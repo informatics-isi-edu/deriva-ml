@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deriva-ml"
+version = "0.0.1"
+authors = [
+    {name = "Your Name", email = "you@yourdomain.com"},
+]
+description = "Utilities to simplify use of Dervia and Pandas"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[metadata]
+license = "Apache 2.0"
+keywords = ["deriva-ml"]
