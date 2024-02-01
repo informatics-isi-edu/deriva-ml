@@ -383,7 +383,7 @@ class DerivaML:
             configuration = json.load(file)
         # check input configuration
         try:
-            self.configuration = ExecutionConfiguration.model_validate(configuration)
+            self.configuration = ExecutionConfiguration.parse_obj(configuration)
             print("Configuration validation successful!")
         except ValidationError as e:
             raise DerivaMLException(f"configuration validation failed: {e}")
