@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 class Process(BaseModel):
@@ -44,5 +44,5 @@ class ExecutionConfiguration(BaseModel):
     process: List[Process]
     workflow: Workflow
     execution: Execution
-    annotation_tag: AnnotationTag
-    diagnosis_tag: DiagnosisTag
+    annotation_tag: Optional[AnnotationTag] = None
+    diagnosis_tag: Optional[DiagnosisTag] = None
