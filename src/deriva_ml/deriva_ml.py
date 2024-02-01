@@ -377,17 +377,17 @@ class DerivaML:
                            [self.schema.Execution.Duration])
 
     def execution_init(self, metadata_rid: str) -> tuple:
-        # Download metadata json file
-        metadata_path = self.download_execution_asset(asset_rid=metadata_rid, dest_dir=str(self.download_path))
-        with open(metadata_path, 'r') as file:
-            metadata = json.load(file)
-        # check input metadata
+        # Download configuration json file
+        configuration_path = self.download_execution_asset(asset_rid=metadata_rid, dest_dir=str(self.download_path))
+        with open(configuration_path, 'r') as file:
+            configuration = json.load(file)
+        # check input configuration
         try:
-            self.configuration = ExecutionConfiguration.parse_obj(metadata)
+            self.configuration = ExecutionConfiguration.parse_obj(configuration)
             print("Configuration validation successful!")
         except ValidationError as e:
-            raise DerivaMLException(f"Metadata validation failed: {e}")
-        metadata_records = {}
+            raise DerivaMLException(f"configuration validation failed: {e}")
+        configuration_records = {}
         # Insert processes
         process = []
         for proc in self.configuration.process:
@@ -404,34 +404,34 @@ class DerivaML:
         # Insert or return Execution
         execution_rid = self.add_execution(self.configuration.execution.name, workflow_rid,
                                            self.configuration.dataset_rid, self.configuration.execution.description)
-        self.update_status(Status.running, "Inserting metadata... ", execution_rid)
-        # build association: execution - metadata asset
+        self.update_status(Status.running, "Inserting configuration... ", execution_rid)
+        # build association: execution - configuration asset
         self._batch_insert(self.schema.Execution_Asset_Execution,
                            [{"Execution_Asset": metadata_rid, "Execution": execution_rid}])
         # Insert tags
-        annot_tag = metadata.get("annotation_tag")
+        annot_tag = configuration.get("annotation_tag")
         if annot_tag is not None:
             annot_tag_rid = self.add_term(table_name='Annotation_Tag', name=annot_tag['name'],
                                           description=annot_tag['description'],
                                           synonyms=annot_tag['synonyms'], exist_ok=True)
-            metadata_records['annotation_tag_rid'] = annot_tag_rid
-        diag_tag = metadata.get("diagnosis_Tag")
+            configuration_records['annotation_tag_rid'] = annot_tag_rid
+        diag_tag = configuration.get("diagnosis_Tag")
         if diag_tag is not None:
             diag_tag_rid = self.add_term(table_name='Diagnosis_Tag', name=diag_tag['name'],
                                          description=diag_tag['description'],
                                          synonyms=diag_tag['synonyms'], exist_ok=True)
-            metadata_records['diagnosis_tag_rid'] = diag_tag_rid
+            configuration_records['diagnosis_tag_rid'] = diag_tag_rid
         # Materialize bdbag
         bdb.configure_logging(force=True)
         bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
         # download model
         model_paths = [self.download_execution_asset(m, execution_rid, dest_dir=str(self.download_path)) for m in
                        self.configuration.models]
-        metadata_records.update(
+        configuration_records.update(
             {"execution": execution_rid, "workflow": workflow_rid, "process": process, "bag_paths": bag_paths,
-             "model_paths": model_paths, 'metadata_path': metadata_path})
+             "model_paths": model_paths, 'configuration_path': configuration_path})
         self.start_time = datetime.now()
-        return metadata_records, DerivaMlExec(self, execution_rid, str(self.upload_path))
+        return configuration_records, DerivaMlExec(self, execution_rid, str(self.upload_path))
 
 
 class DerivaMlExec:
