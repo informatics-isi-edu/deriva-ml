@@ -4,7 +4,7 @@ import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from bdbag import bdbag_api as bdb
-from execution_configuration import ExecutionConfiguration
+from deriva_ml.execution_configuration import ExecutionConfiguration
 from datetime import datetime
 from itertools import islice
 import json
