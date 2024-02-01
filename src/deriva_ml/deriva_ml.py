@@ -16,6 +16,7 @@ from copy import deepcopy
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from pydantic import ValidationError
+from enum import Enum
 
 
 class DerivaMLException(Exception):
@@ -24,7 +25,7 @@ class DerivaMLException(Exception):
         self._msg = msg
 
 
-class Status:
+class Status(Enum):
     running = "Running"
     pending = "Pending"
     completed = "Completed"
@@ -44,7 +45,7 @@ class DerivaML:
         self.configuration = None
 
         self.start_time = datetime.now()
-        self.status = Status.pending
+        self.status = Status.pending.value
         self.download_path = Path("./download/")
         self.upload_path = Path("./ExecutionAssets/")
         self.download_path.mkdir(parents=True, exist_ok=True)
@@ -315,8 +316,8 @@ class DerivaML:
         uploader.cleanup()
         return results
 
-    def update_status(self, new_status: str, status_detail: str, execution_rid: str):
-        self.status = new_status
+    def update_status(self, new_status: Status, status_detail: str, execution_rid: str):
+        self.status = new_status.value
         self._batch_update(self.schema.Execution,
                            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
                            [self.schema.Execution.Status, self.schema.Execution.Status_Detail])
