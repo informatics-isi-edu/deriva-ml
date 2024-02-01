@@ -14,7 +14,7 @@ import requests
 from typing import List, Sequence, Optional
 from copy import deepcopy
 
-from execution_configuration import ExecutionConfiguration
+from deriva_ml.execution_configuration import ExecutionConfiguration
 from pydantic import ValidationError
 
 
