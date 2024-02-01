@@ -12,6 +12,9 @@ description = "Utilities to simplify use of Dervia and Pandas"
 readme = "README.md"
 requires-python = ">=3.8"
 
+[project.scripts]
+deriva-ml-validate-configuration = "deriva_ml.validate_configuration:main"
+
 [metadata]
 license = "Apache 2.0"
 keywords = ["deriva-ml"]

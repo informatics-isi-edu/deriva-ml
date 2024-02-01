@@ -1,4 +1,4 @@
-
+import sys
 import argparse
 import json
 import os
@@ -21,7 +21,7 @@ def instantiate_template(config_file='execution_configuration.json'):
         raise FileExistsError
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(
         prog='execution_config',
         description='Validate and upload a DerivaML execution configuration',
@@ -44,6 +44,10 @@ if __name__ == '__main__':
         with open(args.file, 'r') as file:
             config = json.load(file)
             # check input metadata
-        configuration = ExecutionConfiguration.parse_obj(config)
+            configuration = ExecutionConfiguration.parse_obj(config)
     if args.upload:
         upload_configuration(args.hostname, args.catalog_id)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
