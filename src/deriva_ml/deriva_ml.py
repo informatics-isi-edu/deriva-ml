@@ -376,9 +376,9 @@ class DerivaML:
         self._batch_update(self.schema.Execution, [{"RID": execution_rid, "Duration": duration}],
                            [self.schema.Execution.Duration])
 
-    def execution_init(self, metadata_rid: str) -> tuple:
+    def execution_init(self, configuration_rid: str) -> tuple:
         # Download configuration json file
-        configuration_path = self.download_execution_asset(asset_rid=metadata_rid, dest_dir=str(self.download_path))
+        configuration_path = self.download_execution_asset(asset_rid=configuration_rid, dest_dir=str(self.download_path))
         with open(configuration_path, 'r') as file:
             configuration = json.load(file)
         # check input configuration
@@ -407,7 +407,7 @@ class DerivaML:
         self.update_status(Status.running, "Inserting configuration... ", execution_rid)
         # build association: execution - configuration asset
         self._batch_insert(self.schema.Execution_Asset_Execution,
-                           [{"Execution_Asset": metadata_rid, "Execution": execution_rid}])
+                           [{"Execution_Asset": configuration_rid, "Execution": execution_rid}])
         # Insert tags
         annot_tag = configuration.get("annotation_tag")
         if annot_tag is not None:
