@@ -1,10 +1,10 @@
 import sys
 import argparse
 import json
-import os
-from execution_configuration import ExecutionConfiguration
-from deriva_ml import DerivaML
-from execution_template import execution_template
+from pathlib import Path
+from deriva_ml.execution_configuration import ExecutionConfiguration
+from deriva_ml.deriva_ml import DerivaML
+from deriva_ml.execution_template import execution_template
 
 
 def upload_configuration(hostname: str, catalog_id: str):
@@ -14,7 +14,8 @@ def upload_configuration(hostname: str, catalog_id: str):
 
 def instantiate_template(config_file='execution_configuration.json'):
     # test if the dest file exists, if false, do the copy, or else abort the copy operation.
-    if not os.path.exists(config_file):
+    path = Path(config_file)
+    if not path.exists():
         with open(config_file, "w") as template_file:
             json.dump(execution_template, template_file, indent=4, sort_keys=True)
     else:
@@ -44,7 +45,7 @@ def main():
         with open(args.file, 'r') as file:
             config = json.load(file)
             # check input metadata
-            configuration = ExecutionConfiguration.parse_obj(config)
+            configuration = ExecutionConfiguration.model_validate(config)
     if args.upload:
         upload_configuration(args.hostname, args.catalog_id)
 
