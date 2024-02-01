@@ -4,7 +4,7 @@ import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from bdbag import bdbag_api as bdb
-
+from execution_configuration import ExecutionConfiguration
 from datetime import datetime
 from itertools import islice
 import json
@@ -13,8 +13,6 @@ from pathlib import Path
 import requests
 from typing import List, Sequence, Optional
 from copy import deepcopy
-
-from deriva_ml.execution_configuration import ExecutionConfiguration
 from pydantic import ValidationError
 from enum import Enum
 
@@ -379,12 +377,13 @@ class DerivaML:
 
     def execution_init(self, configuration_rid: str) -> tuple:
         # Download configuration json file
-        configuration_path = self.download_execution_asset(asset_rid=configuration_rid, dest_dir=str(self.download_path))
+        configuration_path = self.download_execution_asset(asset_rid=configuration_rid,
+                                                           dest_dir=str(self.download_path))
         with open(configuration_path, 'r') as file:
             configuration = json.load(file)
         # check input configuration
         try:
-            self.configuration = ExecutionConfiguration.parse_obj(configuration)
+            self.configuration = ExecutionConfiguration.model_validate_json(configuration)
             print("Configuration validation successful!")
         except ValidationError as e:
             raise DerivaMLException(f"configuration validation failed: {e}")

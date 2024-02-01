@@ -1,6 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel
 
+
 class Process(BaseModel):
     name: str
     process_tag_name: str
