@@ -121,12 +121,12 @@ class DerivaML:
 
         github_metadata = self._github_metadata(github_owner, github_repo, github_file_path)
         process_rid = self.add_record(self.schema.Process,
-                                      {'Github_URL': github_metadata["Github_URL"],
+                                      {'URL': github_metadata["Github_URL"],
                                        'Name': process_name,
                                        'Process_Tag': process_tag_rid,
                                        'Description': description,
-                                       'Github_Checksum': github_metadata["Github_Checksum"]},
-                                      "Name", exist_ok)
+                                       'Version': github_metadata["Github_Checksum"]},
+                                       'Name', exist_ok)
         return process_rid
 
     def add_workflow(self, workflow_name: str, description: str = "",
@@ -137,11 +137,11 @@ class DerivaML:
         process_list = process_list or ""
         github_metadata = self._github_metadata(github_owner, github_repo, github_file_path)
         workflow_rid = self.add_record(self.schema.Workflow,
-                                       {'Github_URL': github_metadata["Github_URL"],
+                                       {'URL': github_metadata["Github_URL"],
                                         'Name': workflow_name,
                                         'Description': description,
-                                        'Github_Checksum': github_metadata["Github_Checksum"]},
-                                       'Name', exist_ok)
+                                        'Version': github_metadata["Github_Checksum"]},
+                                        'Name', exist_ok)
         proc_work_entities = self.schema.Workflow_Process.filter(
             self.schema.Workflow_Process.Workflow == workflow_rid).entities()
         proc_work_list = [e['Process'] for e in proc_work_entities]
@@ -155,7 +155,7 @@ class DerivaML:
                                         {'Name': execution_name,
                                          'Description': description,
                                          'Workflow': workflow_rid},
-                                        "Name", exist_ok)
+                                         'Name', exist_ok)
         self._batch_insert(self.schema.Dataset_Execution,
                            [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
