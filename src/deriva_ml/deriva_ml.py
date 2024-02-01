@@ -12,6 +12,7 @@ import pandas as pd
 from pathlib import Path
 import requests
 from typing import List, Sequence, Optional
+from copy import deepcopy
 
 from execution_configuration import ExecutionConfiguration
 from pydantic import ValidationError
@@ -44,8 +45,8 @@ class DerivaML:
 
         self.start_time = datetime.now()
         self.status = Status.pending
-        self.download_path = Path("/content/download/")
-        self.upload_path = Path("/content/ExecutionAssets/")
+        self.download_path = Path("./download/")
+        self.upload_path = Path("./ExecutionAssets/")
         self.download_path.mkdir(parents=True, exist_ok=True)
         self.upload_path.mkdir(parents=True, exist_ok=True)
 
@@ -310,8 +311,8 @@ class DerivaML:
         uploader = GenericUploader(server={"host": self.host_name, "protocol": "https", "catalog_id": self.catalog_id})
         uploader.getUpdatedConfig()
         uploader.scanDirectory(assets_dir)
-        results = uploader.uploadFiles()
-        # uploader.cleanup()
+        results = deepcopy(uploader.uploadFiles())
+        uploader.cleanup()
         return results
 
     def update_status(self, new_status: str, status_detail: str, execution_rid: str):
@@ -393,7 +394,7 @@ class DerivaML:
             proc_rid = self.add_process(proc.name, proc.process_tag_name, proc.description,
                                         proc.owner, proc.repo, proc.file_path, exist_ok=True)
             process.append(proc_rid)
-            # Insert or return Workflow
+        # Insert or return Workflow
         workflow_rid = self.add_workflow(self.configuration.workflow.name,
                                          self.configuration.workflow.description,
                                          self.configuration.workflow.owner,
