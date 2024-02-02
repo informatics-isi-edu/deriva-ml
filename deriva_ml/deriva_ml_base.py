@@ -1,13 +1,15 @@
-from deriva.core import ErmrestCatalog, get_credential, format_exception
+from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote
+from deriva.core.utils import hash_utils, mime_utils
 import deriva.core.ermrest_model as ermrest_model
 import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from bdbag import bdbag_api as bdb
-from deriva_ml.execution_configuration import ExecutionConfiguration
+from execution_configuration import ExecutionConfiguration
 from datetime import datetime
 from itertools import islice
 import json
+import re
 import pandas as pd
 from pathlib import Path
 import requests
@@ -340,6 +342,38 @@ class DerivaML:
                 self._batch_insert(self.schema.Execution_Asset_Execution,
                                    [{"Execution_Asset": asset_rid, "Execution": execution_rid}])
         return file_path
+
+    def upload_execution_configuration(self, config_file: str, desc: str):
+        file_path = Path(config_file)
+        file_name = file_path.name
+        file_size = file_path.stat().st_size
+        try:
+            hs = HatracStore("https", self.host_name, self.credential)
+            md5 = hash_utils.compute_file_hashes(config_file, ['md5'])['md5'][1]
+            sanitized_filename = urlquote(re.sub("[^a-zA-Z0-9_.-]", "_", file_name + "." + md5))
+            hatrac_path = f"/hatrac/deriva_ml/workflow/execution/config/{sanitized_filename}"
+            hatrac_uri = hs.put_obj(hatrac_path,
+                                    config_file,
+                                    md5=md5,
+                                    content_type=mime_utils.guess_content_type(config_file),
+                                    content_disposition="filename*=UTF-8''" + file_name)
+        except Exception as e:
+            error = format_exception(e)
+            raise DerivaMLException(
+                f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
+        try:
+
+            self._batch_insert(self.schema.Execution_Asset,
+                               [{"URL": hatrac_uri,
+                                 "Filename": file_name,
+                                 "Length": file_size,
+                                 "MD5": md5,
+                                 "Description": desc,
+                                 "Execution_Asset_Tag": "2-5N8P"}])  # TODO: Fix this by doing a RID lookup based on an input parameter and add that parameter to the function arguments
+        except Exception as e:
+            error = format_exception(e)
+            raise DerivaMLException(
+                f"Failed to update Execution_Asset table with configuration file metadata. Error: {error}")
 
     def upload_execution_assets(self, execution_rid: str):
         try:
