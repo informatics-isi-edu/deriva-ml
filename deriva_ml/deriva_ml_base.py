@@ -351,8 +351,8 @@ class DerivaML:
         try:
             hs = HatracStore("https", self.host_name, self.credential)
             md5 = hash_utils.compute_file_hashes(config_file, ['md5'])['md5'][1]
-            sanitized_filename = urlquote(re.sub("[^a-zA-Z0-9_.-]", "_", file_name + "." + md5))
-            hatrac_path = f"/hatrac/deriva_ml/workflow/execution/config/{sanitized_filename}"
+            sanitized_filename = urlquote(re.sub("[^a-zA-Z0-9_.-]", "_",  md5 + "." + file_name))
+            hatrac_path = f"/hatrac/execution_metadata/{sanitized_filename}"
             hatrac_uri = hs.put_obj(hatrac_path,
                                     config_file,
                                     md5=md5,
