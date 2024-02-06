@@ -5,7 +5,7 @@ import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from bdbag import bdbag_api as bdb
-from deriva_ml.execution_configuration import ExecutionConfiguration
+from execution_configuration import ExecutionConfiguration
 from datetime import datetime
 from itertools import islice
 import json
@@ -17,6 +17,9 @@ from typing import List, Sequence, Optional
 from copy import deepcopy
 from pydantic import ValidationError
 from enum import Enum
+from urllib.parse import urlparse
+import hashlib
+import pkg_resources
 
 
 class DerivaMLException(Exception):
@@ -46,10 +49,12 @@ class DerivaML:
 
         self.start_time = datetime.now()
         self.status = Status.pending.value
-        self.download_path = Path("./download/")
-        self.upload_path = Path("./ExecutionAssets/")
-        self.download_path.mkdir(parents=True, exist_ok=True)
-        self.upload_path.mkdir(parents=True, exist_ok=True)
+        self.execution_product_path = Path("./Execution_Products/")
+        self.execution_metadata_path = Path("./Execution_Metadata/")
+        # self.download_path.mkdir(parents=True, exist_ok=True)
+        # self.upload_path.mkdir(parents=True, exist_ok=True)
+        self.execution_product_path.mkdir(parents=True, exist_ok=True)
+        self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
     def is_vocabulary(self, table_name: str) -> bool:
         """
@@ -88,7 +93,7 @@ class DerivaML:
                    exist_ok: bool = False) -> str:
         try:
             entities = table.entities()
-            name_list = [e['Name'] for e in entities]
+            name_list = [e[unique_col] for e in entities]
             record_rid = entities[name_list.index(record[unique_col])]['RID']
         except ValueError:
             record_rid = table.insert([record])[0]['RID']
@@ -98,66 +103,27 @@ class DerivaML:
                     f"{record[unique_col]} existed with RID {entities[name_list.index(record[unique_col])]['RID']}")
         return record_rid
 
-    def add_process(self, process_name: str, process_tag_name: str = "", description: str = "",
-                    github_owner: str = "", github_repo: str = "", github_file_path: str = "",
-                    exist_ok: bool = False) -> str:
-        """
-        Add a new process to the catalog.
-
-        Args:
-        - process_name (str): Name of the new process.
-        - github_url (str, optional): GitHub URL associated with the process.
-        - process_tag (str, optional): Tag for the process.
-        - description (str, optional): Description of the process.
-        - github_checksum (str, optional): Checksum of the GitHub repository.
-        - exists_ok (bool, optional):  Optional flag indicating whether to allow creation if the control
-          vocabulary name already exists. Defaults to False.
-
-        Returns:
-        - str: RID (Record ID) of the newly created process.
-
-        Raises:
-        - Exception: If the process already exists and exists_ok is False.
-        """
-        process_tag_rid = self.lookup_term("Process_Tag", process_tag_name)
-
-        github_metadata = self._github_metadata(github_owner, github_repo, github_file_path)
-        process_rid = self.add_record(self.schema.Process,
-                                      {'URL': github_metadata["Github_URL"],
-                                       'Name': process_name,
-                                       'Process_Tag': process_tag_rid,
-                                       'Description': description,
-                                       'Version': github_metadata["Github_Checksum"]},
-                                       'Name', exist_ok)
-        return process_rid
-
-    def add_workflow(self, workflow_name: str, description: str = "",
-                     github_owner: str = "", github_repo: str = "", github_file_path: str = "",
-                     process_list: Optional[List] = None,
+    def add_workflow(self, workflow_name: str, url: str, workflow_type : str,
+                     version: str = "",
+                     description: str = "",
                      exist_ok: bool = False) -> str:
 
-        process_list = process_list or ""
-        github_metadata = self._github_metadata(github_owner, github_repo, github_file_path)
+        workflow_type_rid = self.lookup_term("Workflow_Type", workflow_type)
+        url, checksum = self._get_checksum(url)
         workflow_rid = self.add_record(self.schema.Workflow,
-                                       {'URL': github_metadata["Github_URL"],
+                                       {'URL': url,
                                         'Name': workflow_name,
                                         'Description': description,
-                                        'Version': github_metadata["Github_Checksum"]},
-                                        'Name', exist_ok)
-        proc_work_entities = self.schema.Workflow_Process.filter(
-            self.schema.Workflow_Process.Workflow == workflow_rid).entities()
-        proc_work_list = [e['Process'] for e in proc_work_entities]
-        asso_entities = [{"Process": p, "Workflow": workflow_rid} for p in process_list if p not in proc_work_list]
-        self._batch_insert(self.schema.Workflow_Process, asso_entities)
+                                        'Checksum': checksum,
+                                        'Version': version,
+                                        'Workflow_Type': workflow_type_rid},
+                                        'Checksum', True) #??? checksum doesn't allow duplicate
         return workflow_rid
 
-    def add_execution(self, execution_name: str, workflow_rid: str, datasets: List[str],
-                      description: str = "", exist_ok: bool = False) -> str:
-        execution_rid = self.add_record(self.schema.Execution,
-                                        {'Name': execution_name,
-                                         'Description': description,
-                                         'Workflow': workflow_rid},
-                                         'Name', exist_ok)
+    def add_execution(self, workflow_rid: str, datasets: List[str],
+                      description: str = "") -> str:
+        execution_rid = self.schema.Execution.insert([{'Description': description,
+                                                       'Workflow': workflow_rid}])[0]['RID']
         self._batch_insert(self.schema.Dataset_Execution,
                            [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
@@ -293,15 +259,28 @@ class DerivaML:
             table.update(chunk, [table.RID], update_cols)
 
     @staticmethod
-    def _github_metadata(owner: str, repo: str, file_path: str) -> dict[str, str]:
+    def _get_checksum(url) -> tuple:
         try:
-            response = requests.get(f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}")
+            response = requests.get(url)
             response.raise_for_status()
         except Exception:
-            raise DerivaMLException(f"Invalid GitHub repo for owner: {owner}, repo: {repo}, file_path: {file_path}")
+            raise DerivaMLException(f"Invalid URL: {url}")
         else:
-            github_metadata = response.json()
-            return {"Github_Checksum": github_metadata['sha'], "Github_URL": github_metadata["html_url"]}
+            if urlparse(url).hostname.endswith('github.com'):
+                pattern = r'https://github\.com/([^/]+)/([^/]+)/blob/main/([^*]+)'
+                # Use regex to extract the owner and file path from the GitHub link
+                match = re.match(pattern, url)
+                owner = match.group(1)
+                repo = match.group(2)
+                file_path = match.group(3)
+                metadata_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
+                github_metadata = requests.get(metadata_url).json()
+                checksum = 'sha-256: ' + github_metadata['sha']
+                url = url  # TODO: The commit sha is different from the file sha
+            else:
+                sha256_hash = hashlib.sha256()
+                checksum = 'sha-256: ' + sha256_hash.update(response.content).hexdigest
+            return url, checksum
 
     def download_asset(self, asset_url: str, destfilename: str):
         hs = HatracStore("https", self.host_name, self.credential)
@@ -322,8 +301,8 @@ class DerivaML:
                            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
                            [self.schema.Execution.Status, self.schema.Execution.Status_Detail])
 
-    def download_execution_asset(self, asset_rid: str, execution_rid="", dest_dir: str = "") -> str:
-        asset_metadata = self.schema.Execution_Asset.filter(self.schema.Execution_Asset.RID == asset_rid).entities()[0]
+    def download_execution_product(self, product_rid: str, execution_rid="", dest_dir: str = "") -> str:
+        asset_metadata = self.schema.Execution_Products.filter(self.schema.Execution_Products.RID ==  product_rid).entities()[0]
         asset_url = asset_metadata['URL']
         file_name = asset_metadata['Filename']
         try:
@@ -332,15 +311,37 @@ class DerivaML:
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
-            raise DerivaMLException(f"Faild to download the asset {asset_rid}. Error: {error}")
+            raise DerivaMLException(f"Faild to download the asset {product_rid}. Error: {error}")
 
         if execution_rid != '':
-            asset_exec_entities = self.schema.Execution_Asset_Execution.filter(
-                self.schema.Execution_Asset_Execution.Execution_Asset == asset_rid).entities()
-            exec_list = [e['Execution'] for e in asset_exec_entities]
+            exec_prod_exec_entities = self.schema.Execution_Products_Execution.filter(
+                self.schema.Execution_Products_Execution.Execution_Products == product_rid).entities()
+            exec_list = [e['Execution'] for e in exec_prod_exec_entities]
             if execution_rid not in exec_list:
-                self._batch_insert(self.schema.Execution_Asset_Execution,
-                                   [{"Execution_Asset": asset_rid, "Execution": execution_rid}])
+                self._batch_insert(self.schema.Execution_Products_Execution,
+                                   [{"Execution_Products":  product_rid, "Execution": execution_rid}])
+        return file_path
+    
+    def download_execution_metadata(self, metadata_rid: str, execution_rid="", dest_dir: str = "") -> str:
+        asset_metadata = self.schema.Execution_Metadata.filter(self.schema.Execution_Metadata.RID ==  metadata_rid).entities()[0]
+        asset_url = asset_metadata['URL']
+        file_name = asset_metadata['Filename']
+        try:
+            file_path = self.download_asset(asset_url, str(dest_dir) + '/' + file_name)
+            self.update_status(Status.running, "Downloading assets...", execution_rid)
+        except Exception as e:
+            error = format_exception(e)
+            self.update_status(Status.failed, error, execution_rid)
+            raise DerivaMLException(f"Faild to download the asset {metadata_rid}. Error: {error}")
+
+        if execution_rid != '':
+            exec_metadata_exec_entities = self.schema.Execution_Metadata.filter(
+                self.schema.Execution_Metadata.RID == metadata_rid).entities()
+            exec_list = [e['Execution'] for e in exec_metadata_exec_entities]
+            if execution_rid not in exec_list:
+                self._batch_update(self.Execution_Metadata,
+                                   [{"Execution": execution_rid}],
+                                   [self.schema.Execution_Metadata.Execution])
         return file_path
 
     def upload_execution_configuration(self, config_file: str, desc: str):
@@ -362,43 +363,63 @@ class DerivaML:
             raise DerivaMLException(
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
-
-            self._batch_insert(self.schema.Execution_Asset,
+            execution_metadata_type_rid = self.lookup_term(self.schema.Execution_Metadata_Type, "Execution Config")
+            self._batch_insert(self.schema.Execution_Metadata,
                                [{"URL": hatrac_uri,
                                  "Filename": file_name,
                                  "Length": file_size,
                                  "MD5": md5,
                                  "Description": desc,
-                                 "Execution_Asset_Tag": "2-5N8P"}])  # TODO: Fix this by doing a RID lookup based on an input parameter and add that parameter to the function arguments
+                                 "Execution_Metadata_Type": execution_metadata_type_rid}])  # TODO: Fix this by doing a RID lookup based on an input parameter and add that parameter to the function arguments
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(
                 f"Failed to update Execution_Asset table with configuration file metadata. Error: {error}")
-
-    def upload_execution_assets(self, execution_rid: str):
+    
+    def upload_execution_metadata(self, execution_rid: str):
         try:
-            results = self.upload_assets(str(self.upload_path))
+            results = self.upload_assets(str(self.execution_metadata_path))
             self.update_status(Status.running, "Uploading assets...", execution_rid)
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
             raise DerivaMLException(
-                f"Fail to upload the files in {self.upload_path} to Executoin_Asset table. Error: {error}")
+                f"Fail to upload the files in {self.execution_metadata_path} to Executoin_Metadata table. Error: {error}")
         else:
-            asset_exec_entities = self.schema.Execution_Asset_Execution.filter(
-                self.schema.Execution_Asset_Execution.Execution == execution_rid).entities()
-            assets_list = [e['Execution_Asset'] for e in asset_exec_entities]
+            entities = []
+            for asset in results.values():
+                if asset["State"] == 0 and asset["Result"] is not None:
+                    rid = asset["Result"].get("RID")
+                    entities.append({"Execution_Metadata": rid, "Execution": execution_rid})
+            self._batch_update(self.schema.Execution_Metadata,
+                               entities,
+                               [self.schema.Execution_Metadata.Execution])
+
+    def upload_execution_products(self, execution_rid: str):
+        try:
+            results = self.upload_assets(str(self.execution_product_path))
+            self.update_status(Status.running, "Uploading assets...", execution_rid)
+        except Exception as e:
+            error = format_exception(e)
+            self.update_status(Status.failed, error, execution_rid)
+            raise DerivaMLException(
+                f"Fail to upload the files in {self.execution_product_path} to Executoin_Products table. Error: {error}")
+        else:
+            asset_exec_entities = self.schema.Execution_Products_Execution.filter(
+                self.schema.Execution_Products_Execution.Execution == execution_rid).entities()
+            assets_list = [e['Execution_Products'] for e in asset_exec_entities]
             entities = []
             for asset in results.values():
                 if asset["State"] == 0 and asset["Result"] is not None:
                     rid = asset["Result"].get("RID")
                     if (rid is not None) and (rid not in assets_list):
-                        entities.append({"Execution_Asset": rid, "Execution": execution_rid})
-            self._batch_insert(self.schema.Execution_Asset_Execution, entities)
+                        entities.append({"Execution_Products": rid, "Execution": execution_rid})
+            self._batch_insert(self.schema.Execution_Products_Execution, entities)
         return results
 
     def execution_end(self, execution_rid: str):
-        self.upload_execution_assets(execution_rid)
+        self.upload_execution_products(execution_rid)
+        self.upload_execution_metadata(execution_rid)
 
         duration = datetime.now() - self.start_time
         hours, remainder = divmod(duration.total_seconds(), 3600)
@@ -411,8 +432,8 @@ class DerivaML:
 
     def execution_init(self, configuration_rid: str) -> tuple:
         # Download configuration json file
-        configuration_path = self.download_execution_asset(asset_rid=configuration_rid,
-                                                           dest_dir=str(self.download_path))
+        configuration_path = self.download_execution_metadata(metadata_rid=configuration_rid,
+                                                              dest_dir=str(self.execution_metadata_path ))
         with open(configuration_path, 'r') as file:
             configuration = json.load(file)
         # check input configuration
@@ -422,50 +443,50 @@ class DerivaML:
         except ValidationError as e:
             raise DerivaMLException(f"configuration validation failed: {e}")
         configuration_records = {}
-        # Insert processes
-        process = []
-        for proc in self.configuration.process:
-            proc_rid = self.add_process(proc.name, proc.process_tag_name, proc.description,
-                                        proc.owner, proc.repo, proc.file_path, exist_ok=True)
-            process.append(proc_rid)
-        # Insert or return Workflow
         workflow_rid = self.add_workflow(self.configuration.workflow.name,
+                                         self.configuration.workflow.url,
+                                         self.configuration.workflow.workflow_type,
+                                         self.configuration.workflow.version,
                                          self.configuration.workflow.description,
-                                         self.configuration.workflow.owner,
-                                         self.configuration.workflow.repo,
-                                         self.configuration.workflow.file_path,
-                                         process, exist_ok=True)
+                                         exist_ok=True)
         # Insert or return Execution
-        execution_rid = self.add_execution(self.configuration.execution.name, workflow_rid,
-                                           self.configuration.dataset_rid, self.configuration.execution.description)
+        execution_rid = self.add_execution(workflow_rid,
+                                           self.configuration.dataset_rid, 
+                                           self.configuration.execution.description)
         self.update_status(Status.running, "Inserting configuration... ", execution_rid)
-        # build association: execution - configuration asset
-        self._batch_insert(self.schema.Execution_Asset_Execution,
-                           [{"Execution_Asset": configuration_rid, "Execution": execution_rid}])
         # Insert tags
         annot_tag = configuration.get("annotation_tag")
         if annot_tag is not None:
-            annot_tag_rid = self.add_term(table_name='Annotation_Tag', name=annot_tag['name'],
+            annot_tag_rid = self.add_term(table_name='Annotation_Tag',
+                                          name=annot_tag['name'],
                                           description=annot_tag['description'],
-                                          synonyms=annot_tag['synonyms'], exist_ok=True)
+                                          synonyms=annot_tag['synonyms'],
+                                          exist_ok=True)
             configuration_records['annotation_tag_rid'] = annot_tag_rid
         diag_tag = configuration.get("diagnosis_Tag")
         if diag_tag is not None:
-            diag_tag_rid = self.add_term(table_name='Diagnosis_Tag', name=diag_tag['name'],
+            diag_tag_rid = self.add_term(table_name='Diagnosis_Tag',
+                                         name=diag_tag['name'],
                                          description=diag_tag['description'],
-                                         synonyms=diag_tag['synonyms'], exist_ok=True)
+                                         synonyms=diag_tag['synonyms'],
+                                         exist_ok=True)
             configuration_records['diagnosis_tag_rid'] = diag_tag_rid
         # Materialize bdbag
         bdb.configure_logging(force=True)
         bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
         # download model
-        model_paths = [self.download_execution_asset(m, execution_rid, dest_dir=str(self.download_path)) for m in
+        model_paths = [self.download_execution_product(m, execution_rid, dest_dir=str(self.execution_product_path)) for m in
                        self.configuration.models]
         configuration_records.update(
-            {"execution": execution_rid, "workflow": workflow_rid, "process": process, "bag_paths": bag_paths,
+            {"execution": execution_rid, "workflow": workflow_rid, "bag_paths": bag_paths,
              "model_paths": model_paths, 'configuration_path': configuration_path})
+        # save runtime env
+        runtime_env_file = str(self.execution_metadata_path)+'/Runtime_Env-python_environment_snapshot.txt'
+        with open(runtime_env_file, 'w') as file:
+            for package in pkg_resources.working_set:
+                file.write(str(package) + "\n")
         self.start_time = datetime.now()
-        return configuration_records, DerivaMlExec(self, execution_rid, str(self.upload_path))
+        return configuration_records, DerivaMlExec(self, execution_rid, str(self.execution_product_path))
 
 
 class DerivaMlExec:

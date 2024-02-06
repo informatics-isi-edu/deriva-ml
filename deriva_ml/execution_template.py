@@ -5,33 +5,14 @@ execution_template = {
     "bdbag_url": ["minid:oLkKfQWmEfXw"],
     "models": ["2-5MWA"],
     
-    "process": [
-        {
-            "name": "Test process1",
-            "process_tag_name": "Notebook Cropping Test",
-            "description": "Test new workflow process",
-            "owner": "sree369nidhi",
-            "repo": "ISI_EYE_AI",
-            "file_path": "Glaucoma%20Suspect%20or%20No%20Glaaucoma/Cleaned_Optic_Disc_Cropping_Algorithm_1_0_3_SVG.py"
-        },
-        {
-            "name": "Test process2",
-            "process_tag_name": "Notebook Cropping Test",
-            "description": "Test new workflow process",
-            "owner": "sree369nidhi",
-            "repo": "ISI_EYE_AI",
-            "file_path": "Glaucoma%20Suspect%20or%20No%20Glaaucoma/Cleaned_Optic_Disc_Cropping_Algorithm_1_0_3.py"
-        }
-        ],
     "workflow": {
-        "name": "Test workflow",
-        "description": "Test new workflow process",
-        "owner": "sree369nidhi",
-        "repo": "ISI_EYE_AI",
-        "file_path": "Glaucoma%20Suspect%20or%20No%20Glaaucoma/Crop_Detector_1_0_0.py"
+        "name" : "Test workflow",
+        "url": "https://github.com/informatics-isi-edu/eye-ai-tools/blob/main/notebooks/Eye_ai_workflow_temp.ipynb",
+        "workflow_type": "Image Cropping",
+        "version": "0.01",
+        "description": "Test"
     },
     "execution": {
-        "name": "Test execution",
         "description": "Test new workflow process"
     },
 
