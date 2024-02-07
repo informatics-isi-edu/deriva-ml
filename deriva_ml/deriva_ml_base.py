@@ -390,7 +390,9 @@ class DerivaML:
             for asset in results.values():
                 if asset["State"] == 0 and asset["Result"] is not None:
                     rid = asset["Result"].get("RID")
-                    entities.append({"Execution_Metadata": rid, "Execution": execution_rid})
+                    print(rid)
+                    if rid is not None:
+                        entities.append({"RID": rid, "Execution": execution_rid})
             self._batch_update(self.schema.Execution_Metadata,
                                entities,
                                [self.schema.Execution_Metadata.Execution])
@@ -418,7 +420,7 @@ class DerivaML:
         return results
 
     def execution_end(self, execution_rid: str):
-        self.upload_execution_products(execution_rid)
+        # self.upload_execution_products(execution_rid)
         self.upload_execution_metadata(execution_rid)
 
         duration = datetime.now() - self.start_time
