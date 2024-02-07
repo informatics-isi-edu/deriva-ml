@@ -35,6 +35,22 @@ class Status(Enum):
     failed = "Failed"
 
 
+class DerivaMlExec:
+    def __init__(self, catalog_ml, execution_rid: str, assets_dir: str):
+        self.execution_rid = execution_rid
+        self.catalog_ml = catalog_ml
+        self.assets_dir = assets_dir
+        self.catalog_ml.start_time = datetime.now()
+
+    def __enter__(self):
+        return self.execution_rid
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        print(f"Exeption type: {exc_type}, Exeption value: {exc_value}, Exeption traceback: {exc_tb}")
+        self.catalog_ml.execution_end(self.execution_rid)
+        return True
+
+
 class DerivaML:
     def __init__(self, hostname: str, catalog_id: str, schema_name):
         self.credential = get_credential(hostname)
@@ -51,8 +67,6 @@ class DerivaML:
         self.status = Status.pending.value
         self.execution_product_path = Path("./Execution_Products/")
         self.execution_metadata_path = Path("./Execution_Metadata/")
-        # self.download_path.mkdir(parents=True, exist_ok=True)
-        # self.upload_path.mkdir(parents=True, exist_ok=True)
         self.execution_product_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
@@ -109,7 +123,7 @@ class DerivaML:
                      exist_ok: bool = False) -> str:
 
         workflow_type_rid = self.lookup_term("Workflow_Type", workflow_type)
-        url, checksum = self._get_checksum(url)
+        checksum = self._get_checksum(url)
         workflow_rid = self.add_record(self.schema.Workflow,
                                        {'URL': url,
                                         'Name': workflow_name,
@@ -117,7 +131,7 @@ class DerivaML:
                                         'Checksum': checksum,
                                         'Version': version,
                                         'Workflow_Type': workflow_type_rid},
-                                        'Checksum', True) #??? checksum doesn't allow duplicate
+                                        'Checksum', True)
         return workflow_rid
 
     def add_execution(self, workflow_rid: str, datasets: List[str],
@@ -259,28 +273,16 @@ class DerivaML:
             table.update(chunk, [table.RID], update_cols)
 
     @staticmethod
-    def _get_checksum(url) -> tuple:
+    def _get_checksum(url) -> str:
         try:
             response = requests.get(url)
             response.raise_for_status()
         except Exception:
             raise DerivaMLException(f"Invalid URL: {url}")
         else:
-            if urlparse(url).hostname.endswith('github.com'):
-                pattern = r'https://github\.com/([^/]+)/([^/]+)/blob/main/([^*]+)'
-                # Use regex to extract the owner and file path from the GitHub link
-                match = re.match(pattern, url)
-                owner = match.group(1)
-                repo = match.group(2)
-                file_path = match.group(3)
-                metadata_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
-                github_metadata = requests.get(metadata_url).json()
-                checksum = 'sha-256: ' + github_metadata['sha']
-                url = url  # TODO: The commit sha is different from the file sha
-            else:
-                sha256_hash = hashlib.sha256()
-                checksum = 'sha-256: ' + sha256_hash.update(response.content).hexdigest
-            return url, checksum
+            sha256_hash = hashlib.sha256()
+            checksum = 'SHA-256: ' + sha256_hash.update(response.content).hexdigest
+        return checksum
 
     def download_asset(self, asset_url: str, destfilename: str):
         hs = HatracStore("https", self.host_name, self.credential)
@@ -419,7 +421,7 @@ class DerivaML:
         return results
 
     def execution_end(self, execution_rid: str):
-        # self.upload_execution_products(execution_rid)
+        self.upload_execution_products(execution_rid)
         self.upload_execution_metadata(execution_rid)
 
         duration = datetime.now() - self.start_time
@@ -431,7 +433,7 @@ class DerivaML:
         self._batch_update(self.schema.Execution, [{"RID": execution_rid, "Duration": duration}],
                            [self.schema.Execution.Duration])
 
-    def execution_init(self, configuration_rid: str) -> tuple:
+    def execution_init(self, configuration_rid: str) -> dict:
         # Download configuration json file
         configuration_path = self.download_execution_metadata(metadata_rid=configuration_rid,
                                                               dest_dir=str(self.execution_metadata_path ))
@@ -487,20 +489,8 @@ class DerivaML:
             for package in pkg_resources.working_set:
                 file.write(str(package) + "\n")
         self.start_time = datetime.now()
-        return configuration_records, DerivaMlExec(self, execution_rid, str(self.execution_product_path))
+        return configuration_records
 
+    def start_execution(self, execution_rid: str) -> DerivaMlExec:
+        return DerivaMlExec(self, execution_rid, str(self.execution_product_path))
 
-class DerivaMlExec:
-    def __init__(self, catalog_ml, execution_rid: str, assets_dir: str):
-        self.execution_rid = execution_rid
-        self.catalog_ml = catalog_ml
-        self.assets_dir = assets_dir
-        self.catalog_ml.start_time = datetime.now()
-
-    def __enter__(self):
-        return self.execution_rid
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        print(f"Exeption type: {exc_type}, Exeption value: {exc_value}, Exeption traceback: {exc_tb}")
-        self.catalog_ml.execution_end(self.execution_rid)
-        return True
