@@ -281,7 +281,8 @@ class DerivaML:
             raise DerivaMLException(f"Invalid URL: {url}")
         else:
             sha256_hash = hashlib.sha256()
-            checksum = 'SHA-256: ' + sha256_hash.update(response.content).hexdigest
+            sha256_hash.update(response.content)
+            checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
 
     def download_asset(self, asset_url: str, destfilename: str):
