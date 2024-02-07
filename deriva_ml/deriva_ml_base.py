@@ -390,7 +390,6 @@ class DerivaML:
             for asset in results.values():
                 if asset["State"] == 0 and asset["Result"] is not None:
                     rid = asset["Result"].get("RID")
-                    print(rid)
                     if rid is not None:
                         entities.append({"RID": rid, "Execution": execution_rid})
             self._batch_update(self.schema.Execution_Metadata,
