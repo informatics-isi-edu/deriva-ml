@@ -1,5 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel
+from enum import Enum
 
 
 class Workflow(BaseModel):
@@ -14,16 +15,15 @@ class Execution(BaseModel):
     description: str
 
 
-class AnnotationTag(BaseModel):
-    name: str
-    description: str
-    synonyms: List[str] = []
+class Tag(str, Enum):
+    annotation = "Annotation_Tag"
+    diagnosis = "Diagnosis_Tag"
 
 
-class DiagnosisTag(BaseModel):
+class WorkflowTag(BaseModel):
+    tag: Tag
     name: str
     description: str
-    synonyms: List[str] = []
 
 
 class ExecutionConfiguration(BaseModel):
@@ -34,5 +34,4 @@ class ExecutionConfiguration(BaseModel):
     models: List[str]
     workflow: Workflow
     execution: Execution
-    annotation_tag: Optional[AnnotationTag] = None
-    diagnosis_tag: Optional[DiagnosisTag] = None
+    workflow_tags: List[WorkflowTag]

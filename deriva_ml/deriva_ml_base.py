@@ -5,7 +5,7 @@ import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from bdbag import bdbag_api as bdb
-from deriva_ml.execution_configuration import ExecutionConfiguration
+from execution_configuration import ExecutionConfiguration
 from datetime import datetime
 from itertools import islice
 import json
@@ -459,22 +459,30 @@ class DerivaML:
                                            self.configuration.execution.description)
         self.update_status(Status.running, "Inserting configuration... ", execution_rid)
         # Insert tags
-        annot_tag = configuration.get("annotation_tag")
-        if annot_tag is not None:
-            annot_tag_rid = self.add_term(table_name='Annotation_Tag',
-                                          name=annot_tag['name'],
-                                          description=annot_tag['description'],
-                                          synonyms=annot_tag['synonyms'],
+        for tag in configuration.get("workflow_tags"):
+            annot_tag_rid = self.add_term(table_name=tag["tag"],
+                                          name=tag["name"],
+                                          description=tag["description"],
                                           exist_ok=True)
-            configuration_records['annotation_tag_rid'] = annot_tag_rid
-        diag_tag = configuration.get("diagnosis_Tag")
-        if diag_tag is not None:
-            diag_tag_rid = self.add_term(table_name='Diagnosis_Tag',
-                                         name=diag_tag['name'],
-                                         description=diag_tag['description'],
-                                         synonyms=diag_tag['synonyms'],
-                                         exist_ok=True)
-            configuration_records['diagnosis_tag_rid'] = diag_tag_rid
+            configuration_records[tag["tag"]] = annot_tag_rid
+        # annot_tag = configuration.get("annotation_tag")
+        # if annot_tag is not None:
+        #     annot_tag_rid = self.add_term(table_name='Annotation_Tag',
+        #                                   name=annot_tag['name'],
+        #                                   description=annot_tag['description'],
+        #                                   synonyms=annot_tag['synonyms'],
+        #                                   exist_ok=True)
+        #     configuration_records['annotation_tag_rid'] = annot_tag_rid
+        # diag_tag = configuration.get("diagnosis_Tag")
+        # if diag_tag is not None:
+        #     diag_tag_rid = self.add_term(table_name='Diagnosis_Tag',
+        #                                  name=diag_tag['name'],
+        #                                  description=diag_tag['description'],
+        #                                  synonyms=diag_tag['synonyms'],
+        #                                  exist_ok=True)
+        #     configuration_records['diagnosis_tag_rid'] = diag_tag_rid
+
+
         # Materialize bdbag
         bdb.configure_logging(force=True)
         bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
