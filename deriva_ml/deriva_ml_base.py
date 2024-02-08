@@ -131,7 +131,7 @@ class DerivaML:
                                         'Checksum': checksum,
                                         'Version': version,
                                         'Workflow_Type': workflow_type_rid},
-                                        'Checksum', True)
+                                        'URL', True)
         return workflow_rid
 
     def add_execution(self, workflow_rid: str, datasets: List[str],
