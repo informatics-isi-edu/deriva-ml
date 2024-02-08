@@ -5,7 +5,7 @@ import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from bdbag import bdbag_api as bdb
-from deriva_ml.execution_configuration import ExecutionConfiguration
+from execution_configuration import ExecutionConfiguration
 from datetime import datetime
 from itertools import islice
 import json
@@ -464,7 +464,12 @@ class DerivaML:
                                           name=tag["name"],
                                           description=tag["description"],
                                           exist_ok=True)
-            configuration_records[tag["tag"]] = annot_tag_rid
+            tag_records = configuration_records.get(tag["tag"], [])
+            tag_records.append({"name": tag["name"], "RID": annot_tag_rid})
+            configuration_records[tag["tag"]] = tag_records
+            # print({"name": tag["name"], "RID": annot_tag_rid})
+            # configuration_records[tag["tag"]] = configuration_records.get(tag["tag"], []).append({"name": tag["name"], "RID": annot_tag_rid})
+            # configuration_records[tag["tag"]] = annot_tag_rid
 
         # Materialize bdbag
         bdb.configure_logging(force=True)
