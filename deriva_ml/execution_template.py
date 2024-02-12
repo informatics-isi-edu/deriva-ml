@@ -15,12 +15,12 @@ execution_template = {
     "execution": {
         "description": "Test new workflow process"
     },
-    "workflow_tags": [
-        {"tag": "Annotation_Tag",
+    "workflow_terms": [
+        {"term": "Annotation_Type",
          "name": "Test new library",
          "description": "Test new workflow process"
         },
-        {"tag": "Diagnosis_Tag",
+        {"term": "Diagnosis_Tag",
          "name": "Test new library",
          "description": "Test new workflow process"
         }

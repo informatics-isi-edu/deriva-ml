@@ -15,13 +15,13 @@ class Execution(BaseModel):
     description: str
 
 
-class Tag(str, Enum):
-    annotation = "Annotation_Tag"
+class Term(str, Enum):
+    annotation = "Annotation_Type"
     diagnosis = "Diagnosis_Tag"
 
 
-class WorkflowTag(BaseModel):
-    tag: Tag
+class WorkflowTerm(BaseModel):
+    term: Term
     name: str
     description: str
 
@@ -34,4 +34,4 @@ class ExecutionConfiguration(BaseModel):
     models: List[str]
     workflow: Workflow
     execution: Execution
-    workflow_tags: List[WorkflowTag]
+    workflow_terms: List[WorkflowTerm]

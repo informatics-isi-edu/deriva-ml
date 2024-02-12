@@ -5,7 +5,8 @@ import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from bdbag import bdbag_api as bdb
-from deriva_ml.execution_configuration import ExecutionConfiguration
+# from deriva_ml.execution_configuration import ExecutionConfiguration
+from execution_configuration import ExecutionConfiguration
 from datetime import datetime
 from itertools import islice
 import json
@@ -36,10 +37,9 @@ class Status(Enum):
 
 
 class DerivaMlExec:
-    def __init__(self, catalog_ml, execution_rid: str, assets_dir: str):
+    def __init__(self, catalog_ml, execution_rid: str):
         self.execution_rid = execution_rid
         self.catalog_ml = catalog_ml
-        self.assets_dir = assets_dir
         self.catalog_ml.start_time = datetime.now()
 
     def __enter__(self):
@@ -65,9 +65,9 @@ class DerivaML:
 
         self.start_time = datetime.now()
         self.status = Status.pending.value
-        self.execution_product_path = Path("./Execution_Products/")
+        self.execution_assets_path = Path("./Execution_Assets/")
         self.execution_metadata_path = Path("./Execution_Metadata/")
-        self.execution_product_path.mkdir(parents=True, exist_ok=True)
+        self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
     def is_vocabulary(self, table_name: str) -> bool:
@@ -304,8 +304,8 @@ class DerivaML:
                            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
                            [self.schema.Execution.Status, self.schema.Execution.Status_Detail])
 
-    def download_execution_product(self, product_rid: str, execution_rid="", dest_dir: str = "") -> str:
-        asset_metadata = self.schema.Execution_Products.filter(self.schema.Execution_Products.RID ==  product_rid).entities()[0]
+    def download_execution_assets(self, asset_rid: str, execution_rid="", dest_dir: str = "") -> str:
+        asset_metadata = self.schema.Execution_Assets.filter(self.schema.Execution_Assets.RID ==  asset_rid).entities()[0]
         asset_url = asset_metadata['URL']
         file_name = asset_metadata['Filename']
         try:
@@ -314,15 +314,15 @@ class DerivaML:
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
-            raise DerivaMLException(f"Faild to download the asset {product_rid}. Error: {error}")
+            raise DerivaMLException(f"Faild to download the asset {asset_rid}. Error: {error}")
 
         if execution_rid != '':
-            exec_prod_exec_entities = self.schema.Execution_Products_Execution.filter(
-                self.schema.Execution_Products_Execution.Execution_Products == product_rid).entities()
+            exec_prod_exec_entities = self.schema.Execution_Assets_Execution.filter(
+                self.schema.Execution_Assets_Execution.Execution_Assets == asset_rid).entities()
             exec_list = [e['Execution'] for e in exec_prod_exec_entities]
             if execution_rid not in exec_list:
-                self._batch_insert(self.schema.Execution_Products_Execution,
-                                   [{"Execution_Products":  product_rid, "Execution": execution_rid}])
+                self._batch_insert(self.schema.Execution_Assets_Execution,
+                                   [{"Execution_Assets":  asset_rid, "Execution": execution_rid}])
         return file_path
     
     def download_execution_metadata(self, metadata_rid: str, execution_rid="", dest_dir: str = "") -> str:
@@ -331,7 +331,7 @@ class DerivaML:
         file_name = asset_metadata['Filename']
         try:
             file_path = self.download_asset(asset_url, str(dest_dir) + '/' + file_name)
-            self.update_status(Status.running, "Downloading assets...", execution_rid)
+            self.update_status(Status.running, "Downloading metadata...", execution_rid)
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
@@ -398,27 +398,30 @@ class DerivaML:
             self._batch_update(self.schema.Execution_Metadata,
                                entities,
                                [self.schema.Execution_Metadata.Execution])
-
-    def upload_execution_products(self, execution_rid: str):
-        try:
-            results = self.upload_assets(str(self.execution_product_path))
-            self.update_status(Status.running, "Uploading assets...", execution_rid)
-        except Exception as e:
-            error = format_exception(e)
-            self.update_status(Status.failed, error, execution_rid)
-            raise DerivaMLException(
-                f"Fail to upload the files in {self.execution_product_path} to Executoin_Products table. Error: {error}")
-        else:
-            asset_exec_entities = self.schema.Execution_Products_Execution.filter(
-                self.schema.Execution_Products_Execution.Execution == execution_rid).entities()
-            assets_list = [e['Execution_Products'] for e in asset_exec_entities]
-            entities = []
-            for asset in results.values():
-                if asset["State"] == 0 and asset["Result"] is not None:
-                    rid = asset["Result"].get("RID")
-                    if (rid is not None) and (rid not in assets_list):
-                        entities.append({"Execution_Products": rid, "Execution": execution_rid})
-            self._batch_insert(self.schema.Execution_Products_Execution, entities)
+    
+    def upload_execution_products(self, execution_rid: str) -> dict:
+        for folder_path in self.execution_assets_path.iterdir():
+            results = {}
+            if folder_path.is_dir():
+                try:
+                    result = self.upload_assets(str(folder_path))
+                    self.update_status(Status.running, "Uploading assets...", execution_rid)
+                except Exception as e:
+                    error = format_exception(e)
+                    self.update_status(Status.failed, error, execution_rid)
+                    raise DerivaMLException(f"Fail to upload the files in {self.folder_path} to Executoin_Assets table. Error: {error}")
+                else:
+                    asset_exec_entities = self.schema.Execution_Assets_Execution.filter(
+                    self.schema.Execution_Assets_Execution.Execution == execution_rid).entities()
+                    assets_list = [e['Execution_Assets'] for e in asset_exec_entities]
+                    entities = []
+                    for asset in result.values():
+                        if asset["State"] == 0 and asset["Result"] is not None:
+                            rid = asset["Result"].get("RID")
+                            if (rid is not None) and (rid not in assets_list):
+                                entities.append({"Execution_Assets": rid, "Execution": execution_rid})
+                    self._batch_insert(self.schema.Execution_Assets_Execution, entities)
+                    results[str(folder_path)] = result
         return results
 
     def execution_end(self, execution_rid: str):
@@ -458,20 +461,20 @@ class DerivaML:
                                            self.configuration.dataset_rid, 
                                            self.configuration.execution.description)
         self.update_status(Status.running, "Inserting configuration... ", execution_rid)
-        # Insert tags
-        for tag in configuration.get("workflow_tags"):
-            annot_tag_rid = self.add_term(table_name=tag["tag"],
-                                          name=tag["name"],
-                                          description=tag["description"],
+        # Insert terms
+        for term in configuration.get("workflow_terms"):
+            term_rid = self.add_term(table_name=term["term"],
+                                          name=term["name"],
+                                          description=term["description"],
                                           exist_ok=True)
-            tag_records = configuration_records.get(tag["tag"], [])
-            tag_records.append({"name": tag["name"], "RID": annot_tag_rid})
-            configuration_records[tag["tag"]] = tag_records
+            term_records = configuration_records.get(term["term"], [])
+            term_records.append({"name": term["name"], "RID": term_rid})
+            configuration_records[term["term"]] = term_records
         # Materialize bdbag
         bdb.configure_logging(force=True)
         bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
         # download model
-        model_paths = [self.download_execution_product(m, execution_rid, dest_dir=str(self.execution_product_path)) for m in
+        model_paths = [self.download_execution_assets(m, execution_rid, dest_dir=str(self.execution_assets_path)) for m in
                        self.configuration.models]
         configuration_records.update(
             {"execution": execution_rid, "workflow": workflow_rid, "bag_paths": bag_paths,
@@ -485,5 +488,5 @@ class DerivaML:
         return configuration_records
 
     def start_execution(self, execution_rid: str) -> DerivaMlExec:
-        return DerivaMlExec(self, execution_rid, str(self.execution_product_path))
+        return DerivaMlExec(self, execution_rid)
 
