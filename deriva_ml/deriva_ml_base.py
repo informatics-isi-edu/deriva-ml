@@ -40,7 +40,7 @@ class DerivaMlExec:
         self.execution_rid = execution_rid
         self.catalog_ml = catalog_ml
         self.catalog_ml.start_time = datetime.now()
-        self.upladed_assets = None
+        self.uploded_assets = None
 
     def __enter__(self):
         return self
