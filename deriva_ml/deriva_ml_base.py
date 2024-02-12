@@ -40,13 +40,14 @@ class DerivaMlExec:
         self.execution_rid = execution_rid
         self.catalog_ml = catalog_ml
         self.catalog_ml.start_time = datetime.now()
+        self.upladed_assets = None
 
     def __enter__(self):
-        return self.execution_rid
+        return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         print(f"Exeption type: {exc_type}, Exeption value: {exc_value}, Exeption traceback: {exc_tb}")
-        self.catalog_ml.execution_end(self.execution_rid)
+        self.uploded_assets = self.catalog_ml.execution_end(self.execution_rid)
         return True
 
 
@@ -398,7 +399,7 @@ class DerivaML:
                                entities,
                                [self.schema.Execution_Metadata.Execution])
     
-    def upload_execution_products(self, execution_rid: str) -> dict:
+    def upload_execution_assets(self, execution_rid: str) -> dict:
         for folder_path in self.execution_assets_path.iterdir():
             results = {}
             if folder_path.is_dir():
@@ -424,7 +425,7 @@ class DerivaML:
         return results
 
     def execution_end(self, execution_rid: str):
-        self.upload_execution_products(execution_rid)
+        uploded_assets = self.upload_execution_assets(execution_rid)
         self.upload_execution_metadata(execution_rid)
 
         duration = datetime.now() - self.start_time
@@ -435,6 +436,7 @@ class DerivaML:
         self.update_status(Status.completed, "Execution ended.", execution_rid)
         self._batch_update(self.schema.Execution, [{"RID": execution_rid, "Duration": duration}],
                            [self.schema.Execution.Duration])
+        return uploded_assets
 
     def execution_init(self, configuration_rid: str) -> dict:
         # Download configuration json file
