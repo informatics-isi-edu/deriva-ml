@@ -40,14 +40,14 @@ class DerivaMlExec:
         self.execution_rid = execution_rid
         self.catalog_ml = catalog_ml
         self.catalog_ml.start_time = datetime.now()
-        self.uploded_assets = None
+        self.uploaded_assets = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         print(f"Exeption type: {exc_type}, Exeption value: {exc_value}, Exeption traceback: {exc_tb}")
-        self.uploded_assets = self.catalog_ml.execution_end(self.execution_rid)
+        self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
         return True
 
 
