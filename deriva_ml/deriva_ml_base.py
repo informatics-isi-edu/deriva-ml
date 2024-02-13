@@ -451,6 +451,16 @@ class DerivaML:
         except ValidationError as e:
             raise DerivaMLException(f"configuration validation failed: {e}")
         configuration_records = {}
+        # Insert terms
+        for term in configuration.get("workflow_terms"):
+            term_rid = self.add_term(table_name=term["term"],
+                                          name=term["name"],
+                                          description=term["description"],
+                                          exist_ok=True)
+            term_records = configuration_records.get(term["term"], [])
+            term_records.append({"name": term["name"], "RID": term_rid})
+            configuration_records[term["term"]] = term_records
+        # Insert workflow
         workflow_rid = self.add_workflow(self.configuration.workflow.name,
                                          self.configuration.workflow.url,
                                          self.configuration.workflow.workflow_type,
@@ -462,15 +472,6 @@ class DerivaML:
                                            self.configuration.dataset_rid, 
                                            self.configuration.execution.description)
         self.update_status(Status.running, "Inserting configuration... ", execution_rid)
-        # Insert terms
-        for term in configuration.get("workflow_terms"):
-            term_rid = self.add_term(table_name=term["term"],
-                                          name=term["name"],
-                                          description=term["description"],
-                                          exist_ok=True)
-            term_records = configuration_records.get(term["term"], [])
-            term_records.append({"name": term["name"], "RID": term_rid})
-            configuration_records[term["term"]] = term_records
         # Materialize bdbag
         bdb.configure_logging(force=True)
         bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
