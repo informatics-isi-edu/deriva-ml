@@ -17,6 +17,7 @@ class Execution(BaseModel):
 
 class Term(str, Enum):
     annotation = "Annotation_Type"
+    workflow = "Workflow_Type"
     diagnosis = "Diagnosis_Tag"
 
 
