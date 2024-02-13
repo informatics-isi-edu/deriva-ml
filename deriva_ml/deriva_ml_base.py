@@ -284,6 +284,24 @@ class DerivaML:
             sha256_hash.update(response.content)
             checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
+    
+    def materialize_bdbag(self, minid: str) -> tuple:
+        bag_dir = Path(f"./bag-{minid}/")
+        bag_dir.mkdir(parents=True, exist_ok=True)
+        bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
+        if len(bags) == 0:
+            bag_path = bdb.materialize(minid, bag_dir)
+        else:
+            isbag = [bdb.is_bag(bag) for bag in bags]
+            if sum(isbag) == 0:
+                raise DerivaMLException(f'Invalid bag directory: {bag_dir}')
+            else:
+                bag_path = bags[isbag.index(True)]
+                bdb.materialize(bag_path)
+        match = re.search(r'Dataset_([A-Za-z0-9-]+)', bag_path)
+        if match:
+            dataset_rid = match.group(1)
+        return bag_path, dataset_rid
 
     def download_asset(self, asset_url: str, destfilename: str):
         hs = HatracStore("https", self.host_name, self.credential)
@@ -461,14 +479,12 @@ class DerivaML:
             term_records.append({"name": term["name"], "RID": term_rid})
             configuration_records[term["term"]] = term_records
         # Materialize bdbag
-        bdb.configure_logging(force=True)
-        bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
-        # Extract the dataset rid
-        dataset_rid = []
-        for bpath in bag_paths:
-            match = re.search(r'Dataset_([A-Za-z0-9-]+)', bpath)
-            if match:
-                dataset_rid.append(match.group(1))
+        dataset_rids = []
+        bag_paths = []
+        for url in self.configuration.bdbag_url:
+            bag_path, dataset_rid = self.materialize_bdbag(url)
+            dataset_rids.append(dataset_rid)
+            bag_paths.append(bag_path)
         # Insert workflow
         workflow_rid = self.add_workflow(self.configuration.workflow.name,
                                          self.configuration.workflow.url,
@@ -478,7 +494,7 @@ class DerivaML:
                                          exist_ok=True)
         # Insert or return Execution
         execution_rid = self.add_execution(workflow_rid,
-                                           dataset_rid, 
+                                           dataset_rids, 
                                            self.configuration.execution.description)
         self.update_status(Status.running, "Inserting configuration... ", execution_rid)
 
