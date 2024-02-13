@@ -1,7 +1,6 @@
 execution_template = {
     "host": "eye-ai.org",
     "catalog_id": "eye-ai",
-    "dataset_rid": ["2-5K2C"],
     "bdbag_url": ["minid:oLkKfQWmEfXw"],
     "models": ["2-5MWA"],
     

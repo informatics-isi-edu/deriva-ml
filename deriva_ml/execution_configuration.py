@@ -30,7 +30,6 @@ class WorkflowTerm(BaseModel):
 class ExecutionConfiguration(BaseModel):
     host: str
     catalog_id: str
-    dataset_rid: List[str]
     bdbag_url: List[str]
     models: List[str]
     workflow: Workflow

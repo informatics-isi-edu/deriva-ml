@@ -460,6 +460,15 @@ class DerivaML:
             term_records = configuration_records.get(term["term"], [])
             term_records.append({"name": term["name"], "RID": term_rid})
             configuration_records[term["term"]] = term_records
+        # Materialize bdbag
+        bdb.configure_logging(force=True)
+        bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
+        # Extract the dataset rid
+        dataset_rid = []
+        for bpath in bag_paths:
+            match = re.search(r'Dataset_([A-Za-z0-9-]+)', bpath)
+            if match:
+                dataset_rid.append(match.group(1))
         # Insert workflow
         workflow_rid = self.add_workflow(self.configuration.workflow.name,
                                          self.configuration.workflow.url,
@@ -469,12 +478,10 @@ class DerivaML:
                                          exist_ok=True)
         # Insert or return Execution
         execution_rid = self.add_execution(workflow_rid,
-                                           self.configuration.dataset_rid, 
+                                           dataset_rid, 
                                            self.configuration.execution.description)
         self.update_status(Status.running, "Inserting configuration... ", execution_rid)
-        # Materialize bdbag
-        bdb.configure_logging(force=True)
-        bag_paths = [bdb.materialize(url) for url in self.configuration.bdbag_url]
+
         # download model
         model_paths = [self.download_execution_assets(m, execution_rid, dest_dir=str(self.execution_assets_path)) for m in
                        self.configuration.models]
