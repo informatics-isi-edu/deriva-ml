@@ -140,12 +140,12 @@ class DerivaML:
 
     def add_execution(self, workflow_rid: str="", datasets: List[str]=[],
                       description: str = "") -> str:
-        if not workflow_rid:
+        if workflow_rid:
             execution_rid = self.schema.Execution.insert([{'Description': description,
                                                         'Workflow': workflow_rid}])[0]['RID']
         else:
             execution_rid = self.schema.Execution.insert([{'Description': description}])[0]['RID']
-        if not datasets:
+        if datasets:
             self._batch_insert(self.schema.Dataset_Execution,
                             [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
@@ -154,7 +154,7 @@ class DerivaML:
         self._batch_update(self.schema.Execution,
                            [{"RID": execution_rid, "Workflow": workflow_rid, "Description":description}],
                            [self.schema.Execution.Workflow, self.schema.Execution.Description])
-        if not datasets:
+        if datasets:
             self._batch_insert(self.schema.Dataset_Execution,
                             [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
