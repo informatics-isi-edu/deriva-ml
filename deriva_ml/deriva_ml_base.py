@@ -319,7 +319,7 @@ class DerivaML:
                 if not validated_check.exists():
                     bdb.materialize(bag_path)
                     validated_check.touch()
-        bag_dir.chmod(0o444)
+        # bag_dir.chmod(0o444)
         match = re.search(r'Dataset_([A-Za-z0-9-]+)', str(bag_path))
         dataset_rid = match.group(1) if match else None
         return bag_path, dataset_rid
