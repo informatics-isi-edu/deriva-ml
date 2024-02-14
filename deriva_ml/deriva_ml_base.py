@@ -285,22 +285,26 @@ class DerivaML:
             checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
     
-    def materialize_bdbag(self, minid: str) -> tuple:
-        bag_dir = Path(f"./bag-{minid}/")
+    def materialize_bdbag(self, data_dir: str, minid: str) -> tuple:
+        bag_dir = Path(data_dir) / f"bag-{minid}"
         bag_dir.mkdir(parents=True, exist_ok=True)
-        bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
-        if len(bags) == 0:
+        validated_check = bag_dir / "validated_check.txt"
+        bags = [item for item in bag_dir.iterdir() if item.is_dir()]
+        if not bags:
             bag_path = bdb.materialize(minid, bag_dir)
+            validated_check.touch()
         else:
             isbag = [bdb.is_bag(bag) for bag in bags]
-            if sum(isbag) == 0:
+            if sum(isbag) != 1:
                 raise DerivaMLException(f'Invalid bag directory: {bag_dir}')
             else:
                 bag_path = bags[isbag.index(True)]
-                bdb.materialize(bag_path)
-        match = re.search(r'Dataset_([A-Za-z0-9-]+)', bag_path)
-        if match:
-            dataset_rid = match.group(1)
+                if not validated_check.exists():
+                    bdb.materialize(bag_path)
+                    validated_check.touch()
+        bag_dir.chmod(0o444)
+        match = re.search(r'Dataset_([A-Za-z0-9-]+)', str(bag_path))
+        dataset_rid = match.group(1) if match else None
         return bag_path, dataset_rid
 
     def download_asset(self, asset_url: str, destfilename: str):
@@ -456,13 +460,13 @@ class DerivaML:
                            [self.schema.Execution.Duration])
         return uploded_assets
 
-    def execution_init(self, configuration_rid: str) -> dict:
+    def execution_init(self, data_dir, configuration_rid: str) -> dict:
         # Download configuration json file
         configuration_path = self.download_execution_metadata(metadata_rid=configuration_rid,
                                                               dest_dir=str(self.execution_metadata_path ))
         with open(configuration_path, 'r') as file:
             configuration = json.load(file)
-        # check input configuration
+        # Check input configuration
         try:
             self.configuration = ExecutionConfiguration.model_validate(configuration)
             print("Configuration validation successful!")
@@ -482,7 +486,7 @@ class DerivaML:
         dataset_rids = []
         bag_paths = []
         for url in self.configuration.bdbag_url:
-            bag_path, dataset_rid = self.materialize_bdbag(url)
+            bag_path, dataset_rid = self.materialize_bdbag(data_dir, url)
             dataset_rids.append(dataset_rid)
             bag_paths.append(bag_path)
         # Insert workflow
