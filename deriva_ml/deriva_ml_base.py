@@ -289,7 +289,7 @@ class DerivaML:
         bag_dir = Path(data_dir) / f"bag-{minid}"
         bag_dir.mkdir(parents=True, exist_ok=True)
         validated_check = bag_dir / "validated_check.txt"
-        bags = [item for item in bag_dir.iterdir() if item.is_dir()]
+        bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
         if not bags:
             bag_path = bdb.materialize(minid, bag_dir)
             validated_check.touch()
