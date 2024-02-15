@@ -449,7 +449,7 @@ class DerivaML:
                 except Exception as e:
                     error = format_exception(e)
                     self.update_status(Status.failed, error, execution_rid)
-                    raise DerivaMLException(f"Fail to upload the files in {self.folder_path} to Executoin_Assets table. Error: {error}")
+                    raise DerivaMLException(f"Fail to upload the files in {folder_path} to Executoin_Assets table. Error: {error}")
                 else:
                     asset_exec_entities = self.schema.Execution_Assets_Execution.filter(
                     self.schema.Execution_Assets_Execution.Execution == execution_rid).entities()
