@@ -1,4 +1,4 @@
-from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote
+from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.utils import hash_utils, mime_utils
 import deriva.core.ermrest_model as ermrest_model
 import deriva.core.datapath as datapath
@@ -56,7 +56,9 @@ class DerivaMlExec:
 class DerivaML:
     def __init__(self, hostname: str, catalog_id: str, schema_name):
         self.credential = get_credential(hostname)
-        self.catalog = ErmrestCatalog('https', hostname, catalog_id, self.credential)
+        self.catalog = ErmrestCatalog('https', hostname, catalog_id, 
+                                      self.credential, 
+                                      session=self._get_session_config)
         self.model = self.catalog.getCatalogModel()
         self.pb = self.catalog.getPathBuilder()
         self.host_name = hostname
@@ -73,6 +75,20 @@ class DerivaML:
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    @staticmethod
+    def _get_session_config(self):
+        session_config = DEFAULT_SESSION_CONFIG.copy()
+        session_config.update({
+            # our PUT/POST to ermrest is idempotent
+            "allow_retry_on_all_methods": True,
+            # do more retries before aborting
+            "retry_read": 8,
+            "retry_connect": 5,
+            # increase delay factor * 2**(n-1) for Nth retry
+            "retry_backoff_factor": 5,
+        })
+        return session_config
 
     def is_vocabulary(self, table_name: str) -> bool:
         """
