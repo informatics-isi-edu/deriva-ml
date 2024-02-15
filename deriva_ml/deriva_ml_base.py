@@ -77,7 +77,7 @@ class DerivaML:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
     @staticmethod
-    def _get_session_config(self):
+    def _get_session_config():
         session_config = DEFAULT_SESSION_CONFIG.copy()
         session_config.update({
             # our PUT/POST to ermrest is idempotent
