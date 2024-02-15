@@ -58,7 +58,7 @@ class DerivaML:
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id, 
                                       self.credential, 
-                                      session=self._get_session_config())
+                                      session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
         self.pb = self.catalog.getPathBuilder()
         self.host_name = hostname
