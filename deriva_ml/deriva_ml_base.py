@@ -525,7 +525,7 @@ class DerivaML:
         bag_paths = []
         for url in self.configuration.bdbag_url:
             self.update_status(Status.running, f"Inserting bag {url}... ", execution_rid)
-            bag_path, dataset_rid = self.materialize_bdbag(self.data_dir, url)
+            bag_path, dataset_rid = self.materialize_bdbag(url)
             dataset_rids.append(dataset_rid)
             bag_paths.append(bag_path)
         # Insert workflow
