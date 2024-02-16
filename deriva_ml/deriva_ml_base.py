@@ -54,7 +54,7 @@ class DerivaMlExec:
 
 
 class DerivaML:
-    def __init__(self, hostname: str, catalog_id: str, schema_name):
+    def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str="./"):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id, 
                                       self.credential, 
@@ -69,8 +69,9 @@ class DerivaML:
 
         self.start_time = datetime.now()
         self.status = Status.pending.value
-        self.execution_assets_path = Path("./Execution_Assets/")
-        self.execution_metadata_path = Path("./Execution_Metadata/")
+        self.data_dir = Path(data_dir)
+        self.execution_assets_path = self.data_dir/ "/Execution_Assets/"
+        self.execution_assets_path = self.data_dir/ "/Execution_Metadata/"
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
@@ -318,8 +319,8 @@ class DerivaML:
             checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
     
-    def materialize_bdbag(self, data_dir: str, minid: str) -> tuple:
-        bag_dir = Path(data_dir) / f"bag-{minid}"
+    def materialize_bdbag(self, minid: str) -> tuple:
+        bag_dir = self.data_dir / f"bag-{minid}"
         bag_dir.mkdir(parents=True, exist_ok=True)
         validated_check = bag_dir / "validated_check.txt"
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
@@ -494,7 +495,7 @@ class DerivaML:
                            [self.schema.Execution.Duration])
         return uploded_assets
 
-    def execution_init(self, data_dir, configuration_rid: str) -> dict:
+    def execution_init(self, configuration_rid: str) -> dict:
         # Download configuration json file
         configuration_path = self.download_execution_metadata(metadata_rid=configuration_rid,
                                                               dest_dir=str(self.execution_metadata_path ))
@@ -524,7 +525,7 @@ class DerivaML:
         bag_paths = []
         for url in self.configuration.bdbag_url:
             self.update_status(Status.running, f"Inserting bag {url}... ", execution_rid)
-            bag_path, dataset_rid = self.materialize_bdbag(data_dir, url)
+            bag_path, dataset_rid = self.materialize_bdbag(self.data_dir, url)
             dataset_rids.append(dataset_rid)
             bag_paths.append(bag_path)
         # Insert workflow
