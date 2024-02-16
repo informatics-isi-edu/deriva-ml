@@ -54,7 +54,7 @@ class DerivaMlExec:
 
 
 class DerivaML:
-    def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str="./"):
+    def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id, 
                                       self.credential, 
