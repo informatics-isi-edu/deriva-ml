@@ -70,8 +70,8 @@ class DerivaML:
         self.start_time = datetime.now()
         self.status = Status.pending.value
         self.data_dir = Path(data_dir)
-        self.execution_assets_path = self.data_dir/ "/Execution_Assets/"
-        self.execution_metadata_path = self.data_dir/ "/Execution_Metadata/"
+        self.execution_assets_path = self.data_dir/ "Execution_Assets/"
+        self.execution_metadata_path = self.data_dir/ "Execution_Metadata/"
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
