@@ -473,9 +473,9 @@ class DerivaML:
                                [self.schema.Execution_Metadata.Execution])
     
     def upload_execution_assets(self, execution_rid: str) -> dict:
+        results = {}
         for folder_path in self.execution_assets_path.iterdir():
             self.update_status(Status.running, f"Uploading assets {folder_path}...", execution_rid)
-            results = {}
             if folder_path.is_dir():
                 try:
                     result = self.upload_assets(str(folder_path))
