@@ -319,13 +319,25 @@ class DerivaML:
             checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
     
-    def materialize_bdbag(self, minid: str) -> tuple:
+    def materialize_bdbag(self, minid: str, execution_rid: str) -> tuple:
+
+        def fetch_progress_callback(current, total):
+            self.update_status(Status.running,
+                               f"Materializing bag: {current} of {total} file(s) downloaded.", execution_rid)
+
+        def validation_progress_callback(current, total):
+            self.update_status(Status.running,
+                               f"Validating bag: {current} of {total} file(s) validated.", execution_rid)
+
         bag_dir = self.data_dir / f"bag-{minid}"
         bag_dir.mkdir(parents=True, exist_ok=True)
         validated_check = bag_dir / "validated_check.txt"
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
         if not bags:
-            bag_path = bdb.materialize(minid, bag_dir)
+            bag_path = bdb.materialize(minid,
+                                       bag_dir,
+                                       fetch_callback=fetch_progress_callback,
+                                       validation_callback=validation_progress_callback)
             validated_check.touch()
         else:
             isbag = [bdb.is_bag(bag) for bag in bags]
@@ -334,7 +346,9 @@ class DerivaML:
             else:
                 bag_path = bags[isbag.index(True)]
                 if not validated_check.exists():
-                    bdb.materialize(bag_path)
+                    bdb.materialize(bag_path,
+                                    fetch_callback=fetch_progress_callback,
+                                    validation_callback=validation_progress_callback)
                     validated_check.touch()
         # bag_dir.chmod(0o444)
         match = re.search(r'Dataset_([A-Za-z0-9-]+)', str(bag_path))
@@ -525,7 +539,7 @@ class DerivaML:
         bag_paths = []
         for url in self.configuration.bdbag_url:
             self.update_status(Status.running, f"Inserting bag {url}... ", execution_rid)
-            bag_path, dataset_rid = self.materialize_bdbag(url)
+            bag_path, dataset_rid = self.materialize_bdbag(url, execution_rid)
             dataset_rids.append(dataset_rid)
             bag_paths.append(bag_path)
         # Insert workflow
