@@ -166,6 +166,7 @@ class DerivaML:
             self._batch_insert(self.schema.Dataset_Execution,
                             [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
+
     def update_execution(self, execution_rid: str, workflow_rid: str="", datasets: List[str]=[],
                       description: str = "") -> str:
         self._batch_update(self.schema.Execution,
@@ -324,10 +325,12 @@ class DerivaML:
         def fetch_progress_callback(current, total):
             self.update_status(Status.running,
                                f"Materializing bag: {current} of {total} file(s) downloaded.", execution_rid)
+            return True
 
         def validation_progress_callback(current, total):
             self.update_status(Status.running,
                                f"Validating bag: {current} of {total} file(s) validated.", execution_rid)
+            return True
 
         bag_dir = self.data_dir / f"bag-{minid}"
         bag_dir.mkdir(parents=True, exist_ok=True)
