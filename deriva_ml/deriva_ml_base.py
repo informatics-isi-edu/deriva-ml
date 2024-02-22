@@ -52,6 +52,14 @@ class DerivaMlExec:
         self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
         return True
 
+class ConfigurationRecords:
+    def __init__(self):
+        self.terms = {}
+        self.execution = None
+        self.workflow = None
+        self.bag_paths = []
+        self.model_paths = []
+        self.configuration_path = None
 
 class DerivaML:
     def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str):
@@ -446,7 +454,7 @@ class DerivaML:
                                  "Length": file_size,
                                  "MD5": md5,
                                  "Description": desc,
-                                 "Execution_Metadata_Type": execution_metadata_type_rid}])  # TODO: Fix this by doing a RID lookup based on an input parameter and add that parameter to the function arguments
+                                 "Execution_Metadata_Type": execution_metadata_type_rid}])
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(
@@ -524,7 +532,7 @@ class DerivaML:
             logging.info("Configuration validation successful!")
         except ValidationError as e:
             raise DerivaMLException(f"configuration validation failed: {e}")
-        configuration_records = {}
+        configuration_records = ConfigurationRecords()
         # Insert or return Execution
         execution_rid = self.add_execution(description=self.configuration.execution.description)
         # Insert terms
@@ -534,9 +542,9 @@ class DerivaML:
                                           name=term["name"],
                                           description=term["description"],
                                           exist_ok=True)
-            term_records = configuration_records.get(term["term"], [])
+            term_records = configuration_records.terms.get(term["term"], [])
             term_records.append({"name": term["name"], "RID": term_rid})
-            configuration_records[term["term"]] = term_records
+            configuration_records.terms[term["term"]] = term_records
         # Materialize bdbag
         dataset_rids = []
         bag_paths = []
@@ -562,9 +570,11 @@ class DerivaML:
         self.update_status(Status.running, "Downloading models ...", execution_rid)
         model_paths = [self.download_execution_assets(m, execution_rid, dest_dir=str(self.execution_assets_path)) for m in
                        self.configuration.models]
-        configuration_records.update(
-            {"execution": execution_rid, "workflow": workflow_rid, "bag_paths": bag_paths,
-             "model_paths": model_paths, 'configuration_path': configuration_path})
+        configuration_records.execution = execution_rid
+        configuration_records.workflow = workflow_rid
+        configuration_records.bag_paths = bag_paths
+        configuration_records.model_paths = model_paths
+        configuration_records.configuration_path = configuration_path
         # save runtime env
         runtime_env_file = str(self.execution_metadata_path)+'/Runtime_Env-python_environment_snapshot.txt'
         with open(runtime_env_file, 'w') as file:
