@@ -60,6 +60,21 @@ class ConfigurationRecords:
         self.bag_paths = []
         self.model_paths = []
         self.configuration_path = None
+        
+    def display(self):
+        print("Configuration Records:")
+        print("Terms:")
+        for key, value in self.terms.items():
+            print(f"{key}: {value}")
+        print(f"Execution: {self.execution}")
+        print(f"Workflow: {self.workflow}")
+        print("Bag Paths:")
+        for path in self.bag_paths:
+            print(f"- {path}")
+        print("Model Paths:")
+        for path in self.model_paths:
+            print(f"- {path}")
+        print(f"Configuration Path: {self.configuration_path}")
 
 class DerivaML:
     def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str):
