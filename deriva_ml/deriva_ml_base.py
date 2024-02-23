@@ -55,7 +55,7 @@ class DerivaMlExec:
 
 class Term(BaseModel):
     name: str
-    RID: str
+    rid: str
 
 class ConfigurationRecord(BaseModel):
     vocabs: dict[str, list[Term]]
@@ -552,7 +552,7 @@ class DerivaML:
                                           exist_ok=True)
             term_records = vocabs.get(term["term"], [])
             # term_records.append({"name": term["name"], "RID": term_rid})
-            term_records.append(Term(term["name"], term_rid))
+            term_records.append(Term(name=term["name"], rid=term_rid))
             vocabs[term["term"]] = term_records
         # Materialize bdbag
         dataset_rids = []
