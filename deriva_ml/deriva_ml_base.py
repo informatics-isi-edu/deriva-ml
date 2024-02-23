@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 import hashlib
 import pkg_resources
 import logging
+from pydantic import BaseModel
 
 
 
@@ -52,29 +53,20 @@ class DerivaMlExec:
         self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
         return True
 
-class ConfigurationRecords:
-    def __init__(self):
-        self.terms = {}
-        self.execution = None
-        self.workflow = None
-        self.bag_paths = []
-        self.model_paths = []
-        self.configuration_path = None
-        
-    def display(self):
-        print("Configuration Records:")
-        print("Terms:")
-        for key, value in self.terms.items():
-            print(f"{key}: {value}")
-        print(f"Execution: {self.execution}")
-        print(f"Workflow: {self.workflow}")
-        print("Bag Paths:")
-        for path in self.bag_paths:
-            print(f"- {path}")
-        print("Model Paths:")
-        for path in self.model_paths:
-            print(f"- {path}")
-        print(f"Configuration Path: {self.configuration_path}")
+class Term(BaseModel):
+    name: str
+    RID: str
+
+class ConfigurationRecord(BaseModel):
+    vocabs: dict[str, list[Term]]
+    execution_rid: str
+    workflow_rid: str
+    bag_paths: list[Path]
+    model_paths: list[Path]
+    configuration_path: Path
+
+    class Config:
+        frozen = True
 
 class DerivaML:
     def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str):
@@ -379,7 +371,7 @@ class DerivaML:
         # bag_dir.chmod(0o444)
         match = re.search(r'Dataset_([A-Za-z0-9-]+)', str(bag_path))
         dataset_rid = match.group(1) if match else None
-        return bag_path, dataset_rid
+        return Path(bag_path), dataset_rid
 
     def download_asset(self, asset_url: str, destfilename: str):
         hs = HatracStore("https", self.host_name, self.credential)
@@ -400,7 +392,7 @@ class DerivaML:
                            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
                            [self.schema.Execution.Status, self.schema.Execution.Status_Detail])
 
-    def download_execution_assets(self, asset_rid: str, execution_rid="", dest_dir: str = "") -> str:
+    def download_execution_assets(self, asset_rid: str, execution_rid="", dest_dir: str = "") -> Path:
         asset_metadata = self.schema.Execution_Assets.filter(self.schema.Execution_Assets.RID ==  asset_rid).entities()[0]
         asset_url = asset_metadata['URL']
         file_name = asset_metadata['Filename']
@@ -419,7 +411,7 @@ class DerivaML:
             if execution_rid not in exec_list:
                 self._batch_insert(self.schema.Execution_Assets_Execution,
                                    [{"Execution_Assets":  asset_rid, "Execution": execution_rid}])
-        return file_path
+        return Path(file_path)
     
     def download_execution_metadata(self, metadata_rid: str, execution_rid="", dest_dir: str = "") -> str:
         self.update_status(Status.running, "Downloading metadata...", execution_rid)
@@ -441,7 +433,7 @@ class DerivaML:
                 self._batch_update(self.Execution_Metadata,
                                    [{"Execution": execution_rid}],
                                    [self.schema.Execution_Metadata.Execution])
-        return file_path
+        return Path(file_path)
 
     def upload_execution_configuration(self, config_file: str, desc: str):
         file_path = Path(config_file)
@@ -535,7 +527,7 @@ class DerivaML:
                            [self.schema.Execution.Duration])
         return uploded_assets
 
-    def execution_init(self, configuration_rid: str) -> dict:
+    def execution_init(self, configuration_rid: str) -> ConfigurationRecord:
         # Download configuration json file
         configuration_path = self.download_execution_metadata(metadata_rid=configuration_rid,
                                                               dest_dir=str(self.execution_metadata_path ))
@@ -547,19 +539,21 @@ class DerivaML:
             logging.info("Configuration validation successful!")
         except ValidationError as e:
             raise DerivaMLException(f"configuration validation failed: {e}")
-        configuration_records = ConfigurationRecords()
+        # configuration_records = ConfigurationRecords()
         # Insert or return Execution
         execution_rid = self.add_execution(description=self.configuration.execution.description)
         # Insert terms
         self.update_status(Status.running, "Inserting tags... ", execution_rid)
+        vocabs = {}
         for term in configuration.get("workflow_terms"):
             term_rid = self.add_term(table_name=term["term"],
                                           name=term["name"],
                                           description=term["description"],
                                           exist_ok=True)
-            term_records = configuration_records.terms.get(term["term"], [])
-            term_records.append({"name": term["name"], "RID": term_rid})
-            configuration_records.terms[term["term"]] = term_records
+            term_records = vocabs.get(term["term"], [])
+            # term_records.append({"name": term["name"], "RID": term_rid})
+            term_records.append(Term(term["name"], term_rid))
+            vocabs[term["term"]] = term_records
         # Materialize bdbag
         dataset_rids = []
         bag_paths = []
@@ -583,13 +577,15 @@ class DerivaML:
 
         # Download model
         self.update_status(Status.running, "Downloading models ...", execution_rid)
-        model_paths = [self.download_execution_assets(m, execution_rid, dest_dir=str(self.execution_assets_path)) for m in
-                       self.configuration.models]
-        configuration_records.execution = execution_rid
-        configuration_records.workflow = workflow_rid
-        configuration_records.bag_paths = bag_paths
-        configuration_records.model_paths = model_paths
-        configuration_records.configuration_path = configuration_path
+        model_paths = [self.download_execution_assets(m, execution_rid, dest_dir=str(self.execution_assets_path)) 
+                       for m in self.configuration.models]
+        configuration_records = ConfigurationRecord(
+            execution_rid=execution_rid,
+            workflow_rid=workflow_rid,
+            bag_paths=bag_paths,
+            vocabs=vocabs,
+            model_paths=model_paths,
+            configuration_path=configuration_path)
         # save runtime env
         runtime_env_file = str(self.execution_metadata_path)+'/Runtime_Env-python_environment_snapshot.txt'
         with open(runtime_env_file, 'w') as file:
