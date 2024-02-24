@@ -48,8 +48,19 @@ class DerivaMlExec:
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         if not exc_type:
-            self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
-            return True
+            self.catalog_ml.update_status(Status.running,
+                                          "Successfully run Ml.",
+                                          self.execution_rid)
+            try:
+                self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
+                self.catalog_ml.update_status(Status.running,
+                                              "Successfully end the execution.",
+                                              self.execution_rid)
+                return True
+            except Exception as e:
+                error = format_exception(e)
+                self.catalog_ml.update_status(Status.failed, error, self.execution_rid)
+                return False
         else:
             self.catalog_ml.update_status(Status.failed,
                                           f"Exception type: {exc_type}, Exception value: {exc_value}",
