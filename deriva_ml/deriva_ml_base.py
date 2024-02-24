@@ -47,9 +47,15 @@ class DerivaMlExec:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        logging.info(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
-        self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
-        return True
+        if not exc_type:
+            self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
+            return True
+        else:
+            self.catalog_ml.update_status(Status.failed,
+                                          f"Exception type: {exc_type}, Exception value: {exc_value}",
+                                          self.execution_rid)
+            logging.error(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
+            return False
 
 
 class Term(BaseModel):
@@ -407,7 +413,7 @@ class DerivaML:
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
-            raise DerivaMLException(f"Faild to download the asset {asset_rid}. Error: {error}")
+            raise DerivaMLException(f"Failed to download the asset {asset_rid}. Error: {error}")
 
         if execution_rid != '':
             exec_prod_exec_entities = self.schema.Execution_Assets_Execution.filter(
