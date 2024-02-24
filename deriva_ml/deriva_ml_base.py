@@ -47,7 +47,7 @@ class DerivaMlExec:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        logging.info(f"Exeption type: {exc_type}, Exeption value: {exc_value}, Exeption traceback: {exc_tb}")
+        logging.info(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
         self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
         return True
 
@@ -377,7 +377,7 @@ class DerivaML:
         dataset_rid = match.group(1) if match else None
         return Path(bag_path), dataset_rid
 
-    def download_asset(self, asset_url: str, destfilename: str):
+    def download_asset(self, asset_url: str, destfilename: str) -> str:
         hs = HatracStore("https", self.host_name, self.credential)
         hs.get_obj(path=asset_url, destfilename=destfilename)
         return destfilename
@@ -436,7 +436,7 @@ class DerivaML:
                 self.schema.Execution_Metadata.RID == metadata_rid).entities()
             exec_list = [e['Execution'] for e in exec_metadata_exec_entities]
             if execution_rid not in exec_list:
-                self._batch_update(self.Execution_Metadata,
+                self._batch_update(self.schema.Execution_Metadata,
                                    [{"Execution": execution_rid}],
                                    [self.schema.Execution_Metadata.Execution])
         return Path(file_path)
@@ -521,7 +521,7 @@ class DerivaML:
         return results
 
     def execution_end(self, execution_rid: str):
-        uploded_assets = self.upload_execution_assets(execution_rid)
+        uploaded_assets = self.upload_execution_assets(execution_rid)
         self.upload_execution_metadata(execution_rid)
 
         duration = datetime.now() - self.start_time
@@ -532,7 +532,7 @@ class DerivaML:
         self.update_status(Status.completed, "Execution ended.", execution_rid)
         self._batch_update(self.schema.Execution, [{"RID": execution_rid, "Duration": duration}],
                            [self.schema.Execution.Duration])
-        return uploded_assets
+        return uploaded_assets
 
     def execution_init(self, configuration_rid: str) -> ConfigurationRecord:
         # Download configuration json file
@@ -577,7 +577,7 @@ class DerivaML:
                                          self.configuration.workflow.version,
                                          self.configuration.workflow.description,
                                          exist_ok=True)
-        # Update execition info
+        # Update execution info
         execution_rid = self.update_execution(execution_rid, workflow_rid, dataset_rids,
                                               self.configuration.execution.description)
         self.update_status(Status.running, "Execution created ", execution_rid)
