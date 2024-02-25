@@ -79,11 +79,12 @@ class ConfigurationRecord(BaseModel):
     execution_rid: str
     workflow_rid: str
     bag_paths: list[Path]
-    model_paths: list[Path]
+    assets_paths: list[Path]
     configuration_path: Path
 
     class Config:
         frozen = True
+        protected_namespaces = ()
 
 
 class DerivaML:
@@ -155,10 +156,11 @@ class DerivaML:
         return [fk.columns[0].name for fk in table.foreign_keys
                 if len(fk.columns) == 1 and self.is_vocabulary(fk.pk_table)]
 
-    def add_record(self, table: datapath._TableWrapper,
-                   record: dict[str, str],
-                   unique_col: str,
-                   exist_ok: bool = False) -> str:
+    @staticmethod
+    def _add_record(table: datapath._TableWrapper,
+                    record: dict[str, str],
+                    unique_col: str,
+                    exist_ok: bool = False) -> str:
         try:
             entities = table.entities()
             name_list = [e[unique_col] for e in entities]
@@ -173,19 +175,18 @@ class DerivaML:
 
     def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
                      version: str = "",
-                     description: str = "",
-                     exist_ok: bool = False) -> str:
-
+                     description: str = "") -> str:
         workflow_type_rid = self.lookup_term("Workflow_Type", workflow_type)
         checksum = self._get_checksum(url)
-        workflow_rid = self.add_record(self.schema.Workflow,
-                                       {'URL': url,
-                                        'Name': workflow_name,
-                                        'Description': description,
-                                        'Checksum': checksum,
-                                        'Version': version,
-                                        'Workflow_Type': workflow_type_rid},
-                                       'URL', True)
+        workflow_rid = self._add_record(self.schema.Workflow,
+                                        {'URL': url,
+                                         'Name': workflow_name,
+                                         'Description': description,
+                                         'Checksum': checksum,
+                                         'Version': version,
+                                         'Workflow_Type': workflow_type_rid},
+                                        'URL',
+                                        True)
         return workflow_rid
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
@@ -286,11 +287,11 @@ class DerivaML:
             if term_name == term['Name'] or (term['Synonyms'] and term_name in term['Synonyms']):
                 return term['RID']
 
-        raise DerivaMLException(f"Term {term_name} is not in vocabuary {table_name}")
+        raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
 
     def list_vocabularies(self):
         """
-        Return a list of all of the controlled vocabulary tables in the schema.
+        Return a list of all the controlled vocabulary tables in the schema.
 
         Returns:
          - List[str]: A list of table names representing controlled vocabulary tables in the schema.
@@ -345,6 +346,10 @@ class DerivaML:
 
     @staticmethod
     def _get_checksum(url) -> str:
+        """
+
+        :rtype: str
+        """
         try:
             response = requests.get(url)
             response.raise_for_status()
@@ -379,11 +384,11 @@ class DerivaML:
                                        validation_callback=validation_progress_callback)
             validated_check.touch()
         else:
-            isbag = [bdb.is_bag(bag) for bag in bags]
-            if sum(isbag) != 1:
+            is_bag = [bdb.is_bag(bag) for bag in bags]
+            if sum(is_bag) != 1:
                 raise DerivaMLException(f'Invalid bag directory: {bag_dir}')
             else:
-                bag_path = bags[isbag.index(True)]
+                bag_path = bags[is_bag.index(True)]
                 if not validated_check.exists():
                     bdb.materialize(bag_path,
                                     fetch_callback=fetch_progress_callback,
@@ -394,10 +399,10 @@ class DerivaML:
         dataset_rid = match.group(1) if match else None
         return Path(bag_path), dataset_rid
 
-    def download_asset(self, asset_url: str, destfilename: str) -> str:
+    def download_asset(self, asset_url: str, dest_filename: str) -> str:
         hs = HatracStore("https", self.host_name, self.credential)
-        hs.get_obj(path=asset_url, destfilename=destfilename)
-        return destfilename
+        hs.get_obj(path=asset_url, destfilename=dest_filename)
+        return dest_filename
 
     def upload_assets(self, assets_dir: str):
         uploader = GenericUploader(server={"host": self.host_name, "protocol": "https", "catalog_id": self.catalog_id})
@@ -446,7 +451,7 @@ class DerivaML:
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
-            raise DerivaMLException(f"Faild to download the asset {metadata_rid}. Error: {error}")
+            raise DerivaMLException(f"Failed to download the asset {metadata_rid}. Error: {error}")
 
         if execution_rid != '':
             exec_metadata_exec_entities = self.schema.Execution_Metadata.filter(
@@ -498,7 +503,8 @@ class DerivaML:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
             raise DerivaMLException(
-                f"Fail to upload the files in {self.execution_metadata_path} to Executoin_Metadata table. Error: {error}")
+                f"Fail to upload the files in {self.execution_metadata_path}"
+                f" to Execution_Metadata table. Error: {error}")
         else:
             entities = []
             for asset in results.values():
@@ -522,7 +528,7 @@ class DerivaML:
                     error = format_exception(e)
                     self.update_status(Status.failed, error, execution_rid)
                     raise DerivaMLException(
-                        f"Fail to upload the files in {folder_path} to Executoin_Assets table. Error: {error}")
+                        f"Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}")
                 else:
                     asset_exec_entities = self.schema.Execution_Assets_Execution.filter(
                         self.schema.Execution_Assets_Execution.Execution == execution_rid).entities()
@@ -592,8 +598,7 @@ class DerivaML:
                                          self.configuration.workflow.url,
                                          self.configuration.workflow.workflow_type,
                                          self.configuration.workflow.version,
-                                         self.configuration.workflow.description,
-                                         exist_ok=True)
+                                         self.configuration.workflow.description)
         # Update execution info
         execution_rid = self.update_execution(execution_rid, workflow_rid, dataset_rids,
                                               self.configuration.execution.description)
@@ -601,14 +606,15 @@ class DerivaML:
 
         # Download model
         self.update_status(Status.running, "Downloading models ...", execution_rid)
-        model_paths = [self.download_execution_assets(m, execution_rid, dest_dir=str(self.execution_assets_path))
-                       for m in self.configuration.models]
+        assets_paths = [self.download_execution_assets(m, execution_rid,
+                                                       dest_dir=str(self.execution_assets_path))
+                        for m in self.configuration.models]
         configuration_records = ConfigurationRecord(
             execution_rid=execution_rid,
             workflow_rid=workflow_rid,
             bag_paths=bag_paths,
             vocabs=vocabs,
-            model_paths=model_paths,
+            assets_paths=assets_paths,
             configuration_path=configuration_path)
         # save runtime env
         runtime_env_file = str(self.execution_metadata_path) + '/Runtime_Env-python_environment_snapshot.txt'
