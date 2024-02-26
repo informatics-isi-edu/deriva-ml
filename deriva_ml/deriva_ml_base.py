@@ -24,12 +24,29 @@ import logging
 
 
 class DerivaMLException(Exception):
+    """
+    Exception class specific to DerivaML module.
+
+    Args:
+    - msg (str): Optional message for the exception.
+
+    """
     def __init__(self, msg=""):
         super().__init__(msg)
         self._msg = msg
 
 
 class Status(Enum):
+    """
+    Enumeration class defining execution status.
+
+    Attributes:
+    - running: Execution is currently running.
+    - pending: Execution is pending.
+    - completed: Execution has been completed successfully.
+    - failed: Execution has failed.
+
+    """
     running = "Running"
     pending = "Pending"
     completed = "Completed"
@@ -37,6 +54,14 @@ class Status(Enum):
 
 
 class DerivaMlExec:
+    """
+    Context manager for managing DerivaML execution.
+
+    Args:
+    - catalog_ml: Instance of DerivaML class.
+    - execution_rid (str): Execution resource identifier.
+
+    """
     def __init__(self, catalog_ml, execution_rid: str):
         self.execution_rid = execution_rid
         self.catalog_ml = catalog_ml
@@ -44,9 +69,28 @@ class DerivaMlExec:
         self.uploaded_assets = None
 
     def __enter__(self):
+        """
+        Method invoked when entering the context.
+
+        Returns:
+        - self: The instance itself.
+
+        """
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
+        """
+         Method invoked when exiting the context.
+
+         Args:
+         - exc_type: Exception type.
+         - exc_value: Exception value.
+         - exc_tb: Exception traceback.
+
+         Returns:
+         - bool: True if execution completed successfully, False otherwise.
+
+         """
         if not exc_type:
             self.catalog_ml.update_status(Status.running,
                                           "Successfully run Ml.",
@@ -70,11 +114,32 @@ class DerivaMlExec:
 
 
 class Term(BaseModel):
+    """
+    Data model representing a controlled vocabulary term.
+
+    Attributes:
+    - name (str): The name of the term.
+    - rid (str): The ID of the term in catalog.
+
+    """
     name: str
     rid: str
 
 
 class ConfigurationRecord(BaseModel):
+    """
+    Data model representing configuration records.
+
+    Attributes:
+    - vocabs (dict): Dictionary containing vocabulary terms with key as vocabulary table name,
+    and values as a list of dict containing name, rid pairs.
+    - execution_rid (str): Execution identifier in catalog.
+    - workflow_rid (str): Workflow identifier in catalog.
+    - bag_paths (list): List of paths to bag files.
+    - assets_paths (list): List of paths to assets.
+    - configuration_path (Path): Path to the configuration file.
+
+    """
     vocabs: dict[str, list[Term]]
     execution_rid: str
     workflow_rid: str
@@ -88,6 +153,16 @@ class ConfigurationRecord(BaseModel):
 
 
 class DerivaML:
+    """
+    Class for managing Machine Learning experiments with data and metadata stored in Deriva platform.
+
+    Args:
+    - hostname (str): Hostname of the Deriva server.
+    - catalog_id (str): Catalog ID.
+    - schema_name (str): Schema name.
+    - data_dir (str): Directory path for storing data.
+
+    """
     def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
@@ -161,6 +236,19 @@ class DerivaML:
                     record: dict[str, str],
                     unique_col: str,
                     exist_ok: bool = False) -> str:
+        """
+        Add a record to a table.
+
+        Args:
+        - table (datapath._TableWrapper): Table wrapper object.
+        - record (dict): Record to be added.
+        - unique_col (str): Name of the column need to be unique.
+        - exist_ok (bool): Flag indicating whether to allow creation if the record already exists.
+
+        Returns:
+        - str: Resource Identifier (RID) of the added record.
+
+        """
         try:
             entities = table.entities()
             name_list = [e[unique_col] for e in entities]
@@ -176,6 +264,20 @@ class DerivaML:
     def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
                      version: str = "",
                      description: str = "") -> str:
+        """
+        Add a workflow to the Workflow table.
+
+        Args:
+        - workflow_name (str): Name of the workflow.
+        - url (str): URL of the workflow.
+        - workflow_type (str): Type of the workflow.
+        - version (str): Version of the workflow.
+        - description (str): Description of the workflow.
+
+        Returns:
+        - str: Resource Identifier (RID) of the added workflow.
+
+        """
         workflow_type_rid = self.lookup_term("Workflow_Type", workflow_type)
         checksum = self._get_checksum(url)
         workflow_rid = self._add_record(self.schema.Workflow,
@@ -191,6 +293,18 @@ class DerivaML:
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
                       description: str = "") -> str:
+        """
+        Add an execution to the Execution table.
+
+        Args:
+        - workflow_rid (str): Resource Identifier (RID) of the workflow.
+        - datasets (List[str]): List of dataset RIDs.
+        - description (str): Description of the execution.
+
+        Returns:
+        - str: Resource Identifier (RID) of the added execution.
+
+        """
         datasets = datasets or []
         if workflow_rid:
             execution_rid = self.schema.Execution.insert([{'Description': description,
@@ -204,6 +318,20 @@ class DerivaML:
 
     def update_execution(self, execution_rid: str, workflow_rid: str = "", datasets: List[str] = None,
                          description: str = "") -> str:
+        """
+        Update an existing execution to build the linkage between the
+        Execution table and the Workflow and Dataset table.
+
+        Args:
+        - execution_rid (str): Resource Identifier (RID) of the execution to update.
+        - workflow_rid (str): Resource Identifier (RID) of the workflow.
+        - datasets (List[str]): List of dataset identifiers.
+        - description (str): Description of the execution.
+
+        Returns:
+        - str: Resource Identifier (RID) of the updated execution.
+
+        """
 
         datasets = datasets or []
         self._batch_update(self.schema.Execution,
@@ -325,7 +453,11 @@ class DerivaML:
 
     def user_list(self) -> pd.DataFrame:
         """
-        Return a DataFrame containing user information.
+        Return a DataFrame containing user information of current catalog.
+
+        Returns:
+        - pd.DataFrame: DataFrame containing user information.
+
         """
         users = self.pb.schemas['public']
         path = users.ERMrest_Client.path
@@ -333,6 +465,14 @@ class DerivaML:
 
     @staticmethod
     def _batch_insert(table: datapath._TableWrapper, entities: Sequence[dict]):
+        """
+        Batch insert entities into a table.
+
+        Args:
+        - table (datapath._TableWrapper): Table wrapper object.
+        - entities (Sequence[dict]): Sequence of entity dictionaries to insert.
+
+        """
         it = iter(entities)
         while chunk := list(islice(it, 2000)):
             table.insert(chunk)
@@ -340,6 +480,15 @@ class DerivaML:
     @staticmethod
     def _batch_update(table: datapath._TableWrapper, entities: Sequence[dict],
                       update_cols: List[datapath._ColumnWrapper]):
+        """
+        Batch update entities in a table.
+
+        Args:
+        - table (datapath._TableWrapper): Table wrapper object.
+        - entities (Sequence[dict]): Sequence of entity dictionaries to update, must include RID.
+        - update_cols (List[datapath._ColumnWrapper]): List of columns to update.
+
+        """
         it = iter(entities)
         while chunk := list(islice(it, 2000)):
             table.update(chunk, [table.RID], update_cols)
@@ -347,8 +496,17 @@ class DerivaML:
     @staticmethod
     def _get_checksum(url) -> str:
         """
+        Get the checksum of a file from a URL.
 
-        :rtype: str
+        Args:
+        - url: URL of the file.
+
+        Returns:
+        - str: Checksum of the file.
+
+        Raises:
+        - DerivaMLException: If the URL is invalid or the file cannot be accessed.
+
         """
         try:
             response = requests.get(url)
@@ -362,7 +520,20 @@ class DerivaML:
         return checksum
 
     def materialize_bdbag(self, minid: str, execution_rid: str) -> tuple:
+        """
+        Materialize a BDBag.
 
+        Args:
+        - minid (str): Minimum viable identifier (minid) of the bag.
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        Returns:
+        - tuple: Tuple containing the path to the bag and the RID of the associated dataset.
+
+        Raises:
+        - DerivaMLException: If there is an issue materializing the bag.
+
+        """
         def fetch_progress_callback(current, total):
             self.update_status(Status.running,
                                f"Materializing bag: {current} of {total} file(s) downloaded.", execution_rid)
@@ -400,11 +571,38 @@ class DerivaML:
         return Path(bag_path), dataset_rid
 
     def download_asset(self, asset_url: str, dest_filename: str) -> str:
+        """
+        Download an asset from a URL.
+
+        Args:
+        - asset_url (str): URL of the asset.
+        - dest_filename (str): Destination filename.
+
+        Returns:
+        - str: Path to the downloaded asset.
+
+        Raises:
+        - DerivaMLException: If there is an issue downloading the asset.
+
+        """
         hs = HatracStore("https", self.host_name, self.credential)
         hs.get_obj(path=asset_url, destfilename=dest_filename)
         return dest_filename
 
     def upload_assets(self, assets_dir: str):
+        """
+        Upload assets from a directory.
+
+        Args:
+        - assets_dir (str): Directory containing the assets to upload.
+
+        Returns:
+        - dict: Results of the upload operation.
+
+        Raises:
+        - DerivaMLException: If there is an issue uploading the assets.
+
+           """
         uploader = GenericUploader(server={"host": self.host_name, "protocol": "https", "catalog_id": self.catalog_id})
         uploader.getUpdatedConfig()
         uploader.scanDirectory(assets_dir)
@@ -413,12 +611,36 @@ class DerivaML:
         return results
 
     def update_status(self, new_status: Status, status_detail: str, execution_rid: str):
+        """
+        Update the status of an execution.
+
+        Args:
+        - new_status (Status): New status.
+        - status_detail (str): Details of the status.
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        """
         self.status = new_status.value
         self._batch_update(self.schema.Execution,
                            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
                            [self.schema.Execution.Status, self.schema.Execution.Status_Detail])
 
     def download_execution_assets(self, asset_rid: str, execution_rid="", dest_dir: str = "") -> Path:
+        """
+        Download execution assets.
+
+        Args:
+        - asset_rid (str): Resource Identifier (RID) of the asset.
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+        - dest_dir (str): Destination directory for the downloaded assets.
+
+        Returns:
+        - Path: Path to the downloaded asset.
+
+        Raises:
+        - DerivaMLException: If there is an issue downloading the assets.
+
+        """
         asset_metadata = self.schema.Execution_Assets.filter(self.schema.Execution_Assets.RID == asset_rid).entities()[
             0]
         asset_url = asset_metadata['URL']
@@ -441,6 +663,21 @@ class DerivaML:
         return Path(file_path)
 
     def download_execution_metadata(self, metadata_rid: str, execution_rid="", dest_dir: str = "") -> Path:
+        """
+        Download execution metadata.
+
+        Args:
+        - metadata_rid (str): Resource Identifier (RID) of the metadata.
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+        - dest_dir (str): Destination directory for the downloaded metadata.
+
+        Returns:
+        - Path: Path to the downloaded metadata.
+
+        Raises:
+        - DerivaMLException: If there is an issue downloading the metadata.
+
+        """
         self.update_status(Status.running, "Downloading metadata...", execution_rid)
         asset_metadata = \
             self.schema.Execution_Metadata.filter(self.schema.Execution_Metadata.RID == metadata_rid).entities()[0]
@@ -464,6 +701,17 @@ class DerivaML:
         return Path(file_path)
 
     def upload_execution_configuration(self, config_file: str, desc: str):
+        """
+        Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
+
+        Args:
+        - config_file (str): Path to the configuration file.
+        - desc (str): Description of the configuration.
+
+        Raises:
+        - DerivaMLException: If there is an issue uploading the configuration.
+
+        """
         file_path = Path(config_file)
         file_name = file_path.name
         file_size = file_path.stat().st_size
@@ -496,6 +744,16 @@ class DerivaML:
                 f"Failed to update Execution_Asset table with configuration file metadata. Error: {error}")
 
     def upload_execution_metadata(self, execution_rid: str):
+        """
+        Upload execution metadata at self.data_dir/Execution_metadata.
+
+        Args:
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        Raises:
+        - DerivaMLException: If there is an issue uploading the metadata.
+
+        """
         self.update_status(Status.running, "Uploading assets...", execution_rid)
         try:
             results = self.upload_assets(str(self.execution_metadata_path))
@@ -517,6 +775,19 @@ class DerivaML:
                                [self.schema.Execution_Metadata.Execution])
 
     def upload_execution_assets(self, execution_rid: str) -> dict:
+        """
+        Upload execution assets at self.data_dir/Execution_assets.
+
+        Args:
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        Returns:
+        - dict: Results of the upload operation.
+
+        Raises:
+        - DerivaMLException: If there is an issue uploading the assets.
+
+        """
         results = {}
         for folder_path in self.execution_assets_path.iterdir():
             self.update_status(Status.running, f"Uploading assets {folder_path}...", execution_rid)
@@ -543,7 +814,18 @@ class DerivaML:
                     results[str(folder_path)] = result
         return results
 
-    def execution_end(self, execution_rid: str):
+    def execution_end(self, execution_rid: str) -> dict[str, dict]:
+        """
+        Finish the execution and upload all the assets and metadata associated with the current execution.
+
+        Args:
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        Returns:
+        - dict: Uploaded assets with key as assets' suborder name,
+        values as an ordered dictionary with RID and metadata in the Execution_Assets table."
+
+        """
         uploaded_assets = self.upload_execution_assets(execution_rid)
         self.upload_execution_metadata(execution_rid)
 
@@ -558,6 +840,21 @@ class DerivaML:
         return uploaded_assets
 
     def execution_init(self, configuration_rid: str) -> ConfigurationRecord:
+        """
+        Initialize the execution by a configuration file in the Execution_Metadata table.
+        Setup working directory and download all the assets and data.
+
+        Args:
+        - configuration_rid (str): Resource Identifier (RID) of the configuration.
+
+        Returns:
+        - ConfigurationRecord: Configurations' RID including Workflow, Execution, bag_paths(data directory),
+        assets_paths(model directory), and vocabs (dict of controlled vocabularies).
+
+        Raises:
+        - DerivaMLException: If there is an issue initializing the execution.
+
+        """
         # Download configuration json file
         configuration_path = self.download_execution_metadata(metadata_rid=configuration_rid,
                                                               dest_dir=str(self.execution_metadata_path))
@@ -626,4 +923,14 @@ class DerivaML:
         return configuration_records
 
     def start_execution(self, execution_rid: str) -> DerivaMlExec:
+        """
+        Start the execution by initializing the context manager DerivaMlExec.
+
+        Args:
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        Returns:
+        - DerivaMlExec: Execution object.
+
+        """
         return DerivaMlExec(self, execution_rid)
