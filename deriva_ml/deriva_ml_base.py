@@ -31,6 +31,7 @@ class DerivaMLException(Exception):
     - msg (str): Optional message for the exception.
 
     """
+
     def __init__(self, msg=""):
         super().__init__(msg)
         self._msg = msg
@@ -62,6 +63,7 @@ class DerivaMlExec:
     - execution_rid (str): Execution resource identifier.
 
     """
+
     def __init__(self, catalog_ml, execution_rid: str):
         self.execution_rid = execution_rid
         self.catalog_ml = catalog_ml
@@ -95,16 +97,7 @@ class DerivaMlExec:
             self.catalog_ml.update_status(Status.running,
                                           "Successfully run Ml.",
                                           self.execution_rid)
-            try:
-                self.uploaded_assets = self.catalog_ml.execution_end(self.execution_rid)
-                self.catalog_ml.update_status(Status.running,
-                                              "Successfully end the execution.",
-                                              self.execution_rid)
-                return True
-            except Exception as e:
-                error = format_exception(e)
-                self.catalog_ml.update_status(Status.failed, error, self.execution_rid)
-                return False
+            self.catalog_ml.execution_end(self.execution_rid)
         else:
             self.catalog_ml.update_status(Status.failed,
                                           f"Exception type: {exc_type}, Exception value: {exc_value}",
@@ -163,6 +156,7 @@ class DerivaML:
     - data_dir (str): Directory path for storing data.
 
     """
+
     def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
@@ -534,6 +528,7 @@ class DerivaML:
         - DerivaMLException: If there is an issue materializing the bag.
 
         """
+
         def fetch_progress_callback(current, total):
             self.update_status(Status.running,
                                f"Materializing bag: {current} of {total} file(s) downloaded.", execution_rid)
@@ -814,9 +809,9 @@ class DerivaML:
                     results[str(folder_path)] = result
         return results
 
-    def execution_end(self, execution_rid: str) -> dict[str, dict]:
+    def execution_end(self, execution_rid: str) -> None:
         """
-        Finish the execution and upload all the assets and metadata associated with the current execution.
+        Finish the execution and update the duration and status of execution.
 
         Args:
         - execution_rid (str): Resource Identifier (RID) of the execution.
@@ -826,9 +821,6 @@ class DerivaML:
         values as an ordered dictionary with RID and metadata in the Execution_Assets table."
 
         """
-        uploaded_assets = self.upload_execution_assets(execution_rid)
-        self.upload_execution_metadata(execution_rid)
-
         duration = datetime.now() - self.start_time
         hours, remainder = divmod(duration.total_seconds(), 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -837,7 +829,6 @@ class DerivaML:
         self.update_status(Status.completed, "Execution ended.", execution_rid)
         self._batch_update(self.schema.Execution, [{"RID": execution_rid, "Duration": duration}],
                            [self.schema.Execution.Duration])
-        return uploaded_assets
 
     def execution_init(self, configuration_rid: str) -> ConfigurationRecord:
         """
@@ -922,7 +913,7 @@ class DerivaML:
         self.update_status(Status.running, "Initialize status finished.", execution_rid)
         return configuration_records
 
-    def start_execution(self, execution_rid: str) -> DerivaMlExec:
+    def execution(self, execution_rid: str) -> DerivaMlExec:
         """
         Start the execution by initializing the context manager DerivaMlExec.
 
@@ -934,3 +925,26 @@ class DerivaML:
 
         """
         return DerivaMlExec(self, execution_rid)
+
+    def execution_upload(self, execution_rid: str) -> dict[str, dict]:
+        """
+        Upload all the assets and metadata associated with the current execution.
+
+        Args:
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        Returns:
+        - dict: Uploaded assets with key as assets' suborder name,
+        values as an ordered dictionary with RID and metadata in the Execution_Assets table."
+
+        """
+        try:
+            uploaded_assets = self.upload_execution_assets(execution_rid)
+            self.upload_execution_metadata(execution_rid)
+            self.update_status(Status.completed,
+                               "Successfully end the execution.",
+                               execution_rid)
+            return uploaded_assets
+        except Exception as e:
+            error = format_exception(e)
+            self.update_status(Status.failed, error, execution_rid)
