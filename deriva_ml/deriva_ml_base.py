@@ -826,7 +826,7 @@ class DerivaML:
         minutes, seconds = divmod(remainder, 60)
         duration = f'{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec'
 
-        self.update_status(Status.completed, "Execution ended.", execution_rid)
+        self.update_status(Status.running, "Algorithm execution ended.", execution_rid)
         self._batch_update(self.schema.Execution, [{"RID": execution_rid, "Duration": duration}],
                            [self.schema.Execution.Duration])
 
