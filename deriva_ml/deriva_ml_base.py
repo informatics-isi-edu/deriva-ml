@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import datetime
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.utils import hash_utils, mime_utils
+from deriva.core.ermrest_catalog import ResolveRidResult
 import deriva.core.ermrest_model as ermrest_model
 import deriva.core.datapath as datapath
 from deriva.transfer.upload.deriva_upload import GenericUploader
@@ -16,7 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel
 import re
 import requests
-from typing import List, Sequence, Optional
+from typing import List, Sequence, Optional, Any
 from pydantic import ValidationError
 import hashlib
 import pkg_resources
@@ -444,6 +445,25 @@ class DerivaML:
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
         return pd.DataFrame(self.schema.tables[table_name].entities().fetch())
+
+    def resolve_rid(self, rid: str) -> ResolveRidResult:
+        """
+        Return a named tuple with information about the specified RID.
+        :param rid:
+        :return:
+        """
+        try:
+            return self.catalog.resolve_rid(rid, self.model, self.pb)
+        except KeyError as e:
+            raise DerivaMLException(f'Invalid RID {rid}')
+
+    def retrieve_rid(self, rid: str) -> dict[str, Any]:
+        """
+        Return a dictionary that represents the values of the specified RID.
+        :param rid:
+        :return:
+        """
+        return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
     def user_list(self) -> pd.DataFrame:
         """
