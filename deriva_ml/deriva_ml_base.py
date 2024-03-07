@@ -569,7 +569,7 @@ class DerivaML:
                 checksum_value = checksum.get('value')
                 break
 
-        bag_dir = self.data_dir / f"{dataset_rid}_sha256:{checksum_value}"
+        bag_dir = self.data_dir / f"{dataset_rid}_{checksum_value}"
         bag_dir.mkdir(parents=True, exist_ok=True)
         validated_check = bag_dir / "validated_check.txt"
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
