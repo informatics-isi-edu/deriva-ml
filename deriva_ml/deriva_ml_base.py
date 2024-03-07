@@ -560,7 +560,7 @@ class DerivaML:
             return True
 
         # request metadata
-        r = requests.get(f"https://identifiers.org/minid:{minid}", headers={'accept': 'application/json'})
+        r = requests.get(f"https://identifiers.org/{minid}", headers={'accept': 'application/json'})
         metadata = r.json()['metadata']
         dataset_rid = metadata['Dataset_RID'].split('@')[0]
         checksum_value = ""
