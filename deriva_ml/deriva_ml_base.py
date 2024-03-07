@@ -539,7 +539,17 @@ class DerivaML:
                                f"Validating bag: {current} of {total} file(s) validated.", execution_rid)
             return True
 
-        bag_dir = self.data_dir / f"bag-{minid}"
+        # request metadata
+        r = requests.get(f"https://identifiers.org/minid:{minid}", headers={'accept': 'application/json'})
+        metadata = r.json()['metadata']
+        dataset_rid = metadata['Dataset_RID'].split('@')[0]
+        checksum_value = ""
+        for checksum in r.json().get('checksums', []):
+            if checksum.get('function') == 'sha256':
+                checksum_value = checksum.get('value')
+                break
+
+        bag_dir = self.data_dir / f"{dataset_rid}_sha256:{checksum_value}"
         bag_dir.mkdir(parents=True, exist_ok=True)
         validated_check = bag_dir / "validated_check.txt"
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
@@ -561,8 +571,9 @@ class DerivaML:
                                     validation_callback=validation_progress_callback)
                     validated_check.touch()
         # bag_dir.chmod(0o444)
-        match = re.search(r'Dataset_([A-Za-z0-9-]+)', str(bag_path))
-        dataset_rid = match.group(1) if match else None
+
+        # match = re.search(r'Dataset_([A-Za-z0-9-]+)', str(bag_path))
+        # dataset_rid = match.group(1) if match else None
         return Path(bag_path), dataset_rid
 
     def download_asset(self, asset_url: str, dest_filename: str) -> str:
