@@ -31,8 +31,10 @@ def main():
     parser.add_argument('--hostname', type=str, required=True)
     parser.add_argument('--schema_name', type=str, required=True)
     parser.add_argument('--catalog_id', type=str, required=True)
-    parser.add_argument('--comments_dir', type=str, required=True)
-    parser.add_argument('--table_name', type=str)
+    parser.add_argument('--comments_dir', type=str, required=True,
+                        help="The directory containing the comments files for the whole catalog")
+    parser.add_argument('--table_name', type=str,
+                        help="Only update the comments for one table")
     args = parser.parse_args()
 
     credentials = get_credential(args.hostname)
