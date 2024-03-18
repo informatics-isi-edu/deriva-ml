@@ -95,12 +95,13 @@ def define_asset_execution_assets(schema):
     return table_def
 
 
-def setup_ml_workflow(model, schema_name):
+def setup_ml_workflow(model, schema_name, catalog_id):
+    curie_template = catalog_id+':{RID}'
     schema = create_schema_if_not_exist(model, schema_name)
     # Workflow
     workflow_table = create_table_if_not_exist(schema, 'Workflow', define_table_workflow())
     table_def_workflow_type_vocab = Table.define_vocabulary(
-        tname='Workflow_Type', curie_template='eye-ai:{RID}'
+        tname='Workflow_Type', curie_template=curie_template
     )
     workflow_type_table = schema.create_table(table_def_workflow_type_vocab)
     workflow_table.add_reference(workflow_type_table)
@@ -116,7 +117,7 @@ def setup_ml_workflow(model, schema_name):
                                                          define_asset_execution_metadata(schema))
     execution_metadata_table.add_reference(execution_table)
     table_def_metadata_type_vocab = Table.define_vocabulary(tname='Execution_Metadata_Type',
-                                                            curie_template='eye-ai:{RID}')
+                                                            curie_template=curie_template)
     metadata_type_table = schema.create_table(table_def_metadata_type_vocab)
     execution_metadata_table.add_reference(metadata_type_table)
 
@@ -126,7 +127,7 @@ def setup_ml_workflow(model, schema_name):
     association_execution_execution_asset = schema.create_association(execution_assets_table, execution_table)
 
     table_def_execution_product_type_vocab = Table.define_vocabulary(
-        tname='Execution_Product_Type', curie_template='eye-ai:{RID}'
+        tname='Execution_Product_Type', curie_template=curie_template
     )
     execution_asset_type_table = schema.create_table(table_def_execution_product_type_vocab)
     execution_assets_table.add_reference(execution_asset_type_table)
@@ -136,7 +137,7 @@ def setup_ml_workflow(model, schema_name):
 
 def main(hostname, catalog_id, credentials, schema_name):
     model = Model.from_catalog(DerivaServer('https', hostname, credentials.connect_ermrest(catalog_id)))
-    setup_ml_workflow(model, schema_name)
+    setup_ml_workflow(model, schema_name, catalog_id)
 
 
 if __name__ == "__main__":
