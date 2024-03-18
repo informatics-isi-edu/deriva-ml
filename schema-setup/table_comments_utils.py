@@ -12,7 +12,6 @@ def update_table_comments(model, schema_name: str, table_name: str, comments_dir
         file_path = os.path.join(table_comments_dir, file)
         with open(file_path, "r") as f:
             comment_str = f.read()
-            print(comment_str)
             if file.split(".")[0] == table_name:
                 table.comment = comment_str
             else:
