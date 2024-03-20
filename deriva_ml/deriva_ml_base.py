@@ -79,6 +79,9 @@ class DerivaMlExec:
         - self: The instance itself.
 
         """
+        self.catalog_ml.update_status(Status.running,
+                                      "Start ML algorithm.",
+                                      self.execution_rid)
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
