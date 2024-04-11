@@ -140,7 +140,7 @@ def setup_ml_workflow(model, schema_name, catalog_id):
     association_execution_execution_asset = schema.create_association(execution_assets_table, execution_table)
 
     table_def_execution_product_type_vocab = Table.define_vocabulary(
-        tname='Execution_Product_Type', curie_template=curie_template
+        tname='Execution_Asset_Type', curie_template=curie_template
     )
     execution_asset_type_table = schema.create_table(table_def_execution_product_type_vocab)
     execution_assets_table.add_reference(execution_asset_type_table)
