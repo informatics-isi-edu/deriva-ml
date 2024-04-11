@@ -1,3 +1,5 @@
+import sys
+
 from deriva.core import DerivaServer, get_credential
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
 from deriva.chisel import Model, Schema, Table, Column, ForeignKey
@@ -135,12 +137,7 @@ def setup_ml_workflow(model, schema_name, catalog_id):
     # association_image_execution_asset = schema.create_association(execution_assets_table, image_table)
 
 
-def main(hostname, catalog_id, credentials, schema_name):
-    model = Model.from_catalog(DerivaServer('https', hostname, credentials.connect_ermrest(catalog_id)))
-    setup_ml_workflow(model, schema_name, catalog_id)
-
-
-if __name__ == "__main__":
+def main():
     scheme = 'https'
     parser = argparse.ArgumentParser()
     parser.add_argument('--hostname', type=str, required=True)
@@ -148,5 +145,11 @@ if __name__ == "__main__":
     parser.add_argument('--catalog_id', type=str, required=True)
     args = parser.parse_args()
     credentials = get_credential(args.hostname)
-    print(credentials)
-    main(args.hostname, args.catalog_id, credentials, args.schema_name)
+    # print(credentials)
+    server = DerivaServer(scheme, args.hostname, credentials)
+    model = Model.from_catalog(server.connect_ermrest(args.catalog_id))
+    setup_ml_workflow(model, args.schema_name, args.catalog_id)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
