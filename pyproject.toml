@@ -16,6 +16,7 @@ requires-python = ">=3.8"
 deriva-ml-validate-configuration = "deriva_ml.validate_configuration:main"
 deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:main"
 deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
+deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
 
 [metadata]
 license = "Apache 2.0"
