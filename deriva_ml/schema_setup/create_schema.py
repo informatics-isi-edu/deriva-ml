@@ -3,7 +3,7 @@ import sys
 from deriva.core import DerivaServer, get_credential
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
 from deriva.chisel import Model, Schema, Table, Column, ForeignKey
-from schema_annotation import generate_annotation
+from deriva_ml.schema_setup.annotation_temp import generate_annotation
 import argparse
 
 
@@ -106,7 +106,7 @@ def setup_ml_workflow(model, schema_name, catalog_id):
     curie_template = catalog_id+':{RID}'
     schema = create_schema_if_not_exist(model, schema_name)
     # get annotations
-    annotations = generate_annotation(schema_name)
+    annotations = generate_annotation(catalog_id, schema_name)
     # Workflow
     workflow_table = create_table_if_not_exist(schema, 'Workflow',
                                                define_table_workflow(annotations["workflow_annotation"]))

@@ -176,7 +176,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
     schema_annotation = {
         "headTitle": "Catalog ML",
         "navbarMenu": {
-            "newTab": false,
+            "newTab": False,
             "children": [
                 {
                     "name": "User Info",
