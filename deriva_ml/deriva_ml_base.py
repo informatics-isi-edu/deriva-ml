@@ -161,7 +161,8 @@ class DerivaML:
 
     """
 
-    def __init__(self, hostname: str, catalog_id: str, schema_name: str, data_dir: str):
+    def __init__(self, hostname: str, catalog_id: str,
+                 ml_schema: str, data_dir: str):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
                                       self.credential,
@@ -169,9 +170,10 @@ class DerivaML:
         self.model = self.catalog.getCatalogModel()
         self.pb = self.catalog.getPathBuilder()
         self.host_name = hostname
-        self.schema_name = schema_name
+        self.ml_schema_name = ml_schema
+
         self.catalog_id = catalog_id
-        self.schema = self.pb.schemas[schema_name]
+        self.ml_schema = self.pb.schemas[ml_schema]
         self.configuration = None
 
         self.start_time = datetime.now()
@@ -198,6 +200,17 @@ class DerivaML:
         })
         return session_config
 
+    def find_table_schema(self, table_name: str) -> str:
+        schemas = self.pb.schemas.keys()
+        schema = None
+        for s in schemas:
+            if table_name in self.pb.schemas[s].tables:
+                schema = s
+        if schema is None:
+            raise DerivaMLException(f"The table {table_name} doesn't exist.")
+        else:
+            return schema
+
     def is_vocabulary(self, table_name: str) -> bool:
         """
         Check if a given table is a controlled vocabulary table.
@@ -209,12 +222,13 @@ class DerivaML:
         - bool: True if the table is a controlled vocabulary, False otherwise.
 
         """
-        vocab_columns = {'Name', 'URI', 'Synonyms', 'Description', 'ID'}
+        vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
+        schema = self.find_table_schema(table_name)
         try:
-            table = self.model.schemas[self.schema_name].tables[table_name]
+            table = self.model.schemas[schema].tables[table_name]
         except KeyError:
             raise DerivaMLException(f"The vocabulary table {table_name} doesn't exist.")
-        return vocab_columns.issubset({c.name for c in table.columns})
+        return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
     def _vocab_columns(self, table: ermrest_model.Table):
         """
@@ -278,7 +292,7 @@ class DerivaML:
         """
         workflow_type_rid = self.lookup_term("Workflow_Type", workflow_type)
         checksum = self._get_checksum(url)
-        workflow_rid = self._add_record(self.schema.Workflow,
+        workflow_rid = self._add_record(self.ml_schema.Workflow,
                                         {'URL': url,
                                          'Name': workflow_name,
                                          'Description': description,
@@ -305,12 +319,12 @@ class DerivaML:
         """
         datasets = datasets or []
         if workflow_rid:
-            execution_rid = self.schema.Execution.insert([{'Description': description,
-                                                           'Workflow': workflow_rid}])[0]['RID']
+            execution_rid = self.ml_schema.Execution.insert([{'Description': description,
+                                                              'Workflow': workflow_rid}])[0]['RID']
         else:
-            execution_rid = self.schema.Execution.insert([{'Description': description}])[0]['RID']
+            execution_rid = self.ml_schema.Execution.insert([{'Description': description}])[0]['RID']
         if datasets:
-            self._batch_insert(self.schema.Dataset_Execution,
+            self._batch_insert(self.ml_schema.Dataset_Execution,
                                [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
@@ -332,15 +346,16 @@ class DerivaML:
         """
 
         datasets = datasets or []
-        self._batch_update(self.schema.Execution,
+        self._batch_update(self.ml_schema.Execution,
                            [{"RID": execution_rid, "Workflow": workflow_rid, "Description": description}],
-                           [self.schema.Execution.Workflow, self.schema.Execution.Description])
+                           [self.ml_schema.Execution.Workflow, self.ml_schema.Execution.Description])
         if datasets:
-            self._batch_insert(self.schema.Dataset_Execution,
+            self._batch_insert(self.ml_schema.Dataset_Execution,
                                [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
-    def add_term(self, table_name: str,
+    def add_term(self,
+                 table_name: str,
                  name: str,
                  description: str,
                  synonyms: Optional[List[str]] = None,
@@ -363,22 +378,24 @@ class DerivaML:
         - EyeAIException: If the control vocabulary name already exists and exist_ok is False.
         """
         synonyms = synonyms or []
-
         try:
             if not self.is_vocabulary(table_name):
                 raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
         except KeyError:
             raise DerivaMLException(f"The schema or vocabulary table {table_name} doesn't exist.")
 
+        schema = self.find_table_schema(table_name)
         try:
-            entities = self.schema.tables[table_name].entities()
-            name_list = [e['Name'] for e in entities]
+            entities = self.pb.schemas[schema].tables[table_name].entities()
+            entities_upper = {key.upper(): value for key, value in entities.items()}
+            name_list = [e['NAME'] for e in entities]
             term_rid = entities[name_list.index(name)]['RID']
         except ValueError:
             # Name is not in list of current terms
-            term_rid = self.schema.tables[table_name].insert(
-                [{'Name': name, 'Description': description, 'Synonyms': synonyms}],
-                defaults={'ID', 'URI'})[0]['RID']
+            col_map = {col.upper(): col for col in self.pb.schemas[schema].tables[table_name].columns.keys()}
+            term_rid = self.pb.schemas[schema].tables[table_name].insert(
+                [{col_map['NAME']: name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
+                defaults={col_map['ID'], col_map['URI']})[0]['RID']
         else:
             # Name is list of current terms.
             if not exist_ok:
@@ -409,8 +426,10 @@ class DerivaML:
         if not vocab_table:
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        for term in self.schema.tables[table_name].entities():
-            if term_name == term['Name'] or (term['Synonyms'] and term_name in term['Synonyms']):
+        schema = self.find_table_schema(table_name)
+        for term in self.pb.schemas[schema].tables[table_name].entities():
+            term_upper = {key.upper(): value for key, value in term.items()}
+            if term_name == term_upper['NAME'] or (term['SYNONYMS'] and term_name in term['SYNONYMS']):
                 return term['RID']
 
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
@@ -423,7 +442,8 @@ class DerivaML:
          - List[str]: A list of table names representing controlled vocabulary tables in the schema.
 
         """
-        return [t for t in self.schema.tables if self.is_vocabulary(t)]
+        return [t for s in self.pb.schemas.keys() for t in self.pb.schemas[s].tables if self.is_vocabulary(t)]
+
 
     def list_vocabulary(self, table_name: str) -> pd.DataFrame:
         """
@@ -447,7 +467,7 @@ class DerivaML:
         if not vocab_table:
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        return pd.DataFrame(self.schema.tables[table_name].entities().fetch())
+        return pd.DataFrame(self.pb.schemas[self.find_table_schema(table_name)].tables[table_name].entities().fetch())
 
     def resolve_rid(self, rid: str) -> ResolveRidResult:
         """
@@ -593,10 +613,6 @@ class DerivaML:
                                     fetch_callback=fetch_progress_callback,
                                     validation_callback=validation_progress_callback)
                     validated_check.touch()
-        # bag_dir.chmod(0o444)
-
-        # match = re.search(r'Dataset_([A-Za-z0-9-]+)', str(bag_path))
-        # dataset_rid = match.group(1) if match else None
         return Path(bag_path), dataset_rid
 
     def download_asset(self, asset_url: str, dest_filename: str) -> str:
@@ -650,9 +666,9 @@ class DerivaML:
 
         """
         self.status = new_status.value
-        self._batch_update(self.schema.Execution,
+        self._batch_update(self.ml_schema.Execution,
                            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
-                           [self.schema.Execution.Status, self.schema.Execution.Status_Detail])
+                           [self.ml_schema.Execution.Status, self.ml_schema.Execution.Status_Detail])
 
     def download_execution_assets(self, asset_rid: str, execution_rid="", dest_dir: str = "") -> Path:
         """
@@ -670,8 +686,8 @@ class DerivaML:
         - DerivaMLException: If there is an issue downloading the assets.
 
         """
-        asset_metadata = self.schema.Execution_Assets.filter(self.schema.Execution_Assets.RID == asset_rid).entities()[
-            0]
+        asset_metadata = self.ml_schema.Execution_Assets.filter(self.ml_schema.Execution_Assets.RID == asset_rid
+                                                                ).entities()[0]
         asset_url = asset_metadata['URL']
         file_name = asset_metadata['Filename']
         try:
@@ -683,11 +699,11 @@ class DerivaML:
             raise DerivaMLException(f"Failed to download the asset {asset_rid}. Error: {error}")
 
         if execution_rid != '':
-            exec_prod_exec_entities = self.schema.Execution_Assets_Execution.filter(
-                self.schema.Execution_Assets_Execution.Execution_Assets == asset_rid).entities()
+            exec_prod_exec_entities = self.ml_schema.Execution_Assets_Execution.filter(
+                self.ml_schema.Execution_Assets_Execution.Execution_Assets == asset_rid).entities()
             exec_list = [e['Execution'] for e in exec_prod_exec_entities]
             if execution_rid not in exec_list:
-                self._batch_insert(self.schema.Execution_Assets_Execution,
+                self._batch_insert(self.ml_schema.Execution_Assets_Execution,
                                    [{"Execution_Assets": asset_rid, "Execution": execution_rid}])
         return Path(file_path)
 
@@ -709,7 +725,7 @@ class DerivaML:
         """
         self.update_status(Status.running, "Downloading metadata...", execution_rid)
         asset_metadata = \
-            self.schema.Execution_Metadata.filter(self.schema.Execution_Metadata.RID == metadata_rid).entities()[0]
+            self.ml_schema.Execution_Metadata.filter(self.ml_schema.Execution_Metadata.RID == metadata_rid).entities()[0]
         asset_url = asset_metadata['URL']
         file_name = asset_metadata['Filename']
         try:
@@ -720,13 +736,13 @@ class DerivaML:
             raise DerivaMLException(f"Failed to download the asset {metadata_rid}. Error: {error}")
 
         if execution_rid != '':
-            exec_metadata_exec_entities = self.schema.Execution_Metadata.filter(
-                self.schema.Execution_Metadata.RID == metadata_rid).entities()
+            exec_metadata_exec_entities = self.ml_schema.Execution_Metadata.filter(
+                self.ml_schema.Execution_Metadata.RID == metadata_rid).entities()
             exec_list = [e['Execution'] for e in exec_metadata_exec_entities]
             if execution_rid not in exec_list:
-                self._batch_update(self.schema.Execution_Metadata,
+                self._batch_update(self.ml_schema.Execution_Metadata,
                                    [{"Execution": execution_rid}],
-                                   [self.schema.Execution_Metadata.Execution])
+                                   [self.ml_schema.Execution_Metadata.Execution])
         return Path(file_path)
 
     def upload_execution_configuration(self, config_file: str, desc: str):
@@ -759,8 +775,8 @@ class DerivaML:
             raise DerivaMLException(
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
-            execution_metadata_type_rid = self.lookup_term(self.schema.Execution_Metadata_Type, "Execution Config")
-            self._batch_insert(self.schema.Execution_Metadata,
+            execution_metadata_type_rid = self.lookup_term(self.ml_schema.Execution_Metadata_Type, "Execution Config")
+            self._batch_insert(self.ml_schema.Execution_Metadata,
                                [{"URL": hatrac_uri,
                                  "Filename": file_name,
                                  "Length": file_size,
@@ -799,9 +815,9 @@ class DerivaML:
                     rid = asset["Result"].get("RID")
                     if rid is not None:
                         entities.append({"RID": rid, "Execution": execution_rid})
-            self._batch_update(self.schema.Execution_Metadata,
+            self._batch_update(self.ml_schema.Execution_Metadata,
                                entities,
-                               [self.schema.Execution_Metadata.Execution])
+                               [self.ml_schema.Execution_Metadata.Execution])
 
     def upload_execution_assets(self, execution_rid: str) -> dict:
         """
@@ -830,8 +846,8 @@ class DerivaML:
                     raise DerivaMLException(
                         f"Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}")
                 else:
-                    asset_exec_entities = self.schema.Execution_Assets_Execution.filter(
-                        self.schema.Execution_Assets_Execution.Execution == execution_rid).entities()
+                    asset_exec_entities = self.ml_schema.Execution_Assets_Execution.filter(
+                        self.ml_schema.Execution_Assets_Execution.Execution == execution_rid).entities()
                     assets_list = [e['Execution_Assets'] for e in asset_exec_entities]
                     entities = []
                     for asset in result.values():
@@ -839,7 +855,7 @@ class DerivaML:
                             rid = asset["Result"].get("RID")
                             if (rid is not None) and (rid not in assets_list):
                                 entities.append({"Execution_Assets": rid, "Execution": execution_rid})
-                    self._batch_insert(self.schema.Execution_Assets_Execution, entities)
+                    self._batch_insert(self.ml_schema.Execution_Assets_Execution, entities)
                     results[str(folder_path)] = result
         return results
 
@@ -861,8 +877,8 @@ class DerivaML:
         duration = f'{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec'
 
         self.update_status(Status.running, "Algorithm execution ended.", execution_rid)
-        self._batch_update(self.schema.Execution, [{"RID": execution_rid, "Duration": duration}],
-                           [self.schema.Execution.Duration])
+        self._batch_update(self.ml_schema.Execution, [{"RID": execution_rid, "Duration": duration}],
+                           [self.ml_schema.Execution.Duration])
 
     def execution_init(self, configuration_rid: str) -> ConfigurationRecord:
         """
@@ -891,7 +907,6 @@ class DerivaML:
             logging.info("Configuration validation successful!")
         except ValidationError as e:
             raise DerivaMLException(f"configuration validation failed: {e}")
-        # configuration_records = ConfigurationRecords()
         # Insert or return Execution
         execution_rid = self.add_execution(description=self.configuration.execution.description)
         # Insert terms
@@ -903,7 +918,6 @@ class DerivaML:
                                      description=term["description"],
                                      exist_ok=True)
             term_records = vocabs.get(term["term"], [])
-            # term_records.append({"name": term["name"], "RID": term_rid})
             term_records.append(Term(name=term["name"], rid=term_rid))
             vocabs[term["term"]] = term_records
         # Materialize bdbag
