@@ -1056,11 +1056,11 @@ class DerivaML:
             # uploaded_assets = self.upload_execution_assets(execution_rid)
             uploaded_assets = self.upload_execution_files('Execution_Assets',
                                                           execution_rid,
-                                                          self.execution_assets_path)
+                                                          self.working_dir)
             # self.upload_execution_metadata(execution_rid)
             self.upload_execution_files('Execution_Metadata',
                                         execution_rid,
-                                        self.execution_metadata_path)
+                                        self.working_dir)
             self.update_status(Status.completed,
                                "Successfully end the execution.",
                                execution_rid)
