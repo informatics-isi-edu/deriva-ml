@@ -157,12 +157,13 @@ class DerivaML:
     - hostname (str): Hostname of the Deriva server.
     - catalog_id (str): Catalog ID.
     - schema_name (str): Schema name.
-    - data_dir (str): Directory path for storing data.
+    - cache_dir (str): Directory path for caching data.
+    - working_dir (str): Directory path for storing temporary data.
 
     """
 
-    def __init__(self, hostname: str, catalog_id: str,
-                 ml_schema: str, data_dir: str):
+    def __init__(self, hostname: str, catalog_id: str, ml_schema: str,
+                 cache_dir: str, working_dir: str):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
                                       self.credential,
@@ -178,9 +179,12 @@ class DerivaML:
 
         self.start_time = datetime.now()
         self.status = Status.pending.value
-        self.data_dir = Path(data_dir)
-        self.execution_assets_path = self.data_dir / "Execution_Assets/"
-        self.execution_metadata_path = self.data_dir / "Execution_Metadata/"
+        self.cache_dir = Path(cache_dir)
+        self.working_dir = Path(working_dir)
+        # self.data_dir = Path(data_dir)
+        self.execution_assets_path = self.working_dir / "Execution_Assets/"
+        self.execution_metadata_path = self.working_dir / "Execution_Metadata/"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
@@ -387,8 +391,8 @@ class DerivaML:
         schema = self.find_table_schema(table_name)
         try:
             entities = self.pb.schemas[schema].tables[table_name].entities()
-            entities_upper = {key.upper(): value for key, value in entities.items()}
-            name_list = [e['NAME'] for e in entities]
+            entities_upper = [{key.upper(): value for key, value in e.items()} for e in entities]
+            name_list = [e['NAME'] for e in entities_upper]
             term_rid = entities[name_list.index(name)]['RID']
         except ValueError:
             # Name is not in list of current terms
@@ -429,7 +433,7 @@ class DerivaML:
         schema = self.find_table_schema(table_name)
         for term in self.pb.schemas[schema].tables[table_name].entities():
             term_upper = {key.upper(): value for key, value in term.items()}
-            if term_name == term_upper['NAME'] or (term['SYNONYMS'] and term_name in term['SYNONYMS']):
+            if term_name == term_upper['NAME'] or (term_upper['SYNONYMS'] and term_name in term_upper['SYNONYMS']):
                 return term['RID']
 
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
@@ -592,7 +596,7 @@ class DerivaML:
                 checksum_value = checksum.get('value')
                 break
 
-        bag_dir = self.data_dir / f"{dataset_rid}_{checksum_value}"
+        bag_dir = self.cache_dir / f"{dataset_rid}_{checksum_value}"
         bag_dir.mkdir(parents=True, exist_ok=True)
         validated_check = bag_dir / "validated_check.txt"
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
@@ -790,7 +794,7 @@ class DerivaML:
 
     def upload_execution_metadata(self, execution_rid: str):
         """
-        Upload execution metadata at self.data_dir/Execution_metadata.
+        Upload execution metadata at working_dir/Execution_metadata.
 
         Args:
         - execution_rid (str): Resource Identifier (RID) of the execution.
@@ -821,7 +825,7 @@ class DerivaML:
 
     def upload_execution_assets(self, execution_rid: str) -> dict:
         """
-        Upload execution assets at self.data_dir/Execution_assets.
+        Upload execution assets at working_dir/Execution_assets.
 
         Args:
         - execution_rid (str): Resource Identifier (RID) of the execution.
@@ -974,7 +978,15 @@ class DerivaML:
         """
         return DerivaMlExec(self, execution_rid)
 
-    def execution_upload(self, execution_rid: str) -> dict[str, dict]:
+    def _clean_folder_contents(self, folder_path: Path):
+        folder = Path(folder_path)
+        for item in folder.iterdir():
+            if item.is_file():
+                item.unlink()
+            elif item.is_dir():
+                item.rmdir()
+
+    def execution_upload(self, execution_rid: str, clean_folder: bool = True) -> dict[str, dict]:
         """
         Upload all the assets and metadata associated with the current execution.
 
@@ -992,6 +1004,9 @@ class DerivaML:
             self.update_status(Status.completed,
                                "Successfully end the execution.",
                                execution_rid)
+            if clean_folder:
+                self._clean_folder_contents(self.execution_assets_path)
+                self._clean_folder_contents(self.execution_metadata_path)
             return uploaded_assets
         except Exception as e:
             error = format_exception(e)
