@@ -802,80 +802,44 @@ class DerivaML:
             raise DerivaMLException(
                 f"Failed to update Execution_Asset table with configuration file metadata. Error: {error}")
 
-    # def upload_execution_metadata(self, execution_rid: str):
-    #     """
-    #     Upload execution metadata at working_dir/Execution_metadata.
-    #
-    #     Args:
-    #     - execution_rid (str): Resource Identifier (RID) of the execution.
-    #
-    #     Raises:
-    #     - DerivaMLException: If there is an issue uploading the metadata.
-    #
-    #     """
-    #     self.update_status(Status.running, "Uploading assets...", execution_rid)
-    #     try:
-    #         results = self.upload_assets(str(self.execution_metadata_path))
-    #     except Exception as e:
-    #         error = format_exception(e)
-    #         self.update_status(Status.failed, error, execution_rid)
-    #         raise DerivaMLException(
-    #             f"Fail to upload the files in {self.execution_metadata_path}"
-    #             f" to Execution_Metadata table. Error: {error}")
-    #     else:
-    #         entities = []
-    #         for asset in results.values():
-    #             if asset["State"] == 0 and asset["Result"] is not None:
-    #                 rid = asset["Result"].get("RID")
-    #                 if rid is not None:
-    #                     entities.append({"RID": rid, "Execution": execution_rid})
-    #         self._batch_update(self.ml_schema.Execution_Metadata,
-    #                            entities,
-    #                            [self.ml_schema.Execution_Metadata.Execution])
-
-    # def upload_execution_assets(self, execution_rid: str) -> dict:
-    #     """
-    #     Upload execution assets at working_dir/Execution_assets.
-    #
-    #     Args:
-    #     - execution_rid (str): Resource Identifier (RID) of the execution.
-    #
-    #     Returns:
-    #     - dict: Results of the upload operation.
-    #
-    #     Raises:
-    #     - DerivaMLException: If there is an issue uploading the assets.
-    #
-    #     """
-    #     results = {}
-    #     for folder_path in self.execution_assets_path.iterdir():
-    #         self.update_status(Status.running, f"Uploading assets {folder_path}...", execution_rid)
-    #         if folder_path.is_dir():
-    #             try:
-    #                 result = self.upload_assets(str(folder_path))
-    #                 self.update_status(Status.running, "Uploading assets...", execution_rid)
-    #             except Exception as e:
-    #                 error = format_exception(e)
-    #                 self.update_status(Status.failed, error, execution_rid)
-    #                 raise DerivaMLException(
-    #                     f"Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}")
-    #             else:
-    #                 asset_exec_entities = self.ml_schema.Execution_Assets_Execution.filter(
-    #                     self.ml_schema.Execution_Assets_Execution.Execution == execution_rid).entities()
-    #                 assets_list = [e['Execution_Assets'] for e in asset_exec_entities]
-    #                 entities = []
-    #                 for asset in result.values():
-    #                     if asset["State"] == 0 and asset["Result"] is not None:
-    #                         rid = asset["Result"].get("RID")
-    #                         if (rid is not None) and (rid not in assets_list):
-    #                             entities.append({"Execution_Assets": rid, "Execution": execution_rid})
-    #                 self._batch_insert(self.ml_schema.Execution_Assets_Execution, entities)
-    #                 results[str(folder_path)] = result
-    #     return results
-
-    def upload_execution_files(self, table_name: str, execution_rid: str, dest_dir: Path) -> dict:
+    def upload_execution_metadata(self, execution_rid: str):
         """
-        Upload execution files at working_dir/Execution_Assets or working_dir/Execution_Metadata.
+        Upload execution metadata at working_dir/Execution_metadata.
+
+        Args:
+        - execution_rid (str): Resource Identifier (RID) of the execution.
+
+        Raises:
+        - DerivaMLException: If there is an issue uploading the metadata.
+
+        """
+        self.update_status(Status.running, "Uploading assets...", execution_rid)
+        try:
+            results = self.upload_assets(str(self.execution_metadata_path))
+        except Exception as e:
+            error = format_exception(e)
+            self.update_status(Status.failed, error, execution_rid)
+            raise DerivaMLException(
+                f"Fail to upload the files in {self.execution_metadata_path}"
+                f" to Execution_Metadata table. Error: {error}")
+
+        else:
+            meta_exec_entities = self.ml_schema.Execution_Metadata_Execution.filter(
+                self.ml_schema.Execution_Metadata_Execution.Execution == execution_rid).entities()
+            meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
+            entities = []
+            for metadata in results.values():
+                if metadata["State"] == 0 and metadata["Result"] is not None:
+                    rid = metadata["Result"].get("RID")
+                    if (rid is not None) and (rid not in meta_list):
+                        entities.append({"Execution_Metadata": rid, "Execution": execution_rid})
+        self._batch_insert(self.ml_schema.Execution_Metadata_Execution, entities)
+
+        return results
+
+    def upload_execution_assets(self, execution_rid: str) -> dict:
+        """
+        Upload execution assets at working_dir/Execution_assets.
 
         Args:
         - execution_rid (str): Resource Identifier (RID) of the execution.
@@ -888,32 +852,30 @@ class DerivaML:
 
         """
         results = {}
-        for folder_path in dest_dir.iterdir():
-            self.update_status(Status.running, f"Uploading {folder_path} ...", execution_rid)
+        for folder_path in self.execution_assets_path.iterdir():
+            self.update_status(Status.running, f"Uploading assets {folder_path}...", execution_rid)
             if folder_path.is_dir():
                 try:
                     result = self.upload_assets(str(folder_path))
-                    self.update_status(Status.running, f"Uploading {table_name} ...", execution_rid)
+                    self.update_status(Status.running, "Uploading assets...", execution_rid)
                 except Exception as e:
                     error = format_exception(e)
                     self.update_status(Status.failed, error, execution_rid)
                     raise DerivaMLException(
                         f"Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}")
                 else:
-                    ass_table = self.ml_schema.tables[table_name + '_Execution']
-                    file_exec_entities = ass_table.filter(ass_table.Execution == execution_rid).entities()
-                    files_list = [e[table_name] for e in file_exec_entities]
+                    asset_exec_entities = self.ml_schema.Execution_Assets_Execution.filter(
+                        self.ml_schema.Execution_Assets_Execution.Execution == execution_rid).entities()
+                    assets_list = [e['Execution_Assets'] for e in asset_exec_entities]
                     entities = []
                     for asset in result.values():
                         if asset["State"] == 0 and asset["Result"] is not None:
                             rid = asset["Result"].get("RID")
-                            if (rid is not None) and (rid not in files_list):
-                                entities.append({table_name: rid, "Execution": execution_rid})
-                    self._batch_insert(ass_table, entities)
+                            if (rid is not None) and (rid not in assets_list):
+                                entities.append({"Execution_Assets": rid, "Execution": execution_rid})
+                    self._batch_insert(self.ml_schema.Execution_Assets_Execution, entities)
                     results[str(folder_path)] = result
-            self.update_status(Status.running, f"Successfully upload {folder_path}...", execution_rid)
         return results
-
 
     def execution_end(self, execution_rid: str) -> None:
         """
@@ -1053,14 +1015,9 @@ class DerivaML:
 
         """
         try:
-            # uploaded_assets = self.upload_execution_assets(execution_rid)
-            uploaded_assets = self.upload_execution_files('Execution_Assets',
-                                                          execution_rid,
-                                                          self.working_dir)
-            # self.upload_execution_metadata(execution_rid)
-            self.upload_execution_files('Execution_Metadata',
-                                        execution_rid,
-                                        self.working_dir)
+            uploaded_assets = self.upload_execution_assets(execution_rid)
+            self.upload_execution_metadata(execution_rid)
+
             self.update_status(Status.completed,
                                "Successfully end the execution.",
                                execution_rid)
