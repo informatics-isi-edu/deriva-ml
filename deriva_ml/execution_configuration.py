@@ -19,6 +19,8 @@ class Term(str, Enum):
     annotation = "Annotation_Type"
     workflow = "Workflow_Type"
     diagnosis = "Diagnosis_Tag"
+    execution_asset_type = "Execution_Asset_Type"
+    execution_metadata_type = "Execution_Metadata_Type"
 
 
 class WorkflowTerm(BaseModel):
