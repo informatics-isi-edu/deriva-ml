@@ -948,11 +948,16 @@ class DerivaML:
             bag_paths.append(bag_path)
         # Insert workflow
         self.update_status(Status.running, "Inserting workflow... ", execution_rid)
-        workflow_rid = self.add_workflow(self.configuration.workflow.name,
-                                         self.configuration.workflow.url,
-                                         self.configuration.workflow.workflow_type,
-                                         self.configuration.workflow.version,
-                                         self.configuration.workflow.description)
+        try:
+            workflow_rid = self.add_workflow(self.configuration.workflow.name,
+                                             self.configuration.workflow.url,
+                                             self.configuration.workflow.workflow_type,
+                                             self.configuration.workflow.version,
+                                             self.configuration.workflow.description)
+        except Exception as e:
+            error = format_exception(e)
+            self.update_status(Status.failed, error, execution_rid)
+            raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
         # Update execution info
         execution_rid = self.update_execution(execution_rid, workflow_rid, dataset_rids,
                                               self.configuration.execution.description)
