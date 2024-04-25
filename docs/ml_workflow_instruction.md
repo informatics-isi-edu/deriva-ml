@@ -37,7 +37,7 @@ This configuration JSON file specifies the datasets, model assets, workflow, and
          "name": "Model training",
          "description": ""
         },
-        {"term": "Execution_Metadat_Type",
+        {"term": "Execution_Metadata_Type",
          "name": "****",
          "description": ""
         },
