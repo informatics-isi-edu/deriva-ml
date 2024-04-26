@@ -56,7 +56,7 @@ This configuration JSON file specifies the datasets, model assets, workflow, and
  Click `Export` -> `BDBag to Cloud` -> `Copy Compact URI`. Then past to the `bdbag_url` list in the configuration file.
  ![minid](copy_minid.png)
 
-- **models**: a list of RIDs from the Execution_Assets table if the assets need to be used in the current execution.
+- **models**: a list of RIDs from the Execution_Assets table if the assets need to be used in the current execution.  Models will be automatically downloaded when the execution workflow is initialized.
 - **workflow**: contains several data fields for workflow table, see Workflow table description in last section. If 
 using the same workflow created before, please ensure the url is the same.
 - **execution**: Add a description of the current execution on the workflow.
