@@ -14,7 +14,7 @@ For a practical demonstration, refer to this Colab
 illustrating the image cropping process within the Eye-AI catalog.
 
 ## Steps
-### 1. Create configuration file for notebook
+### 1. Create a configuration file to describe the details of what the notebook will do.
 This configuration JSON file specifies the datasets, model assets, workflow, and controlled vocabulary for an execution:
     
 ```JSON
