@@ -64,7 +64,11 @@ using the same workflow created before, please ensure the url is the same.
  is a dictionary, where `term` is the controlled vocabulary table name, `name` is the controlled vocab term name, 
  `description` is a description for the term. When creating a new controlled vocab term, please check the catalog 
  to make sure there's no appropriate term for use. When reusing an existing term, please use the exact term `name` shown
- in catalog. 
+ in catalog. Currently, the following term types are allowed:
+    * "Execution_Metadata_Type.  Used to identify the various types of files that may be used to configure an execution.
+    * Execution_Asset_Type. Identifies the type of output file produced by the execution
+    * Diagnosis_Tag. If the execution produces a lable for an image, this value allows 
+
 
 ### 2. Upload the configuration file to catalog 
 Upload via web UI: go to Execution Metadata table -> `create` -> select configuration json file at `URL` -> select an 
