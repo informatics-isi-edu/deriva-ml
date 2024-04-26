@@ -101,7 +101,11 @@ DEFAULT_SERVER = 'dev.eye-ai.org' if DEBUG_MODE else 'www.eye-ai.org'
 ### 5. Notebook - initiate tools
 
 ```python
-EA = EyeAI(hostname = DEFAULT_SERVER, catalog_id = catalog_id, cache_dir= 'content/cache/', working_dir='content/working/')
+EA = EyeAI(hostname = DEFAULT_SERVER,
+    catalog_id = catalog_id,
+    cache_dir= 'content/cache/',
+    working_dir='content/working/')
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
 ```
 The `cache_dir` is the path to directory for data caching. The materialized BDbag will be saved there. 
