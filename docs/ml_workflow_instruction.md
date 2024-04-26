@@ -157,8 +157,8 @@ with EA.execution(execution_rid=configuration_records.execution_rid) as exec:
 ```
 Inside the machine learning scripts, if any outputs need to be saved back to the catalog, save them into the  
 right directory.
-- Metadata: Save to the directory: `{data_dir}/Execution_Metadata/{Execcution_Metadata_Type_Name}-{filename}.{ext}`
-- Assets (model, output images, etc.): Save to directory  `{data_dir}/Execution_Assets/{Execution_Assets_Type_Name}/{filename}.{ext}`
+- Metadata: Save to the directory: `{working_dir}/Execution_Metadata/{Execcution_Metadata_Type_Name}-{filename}.{ext}`
+- Assets (model, output images, etc.): Save to directory  `{working_dir}/Execution_Assets/{Execution_Assets_Type_Name}/{filename}.{ext}`
 
 The Execution_metadata_Type and Execution_Assets_Type_Name are controlled vocabularies. They can be created or retrieved 
 by `workflow_terms` in configuration file in steps 1 and 6.
@@ -167,7 +167,7 @@ by `workflow_terms` in configuration file in steps 1 and 6.
 ```python
 uploaded_assets = EA.execution_upload(configuration_records.execution_rid)
 ```
-This method will upload all the generated files in `{data_dir}/Execution_Assets/` and `{data_dir}/Execution_Metadata/` to 
+This method will upload all the generated files in `{working_dir}/Execution_Assets/` and `{working_dir}/Execution_Metadata/` to 
 the data catalog. After this step, all the files can be found on the execution detailed page or Execution_Assets and 
 Execution_Metadata tables respectively.\
 The return of the method is a dictionary contains file directory information in `data_dir` and metadata in data catalog 
