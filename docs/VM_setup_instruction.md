@@ -1,5 +1,4 @@
 # Instructions of VM setup.
-# Overview
 
 # Clone the Tensorflow Env
 ```bash
