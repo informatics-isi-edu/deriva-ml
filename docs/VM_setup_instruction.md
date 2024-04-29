@@ -2,10 +2,8 @@
 
 # Clone the Tensorflow Env
 ```bash
-conda create --name my-tensorflow --clone tensorflow
-conda activate my-tensorflow
-python -m ipykernel install --user --name 'my-tensorflow' --display-name "My Tensorflow"
-echo "conda activate my-tensorflow" >> ~/.bashrc
+/data/conda-clone-tensorflow.sh
+pip install git+https://github.com/informatics-isi-edu/deriva-ml 
 ```
 After this step, you can see "My-Tensorflow" section on Luncher page:
  ![minid](instruction_image/Launcher.png)
