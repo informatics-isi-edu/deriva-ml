@@ -1,16 +1,21 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=42", "wheel", "setuptools-git-versioning>=2.0,<3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "deriva-ml"
-version = "0.0.2"
+dynamic = ["version"]
 authors = [
     {name = "ISRD", email = "isrd-dev@isi.edu"},
 ]
 description = "Utilities to simplify use of Dervia and Pandas"
 readme = "README.md"
 requires-python = ">=3.8"
+
+[tool.setuptools-git-versioning]
+enabled = true
+version_file = "VERSION"
+count_commits_from_version_file = true
 
 [project.scripts]
 deriva-ml-validate-configuration = "deriva_ml.validate_configuration:main"

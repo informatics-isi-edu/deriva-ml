@@ -10,18 +10,18 @@ from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.core.hatrac_store import HatracStore
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from enum import Enum
+import hashlib
 from itertools import islice
 import json
+import logging
+import pkg_resources
 import pandas as pd
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import re
 import requests
+import sys
 from typing import List, Sequence, Optional, Any
-from pydantic import ValidationError
-import hashlib
-import pkg_resources
-import logging
 import shutil
 
 class DerivaMLException(Exception):
@@ -187,6 +187,7 @@ class DerivaML:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
+        self.version = sys.modules[globals()["__package__"]].__version__
 
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
