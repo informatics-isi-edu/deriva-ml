@@ -714,52 +714,6 @@ class DerivaML:
         self.update_status(Status.running, f"Successfully download {table_name}...", execution_rid)
         return Path(file_path)
 
-    # def download_execution_assets(self, asset_rid: str, execution_rid="", dest_dir: str = "") -> Path:
-    #
-    #     asset_metadata = self.ml_schema.Execution_Assets.filter(self.ml_schema.Execution_Assets.RID == asset_rid
-    #                                                             ).entities()[0]
-    #     asset_url = asset_metadata['URL']
-    #     file_name = asset_metadata['Filename']
-    #     try:
-    #         file_path = self.download_asset(asset_url, str(dest_dir) + '/' + file_name)
-    #         self.update_status(Status.running, "Downloading assets...", execution_rid)
-    #     except Exception as e:
-    #         error = format_exception(e)
-    #         self.update_status(Status.failed, error, execution_rid)
-    #         raise DerivaMLException(f"Failed to download the asset {asset_rid}. Error: {error}")
-    #
-    #     if execution_rid != '':
-    #         exec_prod_exec_entities = self.ml_schema.Execution_Assets_Execution.filter(
-    #             self.ml_schema.Execution_Assets_Execution.Execution_Assets == asset_rid).entities()
-    #         exec_list = [e['Execution'] for e in exec_prod_exec_entities]
-    #         if execution_rid not in exec_list:
-    #             self._batch_insert(self.ml_schema.Execution_Assets_Execution,
-    #                                [{"Execution_Assets": asset_rid, "Execution": execution_rid}])
-    #     return Path(file_path)
-
-    # def download_execution_metadata(self, metadata_rid: str, execution_rid="", dest_dir: str = "") -> Path:
-    #     asset_metadata = \
-    #         self.ml_schema.Execution_Metadata.filter(self.ml_schema.Execution_Metadata.RID == metadata_rid).entities()[0]
-    #     asset_url = asset_metadata['URL']
-    #     file_name = asset_metadata['Filename']
-    #     try:
-    #         file_path = self.download_asset(asset_url, str(dest_dir) + '/' + file_name)
-    #         self.update_status(Status.running, "Downloading metadata...", execution_rid)
-    #     except Exception as e:
-    #         error = format_exception(e)
-    #         self.update_status(Status.failed, error, execution_rid)
-    #         raise DerivaMLException(f"Failed to download the asset {metadata_rid}. Error: {error}")
-    #
-    #     if execution_rid != '':
-    #         exec_metadata_exec_entities = self.ml_schema.Execution_Metadata.filter(
-    #             self.ml_schema.Execution_Metadata.RID == metadata_rid).entities()
-    #         exec_list = [e['Execution'] for e in exec_metadata_exec_entities]
-    #         if execution_rid not in exec_list:
-    #             self._batch_update(self.ml_schema.Execution_Metadata,
-    #                                [{"Execution": execution_rid}],
-    #                                [self.ml_schema.Execution_Metadata.Execution])
-    #     return Path(file_path)
-
     def upload_execution_configuration(self, config_file: str, desc: str):
         """
         Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
