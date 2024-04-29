@@ -12,9 +12,14 @@ description = "Utilities to simplify use of Dervia and Pandas"
 readme = "README.md"
 requires-python = ">=3.8"
 
+[tool.setuptools.package-data]
+# include VERSION file to a package
+deriva_ml = ["VERSION"]
+
+
 [tool.setuptools-git-versioning]
 enabled = true
-version_file = "VERSION"
+version_file = "deriva_ml/VERSION"
 count_commits_from_version_file = true
 
 [project.scripts]

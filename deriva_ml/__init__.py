@@ -6,4 +6,3 @@ except PackageNotFoundError:
     # package is not installed
     pass
 
-print(f"Dervia-ml version{__version__}")
