@@ -966,9 +966,6 @@ class DerivaML:
 
         # Download model
         self.update_status(Status.running, "Downloading models ...", execution_rid)
-        # assets_paths = [self.download_execution_assets(m, execution_rid,
-        #                                                dest_dir=str(self.execution_assets_path))
-        #                 for m in self.configuration.models]
         assets_paths = [self.download_execution_files('Execution_Assets', m, execution_rid,
                                                       dest_dir=str(self.execution_assets_path))
                         for m in self.configuration.models]

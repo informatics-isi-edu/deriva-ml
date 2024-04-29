@@ -76,15 +76,17 @@ Execution Metadata Type (i.e. Execution_Config) at `Execution Metadata Type` -> 
 configuration file. This RID will be used in step 6.
 
 ### 3. Notebook - install dependencies
-
+For Colab env, use the following cell. For VM, see [VM setup instruction](VM_setup_instruction.md)
 ```python
-!pip install --upgrade --force pydantic git+https://github.com/fair-research/bdbag git+https://github.com/informatics-isi-edu/deriva-py git+https://github.com/informatics-isi-edu/eye-ai-tools git+https://github.com/informatics-isi-edu/deriva-ml git+https://github.com/informatics-isi-edu/eye-ai-ml
-import json
-import os
-from eye_ai import EyeAI
-import pandas as pd
-from pathlib import Path, PurePath
-import logging
+# Prerequisites to configure colab
+import sys
+IN_COLAB = 'google.colab' in sys.modules
+
+if IN_COLAB:
+    !pip install deriva
+    !pip install bdbag
+    !pip install --upgrade --force pydantic
+    !pip install git+https://github.com/informatics-isi-edu/deriva-ml git+https://github.com/informatics-isi-edu/eye-ai-ml
 ```
 In the pip installation, the `eye-ai-ml` and `eye-ai-tools` GitHub repos are installed for the Eye-ai use case.
 
