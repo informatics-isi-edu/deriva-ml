@@ -23,6 +23,9 @@ import requests
 import sys
 from typing import List, Sequence, Optional, Any
 import shutil
+import getpass
+import os
+
 
 class DerivaMLException(Exception):
     """
@@ -137,6 +140,8 @@ class ConfigurationRecord(BaseModel):
     - configuration_path (Path): Path to the configuration file.
 
     """
+    caching_dir: Path
+    working_dir: Path
     vocabs: dict[str, list[Term]]
     execution_rid: str
     workflow_rid: str
@@ -163,7 +168,7 @@ class DerivaML:
     """
 
     def __init__(self, hostname: str, catalog_id: str, ml_schema: str,
-                 cache_dir: str, working_dir: str):
+                 cache_dir: str, working_dir: str = None):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
                                       self.credential,
@@ -180,8 +185,12 @@ class DerivaML:
         self.start_time = datetime.now()
         self.status = Status.pending.value
         self.cache_dir = Path(cache_dir)
+        default_workdir = self.__class__.__name__ + "_working"
+        if working_dir is not None:
+            self.working_dir = Path(working_dir).joinpath(getpass.getuser(), default_workdir)
+        else:
+            self.working_dir = Path(os.path.expanduser('~')).joinpath(default_workdir)
         self.working_dir = Path(working_dir)
-        # self.data_dir = Path(data_dir)
         self.execution_assets_path = self.working_dir / "Execution_Assets/"
         self.execution_metadata_path = self.working_dir / "Execution_Metadata/"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -924,6 +933,8 @@ class DerivaML:
                                                       dest_dir=str(self.execution_assets_path))
                         for m in self.configuration.models]
         configuration_records = ConfigurationRecord(
+            caching_dir=self.cache_dir,
+            working_dir=self.working_dir,
             execution_rid=execution_rid,
             workflow_rid=workflow_rid,
             bag_paths=bag_paths,
