@@ -1,10 +1,12 @@
 # Instructions of VM setup.
 
-# Clone the Tensorflow Env in a Terminal window
+# Clone the Tensorflow Env
+Open a Terminal window and execute:
 ```bash
 /data/conda-clone-tensorflow.sh
 ```
-Exit the terminal. Your conda environment will auto activate the next time you open Terminal
+Exit the terminal. Your conda environment will auto activate the next time you open Terminal.
+
 After this step, you can see "My-Tensorflow" section on Luncher page:
  ![minid](instruction_image/Launcher.png)
 
