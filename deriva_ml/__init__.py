@@ -13,7 +13,7 @@ setuptools_git_versioning = Path(sys.executable).parent / "setuptools-git-versio
 
 try:
     if  in_repo:
-        __version__ = subprocess.check_output([setuptools_git_versioning, repo_path], text=True)[:-1] 
+        __version__ = subprocess.check_output([setuptools_git_versioning], cwd=repo_path, text=True)[:-1] 
     else: 
         __version__ = version("deriva_ml")
 except PackageNotFoundError:
