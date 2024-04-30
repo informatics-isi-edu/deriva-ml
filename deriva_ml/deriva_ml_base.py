@@ -24,6 +24,7 @@ import sys
 from typing import List, Sequence, Optional, Any
 import shutil
 
+
 class DerivaMLException(Exception):
     """
     Exception class specific to DerivaML module.
@@ -163,7 +164,8 @@ class DerivaML:
     """
 
     def __init__(self, hostname: str, catalog_id: str, ml_schema: str,
-                 cache_dir: str, working_dir: str):
+                 cache_dir: str, working_dir: str,
+                 model_version: str):
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
                                       self.credential,
@@ -187,9 +189,11 @@ class DerivaML:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
-        self.version = sys.modules[globals()["__package__"]].__version__
+        self.version = model_version
 
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+        if "dirty" in self.version:
+            log.info(f"Loading dirty model.  Consider commiting and tagging: {self.version}")
 
     @staticmethod
     def _get_session_config():
@@ -449,7 +453,6 @@ class DerivaML:
         """
         return [t for s in self.pb.schemas.keys() for t in self.pb.schemas[s].tables if self.is_vocabulary(t)]
 
-
     def list_vocabulary(self, table_name: str) -> pd.DataFrame:
         """
         Return the dataframe of terms that are in a vocabulary table.
@@ -482,7 +485,7 @@ class DerivaML:
         """
         try:
             return self.catalog.resolve_rid(rid, self.model, self.pb)
-        except KeyError as e:
+        except KeyError as _e:
             raise DerivaMLException(f'Invalid RID {rid}')
 
     def retrieve_rid(self, rid: str) -> dict[str, Any]:
