@@ -190,7 +190,6 @@ class DerivaML:
             self.working_dir = Path(working_dir).joinpath(getpass.getuser(), default_workdir)
         else:
             self.working_dir = Path(os.path.expanduser('~')).joinpath(default_workdir)
-        self.working_dir = Path(working_dir)
         self.execution_assets_path = self.working_dir / "Execution_Assets/"
         self.execution_metadata_path = self.working_dir / "Execution_Metadata/"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
