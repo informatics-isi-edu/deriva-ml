@@ -1,23 +1,22 @@
 # Instructions of VM setup.
 
 # Clone the Tensorflow Env
+Open a Terminal window and execute:
 ```bash
 /data/conda-clone-tensorflow.sh
 ```
+Exit the terminal. Your conda environment will auto activate the next time you open Terminal.
+
 After this step, you can see "My-Tensorflow" section on Luncher page:
  ![minid](instruction_image/Launcher.png)
 
 
 # Get GitHub Credential
-1. Open Terminal on the VM and activate the env: `conda activate my-tensorflow`
-2. put a .git-credentials file in your homedir with: `https://<github-username>:ghp_<token_value>@github.com`
-   -  `vim ~/.git-credentials`
-   - paste the  `https://<github-username>:ghp_<token_value>@github.com` and change <github-username> to your won 
-   GitHub username and <token_value> obtained from: https://github.com/settings/tokens
-    - Save file
-3. ```bash
-   chmod 600 ~/.git-credentials
-   git config --global credential.helper store
+1. Create a GitHub classic access token with repo scope(s) from: https://github.com/settings/tokens
+2. Open Terminal on the VM
+3. Substitute `<github-username>` and `<github-token>` with the appropriate values accordingly, then execute:
+   ```bash
+   echo "https://<github-username>:<github-token>@github.com" > ~/.git-credential && chmod 600 ~/.git-credential
    ```
    
 
@@ -27,10 +26,10 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
     
    Example:
 
-       ```bash
-       git clone https://github.com/informatics-isi-edu/eye-ai-ml.git
-       git clone https://github.com/informatics-isi-edu/eye-ai-exec.git
-       ```
+   ```bash
+   git clone https://github.com/informatics-isi-edu/eye-ai-ml.git
+   git clone https://github.com/informatics-isi-edu/eye-ai-exec.git
+    ```
 3. Change the notebook and Catalog-ML tools accordingly.
 4. Push the changes after test.
 

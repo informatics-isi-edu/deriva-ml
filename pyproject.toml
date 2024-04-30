@@ -2,6 +2,7 @@
 requires = ["setuptools>=42", "wheel", "setuptools-git-versioning>=2.0,<3"]
 build-backend = "setuptools.build_meta"
 
+
 [project]
 name = "deriva-ml"
 dynamic = ["version"]
@@ -12,15 +13,17 @@ description = "Utilities to simplify use of Dervia and Pandas"
 readme = "README.md"
 requires-python = ">=3.8"
 
+
 [tool.setuptools.package-data]
 # include VERSION file to a package
-deriva_ml = ["VERSION"]
+deriva_ml = ["deriva_ml/VERSION"]
 
 
 [tool.setuptools-git-versioning]
 enabled = true
 version_file = "deriva_ml/VERSION"
 count_commits_from_version_file = true
+
 
 [project.scripts]
 deriva-ml-validate-configuration = "deriva_ml.validate_configuration:main"
