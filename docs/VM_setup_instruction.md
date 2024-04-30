@@ -14,7 +14,8 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
 # Get GitHub Credential
 1. Create a GitHub classic access token with repo scope(s) from: https://github.com/settings/tokens
 2. Open Terminal on the VM
-3. ```bash
+3. Substitute `<github-username>` and `<github-token>` with the appropriate values accordingly, then execute:
+   ```bash
    echo "https://<github-username>:<github-token>@github.com" > ~/.git-credential && chmod 600 ~/.git-credential
    ```
    
