@@ -3,7 +3,6 @@
 # Clone the Tensorflow Env
 ```bash
 /data/conda-clone-tensorflow.sh
-pip install git+https://github.com/informatics-isi-edu/deriva-ml 
 ```
 After this step, you can see "My-Tensorflow" section on Luncher page:
  ![minid](instruction_image/Launcher.png)
