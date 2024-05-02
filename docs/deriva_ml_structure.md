@@ -2,7 +2,7 @@
 
 While the deriva-ml library is quite flexible, its use can be simplified if a few basic guidelines are followed when structuring an ML project.
 
-When creating a now project, we suggest that you create two new repos.  If your project is named "foo," create GitHub repositories `foo-ml` and `foo-exec`.  GitHub templates for these repositories can be found here.
+When creating a new project, we suggest that you create two new GitHub repositories.  If your project is named "foo," create GitHub repositories `foo-ml` and `foo-exec`.  GitHub templates for these repositories can be found here.
 
 `foo-ml` will contain all of the code related to the actual ML models. We can split this code into two classes.  The first is code, which needs to understand the structure of the data model of the deriva catalog.  
 These functions are best implemented by creating a derived class using DerivaML as a base class.  Any catalog-specific code or utility functions that might be useful to any ML model should be placed here.
