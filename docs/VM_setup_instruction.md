@@ -19,6 +19,15 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
    echo "https://<github-username>:<github-token>@github.com" > ~/.git-credential && chmod 600 ~/.git-credential
    ```
    
+# Setup GitHub To Work Nicely With Jupityer Notebooks.
+
+Execute the following commands in the terminal:
+```
+git config filter.strip-notebook-output.clean 'jupyter nbconvert --ClearOutputPreprocessor.enabled=True --ClearMetadataPreprocessor.enabled=True --to=notebook --stdin --stdout --log-level=ERROR'
+git config filter.strip-notebook-output.smudge 'cat'
+git config filter.strip-notebook-output.required true
+```
+
 
 # Clone Catalog-ml and Catalog-exec repo
 1. Create a directory in your homedir for GitHub Repos `mkdir Repos`
