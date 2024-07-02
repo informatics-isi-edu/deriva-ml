@@ -196,7 +196,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                     ]
                 },
                 {
-                    "name": "FaceBase-ML",
+                    "name": "Deriva-ML",
                     "children": [
                         {
                             "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow",
@@ -225,6 +225,10 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                         {
                             "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset_Type",
                             "name": "Execution Asset Type"
+                        },
+                        {
+                            "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset",
+                            "name": "Dataset"
                         }
                     ]
                 }
