@@ -1,30 +1,36 @@
-from bdbag import bdbag_api as bdb
-from copy import deepcopy
-from datetime import datetime
-from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
-from deriva.core.utils import hash_utils, mime_utils
-from deriva.core.ermrest_catalog import ResolveRidResult
-import deriva.core.ermrest_model as ermrest_model
-import deriva.core.datapath as datapath
-from deriva.transfer.upload.deriva_upload import GenericUploader
-from deriva.core.hatrac_store import HatracStore
-from deriva_ml.execution_configuration import ExecutionConfiguration
-from enum import Enum
+import getpass
 import hashlib
-from itertools import islice
 import json
 import logging
-import pkg_resources
-import pandas as pd
-from pathlib import Path
-from pydantic import BaseModel, ValidationError
-import re
-import requests
-import sys
-from typing import List, Sequence, Optional, Any
-import shutil
-import getpass
 import os
+import re
+import shutil
+from copy import deepcopy
+from datetime import datetime
+from enum import Enum
+from itertools import islice
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import List, Sequence, Optional, Any, NewType
+
+import deriva.core.datapath as datapath
+import pandas as pd
+import pkg_resources
+import requests
+from bdbag import bdbag_api as bdb
+from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
+from deriva.core.ermrest_catalog import ResolveRidResult
+from deriva.core.ermrest_model import Table
+from deriva.core.hatrac_store import HatracStore
+from deriva.core.utils import hash_utils, mime_utils
+from deriva.transfer.upload.deriva_upload import GenericUploader
+from pydantic import BaseModel, ValidationError
+
+from deriva_ml.execution_configuration import ExecutionConfiguration
+
+RID = NewType("RID", str)
+TableName = tuple[str, str]
+
 
 class DerivaMLException(Exception):
     """
@@ -55,6 +61,154 @@ class Status(Enum):
     pending = "Pending"
     completed = "Completed"
     failed = "Failed"
+
+
+class DatasetElement(BaseModel):
+    association_table: tuple[str, str]
+    dataset_column: str
+    element_column: str
+
+
+class DataSet:
+    """
+    A DerivaML dataset is a collection of RIDs.  It is represented in the library by a base dataset table and a set of
+    binary assocation tables.  This class and associate methods are used to create and modify datasets.
+    """
+
+    def __init__(self, ml_base: "DerivaML"):
+        self.model = ml_base.model
+        self.domain_schema = ml_base.ml_schema_name
+        self.dataset_schema = ml_base.ml_schema_name
+        self.catalog = self.model.catalog
+        self.pb = ml_base.pb
+        self.dataset_table = self.model.table(self.dataset_schema, 'Dataset')
+        self.element_types: dict[TableName, DatasetElement] = self._collect_element_types()
+
+    def _collect_element_types(self) -> dict[TableName, DatasetElement]:
+        # Get a list of all the tables that are connected to the dataset via a binary association table.
+        # Go through all of the incoming foreign keys to the dataset.
+        # For each incoming foreign key, look at the table on the other side and check to see if it has
+        # two foreign keys, which would make it a binary association table.  Figure out which key is which, and
+        # record
+        element_types = {}
+        for fk in self.dataset_table.referenced_by:
+            # Is the incoming fkey from an binary association table.
+            association_table = fk.table
+            if len(fkeys := association_table.foreign_keys) == 2:
+                # Figure out which of the two keys is pointing to the dataset, and get the table for the other key.
+                dataset_fkey, element_fkey = (0, 1) if fkeys[0].table == self.dataset_table else (1, 0)
+                element_table = (fkeys[element_fkey].pk_table.schema.name, fkeys[element_fkey].pk_table.name)
+                element_types[element_table] = DatasetElement(
+                    association_table=(association_table.schema.name, association_table.name),
+                    dataset_column=fkeys[dataset_fkey].columns[0].name,
+                    element_column=fkeys[element_fkey].columns[0].name
+                )
+            return element_types
+
+    def _rid_table(self, rid_list: list[RID]) -> list[ResolveRidResult]:
+        """
+        Return a named tuple with information about the specified RID.
+        :param rid_list:
+        :return:
+        """
+        try:
+            return [self.catalog.resolve_rid(rid) for rid in rid_list]
+        except KeyError as _e:
+            raise DerivaMLException(f'Invalid RID')
+
+    def create_dataset(self, description: str, rid_list: list[RID]) -> RID:
+        """
+        Create a new dataset from the specified list of RIDs.
+        :param description:  Description of the dataset.
+        :param rid_list:  List of RIDs to include in the dataset.
+        :return:
+        """
+        # Get the tables associated with every rid.  Check to make sure we are not trying to include an element
+        # in the dataset for which there is not association table.
+        rid_tables = self._rid_table(rid_list)
+        rid_type_names = set((r.table.schema.name, r.table.name) for r in rid_tables)
+        element_names = {t for t in self.element_types}
+        if not (rid_type_names < element_names):
+            raise DerivaMLException(f'RID type cannot be dataset element: {[r for r in rid_type_names]}')
+        dataset_elements = {}
+
+        pb = self.catalog.getPathBuilder()
+        # Create the entry for the new dataset and get its RID.
+        dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
+
+        # Now go through every rid to be added to the data set and sort them based on what association table entries
+        # need to be made.
+        for r in rid_tables:
+            table_name = (r.table.schema.name, r.table.name)
+            association_table = self.element_types[table_name]
+            dataset_elements.setdefault(association_table['association_table'], []).append(
+                {association_table.dataset_column: dataset_rid,
+                 association_table.element_column: r.rid, }
+            )
+
+        # Now make the entries into the association tables.
+        for assoc_table, entries in dataset_elements.items():
+            pb.schemas[assoc_table[0]].tables[assoc_table[1]].insert(entries)
+        return dataset_rid
+
+    def dataset_rids(self, dataset_rid: RID) -> list[RID]:
+        """
+        Return a list of RIDs associated with a specific dataset.
+        :param dataset_rid:
+        :return:
+        """
+        rid_list = []
+        pb = self.catalog.getPathBuilder()
+
+        dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
+
+        if len(dataset_exists) != 1:
+            raise DerivaMLException(f'Invalid RID: {dataset_rid}')
+
+        # Look at each of the element types that might be in the dataset and get the list of rid for them from
+        # the appropriate association table.
+        for assoc_table in self.element_types.values():
+            schema_path = pb.schemas[assoc_table['association_table'][0]]
+            table_path = schema_path.tables[assoc_table['association_table'][1]]
+            dataset_column = table_path.columns[assoc_table['dataset_column']]
+            element_column = table_path.columns[assoc_table['element_column']]
+            assoc_rids = table_path.filter(dataset_column == dataset_rid).attributes(element_column).fetch()
+            rid_list.extend([e[assoc_table['element_column']] for e in assoc_rids])
+        return rid_list
+
+    def extend_dataset(self, dataset_rid: RID, rid_list: list[RID]):
+        # Get
+        pass
+
+    def delete_dataset(self, dataset_rid: RID) -> None:
+        """
+        Delete a dataset from the catalog.
+        :param dataset_rid:  RID of the dataset to delete.
+        :return:
+        """
+        # Get association table entries for this dataset
+        # Delete association table entires
+
+        for assoc_table in self.element_types.values():
+            schema_path = self.pb.schemas[assoc_table['association_table'][0]]
+            table_path = schema_path.tables[assoc_table['association_table'][1]]
+            dataset_column = table_path.columns[assoc_table['dataset_column']]
+            dataset_entries = table_path.filter(dataset_column == dataset_rid)
+            if len(dataset_entries.entities().fetch(limit=1)) == 1:
+                dataset_entries.delete()
+
+        # Delete dataset.
+        dataset_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
+
+    def add_dataset_association(self, element: str) -> Table:
+        # Add table to map
+        element_table = self.model.schemas[self.domain_schema].tables[element]
+        assoc_table = self.model.schemas[self.domain_schema].create_association(self.dataset_table, element_table)
+        self.element_types = self._collect_element_types()
+        return assoc_table
 
 
 class DerivaMlExec:
@@ -184,7 +338,12 @@ class DerivaML:
 
         self.start_time = datetime.now()
         self.status = Status.pending.value
-        self.cache_dir = Path(cache_dir)
+        if cache_dir:
+            self.cache_dir = Path(cache_dir)
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            tdir = TemporaryDirectory(delete=False)
+            self.cache_dir = Path(tdir.name)
         default_workdir = self.__class__.__name__ + "_working"
         if working_dir is not None:
             self.working_dir = Path(working_dir).joinpath(getpass.getuser(), default_workdir)
@@ -192,10 +351,10 @@ class DerivaML:
             self.working_dir = Path(os.path.expanduser('~')).joinpath(default_workdir)
         self.execution_assets_path = self.working_dir / "Execution_Assets/"
         self.execution_metadata_path = self.working_dir / "Execution_Metadata/"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
         self.version = model_version
+        self.dataset = DataSet(self.model)
 
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
         if "dirty" in self.version:
@@ -245,7 +404,7 @@ class DerivaML:
             raise DerivaMLException(f"The vocabulary table {table_name} doesn't exist.")
         return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
-    def _vocab_columns(self, table: ermrest_model.Table):
+    def _vocab_columns(self, table: Table):
         """
         Return the list of columns in the table that are control vocabulary terms.
 
@@ -491,10 +650,10 @@ class DerivaML:
         """
         try:
             return self.catalog.resolve_rid(rid, self.model, self.pb)
-        except KeyError as e:
+        except KeyError as _e:
             raise DerivaMLException(f'Invalid RID {rid}')
 
-    def retrieve_rid(self, rid: str) -> dict[str, Any]:
+    def retrieve_rid(self, rid: RID) -> dict[str, Any]:
         """
         Return a dictionary that represents the values of the specified RID.
         :param rid:
@@ -714,7 +873,7 @@ class DerivaML:
             raise DerivaMLException(f"Failed to download the file {file_rid}. Error: {error}")
 
         if execution_rid != '':
-            ass_table = self.ml_schema.tables[table_name+'_Execution']
+            ass_table = self.ml_schema.tables[table_name + '_Execution']
             exec_file_exec_entities = ass_table.filter(ass_table.columns[table_name] == file_rid).entities()
             exec_list = [e['Execution'] for e in exec_file_exec_entities]
             if execution_rid not in exec_list:
