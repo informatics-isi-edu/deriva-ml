@@ -103,7 +103,7 @@ class DataSet:
                     dataset_column=fkeys[dataset_fkey].columns[0].name,
                     element_column=fkeys[element_fkey].columns[0].name
                 )
-            return element_types
+        return element_types
 
     def _rid_table(self, rid_list: list[RID]) -> list[ResolveRidResult]:
         """
@@ -142,7 +142,7 @@ class DataSet:
         for r in rid_tables:
             table_name = (r.table.schema.name, r.table.name)
             association_table = self.element_types[table_name]
-            dataset_elements.setdefault(association_table['association_table'], []).append(
+            dataset_elements.setdefault(association_table.association_table, []).append(
                 {association_table.dataset_column: dataset_rid,
                  association_table.element_column: r.rid, }
             )
@@ -189,12 +189,12 @@ class DataSet:
         :return:
         """
         # Get association table entries for this dataset
-        # Delete association table entires
+        # Delete association table entries
 
         for assoc_table in self.element_types.values():
-            schema_path = self.pb.schemas[assoc_table['association_table'][0]]
-            table_path = schema_path.tables[assoc_table['association_table'][1]]
-            dataset_column = table_path.columns[assoc_table['dataset_column']]
+            schema_path = self.pb.schemas[assoc_table.association_table[0]]
+            table_path = schema_path.tables[assoc_table.association_table[1]]
+            dataset_column = table_path.columns[assoc_table.dataset_column]
             dataset_entries = table_path.filter(dataset_column == dataset_rid)
             if len(dataset_entries.entities().fetch(limit=1)) == 1:
                 dataset_entries.delete()
@@ -354,7 +354,7 @@ class DerivaML:
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
         self.version = model_version
-        self.dataset = DataSet(self.model)
+        self.dataset = DataSet(self)
 
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
         if "dirty" in self.version:
