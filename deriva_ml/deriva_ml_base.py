@@ -32,6 +32,12 @@ RID = NewType("RID", str)
 TableName = tuple[str, str]
 
 
+class DatasetElement(BaseModel):
+    association_table: TableName
+    dataset_column: str
+    element_column: str
+
+
 class DerivaMLException(Exception):
     """
     Exception class specific to DerivaML module.
@@ -61,12 +67,6 @@ class Status(Enum):
     pending = "Pending"
     completed = "Completed"
     failed = "Failed"
-
-
-class DatasetElement(BaseModel):
-    association_table: tuple[str, str]
-    dataset_column: str
-    element_column: str
 
 
 class DataSet:
@@ -116,13 +116,7 @@ class DataSet:
         except KeyError as _e:
             raise DerivaMLException(f'Invalid RID')
 
-    def create_dataset(self, description: str, rid_list: list[RID]) -> RID:
-        """
-        Create a new dataset from the specified list of RIDs.
-        :param description:  Description of the dataset.
-        :param rid_list:  List of RIDs to include in the dataset.
-        :return:
-        """
+    def _validate_rid_list(self, rid_list: list[RID]) -> list[ResolveRidResult]:
         # Get the tables associated with every rid.  Check to make sure we are not trying to include an element
         # in the dataset for which there is not association table.
         rid_tables = self._rid_table(rid_list)
@@ -130,12 +124,29 @@ class DataSet:
         element_names = {t for t in self.element_types}
         if not (rid_type_names < element_names):
             raise DerivaMLException(f'RID type cannot be dataset element: {[r for r in rid_type_names]}')
+        return rid_tables
+
+    def extend_dataset(self, dataset_rid: Optional[RID], rid_list: list[RID],
+                       description="",
+                       validate: bool = True) -> RID:
+        """
+        Add additional elements to and existing dataset.
+        :param dataset_rid: Name of dataset to extend or None if new dataset is to be created.
+        :param rid_list:
+        :param description: Description of the dataset if new entry is created.
+        :param validate: Check rid_list to make sure elements are not already in the dataset.
+        :return:
+        """
+        rid_tables = self._validate_rid_list(rid_list)
         dataset_elements = {}
 
-        pb = self.catalog.getPathBuilder()
-        # Create the entry for the new dataset and get its RID.
-        dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
-        dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
+        if not dataset_rid:
+            # Create the entry for the new dataset and get its RID.
+            dataset_table_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+            dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
+
+        if validate and (overlap := set(self.dataset_members(dataset_rid)).intersection(rid_list)):
+            raise DerivaMLException(f"Attempting to add existing member to dataset {dataset_rid}: {overlap}")
 
         # Now go through every rid to be added to the data set and sort them based on what association table entries
         # need to be made.
@@ -149,19 +160,28 @@ class DataSet:
 
         # Now make the entries into the association tables.
         for assoc_table, entries in dataset_elements.items():
-            pb.schemas[assoc_table[0]].tables[assoc_table[1]].insert(entries)
+            self.pb.schemas[assoc_table[0]].tables[assoc_table[1]].insert(entries)
         return dataset_rid
 
-    def dataset_rids(self, dataset_rid: RID) -> list[RID]:
+    def create_dataset(self, description: str, rid_list: list[RID]) -> RID:
+        """
+        Create a new dataset from the specified list of RIDs.
+        :param description:  Description of the dataset.
+        :param rid_list:  List of RIDs to include in the dataset.
+        :return: New dataset RID.
+        """
+
+        return self.extend_dataset(None, rid_list, description=description, validate=False)
+
+    def dataset_members(self, dataset_rid: RID) -> list[RID]:
         """
         Return a list of RIDs associated with a specific dataset.
         :param dataset_rid:
         :return:
         """
         rid_list = []
-        pb = self.catalog.getPathBuilder()
 
-        dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
 
         if len(dataset_exists) != 1:
@@ -170,17 +190,13 @@ class DataSet:
         # Look at each of the element types that might be in the dataset and get the list of rid for them from
         # the appropriate association table.
         for assoc_table in self.element_types.values():
-            schema_path = pb.schemas[assoc_table['association_table'][0]]
-            table_path = schema_path.tables[assoc_table['association_table'][1]]
-            dataset_column = table_path.columns[assoc_table['dataset_column']]
-            element_column = table_path.columns[assoc_table['element_column']]
+            schema_path = self.pb.schemas[assoc_table.association_table[0]]
+            table_path = schema_path.tables[assoc_table.association_table[1]]
+            dataset_column = table_path.columns[assoc_table.dataset_column]
+            element_column = table_path.columns[assoc_table.element_column]
             assoc_rids = table_path.filter(dataset_column == dataset_rid).attributes(element_column).fetch()
-            rid_list.extend([e[assoc_table['element_column']] for e in assoc_rids])
+            rid_list.extend([e[assoc_table.element_column] for e in assoc_rids])
         return rid_list
-
-    def extend_dataset(self, dataset_rid: RID, rid_list: list[RID]):
-        # Get
-        pass
 
     def delete_dataset(self, dataset_rid: RID) -> None:
         """
@@ -204,6 +220,11 @@ class DataSet:
         dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
 
     def add_dataset_association(self, element: str) -> Table:
+        """
+        Add a new element type to a dataset.
+        :param element:
+        :return:
+        """
         # Add table to map
         element_table = self.model.schemas[self.domain_schema].tables[element]
         assoc_table = self.model.schemas[self.domain_schema].create_association(self.dataset_table, element_table)
