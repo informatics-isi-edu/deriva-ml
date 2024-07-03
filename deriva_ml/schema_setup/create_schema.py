@@ -40,9 +40,37 @@ def define_table_workflow(workflow_annotation: dict):
                 ['RCB'],
                 'public', 'ERMrest_Client',
                 ['ID']
+            ),
+            ForeignKey.define(
+                ['RMB'],
+                'public', 'ERMrest_Client',
+                ['ID']
             )
         ],
         annotations=workflow_annotation
+    )
+    return table_def
+
+
+def define_table_dataset(dataset_annotation: dict = None):
+    table_def = Table.define(
+        tname='Dataset',
+        column_defs=[
+            Column.define('Description', builtin_types.text)
+        ],
+        fkey_defs=[
+            ForeignKey.define(
+                ['RCB'],
+                'public', 'ERMrest_Client',
+                ['ID']
+            ),
+            ForeignKey.define(
+                ['RMB'],
+                'public', 'ERMrest_Client',
+                ['ID']
+            )
+        ],
+        annotations=dataset_annotation if dataset_annotation is not None else {}
     )
     return table_def
 
@@ -59,6 +87,11 @@ def define_table_execution(execution_annotation: dict):
         fkey_defs=[
             ForeignKey.define(
                 ['RCB'],
+                'public', 'ERMrest_Client',
+                ['ID']
+            ),
+            ForeignKey.define(
+                ['RMB'],
                 'public', 'ERMrest_Client',
                 ['ID']
             )
@@ -78,6 +111,11 @@ def define_asset_execution_metadata(schema: str, execution_metadata_annotation: 
                 ['RCB'],
                 'public', 'ERMrest_Client',
                 ['ID']
+            ),
+            ForeignKey.define(
+                ['RMB'],
+                'public', 'ERMrest_Client',
+                ['ID']
             )
         ],
         annotations=execution_metadata_annotation
@@ -93,6 +131,11 @@ def define_asset_execution_assets(schema: str, execution_assets_annotation: dict
         fkey_defs=[
             ForeignKey.define(
                 ['RCB'],
+                'public', 'ERMrest_Client',
+                ['ID']
+            ),
+            ForeignKey.define(
+                ['RMB'],
                 'public', 'ERMrest_Client',
                 ['ID']
             )
@@ -120,13 +163,17 @@ def setup_ml_workflow(model, schema_name, catalog_id):
     execution_table = create_table_if_not_exist(schema, 'Execution',
                                                 define_table_execution(annotations["execution_annotation"]))
     execution_table.add_reference(workflow_table)
-    # dataset_table = create_table_if_not_exist(schema, 'Dataset', define_table_dataset(schema))
-    # association_dataset_execution = schema.create_association(dataset_table, execution_table)
+
+    # Dataset
+    dataset_table = create_table_if_not_exist(schema, "Dataset",
+                                              define_table_dataset(annotations.get("dataset_annotation")))
+    association_dataset_execution = schema.create_association(dataset_table, execution_table)
 
     # Execution Metadata
     execution_metadata_table = create_table_if_not_exist(schema, 'Execution_Metadata',
-                                                         define_asset_execution_metadata(schema,
-                                                                                         annotations["execution_metadata_annotation"]))
+                                                         define_asset_execution_metadata(
+                                                             schema,
+                                                             annotations["execution_metadata_annotation"]))
     execution_metadata_table.add_reference(execution_table)
     table_def_metadata_type_vocab = Table.define_vocabulary(tname='Execution_Metadata_Type',
                                                             curie_template=curie_template)
@@ -135,8 +182,9 @@ def setup_ml_workflow(model, schema_name, catalog_id):
 
     # Execution Asset
     execution_assets_table = create_table_if_not_exist(schema, 'Execution_Assets',
-                                                       define_asset_execution_assets(schema,
-                                                                                     annotations["execution_assets_annotation"]))
+                                                       define_asset_execution_assets(
+                                                           schema,
+                                                           annotations["execution_assets_annotation"]))
     association_execution_execution_asset = schema.create_association(execution_assets_table, execution_table)
 
     table_def_execution_product_type_vocab = Table.define_vocabulary(
@@ -144,8 +192,6 @@ def setup_ml_workflow(model, schema_name, catalog_id):
     )
     execution_asset_type_table = schema.create_table(table_def_execution_product_type_vocab)
     execution_assets_table.add_reference(execution_asset_type_table)
-    # image_table = create_table_if_not_exist(schema, 'Image', define_asset_image(schema))
-    # association_image_execution_asset = schema.create_association(execution_assets_table, image_table)
 
 
 def main():

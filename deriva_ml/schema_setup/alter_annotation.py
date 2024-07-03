@@ -2,7 +2,7 @@ import sys
 import argparse
 from deriva.core import DerivaServer, get_credential, ErmrestCatalog
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
-from annotation_temp import generate_annotation
+from deriva_ml.schema_setup.annotation_temp import generate_annotation
 
 
 def alter_table_annotation(catalog, schema_name: str, table_name: str, annotation: dict):
