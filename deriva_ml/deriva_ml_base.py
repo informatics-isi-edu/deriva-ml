@@ -32,7 +32,7 @@ RID = NewType("RID", str)
 TableName = tuple[str, str]
 
 
-class DatasetElement(BaseModel):
+class DatasetAssociation(BaseModel):
     association_table: TableName
     dataset_column: str
     element_column: str
@@ -82,9 +82,9 @@ class DataSet:
         self.catalog = self.model.catalog
         self.pb = ml_base.pb
         self.dataset_table = self.model.table(self.dataset_schema, 'Dataset')
-        self.element_types: dict[TableName, DatasetElement] = self._collect_element_types()
+        self.element_types: dict[TableName, DatasetAssociation] = self._collect_member_types()
 
-    def _collect_element_types(self) -> dict[TableName, DatasetElement]:
+    def _collect_member_types(self) -> dict[TableName, DatasetAssociation]:
         # Get a list of all the tables that are connected to the dataset via a binary association table.
         # Go through all of the incoming foreign keys to the dataset.
         # For each incoming foreign key, look at the table on the other side and check to see if it has
@@ -98,46 +98,35 @@ class DataSet:
                 # Figure out which of the two keys is pointing to the dataset, and get the table for the other key.
                 dataset_fkey, element_fkey = (0, 1) if fkeys[0].table == self.dataset_table else (1, 0)
                 element_table = (fkeys[element_fkey].pk_table.schema.name, fkeys[element_fkey].pk_table.name)
-                element_types[element_table] = DatasetElement(
+                element_types[element_table] = DatasetAssociation(
                     association_table=(association_table.schema.name, association_table.name),
                     dataset_column=fkeys[dataset_fkey].columns[0].name,
                     element_column=fkeys[element_fkey].columns[0].name
                 )
         return element_types
 
-    def _rid_table(self, rid_list: list[RID]) -> list[ResolveRidResult]:
-        """
-        Return a named tuple with information about the specified RID.
-        :param rid_list:
-        :return:
-        """
-        try:
-            return [self.catalog.resolve_rid(rid) for rid in rid_list]
-        except KeyError as _e:
-            raise DerivaMLException(f'Invalid RID')
-
     def _validate_rid_list(self, rid_list: list[RID]) -> list[ResolveRidResult]:
         # Get the tables associated with every rid.  Check to make sure we are not trying to include an element
         # in the dataset for which there is not association table.
-        rid_tables = self._rid_table(rid_list)
+        rid_info = [self.catalog.resolve_rid(rid) for rid in rid_list]
         rid_type_names = set((r.table.schema.name, r.table.name) for r in rid_tables)
         element_names = {t for t in self.element_types}
         if not (rid_type_names < element_names):
             raise DerivaMLException(f'RID type cannot be dataset element: {[r for r in rid_type_names]}')
-        return rid_tables
+        return rid_info
 
-    def extend_dataset(self, dataset_rid: Optional[RID], rid_list: list[RID],
+    def extend_dataset(self, dataset_rid: Optional[RID], members: list[RID],
                        description="",
                        validate: bool = True) -> RID:
         """
         Add additional elements to and existing dataset.
         :param dataset_rid: Name of dataset to extend or None if new dataset is to be created.
-        :param rid_list:
+        :param members: List of members to add to the  dataset.
         :param description: Description of the dataset if new entry is created.
         :param validate: Check rid_list to make sure elements are not already in the dataset.
         :return:
         """
-        rid_tables = self._validate_rid_list(rid_list)
+        rid_info = self._validate_rid_list(members)
         dataset_elements = {}
 
         if not dataset_rid:
@@ -145,12 +134,12 @@ class DataSet:
             dataset_table_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
             dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
 
-        if validate and (overlap := set(self.dataset_members(dataset_rid)).intersection(rid_list)):
+        if validate and (overlap := set(self.dataset_members(dataset_rid)).intersection(members)):
             raise DerivaMLException(f"Attempting to add existing member to dataset {dataset_rid}: {overlap}")
 
         # Now go through every rid to be added to the data set and sort them based on what association table entries
         # need to be made.
-        for r in rid_tables:
+        for r in rid_info:
             table_name = (r.table.schema.name, r.table.name)
             association_table = self.element_types[table_name]
             dataset_elements.setdefault(association_table.association_table, []).append(
@@ -163,15 +152,15 @@ class DataSet:
             self.pb.schemas[assoc_table[0]].tables[assoc_table[1]].insert(entries)
         return dataset_rid
 
-    def create_dataset(self, description: str, rid_list: list[RID]) -> RID:
+    def create_dataset(self, description: str, members: list[RID]) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
         :param description:  Description of the dataset.
-        :param rid_list:  List of RIDs to include in the dataset.
+        :param members:  List of RIDs to include in the dataset.
         :return: New dataset RID.
         """
 
-        return self.extend_dataset(None, rid_list, description=description, validate=False)
+        return self.extend_dataset(None, members, description=description, validate=False)
 
     def dataset_members(self, dataset_rid: RID) -> list[RID]:
         """
@@ -228,7 +217,7 @@ class DataSet:
         # Add table to map
         element_table = self.model.schemas[self.domain_schema].tables[element]
         assoc_table = self.model.schemas[self.domain_schema].create_association(self.dataset_table, element_table)
-        self.element_types = self._collect_element_types()
+        self.element_types = self._collect_member_types()
         return assoc_table
 
 
