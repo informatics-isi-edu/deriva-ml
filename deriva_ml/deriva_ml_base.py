@@ -1,22 +1,6 @@
-import getpass
-import hashlib
-import json
-import logging
-import os
-import re
-import shutil
 from copy import deepcopy
 from datetime import datetime
-from enum import Enum
-from itertools import islice
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import List, Sequence, Optional, Any, NewType
-
 import deriva.core.datapath as datapath
-import pandas as pd
-import pkg_resources
-import requests
 from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.ermrest_catalog import ResolveRidResult
@@ -24,9 +8,25 @@ from deriva.core.ermrest_model import Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from pydantic import BaseModel, ValidationError
-
 from deriva_ml.execution_configuration import ExecutionConfiguration
+from enum import Enum
+import getpass
+import hashlib
+from itertools import islice
+import json
+import logging
+import os
+import pandas as pd
+from pathlib import Path
+from pydantic import BaseModel, ValidationError
+import re
+import requests
+import shutil
+from tempfile import TemporaryDirectory
+from typing import List, Sequence, Optional, Any, NewType
+
+import importlib.resources
+import pkg_resources
 
 RID = NewType("RID", str)
 TableName = tuple[str, str]
@@ -109,7 +109,7 @@ class DataSet:
         # Get the tables associated with every rid.  Check to make sure we are not trying to include an element
         # in the dataset for which there is not association table.
         rid_info = [self.catalog.resolve_rid(rid) for rid in rid_list]
-        rid_type_names = set((r.table.schema.name, r.table.name) for r in rid_tables)
+        rid_type_names = set((r.table.schema.name, r.table.name) for r in rid_info)
         element_names = {t for t in self.element_types}
         if not (rid_type_names < element_names):
             raise DerivaMLException(f'RID type cannot be dataset element: {[r for r in rid_type_names]}')
