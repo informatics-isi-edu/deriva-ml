@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import shutil
+import warnings
 from datetime import datetime
 from enum import Enum
 from itertools import islice
@@ -28,7 +29,17 @@ from pydantic import BaseModel, ValidationError, Field
 from deriva_ml.execution_configuration import ExecutionConfiguration
 
 RID = NewType("RID", str)
-TableName = tuple[str, str]
+
+# We are going to use schema as a field name and this collides with method in pydantic base class
+warnings.filterwarnings("ignore",
+                        message='Field name "schema"',
+                        category=Warning,
+                        module='pydantic')
+
+
+class TableName(BaseModel, frozen=True):
+    table: str
+    schema: str
 
 
 # For some reason, deriva-py doesn't use the proper enum class!!
@@ -45,7 +56,8 @@ class UploadState(str, Enum):
 
 class AssociatedTable(BaseModel):
     association_table: TableName
-    target_table: TableName
+    left_table: TableName
+    right_table: TableName
     in_column: str
     out_column: str
     attribute_columns: list[str] = Field(default=[])
@@ -91,7 +103,7 @@ class Status(Enum):
 class DataSet:
     """
     A DerivaML dataset is a collection of RIDs.  It is represented in the library by a base dataset table and a set of
-    binary assocation tables.  This class and associate methods are used to create and modify datasets.
+    binary association tables.  This class and associate methods are used to create and modify datasets.
     """
 
     def __init__(self, ml_base: "DerivaML"):
@@ -99,14 +111,13 @@ class DataSet:
         self.domain_schema: str = ml_base.ml_schema_name
         self.dataset_schema: str = ml_base.ml_schema_name
         self.dataset_table: Table = self.ml_base.model.table(self.dataset_schema, 'Dataset')
-        self.element_types = {at.target_table: at for at in ml_base.associated_tables(self.dataset_table.name)}
 
     def _validate_rid_list(self, rid_list: list[RID]) -> list[ResolveRidResult]:
         # Get the tables associated with every rid.  Check to make sure we are not trying to include an element
         # in the dataset for which there is not association table.
         rid_info = [self.ml_base.resolve_rid(rid) for rid in rid_list]
-        rid_type_names = set((r.table.schema.name, r.table.name) for r in rid_info)
-        element_names = {t for t in self.element_types}
+        rid_type_names = set(TableName(schema=r.table.schema.name, table=r.table.name) for r in rid_info)
+        element_names = {t.right_table for t in self.ml_base.find_association_tables(self.dataset_table)}
         if not (rid_type_names < element_names):
             raise DerivaMLException(f'RID type cannot be dataset element: {[r for r in rid_type_names]}')
         return rid_info
@@ -124,29 +135,30 @@ class DataSet:
         """
 
         rid_info = self._validate_rid_list(members)
-        dataset_elements = {}
         pb = self.ml_base.pb
         if not dataset_rid:
             # Create the entry for the new dataset and get its RID.
             dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
             dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
 
-        if validate and (overlap := set(self.dataset_members(dataset_rid)).intersection(members)):
-            raise DerivaMLException(f"Attempting to add existing member to dataset {dataset_rid}: {overlap}")
+        if validate:
+            existing_rids = set(
+                m
+                for ms in self.dataset_members(dataset_rid).values()
+                for m in ms
+            )
+            if overlap := set(existing_rids).intersection(members):
+                raise DerivaMLException(f"Attempting to add existing member to dataset {dataset_rid}: {overlap}")
 
         # Now go through every rid to be added to the data set and sort them based on what association table entries
         # need to be made.
+        dataset_elements = {}
         for r in rid_info:
-            table_name = (r.table.schema.name, r.table.name)
-            association_table = self.element_types[table_name]
-            dataset_elements.setdefault(association_table.association_table, []).append(
-                {association_table.in_column: dataset_rid,
-                 association_table.out_column: r.rid, }
-            )
+            dataset_elements.setdefault(TableName(schema=r.table.schema.name, table=r.table.name), []).append(r.rid)
 
         # Now make the entries into the association tables.
-        for assoc_table, entries in dataset_elements.items():
-            pb.schemas[assoc_table[0]].tables[assoc_table[1]].insert(entries)
+        for elements in dataset_elements.values():
+            self.ml_base.add_attributes([dataset_rid] * len(elements), elements)
         return dataset_rid
 
     def create_dataset(self, description: str, members: list[RID]) -> RID:
@@ -159,13 +171,12 @@ class DataSet:
 
         return self.extend_dataset(None, members, description=description, validate=False)
 
-    def dataset_members(self, dataset_rid: RID) -> list[RID]:
+    def dataset_members(self, dataset_rid: RID) -> dict[TableName, RID]:
         """
         Return a list of RIDs associated with a specific dataset.
         :param dataset_rid:
         :return:
         """
-        rid_list = []
 
         dataset_path = self.ml_base.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
@@ -175,13 +186,14 @@ class DataSet:
 
         # Look at each of the element types that might be in the dataset and get the list of rid for them from
         # the appropriate association table.
-        for assoc_table in self.element_types.values():
-            schema_path = self.ml_base.pb.schemas[assoc_table.association_table[0]]
-            table_path = schema_path.tables[assoc_table.association_table[1]]
+        rid_list = {}
+        for assoc_table in self.ml_base.find_association_tables(self.dataset_table):
+            schema_path = self.ml_base.pb.schemas[assoc_table.association_table.schema]
+            table_path = schema_path.tables[assoc_table.association_table.table]
             dataset_column = table_path.columns[assoc_table.in_column]
             element_column = table_path.columns[assoc_table.out_column]
             assoc_rids = table_path.filter(dataset_column == dataset_rid).attributes(element_column).fetch()
-            rid_list.extend([e[assoc_table.out_column] for e in assoc_rids])
+            rid_list.setdefault(assoc_table.right_table, []).extend([e[assoc_table.out_column] for e in assoc_rids])
         return rid_list
 
     def delete_dataset(self, dataset_rid: RID) -> None:
@@ -193,9 +205,9 @@ class DataSet:
         # Get association table entries for this dataset
         # Delete association table entries
 
-        for assoc_table in self.element_types.values():
-            schema_path = self.ml_base.pb.schemas[assoc_table.association_table[0]]
-            table_path = schema_path.tables[assoc_table.association_table[1]]
+        for assoc_table in self.ml_base.find_association_tables(self.dataset_table):
+            schema_path = self.ml_base.pb.schemas[assoc_table.association_table.schema]
+            table_path = schema_path.tables[assoc_table.association_table.table]
             dataset_column = table_path.columns[assoc_table.in_column]
             dataset_entries = table_path.filter(dataset_column == dataset_rid)
             if len(dataset_entries.entities().fetch(limit=1)) == 1:
@@ -215,7 +227,6 @@ class DataSet:
         element_table = self.ml_base.model.schemas[self.domain_schema].tables[element]
         assoc_table = self.ml_base.model.schemas[self.domain_schema].create_association(self.dataset_table,
                                                                                         element_table)
-        self.element_types = {at.target_table: at for at in self.ml_base.associated_tables(self.dataset_table.name)}
         return assoc_table
 
 
@@ -341,7 +352,7 @@ class DerivaML:
         self.ml_schema_name = ml_schema
 
         self.catalog_id = catalog_id
-        self.ml_schema = self.pb.schemas[ml_schema]
+        self.ml_schema_path = self.pb.schemas[self.ml_schema_name]
         self.configuration = None
 
         self.start_time = datetime.now()
@@ -398,64 +409,64 @@ class DerivaML:
         else:
             return schema
 
-    def associated_tables(self, table: str) -> list[AssociatedTable]:
-        """
-        Find all of the tables that are connected to the named table via a binary association table.
-        :param table: Table name that is considered to be on the "left" hand side of the association table.
-        :return:
-        """
-        # Go through all of the incoming foreign keys to the named table.
-        # For each incoming foreign key, look at the table on the other side and check to see if it has
-        # two foreign keys, which would make it a binary association table.  Figure out which key is which, and
-        # record
-        linked_tables = []
-        for fk in self.model.schemas[self.ml_schema_name].tables[table].referenced_by:
-            # Is the incoming fkey from an binary association table.
-            association_table = fk.table
-            if len(fkeys := association_table.foreign_keys) == 2:
-                # Figure out which of the two keys is pointing to the named table, and get the table for the other key.
-                in_fkey, out_fkey = (0, 1) if fkeys[0].table == table else (1, 0)
-                linked_tables.append(AssociatedTable(
-                    association_table=(association_table.schema.name, association_table.name),
-                    target_table=(fkeys[out_fkey].pk_table.schema.name, fkeys[out_fkey].pk_table.name),
-                    in_column=fkeys[in_fkey].columns[0].name,
-                    out_column=fkeys[out_fkey].columns[0].name
-                )
-                )
-        return linked_tables
-
-    def _find_association_table(self, table: str, target_table: str) -> list[AssociatedTable]:
+    def find_association_tables(self, table: TableName | Table | str,
+                                target_table: Optional[TableName | Table | str] = None) \
+            -> list[AssociatedTable]:
         """
         Find a table linking the two named tables.
         :param table: Table name that is considered to be on the "left" hand side of the association table.
+        :param target_table:
         :return:
         """
-        # Go through all of the incoming foreign keys to the named table.
-        # For each incoming foreign key, look at the table on the other side and check to see if it
-        # matches the table you are looking for.
-        #  Figure out which key is which, and record
+
+        # Normalize input arguments.
+        if isinstance(table, str):
+            table = TableName(schema=self.ml_schema_name, table=table)
+        elif isinstance(table, Table):
+            table = TableName(schema=table.schema.name, table=table.name)
+
+        if isinstance(target_table, str):
+            table = TableName(schema=self.ml_schema_name, table=target_table)
+        elif isinstance(table, Table):
+            table = TableName(schema=target_table.schema.name, table=target_table.name)
+
+        try:
+            self.model.schemas[table.schema].tables[table.table]
+        except KeyError:
+            raise DerivaMLException(f"The table {table.table} doesn't exist.")
+
+        try:
+            target_table and self.model.schemas[target_table.schema].tables[target_table.table]
+        except KeyError:
+            raise DerivaMLException(f"The table {target_table.table} doesn't exist.")
+
         linked_tables = []
-        for fk in self.model.schemas[self.ml_schema_name].tables[table].referenced_by:
-            # Is the incoming fkey from an  association table.
-            association_table = fk.table
-            fk_tables = [fk.pk_table.name for fk in association_table.foreign_keys]
-            try:
-                in_fkey = fk_tables.index(table)
-                out_fkey = fk_tables.index(target_table)
-                fkeys = association_table.foreign_keys
-                in_column = fkeys[in_fkey].columns[0].name
-                out_column = fkeys[out_fkey].columns[0].name
+        for incoming_fk in self.model.schemas[table.schema].tables[table.table].referenced_by:
+            # Is the incoming fkey. Check the table with the incoming key to see if it has an outbound FK to
+            # the target table.  In the case a target_table is not supplied, then try all potential target tables
+            # by iterating over the tables that are connected by the outgoing FKs.
+            association_table = incoming_fk.table
+            referenced_tables = [fk.pk_table.name for fk in association_table.foreign_keys]
+            in_fkey = referenced_tables.index(table.table)
+            for out_fkey in range(len(referenced_tables)):
+                if in_fkey == out_fkey:
+                    continue
+                in_column = association_table.foreign_keys[in_fkey].columns[0].name
+                out_column = association_table.foreign_keys[out_fkey].columns[0].name
                 skip_columns = ['RID', 'RCT', 'RMT', 'RCB', 'RMB', in_column, out_column]
                 linked_tables.append(AssociatedTable(
-                    association_table=(association_table.schema.name, association_table.name),
-                    target_table=(fkeys[out_fkey].pk_table.schema.name, fkeys[out_fkey].pk_table.name),
+                    association_table=TableName(schema=association_table.schema.name,
+                                                table=association_table.name),
+                    left_table=table,
+                    right_table=TableName(schema=association_table.foreign_keys[out_fkey].pk_table.schema.name,
+                                          table=association_table.foreign_keys[out_fkey].pk_table.name),
                     in_column=in_column,
                     out_column=out_column,
                     attribute_columns=[c.name for c in association_table.columns if c.name not in skip_columns]
                 )
                 )
-            except ValueError:
-                pass
+        if target_table:
+            linked_tables = [lt for lt in linked_tables if target_table == lt.right_table]
         return linked_tables
 
     def is_vocabulary(self, table_name: str) -> bool:
@@ -539,7 +550,7 @@ class DerivaML:
         """
         workflow_type_rid = self.lookup_term("Workflow_Type", workflow_type)
         checksum = self._get_checksum(url)
-        workflow_rid = self._add_record(self.ml_schema.Workflow,
+        workflow_rid = self._add_record(self.ml_schema_path.Workflow,
                                         {'URL': url,
                                          'Name': workflow_name,
                                          'Description': description,
@@ -554,25 +565,36 @@ class DerivaML:
                        values: list[dict[str, Any]] = None,
                        validate: bool = True) -> int:
         """
-        Add a attribute to the specified object
-        :param object_rids:
-        :param attribute_rids:
+        Add an attribute to the specified object.
+
+        :param object_rids: A list of the rids to which the new attributes will be attached.  Every RID in the list
+        must come from the same table.
+        :param attribute_rids: A list of the rids of the attributes to be added.
         :param values: Additional attributes that are added to the linkage.
+        :param validate: Flag indicating whether to validate the arguments
         :return: Number of attributed added
         """
 
-        if not values:
+        if len(object_rids) != len(attribute_rids):
+            raise DerivaMLException(f"Must have the name number of objects and attributes")
+        if values:
+            if len(object_rids) != len(values):
+                raise DerivaMLException(f"Must have the name number of values and attributes")
+        else:
             values = [{}]
 
-        object_table = self.resolve_rid(object_rids[0]).table.name
-        attribute_table = self.resolve_rid(attribute_rids[0]).table.name
+        rid_result = self.resolve_rid(object_rids[0])
+        object_table = TableName(schema=rid_result.table.schema.name, table=rid_result.table.name)
+        rid_result = self.resolve_rid(attribute_rids[0])
+        attribute_table = TableName(schema=rid_result.table.schema.name, table=rid_result.table.name)
+
         if validate:
-            if (object_tables := set(self.resolve_rid(r).table for r in object_rids)) != set(object_table):
-                raise DerivaMLException(f"object_rid list contains more than one table: {object_tables}")
-            if (attribute_tables := set(self.resolve_rid(r).table for r in attribute_rids)) != set(attribute_table):
+            if len(object_tables := set(self.resolve_rid(r).table for r in object_rids)) != 1:
+                raise DerivaMLException(f"object_rid list contains more than one table {object_tables}")
+            if len(attribute_tables := set(self.resolve_rid(r).table for r in attribute_rids)) != 1:
                 raise DerivaMLException(f"object_rid list contains more than one table: {attribute_tables}")
 
-        if len(association_tables := self._find_association_table(object_table, attribute_table)) != 1:
+        if len(association_tables := self.find_association_tables(object_table, attribute_table)) != 1:
             raise DerivaMLException(f"Ambiguous association table from {object_table} to {attribute_table}.")
         elif not association_tables:
             raise DerivaMLException(f"No association between {object_table} and {attribute_table}")
@@ -580,58 +602,15 @@ class DerivaML:
 
         entries = []
         for object_rid, attribute_rid, value in zip(object_rids, attribute_rids, values):
-            if len(association_tables := self._find_association_table(object_table, attribute_table)) != 1:
-                raise DerivaMLException(f"Ambiguous association table from {object_rid} to {attribute_rid}.")
-            elif not association_tables:
-                raise DerivaMLException(f"No association between {object_table} and {attribute_table}")
-            association_table = association_tables[0]
-
             if set(value.keys()) != set(association_table.attribute_columns):
                 raise DerivaMLException(f"Missing attribute values: {set(association_table.attribute_columns)}")
             entries.append(
                 {association_table.in_column: object_rid, association_table.out_column: attribute_rid} | value
             )
-            
         self._batch_insert(
             self.pb.schemas[association_table[0]].tables[association_table.association_table[1]],
             entries)
         return len(entries)
-
-    def add_annotation(self, annotation_object,
-                       annotation_function: str,
-                       annotation_type: str,
-                       upload_result: dict[str, FileUploadState], metadata: pd.DataFrame) -> None:
-        """
-        Inserts image annotations into the catalog Image_Annotation table based on upload results and metadata.
-
-        Parameters:
-        - upload_result (str): The result of the image upload process.
-        - metadata (pd.DataFrame): DataFrame containing metadata information.
-
-        Returns:
-        - None
-        """
-        for assoc_table in self.associated_tables(annotation_object):
-            # Check to see if table is an annotation.
-            ...
-
-        image_annot_entities = []
-        for annotation in upload_result.values():
-            if annotation.state == UploadState.success and annotation.result is not None:
-                rid = annotation.result.get("RID")
-                if rid is not None:
-                    filename = annotation.result.get("Filename")
-                    cur = metadata[metadata['Saved SVG Name'] == filename]
-                    image_rid = cur['Image RID'].iloc[0]
-                    annot_func = cur['Worked Image Cropping Function'].iloc[0]
-                    annot_func_rid = self.lookup_term(table_name="Annotation_Function",
-                                                      term_name=annotation_function)
-                    annot_type_rid = self.lookup_term(table_name="Annotation_Type", term_name=annotation_type)
-                    image_annot_entities.append({'Annotation_Function': annot_func_rid,
-                                                 'Annotation_Type': annot_type_rid,
-                                                 'Image': image_rid,
-                                                 'Execution_Assets': rid})
-        self._batch_insert(self.schema.Image_Annotation, image_annot_entities)
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
                       description: str = "") -> RID:
@@ -649,12 +628,12 @@ class DerivaML:
         """
         datasets = datasets or []
         if workflow_rid:
-            execution_rid = self.ml_schema.Execution.insert([{'Description': description,
-                                                              'Workflow': workflow_rid}])[0]['RID']
+            execution_rid = self.ml_schema_path.Execution.insert([{'Description': description,
+                                                                   'Workflow': workflow_rid}])[0]['RID']
         else:
-            execution_rid = self.ml_schema.Execution.insert([{'Description': description}])[0]['RID']
+            execution_rid = self.ml_schema_path.Execution.insert([{'Description': description}])[0]['RID']
         if datasets:
-            self._batch_insert(self.ml_schema.Dataset_Execution,
+            self._batch_insert(self.ml_schema_path.Dataset_Execution,
                                [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
@@ -676,11 +655,11 @@ class DerivaML:
         """
 
         datasets = datasets or []
-        self._batch_update(self.ml_schema.Execution,
+        self._batch_update(self.ml_schema_path.Execution,
                            [{"RID": execution_rid, "Workflow": workflow_rid, "Description": description}],
-                           [self.ml_schema.Execution.Workflow, self.ml_schema.Execution.Description])
+                           [self.ml_schema_path.Execution.Workflow, self.ml_schema_path.Execution.Description])
         if datasets:
-            self._batch_insert(self.ml_schema.Dataset_Execution,
+            self._batch_insert(self.ml_schema_path.Dataset_Execution,
                                [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
@@ -998,9 +977,9 @@ class DerivaML:
 
         """
         self.status = new_status.value
-        self._batch_update(self.ml_schema.Execution,
+        self._batch_update(self.ml_schema_path.Execution,
                            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
-                           [self.ml_schema.Execution.Status, self.ml_schema.Execution.Status_Detail])
+                           [self.ml_schema_path.Execution.Status, self.ml_schema_path.Execution.Status_Detail])
 
     def download_execution_files(self, table_name: str, file_rid: str, execution_rid="", dest_dir: str = "") -> Path:
         """
@@ -1019,7 +998,7 @@ class DerivaML:
         - DerivaMLException: If there is an issue downloading the assets.
 
         """
-        table = self.ml_schema.tables[table_name]
+        table = self.ml_schema_path.tables[table_name]
         file_metadata = table.filter(table.RID == file_rid).entities()[0]
         file_url = file_metadata['URL']
         file_name = file_metadata['Filename']
@@ -1032,7 +1011,7 @@ class DerivaML:
             raise DerivaMLException(f"Failed to download the file {file_rid}. Error: {error}")
 
         if execution_rid != '':
-            ass_table = self.ml_schema.tables[table_name + '_Execution']
+            ass_table = self.ml_schema_path.tables[table_name + '_Execution']
             exec_file_exec_entities = ass_table.filter(ass_table.columns[table_name] == file_rid).entities()
             exec_list = [e['Execution'] for e in exec_file_exec_entities]
             if execution_rid not in exec_list:
@@ -1071,8 +1050,9 @@ class DerivaML:
             raise DerivaMLException(
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
-            execution_metadata_type_rid = self.lookup_term(self.ml_schema.Execution_Metadata_Type, "Execution Config")
-            self._batch_insert(self.ml_schema.Execution_Metadata,
+            execution_metadata_type_rid = self.lookup_term(self.ml_schema_path.Execution_Metadata_Type,
+                                                           "Execution Config")
+            self._batch_insert(self.ml_schema_path.Execution_Metadata,
                                [{"URL": hatrac_uri,
                                  "Filename": file_name,
                                  "Length": file_size,
@@ -1106,8 +1086,8 @@ class DerivaML:
                 f" to Execution_Metadata table. Error: {error}")
 
         else:
-            meta_exec_entities = self.ml_schema.Execution_Metadata_Execution.filter(
-                self.ml_schema.Execution_Metadata_Execution.Execution == execution_rid).entities()
+            meta_exec_entities = self.ml_schema_path.Execution_Metadata_Execution.filter(
+                self.ml_schema_path.Execution_Metadata_Execution.Execution == execution_rid).entities()
             meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
             entities = []
             for metadata in results.values():
@@ -1115,7 +1095,7 @@ class DerivaML:
                     rid = metadata["Result"].get("RID")
                     if (rid is not None) and (rid not in meta_list):
                         entities.append({"Execution_Metadata": rid, "Execution": execution_rid})
-        self._batch_insert(self.ml_schema.Execution_Metadata_Execution, entities)
+        self._batch_insert(self.ml_schema_path.Execution_Metadata_Execution, entities)
 
         return results
 
@@ -1146,8 +1126,8 @@ class DerivaML:
                     raise DerivaMLException(
                         f"Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}")
                 else:
-                    asset_exec_entities = self.ml_schema.Execution_Assets_Execution.filter(
-                        self.ml_schema.Execution_Assets_Execution.Execution == execution_rid).entities()
+                    asset_exec_entities = self.ml_schema_path.Execution_Assets_Execution.filter(
+                        self.ml_schema_path.Execution_Assets_Execution.Execution == execution_rid).entities()
                     assets_list = [e['Execution_Assets'] for e in asset_exec_entities]
                     entities = []
                     for asset in result.values():
@@ -1155,7 +1135,7 @@ class DerivaML:
                             rid = asset["Result"].get("RID")
                             if (rid is not None) and (rid not in assets_list):
                                 entities.append({"Execution_Assets": rid, "Execution": execution_rid})
-                    self._batch_insert(self.ml_schema.Execution_Assets_Execution, entities)
+                    self._batch_insert(self.ml_schema_path.Execution_Assets_Execution, entities)
                     results[str(folder_path)] = result
         return results
 
@@ -1168,7 +1148,7 @@ class DerivaML:
 
         Returns:
         - dict: Uploaded assets with key as assets' suborder name,
-        values as an ordered dictionary with RID and metadata in the Execution_Assets table."
+        values as an ordered dictionary with RID and metadata in the Execution_Assets table.
 
         """
         duration = datetime.now() - self.start_time
@@ -1177,8 +1157,8 @@ class DerivaML:
         duration = f'{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec'
 
         self.update_status(Status.running, "Algorithm execution ended.", execution_rid)
-        self._batch_update(self.ml_schema.Execution, [{"RID": execution_rid, "Duration": duration}],
-                           [self.ml_schema.Execution.Duration])
+        self._batch_update(self.ml_schema_path.Execution, [{"RID": execution_rid, "Duration": duration}],
+                           [self.ml_schema_path.Execution.Duration])
 
     def execution_init(self, configuration_rid: RID) -> ConfigurationRecord:
         """
@@ -1288,7 +1268,7 @@ class DerivaML:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
 
-    def execution_upload(self, execution_rid: RID, clean_folder: bool = True) -> dict[str, FileUploadState]:
+    def execution_upload(self, execution_rid: RID, clean_folder: bool = True) -> dict[str, dict[str, FileUploadState]]:
         """
         Upload all the assets and metadata associated with the current execution.
 
@@ -1297,7 +1277,7 @@ class DerivaML:
 
         Returns:
         - dict: Uploaded assets with key as assets' suborder name,
-        values as an ordered dictionary with RID and metadata in the Execution_Assets table."
+        values as an ordered dictionary with RID and metadata in the Execution_Assets table.
 
         """
         try:
