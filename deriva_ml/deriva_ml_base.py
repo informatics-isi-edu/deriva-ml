@@ -20,11 +20,11 @@ import requests
 from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import Table
+from deriva.core.ermrest_model import Table, Column
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, ValidationError
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
 
@@ -35,11 +35,6 @@ warnings.filterwarnings("ignore",
                         message='Field name "schema"',
                         category=Warning,
                         module='pydantic')
-
-
-class TableName(BaseModel, frozen=True):
-    table: str
-    schema: str
 
 
 # For some reason, deriva-py doesn't use the proper enum class!!
@@ -54,13 +49,28 @@ class UploadState(str, Enum):
     timeout = "Timeout"
 
 
-class AssociatedTable(BaseModel):
-    association_table: TableName
-    left_table: TableName
-    right_table: TableName
-    in_column: str
-    out_column: str
-    attribute_columns: list[str] = Field(default=[])
+class AssociatedTable(BaseModel, frozen=True, arbitrary_types_allowed=True):
+    """
+    Information from deriva-model for an association table, all in one place.
+    This has a place to store additional attributes.
+    """
+    association_table: Table
+    left_table: Table
+    right_table: Table
+    left_column: Column
+    right_column: Column
+    attributes: list[str] = []
+
+    @property
+    def linked_tables(self) -> set[Table]:
+        """
+        The linked tables in an association table returned as a set.
+        :return: set of tables.
+        """
+        return {self.left_table, self.right_table}
+
+    def __repr__(self):
+        return f"<{self.association_table.name}>"
 
 
 class FileUploadState(BaseModel):
@@ -103,7 +113,7 @@ class Status(Enum):
 class DataSet:
     """
     A DerivaML dataset is a collection of RIDs.  It is represented in the library by a base dataset table and a set of
-    binary association tables.  This class and associate methods are used to create and modify datasets.
+    binary association tables.  This class and associated methods are used to create and modify datasets.
     """
 
     def __init__(self, ml_base: "DerivaML"):
@@ -111,16 +121,6 @@ class DataSet:
         self.domain_schema: str = ml_base.ml_schema_name
         self.dataset_schema: str = ml_base.ml_schema_name
         self.dataset_table: Table = self.ml_base.model.table(self.dataset_schema, 'Dataset')
-
-    def _validate_rid_list(self, rid_list: list[RID]) -> list[ResolveRidResult]:
-        # Get the tables associated with every rid.  Check to make sure we are not trying to include an element
-        # in the dataset for which there is not association table.
-        rid_info = [self.ml_base.resolve_rid(rid) for rid in rid_list]
-        rid_type_names = set(TableName(schema=r.table.schema.name, table=r.table.name) for r in rid_info)
-        element_names = {t.right_table for t in self.ml_base.find_association_tables(self.dataset_table)}
-        if not (rid_type_names < element_names):
-            raise DerivaMLException(f'RID type cannot be dataset element: {[r for r in rid_type_names]}')
-        return rid_info
 
     def extend_dataset(self, dataset_rid: Optional[RID], members: list[RID],
                        description="",
@@ -134,7 +134,9 @@ class DataSet:
         :return:
         """
 
-        rid_info = self._validate_rid_list(members)
+        rid_info, _tables, assoc_tables = self.ml_base.validate_rids(members)
+        if self.dataset_table not in [a for a in assoc_tables]:
+            pass
         pb = self.ml_base.pb
         if not dataset_rid:
             # Create the entry for the new dataset and get its RID.
@@ -154,7 +156,7 @@ class DataSet:
         # need to be made.
         dataset_elements = {}
         for r in rid_info:
-            dataset_elements.setdefault(TableName(schema=r.table.schema.name, table=r.table.name), []).append(r.rid)
+            dataset_elements.setdefault(r.table, []).append(r.rid)
 
         # Now make the entries into the association tables.
         for elements in dataset_elements.values():
@@ -171,7 +173,7 @@ class DataSet:
 
         return self.extend_dataset(None, members, description=description, validate=False)
 
-    def dataset_members(self, dataset_rid: RID) -> dict[TableName, RID]:
+    def dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
         """
         Return a list of RIDs associated with a specific dataset.
         :param dataset_rid:
@@ -188,12 +190,16 @@ class DataSet:
         # the appropriate association table.
         rid_list = {}
         for assoc_table in self.ml_base.find_association_tables(self.dataset_table):
-            schema_path = self.ml_base.pb.schemas[assoc_table.association_table.schema]
-            table_path = schema_path.tables[assoc_table.association_table.table]
-            dataset_column = table_path.columns[assoc_table.in_column]
-            element_column = table_path.columns[assoc_table.out_column]
-            assoc_rids = table_path.filter(dataset_column == dataset_rid).attributes(element_column).fetch()
-            rid_list.setdefault(assoc_table.right_table, []).extend([e[assoc_table.out_column] for e in assoc_rids])
+            schema_path = self.ml_base.pb.schemas[assoc_table.association_table.schema.name]
+            table_path = schema_path.tables[assoc_table.association_table.name]
+            element_table = assoc_table.right_table
+            dataset_column = assoc_table.left_column.name
+            element_column = assoc_table.right_column.name
+            dataset_path = table_path.columns[dataset_column]
+            element_path = table_path.columns[element_column]
+
+            assoc_rids = table_path.filter(dataset_path == dataset_rid).attributes(element_path).fetch()
+            rid_list.setdefault(element_table, []).extend([e[element_column] for e in assoc_rids])
         return rid_list
 
     def delete_dataset(self, dataset_rid: RID) -> None:
@@ -207,11 +213,10 @@ class DataSet:
 
         for assoc_table in self.ml_base.find_association_tables(self.dataset_table):
             schema_path = self.ml_base.pb.schemas[assoc_table.association_table.schema]
-            table_path = schema_path.tables[assoc_table.association_table.table]
-            dataset_column = table_path.columns[assoc_table.in_column]
+            table_path = schema_path.tables[assoc_table.association_table.name]
+            dataset_column = table_path.columns[assoc_table.left_column.name]
             dataset_entries = table_path.filter(dataset_column == dataset_rid)
-            if len(dataset_entries.entities().fetch(limit=1)) == 1:
-                dataset_entries.delete()
+            dataset_entries.delete()
 
         # Delete dataset.
         dataset_path = self.ml_base.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
@@ -409,64 +414,70 @@ class DerivaML:
         else:
             return schema
 
-    def find_association_tables(self, table: TableName | Table | str,
-                                target_table: Optional[TableName | Table | str] = None) \
-            -> list[AssociatedTable]:
+    def find_association_tables(self,
+                                table: Table | str,
+                                target_table: Optional[Table | str] = None,
+                                follow_naming_convention: bool = True) -> list[AssociatedTable]:
         """
         Find a table linking the two named tables.
         :param table: Table name that is considered to be on the "left" hand side of the association table.
         :param target_table:
+        :param follow_naming_convention: If target table is not provided, use the association naming convention of
+               t1_t2 to determine the right hand table in the association.  If False, assume that all foreign_key
+               tables are potentially associated.
         :return:
         """
 
         # Normalize input arguments.
         if isinstance(table, str):
-            table = TableName(schema=self.ml_schema_name, table=table)
-        elif isinstance(table, Table):
-            table = TableName(schema=table.schema.name, table=table.name)
+            try:
+                table = self.model.schemas[self.ml_schema_name].tables[table]
+            except KeyError:
+                raise DerivaMLException(f"The table {table} doesn't exist.")
 
         if isinstance(target_table, str):
-            table = TableName(schema=self.ml_schema_name, table=target_table)
-        elif isinstance(table, Table):
-            table = TableName(schema=target_table.schema.name, table=target_table.name)
-
-        try:
-            self.model.schemas[table.schema].tables[table.table]
-        except KeyError:
-            raise DerivaMLException(f"The table {table.table} doesn't exist.")
-
-        try:
-            target_table and self.model.schemas[target_table.schema].tables[target_table.table]
-        except KeyError:
-            raise DerivaMLException(f"The table {target_table.table} doesn't exist.")
+            try:
+                target_table = target_table and self.model.schemas[self.ml_schema_name].tables[target_table]
+            except KeyError:
+                raise DerivaMLException(f"The table {target_table.table} doesn't exist.")
 
         linked_tables = []
-        for incoming_fk in self.model.schemas[table.schema].tables[table.table].referenced_by:
+        system_tables = [self.model.schemas['public'].tables['ERMrest_Client']]
+        for incoming_fk in table.referenced_by:
             # Is the incoming fkey. Check the table with the incoming key to see if it has an outbound FK to
-            # the target table.  In the case a target_table is not supplied, then try all potential target tables
-            # by iterating over the tables that are connected by the outgoing FKs.
+            # Try  all potential target table by iterating over the tables that are connected by the outgoing FKs.
             association_table = incoming_fk.table
-            referenced_tables = [fk.pk_table.name for fk in association_table.foreign_keys]
-            in_fkey = referenced_tables.index(table.table)
-            for out_fkey in range(len(referenced_tables)):
-                if in_fkey == out_fkey:
+            in_fkey = next(fk for fk in association_table.foreign_keys if fk.pk_table == table)
+            in_column = in_fkey.columns[0]
+            for out_fkey in [fk for fk in association_table.foreign_keys if fk != in_fkey]:
+                if out_fkey.pk_table in system_tables:
                     continue
-                in_column = association_table.foreign_keys[in_fkey].columns[0].name
-                out_column = association_table.foreign_keys[out_fkey].columns[0].name
-                skip_columns = ['RID', 'RCT', 'RMT', 'RCB', 'RMB', in_column, out_column]
+                if target_table and out_fkey.pk_table != target_table:
+                    continue
+
+                left_table, left_column = in_fkey.pk_table, in_fkey.columns[0]
+                right_table, right_column = out_fkey.pk_table, out_fkey.columns[0]
+                # Check to see if association table follows standard naming convention.
+                if follow_naming_convention and not target_table:
+                    if f"{out_fkey.pk_table.name}_{in_fkey.pk_table.name}" == association_table.name:
+                        left_table, left_column = out_fkey.pk_table, out_fkey.columns[0]
+                        right_table, right_column = in_fkey.pk_table, in_fkey.columns[0]
+                    elif f"{in_fkey.pk_table.name}_{out_fkey.pk_table.name}" != association_table.name:
+                        continue
+
+                out_column: Column = out_fkey.columns[0]
+                skip_columns = ['RID', 'RCT', 'RMT', 'RCB', 'RMB', in_column.name, out_column.name]
                 linked_tables.append(AssociatedTable(
-                    association_table=TableName(schema=association_table.schema.name,
-                                                table=association_table.name),
-                    left_table=table,
-                    right_table=TableName(schema=association_table.foreign_keys[out_fkey].pk_table.schema.name,
-                                          table=association_table.foreign_keys[out_fkey].pk_table.name),
-                    in_column=in_column,
-                    out_column=out_column,
-                    attribute_columns=[c.name for c in association_table.columns if c.name not in skip_columns]
+                    association_table=association_table,
+                    left_table=left_table,
+                    right_table=right_table,
+                    left_column=left_column,
+                    right_column=right_column,
+                    attributes=[c.name for c in association_table.columns if c.name not in skip_columns]
                 )
                 )
         if target_table:
-            linked_tables = [lt for lt in linked_tables if target_table == lt.right_table]
+            linked_tables = [lt for lt in linked_tables if target_table in lt.linked_tables]
         return linked_tables
 
     def is_vocabulary(self, table_name: str) -> bool:
@@ -561,6 +572,22 @@ class DerivaML:
                                         True)
         return workflow_rid
 
+    def validate_rids(self, rid_list: list[RID]) -> tuple[list[ResolveRidResult], set[Table], list[AssociatedTable]]:
+        """
+        Given a table, and a list of RIDS, verify that each RID exists. For each RID, check to see if a binary
+        association exists to another table.  Return the list of RID results, the set of tables that the RIDs come from
+        and a list of the association tables that are connected to the RID tables.
+        :param rid_list: A list of RIDs to check.
+        :return: tuple of list of resolved RIDS, a list of tables associated with the rids and a list of
+                all  the associated tables.
+        """
+        # Get the tables associated with every rid.
+        rid_info = [self.resolve_rid(rid) for rid in rid_list]
+        rid_tables = set(r.table for r in rid_info)
+        assoc_tables = [a for t in rid_tables for a in self.find_association_tables(t)]
+
+        return rid_info, rid_tables, assoc_tables
+
     def add_attributes(self, object_rids: list[RID], attribute_rids: list[RID],
                        values: list[dict[str, Any]] = None,
                        validate: bool = True) -> int:
@@ -583,33 +610,36 @@ class DerivaML:
         else:
             values = [{}]
 
-        rid_result = self.resolve_rid(object_rids[0])
-        object_table = TableName(schema=rid_result.table.schema.name, table=rid_result.table.name)
-        rid_result = self.resolve_rid(attribute_rids[0])
-        attribute_table = TableName(schema=rid_result.table.schema.name, table=rid_result.table.name)
+        # We assume that all the RIDs come from the same table.
+        object_table = self.resolve_rid(object_rids[0]).table
+        attribute_table = self.resolve_rid(attribute_rids[0]).table
 
         if validate:
-            if len(object_tables := set(self.resolve_rid(r).table for r in object_rids)) != 1:
+            _, object_tables, _ = self.validate_rids(object_rids)
+            if len(object_tables) != 1:
                 raise DerivaMLException(f"object_rid list contains more than one table {object_tables}")
-            if len(attribute_tables := set(self.resolve_rid(r).table for r in attribute_rids)) != 1:
+            _, attribute_tables, _ = self.validate_rids(attribute_rids)
+            if len(attribute_tables) != 1:
                 raise DerivaMLException(f"object_rid list contains more than one table: {attribute_tables}")
 
         if len(association_tables := self.find_association_tables(object_table, attribute_table)) != 1:
-            raise DerivaMLException(f"Ambiguous association table from {object_table} to {attribute_table}.")
+            print(association_tables)
+            raise DerivaMLException(f"Ambiguous association table from {object_table.name} to {attribute_table.name}.")
         elif not association_tables:
-            raise DerivaMLException(f"No association between {object_table} and {attribute_table}")
+            raise DerivaMLException(f"No association between {object_table.name} and {attribute_table.name}")
         association_table = association_tables[0]
 
         entries = []
         for object_rid, attribute_rid, value in zip(object_rids, attribute_rids, values):
-            if set(value.keys()) != set(association_table.attribute_columns):
-                raise DerivaMLException(f"Missing attribute values: {set(association_table.attribute_columns)}")
+            if set(value.keys()) != set(association_table.attributes):
+                raise DerivaMLException(f"Missing attribute values: {set(association_table.attributes)}")
             entries.append(
-                {association_table.in_column: object_rid, association_table.out_column: attribute_rid} | value
+                {association_table.left_column.name: object_rid,
+                 association_table.right_column.name: attribute_rid} | value
             )
-        self._batch_insert(
-            self.pb.schemas[association_table[0]].tables[association_table.association_table[1]],
-            entries)
+
+        at = association_table.association_table
+        self._batch_insert(self.pb.schemas[at.schema.name].tables[at.name], entries)
         return len(entries)
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
