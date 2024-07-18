@@ -18,7 +18,7 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
 2. Open Terminal on the VM
 3. Substitute `<github-username>` and `<github-token>` with the appropriate values accordingly, then execute:
    ```bash
-   echo "https://<github-username>:<github-token>@github.com" > ~/.git-credential && chmod 600 ~/.git-credential
+   echo "https://<github-username>:<github-token>@github.com" > ~/.git-credentials && chmod 600 ~/.git-credentials
    ```
 
 # Clone Catalog-ml and Catalog-exec repo
