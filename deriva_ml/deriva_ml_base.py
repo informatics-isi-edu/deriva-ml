@@ -19,6 +19,7 @@ import pkg_resources
 import requests
 from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
+from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Table, Column
 from deriva.core.hatrac_store import HatracStore
@@ -108,131 +109,6 @@ class Status(Enum):
     pending = "Pending"
     completed = "Completed"
     failed = "Failed"
-
-
-class DataSet:
-    """
-    A DerivaML dataset is a collection of RIDs.  It is represented in the library by a base dataset table and a set of
-    binary association tables.  This class and associated methods are used to create and modify datasets.
-    """
-
-    def __init__(self, ml_base: "DerivaML"):
-        self.ml_base = ml_base
-        self.domain_schema: str = ml_base.ml_schema_name
-        self.dataset_schema: str = ml_base.ml_schema_name
-        self.dataset_table: Table = self.ml_base.model.table(self.dataset_schema, 'Dataset')
-
-    def extend_dataset(self, dataset_rid: Optional[RID], members: list[RID],
-                       description="",
-                       validate: bool = True) -> RID:
-        """
-        Add additional elements to an existing dataset.
-        :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
-        :param members: List of RIDs of members to add to the  dataset.
-        :param description: Description of the dataset if new entry is created.
-        :param validate: Check rid_list to make sure elements are not already in the dataset.
-        :return:
-        """
-
-        rid_info, _tables, assoc_tables = self.ml_base.validate_rids(members)
-        if self.dataset_table not in [a for a in assoc_tables]:
-            pass
-        pb = self.ml_base.pb
-        if not dataset_rid:
-            # Create the entry for the new dataset and get its RID.
-            dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
-            dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
-
-        if validate:
-            existing_rids = set(
-                m
-                for ms in self.dataset_members(dataset_rid).values()
-                for m in ms
-            )
-            if overlap := set(existing_rids).intersection(members):
-                raise DerivaMLException(f"Attempting to add existing member to dataset {dataset_rid}: {overlap}")
-
-        # Now go through every rid to be added to the data set and sort them based on what association table entries
-        # need to be made.
-        dataset_elements = {}
-        for r in rid_info:
-            dataset_elements.setdefault(r.table, []).append(r.rid)
-
-        # Now make the entries into the association tables.
-        for elements in dataset_elements.values():
-            self.ml_base.add_attributes([dataset_rid] * len(elements), elements)
-        return dataset_rid
-
-    def create_dataset(self, description: str, members: list[RID]) -> RID:
-        """
-        Create a new dataset from the specified list of RIDs.
-        :param description:  Description of the dataset.
-        :param members:  List of RIDs to include in the dataset.
-        :return: New dataset RID.
-        """
-
-        return self.extend_dataset(None, members, description=description, validate=False)
-
-    def dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
-        """
-        Return a list of RIDs associated with a specific dataset.
-        :param dataset_rid:
-        :return:
-        """
-
-        dataset_path = self.ml_base.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
-        dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
-
-        if len(dataset_exists) != 1:
-            raise DerivaMLException(f'Invalid RID: {dataset_rid}')
-
-        # Look at each of the element types that might be in the dataset and get the list of rid for them from
-        # the appropriate association table.
-        rid_list = {}
-        for assoc_table in self.ml_base.find_association_tables(self.dataset_table):
-            schema_path = self.ml_base.pb.schemas[assoc_table.association_table.schema.name]
-            table_path = schema_path.tables[assoc_table.association_table.name]
-            element_table = assoc_table.right_table
-            dataset_column = assoc_table.left_column.name
-            element_column = assoc_table.right_column.name
-            dataset_path = table_path.columns[dataset_column]
-            element_path = table_path.columns[element_column]
-
-            assoc_rids = table_path.filter(dataset_path == dataset_rid).attributes(element_path).fetch()
-            rid_list.setdefault(element_table, []).extend([e[element_column] for e in assoc_rids])
-        return rid_list
-
-    def delete_dataset(self, dataset_rid: RID) -> None:
-        """
-        Delete a dataset from the catalog.
-        :param dataset_rid:  RID of the dataset to delete.
-        :return:
-        """
-        # Get association table entries for this dataset
-        # Delete association table entries
-
-        for assoc_table in self.ml_base.find_association_tables(self.dataset_table):
-            schema_path = self.ml_base.pb.schemas[assoc_table.association_table.schema]
-            table_path = schema_path.tables[assoc_table.association_table.name]
-            dataset_column = table_path.columns[assoc_table.left_column.name]
-            dataset_entries = table_path.filter(dataset_column == dataset_rid)
-            dataset_entries.delete()
-
-        # Delete dataset.
-        dataset_path = self.ml_base.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
-        dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
-
-    def add_element_type(self, element: str) -> Table:
-        """
-        Add a new element type to a dataset.
-        :param element:
-        :return:
-        """
-        # Add table to map
-        element_table = self.ml_base.model.schemas[self.domain_schema].tables[element]
-        assoc_table = self.ml_base.model.schemas[self.domain_schema].create_association(self.dataset_table,
-                                                                                        element_table)
-        return assoc_table
 
 
 class DerivaMlExec:
@@ -355,9 +231,12 @@ class DerivaML:
         self.pb = self.catalog.getPathBuilder()
         self.host_name = hostname
         self.ml_schema_name = ml_schema
-
+        self.domain_schema = ml_schema
+        self.dataset_schema = ml_schema
         self.catalog_id = catalog_id
         self.ml_schema_path = self.pb.schemas[self.ml_schema_name]
+        self.version = model_version
+        self.dataset_table = self.model.table(self.dataset_schema, 'Dataset')
         self.configuration = None
 
         self.start_time = datetime.now()
@@ -377,8 +256,6 @@ class DerivaML:
         self.execution_metadata_path = self.working_dir / "Execution_Metadata/"
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
-        self.version = model_version
-        self.dataset = DataSet(self)
 
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
         if "dirty" in self.version:
@@ -512,36 +389,6 @@ class DerivaML:
         return [fk.columns[0].name for fk in table.foreign_keys
                 if len(fk.columns) == 1 and self.is_vocabulary(fk.pk_table)]
 
-    @staticmethod
-    def _add_record(table: datapath._TableWrapper,
-                    record: dict[str, str],
-                    unique_col: str,
-                    exist_ok: bool = False) -> RID:
-        """
-        Add a record to a table.
-
-        Args:
-        - table (datapath._TableWrapper): Table wrapper object.
-        - record (dict): Record to be added.
-        - unique_col (str): Name of the column need to be unique.
-        - exist_ok (bool): Flag indicating whether to allow creation if the record already exists.
-
-        Returns:
-        - str: Resource Identifier (RID) of the added record.
-
-        """
-        try:
-            entities = table.entities()
-            name_list = [e[unique_col] for e in entities]
-            record_rid = entities[name_list.index(record[unique_col])]['RID']
-        except ValueError:
-            record_rid = table.insert([record])[0]['RID']
-        else:
-            if not exist_ok:
-                raise DerivaMLException(
-                    f"{record[unique_col]} existed with RID {entities[name_list.index(record[unique_col])]['RID']}")
-        return record_rid
-
     def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
                      version: str = "",
                      description: str = "") -> RID:
@@ -559,17 +406,23 @@ class DerivaML:
         - str: Resource Identifier (RID) of the added workflow.
 
         """
-        workflow_type_rid = self.lookup_term("Workflow_Type", workflow_type)
-        checksum = self._get_checksum(url)
-        workflow_rid = self._add_record(self.ml_schema_path.Workflow,
-                                        {'URL': url,
-                                         'Name': workflow_name,
-                                         'Description': description,
-                                         'Checksum': checksum,
-                                         'Version': version,
-                                         'Workflow_Type': workflow_type_rid},
-                                        'URL',
-                                        True)
+
+        # Check to make sure that the workflow is not already in the table. If its not, add it.
+        try:
+            url_column = self.ml_schema_path.Workflow.URL
+            workflow_record = list(self.ml_schema_path.Workflow.filter(url_column == url).entities())[0]
+            workflow_rid = workflow_record['RID']
+        except IndexError:
+            # Record doesn't exist already
+            workflow_record = {
+                'URL': url,
+                'Name': workflow_name,
+                'Description': description,
+                'Checksum': self._get_checksum(url),
+                'Version': version,
+                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type)}
+            workflow_rid = self.ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
+
         return workflow_rid
 
     def validate_rids(self, rid_list: list[RID]) -> tuple[list[ResolveRidResult], set[Table], list[AssociatedTable]]:
@@ -608,7 +461,7 @@ class DerivaML:
             if len(object_rids) != len(values):
                 raise DerivaMLException(f"Must have the name number of values and attributes")
         else:
-            values = [{}]
+            values = [{}] * len(object_rids)
 
         # We assume that all the RIDs come from the same table.
         object_table = self.resolve_rid(object_rids[0]).table
@@ -641,6 +494,129 @@ class DerivaML:
         at = association_table.association_table
         self._batch_insert(self.pb.schemas[at.schema.name].tables[at.name], entries)
         return len(entries)
+
+    def create_dataset(self, description: str, members: list[RID]) -> RID:
+        """
+        Create a new dataset from the specified list of RIDs.
+        :param description:  Description of the dataset.
+        :param members:  List of RIDs to include in the dataset.
+        :return: New dataset RID.
+        """
+
+        return self.extend_dataset(None, members, description=description, validate=False)
+
+    def delete_dataset(self, dataset_rid: RID) -> None:
+        """
+        Delete a dataset from the catalog.
+        :param dataset_rid:  RID of the dataset to delete.
+        :return:
+        """
+        # Get association table entries for this dataset
+        # Delete association table entries
+
+        for assoc_table in self.find_association_tables(self.dataset_table):
+            schema_path = self.pb.schemas[assoc_table.association_table.schema.name]
+            table_path = schema_path.tables[assoc_table.association_table.name]
+            if assoc_table.left_table == self.dataset_table:
+                dataset_column, element_column = assoc_table.left_column, assoc_table.right_column
+            else:
+                dataset_column, element_column = assoc_table.right_column, assoc_table.left_column
+            dataset_column_path = table_path.columns[dataset_column.name]
+            dataset_entries = table_path.filter(dataset_column_path == dataset_rid)
+            try:
+                dataset_entries.delete()
+            except DataPathException:
+                pass
+
+        # Delete dataset.
+        dataset_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
+
+    def add_element_type(self, element: str) -> Table:
+        """
+        Add a new element type to a dataset.
+        :param element:
+        :return:
+        """
+        # Add table to map
+        element_table = self.model.schemas[self.domain_schema].tables[element]
+        assoc_table = self.model.schemas[self.domain_schema].create_association(self.dataset_table, element_table)
+        return assoc_table
+
+    def dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
+        """
+        Return a list of RIDs associated with a specific dataset.
+        :param dataset_rid:
+        :return:
+        """
+
+        dataset_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
+
+        if len(dataset_exists) != 1:
+            raise DerivaMLException(f'Invalid RID: {dataset_rid}')
+
+        # Look at each of the element types that might be in the dataset and get the list of rid for them from
+        # the appropriate association table.
+        rid_list = {}
+        for assoc_table in self.find_association_tables(self.dataset_table):
+            schema_path = self.pb.schemas[assoc_table.association_table.schema.name]
+            table_path = schema_path.tables[assoc_table.association_table.name]
+            if assoc_table.left_table == self.dataset_table:
+                dataset_column, element_column = assoc_table.left_column, assoc_table.right_column
+                element_table = assoc_table.right_table
+            else:
+                dataset_column, element_column = assoc_table.right_column, assoc_table.left_column
+                element_table = assoc_table.left_table
+            dataset_path = table_path.columns[dataset_column.name]
+            element_path = table_path.columns[element_column.name]
+            assoc_rids = table_path.filter(dataset_path == dataset_rid).attributes(element_path).fetch()
+            rid_list.setdefault(element_table.name, []).extend([e[element_column.name] for e in assoc_rids])
+        return rid_list
+
+    def extend_dataset(self, dataset_rid: Optional[RID], members: list[RID],
+                       description="",
+                       validate: bool = True) -> RID:
+        """
+        Add additional elements to an existing dataset.
+        :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
+        :param members: List of RIDs of members to add to the  dataset.
+        :param description: Description of the dataset if new entry is created.
+        :param validate: Check rid_list to make sure elements are not already in the dataset.
+        :return:
+        """
+
+        rid_info, _tables, assoc_tables = self.validate_rids(members)
+        if self.dataset_table not in [a for a in assoc_tables]:
+            pass
+        pb = self.pb
+        if dataset_rid:
+            if self.resolve_rid(dataset_rid).table != self.dataset_table:
+                raise DerivaMLException(f"RID: {dataset_rid} is not a dataset.")
+        else:
+            # Create the entry for the new dataset and get its RID.
+            dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+            dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
+
+        if validate:
+            existing_rids = set(
+                m
+                for ms in self.dataset_members(dataset_rid).values()
+                for m in ms
+            )
+            if overlap := set(existing_rids).intersection(members):
+                raise DerivaMLException(f"Attempting to add existing member to dataset {dataset_rid}: {overlap}")
+
+        # Now go through every rid to be added to the data set and sort them based on what association table entries
+        # need to be made.
+        dataset_elements = {}
+        for r in rid_info:
+            dataset_elements.setdefault(r.table, []).append(r.rid)
+        # Now make the entries into the association tables.
+        for elements in dataset_elements.values():
+            if len(elements):
+                self.add_attributes([dataset_rid] * len(elements), elements)
+        return dataset_rid
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
                       description: str = "") -> RID:
