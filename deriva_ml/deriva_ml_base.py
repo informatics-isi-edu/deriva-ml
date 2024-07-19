@@ -209,33 +209,34 @@ class ConfigurationRecord(BaseModel):
 
 class DerivaML:
     """
-    Class for managing Machine Learning experiments with data and metadata stored in Deriva platform.
-
-    Args:
-    - hostname (str): Hostname of the Deriva server.
-    - catalog_id (str): Catalog ID.
-    - schema_name (str): Schema name.
-    - cache_dir (str): Directory path for caching data.
-    - working_dir (str): Directory path for storing temporary data.
-
+    Base class for ML operations on a Deriva catalog.  This class is intended to be used as a base class on which
+    more domain specific interfaces are built.
     """
-
-    def __init__(self, hostname: str, catalog_id: str, ml_schema: str,
+    def __init__(self, hostname: str, catalog_id: str, domain_schema: str,
                  cache_dir: str, working_dir: str,
                  model_version: str):
+        """
+
+        :param hostname: Hostname of the Deriva server.
+        :param catalog_id: Catalog ID.
+        :param domain_schema: Schema name for domain specific tables and relationships.
+        :param cache_dir: Directory path for caching data.
+        :param working_dir: Directory path for storing temporary data.
+        :param model_version:
+        """
+        self.host_name = hostname
+        self.catalog_id = catalog_id
+        self.domain_schema = domain_schema
+        self.version = model_version
+
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
                                       self.credential,
                                       session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
         self.pb = self.catalog.getPathBuilder()
-        self.host_name = hostname
-        self.ml_schema_name = ml_schema
-        self.domain_schema = ml_schema
-        self.dataset_schema = ml_schema
-        self.catalog_id = catalog_id
-        self.ml_schema_path = self.pb.schemas[self.ml_schema_name]
-        self.version = model_version
+        self.dataset_schema = domain_schema
+        self.ml_schema_path = self.pb.schemas[self.domain_schema]
         self.dataset_table = self.model.table(self.dataset_schema, 'Dataset')
         self.configuration = None
 
@@ -308,13 +309,13 @@ class DerivaML:
         # Normalize input arguments.
         if isinstance(table, str):
             try:
-                table = self.model.schemas[self.ml_schema_name].tables[table]
+                table = self.model.schemas[self.domain_schema].tables[table]
             except KeyError:
                 raise DerivaMLException(f"The table {table} doesn't exist.")
 
         if isinstance(target_table, str):
             try:
-                target_table = target_table and self.model.schemas[self.ml_schema_name].tables[target_table]
+                target_table = target_table and self.model.schemas[self.domain_schema].tables[target_table]
             except KeyError:
                 raise DerivaMLException(f"The table {target_table.table} doesn't exist.")
 
