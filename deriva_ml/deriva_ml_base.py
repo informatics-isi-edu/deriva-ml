@@ -303,7 +303,7 @@ class DerivaML:
         :param follow_naming_convention: If target table is not provided, use the association naming convention of
                t1_t2 to determine the right hand table in the association.  If False, assume that all foreign_key
                tables are potentially associated.
-        :return:
+        :return: A list of association tables.
         """
 
         # Normalize input arguments.
@@ -322,29 +322,30 @@ class DerivaML:
         linked_tables = []
         system_tables = [self.model.schemas['public'].tables['ERMrest_Client']]
         for incoming_fk in table.referenced_by:
-            # Is the incoming fkey. Check the table with the incoming key to see if it has an outbound FK to
-            # Try  all potential target table by iterating over the tables that are connected by the outgoing FKs.
+            # Is the incoming fkey. Check the table with the incoming key to see if it has an outbound FK/
+            # Try  all potential target tables by iterating over the tables that are connected by the outgoing FKs.
             association_table = incoming_fk.table
-            in_fkey = next(fk for fk in association_table.foreign_keys if fk.pk_table == table)
-            in_column = in_fkey.columns[0]
-            for out_fkey in [fk for fk in association_table.foreign_keys if fk != in_fkey]:
-                if out_fkey.pk_table in system_tables:
+            left_fkey = next(fk for fk in association_table.foreign_keys if fk.pk_table == table)
+            for right_fkey in [fk for fk in association_table.foreign_keys if fk != left_fkey]:
+                left_table, right_table = left_fkey.pk_table, right_fkey.pk_table
+                left_column, right_column = left_fkey.columns[0], right_fkey.columns[0]
+
+                if right_table in system_tables:
                     continue
-                if target_table and out_fkey.pk_table != target_table:
+                if target_table and right_table != target_table:
                     continue
 
-                left_table, left_column = in_fkey.pk_table, in_fkey.columns[0]
-                right_table, right_column = out_fkey.pk_table, out_fkey.columns[0]
                 # Check to see if association table follows standard naming convention.
                 if follow_naming_convention and not target_table:
-                    if f"{out_fkey.pk_table.name}_{in_fkey.pk_table.name}" == association_table.name:
-                        left_table, left_column = out_fkey.pk_table, out_fkey.columns[0]
-                        right_table, right_column = in_fkey.pk_table, in_fkey.columns[0]
-                    elif f"{in_fkey.pk_table.name}_{out_fkey.pk_table.name}" != association_table.name:
+                    if f"{right_table.name}_{left_table.name}" == association_table.name:
+                        left_fkey, right_fkey = right_fkey, left_fkey
+                        left_table, right_table = right_table, left_table
+                        left_column, right_column = right_column, left_column
+                    elif f"{left_table.name}_{right_table.name}" != association_table.name:
+                        # If we are following the naming convention, only use tables that are called out in the name.
                         continue
 
-                out_column: Column = out_fkey.columns[0]
-                skip_columns = ['RID', 'RCT', 'RMT', 'RCB', 'RMB', in_column.name, out_column.name]
+                skip_columns = ['RID', 'RCT', 'RMT', 'RCB', 'RMB', left_column.name, right_column.name]
                 linked_tables.append(AssociatedTable(
                     association_table=association_table,
                     left_table=left_table,
