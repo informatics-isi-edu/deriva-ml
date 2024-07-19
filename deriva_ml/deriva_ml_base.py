@@ -872,13 +872,14 @@ class DerivaML:
             checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
 
-    def materialize_bdbag(self, minid: str, execution_rid: str) -> tuple:
+    def materialize_bdbag(self, minid: str, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
         """
-        Materialize a BDBag.
+        Materialize a BDBag into the cache directory. Validate its contents and return the path to the bag, and its RID.
 
         Args:
         - minid (str): Minimum viable identifier (minid) of the bag.
-        - execution_rid (str): Resource Identifier (RID) of the execution.
+        - execution_rid (str): Resource Identifier (RID) of the execution to report status to.  If None, status is
+                                not updated.
 
         Returns:
         - tuple: Tuple containing the path to the bag and the RID of the associated dataset.
@@ -889,13 +890,17 @@ class DerivaML:
         """
 
         def fetch_progress_callback(current, total):
-            self.update_status(Status.running,
-                               f"Materializing bag: {current} of {total} file(s) downloaded.", execution_rid)
+            msg = f"Materializing bag: {current} of {total} file(s) downloaded."
+            if execution_rid:
+                self.update_status(Status.running, msg, execution_rid)
+            logging.info(msg)
             return True
 
         def validation_progress_callback(current, total):
-            self.update_status(Status.running,
-                               f"Validating bag: {current} of {total} file(s) validated.", execution_rid)
+            msg = f"Validating bag: {current} of {total} file(s) validated."
+            if execution_rid:
+                self.update_status(Status.running, msg, execution_rid)
+            logging.info(msg)
             return True
 
         # request metadata
@@ -931,7 +936,7 @@ class DerivaML:
                     validated_check.touch()
         return Path(bag_path), dataset_rid
 
-    def download_asset(self, asset_url: str, dest_filename: str) -> str:
+    def download_asset(self, asset_url: str, dest_filename: str) -> Path:
         """
         Download an asset from a URL.
 
@@ -948,7 +953,7 @@ class DerivaML:
         """
         hs = HatracStore("https", self.host_name, self.credential)
         hs.get_obj(path=asset_url, destfilename=dest_filename)
-        return dest_filename
+        return Path(dest_filename)
 
     def upload_assets(self, assets_dir: str) -> dict[str, FileUploadState]:
         """
