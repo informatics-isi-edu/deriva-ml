@@ -13,7 +13,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import List, Sequence, Optional, Any, NewType
 
-import deriva.core.datapath as datapath
 import pandas as pd
 import pkg_resources
 import requests
@@ -494,7 +493,7 @@ class DerivaML:
             )
 
         at = association_table.association_table
-        self._batch_insert(self.pb.schemas[at.schema.name].tables[at.name], entries)
+        self._batch_insert(at.name, entries, schema_name=at.schema.schema_name)
         return len(entries)
 
     def create_dataset(self, description: str, members: list[RID]) -> RID:
@@ -641,7 +640,7 @@ class DerivaML:
         else:
             execution_rid = self.ml_schema_path.Execution.insert([{'Description': description}])[0]['RID']
         if datasets:
-            self._batch_insert(self.ml_schema_path.Dataset_Execution,
+            self._batch_insert("Dataset_Execution",
                                [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
@@ -663,11 +662,10 @@ class DerivaML:
         """
 
         datasets = datasets or []
-        self._batch_update(self.ml_schema_path.Execution,
-                           [{"RID": execution_rid, "Workflow": workflow_rid, "Description": description}],
-                           [self.ml_schema_path.Execution.Workflow, self.ml_schema_path.Execution.Description])
+        self._batch_update("Execution",
+                           [{"RID": execution_rid, "Workflow": workflow_rid, "Description": description}])
         if datasets:
-            self._batch_insert(self.ml_schema_path.Dataset_Execution,
+            self._batch_insert("Dataset_Execution",
                                [{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
@@ -816,8 +814,7 @@ class DerivaML:
         path = users.ERMrest_Client.path
         return pd.DataFrame(path.entities().fetch())[['ID', 'Full_Name']]
 
-    @staticmethod
-    def _batch_insert(table: datapath._TableWrapper, entities: Sequence[dict]):
+    def _batch_insert(self, table: str, entities: Sequence[dict], schema_name: str = "") -> None:
         """
         Batch insert entities into a table.
 
@@ -826,13 +823,14 @@ class DerivaML:
         - entities (Sequence[dict]): Sequence of entity dictionaries to insert.
 
         """
+        schema_path = self.pb.schemas[schema_name] if schema_name else self.ml_schema_path
+        table_path = schema_path.table[table]
+
         it = iter(entities)
         while chunk := list(islice(it, 2000)):
-            table.insert(chunk)
+            table_path.insert(chunk)
 
-    @staticmethod
-    def _batch_update(table: datapath._TableWrapper, entities: Sequence[dict],
-                      update_cols: List[datapath._ColumnWrapper]):
+    def _batch_update(self, table: str, entities: Sequence[dict], schema_name: str = ""):
         """
         Batch update entities in a table.
 
@@ -842,9 +840,13 @@ class DerivaML:
         - update_cols (List[datapath._ColumnWrapper]): List of columns to update.
 
         """
+        schema_path = self.pb.schemas[schema_name] if schema_name else self.ml_schema_path
+        table_path = schema_path.table[table]
+
         it = iter(entities)
         while chunk := list(islice(it, 2000)):
-            table.update(chunk, [table.RID], update_cols)
+            columns = [table_path.columns[c] for e in chunk for c in e.keys() if c != "RID"]
+            table_path.update(chunk, [table_path.RID], columns)
 
     @staticmethod
     def _get_checksum(url) -> str:
@@ -990,9 +992,8 @@ class DerivaML:
 
         """
         self.status = new_status.value
-        self._batch_update(self.ml_schema_path.Execution,
-                           [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}],
-                           [self.ml_schema_path.Execution.Status, self.ml_schema_path.Execution.Status_Detail])
+        self._batch_update("Execution",
+                           [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}])
 
     def download_execution_files(self, table_name: str, file_rid: str, execution_rid="", dest_dir: str = "") -> Path:
         """
@@ -1024,8 +1025,9 @@ class DerivaML:
             raise DerivaMLException(f"Failed to download the file {file_rid}. Error: {error}")
 
         if execution_rid != '':
-            ass_table = self.ml_schema_path.tables[table_name + '_Execution']
-            exec_file_exec_entities = ass_table.filter(ass_table.columns[table_name] == file_rid).entities()
+            ass_table = table_name + '_Execution'
+            ass_table_path = self.ml_schema_path.tables[ass_table]
+            exec_file_exec_entities = ass_table_path.filter(ass_table_path.columns[table_name] == file_rid).entities()
             exec_list = [e['Execution'] for e in exec_file_exec_entities]
             if execution_rid not in exec_list:
                 self._batch_insert(ass_table, [{table_name: file_rid, "Execution": execution_rid}])
@@ -1065,7 +1067,7 @@ class DerivaML:
         try:
             execution_metadata_type_rid = self.lookup_term(self.ml_schema_path.Execution_Metadata_Type,
                                                            "Execution Config")
-            self._batch_insert(self.ml_schema_path.Execution_Metadata,
+            self._batch_insert("Execution_Metadata",
                                [{"URL": hatrac_uri,
                                  "Filename": file_name,
                                  "Length": file_size,
@@ -1108,7 +1110,7 @@ class DerivaML:
                     rid = metadata["Result"].get("RID")
                     if (rid is not None) and (rid not in meta_list):
                         entities.append({"Execution_Metadata": rid, "Execution": execution_rid})
-        self._batch_insert(self.ml_schema_path.Execution_Metadata_Execution, entities)
+        self._batch_insert("Execution_Metadata_Execution", entities)
 
         return results
 
@@ -1148,7 +1150,7 @@ class DerivaML:
                             rid = asset["Result"].get("RID")
                             if (rid is not None) and (rid not in assets_list):
                                 entities.append({"Execution_Assets": rid, "Execution": execution_rid})
-                    self._batch_insert(self.ml_schema_path.Execution_Assets_Execution, entities)
+                    self._batch_insert("Execution_Assets_Execution", entities)
                     results[str(folder_path)] = result
         return results
 
@@ -1170,8 +1172,7 @@ class DerivaML:
         duration = f'{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec'
 
         self.update_status(Status.running, "Algorithm execution ended.", execution_rid)
-        self._batch_update(self.ml_schema_path.Execution, [{"RID": execution_rid, "Duration": duration}],
-                           [self.ml_schema_path.Execution.Duration])
+        self._batch_update("Execution", [{"RID": execution_rid, "Duration": duration}])
 
     def execution_init(self, configuration_rid: RID) -> ConfigurationRecord:
         """
