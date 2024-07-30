@@ -824,7 +824,7 @@ class DerivaML:
 
         """
         schema_path = self.pb.schemas[schema_name] if schema_name else self.ml_schema_path
-        table_path = schema_path.table[table]
+        table_path = schema_path.tables[table]
 
         it = iter(entities)
         while chunk := list(islice(it, 2000)):
@@ -841,7 +841,7 @@ class DerivaML:
 
         """
         schema_path = self.pb.schemas[schema_name] if schema_name else self.ml_schema_path
-        table_path = schema_path.table[table]
+        table_path = schema_path.tables[table]
 
         it = iter(entities)
         while chunk := list(islice(it, 2000)):
