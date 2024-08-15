@@ -20,7 +20,7 @@ from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import Table, Column
+from deriva.core.ermrest_model import Table, Column, ForeignKey, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
@@ -491,16 +491,36 @@ class DerivaML:
 
     def create_feature(self, feature_name: str, table: Table, target: Table, description: str = "") -> None:
         execution_instance = self.model.schemas[self.ml_schema].tables["Execution"]
-        self.model.schemas[self.domain_schema].create_table(
+        object_fk = ForeignKey.define()
+        feature_fk = ForeignKey.define()
+        execution_fk = ForeignKey.define()
+
+
+        return self.create_table(
             Table.define(
-                tname=f"{table.name}_{target.name}_{feature_name}",
+                f'{table.name}_{table2.name}_{feature_name}',
                 column_defs=[
-                    Column.define(table.name),
-                    Column.define("Execution"),
-                    Column.define(target.name)],
-                comment=description
+                    Column.define(table1.name, _erm.builtin_types['text'], nullok=False),
+                    Column.define(table2.name, _erm.builtin_types['text'], nullok=False)
+                ],
+                key_defs=[
+                    Key.define([table1.name, table2.name])
+                ],
+                fkey_defs=[
+                    ForeignKey.define(
+                        [table1.name],
+                        table1.schema.name, table1.name, [table1.columns['RID'].name],
+                        on_update='CASCADE'
+                    ),
+                    ForeignKey.define(
+                        [table2.name],
+                        table2.schema.name, table2.name, [table2.columns['RID'].name],
+                        on_update='CASCADE'
+                    )
+                ]
+            )
         )
-        )
+
 
 
     def add_feature(self, object_rids: list[RID], attribute_rids: list[RID],
