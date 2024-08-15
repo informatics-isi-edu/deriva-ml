@@ -319,41 +319,33 @@ class DerivaML:
                 raise DerivaMLException(f"The table {target_table.table} doesn't exist.")
 
         linked_tables = []
-        system_tables = [self.model.schemas['public'].tables['ERMrest_Client']]
-        for incoming_fk in table.referenced_by:
-            # Is the incoming fkey. Check the table with the incoming key to see if it has an outbound FK/
-            # Try  all potential target tables by iterating over the tables that are connected by the outgoing FKs.
-            association_table = incoming_fk.table
-            left_fkey = next(fk for fk in association_table.foreign_keys if fk.pk_table == table)
-            for right_fkey in [fk for fk in association_table.foreign_keys if fk != left_fkey]:
-                left_table, right_table = left_fkey.pk_table, right_fkey.pk_table
-                left_column, right_column = left_fkey.columns[0], right_fkey.columns[0]
-
-                if right_table in system_tables:
-                    continue
+        for assoc in table.find_associations():
+            a_table = assoc.table
+            for other_fkey in assoc.other_fkeys:
+                left_table, right_table = assoc.self_fkey.pk_table, other_fkey.pk_table
+                left_column, right_column = assoc.self_fkey.columns[0], other_fkey.columns[0]
                 if target_table and right_table != target_table:
                     continue
 
                 # Check to see if association table follows standard naming convention.
                 if follow_naming_convention and not target_table:
-                    if f"{right_table.name}_{left_table.name}" == association_table.name:
-                        left_fkey, right_fkey = right_fkey, left_fkey
+                    if f"{right_table.name}_{left_table.name}" == a_table.name:
                         left_table, right_table = right_table, left_table
                         left_column, right_column = right_column, left_column
-                    elif f"{left_table.name}_{right_table.name}" != association_table.name:
+                    elif f"{left_table.name}_{right_table.name}" != a_table.name:
                         # If we are following the naming convention, only use tables that are called out in the name.
                         continue
 
                 skip_columns = ['RID', 'RCT', 'RMT', 'RCB', 'RMB', left_column.name, right_column.name]
                 linked_tables.append(AssociatedTable(
-                    association_table=association_table,
+                    association_table=a_table,
                     left_table=left_table,
                     right_table=right_table,
                     left_column=left_column,
                     right_column=right_column,
-                    attributes=[c.name for c in association_table.columns if c.name not in skip_columns]
-                )
-                )
+                    attributes=[c.name for c in a_table.columns if c.name not in skip_columns]
+                ))
+
         if target_table:
             linked_tables = [lt for lt in linked_tables if target_table in lt.linked_tables]
         return linked_tables
@@ -442,8 +434,77 @@ class DerivaML:
 
         return rid_info, rid_tables, assoc_tables
 
+    # delete
     def add_attributes(self, object_rids: list[RID], attribute_rids: list[RID],
                        values: list[dict[str, Any]] = None,
+                       validate: bool = True) -> int:
+        """
+        Add an attribute to the specified object.
+
+        :param object_rids: A list of the rids to which the new attributes will be attached.  Every RID in the list
+        must come from the same table.
+        :param attribute_rids: A list of the rids of the attributes to be added.
+        :param values: Additional attributes that are added to the linkage.
+        :param validate: Flag indicating whether to validate the arguments
+        :return: Number of attributed added
+        """
+
+        if len(object_rids) != len(attribute_rids):
+            raise DerivaMLException(f"Must have the name number of objects and attributes")
+        if values:
+            if len(object_rids) != len(values):
+                raise DerivaMLException(f"Must have the name number of values and attributes")
+        else:
+            values = [{}] * len(object_rids)
+
+        # We assume that all the RIDs come from the same table.
+        object_table = self.resolve_rid(object_rids[0]).table
+        attribute_table = self.resolve_rid(attribute_rids[0]).table
+
+        if validate:
+            _, object_tables, _ = self.validate_rids(object_rids)
+            if len(object_tables) != 1:
+                raise DerivaMLException(f"object_rid list contains more than one table {object_tables}")
+            _, attribute_tables, _ = self.validate_rids(attribute_rids)
+            if len(attribute_tables) != 1:
+                raise DerivaMLException(f"object_rid list contains more than one table: {attribute_tables}")
+
+        if len(association_tables := self.find_association_tables(object_table, attribute_table)) != 1:
+            print(association_tables)
+            raise DerivaMLException(f"Ambiguous association table from {object_table.name} to {attribute_table.name}.")
+        elif not association_tables:
+            raise DerivaMLException(f"No association between {object_table.name} and {attribute_table.name}")
+        association_table = association_tables[0]
+
+        entries = []
+        for object_rid, attribute_rid, value in zip(object_rids, attribute_rids, values):
+            if set(value.keys()) != set(association_table.attributes):
+                raise DerivaMLException(f"Missing attribute values: {set(association_table.attributes)}")
+            entries.append(
+                {association_table.left_column.name: object_rid,
+                 association_table.right_column.name: attribute_rid} | value
+            )
+
+        at = association_table.association_table
+        self._batch_insert(at.name, entries, schema_name=at.schema.schema_name)
+        return len(entries)
+
+    def create_feature(self, feature_name: str, table: Table, target: Table, description: str = "") -> None:
+        execution_instance = self.model.schemas[self.ml_schema].tables["Execution"]
+        self.model.schemas[self.domain_schema].create_table(
+            Table.define(
+                tname=f"{table.name}_{target.name}_{feature_name}",
+                column_defs=[
+                    Column.define(table.name),
+                    Column.define("Execution"),
+                    Column.define(target.name)],
+                comment=description
+        )
+        )
+
+
+    def add_feature(self, object_rids: list[RID], attribute_rids: list[RID],
+                       values: list[dict[str, Any]]= None,
                        validate: bool = True) -> int:
         """
         Add an attribute to the specified object.
