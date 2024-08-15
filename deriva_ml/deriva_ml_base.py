@@ -493,7 +493,7 @@ class DerivaML:
             )
 
         at = association_table.association_table
-        self._batch_insert(at.name, entries, schema_name=at.schema.schema_name)
+        self._batch_insert(at.name, entries, schema_name=at.schema.name)
         return len(entries)
 
     def create_dataset(self, description: str, members: list[RID]) -> RID:
