@@ -12,6 +12,7 @@ from itertools import islice
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import List, Sequence, Optional, Any, NewType
+from copy import deepcopy
 
 import pandas as pd
 import pkg_resources
@@ -27,7 +28,6 @@ from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import BaseModel, ValidationError
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
-
 RID = NewType("RID", str)
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
@@ -974,10 +974,11 @@ class DerivaML:
         uploader = GenericUploader(server={"host": self.host_name, "protocol": "https", "catalog_id": self.catalog_id})
         uploader.getUpdatedConfig()
         uploader.scanDirectory(assets_dir)
-        results = {
-            path: FileUploadState(state=result["State"], status=result["Status"], result=result["Result"])
-            for path, result in uploader.uploadFiles().items()
-        }
+        results = deepcopy(uploader.uploadFiles())
+        # results = {
+        #     path: FileUploadState(state=result["State"], status=result["Status"], result=result["Result"])
+        #     for path, result in uploader.uploadFiles().items()
+        # }
         uploader.cleanup()
         return results
 
