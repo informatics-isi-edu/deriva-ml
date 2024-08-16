@@ -11,7 +11,7 @@ from enum import Enum
 from itertools import islice
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List, Sequence, Optional, Any, NewType
+from typing import List, Sequence, Optional, Any, NewType, Iterable
 
 import pandas as pd
 import pkg_resources
@@ -20,7 +20,7 @@ from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import Table, Column, ForeignKey, builtin_types
+from deriva.core.ermrest_model import Table, Column, ForeignKey
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
@@ -47,6 +47,57 @@ class UploadState(str, Enum):
     aborted = "Aborted"
     cancelled = "Cancelled"
     timeout = "Timeout"
+
+
+class BuiltinTypes(str, Enum):
+    text = 'text',
+    int2 = 'int2',
+    jsonb = 'jsonb',
+    float8 = 'float8',
+    timestamp = 'timestamp',
+    int8 = 'int8',
+    boolean = 'boolean',
+    json = 'json',
+    float4 = 'float4',
+    int4 = 'int4',
+    timestamptz = 'timestamptz',
+    date = 'date',
+    text_array = 'text[]',
+    int2_array = 'int2[]',
+    jsonb_array = 'jsonb[]',
+    float8_array = 'float8[]',
+    timestamp_array = 'timestamp[]',
+    int8_array = 'int8[]',
+    boolean_array = 'boolean[]',
+    json_array = 'json[]',
+    float4_array = 'float4[]',
+    int4_array = 'int4[]',
+    timestamptz_array = 'timestamptz[]',
+    date_array = 'date[]',
+    ermrest_rid = 'ermrest_rid',
+    ermrest_rcb = 'ermrest_rcb',
+    ermrest_rmb = 'ermrest_rmb',
+    ermrest_rct = 'ermrest_rct',
+    ermrest_rmt = 'ermrest_rmt',
+    markdown = 'markdown',
+    longtext = 'longtext',
+    ermrest_curie = 'ermrest_curie',
+    ermrest_uri = 'ermrest_uri',
+    color_rgb_hex = 'color_rgb_hex',
+    serial2 = 'serial2',
+    serial4 = 'serial4',
+    serial8 = 'serial8'
+
+
+class ColumnDefinitions(BaseModel):
+    cname: str
+    ctype: BuiltinTypes
+    nullable: bool = True
+    default: Any = None
+    comment: Optional[str] = None
+    acls: dict = {}
+    acl_bindings: dict = {}
+    annotations: dict = {}
 
 
 class AssociatedTable(BaseModel, frozen=True, arbitrary_types_allowed=True):
@@ -489,42 +540,17 @@ class DerivaML:
         self._batch_insert(at.name, entries, schema_name=at.schema.schema_name)
         return len(entries)
 
-    def create_feature(self, feature_name: str, table: Table, target: Table, description: str = "") -> None:
+    def define_feature(self, feature_name: str, table: Table, target: Table, comment: str = "") -> None:
         execution_instance = self.model.schemas[self.ml_schema].tables["Execution"]
-        object_fk = ForeignKey.define()
-        feature_fk = ForeignKey.define()
-        execution_fk = ForeignKey.define()
+        table.define_association(self.model.schemas[self.domain_schema],
+                                 [execution_instance],
+                                 comment=comment
+                                 )
 
-
-        return self.create_table(
-            Table.define(
-                f'{table.name}_{table2.name}_{feature_name}',
-                column_defs=[
-                    Column.define(table1.name, _erm.builtin_types['text'], nullok=False),
-                    Column.define(table2.name, _erm.builtin_types['text'], nullok=False)
-                ],
-                key_defs=[
-                    Key.define([table1.name, table2.name])
-                ],
-                fkey_defs=[
-                    ForeignKey.define(
-                        [table1.name],
-                        table1.schema.name, table1.name, [table1.columns['RID'].name],
-                        on_update='CASCADE'
-                    ),
-                    ForeignKey.define(
-                        [table2.name],
-                        table2.schema.name, table2.name, [table2.columns['RID'].name],
-                        on_update='CASCADE'
-                    )
-                ]
-            )
-        )
-
-
-
-    def add_feature(self, object_rids: list[RID], attribute_rids: list[RID],
-                       values: list[dict[str, Any]]= None,
+    def add_features(self, feature_name: str,
+                     object_rids: Iterable[RID],
+                     execution_rids: Iterable[RID], values: Iterable[RID],
+                       metadata: list[dict[str, Any]]= None,
                        validate: bool = True) -> int:
         """
         Add an attribute to the specified object.
@@ -532,18 +558,23 @@ class DerivaML:
         :param object_rids: A list of the rids to which the new attributes will be attached.  Every RID in the list
         must come from the same table.
         :param attribute_rids: A list of the rids of the attributes to be added.
+        :param execution_rids: A list of the executables to be associated with the rids.
         :param values: Additional attributes that are added to the linkage.
         :param validate: Flag indicating whether to validate the arguments
         :return: Number of attributed added
         """
 
+        self.find_association_tables()
+        try:
+            entities = { {object_name: obj, "Execution": exe} for obj, exe in zip(object_rids, execution_rids, strict=True)}
+        except ValueError:
+            raise DerivaMLException(f"Must have the name number of objects and execution RIDS")
+
+        if not values:
+            values = [{}] * len(entities)
         if len(object_rids) != len(attribute_rids):
             raise DerivaMLException(f"Must have the name number of objects and attributes")
-        if values:
-            if len(object_rids) != len(values):
-                raise DerivaMLException(f"Must have the name number of values and attributes")
-        else:
-            values = [{}] * len(object_rids)
+
 
         # We assume that all the RIDs come from the same table.
         object_table = self.resolve_rid(object_rids[0]).table
@@ -573,6 +604,8 @@ class DerivaML:
                  association_table.right_column.name: attribute_rid} | value
             )
 
+        self._batch_insert(self.schema.Diagnosis,
+                           [{'Execution': execution_rid, 'Diagnosis_Tag': diagtag_rid, **e} for e in entities])
         at = association_table.association_table
         self._batch_insert(at.name, entries, schema_name=at.schema.schema_name)
         return len(entries)
