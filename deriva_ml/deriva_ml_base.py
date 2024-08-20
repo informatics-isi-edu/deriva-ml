@@ -8,7 +8,7 @@ import shutil
 import warnings
 from datetime import datetime
 from enum import Enum
-from itertools import islice
+from itertools import islice, repeat
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import List, Sequence, Optional, Any, NewType, Iterable
@@ -20,11 +20,11 @@ from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import Table, Column, ForeignKey
+from deriva.core.ermrest_model import Schema, Table, Column, builtin_types, Key, ForeignKey, FindAssociationResult
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, model_serializer
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
 
@@ -49,55 +49,123 @@ class UploadState(str, Enum):
     timeout = "Timeout"
 
 
-class BuiltinTypes(str, Enum):
-    text = 'text',
-    int2 = 'int2',
-    jsonb = 'jsonb',
-    float8 = 'float8',
-    timestamp = 'timestamp',
-    int8 = 'int8',
-    boolean = 'boolean',
-    json = 'json',
-    float4 = 'float4',
-    int4 = 'int4',
-    timestamptz = 'timestamptz',
-    date = 'date',
-    text_array = 'text[]',
-    int2_array = 'int2[]',
-    jsonb_array = 'jsonb[]',
-    float8_array = 'float8[]',
-    timestamp_array = 'timestamp[]',
-    int8_array = 'int8[]',
-    boolean_array = 'boolean[]',
-    json_array = 'json[]',
-    float4_array = 'float4[]',
-    int4_array = 'int4[]',
-    timestamptz_array = 'timestamptz[]',
-    date_array = 'date[]',
-    ermrest_rid = 'ermrest_rid',
-    ermrest_rcb = 'ermrest_rcb',
-    ermrest_rmb = 'ermrest_rmb',
-    ermrest_rct = 'ermrest_rct',
-    ermrest_rmt = 'ermrest_rmt',
-    markdown = 'markdown',
-    longtext = 'longtext',
-    ermrest_curie = 'ermrest_curie',
-    ermrest_uri = 'ermrest_uri',
-    color_rgb_hex = 'color_rgb_hex',
-    serial2 = 'serial2',
-    serial4 = 'serial4',
-    serial8 = 'serial8'
+class BuiltinTypes(Enum):
+    text = builtin_types.text
+    int2 = builtin_types.int2
+    jsonb = builtin_types.json
+    float8 = builtin_types.float8
+    timestamp = builtin_types.timestamp
+    int8 = builtin_types.int8
+    boolean = builtin_types.boolean
+    json = builtin_types.json
+    float4 = builtin_types.float4
+    int4 = builtin_types.int4
+    timestamptz = builtin_types.timestamptz
+    date = builtin_types.date
+    ermrest_rid = builtin_types.ermrest_rid
+    ermrest_rcb = builtin_types.ermrest_rcb
+    ermrest_rmb = builtin_types.ermrest_rmb
+    ermrest_rct = builtin_types.ermrest_rct
+    ermrest_rmt = builtin_types.ermrest_rmt
+    markdown = builtin_types.markdown
+    longtext = builtin_types.longtext
+    ermrest_curie = builtin_types.ermrest_curie
+    ermrest_uri = builtin_types.ermrest_uri
+    color_rgb_hex = builtin_types.color_rgb_hex
+    serial2 = builtin_types.serial2
+    serial4 = builtin_types.serial4
+    serial8 = builtin_types.serial8
 
 
-class ColumnDefinitions(BaseModel):
-    cname: str
-    ctype: BuiltinTypes
-    nullable: bool = True
+class ColumnDefinition(BaseModel):
+    name: str
+    type: BuiltinTypes
+    nullok: bool = True
     default: Any = None
-    comment: Optional[str] = None
+    comment: str = None
     acls: dict = {}
     acl_bindings: dict = {}
     annotations: dict = {}
+
+    @model_serializer()
+    def serialize_column_definition(self):
+        return Column.define(
+            cname=self.name,
+            ctype=self.type.value,
+            nullok=self.nullok,
+            default=self.default,
+            comment=self.comment,
+            acls=self.acls,
+            acl_bindings=self.acl_bindings,
+            annotations=self.annotations)
+
+
+class KeyDefinition(BaseModel):
+    colnames: Iterable[str]
+    constraint_names: Iterable[str]
+    comment: str = None
+    annotations: dict = {}
+
+    @model_serializer()
+    def serialize_key_definition(self):
+        return Key.define(
+            colnames=self.colnames,
+            constraint_names=self.constraint_names,
+            comment=self.comment,
+            annotations=self.annotations
+        )
+
+
+class ForeignKeyDefinition(BaseModel):
+    colnames: Iterable[str]
+    pk_sname: str
+    pk_tname: str
+    pk_colnames: Iterable[str]
+    constraint_names: Iterable[str] = []
+    on_update: str = 'NO ACTION'
+    on_delete: str = 'NO ACTION'
+    comment: str = None
+    acls: dict[str, Any] = {}
+    acl_bindings: dict[str, Any] = {}
+    annotations: dict[str, Any] = {}
+
+    @model_serializer()
+    def serialize_fk_definition(self):
+        return ForeignKey.define(
+            fk_colnames=self.colnames,
+            pk_sname=self.pk_sname,
+            pk_tname=self.pk_tname,
+            pk_colnames=self.pk_colnames,
+            on_update=self.on_update,
+            on_delete=self.on_delete,
+            comment=self.comment,
+            acls=self.acls,
+            acl_bindings=self.acl_bindings,
+            annotations=self.annotations
+        )
+
+
+class TableDefinition(BaseModel):
+    name: str
+    column_defs: Iterable[ColumnDefinition]
+    key_defs: Iterable[KeyDefinition] = []
+    fkey_defs: Iterable[ForeignKeyDefinition] = []
+    comment: str = None
+    acls: dict = {}
+    acl_bindings: dict = {}
+    annotations: dict = {}
+
+    @model_serializer()
+    def serialize_table_definition(self):
+        return Table.define(
+            tname=self.name,
+            column_defs=self.column_defs,
+            key_defs=self.key_defs,
+            fkey_defs=self.fkey_defs,
+            comment=self.comment,
+            acls=self.acls,
+            acl_bindings=self.acl_bindings,
+            annotations=self.annotations)
 
 
 class AssociatedTable(BaseModel, frozen=True, arbitrary_types_allowed=True):
@@ -122,6 +190,13 @@ class AssociatedTable(BaseModel, frozen=True, arbitrary_types_allowed=True):
 
     def __repr__(self):
         return f"<{self.association_table.name}>"
+
+
+class FindFeatureResult (FindAssociationResult):
+    """Wrapper for results of Table.find_associations()"""
+    def __init__(self, feature_name, table, self_fkey, other_fkeys):
+        self.feature_name = feature_name
+        super().__init__(table, self_fkey, other_fkeys)
 
 
 class FileUploadState(BaseModel):
@@ -262,8 +337,15 @@ class DerivaML:
     Base class for ML operations on a Deriva catalog.  This class is intended to be used as a base class on which
     more domain specific interfaces are built.
     """
-    def __init__(self, hostname: str, catalog_id: str, domain_schema: str,
-                 cache_dir: str, working_dir: str,
+
+    DERIVA_ML_SCHEMA = "deriva_ml"
+
+    def __init__(self,
+                 hostname: str,
+                 catalog_id: str,
+                 domain_schema: str,
+                 cache_dir: str,
+                 working_dir: str,
                  model_version: str):
         """
 
@@ -277,6 +359,7 @@ class DerivaML:
         self.host_name = hostname
         self.catalog_id = catalog_id
         self.domain_schema = domain_schema
+        self.ml_schema = domain_schema  # DerivaML.DERIVA_ML_SCHEMA
         self.version = model_version
 
         self.credential = get_credential(hostname)
@@ -284,10 +367,8 @@ class DerivaML:
                                       self.credential,
                                       session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
-        self.pb = self.catalog.getPathBuilder()
-        self.dataset_schema = domain_schema
-        self.ml_schema_path = self.pb.schemas[self.domain_schema]
-        self.dataset_table = self.model.table(self.dataset_schema, 'Dataset')
+        self.dataset_table = self.model.table(self.ml_schema, 'Dataset')
+        self.execution_table = self.model.table(self.ml_schema, "Execution")
         self.configuration = None
 
         self.start_time = datetime.now()
@@ -326,16 +407,21 @@ class DerivaML:
         })
         return session_config
 
-    def find_table_schema(self, table_name: str) -> str:
+    def _get_table(self, table: str | Table) -> Table:
+        try:
+            return self.model.schemas[self.domain_schema].tables[table] if isinstance(table, str) else table
+        except KeyError:
+            raise DerivaMLException(f"The table {table} doesn't exist.")
+
+    def find_table_schema(self, table_name: str) -> Schema:
         """
         Given a table name, return the name of its schema.
         :param table_name:
         :return:
         """
-        schemas = self.pb.schemas.keys()
         schema = None
-        for s in schemas:
-            if table_name in self.pb.schemas[s].tables:
+        for s in self.model.schemas.values():
+            if table_name in s.tables:
                 schema = s
         if schema is None:
             raise DerivaMLException(f"The table {table_name} doesn't exist.")
@@ -357,20 +443,11 @@ class DerivaML:
         """
 
         # Normalize input arguments.
-        if isinstance(table, str):
-            try:
-                table = self.model.schemas[self.domain_schema].tables[table]
-            except KeyError:
-                raise DerivaMLException(f"The table {table} doesn't exist.")
-
-        if isinstance(target_table, str):
-            try:
-                target_table = target_table and self.model.schemas[self.domain_schema].tables[target_table]
-            except KeyError:
-                raise DerivaMLException(f"The table {target_table.table} doesn't exist.")
+        table = self._get_table(table)
+        target_table = target_table and self._get_table(target_table)
 
         linked_tables = []
-        for assoc in table.find_associations():
+        for assoc in table.find_associations(pure=False):
             a_table = assoc.table
             for other_fkey in assoc.other_fkeys:
                 left_table, right_table = assoc.self_fkey.pk_table, other_fkey.pk_table
@@ -401,6 +478,17 @@ class DerivaML:
             linked_tables = [lt for lt in linked_tables if target_table in lt.linked_tables]
         return linked_tables
 
+    def create_vocabulary(self, vocab_name: str, comment="") -> Table:
+        """
+        Create a controlled vocabulary table with the given vocab name.
+        :param vocab_name:
+        :param comment:
+        :return:
+        """
+        return self.model.schemas[self.domain_schema].create_table(
+            Table.define_vocabulary(vocab_name,  f'{self.domain_schema}:{{{RID}}}', comment=comment)
+        )
+
     def is_vocabulary(self, table_name: str) -> bool:
         """
         Check if a given table is a controlled vocabulary table.
@@ -413,25 +501,7 @@ class DerivaML:
 
         """
         vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
-        schema = self.find_table_schema(table_name)
-        try:
-            table = self.model.schemas[schema].tables[table_name]
-        except KeyError:
-            raise DerivaMLException(f"The vocabulary table {table_name} doesn't exist.")
-        return vocab_columns.issubset({c.name.upper() for c in table.columns})
-
-    def _vocab_columns(self, table: Table) -> list[str]:
-        """
-        Return the list of columns in the table that are control vocabulary terms.
-
-        Args:
-        - table (ermrest_model.Table): The table.
-
-        Returns:
-        - List[str]: List of column names that are control vocabulary terms.
-        """
-        return [fk.columns[0].name for fk in table.foreign_keys
-                if len(fk.columns) == 1 and self.is_vocabulary(fk.pk_table)]
+        return vocab_columns.issubset({c.name.upper() for c in self._get_table(table_name).columns})
 
     def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
                      version: str = "",
@@ -452,9 +522,10 @@ class DerivaML:
         """
 
         # Check to make sure that the workflow is not already in the table. If its not, add it.
+        ml_schema_path = self.pb.schemas[self.ml_schema]
         try:
-            url_column = self.ml_schema_path.Workflow.URL
-            workflow_record = list(self.ml_schema_path.Workflow.filter(url_column == url).entities())[0]
+            url_column = ml_schema_path.Workflow.URL
+            workflow_record = list(ml_schema_path.Workflow.filter(url_column == url).entities())[0]
             workflow_rid = workflow_record['RID']
         except IndexError:
             # Record doesn't exist already
@@ -465,7 +536,7 @@ class DerivaML:
                 'Checksum': self._get_checksum(url),
                 'Version': version,
                 'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type)}
-            workflow_rid = self.ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
+            workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
 
         return workflow_rid
 
@@ -486,129 +557,113 @@ class DerivaML:
         return rid_info, rid_tables, assoc_tables
 
     # delete
-    def add_attributes(self, object_rids: list[RID], attribute_rids: list[RID],
-                       values: list[dict[str, Any]] = None,
-                       validate: bool = True) -> int:
-        """
-        Add an attribute to the specified object.
 
-        :param object_rids: A list of the rids to which the new attributes will be attached.  Every RID in the list
-        must come from the same table.
-        :param attribute_rids: A list of the rids of the attributes to be added.
-        :param values: Additional attributes that are added to the linkage.
-        :param validate: Flag indicating whether to validate the arguments
-        :return: Number of attributed added
-        """
+    def create_feature(self,
+                       feature_name: str,
+                       table: Table | str,
+                       metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
+                       comment: str = "") -> None:
 
-        if len(object_rids) != len(attribute_rids):
-            raise DerivaMLException(f"Must have the name number of objects and attributes")
-        if values:
-            if len(object_rids) != len(values):
-                raise DerivaMLException(f"Must have the name number of values and attributes")
-        else:
-            values = [{}] * len(object_rids)
+        def normalize_metadata(m: Key | Table | ColumnDefinition | str):
+            if isinstance(m, str):
+                return self._get_table(m)
+            elif isinstance(m, ColumnDefinition):
+                return m.model_dump()
+            else:
+                return m
 
-        # We assume that all the RIDs come from the same table.
-        object_table = self.resolve_rid(object_rids[0]).table
-        attribute_table = self.resolve_rid(attribute_rids[0]).table
-
-        if validate:
-            _, object_tables, _ = self.validate_rids(object_rids)
-            if len(object_tables) != 1:
-                raise DerivaMLException(f"object_rid list contains more than one table {object_tables}")
-            _, attribute_tables, _ = self.validate_rids(attribute_rids)
-            if len(attribute_tables) != 1:
-                raise DerivaMLException(f"object_rid list contains more than one table: {attribute_tables}")
-
-        if len(association_tables := self.find_association_tables(object_table, attribute_table)) != 1:
-            print(association_tables)
-            raise DerivaMLException(f"Ambiguous association table from {object_table.name} to {attribute_table.name}.")
-        elif not association_tables:
-            raise DerivaMLException(f"No association between {object_table.name} and {attribute_table.name}")
-        association_table = association_tables[0]
-
-        entries = []
-        for object_rid, attribute_rid, value in zip(object_rids, attribute_rids, values):
-            if set(value.keys()) != set(association_table.attributes):
-                raise DerivaMLException(f"Missing attribute values: {set(association_table.attributes)}")
-            entries.append(
-                {association_table.left_column.name: object_rid,
-                 association_table.right_column.name: attribute_rid} | value
+        execution = self.model.schemas[self.ml_schema].tables["Execution"]
+        feature = self.model.schemas[self.ml_schema].tables["Feature_Name"]
+        self.lookup_term("Feature_Name", feature_name)
+        table = self._get_table(table)
+        self.model.schemas[self.ml_schema].create_table(
+          table.define_association(
+             schema=self.model.schemas[self.domain_schema],
+             associates=[execution, table, feature],
+             table_name=f"{table.name}_Execution_Feature_Name_{feature_name}",
+             metadata=[normalize_metadata(m) for m in metadata] if metadata else [],
+             comment=comment
             )
+        )
 
-        at = association_table.association_table
-        self._batch_insert(at.name, entries, schema_name=at.schema.schema_name)
-        return len(entries)
+    def find_features(self, table: Table | str) -> list[FindFeatureResult]:
+        """
+        List the names of the features in the specified table.
+        """
+        table = self._get_table(table)
 
-    def define_feature(self, feature_name: str, table: Table, target: Table, comment: str = "") -> None:
-        execution_instance = self.model.schemas[self.ml_schema].tables["Execution"]
-        table.define_association(self.model.schemas[self.domain_schema],
-                                 [execution_instance],
-                                 comment=comment
-                                 )
+        def is_feature(a: FindAssociationResult) -> bool:
+            try:
+                return a.table.columns['Feature_Name']
+            except KeyError:
+                return False
 
-    def add_features(self, feature_name: str,
+        return [
+            FindFeatureResult(
+                feature_name=a.name.replace(f"{table.name}_Execution_Feature_Name_", ""),
+                table=a.table,
+                self_fkey=a.self_fkey, other_fkeys=a.other_fkeys
+            ) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
+            ]
+
+    def add_features(self,
+                     table: str,
+                     feature_name: str,
                      object_rids: Iterable[RID],
-                     execution_rids: Iterable[RID], values: Iterable[RID],
-                       metadata: list[dict[str, Any]]= None,
-                       validate: bool = True) -> int:
+                     execution_rids: Iterable[RID],
+                     metadata: list[dict[str, Any]] = None) -> int:
         """
         Add an attribute to the specified object.
 
         :param object_rids: A list of the rids to which the new attributes will be attached.  Every RID in the list
         must come from the same table.
-        :param attribute_rids: A list of the rids of the attributes to be added.
         :param execution_rids: A list of the executables to be associated with the rids.
-        :param values: Additional attributes that are added to the linkage.
-        :param validate: Flag indicating whether to validate the arguments
+        :param metadata: Additional attributes that are added to the linkage.
         :return: Number of attributed added
         """
 
-        self.find_association_tables()
+        table = self._get_table(table)
+        feature_name_rid = self.lookup_term("Feature_Name", feature_name)
+        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+        object_table = feature.self_fkey.pk_table.name
+        skip_columns = {"RID", "RCB", "RMB", "RCT", "RMT", "Execution", "Feature_Name", table.name}
+        metadata_columns = {c.name for c in feature.table.columns if c.name not in skip_columns}
+        required_metadata = {c.name for c in feature.table.columns if c.name not in skip_columns and c.nullok == False}
+
+        def feature_entity(object_rid: RID, exe_rid: RID, meta: dict[str, Any]) -> dict[str, Any]:
+            if self.resolve_rid(object_rid).table.name != object_table:
+                raise DerivaMLException(f"object_rid {object_rid} is not in {object_table} table.")
+            if self.resolve_rid(exe_rid).table.name != "Execution":
+                raise DerivaMLException(f"execution_rid {exe_rid} is not in Execution table.")
+            if not metadata_columns >= set(meta.keys()):
+                raise DerivaMLException(f"Bad column values: {set(meta.keys())} not in {metadata_columns}")
+            if not set(meta.keys()) >= required_metadata:
+                raise DerivaMLException(f"Missing non-null column: {required_metadata}")
+
+            return {object_table: object_rid, 'Execution': exe_rid, 'Feature_Name': feature_name_rid} | meta
+
         try:
-            entities = { {object_name: obj, "Execution": exe} for obj, exe in zip(object_rids, execution_rids, strict=True)}
+            entries = [
+                feature_entity(object_rid, execution_rid, md)
+                for object_rid, execution_rid, md in
+                    zip(object_rids, execution_rids, metadata or repeat({}), strict=True)
+            ]
         except ValueError:
-            raise DerivaMLException(f"Must have the name number of objects and execution RIDS")
-
-        if not values:
-            values = [{}] * len(entities)
-        if len(object_rids) != len(attribute_rids):
-            raise DerivaMLException(f"Must have the name number of objects and attributes")
-
-
-        # We assume that all the RIDs come from the same table.
-        object_table = self.resolve_rid(object_rids[0]).table
-        attribute_table = self.resolve_rid(attribute_rids[0]).table
-
-        if validate:
-            _, object_tables, _ = self.validate_rids(object_rids)
-            if len(object_tables) != 1:
-                raise DerivaMLException(f"object_rid list contains more than one table {object_tables}")
-            _, attribute_tables, _ = self.validate_rids(attribute_rids)
-            if len(attribute_tables) != 1:
-                raise DerivaMLException(f"object_rid list contains more than one table: {attribute_tables}")
-
-        if len(association_tables := self.find_association_tables(object_table, attribute_table)) != 1:
-            print(association_tables)
-            raise DerivaMLException(f"Ambiguous association table from {object_table.name} to {attribute_table.name}.")
-        elif not association_tables:
-            raise DerivaMLException(f"No association between {object_table.name} and {attribute_table.name}")
-        association_table = association_tables[0]
-
-        entries = []
-        for object_rid, attribute_rid, value in zip(object_rids, attribute_rids, values):
-            if set(value.keys()) != set(association_table.attributes):
-                raise DerivaMLException(f"Missing attribute values: {set(association_table.attributes)}")
-            entries.append(
-                {association_table.left_column.name: object_rid,
-                 association_table.right_column.name: attribute_rid} | value
-            )
-
-        self._batch_insert(self.schema.Diagnosis,
-                           [{'Execution': execution_rid, 'Diagnosis_Tag': diagtag_rid, **e} for e in entities])
-        at = association_table.association_table
-        self._batch_insert(at.name, entries, schema_name=at.schema.schema_name)
+            raise DerivaMLException(f"Length of object_rid, execution_rid, and metadata must be equal.")
+        self._batch_insert(feature.name, entries, schema_name=feature.table.schema.name)
         return len(entries)
+
+    def list_feature(self, table: Table | str, feature_name: str) -> pd.DataFrame:
+        """
+        Return a dataframe containing all values of a feature associated with a table.
+        :param table:
+        :param feature_name:
+        :return:
+        """
+        feature_name_rid = self.lookup_term("Feature_Name", feature_name)
+        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+        pb = self.catalog.getPathBuilder()
+        return pd.DataFrame(pb.schemas[self.domain_schema].tables[feature.name].entities().fetch())
 
     def create_dataset(self, description: str, members: list[RID]) -> RID:
         """
@@ -628,9 +683,9 @@ class DerivaML:
         """
         # Get association table entries for this dataset
         # Delete association table entries
-
+        pb = self.catalog.getPathBuilder()
         for assoc_table in self.find_association_tables(self.dataset_table):
-            schema_path = self.pb.schemas[assoc_table.association_table.schema.name]
+            schema_path = pb.schemas[assoc_table.association_table.schema.name]
             table_path = schema_path.tables[assoc_table.association_table.name]
             if assoc_table.left_table == self.dataset_table:
                 dataset_column, element_column = assoc_table.left_column, assoc_table.right_column
@@ -644,7 +699,7 @@ class DerivaML:
                 pass
 
         # Delete dataset.
-        dataset_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
 
     def add_element_type(self, element: str) -> Table:
@@ -664,8 +719,8 @@ class DerivaML:
         :param dataset_rid:
         :return:
         """
-
-        dataset_path = self.pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        pb = self.catalog.getPathBuilder()
+        dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
 
         if len(dataset_exists) != 1:
@@ -675,7 +730,7 @@ class DerivaML:
         # the appropriate association table.
         rid_list = {}
         for assoc_table in self.find_association_tables(self.dataset_table):
-            schema_path = self.pb.schemas[assoc_table.association_table.schema.name]
+            schema_path = pb.schemas[assoc_table.association_table.schema.name]
             table_path = schema_path.tables[assoc_table.association_table.name]
             if assoc_table.left_table == self.dataset_table:
                 dataset_column, element_column = assoc_table.left_column, assoc_table.right_column
@@ -704,7 +759,7 @@ class DerivaML:
         rid_info, _tables, assoc_tables = self.validate_rids(members)
         if self.dataset_table not in [a for a in assoc_tables]:
             pass
-        pb = self.pb
+        pb = self.catalog.getPathBuilder()
         if dataset_rid:
             if self.resolve_rid(dataset_rid).table != self.dataset_table:
                 raise DerivaMLException(f"RID: {dataset_rid} is not a dataset.")
@@ -748,11 +803,12 @@ class DerivaML:
 
         """
         datasets = datasets or []
+        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         if workflow_rid:
-            execution_rid = self.ml_schema_path.Execution.insert([{'Description': description,
-                                                                   'Workflow': workflow_rid}])[0]['RID']
+            execution_rid = (
+                ml_schema_path.Execution.insert([{'Description': description, 'Workflow': workflow_rid}]))[0]['RID']
         else:
-            execution_rid = self.ml_schema_path.Execution.insert([{'Description': description}])[0]['RID']
+            execution_rid = ml_schema_path.Execution.insert([{'Description': description}])[0]['RID']
         if datasets:
             self._batch_insert("Dataset_Execution",
                                [{"Dataset": d, "Execution": execution_rid} for d in datasets])
@@ -807,22 +863,19 @@ class DerivaML:
         - EyeAIException: If the control vocabulary name already exists and exist_ok is False.
         """
         synonyms = synonyms or []
-        try:
-            if not self.is_vocabulary(table_name):
-                raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
-        except KeyError:
-            raise DerivaMLException(f"The schema or vocabulary table {table_name} doesn't exist.")
+        pb = self.catalog.getPathBuilder()
+        if not self.is_vocabulary(table_name):
+            raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        schema = self.find_table_schema(table_name)
         try:
-            entities = self.pb.schemas[schema].tables[table_name].entities()
+            entities = pb.schemas[self.domain_schema].tables[table_name].entities()
             entities_upper = [{key.upper(): value for key, value in e.items()} for e in entities]
             name_list = [e['NAME'] for e in entities_upper]
             term_rid = entities[name_list.index(name)]['RID']
         except ValueError:
             # Name is not in list of current terms
-            col_map = {col.upper(): col for col in self.pb.schemas[schema].tables[table_name].columns.keys()}
-            term_rid = self.pb.schemas[schema].tables[table_name].insert(
+            col_map = {col.upper(): col for col in pb.schemas[self.domain_schema].tables[table_name].columns.keys()}
+            term_rid = pb.schemas[self.domain_schema].tables[table_name].insert(
                 [{col_map['NAME']: name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
                 defaults={col_map['ID'], col_map['URI']})[0]['RID']
         else:
@@ -847,16 +900,12 @@ class DerivaML:
           found in the vocabulary.
 
         """
-        try:
-            vocab_table = self.is_vocabulary(table_name)
-        except KeyError:
-            raise DerivaMLException(f"The schema or vocabulary table {table_name} doesn't exist.")
-
+        vocab_table = self.is_vocabulary(table_name)
         if not vocab_table:
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        schema = self.find_table_schema(table_name)
-        for term in self.pb.schemas[schema].tables[table_name].entities():
+        schema_path = self.catalog.getPathBuilder().schemas[self.find_table_schema(table_name).name]
+        for term in schema_path.tables[table_name].entities():
             term_upper = {key.upper(): value for key, value in term.items()}
             if term_name == term_upper['NAME'] or (term_upper['SYNONYMS'] and term_name in term_upper['SYNONYMS']):
                 return term['RID']
@@ -865,15 +914,15 @@ class DerivaML:
 
     def list_vocabularies(self) -> list:
         """
-        Return a list of all the controlled vocabulary tables in the schema.
+        Return a list of all the controlled vocabulary tables in the domain schema.
 
         Returns:
          - List[str]: A list of table names representing controlled vocabulary tables in the schema.
 
         """
-        return [t for s in self.pb.schemas.keys() for t in self.pb.schemas[s].tables if self.is_vocabulary(t)]
+        return [t for t in self.model.schemas[self.domain_schema].tables.values() if self.is_vocabulary(t)]
 
-    def list_vocabulary(self, table_name: str) -> pd.DataFrame:
+    def list_vocabulary_terms(self, table_name: str) -> pd.DataFrame:
         """
         Return the dataframe of terms that are in a vocabulary table.
 
@@ -887,15 +936,11 @@ class DerivaML:
         - EyeAIException: If the schema or vocabulary table doesn't exist, or if the table is not
           a controlled vocabulary.
         """
-        try:
-            vocab_table = self.is_vocabulary(table_name)
-        except KeyError:
-            raise DerivaMLException(f"The schema or vocabulary table {table_name} doesn't exist.")
-
-        if not vocab_table:
+        pb = self.catalog.getPathBuilder()
+        if not self.is_vocabulary(table_name):
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        return pd.DataFrame(self.pb.schemas[self.find_table_schema(table_name)].tables[table_name].entities().fetch())
+        return pd.DataFrame(pb.schemas[self.domain_schema].tables[table_name].entities().fetch())
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
         """
@@ -904,7 +949,7 @@ class DerivaML:
         :return:
         """
         try:
-            return self.catalog.resolve_rid(rid, self.model, self.pb)
+            return self.catalog.resolve_rid(rid, self.model)
         except KeyError as _e:
             raise DerivaMLException(f'Invalid RID {rid}')
 
@@ -924,9 +969,8 @@ class DerivaML:
         - pd.DataFrame: DataFrame containing user information.
 
         """
-        users = self.pb.schemas['public']
-        path = users.ERMrest_Client.path
-        return pd.DataFrame(path.entities().fetch())[['ID', 'Full_Name']]
+        user_path = self.catalog.getPathBuilder().schemas['public'].users.ERMrest_Client.path
+        return pd.DataFrame(user_path.entities().fetch())[['ID', 'Full_Name']]
 
     def _batch_insert(self, table: str, entities: Sequence[dict], schema_name: str = "") -> None:
         """
@@ -937,7 +981,7 @@ class DerivaML:
         - entities (Sequence[dict]): Sequence of entity dictionaries to insert.
 
         """
-        schema_path = self.pb.schemas[schema_name] if schema_name else self.ml_schema_path
+        schema_path = self.catalog.getPathBuilder().schemas[schema_name if schema_name else self.ml_schema]
         table_path = schema_path.tables[table]
 
         it = iter(entities)
@@ -954,7 +998,7 @@ class DerivaML:
         - update_cols (List[datapath._ColumnWrapper]): List of columns to update.
 
         """
-        schema_path = self.pb.schemas[schema_name] if schema_name else self.ml_schema_path
+        schema_path = self.catalog.getPathBuilder().schemas[schema_name if schema_name else self.ml_schema]
         table_path = schema_path.tables[table]
 
         it = iter(entities)
@@ -1126,7 +1170,8 @@ class DerivaML:
         - DerivaMLException: If there is an issue downloading the assets.
 
         """
-        table = self.ml_schema_path.tables[table_name]
+        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+        table = ml_schema_path.tables[table_name]
         file_metadata = table.filter(table.RID == file_rid).entities()[0]
         file_url = file_metadata['URL']
         file_name = file_metadata['Filename']
@@ -1140,7 +1185,7 @@ class DerivaML:
 
         if execution_rid != '':
             ass_table = table_name + '_Execution'
-            ass_table_path = self.ml_schema_path.tables[ass_table]
+            ass_table_path = ml_schema_path.tables[ass_table]
             exec_file_exec_entities = ass_table_path.filter(ass_table_path.columns[table_name] == file_rid).entities()
             exec_list = [e['Execution'] for e in exec_file_exec_entities]
             if execution_rid not in exec_list:
@@ -1179,7 +1224,8 @@ class DerivaML:
             raise DerivaMLException(
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
-            execution_metadata_type_rid = self.lookup_term(self.ml_schema_path.Execution_Metadata_Type,
+            ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+            execution_metadata_type_rid = self.lookup_term(ml_schema_path.Execution_Metadata_Type,
                                                            "Execution Config")
             self._batch_insert("Execution_Metadata",
                                [{"URL": hatrac_uri,
@@ -1204,6 +1250,7 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the metadata.
 
         """
+        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         self.update_status(Status.running, "Uploading assets...", execution_rid)
         try:
             results = self.upload_assets(str(self.execution_metadata_path))
@@ -1215,8 +1262,8 @@ class DerivaML:
                 f" to Execution_Metadata table. Error: {error}")
 
         else:
-            meta_exec_entities = self.ml_schema_path.Execution_Metadata_Execution.filter(
-                self.ml_schema_path.Execution_Metadata_Execution.Execution == execution_rid).entities()
+            meta_exec_entities = ml_schema_path.Execution_Metadata_Execution.filter(
+                ml_schema_path.Execution_Metadata_Execution.Execution == execution_rid).entities()
             meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
             entities = []
             for metadata in results.values():
@@ -1243,6 +1290,7 @@ class DerivaML:
 
         """
         results = {}
+        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         for folder_path in self.execution_assets_path.iterdir():
             self.update_status(Status.running, f"Uploading assets {folder_path}...", execution_rid)
             if folder_path.is_dir():
@@ -1255,8 +1303,8 @@ class DerivaML:
                     raise DerivaMLException(
                         f"Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}")
                 else:
-                    asset_exec_entities = self.ml_schema_path.Execution_Assets_Execution.filter(
-                        self.ml_schema_path.Execution_Assets_Execution.Execution == execution_rid).entities()
+                    asset_exec_entities = ml_schema_path.Execution_Assets_Execution.filter(
+                        ml_schema_path.Execution_Assets_Execution.Execution == execution_rid).entities()
                     assets_list = [e['Execution_Assets'] for e in asset_exec_entities]
                     entities = []
                     for asset in result.values():
