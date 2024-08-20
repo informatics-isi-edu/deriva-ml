@@ -428,56 +428,6 @@ class DerivaML:
         else:
             return schema
 
-    def find_association_tables(self,
-                                table: Table | str,
-                                target_table: Optional[Table | str] = None,
-                                follow_naming_convention: bool = True) -> list[AssociatedTable]:
-        """
-        Find a table linking the two named tables.
-        :param table: Table name that is considered to be on the "left" hand side of the association table.
-        :param target_table:
-        :param follow_naming_convention: If target table is not provided, use the association naming convention of
-               t1_t2 to determine the right hand table in the association.  If False, assume that all foreign_key
-               tables are potentially associated.
-        :return: A list of association tables.
-        """
-
-        # Normalize input arguments.
-        table = self._get_table(table)
-        target_table = target_table and self._get_table(target_table)
-
-        linked_tables = []
-        for assoc in table.find_associations(pure=False):
-            a_table = assoc.table
-            for other_fkey in assoc.other_fkeys:
-                left_table, right_table = assoc.self_fkey.pk_table, other_fkey.pk_table
-                left_column, right_column = assoc.self_fkey.columns[0], other_fkey.columns[0]
-                if target_table and right_table != target_table:
-                    continue
-
-                # Check to see if association table follows standard naming convention.
-                if follow_naming_convention and not target_table:
-                    if f"{right_table.name}_{left_table.name}" == a_table.name:
-                        left_table, right_table = right_table, left_table
-                        left_column, right_column = right_column, left_column
-                    elif f"{left_table.name}_{right_table.name}" != a_table.name:
-                        # If we are following the naming convention, only use tables that are called out in the name.
-                        continue
-
-                skip_columns = ['RID', 'RCT', 'RMT', 'RCB', 'RMB', left_column.name, right_column.name]
-                linked_tables.append(AssociatedTable(
-                    association_table=a_table,
-                    left_table=left_table,
-                    right_table=right_table,
-                    left_column=left_column,
-                    right_column=right_column,
-                    attributes=[c.name for c in a_table.columns if c.name not in skip_columns]
-                ))
-
-        if target_table:
-            linked_tables = [lt for lt in linked_tables if target_table in lt.linked_tables]
-        return linked_tables
-
     def create_vocabulary(self, vocab_name: str, comment="") -> Table:
         """
         Create a controlled vocabulary table with the given vocab name.
@@ -539,24 +489,6 @@ class DerivaML:
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
 
         return workflow_rid
-
-    def validate_rids(self, rid_list: list[RID]) -> tuple[list[ResolveRidResult], set[Table], list[AssociatedTable]]:
-        """
-        Given a table, and a list of RIDS, verify that each RID exists. For each RID, check to see if a binary
-        association exists to another table.  Return the list of RID results, the set of tables that the RIDs come from
-        and a list of the association tables that are connected to the RID tables.
-        :param rid_list: A list of RIDs to check.
-        :return: tuple of list of resolved RIDS, a list of tables associated with the rids and a list of
-                all  the associated tables.
-        """
-        # Get the tables associated with every rid.
-        rid_info = [self.resolve_rid(rid) for rid in rid_list]
-        rid_tables = set(r.table for r in rid_info)
-        assoc_tables = [a for t in rid_tables for a in self.find_association_tables(t)]
-
-        return rid_info, rid_tables, assoc_tables
-
-    # delete
 
     def create_feature(self,
                        feature_name: str,
@@ -729,15 +661,11 @@ class DerivaML:
         # Look at each of the element types that might be in the dataset and get the list of rid for them from
         # the appropriate association table.
         rid_list = {}
-        for assoc_table in self.find_association_tables(self.dataset_table):
-            schema_path = pb.schemas[assoc_table.association_table.schema.name]
-            table_path = schema_path.tables[assoc_table.association_table.name]
-            if assoc_table.left_table == self.dataset_table:
-                dataset_column, element_column = assoc_table.left_column, assoc_table.right_column
-                element_table = assoc_table.right_table
-            else:
-                dataset_column, element_column = assoc_table.right_column, assoc_table.left_column
-                element_table = assoc_table.left_table
+        for assoc_table in self.dataset_table.find_associations():
+            schema_path = pb.schemas[assoc_table.table.schema.name]
+            table_path = schema_path.tables[assoc_table.name]
+            dataset_column, element_column = assoc_table.self_fkey.columns[0], assoc_table.other_fkeys.pop().columns[0]
+            element_table = element_column.table
             dataset_path = table_path.columns[dataset_column.name]
             element_path = table_path.columns[element_column.name]
             assoc_rids = table_path.filter(dataset_path == dataset_rid).attributes(element_path).fetch()
@@ -912,7 +840,7 @@ class DerivaML:
 
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
 
-    def list_vocabularies(self) -> list:
+    def find_vocabularies(self) -> list:
         """
         Return a list of all the controlled vocabulary tables in the domain schema.
 
