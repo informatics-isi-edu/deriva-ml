@@ -645,7 +645,7 @@ class DerivaML:
         assoc_table = self.model.schemas[self.domain_schema].create_association(self.dataset_table, element_table)
         return assoc_table
 
-    def dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
+    def list_dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
         """
         Return a list of RIDs associated with a specific dataset.
         :param dataset_rid:
