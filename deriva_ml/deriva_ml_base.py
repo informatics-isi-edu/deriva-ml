@@ -472,7 +472,7 @@ class DerivaML:
         """
 
         # Check to make sure that the workflow is not already in the table. If its not, add it.
-        ml_schema_path = self.pb.schemas[self.ml_schema]
+        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         try:
             url_column = ml_schema_path.Workflow.URL
             workflow_record = list(ml_schema_path.Workflow.filter(url_column == url).entities())[0]
@@ -510,7 +510,6 @@ class DerivaML:
         table = self._get_table(table)
         self.model.schemas[self.ml_schema].create_table(
           table.define_association(
-             schema=self.model.schemas[self.domain_schema],
              associates=[execution, table, feature],
              table_name=f"{table.name}_Execution_Feature_Name_{feature_name}",
              metadata=[normalize_metadata(m) for m in metadata] if metadata else [],
@@ -606,6 +605,9 @@ class DerivaML:
         """
 
         return self.extend_dataset(None, members, description=description, validate=False)
+
+    def list_datasets(self) -> pd.DataFrame:
+        return self.dataset_table.entities().fetch()
 
     def delete_dataset(self, dataset_rid: RID) -> None:
         """
@@ -930,7 +932,7 @@ class DerivaML:
         table_path = schema_path.tables[table]
 
         it = iter(entities)
-        while chunk := list(islice(it, 2000)):
+        while chunk := list(islice(it, 1000)):
             columns = [table_path.columns[c] for e in chunk for c in e.keys() if c != "RID"]
             table_path.update(chunk, [table_path.RID], columns)
 
