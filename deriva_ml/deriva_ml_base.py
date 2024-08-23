@@ -18,7 +18,7 @@ import pkg_resources
 import requests
 from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
-from deriva.core.datapath import DataPathException
+from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Schema, Table, Column, builtin_types, Key, ForeignKey, FindAssociationResult
 from deriva.core.hatrac_store import HatracStore
@@ -517,7 +517,7 @@ class DerivaML:
             )
         )
 
-    def find_features(self, table: Table | str) -> list[FindFeatureResult]:
+    def find_features(self, table: Table | str) -> Iterable[FindFeatureResult]:
         """
         List the names of the features in the specified table.
         """
@@ -581,10 +581,10 @@ class DerivaML:
             ]
         except ValueError:
             raise DerivaMLException(f"Length of object_rid, execution_rid, and metadata must be equal.")
-        self._batch_insert(feature.name, entries, schema_name=feature.table.schema.name)
+        self.catalog.getPathBuilder().schemas[feature.table.schema.name].tables[feature.name].insert(entries)
         return len(entries)
 
-    def list_feature(self, table: Table | str, feature_name: str) -> pd.DataFrame:
+    def list_feature(self, table: Table | str, feature_name: str) -> _ResultSet:
         """
         Return a dataframe containing all values of a feature associated with a table.
         :param table:
@@ -594,20 +594,26 @@ class DerivaML:
         feature_name_rid = self.lookup_term("Feature_Name", feature_name)
         feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
         pb = self.catalog.getPathBuilder()
-        return pd.DataFrame(pb.schemas[self.domain_schema].tables[feature.name].entities().fetch())
+        return pb.schemas[self.domain_schema].tables[feature.name].entities().fetch()
 
-    def create_dataset(self, description: str, members: list[RID]) -> RID:
+    def create_dataset(self, description: str, **kwargs) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
         :param description:  Description of the dataset.
-        :param members:  List of RIDs to include in the dataset.
         :return: New dataset RID.
         """
+        # Create the entry for the new dataset and get its RID.
+        dataset_table_path = (
+            self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
+        return dataset_table_path.insert([{'Description': description}])[0]['RID']
 
-        return self.extend_dataset(None, members, description=description, validate=False)
-
-    def list_datasets(self) -> pd.DataFrame:
-        return self.dataset_table.entities().fetch()
+    def find_datasets(self) -> Iterable[dict[str, Any]]:
+        """
+        Returns a list of currently available datasets.
+        :return:
+        """
+        return list(
+            self.catalog.getPathBuilder().schemas[self.ml_schema].tables[self.dataset_table.name].entities().fetch())
 
     def delete_dataset(self, dataset_rid: RID) -> None:
         """
@@ -618,14 +624,10 @@ class DerivaML:
         # Get association table entries for this dataset
         # Delete association table entries
         pb = self.catalog.getPathBuilder()
-        for assoc_table in self.find_association_tables(self.dataset_table):
-            schema_path = pb.schemas[assoc_table.association_table.schema.name]
-            table_path = schema_path.tables[assoc_table.association_table.name]
-            if assoc_table.left_table == self.dataset_table:
-                dataset_column, element_column = assoc_table.left_column, assoc_table.right_column
-            else:
-                dataset_column, element_column = assoc_table.right_column, assoc_table.left_column
-            dataset_column_path = table_path.columns[dataset_column.name]
+        for assoc_table in self.dataset_table.find_associations(self.dataset_table):
+            schema_path = pb.schemas[assoc_table.table.schema.name]
+            table_path = schema_path.tables[assoc_table.name]
+            dataset_column_path = table_path.columns[assoc_table.self_fkey.columns[0].name]
             dataset_entries = table_path.filter(dataset_column_path == dataset_rid)
             try:
                 dataset_entries.delete()
@@ -686,22 +688,15 @@ class DerivaML:
         :return:
         """
 
-        rid_info, _tables, assoc_tables = self.validate_rids(members)
-        if self.dataset_table not in [a for a in assoc_tables]:
-            pass
+        # Get a list of all of the types of objects that can be linked to a dataset.
+        dataset_objects = [a.other_fkeys.pop().pk_table.name for a in self.dataset_table.find_associations(pure=False)]
         pb = self.catalog.getPathBuilder()
-        if dataset_rid:
-            if self.resolve_rid(dataset_rid).table != self.dataset_table:
-                raise DerivaMLException(f"RID: {dataset_rid} is not a dataset.")
-        else:
-            # Create the entry for the new dataset and get its RID.
-            dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
-            dataset_rid = dataset_table_path.insert([{'Description': description}])[0]['RID']
+        dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
 
         if validate:
             existing_rids = set(
                 m
-                for ms in self.dataset_members(dataset_rid).values()
+                for ms in self.list_dataset_members(dataset_rid).values()
                 for m in ms
             )
             if overlap := set(existing_rids).intersection(members):
@@ -709,14 +704,17 @@ class DerivaML:
 
         # Now go through every rid to be added to the data set and sort them based on what association table entries
         # need to be made.
+        dataset_elements = self.list_dataset_members(dataset_rid)
         dataset_elements = {}
         for r in rid_info:
             dataset_elements.setdefault(r.table, []).append(r.rid)
         # Now make the entries into the association tables.
         for elements in dataset_elements.values():
             if len(elements):
+                [ {'Dataset': dataset_rid, element_name: e} for e in elements])
                 self.add_attributes([dataset_rid] * len(elements), elements)
         return dataset_rid
+
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
                       description: str = "") -> RID:
@@ -740,8 +738,7 @@ class DerivaML:
         else:
             execution_rid = ml_schema_path.Execution.insert([{'Description': description}])[0]['RID']
         if datasets:
-            self._batch_insert("Dataset_Execution",
-                               [{"Dataset": d, "Execution": execution_rid} for d in datasets])
+            ml_schema_path.Dataset_Execution.insert([{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
     def update_execution(self, execution_rid: RID, workflow_rid: RID = "", datasets: List[str] = None,
@@ -762,11 +759,10 @@ class DerivaML:
         """
 
         datasets = datasets or []
-        self._batch_update("Execution",
-                           [{"RID": execution_rid, "Workflow": workflow_rid, "Description": description}])
+        schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+        schema_path.Execution.update([{"RID": execution_rid, "Workflow": workflow_rid, "Description": description}])
         if datasets:
-            self._batch_insert("Dataset_Execution",
-                               [{"Dataset": d, "Execution": execution_rid} for d in datasets])
+            schema_path.Dataset_Execution.insert([{"Dataset": d, "Execution": execution_rid} for d in datasets])
         return execution_rid
 
     def add_term(self,
@@ -842,7 +838,7 @@ class DerivaML:
 
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
 
-    def find_vocabularies(self) -> list:
+    def find_vocabularies(self) -> Iterable[Table]:
         """
         Return a list of all the controlled vocabulary tables in the domain schema.
 
@@ -852,7 +848,7 @@ class DerivaML:
         """
         return [t for t in self.model.schemas[self.domain_schema].tables.values() if self.is_vocabulary(t)]
 
-    def list_vocabulary_terms(self, table_name: str) -> pd.DataFrame:
+    def list_vocabulary_terms(self, table_name: str) -> Iterable[dict[str, Any]]:
         """
         Return the dataframe of terms that are in a vocabulary table.
 
@@ -870,7 +866,7 @@ class DerivaML:
         if not self.is_vocabulary(table_name):
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        return pd.DataFrame(pb.schemas[self.domain_schema].tables[table_name].entities().fetch())
+        return list(pb.schemas[self.domain_schema].tables[table_name].entities().fetch())
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
         """
@@ -901,40 +897,6 @@ class DerivaML:
         """
         user_path = self.catalog.getPathBuilder().schemas['public'].users.ERMrest_Client.path
         return pd.DataFrame(user_path.entities().fetch())[['ID', 'Full_Name']]
-
-    def _batch_insert(self, table: str, entities: Sequence[dict], schema_name: str = "") -> None:
-        """
-        Batch insert entities into a table.
-
-        Args:
-        - table (datapath._TableWrapper): Table wrapper object.
-        - entities (Sequence[dict]): Sequence of entity dictionaries to insert.
-
-        """
-        schema_path = self.catalog.getPathBuilder().schemas[schema_name if schema_name else self.ml_schema]
-        table_path = schema_path.tables[table]
-
-        it = iter(entities)
-        while chunk := list(islice(it, 2000)):
-            table_path.insert(chunk)
-
-    def _batch_update(self, table: str, entities: Sequence[dict], schema_name: str = ""):
-        """
-        Batch update entities in a table.
-
-        Args:
-        - table (datapath._TableWrapper): Table wrapper object.
-        - entities (Sequence[dict]): Sequence of entity dictionaries to update, must include RID.
-        - update_cols (List[datapath._ColumnWrapper]): List of columns to update.
-
-        """
-        schema_path = self.catalog.getPathBuilder().schemas[schema_name if schema_name else self.ml_schema]
-        table_path = schema_path.tables[table]
-
-        it = iter(entities)
-        while chunk := list(islice(it, 1000)):
-            columns = [table_path.columns[c] for e in chunk for c in e.keys() if c != "RID"]
-            table_path.update(chunk, [table_path.RID], columns)
 
     @staticmethod
     def _get_checksum(url) -> str:
@@ -1080,8 +1042,9 @@ class DerivaML:
 
         """
         self.status = new_status.value
-        self._batch_update("Execution",
-                           [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}])
+        self.catalog.getPathBuilder().schemas[self.ml_schema].Execution.update(
+                           [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}]
+        )
 
     def download_execution_files(self, table_name: str, file_rid: str, execution_rid="", dest_dir: str = "") -> Path:
         """
@@ -1119,8 +1082,8 @@ class DerivaML:
             exec_file_exec_entities = ass_table_path.filter(ass_table_path.columns[table_name] == file_rid).entities()
             exec_list = [e['Execution'] for e in exec_file_exec_entities]
             if execution_rid not in exec_list:
-                self._batch_insert(ass_table, [{table_name: file_rid, "Execution": execution_rid}])
-
+                table_path = self.catalog.getPathBuilder().schemas[self.ml_schema].tables[ass_table]
+                table_path.insert([{table_name: file_rid, "Execution": execution_rid}])
         self.update_status(Status.running, f"Successfully download {table_name}...", execution_rid)
         return Path(file_path)
 
@@ -1157,7 +1120,7 @@ class DerivaML:
             ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
             execution_metadata_type_rid = self.lookup_term(ml_schema_path.Execution_Metadata_Type,
                                                            "Execution Config")
-            self._batch_insert("Execution_Metadata",
+            ml_schema_path.tables["Execution_Metadata"].insert(
                                [{"URL": hatrac_uri,
                                  "Filename": file_name,
                                  "Length": file_size,
@@ -1201,8 +1164,7 @@ class DerivaML:
                     rid = metadata["Result"].get("RID")
                     if (rid is not None) and (rid not in meta_list):
                         entities.append({"Execution_Metadata": rid, "Execution": execution_rid})
-        self._batch_insert("Execution_Metadata_Execution", entities)
-
+        self.catalog.getPathBuilder().schemas[self.ml_schema].Execution_Metadata_Execution.insert(entities)
         return results
 
     def upload_execution_assets(self, execution_rid: RID) -> dict[str, dict[str, FileUploadState]]:
@@ -1242,7 +1204,7 @@ class DerivaML:
                             rid = asset["Result"].get("RID")
                             if (rid is not None) and (rid not in assets_list):
                                 entities.append({"Execution_Assets": rid, "Execution": execution_rid})
-                    self._batch_insert("Execution_Assets_Execution", entities)
+                    ml_schema_path.Execution_Assets_Execution.insert(entities)
                     results[str(folder_path)] = result
         return results
 
@@ -1264,7 +1226,8 @@ class DerivaML:
         duration = f'{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec'
 
         self.update_status(Status.running, "Algorithm execution ended.", execution_rid)
-        self._batch_update("Execution", [{"RID": execution_rid, "Duration": duration}])
+        self.catalog.getPathBuilder().schemas[self.ml_schema].Execution.update(
+            [{"RID": execution_rid, "Duration": duration}])
 
     def execution_init(self, configuration_rid: RID) -> ConfigurationRecord:
         """
