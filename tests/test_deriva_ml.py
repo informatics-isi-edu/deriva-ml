@@ -34,11 +34,10 @@ if os.getenv("DERIVA_PY_TEST_VERBOSE"):
     logger.addHandler(logging.StreamHandler())
 
 
-def define_test_schema(catalog: ErmrestCatalog) -> None:
-    model = catalog.getCatalogModel()
+def define_test_schema(catalog: Catalog) -> None:
+    model = Model.from_catalog().('test')
     setup_ml_workflow(model, 'deriva-ml', catalog.catalog_id)
     domain = model.create_schema(_em.Schema.define(SNAME_DOMAIN))
-
     domain.create_table(_em.Table.define("Subject"))
     domain.create_table(_em.Table.define("Image"))
 
@@ -55,8 +54,9 @@ class DerivaMLTests (unittest.TestCase):
         credential = os.getenv("DERIVA_PY_TEST_CREDENTIAL") or get_credential(hostname)
         server = DerivaServer('https', hostname, credentials=credential)
         cls.catalog = server.create_ermrest_catalog()
+        model = Model.from_catalog(server.connect_ermrest(cls.catalog.catalog_id))
         try:
-            define_test_schema(cls.catalog)
+            define_test_schema(model, cls.catalog)
             populate_test_catalog(cls.catalog)
         except Exception:
             # on failure, delete catalog and re-raise exception
