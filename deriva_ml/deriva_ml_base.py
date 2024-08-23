@@ -17,6 +17,7 @@ import pandas as pd
 import pkg_resources
 import requests
 from bdbag import bdbag_api as bdb
+from copy import deepcopy
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
@@ -27,7 +28,6 @@ from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import BaseModel, ValidationError, model_serializer
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
-
 RID = NewType("RID", str)
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
@@ -1019,10 +1019,11 @@ class DerivaML:
         uploader = GenericUploader(server={"host": self.host_name, "protocol": "https", "catalog_id": self.catalog_id})
         uploader.getUpdatedConfig()
         uploader.scanDirectory(assets_dir)
-        results = {
-            path: FileUploadState(state=result["State"], status=result["Status"], result=result["Result"])
-            for path, result in uploader.uploadFiles().items()
-        }
+        results = deepcopy(uploader.uploadFiles())
+        # results = {
+        #     path: FileUploadState(state=result["State"], status=result["Status"], result=result["Result"])
+        #     for path, result in uploader.uploadFiles().items()
+        # }
         uploader.cleanup()
         return results
 
