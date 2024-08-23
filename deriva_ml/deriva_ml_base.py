@@ -8,10 +8,10 @@ import shutil
 import warnings
 from datetime import datetime
 from enum import Enum
-from itertools import islice, repeat
+from itertools import repeat
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List, Sequence, Optional, Any, NewType, Iterable
+from typing import List, Optional, Any, NewType, Iterable
 
 import pandas as pd
 import pkg_resources
@@ -20,7 +20,7 @@ from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import Schema, Table, Column, builtin_types, Key, ForeignKey, FindAssociationResult
+from deriva.core.ermrest_model import Table, Column, builtin_types, Key, ForeignKey, FindAssociationResult
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
@@ -192,8 +192,9 @@ class AssociatedTable(BaseModel, frozen=True, arbitrary_types_allowed=True):
         return f"<{self.association_table.name}>"
 
 
-class FindFeatureResult (FindAssociationResult):
+class FindFeatureResult(FindAssociationResult):
     """Wrapper for results of Table.find_associations()"""
+
     def __init__(self, feature_name, table, self_fkey, other_fkeys):
         self.feature_name = feature_name
         super().__init__(table, self_fkey, other_fkeys)
@@ -338,15 +339,14 @@ class DerivaML:
     more domain specific interfaces are built.
     """
 
-    DERIVA_ML_SCHEMA = "deriva_ml"
-
     def __init__(self,
                  hostname: str,
                  catalog_id: str,
                  domain_schema: str,
                  cache_dir: str,
                  working_dir: str,
-                 model_version: str):
+                 model_version: str,
+                 ml_schema='deriva-ml'):
         """
 
         :param hostname: Hostname of the Deriva server.
@@ -359,7 +359,7 @@ class DerivaML:
         self.host_name = hostname
         self.catalog_id = catalog_id
         self.domain_schema = domain_schema
-        self.ml_schema = domain_schema  # DerivaML.DERIVA_ML_SCHEMA
+        self.ml_schema = ml_schema
         self.version = model_version
 
         self.credential = get_credential(hostname)
@@ -368,7 +368,6 @@ class DerivaML:
                                       session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
         self.dataset_table = self.model.table(self.ml_schema, 'Dataset')
-        self.execution_table = self.model.table(self.ml_schema, "Execution")
         self.configuration = None
 
         self.start_time = datetime.now()
@@ -408,38 +407,33 @@ class DerivaML:
         return session_config
 
     def _get_table(self, table: str | Table) -> Table:
-        try:
-            return self.model.schemas[self.domain_schema].tables[table] if isinstance(table, str) else table
-        except KeyError:
-            raise DerivaMLException(f"The table {table} doesn't exist.")
-
-    def find_table_schema(self, table_name: str) -> Schema:
         """
-        Given a table name, return the name of its schema.
-        :param table_name:
-        :return:
+        Return the table object corresponding to the given table name. If the table name appears in more
+        than one schema, return the first one you find.
+        :param table:
+        :return: Table object.
         """
-        schema = None
-        for s in self.model.schemas.values():
-            if table_name in s.tables:
-                schema = s
-        if schema is None:
-            raise DerivaMLException(f"The table {table_name} doesn't exist.")
-        else:
-            return schema
+        if isinstance(table, Table):
+            return table
+        for s in self.model.schemas:
+            if table in s.tables.keys():
+                return s.tables[table]
+        raise DerivaMLException(f"The table {table} doesn't exist.")
 
-    def create_vocabulary(self, vocab_name: str, comment="") -> Table:
+    def create_vocabulary(self, vocab_name: str, comment="", schema=None) -> Table:
         """
         Create a controlled vocabulary table with the given vocab name.
-        :param vocab_name:
+        :param vocab_name: Name of the controlled vocabulary table.
         :param comment:
+        :param schema: Schema in which to create the controlled vocabulary table.  Defaults to domain_schema.
         :return:
         """
+        schema = schema or self.domain_schema
         return self.model.schemas[self.domain_schema].create_table(
-            Table.define_vocabulary(vocab_name,  f'{self.domain_schema}:{{{RID}}}', comment=comment)
+            Table.define_vocabulary(vocab_name, f'{schema}:{{{RID}}}', comment=comment)
         )
 
-    def is_vocabulary(self, table_name: str) -> bool:
+    def is_vocabulary(self, table_name: str) -> Table:
         """
         Check if a given table is a controlled vocabulary table.
 
@@ -447,11 +441,12 @@ class DerivaML:
         - table_name (str): The name of the table.
 
         Returns:
-        - bool: True if the table is a controlled vocabulary, False otherwise.
+        - Table: Table object if the table is a controlled vocabulary, False otherwise.
 
         """
         vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
-        return vocab_columns.issubset({c.name.upper() for c in self._get_table(table_name).columns})
+        table = self._get_table(table_name)
+        return vocab_columns.issubset({c.name.upper() for c in table.columns}) and table
 
     def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
                      version: str = "",
@@ -509,11 +504,11 @@ class DerivaML:
         self.lookup_term("Feature_Name", feature_name)
         table = self._get_table(table)
         self.model.schemas[self.ml_schema].create_table(
-          table.define_association(
-             associates=[execution, table, feature],
-             table_name=f"{table.name}_Execution_Feature_Name_{feature_name}",
-             metadata=[normalize_metadata(m) for m in metadata] if metadata else [],
-             comment=comment
+            table.define_association(
+                associates=[execution, table, feature],
+                table_name=f"{table.name}_Execution_Feature_Name_{feature_name}",
+                metadata=[normalize_metadata(m) for m in metadata] if metadata else [],
+                comment=comment
             )
         )
 
@@ -535,7 +530,7 @@ class DerivaML:
                 table=a.table,
                 self_fkey=a.self_fkey, other_fkeys=a.other_fkeys
             ) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
-            ]
+        ]
 
     def add_features(self,
                      table: str,
@@ -545,7 +540,8 @@ class DerivaML:
                      metadata: list[dict[str, Any]] = None) -> int:
         """
         Add an attribute to the specified object.
-
+        :param table: The table to which the attribute is added.
+        :param feature_name: The name of the feature.
         :param object_rids: A list of the rids to which the new attributes will be attached.  Every RID in the list
         must come from the same table.
         :param execution_rids: A list of the executables to be associated with the rids.
@@ -559,7 +555,7 @@ class DerivaML:
         object_table = feature.self_fkey.pk_table.name
         skip_columns = {"RID", "RCB", "RMB", "RCT", "RMT", "Execution", "Feature_Name", table.name}
         metadata_columns = {c.name for c in feature.table.columns if c.name not in skip_columns}
-        required_metadata = {c.name for c in feature.table.columns if c.name not in skip_columns and c.nullok == False}
+        required_metadata = {c.name for c in feature.table.columns if c.name not in skip_columns and c.nullok is False}
 
         def feature_entity(object_rid: RID, exe_rid: RID, meta: dict[str, Any]) -> dict[str, Any]:
             if self.resolve_rid(object_rid).table.name != object_table:
@@ -577,7 +573,7 @@ class DerivaML:
             entries = [
                 feature_entity(object_rid, execution_rid, md)
                 for object_rid, execution_rid, md in
-                    zip(object_rids, execution_rids, metadata or repeat({}), strict=True)
+                zip(object_rids, execution_rids, metadata or repeat({}), strict=True)
             ]
         except ValueError:
             raise DerivaMLException(f"Length of object_rid, execution_rid, and metadata must be equal.")
@@ -711,10 +707,9 @@ class DerivaML:
         # Now make the entries into the association tables.
         for elements in dataset_elements.values():
             if len(elements):
-                [ {'Dataset': dataset_rid, element_name: e} for e in elements])
+                #       [ {'Dataset': dataset_rid, element_name: e} for e in elements]
                 self.add_attributes([dataset_rid] * len(elements), elements)
         return dataset_rid
-
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
                       description: str = "") -> RID:
@@ -766,8 +761,8 @@ class DerivaML:
         return execution_rid
 
     def add_term(self,
-                 table_name: str,
-                 name: str,
+                 table: str | Table,
+                 term_name: str,
                  description: str,
                  synonyms: Optional[List[str]] = None,
                  exist_ok: bool = False) -> RID:
@@ -776,7 +771,7 @@ class DerivaML:
 
         Args:
         - table_name (str): The name of the control vocabulary table.
-        - name (str): The name of the new control vocabulary.
+        - term_name (str): The name of the new control vocabulary.
         - description (str): The description of the new control vocabulary.
         - synonyms (List[str]): Optional list of synonyms for the new control vocabulary. Defaults to an empty list.
         - exist_ok (bool): Optional flag indicating whether to allow creation if the control vocabulary name
@@ -790,19 +785,19 @@ class DerivaML:
         """
         synonyms = synonyms or []
         pb = self.catalog.getPathBuilder()
-        if not self.is_vocabulary(table_name):
-            raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
+        if not (table := self.is_vocabulary(table)):
+            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
+        schema_name = table.schema.name
+        table_name = table.name
         try:
-            entities = pb.schemas[self.domain_schema].tables[table_name].entities()
-            entities_upper = [{key.upper(): value for key, value in e.items()} for e in entities]
-            name_list = [e['NAME'] for e in entities_upper]
-            term_rid = entities[name_list.index(name)]['RID']
+            term_rid = self.lookup_term(table, term_name)
+            # Check vocabulary
         except ValueError:
             # Name is not in list of current terms
-            col_map = {col.upper(): col for col in pb.schemas[self.domain_schema].tables[table_name].columns.keys()}
-            term_rid = pb.schemas[self.domain_schema].tables[table_name].insert(
-                [{col_map['NAME']: name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
+            col_map = {col.upper(): col for col in pb.schemas[schema_name].tables[table_name].columns.keys()}
+            term_rid = pb.schemas[schema_name].tables[table_name].insert(
+                [{col_map['NAME']: term_name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
                 defaults={col_map['ID'], col_map['URI']})[0]['RID']
         else:
             # Name is list of current terms.
@@ -810,7 +805,7 @@ class DerivaML:
                 raise DerivaMLException(f"{name} existed with RID {entities[name_list.index(name)]['RID']}")
         return term_rid
 
-    def lookup_term(self, table_name: str, term_name: str) -> str:
+    def lookup_term(self, table: str | Table, term_name: str) -> str:
         """
         Given a term name, return the RID of the associated term (or synonym).
 
@@ -826,11 +821,11 @@ class DerivaML:
           found in the vocabulary.
 
         """
-        vocab_table = self.is_vocabulary(table_name)
+        vocab_table = self.is_vocabulary(table)
         if not vocab_table:
-            raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
-
-        schema_path = self.catalog.getPathBuilder().schemas[self.find_table_schema(table_name).name]
+            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
+        schema_name, table_name = vocab_table.schema.name, vocab_table.name
+        schema_path = self.catalog.getPathBuilder().schemas[schema_name]
         for term in schema_path.tables[table_name].entities():
             term_upper = {key.upper(): value for key, value in term.items()}
             if term_name == term_upper['NAME'] or (term_upper['SYNONYMS'] and term_name in term_upper['SYNONYMS']):
@@ -846,7 +841,7 @@ class DerivaML:
          - List[str]: A list of table names representing controlled vocabulary tables in the schema.
 
         """
-        return [t for t in self.model.schemas[self.domain_schema].tables.values() if self.is_vocabulary(t)]
+        return [t for s in self.model.schemas for t in s.tables.values() if self.is_vocabulary(t)]
 
     def list_vocabulary_terms(self, table_name: str) -> Iterable[dict[str, Any]]:
         """
@@ -856,17 +851,17 @@ class DerivaML:
         - table_name (str): The name of the controlled vocabulary table.
 
         Returns:
-        - pd.DataFrame: A DataFrame containing the terms in the specified controlled vocabulary table.
+        - Iterable: A iterable containing the terms in the specified controlled vocabulary table.
 
         Raises:
         - EyeAIException: If the schema or vocabulary table doesn't exist, or if the table is not
           a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
-        if not self.is_vocabulary(table_name):
+        if not (table := self.is_vocabulary(table_name)):
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        return list(pb.schemas[self.domain_schema].tables[table_name].entities().fetch())
+        return list(pb.schemas[table.schema.name].tables[table.name].entities().fetch())
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
         """
@@ -1043,7 +1038,7 @@ class DerivaML:
         """
         self.status = new_status.value
         self.catalog.getPathBuilder().schemas[self.ml_schema].Execution.update(
-                           [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}]
+            [{"RID": execution_rid, "Status": self.status, "Status_Detail": status_detail}]
         )
 
     def download_execution_files(self, table_name: str, file_rid: str, execution_rid="", dest_dir: str = "") -> Path:
@@ -1121,12 +1116,12 @@ class DerivaML:
             execution_metadata_type_rid = self.lookup_term(ml_schema_path.Execution_Metadata_Type,
                                                            "Execution Config")
             ml_schema_path.tables["Execution_Metadata"].insert(
-                               [{"URL": hatrac_uri,
-                                 "Filename": file_name,
-                                 "Length": file_size,
-                                 "MD5": md5,
-                                 "Description": desc,
-                                 "Execution_Metadata_Type": execution_metadata_type_rid}])
+                [{"URL": hatrac_uri,
+                  "Filename": file_name,
+                  "Length": file_size,
+                  "MD5": md5,
+                  "Description": desc,
+                  "Execution_Metadata_Type": execution_metadata_type_rid}])
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(
