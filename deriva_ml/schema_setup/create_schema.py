@@ -168,6 +168,12 @@ def setup_ml_workflow(model, schema_name, catalog_id):
     dataset_table = create_table_if_not_exist(schema, "Dataset",
                                               define_table_dataset(annotations.get("dataset_annotation")))
     association_dataset_execution = schema.create_association(dataset_table, execution_table)
+    table_def_dataset_type_vocab = Table.define_vocabulary(
+        tname='Dataset_Type', curie_template=curie_template
+    )
+    dataset_type_table = create_table_if_not_exist(schema, 'Dataset_Type',
+                                                   table_def_dataset_type_vocab)
+    dataset_table.add_reference(dataset_type_table)
 
     # Execution Metadata
     execution_metadata_table = create_table_if_not_exist(schema, 'Execution_Metadata',
@@ -192,6 +198,13 @@ def setup_ml_workflow(model, schema_name, catalog_id):
     )
     execution_asset_type_table = schema.create_table(table_def_execution_product_type_vocab)
     execution_assets_table.add_reference(execution_asset_type_table)
+
+    # Feature Name
+    table_def_feature_name_vocab = Table.define_vocabulary(
+        tname='Feature_Name', curie_template=curie_template)
+    feature_name_vocab_table = create_table_if_not_exist(schema, 'Feature_Name',
+                                                         table_def_feature_name_vocab)
+
 
 
 def main():
