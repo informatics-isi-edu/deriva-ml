@@ -146,7 +146,7 @@ def define_asset_execution_assets(schema: str, execution_assets_annotation: dict
 
 
 def setup_ml_workflow(model, schema_name, catalog_id):
-    curie_template = catalog_id+':{RID}'
+    curie_template = schema_name+':{RID}'
     schema = create_schema_if_not_exist(model, schema_name)
     # get annotations
     annotations = generate_annotation(catalog_id, schema_name)
