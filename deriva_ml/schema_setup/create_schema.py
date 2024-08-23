@@ -145,8 +145,8 @@ def define_asset_execution_assets(schema: str, execution_assets_annotation: dict
     return table_def
 
 
-def setup_ml_workflow(model, schema_name, catalog_id):
-    curie_template = schema_name+':{RID}'
+def setup_ml_workflow(model, schema_name, catalog_id, curie_prefix):
+    curie_template = curie_prefix + ':{RID}'
     schema = create_schema_if_not_exist(model, schema_name)
     # get annotations
     annotations = generate_annotation(catalog_id, schema_name)
@@ -213,11 +213,12 @@ def main():
     parser.add_argument('--hostname', type=str, required=True)
     parser.add_argument('--schema_name', type=str, required=True)
     parser.add_argument('--catalog_id', type=str, required=True)
+    parser.add_argument('--curie_prefix', type=str, required=True)
     args = parser.parse_args()
     credentials = get_credential(args.hostname)
     server = DerivaServer(scheme, args.hostname, credentials)
     model = Model.from_catalog(server.connect_ermrest(args.catalog_id))
-    setup_ml_workflow(model, args.schema_name, args.catalog_id)
+    setup_ml_workflow(model, args.schema_name, args.catalog_id, args.curie_prefix)
 
 
 if __name__ == "__main__":
