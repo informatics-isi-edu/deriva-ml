@@ -21,7 +21,8 @@ from copy import deepcopy
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import Table, Column, builtin_types, Key, ForeignKey, FindAssociationResult
+from deriva.core.ermrest_model import FindAssociationResult
+from deriva.chisel import Model, Schema, Table, Column, ForeignKey, Key, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
@@ -366,8 +367,8 @@ class DerivaML:
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
                                       self.credential,
                                       session_config=self._get_session_config())
-        self.model = self.catalog.getCatalogModel()
-        self.dataset_table = self.model.table(self.ml_schema, 'Dataset')
+        self.model = Model.from_catalog(self.catalog)
+        self.dataset_table = self.model.schemas[self.ml_schema].tables['Dataset']
         self.configuration = None
 
         self.start_time = datetime.now()
@@ -415,7 +416,7 @@ class DerivaML:
         """
         if isinstance(table, Table):
             return table
-        for s in self.model.schemas:
+        for s in self.model.schemas.values():
             if table in s.tables.keys():
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
@@ -430,7 +431,7 @@ class DerivaML:
         """
         schema = schema or self.domain_schema
         return self.model.schemas[self.domain_schema].create_table(
-            Table.define_vocabulary(vocab_name, f'{schema}:{{{RID}}}', comment=comment)
+            Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}', comment=comment)
         )
 
     def is_vocabulary(self, table_name: str) -> Table:
@@ -790,19 +791,20 @@ class DerivaML:
 
         schema_name = table.schema.name
         table_name = table.name
+
         try:
-            term_rid = self.lookup_term(table, term_name)
-            # Check vocabulary
-        except ValueError:
-            # Name is not in list of current terms
             col_map = {col.upper(): col for col in pb.schemas[schema_name].tables[table_name].columns.keys()}
             term_rid = pb.schemas[schema_name].tables[table_name].insert(
                 [{col_map['NAME']: term_name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
                 defaults={col_map['ID'], col_map['URI']})[0]['RID']
-        else:
-            # Name is list of current terms.
-            if not exist_ok:
+        except e:
+            print(f"checking to see if term exists")
+            print(e)
+            if exist_ok:
+                term_rid = self.lookup_term(table, term_name)
+            else:
                 raise DerivaMLException(f"{name} existed with RID {entities[name_list.index(name)]['RID']}")
+            # Check vocabulary
         return term_rid
 
     def lookup_term(self, table: str | Table, term_name: str) -> str:
@@ -841,7 +843,7 @@ class DerivaML:
          - List[str]: A list of table names representing controlled vocabulary tables in the schema.
 
         """
-        return [t for s in self.model.schemas for t in s.tables.values() if self.is_vocabulary(t)]
+        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
     def list_vocabulary_terms(self, table_name: str) -> Iterable[dict[str, Any]]:
         """
