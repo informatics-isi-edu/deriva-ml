@@ -10,6 +10,7 @@ from datetime import datetime
 from enum import Enum
 from itertools import repeat
 from pathlib import Path
+from requests import HTTPError
 from tempfile import TemporaryDirectory
 from typing import List, Optional, Any, NewType, Iterable
 
@@ -22,7 +23,7 @@ from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquo
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import FindAssociationResult
-from deriva.chisel import Model, Schema, Table, Column, ForeignKey, Key, builtin_types
+from deriva.chisel import Model, Table, Column, ForeignKey, Key, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
@@ -431,7 +432,9 @@ class DerivaML:
         """
         schema = schema or self.domain_schema
         return self.model.schemas[self.domain_schema].create_table(
-            Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}', comment=comment)
+            Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}',
+                                    comment=comment,
+                                    key_defs=[Key.define(["Name"])])
         )
 
     def is_vocabulary(self, table_name: str) -> Table:
@@ -504,7 +507,7 @@ class DerivaML:
         feature = self.model.schemas[self.ml_schema].tables["Feature_Name"]
         self.lookup_term("Feature_Name", feature_name)
         table = self._get_table(table)
-        self.model.schemas[self.ml_schema].create_table(
+        self.model.schemas[self.domain_schema].create_table(
             table.define_association(
                 associates=[execution, table, feature],
                 table_name=f"{table.name}_Execution_Feature_Name_{feature_name}",
@@ -512,6 +515,15 @@ class DerivaML:
                 comment=comment
             )
         )
+
+    def drop_feature(self, feature_name: str, table: Table | str) -> bool:
+        table = self._get_table(table)
+        try:
+            feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+            feature.table.drop()
+            return True
+        except StopIteration:
+            return False
 
     def find_features(self, table: Table | str) -> Iterable[FindFeatureResult]:
         """
@@ -524,7 +536,6 @@ class DerivaML:
                 return a.table.columns['Feature_Name']
             except KeyError:
                 return False
-
         return [
             FindFeatureResult(
                 feature_name=a.name.replace(f"{table.name}_Execution_Feature_Name_", ""),
@@ -571,10 +582,11 @@ class DerivaML:
             return {object_table: object_rid, 'Execution': exe_rid, 'Feature_Name': feature_name_rid} | meta
 
         try:
+            entries = list(object_rids)
             entries = [
                 feature_entity(object_rid, execution_rid, md)
                 for object_rid, execution_rid, md in
-                zip(object_rids, execution_rids, metadata or repeat({}), strict=True)
+                zip(entries, execution_rids, metadata or repeat({}, times=len(entries)), strict=True)
             ]
         except ValueError:
             raise DerivaMLException(f"Length of object_rid, execution_rid, and metadata must be equal.")
@@ -591,7 +603,7 @@ class DerivaML:
         feature_name_rid = self.lookup_term("Feature_Name", feature_name)
         feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
         pb = self.catalog.getPathBuilder()
-        return pb.schemas[self.domain_schema].tables[feature.name].entities().fetch()
+        return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
 
     def create_dataset(self, description: str, **kwargs) -> RID:
         """
@@ -635,14 +647,14 @@ class DerivaML:
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
 
-    def add_element_type(self, element: str) -> Table:
+    def add_element_type(self, element: str | Table) -> Table:
         """
         Add a new element type to a dataset.
         :param element:
         :return:
         """
         # Add table to map
-        element_table = self.model.schemas[self.domain_schema].tables[element]
+        element_table = self._get_table(element)
         assoc_table = self.model.schemas[self.domain_schema].create_association(self.dataset_table, element_table)
         return assoc_table
 
@@ -766,7 +778,7 @@ class DerivaML:
                  term_name: str,
                  description: str,
                  synonyms: Optional[List[str]] = None,
-                 exist_ok: bool = False) -> RID:
+                 exists_ok: bool = True) -> RID:
         """
         Creates a new control vocabulary term in the control vocabulary table.
 
@@ -776,7 +788,7 @@ class DerivaML:
         - description (str): The description of the new control vocabulary.
         - synonyms (List[str]): Optional list of synonyms for the new control vocabulary. Defaults to an empty list.
         - exist_ok (bool): Optional flag indicating whether to allow creation if the control vocabulary name
-          already exists. Defaults to False.
+          already exists. Defaults to True.
 
         Returns:
         - str: The RID of the newly created control vocabulary.
@@ -797,13 +809,13 @@ class DerivaML:
             term_rid = pb.schemas[schema_name].tables[table_name].insert(
                 [{col_map['NAME']: term_name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
                 defaults={col_map['ID'], col_map['URI']})[0]['RID']
-        except e:
-            print(f"checking to see if term exists")
-            print(e)
-            if exist_ok:
+        except HTTPError as e:
+            if "duplicate key" in str(e):
                 term_rid = self.lookup_term(table, term_name)
+                if not exists_ok:
+                    raise DerivaMLException(f"{term_name} existed with RID {term_rid}")
             else:
-                raise DerivaMLException(f"{name} existed with RID {entities[name_list.index(name)]['RID']}")
+                raise e
             # Check vocabulary
         return term_rid
 
