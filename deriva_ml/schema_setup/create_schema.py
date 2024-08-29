@@ -1,14 +1,15 @@
 import argparse
 import sys
 
-from deriva.chisel import Model, Schema, Table, Column, ForeignKey, Key
+#from deriva.chisel import Model, Schema, Table, Column, ForeignKey, Key
+from deriva.core.ermrest_model import Model,  Key
 from deriva.core import DerivaServer, get_credential
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
 
 from deriva_ml.schema_setup.annotation_temp import generate_annotation
 
 
-def define_table_workflow(workflow_annotation: dict):
+def define_table_workflow(schema: str, workflow_annotation: dict):
     table_def = Table.define(
         "Workflow",
         column_defs=[
@@ -17,10 +18,14 @@ def define_table_workflow(workflow_annotation: dict):
             Column.define("URL", builtin_types.ermrest_uri),
             Column.define("Checksum", builtin_types.text),
             Column.define("Version", builtin_types.text),
+            Column.define("Workflow_Type", builtin_types.text)
         ],
         fkey_defs=[
             ForeignKey.define(["RCB"], "public", "ERMrest_Client", ["ID"]),
             ForeignKey.define(["RMB"], "public", "ERMrest_Client", ["ID"]),
+            ForeignKey.define(["Workflow_Type"],
+                              schema, "Workflow_Type", ["ID"],
+                                on_update='CASCADE')
         ],
         annotations=workflow_annotation,
     )
@@ -103,12 +108,9 @@ def setup_ml_workflow(model: Model, schema_name: str, catalog_id, curie_prefix):
         key_defs=[Key.define(["Name"])],
     )
 
+    workflow_type_table = schema.tables.get("Workflow_Type") or schema.create_table(table_def_workflow_type_vocab)
     workflow_table = schema.create_table(
         define_table_workflow(annotations["workflow_annotation"])
-    )
-
-    workflow_type_table = schema.tables.get("Workflow_Type") or schema.create_table(
-        table_def_workflow_type_vocab
     )
     workflow_table.add_reference(workflow_type_table)
 
@@ -187,7 +189,7 @@ def main():
     args = parser.parse_args()
     credentials = get_credential(args.hostname)
     server = DerivaServer(scheme, args.hostname, credentials)
-    model = Model.from_catalog(server.connect_ermrest(args.catalog_id))
+    model = server.connect_ermrest(args.catalog_id).getCatalogModel()
     setup_ml_workflow(model, args.schema_name, args.catalog_id, args.curie_prefix)
 
 

@@ -23,7 +23,8 @@ from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquo
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import FindAssociationResult
-from deriva.chisel import Model, Table, Column, ForeignKey, Key, builtin_types
+#from deriva.chisel import Model, Table, Column, ForeignKey, Key, builtin_types
+from deriva.core.ermrest_model import Model, Table, Column, ForeignKey, Key, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader

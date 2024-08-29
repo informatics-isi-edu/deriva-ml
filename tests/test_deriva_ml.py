@@ -10,8 +10,9 @@ import sys
 import unittest
 from requests import HTTPError
 
-from deriva.chisel import Model, Schema, Table, Column, ForeignKey, builtin_types
+#from deriva.chisel import Model, Schema, Table, Column, ForeignKey, builtin_types
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential, ermrest_model as _em
+from deriva.core.ermrest_model import Model, Schema, Table, Column
 from deriva.core.datapath import DataPathException
 
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException
@@ -108,7 +109,7 @@ def setUpModule():
     credential = os.getenv("DERIVA_PY_TEST_CREDENTIAL") or get_credential(hostname)
     server = DerivaServer('https', hostname, credentials=credential)
     test_catalog = server.create_ermrest_catalog()
-    model = Model.from_catalog(server.connect_ermrest(test_catalog.catalog_id))
+    model = test_catalog.getCatalogModel()
     try:
         define_domain_schema(model)
         populate_test_catalog(model)
