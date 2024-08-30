@@ -10,7 +10,6 @@ from datetime import datetime
 from enum import Enum
 from itertools import repeat
 from pathlib import Path
-from requests import HTTPError
 from tempfile import TemporaryDirectory
 from typing import List, Optional, Any, NewType, Iterable
 
@@ -23,8 +22,7 @@ from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquo
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import FindAssociationResult
-#from deriva.chisel import Model, Table, Column, ForeignKey, Key, builtin_types
-from deriva.core.ermrest_model import Model, Table, Column, ForeignKey, Key, builtin_types
+from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
@@ -169,30 +167,6 @@ class TableDefinition(BaseModel):
             acls=self.acls,
             acl_bindings=self.acl_bindings,
             annotations=self.annotations)
-
-
-class AssociatedTable(BaseModel, frozen=True, arbitrary_types_allowed=True):
-    """
-    Information from deriva-model for an association table, all in one place.
-    This has a place to store additional attributes.
-    """
-    association_table: Table
-    left_table: Table
-    right_table: Table
-    left_column: Column
-    right_column: Column
-    attributes: list[str] = []
-
-    @property
-    def linked_tables(self) -> set[Table]:
-        """
-        The linked tables in an association table returned as a set.
-        :return: set of tables.
-        """
-        return {self.left_table, self.right_table}
-
-    def __repr__(self):
-        return f"<{self.association_table.name}>"
 
 
 class FindFeatureResult(FindAssociationResult):
@@ -438,7 +412,7 @@ class DerivaML:
                                     key_defs=[Key.define(["Name"])])
         )
 
-    def is_vocabulary(self, table_name: str) -> Table:
+    def is_vocabulary(self, table_name: str | Table) -> Table:
         """
         Check if a given table is a controlled vocabulary table.
 
@@ -606,13 +580,15 @@ class DerivaML:
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
 
-    def create_dataset(self, description: str, **kwargs) -> RID:
+    def create_dataset(self, ds_type: RID, description: str, **kwargs) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
         :param description:  Description of the dataset.
         :return: New dataset RID.
         """
         # Create the entry for the new dataset and get its RID.
+        if not self.is_vocabulary(self.resolve_rid(ds_type).table):
+            raise DerivaMLException(f"Dataset type must be a vocabulary term.")
         dataset_table_path = (
             self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
         return dataset_table_path.insert([{'Description': description}])[0]['RID']
@@ -656,8 +632,9 @@ class DerivaML:
         """
         # Add table to map
         element_table = self._get_table(element)
-        assoc_table = self.model.schemas[self.domain_schema].create_association(self.dataset_table, element_table)
-        return assoc_table
+        return self.model.schemas[self.domain_schema].create_table(
+            Table.define_association([self.dataset_table, element_table]))
+
 
     def list_dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
         """
@@ -676,32 +653,25 @@ class DerivaML:
         # the appropriate association table.
         rid_list = {}
         for assoc_table in self.dataset_table.find_associations():
-            schema_path = pb.schemas[assoc_table.table.schema.name]
-            table_path = schema_path.tables[assoc_table.name]
-            dataset_column, element_column = assoc_table.self_fkey.columns[0], assoc_table.other_fkeys.pop().columns[0]
-            element_table = element_column.table
+            table_path = pb.schemas[assoc_table.table.schema.name].tables[assoc_table.name]
+            other_fkey = assoc_table.other_fkeys.pop()
+            dataset_column, element_column = assoc_table.self_fkey.columns[0], other_fkey.columns[0]
+            element_table = other_fkey.pk_table.name
             dataset_path = table_path.columns[dataset_column.name]
             element_path = table_path.columns[element_column.name]
             assoc_rids = table_path.filter(dataset_path == dataset_rid).attributes(element_path).fetch()
-            rid_list.setdefault(element_table.name, []).extend([e[element_column.name] for e in assoc_rids])
+            rid_list.setdefault(element_table, []).extend([e[element_column.name] for e in assoc_rids])
         return rid_list
 
-    def insert_dataset(self, dataset_rid: Optional[RID], members: list[RID],
-                       description="",
+    def insert_dataset_elements(self, dataset_rid: Optional[RID], members: list[RID],
                        validate: bool = True) -> RID:
         """
         Add additional elements to an existing dataset.
         :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
         :param members: List of RIDs of members to add to the  dataset.
-        :param description: Description of the dataset if new entry is created.
         :param validate: Check rid_list to make sure elements are not already in the dataset.
         :return:
         """
-
-        # Get a list of all of the types of objects that can be linked to a dataset.
-        dataset_objects = [a.other_fkeys.pop().pk_table.name for a in self.dataset_table.find_associations(pure=False)]
-        pb = self.catalog.getPathBuilder()
-        dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
 
         if validate:
             existing_rids = set(
@@ -714,16 +684,23 @@ class DerivaML:
 
         # Now go through every rid to be added to the data set and sort them based on what association table entries
         # need to be made.
-        dataset_elements = self.list_dataset_members(dataset_rid)
         dataset_elements = {}
+        association_map = {a.other_fkeys.pop().pk_table.name:a.table.name for a in
+                           self.dataset_table.find_associations()}
+        # Get a list of all of the types of objects that can be linked to a dataset.
         for m in members:
             rid_info = self.resolve_rid(m)
-            dataset_elements.setdefault(rid_info.table, []).append(rid_info.rid)
+            if rid_info.table.name not in association_map:
+                raise DerivaMLException(f"RID table: {rid_info.table.name} not part of dataset")
+            dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
         # Now make the entries into the association tables.
-        for elements in dataset_elements.values():
+        schema_path = self.catalog.getPathBuilder().schemas[self.domain_schema]
+        for table, elements in dataset_elements.items():
             if len(elements):
-                #       [ {'Dataset': dataset_rid, element_name: e} for e in elements]
-                self.add_attributes([dataset_rid] * len(elements), elements)
+                # Find out the name of the column in the association table.
+                r = schema_path.tables[association_map[table]].insert([
+                    {'Dataset': dataset_rid, table: e} for e in elements])
+                len(r)
         return dataset_rid
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
@@ -1274,10 +1251,10 @@ class DerivaML:
         self.update_status(Status.running, "Inserting tags... ", execution_rid)
         vocabs = {}
         for term in configuration.get("workflow_terms"):
-            term_rid = self.add_term(table_name=term["term"],
-                                     name=term["name"],
+            term_rid = self.add_term(table=term["term"],
+                                     term_name=term["name"],
                                      description=term["description"],
-                                     exist_ok=True)
+                                     exists_ok=True)
             term_records = vocabs.get(term["term"], [])
             term_records.append(Term(name=term["name"], rid=term_rid))
             vocabs[term["term"]] = term_records

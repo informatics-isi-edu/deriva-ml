@@ -14,7 +14,7 @@ from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, builtin_types
 from requests import HTTPError
 
-from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException
+from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID
 from deriva_ml.schema_setup.create_schema import setup_ml_workflow
 
 try:
@@ -226,7 +226,7 @@ class TestExecution(unittest.TestCase):
     def test_add_workflow(self):
         populate_test_catalog(self.model)
         workflow_type = self.ml_instance.add_term("Workflow_Type", "Test Flow", description="A test")
-        self.ml_instance.add_workflow("Test Workflow", "http://foo/bar", "Test Flow")
+        self.ml_instance.add_workflow("Test Workflow", "file:testworkflow", "Test Flow")
 
 class TestDataset(unittest.TestCase):
     def setUp(self):
@@ -234,12 +234,25 @@ class TestDataset(unittest.TestCase):
         self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
         self.model = self.ml_instance.model
 
-    def test_create_dataset(self):
+    def test_add_element_type(self):
         populate_test_catalog(self.model)
-        self.ml_instance.create_dataset(description="A Dataset")
+        self.ml_instance.add_element_type("Subject")
+        self.assertEqual(len(list(self.ml_instance.dataset_table.find_associations())), 2)
+
+    def test_create_dataset(self) -> RID:
+        populate_test_catalog(self.model)
+        self.ml_instance.add_element_type("Subject")
+        type_rid = self.ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
+        dataset_rid = self.ml_instance.create_dataset(type_rid, description="A Dataset")
+        self.assertEqual(len(self.ml_instance.find_datasets()), 1)
+        return dataset_rid
 
     def test_insert_dataset(self):
-        pass
+        dataset_rid = self.test_create_dataset()
+        subject_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables[
+            'Subject'].entities().fetch()]
+        self.ml_instance.insert_dataset_elements(dataset_rid=dataset_rid, members=subject_rids)
+        self.assertEqual(len(self.ml_instance.list_dataset_members(dataset_rid)["Subject"]), len(subject_rids))
 
 
 if __name__ == '__main__':
