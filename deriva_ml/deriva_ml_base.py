@@ -686,7 +686,7 @@ class DerivaML:
             rid_list.setdefault(element_table.name, []).extend([e[element_column.name] for e in assoc_rids])
         return rid_list
 
-    def extend_dataset(self, dataset_rid: Optional[RID], members: list[RID],
+    def insert_dataset(self, dataset_rid: Optional[RID], members: list[RID],
                        description="",
                        validate: bool = True) -> RID:
         """
@@ -716,8 +716,9 @@ class DerivaML:
         # need to be made.
         dataset_elements = self.list_dataset_members(dataset_rid)
         dataset_elements = {}
-        for r in rid_info:
-            dataset_elements.setdefault(r.table, []).append(r.rid)
+        for m in members:
+            rid_info = self.resolve_rid(m)
+            dataset_elements.setdefault(rid_info.table, []).append(rid_info.rid)
         # Now make the entries into the association tables.
         for elements in dataset_elements.values():
             if len(elements):

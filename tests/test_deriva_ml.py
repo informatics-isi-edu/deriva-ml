@@ -225,7 +225,7 @@ class TestExecution(unittest.TestCase):
 
     def test_add_workflow(self):
         populate_test_catalog(self.model)
-        workflow_type = self.ml_instance.add_term("Workflow Type", "Test Flow")
+        workflow_type = self.ml_instance.add_term("Workflow_Type", "Test Flow", description="A test")
         self.ml_instance.add_workflow("Test Workflow", "http://foo/bar", "Test Flow")
 
 class TestDataset(unittest.TestCase):
@@ -238,7 +238,7 @@ class TestDataset(unittest.TestCase):
         populate_test_catalog(self.model)
         self.ml_instance.create_dataset(description="A Dataset")
 
-    def test_add_element(self):
+    def test_insert_dataset(self):
         pass
 
 

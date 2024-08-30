@@ -1,7 +1,6 @@
 import argparse
 import sys
 
-#from deriva.chisel import Model, Schema, Table, Column, ForeignKey, Key
 from deriva.core.ermrest_model import Model,  Key
 from deriva.core import DerivaServer, get_credential
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
