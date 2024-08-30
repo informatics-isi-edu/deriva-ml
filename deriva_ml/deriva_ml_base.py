@@ -810,8 +810,8 @@ class DerivaML:
             term_rid = pb.schemas[schema_name].tables[table_name].insert(
                 [{col_map['NAME']: term_name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
                 defaults={col_map['ID'], col_map['URI']})[0]['RID']
-        except HTTPError as e:
-            if "duplicate key" in str(e):
+        except DataPathException as e:
+            if "already exists" in str(e):
                 term_rid = self.lookup_term(table, term_name)
                 if not exists_ok:
                     raise DerivaMLException(f"{term_name} existed with RID {term_rid}")

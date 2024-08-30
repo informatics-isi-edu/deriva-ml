@@ -8,18 +8,18 @@ import logging
 import os
 import sys
 import unittest
-from requests import HTTPError
 
-#from deriva.chisel import Model, Schema, Table, Column, ForeignKey, builtin_types
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
-from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, builtin_types
 from deriva.core.datapath import DataPathException
+from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, builtin_types
+from requests import HTTPError
 
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException
 from deriva_ml.schema_setup.create_schema import setup_ml_workflow
 
 try:
     from pandas import DataFrame
+
     HAS_PANDAS = True
 except ImportError:
     HAS_PANDAS = False
@@ -36,47 +36,36 @@ if os.getenv("DERIVA_PY_TEST_VERBOSE"):
 def define_domain_schema(model: Model) -> None:
     setup_ml_workflow(model, 'deriva-ml', model.catalog.catalog_id, curie_prefix=SNAME_DOMAIN)
     if model.schemas.get(SNAME_DOMAIN):
-        model.schemas[SNAME_DOMAIN].drop(cascade=True)
+        model.schemas[SNAME_DOMAIN].drop()
     domain_schema = model.create_schema(Schema.define(SNAME_DOMAIN))
 
     domain_schema.tables.get('Subject') or domain_schema.create_table(
-        Table.define(
-        "Subject",
-                column_defs=[Column.define('Name', builtin_types.text)],
-                fkey_defs=[
-                    ForeignKey.define(['RCB'], 'public', 'ERMrest_Client', ['ID']),
-                    ForeignKey.define(['RMB'], 'public', 'ERMrest_Client', ['ID'])
-                ])
-        )
+        Table.define("Subject", column_defs=[Column.define('Name', builtin_types.text)],
+                     fkey_defs=[ForeignKey.define(['RCB'], 'public', 'ERMrest_Client', ['ID']),
+                                ForeignKey.define(['RMB'], 'public', 'ERMrest_Client', ['ID'])]))
 
-    image_table_def = Table.define_asset(
-        sname=SNAME_DOMAIN,
-        tname='Image',
-        hatrac_template='/hatrac/execution_assets/{{MD5}}.{{Filename}}',
-        column_defs=[Column.define("Name", builtin_types.text), Column.define('Subject', builtin_types.text)],
-        fkey_defs=[
-            ForeignKey.define(['RCB'], 'public', 'ERMrest_Client', ['ID']),
-            ForeignKey.define(['RMB'], 'public', 'ERMrest_Client', ['ID']),
-            ForeignKey.define(['Subject'], SNAME_DOMAIN, 'Subject', ['RID'])
-        ],
-    )
+    image_table_def = Table.define_asset(sname=SNAME_DOMAIN, tname='Image',
+                                         hatrac_template='/hatrac/execution_assets/{{MD5}}.{{Filename}}',
+                                         column_defs=[Column.define("Name", builtin_types.text),
+                                                      Column.define('Subject', builtin_types.text)],
+                                         fkey_defs=[ForeignKey.define(['RCB'], 'public', 'ERMrest_Client', ['ID']),
+                                                    ForeignKey.define(['RMB'], 'public', 'ERMrest_Client', ['ID']),
+                                                    ForeignKey.define(['Subject'], SNAME_DOMAIN, 'Subject', ['RID'])], )
     domain_schema.tables.get("Image") or domain_schema.create_table(image_table_def)
 
 
 def populate_test_catalog(model: Model) -> None:
-    catalog = model.catalog
-    pb = catalog.getPathBuilder()
-    domain_schema = pb.schemas[SNAME_DOMAIN]
-
     # Delete any vocabularies and features.
     for trial in range(3):
         for t in [v for v in model.schemas[SNAME_DOMAIN].tables.values() if v.name not in ["Subject", "Image"]]:
             try:
-                t.drop(cascade=True)
+                t.drop()
             except HTTPError:
                 pass
 
     # Empty out remaining tables.
+    pb = model.catalog.getPathBuilder()
+    domain_schema = pb.schemas[SNAME_DOMAIN]
     retry = True
     while retry:
         retry = False
@@ -89,14 +78,9 @@ def populate_test_catalog(model: Model) -> None:
                         retry = True
 
     subject = domain_schema.tables['Subject']
-    image = domain_schema.tables['Image']
-    execution = pb.schemas['deriva-ml'].tables['Execution']
-    s = subject.insert([{'Name': f"Thing{t+1}"} for t in range(5)])
-    images = [{'Name': f"Image{i+1}",
-               'Subject': s['RID'],
-               'URL': f"foo/{s['RID']}",
-               'Length': i,
-               'MD5': i} for i, s in zip(range(5), s)]
+    s = subject.insert([{'Name': f"Thing{t + 1}"} for t in range(5)])
+    images = [{'Name': f"Image{i + 1}", 'Subject': s['RID'], 'URL': f"foo/{s['RID']}", 'Length': i, 'MD5': i} for i, s
+              in zip(range(5), s)]
     domain_schema.tables['Image'].insert(images)
     pb.schemas['deriva-ml'].tables['Execution'].insert([{'Description': f"Execution {i}"} for i in range(5)])
 
@@ -132,7 +116,6 @@ class TestVocabulary(unittest.TestCase):
 
     def setUp(self):
         self.ml_instance = DerivaML(hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1")
-        populate_test_catalog(self.ml_instance)
         self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
         self.model = self.ml_instance.model
 
@@ -140,14 +123,17 @@ class TestVocabulary(unittest.TestCase):
         pass
 
     def test_find_vocabularies(self):
+        populate_test_catalog(self.model)
         self.assertIn("Dataset_Type", [v.name for v in self.ml_instance.find_vocabularies()])
 
     def test_create_vocabulary(self):
+        populate_test_catalog(self.model)
         self.ml_instance.create_vocabulary("CV1", "A vocab")
         self.assertTrue(self.domain_schema.tables["CV1"])
         self.domain_schema.tables["CV1"].drop()
 
     def test_add_term(self):
+        populate_test_catalog(self.model)
         try:
             self.ml_instance.create_vocabulary("CV1", "A vocab")
             self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 0)
@@ -156,9 +142,9 @@ class TestVocabulary(unittest.TestCase):
             self.assertEqual(rid, self.ml_instance.lookup_term("CV1", "T1"))
 
             # Check for redudent terms.
-            self.assertRaises(DerivaMLException, self.ml_instance.add_term, "CV1", "T1", description="A vocab")
-            self.assertEqual(rid, self.ml_instance.add_term("CV1", "T1",
-                                                            description="A vocab", exists_ok=True))
+            self.assertRaises(DerivaMLException, self.ml_instance.add_term, "CV1", "T1", description="A vocab",
+                              exists_ok=False)
+            self.assertEqual(rid, self.ml_instance.add_term("CV1", "T1", description="A vocab"))
         finally:
             self.domain_schema.tables["CV1"].drop()
 
@@ -199,9 +185,8 @@ class TestFeatures(unittest.TestCase):
             self.ml_instance.create_feature("Feature1", "Image")
             image_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables[
                 'Image'].entities().fetch()]
-            execution_rids = [i['RID'] for i in
-                              self.ml_instance.catalog.getPathBuilder().schemas['deriva-ml'].tables[
-                                  'Execution'].entities().fetch()]
+            execution_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas['deriva-ml'].tables[
+                'Execution'].entities().fetch()]
             self.ml_instance.add_features('Image', 'Feature1', image_rids, execution_rids)
             features = self.ml_instance.list_feature("Image", "Feature1")
             self.assertEqual(len(features), len(image_rids))
@@ -214,13 +199,47 @@ class TestFeatures(unittest.TestCase):
             cv = self.ml_instance.create_vocabulary("FeatureTest", "My feature vocab")
             self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
             metadata_rid = self.ml_instance.add_term("FeatureTest", "TestMe", description="A piece of metadata")
-            self.ml_instance.create_feature("Feature1", "Image", metadata={cv})
-            image_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables['Image'].entities().fetch()]
-            execution_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas['deriva-ml'].tables['Execution'].entities().fetch()]
-            self.ml_instance.add_features('Image', 'Feature1', image_rids, execution_rids, [cv] * len(image_rids))
+            self.ml_instance.create_feature("Feature1", "Image", metadata=[cv])
+            image_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables[
+                'Image'].entities().fetch()]
+            execution_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas['deriva-ml'].tables[
+                'Execution'].entities().fetch()]
+
+            self.ml_instance.add_features('Image', 'Feature1', image_rids, execution_rids,
+                                          [{'FeatureTest': metadata_rid}] * len(image_rids))
+            features = self.ml_instance.list_feature("Image", "Feature1")
+            self.assertEqual(len(features), len(image_rids))
         finally:
             self.ml_instance.drop_feature("Feature1", "Image")
-            self.ml_instance.model.schemas[SNAME_DOMAIN].tables['FeatureTest'].drop()
+
+
+class TestExecution(unittest.TestCase):
+    def setUp(self):
+        self.ml_instance = DerivaML(hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1")
+        self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
+        self.model = self.ml_instance.model
+
+    def test_add_execution(self):
+        populate_test_catalog(self.model)
+        self.ml_instance.add_execution("Feature_Name", "Feature1", description="A Feature Name")
+
+    def test_add_workflow(self):
+        populate_test_catalog(self.model)
+        workflow_type = self.ml_instance.add_term("Workflow Type", "Test Flow")
+        self.ml_instance.add_workflow("Test Workflow", "http://foo/bar", "Test Flow")
+
+class TestDataset(unittest.TestCase):
+    def setUp(self):
+        self.ml_instance = DerivaML(hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1")
+        self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
+        self.model = self.ml_instance.model
+
+    def test_create_dataset(self):
+        populate_test_catalog(self.model)
+        self.ml_instance.create_dataset(description="A Dataset")
+
+    def test_add_element(self):
+        pass
 
 
 if __name__ == '__main__':
