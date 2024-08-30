@@ -369,7 +369,7 @@ class DerivaML:
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
                                       self.credential,
                                       session_config=self._get_session_config())
-        self.model = Model.from_catalog(self.catalog)
+        self.model = self.catalog.getCatalogModel()
         self.dataset_table = self.model.schemas[self.ml_schema].tables['Dataset']
         self.configuration = None
 

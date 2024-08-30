@@ -9,7 +9,7 @@ from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, Fore
 from deriva_ml.schema_setup.annotation_temp import generate_annotation
 
 
-def define_table_workflow(schema: str, workflow_annotation: dict):
+def define_table_workflow(schema_name: str, workflow_annotation: dict):
     table_def = Table.define(
         "Workflow",
         column_defs=[
@@ -24,31 +24,34 @@ def define_table_workflow(schema: str, workflow_annotation: dict):
             ForeignKey.define(["RCB"], "public", "ERMrest_Client", ["ID"]),
             ForeignKey.define(["RMB"], "public", "ERMrest_Client", ["ID"]),
             ForeignKey.define(["Workflow_Type"],
-                              schema, "Workflow_Type", ["ID"],
-                                on_update='CASCADE')
+                              schema_name, "Workflow_Type", ["Name"], on_update='CASCADE')
         ],
         annotations=workflow_annotation,
     )
     return table_def
 
 
-def define_table_dataset(dataset_annotation: dict = None):
+def define_table_dataset(schema_name, dataset_annotation: dict = None):
     table_def = Table.define(
         tname="Dataset",
-        column_defs=[Column.define("Description", builtin_types.text)],
+        column_defs=[
+            Column.define("Description", builtin_types.text),
+            Column.define("Dataset_Type", builtin_types.text)],
         fkey_defs=[
             ForeignKey.define(["RCB"], "public", "ERMrest_Client", ["ID"]),
             ForeignKey.define(["RMB"], "public", "ERMrest_Client", ["ID"]),
+            ForeignKey.define(["Dataset_Type"], schema_name, "Dataset_Type", ["Name"])
         ],
         annotations=dataset_annotation if dataset_annotation is not None else {},
     )
     return table_def
 
 
-def define_table_execution(execution_annotation: dict):
+def define_table_execution(sname: str, execution_annotation: dict):
     table_def = Table.define(
         "Execution",
         column_defs=[
+            Column.define("Workflow", builtin_types.text),
             Column.define("Description", builtin_types.markdown),
             Column.define("Duration", builtin_types.text),
             Column.define("Status", builtin_types.text),
@@ -57,34 +60,42 @@ def define_table_execution(execution_annotation: dict):
         fkey_defs=[
             ForeignKey.define(["RCB"], "public", "ERMrest_Client", ["ID"]),
             ForeignKey.define(["RMB"], "public", "ERMrest_Client", ["ID"]),
+            ForeignKey.define(["Workflow"], sname, "Workflow", ["RID"]),
         ],
         annotations=execution_annotation,
     )
     return table_def
 
 
-def define_asset_execution_metadata(schema: str, execution_metadata_annotation: dict):
+def define_asset_execution_metadata(sname: str, execution_metadata_annotation: dict):
     table_def = Table.define_asset(
-        sname=schema,
+        sname=sname,
         tname="Execution_Metadata",
+        column_defs=[Column.define("Execution", builtin_types.markdown),
+                     Column.define("Execution_Metadata_Type", builtin_types.markdown)],
         hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
         fkey_defs=[
             ForeignKey.define(["RCB"], "public", "ERMrest_Client", ["ID"]),
             ForeignKey.define(["RMB"], "public", "ERMrest_Client", ["ID"]),
+            ForeignKey.define(["Execution"], sname, "Execution", ["RID"]),
+            ForeignKey.define(["Execution_Metadata_Type"], sname, "Execution_Metadata_Type", ["Name"])
         ],
         annotations=execution_metadata_annotation,
     )
     return table_def
 
 
-def define_asset_execution_assets(schema: str, execution_assets_annotation: dict):
+def define_asset_execution_assets(sname: str, execution_assets_annotation: dict):
     table_def = Table.define_asset(
-        sname=schema,
+        sname=sname,
         tname="Execution_Assets",
         hatrac_template="/hatrac/execution_assets/{{MD5}}.{{Filename}}",
+        column_defs=[Column.define("Execution_Asset_Type", builtin_types.text)],
         fkey_defs=[
             ForeignKey.define(["RCB"], "public", "ERMrest_Client", ["ID"]),
             ForeignKey.define(["RMB"], "public", "ERMrest_Client", ["ID"]),
+            ForeignKey.define(["Execution_Asset_Type"], sname, "Execution_Asset_Type", ["Name"])
+
         ],
         annotations=execution_assets_annotation,
     )
@@ -97,86 +108,30 @@ def setup_ml_workflow(model: Model, schema_name: str, catalog_id, curie_prefix):
         model.schemas[schema_name].drop(cascade=True)
     schema = model.create_schema(Schema.define(schema_name))
 
-    curie_template = curie_prefix + ":{RID}"
+    def create_vocabulary(name):
+        curie_template = curie_prefix + ":{RID}"
+        schema.create_table(Table.define_vocabulary(
+            tname=name, curie_template=curie_template, key_defs=[Key.define(["Name"])]))
 
     # get annotations
     annotations = generate_annotation(catalog_id, schema_name)
     # Workflow
-    table_def_workflow_type_vocab = Table.define_vocabulary(
-        tname="Workflow_Type",
-        curie_template=curie_template,
-        key_defs=[Key.define(["Name"])],
-    )
+    for t in ["Dataset_Type", "Workflow_Type", "Execution_Metadata_Type", "Feature_Name", "Execution_Asset_Type"]:
+        create_vocabulary(t)
 
-    workflow_type_table = schema.tables.get("Workflow_Type") or schema.create_table(table_def_workflow_type_vocab)
-    workflow_table = schema.create_table(
-        define_table_workflow(annotations["workflow_annotation"])
-    )
-    workflow_table.add_reference(workflow_type_table)
-
-    # Execution
-    execution_table = schema.create_table(
-        define_table_execution(annotations["execution_annotation"])
-    )
-    execution_table.add_reference(workflow_table)
-
-    # Dataset
-    dataset_table = schema.create_table(
-        define_table_dataset(annotations.get("dataset_annotation"))
-    )
-    association_dataset_execution = schema.create_association(
-        dataset_table, execution_table
-    )
-    table_def_dataset_type_vocab = Table.define_vocabulary(
-        tname="Dataset_Type",
-        curie_template=curie_template,
-        key_defs=[Key.define(["Name"])],
-    )
-    dataset_type_table = schema.create_table(table_def_dataset_type_vocab)
-    dataset_table.add_reference(dataset_type_table)
+    schema.create_table(define_table_workflow(schema_name, annotations["workflow_annotation"]))
+    execution_table = schema.create_table(define_table_execution(schema_name, annotations["execution_annotation"]))
+    dataset_table = schema.create_table(define_table_dataset(schema_name, annotations.get("dataset_annotation")))
+    schema.create_table(Table.define_association(associates=[dataset_table, execution_table]))
 
     # Execution Metadata
-    execution_metadata_table = schema.create_table(
-        define_asset_execution_metadata(
-            schema.name, annotations["execution_metadata_annotation"]
-        )
-    )
-    execution_metadata_table.add_reference(execution_table)
-    table_def_metadata_type_vocab = Table.define_vocabulary(
-        tname="Execution_Metadata_Type",
-        curie_template=curie_template,
-        key_defs=[Key.define(["Name"])],
-    )
-    metadata_type_table = schema.create_table(table_def_metadata_type_vocab)
-    execution_metadata_table.add_reference(metadata_type_table)
+    schema.create_table(define_asset_execution_metadata(schema.name, annotations["execution_metadata_annotation"]))
 
     # Execution Asset
     execution_assets_table = schema.create_table(
-        define_asset_execution_assets(
-            schema.name, annotations["execution_assets_annotation"]
-        )
+        define_asset_execution_assets(schema.name, annotations["execution_assets_annotation"])
     )
-    association_execution_execution_asset = schema.create_association(
-        execution_assets_table, execution_table
-    )
-
-    table_def_execution_product_type_vocab = Table.define_vocabulary(
-        tname="Execution_Asset_Type",
-        curie_template=curie_template,
-        key_defs=[Key.define(["Name"])],
-    )
-    execution_asset_type_table = schema.create_table(
-        table_def_execution_product_type_vocab
-    )
-    execution_assets_table.add_reference(execution_asset_type_table)
-
-    # Feature Name
-    table_def_feature_name_vocab = Table.define_vocabulary(
-        tname="Feature_Name",
-        curie_template=curie_template,
-        key_defs=[Key.define(["Name"])],
-    )
-    feature_name_vocab_table = schema.create_table(table_def_feature_name_vocab)
+    schema.create_table(Table.define_association([execution_assets_table, execution_table]))
 
 
 def main():

@@ -11,8 +11,8 @@ import unittest
 from requests import HTTPError
 
 #from deriva.chisel import Model, Schema, Table, Column, ForeignKey, builtin_types
-from deriva.core import DerivaServer, ErmrestCatalog, get_credential, ermrest_model as _em
-from deriva.core.ermrest_model import Model, Schema, Table, Column
+from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, builtin_types
 from deriva.core.datapath import DataPathException
 
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException
@@ -40,7 +40,7 @@ def define_domain_schema(model: Model) -> None:
     domain_schema = model.create_schema(Schema.define(SNAME_DOMAIN))
 
     domain_schema.tables.get('Subject') or domain_schema.create_table(
-        _em.Table.define(
+        Table.define(
         "Subject",
                 column_defs=[Column.define('Name', builtin_types.text)],
                 fkey_defs=[
@@ -103,6 +103,7 @@ def populate_test_catalog(model: Model) -> None:
 
 test_catalog: ErmrestCatalog = None
 
+
 def setUpModule():
     global test_catalog
     logger.debug("setUpModule begin")
@@ -119,10 +120,12 @@ def setUpModule():
         raise
     logger.debug("setUpModule  done")
 
+
 def tearDownModule():
     logger.debug("tearDownModule begin")
     test_catalog.delete_ermrest_catalog(really=True)
     logger.debug("tearDownModule done")
+
 
 @unittest.skipUnless(hostname, "Test host not specified")
 class TestVocabulary(unittest.TestCase):
