@@ -4,6 +4,7 @@
 #  DERIVA_PY_TEST_HOSTNAME: hostname of the test server
 #  DERIVA_PY_TEST_CREDENTIAL: user credential, if none, it will attempt to get credentail for given hostname
 #  DERIVA_PY_TEST_VERBOSE: set for verbose logging output to stdout
+import json
 import logging
 import os
 import sys
@@ -14,7 +15,7 @@ from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, builtin_types
 from requests import HTTPError
 
-from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID
+from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID, DerivaMlExec
 from deriva_ml.schema_setup.create_schema import setup_ml_workflow, initialize_ml_schema
 
 try:
@@ -226,6 +227,25 @@ class TestExecution(unittest.TestCase):
         config_file="tests/testfile.json"
         self.ml_instance.upload_execution_configuration(config_file, description="A test case")
 
+    def test_execution_manager(self):
+        with DerivaMlExec(catalog_ml=self.countTestCases(), execution_rid='FOO') as e:
+            pass
+
+    def test_execution(self):
+        populate_test_catalog(self.model)
+        with open("ExecutionAsset/2-5M16_Test_input.json", 'r') as file:
+            metadata = json.load(file)
+        metadata_records = self.ml_instance.Execution_start(metadata)
+        metadata_records
+        model = EA.download_Execution_Asset(Asset_RID="2-5M24", Execution_RID=metadata_records["Execution"],
+                                            dest_dir="download/")
+        EA.upload_Execution_Asset(file_path="/Users/zhiweili/Desktop/eye_ai/Github/eye-ai-tools/src/ExecutionAsset",
+                                  outputf_path="output.json", Execution_RID=metadata_records["Execution"])
+        # EA.Execution_end(metadata_records["Execution"])
+        EA.Execution_end(Execution_RID=metadata_records["Execution"],
+                         file_path="/Users/zhiweili/Desktop/eye_ai/Github/eye-ai-tools/src/ExecutionAsset")
+
+
     def test_update_status(self):
         populate_test_catalog(self.model)
         self.ml_instance.update_status()
@@ -258,11 +278,11 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(len(self.ml_instance.find_datasets()), 1)
         return dataset_rid
 
-    def test_insert_dataset(self):
+    def test_add_dataset_elements(self):
         dataset_rid = self.test_create_dataset()
         subject_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables[
             'Subject'].entities().fetch()]
-        self.ml_instance.insert_dataset_elements(dataset_rid=dataset_rid, members=subject_rids)
+        self.ml_instance.add_dataset_elements(dataset_rid=dataset_rid, members=subject_rids)
         self.assertEqual(len(self.ml_instance.list_dataset_members(dataset_rid)["Subject"]), len(subject_rids))
 
 

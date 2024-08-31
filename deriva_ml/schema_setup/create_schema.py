@@ -138,10 +138,9 @@ def setup_ml_workflow(model: Model, schema_name: str):
 def initialize_ml_schema(model: Model, schema_name: str):
     catalog = model.catalog
     execution_metadata_type = catalog.getPathBuilder().schemas[schema_name].tables['Execution_Metadata_Type']
-    r = execution_metadata_type.insert([{'Name': 'Execution Config',
+    execution_metadata_type.insert([{'Name': 'Execution Config',
                                      'Description': "Configuration File for execution metadata"}],
                                    defaults={'ID', 'URI'})
-    print(list(r))
 
 def main():
     scheme = "https"

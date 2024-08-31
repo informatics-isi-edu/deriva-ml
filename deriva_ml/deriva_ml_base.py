@@ -214,60 +214,6 @@ class Status(Enum):
     failed = "Failed"
 
 
-class DerivaMlExec:
-    """
-    Context manager for managing DerivaML execution.
-
-    Args:
-    - catalog_ml: Instance of DerivaML class.
-    - execution_rid (str): Execution resource identifier.
-
-    """
-
-    def __init__(self, catalog_ml, execution_rid: str):
-        self.execution_rid = execution_rid
-        self.catalog_ml = catalog_ml
-        self.catalog_ml.start_time = datetime.now()
-        self.uploaded_assets = None
-
-    def __enter__(self):
-        """
-        Method invoked when entering the context.
-
-        Returns:
-        - self: The instance itself.
-
-        """
-        self.catalog_ml.update_status(Status.running,
-                                      "Start ML algorithm.",
-                                      self.execution_rid)
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        """
-         Method invoked when exiting the context.
-
-         Args:
-         - exc_type: Exception type.
-         - exc_value: Exception value.
-         - exc_tb: Exception traceback.
-
-         Returns:
-         - bool: True if execution completed successfully, False otherwise.
-
-         """
-        if not exc_type:
-            self.catalog_ml.update_status(Status.running,
-                                          "Successfully run Ml.",
-                                          self.execution_rid)
-            self.catalog_ml.execution_end(self.execution_rid)
-        else:
-            self.catalog_ml.update_status(Status.failed,
-                                          f"Exception type: {exc_type}, Exception value: {exc_value}",
-                                          self.execution_rid)
-            logging.error(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
-            return False
-
 
 class Term(BaseModel):
     """
@@ -661,8 +607,8 @@ class DerivaML:
             rid_list.setdefault(element_table, []).extend([e[element_column.name] for e in assoc_rids])
         return rid_list
 
-    def insert_dataset_elements(self, dataset_rid: Optional[RID], members: list[RID],
-                       validate: bool = True) -> RID:
+    def add_dataset_elements(self, dataset_rid: Optional[RID], members: list[RID],
+                             validate: bool = True) -> RID:
         """
         Add additional elements to an existing dataset.
         :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
@@ -1301,7 +1247,7 @@ class DerivaML:
         self.update_status(Status.running, "Initialize status finished.", execution_rid)
         return configuration_records
 
-    def execution(self, execution_rid: RID) -> DerivaMlExec:
+    def execution(self, execution_rid: RID) -> "DerivaMlExec":
         """
         Start the execution by initializing the context manager DerivaMlExec.
 
@@ -1347,3 +1293,59 @@ class DerivaML:
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
+
+class DerivaMlExec:
+    """
+    Context manager for managing DerivaML execution.
+
+    Args:
+    - catalog_ml: Instance of DerivaML class.
+    - execution_rid (str): Execution resource identifier.
+
+    """
+
+    def __init__(self, catalog_ml: DerivaML, execution_rid: RID):
+        self.execution_rid = execution_rid
+        self.catalog_ml = catalog_ml
+        self.catalog_ml.start_time = datetime.now()
+        self.uploaded_assets = None
+
+    def __enter__(self):
+        """
+        Method invoked when entering the context.
+
+        Returns:
+        - self: The instance itself.
+
+        """
+        self.catalog_ml.update_status(Status.running,
+                                      "Start ML algorithm.",
+                                      self.execution_rid)
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        """
+         Method invoked when exiting the context.
+
+         Args:
+         - exc_type: Exception type.
+         - exc_value: Exception value.
+         - exc_tb: Exception traceback.
+
+         Returns:
+         - bool: True if execution completed successfully, False otherwise.
+
+         """
+        if not exc_type:
+            self.catalog_ml.update_status(Status.running,
+                                          "Successfully run Ml.",
+                                          self.execution_rid)
+            self.catalog_ml.execution_end(self.execution_rid)
+        else:
+            self.catalog_ml.update_status(Status.failed,
+                                          f"Exception type: {exc_type}, Exception value: {exc_value}",
+                                          self.execution_rid)
+            logging.error(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
+            return False
+
+
