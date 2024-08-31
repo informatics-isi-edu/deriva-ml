@@ -142,6 +142,7 @@ def initialize_ml_schema(model: Model, schema_name: str):
                                      'Description': "Configuration File for execution metadata"}],
                                    defaults={'ID', 'URI'})
 
+
 def main():
     scheme = "https"
     parser = argparse.ArgumentParser()

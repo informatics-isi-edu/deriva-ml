@@ -214,7 +214,6 @@ class Status(Enum):
     failed = "Failed"
 
 
-
 class Term(BaseModel):
     """
     Data model representing a controlled vocabulary term.
@@ -245,8 +244,8 @@ class ConfigurationRecord(BaseModel):
     caching_dir: Path
     working_dir: Path
     vocabs: dict[str, list[Term]]
-    execution_rid: str
-    workflow_rid: str
+    execution_rid: RID
+    workflow_rid: RID
     bag_paths: list[Path]
     assets_paths: list[Path]
     configuration_path: Path
@@ -266,9 +265,9 @@ class DerivaML:
                  hostname: str,
                  catalog_id: str,
                  domain_schema: str,
-                 cache_dir: str,
-                 working_dir: str,
-                 model_version: str,
+                 cache_dir: Optional[str] = None,
+                 working_dir: Optional[str] = None,
+                 model_version: str = "1",
                  ml_schema='deriva-ml'):
         """
 
@@ -763,9 +762,8 @@ class DerivaML:
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
         schema_path = self.catalog.getPathBuilder().schemas[schema_name]
         for term in schema_path.tables[table_name].entities():
-            term_upper = {key.upper(): value for key, value in term.items()}
-            if term_name == term_upper['NAME'] or (term_upper['SYNONYMS'] and term_name in term_upper['SYNONYMS']):
-                return term['RID']
+            if term_name == term['Name'] or (term['Synonyms'] and term_name in term['Synonyms']):
+                return term['Name']
 
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
 
@@ -1019,7 +1017,7 @@ class DerivaML:
         self.update_status(Status.running, f"Successfully download {table_name}...", execution_rid)
         return Path(file_path)
 
-    def upload_execution_configuration(self, config_file: str, description: str):
+    def upload_execution_configuration(self, config_file: str, description: str) -> RID:
         """
         Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
 
@@ -1050,13 +1048,13 @@ class DerivaML:
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
             ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
-            ml_schema_path.tables["Execution_Metadata"].insert(
+            return list(ml_schema_path.tables["Execution_Metadata"].insert(
                 [{"URL": hatrac_uri,
                   "Filename": file_name,
                   "Length": file_size,
                   "MD5": md5,
                   "Description": description,
-                  "Execution_Metadata_Type": "Execution Config"}])
+                  "Execution_Metadata_Type": "Execution Config"}]))[0]['RID']
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(
@@ -1192,6 +1190,7 @@ class DerivaML:
         self.update_status(Status.running, "Inserting tags... ", execution_rid)
         vocabs = {}
         for term in configuration.get("workflow_terms"):
+            print(f"adding term {term}")
             term_rid = self.add_term(table=term["term"],
                                      term_name=term["name"],
                                      description=term["description"],
@@ -1294,6 +1293,7 @@ class DerivaML:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
 
+
 class DerivaMlExec:
     """
     Context manager for managing DerivaML execution.
@@ -1347,5 +1347,3 @@ class DerivaMlExec:
                                           self.execution_rid)
             logging.error(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
             return False
-
-

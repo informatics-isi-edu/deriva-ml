@@ -4,7 +4,6 @@
 #  DERIVA_PY_TEST_HOSTNAME: hostname of the test server
 #  DERIVA_PY_TEST_CREDENTIAL: user credential, if none, it will attempt to get credentail for given hostname
 #  DERIVA_PY_TEST_VERBOSE: set for verbose logging output to stdout
-import json
 import logging
 import os
 import sys
@@ -14,8 +13,9 @@ from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, builtin_types
 from requests import HTTPError
+from typing import Optional
 
-from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID, DerivaMlExec
+from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID
 from deriva_ml.schema_setup.create_schema import setup_ml_workflow, initialize_ml_schema
 
 try:
@@ -78,7 +78,7 @@ def populate_test_catalog(model: Model) -> None:
                     except DataPathException:  # FK constraint.
                         retry = True
 
-    initialize_ml_schema(model,'deriva-ml')
+    initialize_ml_schema(model, 'deriva-ml')
 
     subject = domain_schema.tables['Subject']
     s = subject.insert([{'Name': f"Thing{t + 1}"} for t in range(5)])
@@ -88,7 +88,7 @@ def populate_test_catalog(model: Model) -> None:
     pb.schemas['deriva-ml'].tables['Execution'].insert([{'Description': f"Execution {i}"} for i in range(5)])
 
 
-test_catalog: ErmrestCatalog = None
+test_catalog: Optional[ErmrestCatalog] = None
 
 
 def setUpModule():
@@ -155,7 +155,7 @@ class TestVocabulary(unittest.TestCase):
 @unittest.skipUnless(hostname, "Test host not specified")
 class TestFeatures(unittest.TestCase):
     def setUp(self):
-        self.ml_instance = DerivaML(hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1")
+        self.ml_instance = DerivaML(hostname, test_catalog.catalog_id, SNAME_DOMAIN, "", "", "1")
         self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
         self.model = self.ml_instance.model
 
@@ -221,43 +221,24 @@ class TestExecution(unittest.TestCase):
         self.ml_instance = DerivaML(hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1")
         self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
         self.model = self.ml_instance.model
+        self.files = os.path.dirname(__file__) + '/files'
+
 
     def test_upload_configuration(self):
         populate_test_catalog(self.model)
-        config_file="tests/testfile.json"
-        self.ml_instance.upload_execution_configuration(config_file, description="A test case")
+        config_file = "files/testfile.json"
+        return self.ml_instance.upload_execution_configuration(config_file, description="A test case")
 
-    def test_execution_manager(self):
-        with DerivaMlExec(catalog_ml=self.countTestCases(), execution_rid='FOO') as e:
+    def test_execution_1(self):
+        populate_test_catalog(self.model)
+        config_file = self.files + "/test-workflow-1.json"
+        self.ml_instance.create_vocabulary("Workflow Term")
+        self.ml_instance.add_term("Workflow Term", "Workflow1", description="A test workflow")
+        configuration_rid = self.ml_instance.upload_execution_configuration(config_file, description="A test case")
+        configuration_records = self.ml_instance.execution_init(configuration_rid=configuration_rid)
+        with self.ml_instance.execution(execution_rid=configuration_records.execution_rid) as exec:
             pass
 
-    def test_execution(self):
-        populate_test_catalog(self.model)
-        with open("ExecutionAsset/2-5M16_Test_input.json", 'r') as file:
-            metadata = json.load(file)
-        metadata_records = self.ml_instance.Execution_start(metadata)
-        metadata_records
-        model = EA.download_Execution_Asset(Asset_RID="2-5M24", Execution_RID=metadata_records["Execution"],
-                                            dest_dir="download/")
-        EA.upload_Execution_Asset(file_path="/Users/zhiweili/Desktop/eye_ai/Github/eye-ai-tools/src/ExecutionAsset",
-                                  outputf_path="output.json", Execution_RID=metadata_records["Execution"])
-        # EA.Execution_end(metadata_records["Execution"])
-        EA.Execution_end(Execution_RID=metadata_records["Execution"],
-                         file_path="/Users/zhiweili/Desktop/eye_ai/Github/eye-ai-tools/src/ExecutionAsset")
-
-
-    def test_update_status(self):
-        populate_test_catalog(self.model)
-        self.ml_instance.update_status()
-
-    def test_add_execution(self):
-        populate_test_catalog(self.model)
-        self.ml_instance.add_execution("Feature_Name", "Feature1", description="A Feature Name")
-
-    def test_add_workflow(self):
-        populate_test_catalog(self.model)
-        workflow_type = self.ml_instance.add_term("Workflow_Type", "Test Flow", description="A test")
-        self.ml_instance.add_workflow("Test Workflow", "file:testworkflow", "Test Flow")
 
 class TestDataset(unittest.TestCase):
     def setUp(self):

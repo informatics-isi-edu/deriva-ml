@@ -7,7 +7,7 @@ class Workflow(BaseModel):
     name: str
     url: str
     workflow_type: str
-    version: Optional[str]
+    version: Optional[str] = None
     description: str
 
 
@@ -18,7 +18,6 @@ class Execution(BaseModel):
 class Term(str, Enum):
     annotation = "Annotation_Type"
     workflow = "Workflow_Type"
-    diagnosis = "Diagnosis_Tag"
     execution_asset_type = "Execution_Asset_Type"
     execution_metadata_type = "Execution_Metadata_Type"
 
@@ -30,8 +29,8 @@ class WorkflowTerm(BaseModel):
 
 
 class ExecutionConfiguration(BaseModel):
-    bdbag_url: List[str]
-    models: List[str]
+    bdbag_url: list[str]
+    models: list[str]
     workflow: Workflow
     execution: Execution
-    workflow_terms: List[WorkflowTerm]
+    workflow_terms: list[WorkflowTerm]
