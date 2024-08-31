@@ -1104,14 +1104,13 @@ class DerivaML:
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
             ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
-            execution_metadata_type_rid = self.lookup_term("Execution_Metadata_Type", "Execution Config")
             ml_schema_path.tables["Execution_Metadata"].insert(
                 [{"URL": hatrac_uri,
                   "Filename": file_name,
                   "Length": file_size,
                   "MD5": md5,
                   "Description": description,
-                  "Execution_Metadata_Type": execution_metadata_type_rid}])
+                  "Execution_Metadata_Type": "Execution Config"}])
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(

@@ -226,6 +226,10 @@ class TestExecution(unittest.TestCase):
         config_file="tests/testfile.json"
         self.ml_instance.upload_execution_configuration(config_file, description="A test case")
 
+    def test_update_status(self):
+        populate_test_catalog(self.model)
+        self.ml_instance.update_status()
+
     def test_add_execution(self):
         populate_test_catalog(self.model)
         self.ml_instance.add_execution("Feature_Name", "Feature1", description="A Feature Name")
