@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from deriva.core.ermrest_model import Model,  Key
-from deriva.core import DerivaServer, get_credential
+from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
 
 from deriva_ml.schema_setup.annotation_temp import generate_annotation
@@ -101,19 +101,19 @@ def define_asset_execution_assets(sname: str, execution_assets_annotation: dict)
     return table_def
 
 
-def setup_ml_workflow(model: Model, schema_name: str, catalog_id, curie_prefix):
+def setup_ml_workflow(model: Model, schema_name: str):
+    ml_catalog: ErmrestCatalog = model.catalog
 
     if model.schemas.get(schema_name):
         model.schemas[schema_name].drop(cascade=True)
     schema = model.create_schema(Schema.define(schema_name))
 
     def create_vocabulary(name):
-        curie_template = curie_prefix + ":{RID}"
-        schema.create_table(Table.define_vocabulary(
-            tname=name, curie_template=curie_template, key_defs=[Key.define(["Name"])]))
+        schema.create_table(Table.define_vocabulary(name, f'{schema_name}:{{RID}}',
+                                    key_defs=[Key.define(["Name"])]))
 
     # get annotations
-    annotations = generate_annotation(catalog_id, schema_name)
+    annotations = generate_annotation(ml_catalog.catalog_id, schema_name)
     # Workflow
     for t in ["Dataset_Type", "Workflow_Type", "Execution_Metadata_Type", "Feature_Name", "Execution_Asset_Type"]:
         create_vocabulary(t)
@@ -132,6 +132,15 @@ def setup_ml_workflow(model: Model, schema_name: str, catalog_id, curie_prefix):
     )
     schema.create_table(Table.define_association([execution_assets_table, execution_table]))
 
+    initialize_ml_schema(model, schema_name)
+
+
+def initialize_ml_schema(model: Model, schema_name: str):
+    catalog = model.catalog
+    execution_metadata_type = catalog.getPathBuilder().schemas[schema_name].tables['Execution_Metadata_Type']
+    execution_metadata_type.insert([{'Name': 'Execution Config',
+                                     'Description': "Configuration File for execution metadata"}],
+                                   defaults={'ID', 'URI'})
 
 def main():
     scheme = "https"
@@ -144,7 +153,7 @@ def main():
     credentials = get_credential(args.hostname)
     server = DerivaServer(scheme, args.hostname, credentials)
     model = server.connect_ermrest(args.catalog_id).getCatalogModel()
-    setup_ml_workflow(model, args.schema_name, args.catalog_id, args.curie_prefix)
+    setup_ml_workflow(model, args.schema_name)
 
 
 if __name__ == "__main__":

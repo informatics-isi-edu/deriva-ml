@@ -15,7 +15,7 @@ from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, 
 from requests import HTTPError
 
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID
-from deriva_ml.schema_setup.create_schema import setup_ml_workflow
+from deriva_ml.schema_setup.create_schema import setup_ml_workflow, initialize_ml_schema
 
 try:
     from pandas import DataFrame
@@ -34,7 +34,7 @@ if os.getenv("DERIVA_PY_TEST_VERBOSE"):
 
 
 def define_domain_schema(model: Model) -> None:
-    setup_ml_workflow(model, 'deriva-ml', model.catalog.catalog_id, curie_prefix=SNAME_DOMAIN)
+    setup_ml_workflow(model, 'deriva-ml')
     if model.schemas.get(SNAME_DOMAIN):
         model.schemas[SNAME_DOMAIN].drop()
     domain_schema = model.create_schema(Schema.define(SNAME_DOMAIN))
@@ -76,6 +76,8 @@ def populate_test_catalog(model: Model) -> None:
                         t.filter(t.RID == e['RID']).delete()
                     except DataPathException:  # FK constraint.
                         retry = True
+
+    initialize_ml_schema(model,'deriva-ml')
 
     subject = domain_schema.tables['Subject']
     s = subject.insert([{'Name': f"Thing{t + 1}"} for t in range(5)])
@@ -218,6 +220,11 @@ class TestExecution(unittest.TestCase):
         self.ml_instance = DerivaML(hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1")
         self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
         self.model = self.ml_instance.model
+
+    def test_upload_configuration(self):
+        populate_test_catalog(self.model)
+        config_file="tests/testfile.json"
+        self.ml_instance.upload_execution_configuration(config_file, description="A test case")
 
     def test_add_execution(self):
         populate_test_catalog(self.model)

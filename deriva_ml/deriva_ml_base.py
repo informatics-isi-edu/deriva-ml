@@ -575,7 +575,6 @@ class DerivaML:
         :param feature_name:
         :return:
         """
-        feature_name_rid = self.lookup_term("Feature_Name", feature_name)
         feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
@@ -635,7 +634,6 @@ class DerivaML:
         return self.model.schemas[self.domain_schema].create_table(
             Table.define_association([self.dataset_table, element_table]))
 
-
     def list_dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
         """
         Return a list of RIDs associated with a specific dataset.
@@ -685,7 +683,7 @@ class DerivaML:
         # Now go through every rid to be added to the data set and sort them based on what association table entries
         # need to be made.
         dataset_elements = {}
-        association_map = {a.other_fkeys.pop().pk_table.name:a.table.name for a in
+        association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in
                            self.dataset_table.find_associations()}
         # Get a list of all of the types of objects that can be linked to a dataset.
         for m in members:
@@ -698,9 +696,8 @@ class DerivaML:
         for table, elements in dataset_elements.items():
             if len(elements):
                 # Find out the name of the column in the association table.
-                r = schema_path.tables[association_map[table]].insert([
-                    {'Dataset': dataset_rid, table: e} for e in elements])
-                len(r)
+                schema_path.tables[association_map[table]].insert(
+                    [{'Dataset': dataset_rid, table: e} for e in elements])
         return dataset_rid
 
     def add_execution(self, workflow_rid: str = "", datasets: List[str] = None,
@@ -1076,7 +1073,7 @@ class DerivaML:
         self.update_status(Status.running, f"Successfully download {table_name}...", execution_rid)
         return Path(file_path)
 
-    def upload_execution_configuration(self, config_file: str, desc: str):
+    def upload_execution_configuration(self, config_file: str, description: str):
         """
         Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
 
@@ -1107,14 +1104,13 @@ class DerivaML:
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
             ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
-            execution_metadata_type_rid = self.lookup_term(ml_schema_path.Execution_Metadata_Type,
-                                                           "Execution Config")
+            execution_metadata_type_rid = self.lookup_term("Execution_Metadata_Type", "Execution Config")
             ml_schema_path.tables["Execution_Metadata"].insert(
                 [{"URL": hatrac_uri,
                   "Filename": file_name,
                   "Length": file_size,
                   "MD5": md5,
-                  "Description": desc,
+                  "Description": description,
                   "Execution_Metadata_Type": execution_metadata_type_rid}])
         except Exception as e:
             error = format_exception(e)
