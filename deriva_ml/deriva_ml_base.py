@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from itertools import repeat
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import List, Optional, Any, NewType, Iterable
 
 import pandas as pd
@@ -26,7 +26,7 @@ from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_ty
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from pydantic import BaseModel, ValidationError, model_serializer
+from pydantic import BaseModel, ValidationError, model_serializer, Field
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
 RID = NewType("RID", str)
@@ -167,6 +167,14 @@ class TableDefinition(BaseModel):
             acls=self.acls,
             acl_bindings=self.acl_bindings,
             annotations=self.annotations)
+
+
+class VocabularyTerm(BaseModel):
+    name: str = Field(alias='Name')
+    synonyms: list[str] = Field(alias='Synonyms')
+    id: str = Field(alias="ID")
+    uri: str = Field(alias="URI")
+    description: str = Field(alias="Description")
 
 
 class FindFeatureResult(FindAssociationResult):
@@ -404,7 +412,7 @@ class DerivaML:
                 'Description': description,
                 'Checksum': self._get_checksum(url),
                 'Version': version,
-                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type)}
+                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type)['Name']}
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
 
         return workflow_rid
@@ -468,7 +476,7 @@ class DerivaML:
                      table: str,
                      feature_name: str,
                      object_rids: Iterable[RID],
-                     execution_rids: Iterable[RID],
+                     execution_rids: RID,
                      metadata: list[dict[str, Any]] = None) -> int:
         """
         Add an attribute to the specified object.
@@ -482,7 +490,7 @@ class DerivaML:
         """
 
         table = self._get_table(table)
-        feature_name_rid = self.lookup_term("Feature_Name", feature_name)
+        feature_name_id = self.lookup_term("Feature_Name", feature_name)['Name']
         feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
         object_table = feature.self_fkey.pk_table.name
         skip_columns = {"RID", "RCB", "RMB", "RCT", "RMT", "Execution", "Feature_Name", table.name}
@@ -499,7 +507,7 @@ class DerivaML:
             if not set(meta.keys()) >= required_metadata:
                 raise DerivaMLException(f"Missing non-null column: {required_metadata}")
 
-            return {object_table: object_rid, 'Execution': exe_rid, 'Feature_Name': feature_name_rid} | meta
+            return {object_table: object_rid, 'Execution': exe_rid, 'Feature_Name': feature_name_id} | meta
 
         try:
             entries = list(object_rids)
@@ -699,7 +707,7 @@ class DerivaML:
                  term_name: str,
                  description: str,
                  synonyms: Optional[List[str]] = None,
-                 exists_ok: bool = True) -> RID:
+                 exists_ok: bool = True) -> VocabularyTerm:
         """
         Creates a new control vocabulary term in the control vocabulary table.
 
@@ -724,23 +732,19 @@ class DerivaML:
 
         schema_name = table.schema.name
         table_name = table.name
-
         try:
-            col_map = {col.upper(): col for col in pb.schemas[schema_name].tables[table_name].columns.keys()}
-            term_rid = pb.schemas[schema_name].tables[table_name].insert(
-                [{col_map['NAME']: term_name, col_map['DESCRIPTION']: description, col_map['SYNONYMS']: synonyms}],
-                defaults={col_map['ID'], col_map['URI']})[0]['RID']
-        except DataPathException as e:
-            if "already exists" in str(e):
-                term_rid = self.lookup_term(table, term_name)
-                if not exists_ok:
-                    raise DerivaMLException(f"{term_name} existed with RID {term_rid}")
-            else:
-                raise e
+            term_id = VocabularyTerm.model_validate(
+                pb.schemas[schema_name].tables[table_name].insert(
+                    [{'Name': term_name, 'Description': description, 'Synonyms': synonyms}],
+                    defaults={'ID', 'URI'})[0])
+        except (DataPathException) as e:
+            term_id = self.lookup_term(table, term_name)
+            if not exists_ok:
+                raise DerivaMLException(f"{term_name} already exists")
             # Check vocabulary
-        return term_rid
+        return term_id
 
-    def lookup_term(self, table: str | Table, term_name: str) -> str:
+    def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
         """
         Given a term name, return the RID of the associated term (or synonym).
 
@@ -749,7 +753,7 @@ class DerivaML:
         - term_name (str): The name of the term to look up.
 
         Returns:
-        - str: The RID of the associated term or synonym.
+        - str: The entryof the associated term or synonym.
 
         Raises:
         - EyeAIException: If the schema or vocabulary table doesn't exist, or if the term is not
@@ -763,8 +767,7 @@ class DerivaML:
         schema_path = self.catalog.getPathBuilder().schemas[schema_name]
         for term in schema_path.tables[table_name].entities():
             if term_name == term['Name'] or (term['Synonyms'] and term_name in term['Synonyms']):
-                return term['Name']
-
+                return VocabularyTerm.model_validate(term)
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
 
     def find_vocabularies(self) -> Iterable[Table]:
@@ -1017,7 +1020,7 @@ class DerivaML:
         self.update_status(Status.running, f"Successfully download {table_name}...", execution_rid)
         return Path(file_path)
 
-    def upload_execution_configuration(self, config_file: str, description: str) -> RID:
+    def upload_execution_configuration(self, config: str | ExecutionConfiguration, description: str) -> RID:
         """
         Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
 
@@ -1029,6 +1032,16 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the configuration.
 
         """
+        if isinstance(config, str):
+            configuration_rid = self._upload_execution_configuration_file(config, description)
+        else:
+            with NamedTemporaryFile("w", prefix="exec_config", suffix=".json", delete_on_close=False) as fp:
+                json.dump(config.model_dump(), fp)
+                fp.close()
+                configuration_rid = self.upload_execution_configuration(fp.name, description="A test case")
+        return configuration_rid
+
+    def _upload_execution_configuration_file(self, config_file: str, description: str) -> Path:
         file_path = Path(config_file)
         file_name = file_path.name
         file_size = file_path.stat().st_size
@@ -1071,7 +1084,6 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the metadata.
 
         """
-        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         self.update_status(Status.running, "Uploading assets...", execution_rid)
         try:
             results = self.upload_assets(str(self.execution_metadata_path))
@@ -1083,8 +1095,10 @@ class DerivaML:
                 f" to Execution_Metadata table. Error: {error}")
 
         else:
-            meta_exec_entities = ml_schema_path.Execution_Metadata_Execution.filter(
-                ml_schema_path.Execution_Metadata_Execution.Execution == execution_rid).entities()
+            ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+            a_table = list(self.model.schemas[self.ml_schema].tables["Execution_Assets"].find_associations())[0].name
+            meta_exec_entities = ml_schema_path.tables[a_table].filter(
+                ml_schema_path.tables[a_table].Execution == execution_rid).entities()
             meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
             entities = []
             for metadata in results.values():
@@ -1092,7 +1106,7 @@ class DerivaML:
                     rid = metadata["Result"].get("RID")
                     if (rid is not None) and (rid not in meta_list):
                         entities.append({"Execution_Metadata": rid, "Execution": execution_rid})
-        self.catalog.getPathBuilder().schemas[self.ml_schema].Execution_Metadata_Execution.insert(entities)
+        self.catalog.getPathBuilder().schemas[self.ml_schema].tables[a_table].insert(entities)
         return results
 
     def upload_execution_assets(self, execution_rid: RID) -> dict[str, dict[str, FileUploadState]]:
@@ -1190,7 +1204,6 @@ class DerivaML:
         self.update_status(Status.running, "Inserting tags... ", execution_rid)
         vocabs = {}
         for term in configuration.get("workflow_terms"):
-            print(f"adding term {term}")
             term_rid = self.add_term(table=term["term"],
                                      term_name=term["name"],
                                      description=term["description"],
@@ -1261,7 +1274,12 @@ class DerivaML:
 
     def _clean_folder_contents(self, folder_path: Path, execution_rid: RID):
         try:
-            shutil.rmtree(folder_path)
+            with os.scandir(folder_path) as entries:
+                for entry in entries:
+                    if entry.is_dir() and not entry.is_symlink():
+                        shutil.rmtree(entry.path)
+                    else:
+                        os.remove(entry.path)
         except OSError as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)

@@ -5,8 +5,10 @@
 #  DERIVA_PY_TEST_CREDENTIAL: user credential, if none, it will attempt to get credentail for given hostname
 #  DERIVA_PY_TEST_VERBOSE: set for verbose logging output to stdout
 import logging
+import json
 import os
 import sys
+import tempfile
 import unittest
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
@@ -17,6 +19,7 @@ from typing import Optional
 
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID
 from deriva_ml.schema_setup.create_schema import setup_ml_workflow, initialize_ml_schema
+from deriva_ml.execution_configuration import ExecutionConfiguration
 
 try:
     from pandas import DataFrame
@@ -75,7 +78,7 @@ def populate_test_catalog(model: Model) -> None:
                 for e in t.entities().fetch():
                     try:
                         t.filter(t.RID == e['RID']).delete()
-                    except DataPathException:  # FK constraint.
+                    except DataPathException as e:  # FK constraint.
                         retry = True
 
     initialize_ml_schema(model, 'deriva-ml')
@@ -85,7 +88,6 @@ def populate_test_catalog(model: Model) -> None:
     images = [{'Name': f"Image{i + 1}", 'Subject': s['RID'], 'URL': f"foo/{s['RID']}", 'Length': i, 'MD5': i} for i, s
               in zip(range(5), s)]
     domain_schema.tables['Image'].insert(images)
-    pb.schemas['deriva-ml'].tables['Execution'].insert([{'Description': f"Execution {i}"} for i in range(5)])
 
 
 test_catalog: Optional[ErmrestCatalog] = None
@@ -140,14 +142,14 @@ class TestVocabulary(unittest.TestCase):
         try:
             self.ml_instance.create_vocabulary("CV1", "A vocab")
             self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 0)
-            rid = self.ml_instance.add_term("CV1", "T1", description="A vocab")
+            term = self.ml_instance.add_term("CV1", "T1", description="A vocab")
             self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 1)
-            self.assertEqual(rid, self.ml_instance.lookup_term("CV1", "T1"))
+            self.assertEqual(term.name, self.ml_instance.lookup_term("CV1", "T1").name)
 
             # Check for redudent terms.
-            self.assertRaises(DerivaMLException, self.ml_instance.add_term, "CV1", "T1", description="A vocab",
-                              exists_ok=False)
-            self.assertEqual(rid, self.ml_instance.add_term("CV1", "T1", description="A vocab"))
+            with self.assertRaises(DerivaMLException) as context:
+                self.ml_instance.add_term("CV1", "T1", description="A vocab", exists_ok=False)
+            self.assertEqual("T1", self.ml_instance.add_term("CV1", "T1", description="A vocab").name)
         finally:
             self.domain_schema.tables["CV1"].drop()
 
@@ -223,21 +225,24 @@ class TestExecution(unittest.TestCase):
         self.model = self.ml_instance.model
         self.files = os.path.dirname(__file__) + '/files'
 
-
     def test_upload_configuration(self):
         populate_test_catalog(self.model)
-        config_file = "files/testfile.json"
+        config_file = "tests/files/testfile.json"
         return self.ml_instance.upload_execution_configuration(config_file, description="A test case")
 
     def test_execution_1(self):
         populate_test_catalog(self.model)
-        config_file = self.files + "/test-workflow-1.json"
+        exec_config = ExecutionConfiguration.load_configuration(self.files + "/test-workflow-1.json")
+        configuration_rid = self.ml_instance.upload_execution_configuration(exec_config, description="A test case")
+
         self.ml_instance.create_vocabulary("Workflow Term")
         self.ml_instance.add_term("Workflow Term", "Workflow1", description="A test workflow")
-        configuration_rid = self.ml_instance.upload_execution_configuration(config_file, description="A test case")
         configuration_records = self.ml_instance.execution_init(configuration_rid=configuration_rid)
         with self.ml_instance.execution(execution_rid=configuration_records.execution_rid) as exec:
             pass
+        upload_status = self.ml_instance.execution_upload(execution_rid=configuration_records.execution_rid)
+        e = (list(self.ml_instance.catalog.getPathBuilder().deriva_ml.Execution.entities().fetch()))[0]
+        self.assertEqual(e['Status'], "Completed")
 
 
 class TestDataset(unittest.TestCase):

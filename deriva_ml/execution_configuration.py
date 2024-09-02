@@ -1,6 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel
 from enum import Enum
+import json
 
 
 class Workflow(BaseModel):
@@ -34,3 +35,8 @@ class ExecutionConfiguration(BaseModel):
     workflow: Workflow
     execution: Execution
     workflow_terms: list[WorkflowTerm]
+
+    @staticmethod
+    def load_configuration(file: str):
+        with open(file) as fd:
+            return ExecutionConfiguration.model_validate(json.load(fd))
