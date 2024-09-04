@@ -506,13 +506,13 @@ class DerivaML:
                 case _:
                     return str
 
-
         table = self._get_table(table)
-        atable_name = f"Execution_{table.name}_{feature_name}"
         # Get the association table that implements the feature.
-        assoc_table = (
-            [a.table for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if
-             a.name == atable_name].pop())
+        if len(assoc_table := [a.table for a in self.find_features(table) if a.feature_name == feature_name]):
+            assoc_table = assoc_table.pop()
+        else:
+            raise DerivaMLException(f"Table {table.name} doesn't have feature named {feature_name}.")
+
         # Create feature class
         validators = {'execution_validator': field_validator('Execution', mode="after")(validate_rid),
                       'feature_name_validator': field_validator('Feature_Name', mode="after")(validate_rid)}
@@ -561,7 +561,7 @@ class DerivaML:
 
         return [
             FindFeatureResult(
-                feature_name=a.name.replace(f"{table.name}_Execution_Feature_Name_", ""),
+                feature_name=a.name.replace(f"Execution_{table.name}_", ""),
                 table=a.table,
                 self_fkey=a.self_fkey, other_fkeys=a.other_fkeys
             ) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
@@ -587,7 +587,7 @@ class DerivaML:
         """
         table = self._get_table(table)
         feature = next(f for f in self.find_features(table) if
-                       f.feature_name == f"Execution_{table.name}_{feature_name}")
+                       f.feature_name == feature_name)
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
 
@@ -805,14 +805,14 @@ class DerivaML:
 
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
         """
-        Given a term name, return the RID of the associated term (or synonym).
-
+        Given a term name, return the the vocabolary record.  Can provide either the term name
+         or a synaonom for the term.
         Args:
         - table_name (str): The name of the controlled vocabulary table.
         - term_name (str): The name of the term to look up.
 
         Returns:
-        - str: The entryof the associated term or synonym.
+        - str: The entry the associated term or synonym.
 
         Raises:
         - EyeAIException: If the schema or vocabulary table doesn't exist, or if the term is not
@@ -850,7 +850,7 @@ class DerivaML:
         - Iterable: A iterable containing the terms in the specified controlled vocabulary table.
 
         Raises:
-        - EyeAIException: If the schema or vocabulary table doesn't exist, or if the table is not
+        - DerivaMLException: If the schema or vocabulary table doesn't exist, or if the table is not
           a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
