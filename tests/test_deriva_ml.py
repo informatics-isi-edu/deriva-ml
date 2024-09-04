@@ -5,10 +5,8 @@
 #  DERIVA_PY_TEST_CREDENTIAL: user credential, if none, it will attempt to get credentail for given hostname
 #  DERIVA_PY_TEST_VERBOSE: set for verbose logging output to stdout
 import logging
-import json
 import os
 import sys
-import tempfile
 import unittest
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
@@ -17,7 +15,7 @@ from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, 
 from requests import HTTPError
 from typing import Optional
 
-from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID
+from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID, ColumnDefinition, BuiltinTypes
 from deriva_ml.schema_setup.create_schema import setup_ml_workflow, initialize_ml_schema
 from deriva_ml.execution_configuration import ExecutionConfiguration
 
@@ -139,19 +137,16 @@ class TestVocabulary(unittest.TestCase):
 
     def test_add_term(self):
         populate_test_catalog(self.model)
-        try:
-            self.ml_instance.create_vocabulary("CV1", "A vocab")
-            self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 0)
-            term = self.ml_instance.add_term("CV1", "T1", description="A vocab")
-            self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 1)
-            self.assertEqual(term.name, self.ml_instance.lookup_term("CV1", "T1").name)
+        self.ml_instance.create_vocabulary("CV1", "A vocab")
+        self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 0)
+        term = self.ml_instance.add_term("CV1", "T1", description="A vocab")
+        self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 1)
+        self.assertEqual(term.name, self.ml_instance.lookup_term("CV1", "T1").name)
 
-            # Check for redudent terms.
-            with self.assertRaises(DerivaMLException) as context:
-                self.ml_instance.add_term("CV1", "T1", description="A vocab", exists_ok=False)
-            self.assertEqual("T1", self.ml_instance.add_term("CV1", "T1", description="A vocab").name)
-        finally:
-            self.domain_schema.tables["CV1"].drop()
+        # Check for redudent terms.
+        with self.assertRaises(DerivaMLException) as context:
+            self.ml_instance.add_term("CV1", "T1", description="A vocab", exists_ok=False)
+        self.assertEqual("T1", self.ml_instance.add_term("CV1", "T1", description="A vocab").name)
 
 
 @unittest.skipUnless(hostname, "Test host not specified")
@@ -163,59 +158,43 @@ class TestFeatures(unittest.TestCase):
 
     def test_create_feature(self):
         populate_test_catalog(self.model)
-        try:
-            self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
-            self.ml_instance.create_feature("Feature1", "Image")
-            self.assertIn("Image_Execution_Feature_Name_Feature1",
-                          [f.name for f in self.ml_instance.find_features("Image")])
-        finally:
-            self.ml_instance.drop_feature("Feature1", "Image")
-
-    def test_create_feature_with_metadata(self):
-        populate_test_catalog(self.model)
-        try:
-            cv = self.ml_instance.create_vocabulary("FeatureTest", "My feature vocab")
-            self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
-            self.ml_instance.create_feature("Feature1", "Image", metadata={cv})
-            self.assertIn("Image_Execution_Feature_Name_Feature1",
-                          [f.name for f in self.ml_instance.find_features("Image")])
-        finally:
-            self.ml_instance.drop_feature("Feature1", "Image")
-            self.ml_instance.model.schemas[SNAME_DOMAIN].tables['FeatureTest'].drop()
+        self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
+        self.ml_instance.create_vocabulary("FeatureValue", "A vocab")
+        self.ml_instance.add_term("FeatureValue", "V1", description="A Feature Vale")
+        a = self.ml_instance.create_asset("TestAsset", comment="A asset")
+        self.ml_instance.create_feature("Feature1", "Image",
+                                        terms=["FeatureValue"],
+                                        assets=[a],
+                                        metadata=[ColumnDefinition(name='TestCol', type=BuiltinTypes.int2)])
+        self.assertIn("Execution_Image_Feature1",
+                      [f.name for f in self.ml_instance.find_features("Image")])
 
     def test_add_feature(self):
-        populate_test_catalog(self.model)
-        try:
-            self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
-            self.ml_instance.create_feature("Feature1", "Image")
-            image_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables[
-                'Image'].entities().fetch()]
-            execution_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas['deriva-ml'].tables[
-                'Execution'].entities().fetch()]
-            self.ml_instance.add_features('Image', 'Feature1', image_rids, execution_rids)
-            features = self.ml_instance.list_feature("Image", "Feature1")
-            self.assertEqual(len(features), len(image_rids))
-        finally:
-            self.ml_instance.drop_feature("Feature1", "Image")
-
-    def test_add_feature_with_metadata(self):
-        populate_test_catalog(self.model)
-        try:
-            cv = self.ml_instance.create_vocabulary("FeatureTest", "My feature vocab")
-            self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
-            metadata_rid = self.ml_instance.add_term("FeatureTest", "TestMe", description="A piece of metadata")
-            self.ml_instance.create_feature("Feature1", "Image", metadata=[cv])
-            image_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables[
-                'Image'].entities().fetch()]
-            execution_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas['deriva-ml'].tables[
-                'Execution'].entities().fetch()]
-
-            self.ml_instance.add_features('Image', 'Feature1', image_rids, execution_rids,
-                                          [{'FeatureTest': metadata_rid}] * len(image_rids))
-            features = self.ml_instance.list_feature("Image", "Feature1")
-            self.assertEqual(len(features), len(image_rids))
-        finally:
-            self.ml_instance.drop_feature("Feature1", "Image")
+        self.test_create_feature()
+        TestFeature = self.ml_instance.feature_record_class("Image", "Feature1")
+        # Create the name for this feature and then create the feature.
+        # Get some images to attach the feature value to.
+        domain_path = self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN]
+        image_rids = [i['RID'] for i in domain_path.tables['Image'].entities().fetch()]
+        asset_rid = domain_path.tables["TestAsset"].insert(
+            [{'Name': "foo", 'URL': "foo/bar", 'Length': 2, 'MD5': 4}])[0]['RID']
+        # Get an execution RID.
+        ml_path = self.ml_instance.catalog.getPathBuilder().schemas['deriva-ml']
+        self.ml_instance.add_term("Workflow_Type", "TestWorkflow", description="A workflow")
+        workflow_rid = \
+            ml_path.tables['Workflow'].insert([{'Name': "Test Workflow", 'Workflow_Type': "TestWorkflow"}])[0]['RID']
+        execution_rid = \
+            ml_path.tables['Execution'].insert([{'Description': "Test execution", 'Workflow': workflow_rid}])[0]['RID']
+        # Now create a list of features using the feature creation class returned by create_feature.
+        feature_list = [TestFeature(
+            Image=i,
+            Execution=execution_rid,
+            FeatureValue="V1",
+            TestAsset=asset_rid,
+            TestCol=23) for i in image_rids]
+        self.ml_instance.add_features(feature_list)
+        features = self.ml_instance.list_feature("Image", "Feature1")
+        self.assertEqual(len(features), len(image_rids))
 
 
 class TestExecution(unittest.TestCase):
@@ -227,7 +206,7 @@ class TestExecution(unittest.TestCase):
 
     def test_upload_configuration(self):
         populate_test_catalog(self.model)
-        config_file = "tests/files/testfile.json"
+        config_file = self.files + "/testfile.json"
         return self.ml_instance.upload_execution_configuration(config_file, description="A test case")
 
     def test_execution_1(self):
@@ -260,7 +239,7 @@ class TestDataset(unittest.TestCase):
         populate_test_catalog(self.model)
         self.ml_instance.add_element_type("Subject")
         type_rid = self.ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-        dataset_rid = self.ml_instance.create_dataset(type_rid, description="A Dataset")
+        dataset_rid = self.ml_instance.create_dataset(type_rid.name, description="A Dataset")
         self.assertEqual(len(self.ml_instance.find_datasets()), 1)
         return dataset_rid
 

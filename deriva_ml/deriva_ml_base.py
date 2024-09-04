@@ -8,7 +8,7 @@ import shutil
 import warnings
 from datetime import datetime
 from enum import Enum
-from itertools import repeat
+from itertools import chain
 from pathlib import Path
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import List, Optional, Any, NewType, Iterable
@@ -26,9 +26,10 @@ from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_ty
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from pydantic import BaseModel, ValidationError, model_serializer, Field
+from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
+
 RID = NewType("RID", str)
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
@@ -170,12 +171,18 @@ class TableDefinition(BaseModel):
 
 
 class VocabularyTerm(BaseModel):
+    """
+    An entry in a vocabulary table.
+    """
     name: str = Field(alias='Name')
     synonyms: list[str] = Field(alias='Synonyms')
     id: str = Field(alias="ID")
     uri: str = Field(alias="URI")
     description: str = Field(alias="Description")
 
+
+class Feature(BaseModel):
+    pass
 
 class FindFeatureResult(FindAssociationResult):
     """Wrapper for results of Table.find_associations()"""
@@ -222,19 +229,6 @@ class Status(Enum):
     failed = "Failed"
 
 
-class Term(BaseModel):
-    """
-    Data model representing a controlled vocabulary term.
-
-    Attributes:
-    - name (str): The name of the term.
-    - rid (str): The ID of the term in catalog.
-
-    """
-    name: str
-    rid: str
-
-
 class ConfigurationRecord(BaseModel):
     """
     Data model representing configuration records.
@@ -251,7 +245,7 @@ class ConfigurationRecord(BaseModel):
     """
     caching_dir: Path
     working_dir: Path
-    vocabs: dict[str, list[Term]]
+    vocabs: dict[str, list[VocabularyTerm]]
     execution_rid: RID
     workflow_rid: RID
     bag_paths: list[Path]
@@ -365,7 +359,7 @@ class DerivaML:
                                     key_defs=[Key.define(["Name"])])
         )
 
-    def is_vocabulary(self, table_name: str | Table) -> Table:
+    def isvocabulary(self, table_name: str | Table) -> Table:
         """
         Check if a given table is a controlled vocabulary table.
 
@@ -379,6 +373,20 @@ class DerivaML:
         vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
         table = self._get_table(table_name)
         return vocab_columns.issubset({c.name.upper() for c in table.columns}) and table
+
+    def create_asset(self, asset_name: str, comment="", schema=None) -> Table:
+        schema = schema or self.domain_schema
+        return self.model.schemas[schema].create_table(
+            Table.define_asset(schema, asset_name, f'{schema}:{{RID}}', comment=comment)
+        )
+
+    def isasset(self, table_name: str | Table) -> Table:
+        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
+        table = self._get_table(table_name)
+        return asset_columns.issubset({c.name for c in table.columns}) and table
+
+    def find_assets(self) -> list[Table]:
+        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.isasset(t)]
 
     def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
                      version: str = "",
@@ -412,7 +420,7 @@ class DerivaML:
                 'Description': description,
                 'Checksum': self._get_checksum(url),
                 'Version': version,
-                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type)['Name']}
+                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type).name}
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
 
         return workflow_rid
@@ -420,8 +428,25 @@ class DerivaML:
     def create_feature(self,
                        feature_name: str,
                        table: Table | str,
+                       terms: list[Table | str] = None,
+                       assets: list[Table | str] = None,
                        metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
-                       comment: str = "") -> None:
+                       comment: str = "") -> type[Feature]:
+        """
+        Create a new feasture that can be associated with a table. The feature can assocate a controlloed
+        vocabulary term, an asset, or any other values with a specific instance of a object and and execution.
+        :param feature_name:
+        :param table:
+        :param terms:
+        :param assets:
+        :param metadata:
+        :param comment:
+        :return:
+        """
+
+        terms = terms or []
+        assets = assets or []
+        metadata = metadata or []
 
         def normalize_metadata(m: Key | Table | ColumnDefinition | str):
             if isinstance(m, str):
@@ -431,18 +456,87 @@ class DerivaML:
             else:
                 return m
 
-        execution = self.model.schemas[self.ml_schema].tables["Execution"]
-        feature = self.model.schemas[self.ml_schema].tables["Feature_Name"]
-        self.lookup_term("Feature_Name", feature_name)
+        # Make sure that the provided assets or terms are actually assets or terms.
+        if not all(map(self.isasset, assets)):
+            raise DerivaMLException(f"Invalid create_feature asset table.")
+        if not all(map(self.isvocabulary, terms)):
+            raise DerivaMLException(f"Invalid create_feature asset table.")
+
+        # Get references to the necessary tables and make sure that the
+        # provided feature name exists.
         table = self._get_table(table)
+        execution = self.model.schemas[self.ml_schema].tables["Execution"]
+        feature_name_table = self.model.schemas[self.ml_schema].tables["Feature_Name"]
+        feature_name_term = self.lookup_term("Feature_Name", feature_name)
+        atable_name = f"Execution_{table.name}_{feature_name_term.name}"
+        # Now create the association table that implements the feature.
+        x = table.define_association(
+                table_name=atable_name,
+                associates=[execution, table, feature_name_table],
+                metadata=[normalize_metadata(m) for m in chain(assets, terms, metadata)],
+                comment=comment
+            )
         self.model.schemas[self.domain_schema].create_table(
             table.define_association(
-                associates=[execution, table, feature],
-                table_name=f"{table.name}_Execution_Feature_Name_{feature_name}",
-                metadata=[normalize_metadata(m) for m in metadata] if metadata else [],
+                table_name=atable_name,
+                associates=[execution, table, feature_name_table],
+                metadata=[normalize_metadata(m) for m in chain(assets, terms, metadata)],
                 comment=comment
             )
         )
+        return self.feature_record_class(table, feature_name)
+
+    def feature_record_class(self, table: str | Table, feature_name: str) -> type[Feature]:
+        """"
+        Create a pydantic model for entries into the specified feature table
+        """
+
+        def validate_rid(cls, rid):
+            self.model.catalog.resolve_rid(rid, self.model)
+            return rid
+
+        def map_type(x: builtin_types) -> type:
+            match x.typename:
+                case 'text':
+                    return str
+                case 'int2' | 'int4' | 'int8':
+                    return int
+                case 'float4', 'float8':
+                    return float
+                case _:
+                    return str
+
+
+        table = self._get_table(table)
+        atable_name = f"Execution_{table.name}_{feature_name}"
+        # Get the association table that implements the feature.
+        assoc_table = (
+            [a.table for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if
+             a.name == atable_name].pop())
+        # Create feature class
+        validators = {'execution_validator': field_validator('Execution', mode="after")(validate_rid),
+                      'feature_name_validator': field_validator('Feature_Name', mode="after")(validate_rid)}
+        system_columns = {'RID', 'RMB', 'RCB', 'RCT', 'RMT', 'Feature_Name'}
+        feature_columns = {c.name: (map_type(c.type), ...) for c in assoc_table.columns if c.name not in system_columns}
+        feature_columns['Feature_Name'] = (str, feature_name)
+        featureclass_name = f"{table.name}Feature{feature_name}"
+        return create_model(featureclass_name, __base__=Feature, __validators__=validators, **feature_columns)
+
+    def _feature_table(self, f: Feature) -> Table:
+        """
+        Return the feature table associated with the specified feature value class instance.
+        :param f: An instance of a feature class
+        :return:
+        """
+        col_names = set(f.model_dump().keys())  # All of the column names in the feature record.
+        feature_name = f.model_dump()['Feature_Name']
+
+        for a in self.model.schemas[self.ml_schema].tables['Execution'].find_associations(
+                min_arity=3, max_arity=3, pure=False):
+            #  The column names in the keys of the association table are fully contained in the feature value
+            if col_names > {k.pk_table.name for k in a.other_fkeys} and feature_name in a.name:
+                break
+        return a.table
 
     def drop_feature(self, feature_name: str, table: Table | str) -> bool:
         table = self._get_table(table)
@@ -464,6 +558,7 @@ class DerivaML:
                 return a.table.columns['Feature_Name']
             except KeyError:
                 return False
+
         return [
             FindFeatureResult(
                 feature_name=a.name.replace(f"{table.name}_Execution_Feature_Name_", ""),
@@ -472,53 +567,15 @@ class DerivaML:
             ) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
         ]
 
-    def add_features(self,
-                     table: str,
-                     feature_name: str,
-                     object_rids: Iterable[RID],
-                     execution_rids: RID,
-                     metadata: list[dict[str, Any]] = None) -> int:
+    def add_features(self, features: Iterable[Feature]) -> int:
         """
         Add an attribute to the specified object.
-        :param table: The table to which the attribute is added.
-        :param feature_name: The name of the feature.
-        :param object_rids: A list of the rids to which the new attributes will be attached.  Every RID in the list
-        must come from the same table.
-        :param execution_rids: A list of the executables to be associated with the rids.
-        :param metadata: Additional attributes that are added to the linkage.
         :return: Number of attributed added
         """
-
-        table = self._get_table(table)
-        feature_name_id = self.lookup_term("Feature_Name", feature_name)['Name']
-        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
-        object_table = feature.self_fkey.pk_table.name
-        skip_columns = {"RID", "RCB", "RMB", "RCT", "RMT", "Execution", "Feature_Name", table.name}
-        metadata_columns = {c.name for c in feature.table.columns if c.name not in skip_columns}
-        required_metadata = {c.name for c in feature.table.columns if c.name not in skip_columns and c.nullok is False}
-
-        def feature_entity(object_rid: RID, exe_rid: RID, meta: dict[str, Any]) -> dict[str, Any]:
-            if self.resolve_rid(object_rid).table.name != object_table:
-                raise DerivaMLException(f"object_rid {object_rid} is not in {object_table} table.")
-            if self.resolve_rid(exe_rid).table.name != "Execution":
-                raise DerivaMLException(f"execution_rid {exe_rid} is not in Execution table.")
-            if not metadata_columns >= set(meta.keys()):
-                raise DerivaMLException(f"Bad column values: {set(meta.keys())} not in {metadata_columns}")
-            if not set(meta.keys()) >= required_metadata:
-                raise DerivaMLException(f"Missing non-null column: {required_metadata}")
-
-            return {object_table: object_rid, 'Execution': exe_rid, 'Feature_Name': feature_name_id} | meta
-
-        try:
-            entries = list(object_rids)
-            entries = [
-                feature_entity(object_rid, execution_rid, md)
-                for object_rid, execution_rid, md in
-                zip(entries, execution_rids, metadata or repeat({}, times=len(entries)), strict=True)
-            ]
-        except ValueError:
-            raise DerivaMLException(f"Length of object_rid, execution_rid, and metadata must be equal.")
-        self.catalog.getPathBuilder().schemas[feature.table.schema.name].tables[feature.name].insert(entries)
+        features = list(features)
+        feature_table = self._feature_table(features[0])
+        feature_path = self.catalog.getPathBuilder().schemas[feature_table.schema.name].tables[feature_table.name]
+        entries = feature_path.insert(f.model_dump() for f in features)
         return len(entries)
 
     def list_feature(self, table: Table | str, feature_name: str) -> _ResultSet:
@@ -528,22 +585,24 @@ class DerivaML:
         :param feature_name:
         :return:
         """
-        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+        table = self._get_table(table)
+        feature = next(f for f in self.find_features(table) if
+                       f.feature_name == f"Execution_{table.name}_{feature_name}")
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
 
-    def create_dataset(self, ds_type: RID, description: str, **kwargs) -> RID:
+    def create_dataset(self, ds_type: str, description: str, **kwargs) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
         :param description:  Description of the dataset.
         :return: New dataset RID.
         """
         # Create the entry for the new dataset and get its RID.
-        if not self.is_vocabulary(self.resolve_rid(ds_type).table):
+        if not self.lookup_term("Dataset_Type", ds_type):
             raise DerivaMLException(f"Dataset type must be a vocabulary term.")
         dataset_table_path = (
             self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
-        return dataset_table_path.insert([{'Description': description}])[0]['RID']
+        return dataset_table_path.insert([{'Description': description, 'Dataset_Type': ds_type}])[0]['RID']
 
     def find_datasets(self) -> Iterable[dict[str, Any]]:
         """
@@ -727,7 +786,7 @@ class DerivaML:
         """
         synonyms = synonyms or []
         pb = self.catalog.getPathBuilder()
-        if not (table := self.is_vocabulary(table)):
+        if not (table := self.isvocabulary(table)):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
         schema_name = table.schema.name
@@ -737,7 +796,7 @@ class DerivaML:
                 pb.schemas[schema_name].tables[table_name].insert(
                     [{'Name': term_name, 'Description': description, 'Synonyms': synonyms}],
                     defaults={'ID', 'URI'})[0])
-        except (DataPathException) as e:
+        except DataPathException:
             term_id = self.lookup_term(table, term_name)
             if not exists_ok:
                 raise DerivaMLException(f"{term_name} already exists")
@@ -760,7 +819,7 @@ class DerivaML:
           found in the vocabulary.
 
         """
-        vocab_table = self.is_vocabulary(table)
+        vocab_table = self.isvocabulary(table)
         if not vocab_table:
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
@@ -778,7 +837,7 @@ class DerivaML:
          - List[str]: A list of table names representing controlled vocabulary tables in the schema.
 
         """
-        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
+        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.isvocabulary(t)]
 
     def list_vocabulary_terms(self, table_name: str) -> Iterable[dict[str, Any]]:
         """
@@ -795,7 +854,7 @@ class DerivaML:
           a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
-        if not (table := self.is_vocabulary(table_name)):
+        if not (table := self.isvocabulary(table_name)):
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
         return list(pb.schemas[table.schema.name].tables[table.name].entities().fetch())
@@ -1204,12 +1263,12 @@ class DerivaML:
         self.update_status(Status.running, "Inserting tags... ", execution_rid)
         vocabs = {}
         for term in configuration.get("workflow_terms"):
-            term_rid = self.add_term(table=term["term"],
-                                     term_name=term["name"],
-                                     description=term["description"],
-                                     exists_ok=True)
+            term_record = self.add_term(table=term["term"],
+                                        term_name=term["name"],
+                                        description=term["description"],
+                                        exists_ok=True)
             term_records = vocabs.get(term["term"], [])
-            term_records.append(Term(name=term["name"], rid=term_rid))
+            term_records.append(term_record)
             vocabs[term["term"]] = term_records
         # Materialize bdbag
         dataset_rids = []
