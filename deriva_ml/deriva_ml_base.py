@@ -330,6 +330,14 @@ class DerivaML:
         })
         return session_config
 
+    @property
+    def ml_path(self):
+        return self.catalog.getPathBuilder().schemas[self.ml_schema]
+
+    @property
+    def domain_path(self):
+        return self.catalog.getPathBuilder().schemas[self.domain_schema]
+
     def _get_table(self, table: str | Table) -> Table:
         """
         Return the table object corresponding to the given table name. If the table name appears in more
@@ -407,7 +415,7 @@ class DerivaML:
         """
 
         # Check to make sure that the workflow is not already in the table. If its not, add it.
-        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+        ml_schema_path = self.ml_path
         try:
             url_column = ml_schema_path.Workflow.URL
             workflow_record = list(ml_schema_path.Workflow.filter(url_column == url).entities())[0]
@@ -470,13 +478,13 @@ class DerivaML:
         feature_name_term = self.lookup_term("Feature_Name", feature_name)
         atable_name = f"Execution_{table.name}_{feature_name_term.name}"
         # Now create the association table that implements the feature.
-        x = table.define_association(
+        t = table.define_association(
                 table_name=atable_name,
                 associates=[execution, table, feature_name_table],
                 metadata=[normalize_metadata(m) for m in chain(assets, terms, metadata)],
                 comment=comment
             )
-        self.model.schemas[self.domain_schema].create_table(
+        atable = self.model.schemas[self.domain_schema].create_table(
             table.define_association(
                 table_name=atable_name,
                 associates=[execution, table, feature_name_table],
@@ -484,6 +492,7 @@ class DerivaML:
                 comment=comment
             )
         )
+        atable.columns['Feature_Name'].alter(default=feature_name_term.name)
         return self.feature_record_class(table, feature_name)
 
     def feature_record_class(self, table: str | Table, feature_name: str) -> type[Feature]:
@@ -516,9 +525,10 @@ class DerivaML:
         # Create feature class
         validators = {'execution_validator': field_validator('Execution', mode="after")(validate_rid),
                       'feature_name_validator': field_validator('Feature_Name', mode="after")(validate_rid)}
-        system_columns = {'RID', 'RMB', 'RCB', 'RCT', 'RMT', 'Feature_Name'}
-        feature_columns = {c.name: (map_type(c.type), ...) for c in assoc_table.columns if c.name not in system_columns}
-        feature_columns['Feature_Name'] = (str, feature_name)
+        system_columns = {'RID', 'RMB', 'RCB', 'RCT', 'RMT'}
+        feature_columns = {
+            c.name: (map_type(c.type), c.default or ...) for c in assoc_table.columns if c.name not in system_columns
+        }
         featureclass_name = f"{table.name}Feature{feature_name}"
         return create_model(featureclass_name, __base__=Feature, __validators__=validators, **feature_columns)
 
@@ -1097,7 +1107,7 @@ class DerivaML:
             with NamedTemporaryFile("w", prefix="exec_config", suffix=".json", delete_on_close=False) as fp:
                 json.dump(config.model_dump(), fp)
                 fp.close()
-                configuration_rid = self.upload_execution_configuration(fp.name, description="A test case")
+                configuration_rid = self.upload_execution_configuration(fp.name, description=description)
         return configuration_rid
 
     def _upload_execution_configuration_file(self, config_file: str, description: str) -> Path:
