@@ -179,6 +179,7 @@ class VocabularyTerm(BaseModel):
     id: str = Field(alias="ID")
     uri: str = Field(alias="URI")
     description: str = Field(alias="Description")
+    rid: str = Field(alias="RID")
 
 
 class Feature(BaseModel):
@@ -428,7 +429,7 @@ class DerivaML:
                 'Description': description,
                 'Checksum': self._get_checksum(url),
                 'Version': version,
-                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type).name}
+                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type).rid}
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
 
         return workflow_rid
