@@ -476,7 +476,7 @@ class DerivaML:
         table = self._get_table(table)
         execution = self.model.schemas[self.ml_schema].tables["Execution"]
         feature_name_table = self.model.schemas[self.ml_schema].tables["Feature_Name"]
-        feature_name_term = self.add_term("Feature_Name", feature_name)
+        feature_name_term = self.add_term("Feature_Name", feature_name, comment)
         atable_name = f"Execution_{table.name}_{feature_name_term.name}"
         # Now create the association table that implements the feature.
         t = table.define_association(
