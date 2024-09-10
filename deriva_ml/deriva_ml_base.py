@@ -1,4 +1,3 @@
-import getpass
 import hashlib
 import json
 import logging
@@ -875,7 +874,7 @@ class DerivaML:
         if not (table := self.isvocabulary(table_name)):
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        return [ VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
+        return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
         """
@@ -1112,7 +1111,10 @@ class DerivaML:
         if isinstance(config, str):
             configuration_rid = self._upload_execution_configuration_file(config, description)
         else:
-            with NamedTemporaryFile("w", prefix="exec_config", suffix=".json", delete_on_close=False, delete=True) as fp:
+            with NamedTemporaryFile("w", prefix="exec_config",
+                                    suffix=".json",
+                                    delete_on_close=False,
+                                    delete=True) as fp:
                 json.dump(config.model_dump(), fp)
                 fp.close()
                 configuration_rid = self._upload_execution_configuration_file(fp.name, description=description)
