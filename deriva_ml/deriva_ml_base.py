@@ -185,6 +185,7 @@ class VocabularyTerm(BaseModel):
 class Feature(BaseModel):
     pass
 
+
 class FindFeatureResult(FindAssociationResult):
     """Wrapper for results of Table.find_associations()"""
 
@@ -297,6 +298,7 @@ class DerivaML:
 
         self.start_time = datetime.now()
         self.status = Status.pending.value
+        tdir = None
         if cache_dir:
             self.cache_dir = Path(cache_dir)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -304,10 +306,11 @@ class DerivaML:
             tdir = TemporaryDirectory(delete=False)
             self.cache_dir = Path(tdir.name)
         default_workdir = self.__class__.__name__ + "_working"
-        if working_dir is not None:
-            self.working_dir = Path(working_dir).joinpath(getpass.getuser(), default_workdir)
+        if working_dir:
+            self.working_dir = Path(working_dir)
         else:
-            self.working_dir = Path(os.path.expanduser('~')).joinpath(default_workdir)
+            tdir = tdir or TemporaryDirectory(delete=False)
+            self.working_dir = Path(tdir.name) / default_workdir
         self.execution_assets_path = self.working_dir / "Execution_Assets/"
         self.execution_metadata_path = self.working_dir / "Execution_Metadata/"
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
@@ -353,6 +356,11 @@ class DerivaML:
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
 
+    def chaise_url(self, table: str | Table) -> str:
+        table = self._get_table(table)
+        uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
+        return f"{uri}/{table.schema.name}:{table.name}@sort(RID)"
+
     def create_vocabulary(self, vocab_name: str, comment="", schema=None) -> Table:
         """
         Create a controlled vocabulary table with the given vocab name.
@@ -363,9 +371,7 @@ class DerivaML:
         """
         schema = schema or self.domain_schema
         return self.model.schemas[self.domain_schema].create_table(
-            Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}',
-                                    comment=comment,
-                                    key_defs=[Key.define(["Name"])])
+            Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}', comment=comment)
         )
 
     def isvocabulary(self, table_name: str | Table) -> Table:
@@ -429,7 +435,7 @@ class DerivaML:
                 'Description': description,
                 'Checksum': self._get_checksum(url),
                 'Version': version,
-                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type).rid}
+                'Workflow_Type': self.lookup_term("Workflow_Type", workflow_type).name}
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
 
         return workflow_rid
@@ -476,15 +482,9 @@ class DerivaML:
         table = self._get_table(table)
         execution = self.model.schemas[self.ml_schema].tables["Execution"]
         feature_name_table = self.model.schemas[self.ml_schema].tables["Feature_Name"]
-        feature_name_term = self.add_term("Feature_Name", feature_name)
+        feature_name_term = self.add_term("Feature_Name", feature_name, description=comment)
         atable_name = f"Execution_{table.name}_{feature_name_term.name}"
         # Now create the association table that implements the feature.
-        t = table.define_association(
-                table_name=atable_name,
-                associates=[execution, table, feature_name_table],
-                metadata=[normalize_metadata(m) for m in chain(assets, terms, metadata)],
-                comment=comment
-            )
         atable = self.model.schemas[self.domain_schema].create_table(
             table.define_association(
                 table_name=atable_name,
@@ -620,8 +620,9 @@ class DerivaML:
         Returns a list of currently available datasets.
         :return:
         """
+        dataset_path = self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         return list(
-            self.catalog.getPathBuilder().schemas[self.ml_schema].tables[self.dataset_table.name].entities().fetch())
+            dataset_path.entities().fetch())
 
     def delete_dataset(self, dataset_rid: RID) -> None:
         """
@@ -646,7 +647,10 @@ class DerivaML:
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
 
-    def add_element_type(self, element: str | Table) -> Table:
+    def list_dataset_element_types(self) -> Iterable[FindAssociationResult]:
+        return self.dataset_table.find_associations()
+
+    def add_dataset_element_type(self, element: str | Table) -> Table:
         """
         Add a new element type to a dataset.
         :param element:
@@ -1105,13 +1109,14 @@ class DerivaML:
         if isinstance(config, str):
             configuration_rid = self._upload_execution_configuration_file(config, description)
         else:
-            with NamedTemporaryFile("w", prefix="exec_config", suffix=".json", delete_on_close=False) as fp:
+            with NamedTemporaryFile("w", prefix="exec_config", suffix=".json", delete_on_close=False, delete=True) as fp:
                 json.dump(config.model_dump(), fp)
                 fp.close()
-                configuration_rid = self.upload_execution_configuration(fp.name, description=description)
+                configuration_rid = self._upload_execution_configuration_file(fp.name, description=description)
+
         return configuration_rid
 
-    def _upload_execution_configuration_file(self, config_file: str, description: str) -> Path:
+    def _upload_execution_configuration_file(self, config_file: str, description: str) -> RID:
         file_path = Path(config_file)
         file_name = file_path.name
         file_size = file_path.stat().st_size
@@ -1166,9 +1171,9 @@ class DerivaML:
 
         else:
             ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
-            a_table = list(self.model.schemas[self.ml_schema].tables["Execution_Assets"].find_associations())[0].name
-            meta_exec_entities = ml_schema_path.tables[a_table].filter(
-                ml_schema_path.tables[a_table].Execution == execution_rid).entities()
+            a_table = list(self.model.schemas[self.ml_schema].tables["Execution_Metadata"].find_associations())[0].name
+            meta_exec_entities = list(ml_schema_path.tables[a_table].filter(
+                ml_schema_path.tables[a_table].Execution == execution_rid).entities().fetch())
             meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
             entities = []
             for metadata in results.values():
@@ -1193,6 +1198,7 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the assets.
 
         """
+        print("Upload execution assets")
         results = {}
         ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         for folder_path in self.execution_assets_path.iterdir():
@@ -1259,7 +1265,7 @@ class DerivaML:
         """
         # Download configuration json file
         configuration_path = self.download_execution_files('Execution_Metadata', configuration_rid,
-                                                           dest_dir=str(self.execution_metadata_path))
+                                                           dest_dir=str(self.working_dir))
         with open(configuration_path, 'r') as file:
             configuration = json.load(file)
         # Check input configuration
@@ -1369,7 +1375,6 @@ class DerivaML:
         try:
             uploaded_assets = self.upload_execution_assets(execution_rid)
             self.upload_execution_metadata(execution_rid)
-
             self.update_status(Status.completed,
                                "Successfully end the execution.",
                                execution_rid)

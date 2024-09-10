@@ -10,13 +10,11 @@ import sys
 import unittest
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
-from deriva.core.datapath import DataPathException
-from deriva.core.ermrest_model import Model, Schema, Table, Column, ForeignKey, builtin_types
-from requests import HTTPError
 from typing import Optional
 
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID, ColumnDefinition, BuiltinTypes
-from deriva_ml.schema_setup.create_schema import setup_ml_workflow, initialize_ml_schema
+from deriva_ml.schema_setup.create_schema import create_ml_schema
+from deriva_ml.schema_setup.test_catalog import create_domain_schema, populate_test_catalog
 from deriva_ml.execution_configuration import ExecutionConfiguration
 
 try:
@@ -35,59 +33,6 @@ if os.getenv("DERIVA_PY_TEST_VERBOSE"):
     logger.addHandler(logging.StreamHandler())
 
 
-def define_domain_schema(model: Model) -> None:
-    setup_ml_workflow(model, 'deriva-ml')
-    if model.schemas.get(SNAME_DOMAIN):
-        model.schemas[SNAME_DOMAIN].drop()
-    domain_schema = model.create_schema(Schema.define(SNAME_DOMAIN))
-
-    domain_schema.tables.get('Subject') or domain_schema.create_table(
-        Table.define("Subject", column_defs=[Column.define('Name', builtin_types.text)],
-                     fkey_defs=[ForeignKey.define(['RCB'], 'public', 'ERMrest_Client', ['ID']),
-                                ForeignKey.define(['RMB'], 'public', 'ERMrest_Client', ['ID'])]))
-
-    image_table_def = Table.define_asset(sname=SNAME_DOMAIN, tname='Image',
-                                         hatrac_template='/hatrac/execution_assets/{{MD5}}.{{Filename}}',
-                                         column_defs=[Column.define("Name", builtin_types.text),
-                                                      Column.define('Subject', builtin_types.text)],
-                                         fkey_defs=[ForeignKey.define(['RCB'], 'public', 'ERMrest_Client', ['ID']),
-                                                    ForeignKey.define(['RMB'], 'public', 'ERMrest_Client', ['ID']),
-                                                    ForeignKey.define(['Subject'], SNAME_DOMAIN, 'Subject', ['RID'])], )
-    domain_schema.tables.get("Image") or domain_schema.create_table(image_table_def)
-
-
-def populate_test_catalog(model: Model) -> None:
-    # Delete any vocabularies and features.
-    for trial in range(3):
-        for t in [v for v in model.schemas[SNAME_DOMAIN].tables.values() if v.name not in ["Subject", "Image"]]:
-            try:
-                t.drop()
-            except HTTPError:
-                pass
-
-    # Empty out remaining tables.
-    pb = model.catalog.getPathBuilder()
-    domain_schema = pb.schemas[SNAME_DOMAIN]
-    retry = True
-    while retry:
-        retry = False
-        for s in [SNAME_DOMAIN, 'deriva-ml']:
-            for t in pb.schemas[s].tables.values():
-                for e in t.entities().fetch():
-                    try:
-                        t.filter(t.RID == e['RID']).delete()
-                    except DataPathException as e:  # FK constraint.
-                        retry = True
-
-    initialize_ml_schema(model, 'deriva-ml')
-
-    subject = domain_schema.tables['Subject']
-    s = subject.insert([{'Name': f"Thing{t + 1}"} for t in range(5)])
-    images = [{'Name': f"Image{i + 1}", 'Subject': s['RID'], 'URL': f"foo/{s['RID']}", 'Length': i, 'MD5': i} for i, s
-              in zip(range(5), s)]
-    domain_schema.tables['Image'].insert(images)
-
-
 test_catalog: Optional[ErmrestCatalog] = None
 
 
@@ -99,8 +44,9 @@ def setUpModule():
     test_catalog = server.create_ermrest_catalog()
     model = test_catalog.getCatalogModel()
     try:
-        define_domain_schema(model)
-        populate_test_catalog(model)
+        create_ml_schema(model)
+        create_domain_schema(model, SNAME_DOMAIN)
+        populate_test_catalog(model, SNAME_DOMAIN)
     except Exception:
         # on failure, delete catalog and re-raise exception
         test_catalog.delete_ermrest_catalog(really=True)
@@ -126,17 +72,16 @@ class TestVocabulary(unittest.TestCase):
         pass
 
     def test_find_vocabularies(self):
-        populate_test_catalog(self.model)
+        populate_test_catalog(self.model, SNAME_DOMAIN)
         self.assertIn("Dataset_Type", [v.name for v in self.ml_instance.find_vocabularies()])
 
     def test_create_vocabulary(self):
-        populate_test_catalog(self.model)
+        populate_test_catalog(self.model, SNAME_DOMAIN)
         self.ml_instance.create_vocabulary("CV1", "A vocab")
-        self.assertTrue(self.domain_schema.tables["CV1"])
-        self.domain_schema.tables["CV1"].drop()
+        self.assertTrue(self.model.schemas[self.ml_instance.domain_schema].tables["CV1"])
 
     def test_add_term(self):
-        populate_test_catalog(self.model)
+        populate_test_catalog(self.model, SNAME_DOMAIN)
         self.ml_instance.create_vocabulary("CV1", "A vocab")
         self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 0)
         term = self.ml_instance.add_term("CV1", "T1", description="A vocab")
@@ -157,7 +102,7 @@ class TestFeatures(unittest.TestCase):
         self.model = self.ml_instance.model
 
     def test_create_feature(self):
-        populate_test_catalog(self.model)
+        populate_test_catalog(self.model, SNAME_DOMAIN)
         self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
         self.ml_instance.create_vocabulary("FeatureValue", "A vocab")
         self.ml_instance.add_term("FeatureValue", "V1", description="A Feature Vale")
@@ -205,20 +150,24 @@ class TestExecution(unittest.TestCase):
         self.files = os.path.dirname(__file__) + '/files'
 
     def test_upload_configuration(self):
-        populate_test_catalog(self.model)
+        populate_test_catalog(self.model, SNAME_DOMAIN)
         config_file = self.files + "/testfile.json"
         return self.ml_instance.upload_execution_configuration(config_file, description="A test case")
 
     def test_execution_1(self):
-        populate_test_catalog(self.model)
+        populate_test_catalog(self.model, SNAME_DOMAIN)
         exec_config = ExecutionConfiguration.load_configuration(self.files + "/test-workflow-1.json")
         configuration_rid = self.ml_instance.upload_execution_configuration(exec_config, description="A test case")
 
         self.ml_instance.create_vocabulary("Workflow Term")
         self.ml_instance.add_term("Workflow Term", "Workflow1", description="A test workflow")
         configuration_records = self.ml_instance.execution_init(configuration_rid=configuration_rid)
+        self.ml_instance.add_term("Execution_Asset_Type", "testoutput", description="A test output file")
         with self.ml_instance.execution(execution_rid=configuration_records.execution_rid) as exec:
-            pass
+            output_dir = self.ml_instance.execution_assets_path / "testoutput"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            with open(output_dir / "test.txt", "w+") as f:
+                f.write("Hello there\n")
         upload_status = self.ml_instance.execution_upload(execution_rid=configuration_records.execution_rid)
         e = (list(self.ml_instance.catalog.getPathBuilder().deriva_ml.Execution.entities().fetch()))[0]
         self.assertEqual(e['Status'], "Completed")
@@ -231,13 +180,13 @@ class TestDataset(unittest.TestCase):
         self.model = self.ml_instance.model
 
     def test_add_element_type(self):
-        populate_test_catalog(self.model)
-        self.ml_instance.add_element_type("Subject")
+        populate_test_catalog(self.model, SNAME_DOMAIN)
+        self.ml_instance.add_dataset_element_type("Subject")
         self.assertEqual(len(list(self.ml_instance.dataset_table.find_associations())), 2)
 
     def test_create_dataset(self) -> RID:
-        populate_test_catalog(self.model)
-        self.ml_instance.add_element_type("Subject")
+        populate_test_catalog(self.model, SNAME_DOMAIN)
+        self.ml_instance.add_dataset_element_type("Subject")
         type_rid = self.ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
         dataset_rid = self.ml_instance.create_dataset(type_rid.name, description="A Dataset")
         self.assertEqual(len(self.ml_instance.find_datasets()), 1)
