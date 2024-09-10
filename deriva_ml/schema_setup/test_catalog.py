@@ -1,9 +1,10 @@
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
-from deriva_ml.schema_setup.create_schema import initialize_ml_schema
-
 from requests import HTTPError
+
+from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 
 
 def populate_test_catalog(model: Model, sname: str) -> None:
@@ -64,3 +65,18 @@ def create_domain_schema(model: Model, sname: str) -> None:
                            hatrac_template='/hatrac/execution_assets/{{MD5}}.{{Filename}}',
                            column_defs=[Column.define("Name", builtin_types.text)]))
     image_table.create_reference(subject_table)
+
+
+def create_test_catalog(hostname, domain_schema) -> ErmrestCatalog:
+    server = DerivaServer('https', hostname, credentials=get_credential(hostname))
+    test_catalog = server.create_ermrest_catalog()
+    model = test_catalog.getCatalogModel()
+    try:
+        create_ml_schema(model)
+        create_domain_schema(model, domain_schema)
+        populate_test_catalog(model, domain_schema)
+    except Exception:
+        # on failure, delete catalog and re-raise exception
+        test_catalog.delete_ermrest_catalog(really=True)
+        raise
+    return test_catalog

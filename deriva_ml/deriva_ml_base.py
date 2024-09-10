@@ -181,6 +181,9 @@ class VocabularyTerm(BaseModel):
     description: str = Field(alias="Description")
     rid: str = Field(alias="RID")
 
+    class Config:
+        extra = 'ignore'
+
 
 class Feature(BaseModel):
     pass
@@ -854,7 +857,7 @@ class DerivaML:
         """
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.isvocabulary(t)]
 
-    def list_vocabulary_terms(self, table_name: str) -> Iterable[dict[str, Any]]:
+    def list_vocabulary_terms(self, table_name: str) -> Iterable[VocabularyTerm]:
         """
         Return the dataframe of terms that are in a vocabulary table.
 
@@ -872,7 +875,7 @@ class DerivaML:
         if not (table := self.isvocabulary(table_name)):
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
-        return list(pb.schemas[table.schema.name].tables[table.name].entities().fetch())
+        return [ VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
         """
