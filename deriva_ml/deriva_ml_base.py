@@ -361,7 +361,7 @@ class DerivaML:
     def chaise_url(self, table: str | Table) -> str:
         table = self._get_table(table)
         uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
-        return f"{uri}/{table.schema.name}:{table.name}@sort(RID)"
+        return f"{uri}/{table.schema.name}:{table.name}"
 
     def create_vocabulary(self, vocab_name: str, comment="", schema=None) -> Table:
         """
@@ -649,8 +649,8 @@ class DerivaML:
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
 
-    def list_dataset_element_types(self) -> Iterable[FindAssociationResult]:
-        return self.dataset_table.find_associations()
+    def list_dataset_element_types(self) -> Iterable[Table]:
+        return [a.other_fkeys.pop().pk_table for a in self.dataset_table.find_associations()]
 
     def add_dataset_element_type(self, element: str | Table) -> Table:
         """
@@ -690,12 +690,13 @@ class DerivaML:
             rid_list.setdefault(element_table, []).extend([e[element_column.name] for e in assoc_rids])
         return rid_list
 
-    def add_dataset_elements(self, dataset_rid: Optional[RID], members: list[RID],
+    def add_dataset_members(self, dataset_rid: Optional[RID], members: list[RID],
                              validate: bool = True) -> RID:
         """
         Add additional elements to an existing dataset.
         :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
-        :param members: List of RIDs of members to add to the  dataset.
+        :param members: List of RIDs of me
+        mbers to add to the  dataset.
         :param validate: Check rid_list to make sure elements are not already in the dataset.
         :return:
         """
