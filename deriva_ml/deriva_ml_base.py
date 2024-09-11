@@ -392,31 +392,41 @@ class DerivaML:
         table = self._get_table(table_name)
         return vocab_columns.issubset({c.name.upper() for c in table.columns}) and table
 
-    def create_asset(self, asset_name: str, comment="", schema: str = None) -> Table:
+    def create_asset(self, asset_name: str, comment="", schema: str = None, upload_spec: bool = True) -> Table:
+        """
+        Create an asset table with the given asset name.  Optionally modify the upload spec so upload_assets
+        will work with this table.
+        :param asset_name:
+        :param comment:
+        :param schema:
+        :param upload_spec:
+        :return:
+        """
         schema = schema or self.domain_schema
         asset_table = self.model.schemas[schema].create_table(
             Table.define_asset(schema, asset_name, f'{schema}:{{RID}}', comment=comment))
-        self.model.annotations[deriva_tags.bulk_upload]['asset_mappings'].append(
-            {
-                "column_map": {
-                    "MD5": "{md5}",
-                    "URL": "{URI}",
-                    "Length": "{file_size}",
-                    "Filename": "{file_name}"
-                },
-                "file_pattern": f"(?i)^.*/{asset_name}/(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
-                "target_table": [schema, asset_name],
-                "checksum_types": ["sha256", "md5"],
-                "hatrac_options": {"versioned_urls": True},
-                "hatrac_templates": {
-                    "hatrac_uri": f'/hatrac/{asset_name}/{{md5}}.{{file_name}}',
-                    "content-disposition": "filename*=UTF-8''{file_name}"
-                },
-                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-                "create_record_before_upload": False
-            }
-        )
-        self.model.apply()
+        if upload_spec:
+            self.model.annotations[deriva_tags.bulk_upload]['asset_mappings'].append(
+                {
+                    "column_map": {
+                        "MD5": "{md5}",
+                        "URL": "{URI}",
+                        "Length": "{file_size}",
+                        "Filename": "{file_name}"
+                    },
+                    "file_pattern": f"(?i)^.*/{asset_name}/(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
+                    "target_table": [schema, asset_name],
+                    "checksum_types": ["sha256", "md5"],
+                    "hatrac_options": {"versioned_urls": True},
+                    "hatrac_templates": {
+                        "hatrac_uri": f'/hatrac/{asset_name}/{{md5}}.{{file_name}}',
+                        "content-disposition": "filename*=UTF-8''{file_name}"
+                    },
+                    "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+                    "create_record_before_upload": False
+                }
+            )
+            self.model.apply()
         return asset_table
 
     def isasset(self, table_name: str | Table) -> Table:
