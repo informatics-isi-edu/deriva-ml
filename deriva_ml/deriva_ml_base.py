@@ -161,9 +161,9 @@ class TableDefinition(BaseModel):
     def serialize_table_definition(self):
         return Table.define(
             tname=self.name,
-            column_defs=self.column_defs,
-            key_defs=self.key_defs,
-            fkey_defs=self.fkey_defs,
+            column_defs=[c.model_dump() for c in self.column_defs],
+            key_defs=[k.model_dump() for k in self.key_defs],
+            fkey_defs=[fk.model_dump() for fk in self.fkey_defs],
             comment=self.comment,
             acls=self.acls,
             acl_bindings=self.acl_bindings,
@@ -535,7 +535,7 @@ class DerivaML:
         Create a pydantic model for entries into the specified feature table
         """
 
-        def validate_rid(cls, rid):
+        def validate_rid(_cls, rid):
             self.model.catalog.resolve_rid(rid, self.model)
             return rid
 
@@ -636,7 +636,7 @@ class DerivaML:
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
 
-    def create_dataset(self, ds_type: str, description: str, **kwargs) -> RID:
+    def create_dataset(self, ds_type: str, description: str) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
         :param description:  Description of the dataset.
@@ -1130,7 +1130,7 @@ class DerivaML:
         self.update_status(Status.running, f"Successfully download {table_name}...", execution_rid)
         return Path(file_path)
 
-    def upload_execution_configuration(self, config: str | ExecutionConfiguration, description: str) -> RID:
+    def upload_execution_configuration(self, config: ExecutionConfiguration) -> RID:
         """
         Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
 
@@ -1142,19 +1142,24 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the configuration.
 
         """
-        if isinstance(config, str):
-            configuration_rid = self._upload_execution_configuration_file(config, description)
-        elif isinstance(config, ExecutionConfiguration):
+        try:
             with NamedTemporaryFile("w", prefix="exec_config",
-                                    suffix=".json",
-                                    delete_on_close=False,
-                                    delete=True) as fp:
+                                suffix=".json",
+                                delete_on_close=False,
+                                delete=True) as fp:
                 json.dump(config.model_dump(), fp)
                 fp.close()
-                configuration_rid = self._upload_execution_configuration_file(fp.name, description=description)
-        else:
-            raise DerivaMLException(f"Invalid type for config: {type(config)}")
+                configuration_rid = self._upload_execution_configuration_file(fp.name, description=config.description)
+        except Exception as e:
+            raise DerivaMLException(f"Error in execution configuration upload")
         return configuration_rid
+
+    def download_execution_configuration(self, configuration_rid: RID) -> ExecutionConfiguration:
+        configuration = self.retrieve_rid(configuration_rid)
+        with NamedTemporaryFile("w+", delete_on_close=False, suffix=".json") as dest_file:
+            hs = HatracStore("https", self.host_name, self.credential)
+            hs.get_obj(path=configuration['URL'], destfilename=dest_file.name)
+            return ExecutionConfiguration.load_configuration(dest_file.name)
 
     def _upload_execution_configuration_file(self, config_file: str, description: str) -> RID:
         file_path = Path(config_file)
@@ -1238,7 +1243,6 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the assets.
 
         """
-        print("Upload execution assets")
         results = {}
         ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         for folder_path in self.execution_assets_path.iterdir():
@@ -1287,7 +1291,7 @@ class DerivaML:
         self.catalog.getPathBuilder().schemas[self.ml_schema].Execution.update(
             [{"RID": execution_rid, "Duration": duration}])
 
-    def execution_init(self, configuration_rid: RID) -> ConfigurationRecord:
+    def initialize_execution(self, configuration: ExecutionConfiguration) -> ConfigurationRecord:
         """
         Initialize the execution by a configuration file in the Execution_Metadata table.
         Setup working directory and download all the assets and data.
@@ -1303,6 +1307,8 @@ class DerivaML:
         - DerivaMLException: If there is an issue initializing the execution.
 
         """
+        configuration_rid = self.upload_execution_configuration(configuration)
+
         # Download configuration json file
         configuration_path = self.download_execution_files('Execution_Metadata', configuration_rid,
                                                            dest_dir=str(self.working_dir))
@@ -1400,7 +1406,7 @@ class DerivaML:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
 
-    def execution_upload(self, execution_rid: RID, clean_folder: bool = True) -> dict[str, dict[str, FileUploadState]]:
+    def upload_execution(self, execution_rid: RID, clean_folder: bool = True) -> dict[str, dict[str, FileUploadState]]:
         """
         Upload all the assets and metadata associated with the current execution.
 

@@ -117,7 +117,7 @@ The content under Execution_Assets and Execution_Metadata will be deleted after 
 ### 6. Notebook - initiate an execution
 
 ```python
-configuration_records = EA.execution_init(configuration_rid="2-5QFA")
+configuration_records = EA.initialize_execution(configuration_rid="2-5QFA")
 configuration_records.model_dump()
 ```
 
@@ -170,8 +170,9 @@ The Execution_metadata_Type and Execution_Assets_Type_Name are controlled vocabu
 by `workflow_terms` in configuration file in steps 1 and 6.
 
 ### 9. Notebook - save execution metadata and assets back to catalog
+
 ```python
-uploaded_assets = EA.execution_upload(configuration_records.execution_rid)
+uploaded_assets = EA.upload_execution(configuration_records.execution_rid)
 ```
 This method will upload all the generated files in `{working_dir}/Execution_Assets/` and `{working_dir}/Execution_Metadata/` to 
 the data catalog. After this step, all the files can be found on the execution detailed page or Execution_Assets and 

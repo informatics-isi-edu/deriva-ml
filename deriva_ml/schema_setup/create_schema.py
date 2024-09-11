@@ -5,7 +5,7 @@ from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
 
-from deriva_ml.schema_setup.annotation_temp import generate_annotation
+from deriva_ml.schema_setup.annotations import generate_annotation
 
 
 def define_table_workflow(workflow_annotation: dict):

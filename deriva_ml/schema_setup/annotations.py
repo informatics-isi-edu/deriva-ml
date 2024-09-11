@@ -1,6 +1,8 @@
 import argparse
 import sys
+
 from deriva.core.utils.core_utils import tag as deriva_tags
+
 
 def generate_annotation(catalog_id: str, schema: str) -> dict:
     workflow_annotation = {
@@ -9,23 +11,10 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 "RID",
                 "Name",
                 "Description",
-                {
-                    "display": {"markdown_pattern": "[{{{URL}}}]({{{URL}}})"},
-                    "markdown_name": "URL"
-                },
+                {"display": {"markdown_pattern": "[{{{URL}}}]({{{URL}}})"}, "markdown_name": "URL"},
                 "Checksum",
                 "Version",
-                {
-                    "source": [
-                        {
-                            "outbound": [
-                                schema,
-                                "Workflow_Workflow_Type_fkey"
-                            ]
-                        },
-                        "RID"
-                    ]
-                }
+                {"source": [{"outbound": [schema, "Workflow_Workflow_Type_fkey"]}, "RID"]}
             ]
         }
     }
@@ -34,21 +23,10 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
         deriva_tags.visible_columns: {
             "*": [
                 "RID",
-                [
-                    schema,
-                    "Execution_RCB_fkey"
-                ],
+                [schema, "Execution_RCB_fkey"],
                 "RCT",
                 "Description",
-                {"source": [
-                    {"outbound": [
-                        schema,
-                        "Execution_Workflow_fkey"
-                    ]
-                    },
-                    "RID"
-                ]
-                },
+                {"source": [{"outbound": [schema, "Execution_Workflow_fkey"]}, "RID"]},
                 "Duration",
                 "Status",
                 "Status_Detail"
@@ -57,51 +35,18 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
         "tag:isrd.isi.edu,2016:visible-foreign-keys": {
             "detailed": [
                 {
-                    "source": [
-                        {
-                            "inbound": [
-                                schema,
-                                "Dataset_Execution_Execution_fkey"
-                            ]
-                        },
-                        {
-                            "outbound": [
-                                schema,
-                                "Dataset_Execution_Dataset_fkey"
-                            ]
-                        },
-                        "RID"
-                    ],
+                    "source": [{"inbound": [schema, "Dataset_Execution_Execution_fkey"]},
+                               {"outbound": [schema, "Dataset_Execution_Dataset_fkey"]}, "RID"],
                     "markdown_name": "Dataset"
                 },
                 {
                     "source": [
-                        {
-                            "inbound": [
-                                schema,
-                                "Execution_Assets_Execution_Execution_fkey"
-                            ]
-                        },
-                        {
-                            "outbound": [
-                                schema,
-                                "Execution_Assets_Execution_Execution_Assets_fkey"
-                            ]
-                        },
-                        "RID"
-                    ],
+                        {"inbound": [schema, "Execution_Assets_Execution_Execution_fkey"]},
+                        {"outbound": [schema, "Execution_Assets_Execution_Execution_Assets_fkey"]}, "RID"],
                     "markdown_name": "Execution Assets"
                 },
                 {
-                    "source": [
-                        {
-                            "inbound": [
-                                schema,
-                                "Execution_Metadata_Execution_fkey"
-                            ]
-                        },
-                        "RID"
-                    ],
+                    "source": [{"inbound": [schema, "Execution_Metadata_Execution_fkey"]}, "RID"],
                     "markdown_name": "Execution Metadata"
                 }
             ]
@@ -119,11 +64,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 "RID",
                 "URL",
                 "Description",
-                "Length",
-                [
-                    schema,
-                    "Execution_Assets_Execution_Asset_Type_fkey"
-                ],
+                "Length", [schema, "Execution_Assets_Execution_Asset_Type_fkey"],
                 # {
                 #     "display": {
                 #         "template_engine": "handlebars",
@@ -157,10 +98,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 "Description",
                 "Length",
                 "MD5",
-                [
-                    schema,
-                    "Execution_Assets_Execution_Asset_Type_fkey"
-                ]
+                [schema, "Execution_Assets_Execution_Asset_Type_fkey"]
             ]
         }
     }
@@ -307,7 +245,7 @@ def main():
     parser.add_argument('--catalog_id', type=str, required=True)
     parser.add_argument('--schema_name', type=str, required=True)
     args = parser.parse_args()
-    return generate_annotation(args.catalog_id, args.schema_name)
+    generate_annotation(args.catalog_id, args.schema_name)
 
 
 if __name__ == "__main__":

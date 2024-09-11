@@ -151,26 +151,24 @@ class TestExecution(unittest.TestCase):
 
     def test_upload_configuration(self):
         populate_test_catalog(self.model, SNAME_DOMAIN)
-        config_file = self.files + "/testfile.json"
-        return self.ml_instance.upload_execution_configuration(config_file, description="A test case")
+        config_file = self.files + "/test-workflow-1.json"
+        config = ExecutionConfiguration.load_configuration(config_file)
+        rid = self.ml_instance.upload_execution_configuration(config)
+        self.assertEqual(rid, self.ml_instance.retrieve_rid(rid)['RID'])
 
     def test_execution_1(self):
         populate_test_catalog(self.model, SNAME_DOMAIN)
         exec_config = ExecutionConfiguration.load_configuration(self.files + "/test-workflow-1.json")
-        configuration_rid = self.ml_instance.upload_execution_configuration(exec_config, description="A test case")
-
-        self.ml_instance.create_vocabulary("Workflow Term")
-        self.ml_instance.add_term("Workflow Term", "Workflow1", description="A test workflow")
-        configuration_records = self.ml_instance.execution_init(configuration_rid=configuration_rid)
-        self.ml_instance.add_term("Execution_Asset_Type", "testoutput", description="A test output file")
+        configuration_records = self.ml_instance.initialize_execution(configuration=exec_config)
         with self.ml_instance.execution(execution_rid=configuration_records.execution_rid) as exec:
             output_dir = self.ml_instance.execution_assets_path / "testoutput"
             output_dir.mkdir(parents=True, exist_ok=True)
             with open(output_dir / "test.txt", "w+") as f:
                 f.write("Hello there\n")
-        upload_status = self.ml_instance.execution_upload(execution_rid=configuration_records.execution_rid)
+        upload_status = self.ml_instance.upload_execution(execution_rid=configuration_records.execution_rid)
         e = (list(self.ml_instance.catalog.getPathBuilder().deriva_ml.Execution.entities().fetch()))[0]
         self.assertEqual(e['Status'], "Completed")
+
 
 
 class TestDataset(unittest.TestCase):

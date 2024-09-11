@@ -16,6 +16,12 @@
         {"term": "Workflow_Type",
          "name": "Test Case",
          "description": "Test new workflow process"
+        },
+        {
+            "term": "Execution_Asset_Type",
+            "name": "testoutput",
+            "description": "A test output file"
         }
-    ]
+    ],
+    "description": "My test case"
 }

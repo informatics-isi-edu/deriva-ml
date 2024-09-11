@@ -1,7 +1,12 @@
-from typing import List, Optional
+from typing import List, Optional, Self
 from pydantic import BaseModel
 from enum import Enum
 import json
+from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva.core.ermrest_model import Model
+import tempfile
+from deriva.core.hatrac_store import HatracStore
+from urllib.parse import urlparse
 
 
 class Workflow(BaseModel):
@@ -27,19 +32,21 @@ class Term(str, Enum):
 
 
 class WorkflowTerm(BaseModel):
-    term: Term
-    name: str
-    description: str
+    term: Term          # The vocaublary in which the term is found
+    name: str           # The term
+    description: str    # A description
 
 
 class ExecutionConfiguration(BaseModel):
     bdbag_url: list[str] = []
-    models: list[str] = []
+    models: list[str] = []      # List of RIDs to model files.
     workflow: Workflow
     execution: Execution
     workflow_terms: list[WorkflowTerm] = []
+    description: str = ""
+
 
     @staticmethod
-    def load_configuration(file: str):
+    def load_configuration(file: str) -> "ExecutionConfiguration":
         with open(file) as fd:
-            return ExecutionConfiguration.model_validate(json.load(fd))
+                return ExecutionConfiguration.model_validate(json.load(fd))
