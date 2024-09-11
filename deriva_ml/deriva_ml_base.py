@@ -1144,7 +1144,7 @@ class DerivaML:
         """
         if isinstance(config, str):
             configuration_rid = self._upload_execution_configuration_file(config, description)
-        else:
+        elif isinstance(config, ExecutionConfiguration):
             with NamedTemporaryFile("w", prefix="exec_config",
                                     suffix=".json",
                                     delete_on_close=False,
@@ -1152,7 +1152,8 @@ class DerivaML:
                 json.dump(config.model_dump(), fp)
                 fp.close()
                 configuration_rid = self._upload_execution_configuration_file(fp.name, description=description)
-
+        else:
+            raise DerivaMLException(f"Invalid type for config: {type(config)}")
         return configuration_rid
 
     def _upload_execution_configuration_file(self, config_file: str, description: str) -> RID:
