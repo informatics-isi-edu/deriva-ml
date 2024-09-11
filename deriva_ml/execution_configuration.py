@@ -5,11 +5,14 @@ import json
 
 
 class Workflow(BaseModel):
+    """
+    A specificiation of a workflow.  Must have a name, URI to the workflow instance, and a type.
+    """
     name: str
     url: str
     workflow_type: str
     version: Optional[str] = None
-    description: str
+    description: str = None
 
 
 class Execution(BaseModel):
@@ -30,11 +33,11 @@ class WorkflowTerm(BaseModel):
 
 
 class ExecutionConfiguration(BaseModel):
-    bdbag_url: list[str]
-    models: list[str]
+    bdbag_url: list[str] = []
+    models: list[str] = []
     workflow: Workflow
     execution: Execution
-    workflow_terms: list[WorkflowTerm]
+    workflow_terms: list[WorkflowTerm] = []
 
     @staticmethod
     def load_configuration(file: str):

@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import warnings
+from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 from itertools import chain
@@ -16,7 +17,6 @@ import pandas as pd
 import pkg_resources
 import requests
 from bdbag import bdbag_api as bdb
-from copy import deepcopy
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
@@ -24,6 +24,7 @@ from deriva.core.ermrest_model import FindAssociationResult
 from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
+from deriva.core.utils.core_utils import tag as deriva_tags
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator
 
@@ -391,11 +392,32 @@ class DerivaML:
         table = self._get_table(table_name)
         return vocab_columns.issubset({c.name.upper() for c in table.columns}) and table
 
-    def create_asset(self, asset_name: str, comment="", schema=None) -> Table:
+    def create_asset(self, asset_name: str, comment="", schema: str = None) -> Table:
         schema = schema or self.domain_schema
-        return self.model.schemas[schema].create_table(
-            Table.define_asset(schema, asset_name, f'{schema}:{{RID}}', comment=comment)
+        asset_table = self.model.schemas[schema].create_table(
+            Table.define_asset(schema, asset_name, f'{schema}:{{RID}}', comment=comment))
+        self.model.annotations[deriva_tags.bulk_upload]['asset_mappings'].append(
+            {
+                "column_map": {
+                    "MD5": "{md5}",
+                    "URL": "{URI}",
+                    "Length": "{file_size}",
+                    "Filename": "{file_name}"
+                },
+                "file_pattern": f"(?i)^.*/{asset_name}/(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
+                "target_table": [schema, asset_name],
+                "checksum_types": ["sha256", "md5"],
+                "hatrac_options": {"versioned_urls": True},
+                "hatrac_templates": {
+                    "hatrac_uri": f'/hatrac/{asset_name}/{{md5}}.{{file_name}}',
+                    "content-disposition": "filename*=UTF-8''{file_name}"
+                },
+                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+                "create_record_before_upload": False
+            }
         )
+        self.model.apply()
+        return asset_table
 
     def isasset(self, table_name: str | Table) -> Table:
         asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
@@ -622,7 +644,8 @@ class DerivaML:
         Returns a list of currently available datasets.
         :return:
         """
-        dataset_path = self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        dataset_path = self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables[
+            self.dataset_table.name]
         return list(
             dataset_path.entities().fetch())
 
@@ -691,7 +714,7 @@ class DerivaML:
         return rid_list
 
     def add_dataset_members(self, dataset_rid: Optional[RID], members: list[RID],
-                             validate: bool = True) -> RID:
+                            validate: bool = True) -> RID:
         """
         Add additional elements to an existing dataset.
         :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
@@ -1016,7 +1039,7 @@ class DerivaML:
         hs.get_obj(path=asset_url, destfilename=dest_filename)
         return Path(dest_filename)
 
-    def upload_assets(self, assets_dir: str) -> dict[str, FileUploadState]:
+    def upload_assets(self, assets_dir: str | Path) -> dict[str, FileUploadState]:
         """
         Upload assets from a directory.
 
