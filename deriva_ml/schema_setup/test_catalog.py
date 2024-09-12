@@ -10,14 +10,13 @@ from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml
 def populate_test_catalog(model: Model, sname: str) -> None:
     # Delete any vocabularies and features.
     for trial in range(3):
-        for t in [v for v in model.schemas[sname].tables.values()]:
+        for t in [v for v in model.schemas[sname].tables.values() if v.name not in {"Subject", "Image"}]:
             try:
                 t.drop()
             except HTTPError:
                 pass
 
     # Empty out remaining tables.
-    create_domain_schema(model, sname)
     pb = model.catalog.getPathBuilder()
     domain_schema = pb.schemas[sname]
     retry = True
