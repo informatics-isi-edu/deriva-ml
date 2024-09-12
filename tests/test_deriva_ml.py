@@ -102,12 +102,14 @@ class TestFeatures(unittest.TestCase):
         self.model = self.ml_instance.model
 
     def test_create_feature(self):
-        populate_test_catalog(self.model, SNAME_DOMAIN)
-        self.ml_instance.add_term("Feature_Name", "Feature1", description="A Feature Name")
+        populate_test_catalog(self.ml_instance.model, SNAME_DOMAIN)
         self.ml_instance.create_vocabulary("FeatureValue", "A vocab")
         self.ml_instance.add_term("FeatureValue", "V1", description="A Feature Vale")
+
         a = self.ml_instance.create_asset("TestAsset", comment="A asset")
-        self.ml_instance.create_feature("Feature1", "Image",
+
+        self.ml_instance.create_feature("Feature1",
+                                        "Image",
                                         terms=["FeatureValue"],
                                         assets=[a],
                                         metadata=[ColumnDefinition(name='TestCol', type=BuiltinTypes.int2)])
@@ -190,11 +192,11 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(len(self.ml_instance.find_datasets()), 1)
         return dataset_rid
 
-    def test_add_dataset_elements(self):
+    def test_add_dataset_members(self):
         dataset_rid = self.test_create_dataset()
         subject_rids = [i['RID'] for i in self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN].tables[
             'Subject'].entities().fetch()]
-        self.ml_instance.add_dataset_elements(dataset_rid=dataset_rid, members=subject_rids)
+        self.ml_instance.add_dataset_members(dataset_rid=dataset_rid, members=subject_rids)
         self.assertEqual(len(self.ml_instance.list_dataset_members(dataset_rid)["Subject"]), len(subject_rids))
 
 

@@ -535,8 +535,11 @@ class DerivaML:
         Create a pydantic model for entries into the specified feature table
         """
 
-        def validate_rid(_cls, rid):
-            self.model.catalog.resolve_rid(rid, self.model)
+        def validate_rid(rid):
+            try:
+                self.resolve_rid(rid)
+            except DerivaMLException as e:
+                raise ValidationError(str(e))
             return rid
 
         def map_type(x: builtin_types) -> type:
@@ -1147,7 +1150,7 @@ class DerivaML:
                                 suffix=".json",
                                 delete_on_close=False,
                                 delete=True) as fp:
-                json.dump(config.model_dump(), fp)
+                json.dump(config.model_dump_json(), fp)
                 fp.close()
                 configuration_rid = self._upload_execution_configuration_file(fp.name, description=config.description)
         except Exception as e:
@@ -1312,8 +1315,6 @@ class DerivaML:
         # Download configuration json file
         configuration_path = self.download_execution_files('Execution_Metadata', configuration_rid,
                                                            dest_dir=str(self.working_dir))
-        with open(configuration_path, 'r') as file:
-            configuration = json.load(file)
         # Check input configuration
         try:
             self.configuration = ExecutionConfiguration.model_validate(configuration)
@@ -1325,14 +1326,14 @@ class DerivaML:
         # Insert terms
         self.update_status(Status.running, "Inserting tags... ", execution_rid)
         vocabs = {}
-        for term in configuration.get("workflow_terms"):
-            term_record = self.add_term(table=term["term"],
-                                        term_name=term["name"],
-                                        description=term["description"],
+        for term in configuration.workflow_terms:
+            term_record = self.add_term(table=term.term,
+                                        term_name=term.name,
+                                        description=term.description,
                                         exists_ok=True)
-            term_records = vocabs.get(term["term"], [])
+            term_records = vocabs.get(term.term, [])
             term_records.append(term_record)
-            vocabs[term["term"]] = term_records
+            vocabs[term.term] = term_records
         # Materialize bdbag
         dataset_rids = []
         bag_paths = []

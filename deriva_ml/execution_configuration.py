@@ -27,8 +27,8 @@ class Execution(BaseModel):
 class Term(str, Enum):
     annotation = "Annotation_Type"
     workflow = "Workflow_Type"
-    execution_asset_type = "Execution_Asset_Type"
-    execution_metadata_type = "Execution_Metadata_Type"
+    execution_asset = "Execution_Asset_Type"
+    execution_metadata = "Execution_Metadata_Type"
 
 
 class WorkflowTerm(BaseModel):
