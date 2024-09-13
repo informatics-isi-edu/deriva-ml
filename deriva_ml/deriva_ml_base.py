@@ -1147,9 +1147,9 @@ class DerivaML:
         """
         try:
             with NamedTemporaryFile("w", prefix="exec_config",
-                                suffix=".json",
-                                delete_on_close=False,
-                                delete=True) as fp:
+                                    suffix=".json",
+                                    delete_on_close=False,
+                                    delete=True) as fp:
                 json.dump(config.model_dump_json(), fp)
                 fp.close()
                 configuration_rid = self._upload_execution_configuration_file(fp.name, description=config.description)
@@ -1299,6 +1299,7 @@ class DerivaML:
         Initialize the execution by a configuration file in the Execution_Metadata table.
         Setup working directory and download all the assets and data.
 
+
         Args:
         - configuration_rid (str): Resource Identifier (RID) of the configuration.
 
@@ -1382,7 +1383,7 @@ class DerivaML:
         self.update_status(Status.running, "Initialize status finished.", execution_rid)
         return configuration_records
 
-    def execution(self, execution_rid: RID) -> "DerivaMlExec":
+    def execution(self, configuration: ConfigurationRecord) -> "DerivaMlExec":
         """
         Start the execution by initializing the context manager DerivaMlExec.
 
@@ -1393,7 +1394,7 @@ class DerivaML:
         - DerivaMlExec: Execution object.
 
         """
-        return DerivaMlExec(self, execution_rid)
+        return DerivaMlExec(self, configuration)
 
     def _clean_folder_contents(self, folder_path: Path, execution_rid: RID):
         try:
@@ -1407,7 +1408,8 @@ class DerivaML:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
 
-    def upload_execution(self, execution_rid: RID, clean_folder: bool = True) -> dict[str, dict[str, FileUploadState]]:
+    def upload_execution(self, configuration: ConfigurationRecord, clean_folder: bool = True) -> (
+            dict)[str, dict[str, FileUploadState]]:
         """
         Upload all the assets and metadata associated with the current execution.
 
@@ -1419,6 +1421,7 @@ class DerivaML:
         values as an ordered dictionary with RID and metadata in the Execution_Assets table.
 
         """
+        execution_rid = configuration.execution_rid
         try:
             uploaded_assets = self.upload_execution_assets(execution_rid)
             self.upload_execution_metadata(execution_rid)
@@ -1444,8 +1447,9 @@ class DerivaMlExec:
 
     """
 
-    def __init__(self, catalog_ml: DerivaML, execution_rid: RID):
-        self.execution_rid = execution_rid
+    def __init__(self, catalog_ml: DerivaML, configuration: ConfigurationRecord):
+        self.configuration = configuration
+        self.execution_rid = configuration.execution_rid
         self.catalog_ml = catalog_ml
         self.catalog_ml.start_time = datetime.now()
         self.uploaded_assets = None
