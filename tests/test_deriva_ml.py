@@ -161,13 +161,13 @@ class TestExecution(unittest.TestCase):
     def test_execution_1(self):
         populate_test_catalog(self.model, SNAME_DOMAIN)
         exec_config = ExecutionConfiguration.load_configuration(self.files + "/test-workflow-1.json")
-        configuration_records = self.ml_instance.initialize_execution(configuration=exec_config)
-        with self.ml_instance.execution(execution_rid=configuration_records.execution_rid) as exec:
+        configuration_record = self.ml_instance.initialize_execution(configuration=exec_config)
+        with self.ml_instance.execution(configuration=configuration_record) as exec:
             output_dir = self.ml_instance.execution_assets_path / "testoutput"
             output_dir.mkdir(parents=True, exist_ok=True)
             with open(output_dir / "test.txt", "w+") as f:
                 f.write("Hello there\n")
-        upload_status = self.ml_instance.upload_execution(execution_rid=configuration_records.execution_rid)
+        upload_status = self.ml_instance.upload_execution(configuration=configuration_record)
         e = (list(self.ml_instance.catalog.getPathBuilder().deriva_ml.Execution.entities().fetch()))[0]
         self.assertEqual(e['Status'], "Completed")
 
