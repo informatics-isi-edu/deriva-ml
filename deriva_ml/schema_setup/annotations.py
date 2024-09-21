@@ -2,6 +2,7 @@ import argparse
 import sys
 
 from deriva.core.utils.core_utils import tag as deriva_tags
+from deriva_ml.schema_setup.export_spec import generate_dataset_export_spec
 
 
 def generate_annotation(catalog_id: str, schema: str) -> dict:
@@ -236,7 +237,8 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
             "execution_assets_annotation": execution_assets_annotation,
             "execution_metadata_annotation": execution_metadata_annotation,
             "schema_annotation": schema_annotation,
-            "catalog_annotation": catalog_annotation
+            "catalog_annotation": catalog_annotation,
+        #    "dataset_annotation": generate_dataset_export_spec()
             }
 
 

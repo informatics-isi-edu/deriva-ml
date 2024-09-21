@@ -9,12 +9,14 @@ def alter_table_annotation(catalog, schema_name: str, table_name: str, annotatio
     model_root = catalog.getCatalogModel()
     table = model_root.table(schema_name, table_name)
     table.alter(annotations=annotation)
+    model_root.apply()
 
 
 def alter_schema_annotation(catalog, schema_name: str, annotation: dict):
     model_root = catalog.getCatalogModel()
     schema = model_root.schemas[schema_name]
     schema.alter(annotations=annotation)
+    model_root.apply()
 
 def main():
     parser = argparse.ArgumentParser()

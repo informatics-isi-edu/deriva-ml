@@ -1,115 +1,579 @@
-from deriva.core.ermrest_model import Model, FindAssociationResult
-from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID, ColumnDefinition, BuiltinTypes
+from deriva.core.ermrest_model import Table
+from deriva_ml.deriva_ml_base import DerivaML, RID
+from deriva.core.utils.core_utils import tag as deriva_tags
+import re
+from typing import Any
 
-def foo():
-  return {
-    "bag": {
-      "bag_name": "Execution_{RID}",
-      "bag_algorithms": ["md5"],
-      "bag_archiver": "zip",
-      "bag_metadata": {}
-    },
-    "catalog": {
-      "query_processors": [
-
-        {
-          "processor": "csv",
-          "processor_params": {
-            "query_path": "/attributegroup/M:=deriva-ml:Execution/RID={RID}/F1:=left(Workflow)=(deriva-ml:Workflow:RID)/$M/RID;RCT,RCB,Description,Duration,Status,Status_Detail,Workflow,Workflow.Name:=F1:Name?limit=none",
-            "output_path": "Execution"
-          }
-        },
-        {
-          "processor": "csv",
-          "processor_params": {
-            "query_path": "/attributegroup/M:=deriva-ml:Execution/RID={RID}/(RID)=(deriva-ml:Dataset_Execution:Execution)/R:=(Dataset)=(deriva-ml:Dataset:RID)/F1:=left(Dataset_type)=(deriva-ml:Dataset_Type:RID)/$R/RID,Execution.RID:=M:RID;Description,RCB,RMB,Dataset_type,Dataset_Type.Name:=F1:Name?limit=none",
-            "output_path": "Dataset Execution"
-          }
-        },
-        {
-          "processor": "csv",
-          "processor_params": {
-            "query_path": "/attributegroup/M:=deriva-ml:Execution/RID={RID}/(RID)=(deriva-ml:Execution_Assets_Execution:Execution)/R:=(Execution_Assets)=(deriva-ml:Execution_Assets:RID)/RID,Execution.RID:=M:RID;RCT,RMT,RCB,RMB,URL,Filename,Length,MD5,Description?limit=none",
-            "output_path": "Execution Assets"
-          }
-        },
-        {
-          "processor": "fetch",
-          "processor_params": {
-            "query_path": "/attribute/M:=deriva-ml:Execution/RID={RID}/(RID)=(deriva-ml:Execution_Assets_Execution:Execution)/R:=(Execution_Assets)=(deriva-ml:Execution_Assets:RID)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none",
-            "output_path": "assets/Execution Assets/URL"
-          }
-        },
-        {
-          "processor": "csv",
-          "processor_params": {
-            "query_path": "/attributegroup/M:=deriva-ml:Execution/RID={RID}/(RID)=(deriva-ml:Execution_Metadata_Execution:Execution)/R:=(Execution_Metadata)=(deriva-ml:Execution_Metadata:RID)/F1:=left(Execution_Metadata_Type)=(deriva-ml:Execution_Metadata_Type:RID)/$R/RID,Execution.RID:=M:RID;RCB,URL,Filename,Length,MD5,Description,Execution_Metadata_Type,Execution_Metadata_Type.Name:=F1:Name?limit=none",
-            "output_path": "Execution_Metadata"
-          }
-        },
-        {
-          "processor": "fetch",
-          "processor_params": {
-            "query_path": "/attribute/M:=deriva-ml:Execution/RID={RID}/(RID)=(deriva-ml:Execution_Metadata_Execution:Execution)/R:=(Execution_Metadata)=(deriva-ml:Execution_Metadata:RID)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none",
-            "output_path": "assets/Execution_Metadata/URL"
-          }
-        }
-      ]
-    },
-    "post_processors": [
+dataset_fragment = {
+  "detailed": {
+    "templates": [
       {
-        "processor": "cloud_upload",
-        "processor_params": {
-          "acl": "public-read",
-          "target_url": "s3://eye-ai-shared/"
-        }
+        "type": "BAG",
+        "outputs": [
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)"
+            },
+            "destination": {
+              "name": "Subject",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)"
+            },
+            "destination": {
+              "name": "Observation",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)"
+            },
+            "destination": {
+              "name": "Image",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "eye-ai:Image_Angle_Vocab",
+              "skip_root_path": true
+            },
+            "destination": {
+              "name": "Image_Angle_Vocab",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "eye-ai:Image_Side_Vocab",
+              "skip_root_path": true
+            },
+            "destination": {
+              "name": "Image_Side_Vocab",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/D:=(RID)=(eye-ai:Diagnosis:Image)"
+            },
+            "destination": {
+              "name": "Diagnosis",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/D:=(RID)=(eye-ai:Diagnosis:Image)/eye-ai:Diagnosis_Image_Vocab"
+            },
+            "destination": {
+              "name": "Diagnosis_Image_Vocabulary",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/D:=(RID)=(eye-ai:Diagnosis:Image)/eye-ai:Diagnosis_Tag"
+            },
+            "destination": {
+              "name": "Diagnosis_Tag",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "attribute",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5"
+            },
+            "destination": {
+              "name": "assets/Image",
+              "type": "fetch"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/A:=(RID)=(eye-ai:Image_Annotation:Image)"
+            },
+            "destination": {
+              "name": "Image_Annotation",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "attribute",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/A:=(RID)=(eye-ai:Image_Annotation:Image)/E:=(Execution_Assets)=(eye-ai:Execution_Assets:RID)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5"
+            },
+            "destination": {
+              "name": "assets/Image_Annotation",
+              "type": "fetch"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)"
+            },
+            "destination": {
+              "name": "Observation_Clinic_Asso",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)"
+            },
+            "destination": {
+              "name": "Clinical_Records",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)/D:=(RID)=(eye-ai:Clinical_Records_ICD10_Eye:Clinical_Records)"
+            },
+            "destination": {
+              "name": "Clinic_ICD_Asso",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)/D:=(RID)=(eye-ai:Clinical_Records_ICD10_Eye:Clinical_Records)/I:=(ICD10_Eye)=(eye-ai:ICD10_Eye:RID)"
+            },
+            "destination": {
+              "name": "Clinic_ICD10",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)"
+            },
+            "destination": {
+              "name": "Report",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "attribute",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5"
+            },
+            "destination": {
+              "name": "assets/Report",
+              "type": "fetch"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)/N:=(RID)=(eye-ai:OCR_RNFL:Report)"
+            },
+            "destination": {
+              "name": "RNFL_OCR",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)/H:=(RID)=(eye-ai:OCR_HVF:Report)"
+            },
+            "destination": {
+              "name": "HVF_OCR",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)/L:=(Condition_Label)=(eye-ai:Condition_Label:RID)"
+            },
+            "destination": {
+              "name": "Condition_Label",
+              "type": "csv"
+            }
+          }
+        ],
+        "displayname": "BDBag Download"
       },
       {
-        "processor": "identifier",
-        "processor_params": {
-          "test": false
-        }
+        "type": "BAG",
+        "outputs": [
+          {
+            "source": {
+              "api": false,
+              "skip_root_path": true
+            },
+            "destination": {
+              "type": "env",
+              "params": {
+                "query_keys": [
+                  "snaptime"
+                ]
+              }
+            }
+          },
+          {
+            "source": {
+              "api": "entity"
+            },
+            "destination": {
+              "type": "env",
+              "params": {
+                "query_keys": [
+                  "RID",
+                  "Description"
+                ]
+              }
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)"
+            },
+            "destination": {
+              "name": "Subject",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)"
+            },
+            "destination": {
+              "name": "Observation",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)"
+            },
+            "destination": {
+              "name": "Image",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "eye-ai:Image_Angle_Vocab",
+              "skip_root_path": true
+            },
+            "destination": {
+              "name": "Image_Angle_Vocab",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "eye-ai:Image_Side_Vocab",
+              "skip_root_path": true
+            },
+            "destination": {
+              "name": "Image_Side_Vocab",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/D:=(RID)=(eye-ai:Diagnosis:Image)"
+            },
+            "destination": {
+              "name": "Diagnosis",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/D:=(RID)=(eye-ai:Diagnosis:Image)/eye-ai:Diagnosis_Image_Vocab"
+            },
+            "destination": {
+              "name": "Diagnosis_Image_Vocabulary",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/D:=(RID)=(eye-ai:Diagnosis:Image)/eye-ai:Diagnosis_Tag"
+            },
+            "destination": {
+              "name": "Diagnosis_Tag",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Process_Dataset:Dataset)/R:=(Process)=(eye-ai:Process:RID)"
+            },
+            "destination": {
+              "name": "Process",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "attribute",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5"
+            },
+            "destination": {
+              "name": "assets/Image",
+              "type": "fetch"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/A:=(RID)=(eye-ai:Image_Annotation:Image)"
+            },
+            "destination": {
+              "name": "Image_Annotation",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "attribute",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/I:=(RID)=(eye-ai:Image:Observation)/A:=(RID)=(eye-ai:Image_Annotation:Image)/E:=(Execution_Assets)=(eye-ai:Execution_Assets:RID)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5"
+            },
+            "destination": {
+              "name": "assets/Image_Annotation",
+              "type": "fetch"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)"
+            },
+            "destination": {
+              "name": "Observation_Clinic_Asso",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)"
+            },
+            "destination": {
+              "name": "Clinical_Records",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)/D:=(RID)=(eye-ai:Clinical_Records_ICD10_Eye:Clinical_Records)"
+            },
+            "destination": {
+              "name": "Clinic_ICD_Asso",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)/D:=(RID)=(eye-ai:Clinical_Records_ICD10_Eye:Clinical_Records)/I:=(ICD10_Eye)=(eye-ai:ICD10_Eye:RID)"
+            },
+            "destination": {
+              "name": "Clinic_ICD10",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)"
+            },
+            "destination": {
+              "name": "Report",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "attribute",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5"
+            },
+            "destination": {
+              "name": "assets/Report",
+              "type": "fetch"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)/N:=(RID)=(eye-ai:OCR_RNFL:Report)"
+            },
+            "destination": {
+              "name": "RNFL_OCR",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/R:=(RID)=(eye-ai:Report:Observation)/H:=(RID)=(eye-ai:OCR_HVF:Report)"
+            },
+            "destination": {
+              "name": "HVF_OCR",
+              "type": "csv"
+            }
+          },
+          {
+            "source": {
+              "api": "entity",
+              "path": "(RID)=(eye-ai:Subject_Dataset:Dataset)/S:=(Subject)=(eye-ai:Subject:RID)/O:=(RID)=(eye-ai:Observation:Subject)/A:=(RID)=(eye-ai:Clinical_Records_Observation:Observation)/C:=(Clinical_Records)=(eye-ai:Clinical_Records:RID)/L:=(Condition_Label)=(eye-ai:Condition_Label:RID)"
+            },
+            "destination": {
+              "name": "Condition_Label",
+              "type": "csv"
+            }
+          }
+        ],
+        "displayname": "BDBag to Cloud",
+        "bag_idempotent": true,
+        "postprocessors": [
+          {
+            "processor": "cloud_upload",
+            "processor_params": {
+              "acl": "public-read",
+              "target_url": "s3://eye-ai-shared"
+            }
+          },
+          {
+            "processor": "identifier",
+            "processor_params": {
+              "test": false,
+              "env_column_map": {
+                "Dataset_RID": "{RID}@{snaptime}",
+                "Description": "{Description}"
+              }
+            }
+          }
+        ]
       }
     ]
   }
+}
+def generate_dataset_export_spec(ml: DerivaML):
+    return {
+        "detailed": {
+            "templates": [
+                {
+                    "type": "BAG",
+                    "outputs": {BAG-FRAGMENT},
+                    "displayname": "BDBag Download"
+                },
+                {
+                    "type": "BAG",
+                    "outputs": {deriva_tags.export_fragement: 'bag_fragment'},
+                    "displayname": "BDBag to Cloud",
+                    "bag_idempotent": True,
+                    "postprocessors": [
+                        {
+                            "processor": "cloud_upload",
+                            "processor_params": {
+                                "acl": "public-read",
+                                "target_url": "s3://eye-ai-shared"
+                            }
+                        },
+                        {
+                            "processor": "identifier",
+                            "processor_params": {
+                                "test": False,
+                                "env_column_map": {
+                                    "Dataset_RID": "{RID}@{snaptime}",
+                                    "Description": "{Description}"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    }
 
-def generate_export_spec(model: Model):
-    return
 
 def export_vocabularies(ml: DerivaML) -> list[dict[str, Any]]:
-    return [{
-        "source": {
-            "api": "entity",
-            "path": f"{table.schema.name}:{table.name}",
-            "skip_root_path": True
-        },
-        "destination": { "name": table.name, "type": "csv"}} for table in ml.find_vocabularies()]
+    return [
+        {
+            "processor": "csv",
+            "processor_params":
+                {"query_path": f'/entity/{table.schema.name}:{table.name}',
+                 "output_path": table.name,
+                 "skip_root_path": True}
+        } for table in ml.find_vocabularies()]
 
 
-def export_datasets(ml: DerivaML) -> list[dict[str, Any]]:
+def export_table(ml: DerivaML, table: Table, dataset_rid: RID):
+    table = ml._get_table(table)
+    pb = ml.pathBuilder
+    dataset_path = pb.schemas[ml.ml_schema].Dataset
 
-  def dataset_rid(element: FindAssociationResult) -> str:
-    return f"{element.table.schema}:{element.name}:Dataset"
+    dataset_path = pb.schemas[ml.ml_schema].Dataset.filter(dataset_path.RID == dataset_rid)
+    table_path = pb.schemas[table.schema.name].tables[table.name]
 
-  def target_table(element: FindAssociationResult, schema) -> str:
-    table = element.other_fkeys.pop().pk_table
-    return f"{table.schema.name}:{table.name}" if schema else table.name
+    dataset_path.link(table_path)
+    exports = [
+        {
+            "processor": "csv",
+            "processor_params": {
+                "query_path": re.sub(".*/entity", "/entity", dataset_path.uri),
+                "output_path": table.name
+            }
+        }]
 
-  return [
-    {
-      "source": {
-        "api": "entity",
-        "path": f"(RID)=({dataset_rid(element)})/S:=({target_table(element, False)})=({target_table(element, True)}:RID)"
-      },
-      "destination": {
-        "name": target_table(element, False),
-        "type": "csv"
-      }
-    }
-    for element in ml.list_dataset_element_types()
-  ]
+    if ml.model.schemas[table.schema.name].tables[table.name].referenced_by or \
+            ml.model.schemas[table.schema.name].tables[table.name].foreign_keys:
+        print("Referenced")
+
+    if ml.isasset(table.name):
+        assets = dataset_path.attributes(table_path.URL.alias('url'),
+                                         table_path.Length.alias('length'),
+                                         table_path.Filename.alias('filename'),
+                                         table_path.MD5.alias('md5'))
+
+        exports.append(
+            {
+                "processor": "fetch",
+                "processor_params": {
+                    "query_path": re.sub(".*/attribute", "attribute", assets.uri),
+                    "output_path": f"assets/{table.name}"
+                }
+            }
+        )
+
+    return exports
 
 
-
-def foo(table):
-  tab;
+def export_dataset(ml: DerivaML, rid) -> list[dict[str, Any]]:
+    return [spec for elements in ml.list_dataset_element_types() for spec in export_table(ml, elements, rid)]

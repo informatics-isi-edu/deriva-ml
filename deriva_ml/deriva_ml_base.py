@@ -26,6 +26,7 @@ from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.core_utils import tag as deriva_tags
 from deriva.transfer.upload.deriva_upload import GenericUploader
+from fontTools.svgLib.path import PathBuilder
 from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
@@ -336,6 +337,10 @@ class DerivaML:
             "retry_backoff_factor": 5,
         })
         return session_config
+
+    @property
+    def pathBuilder(self) -> PathBuilder:
+        return self.catalog.getPathBuilder()
 
     @property
     def ml_path(self):
