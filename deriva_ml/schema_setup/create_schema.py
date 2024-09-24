@@ -21,7 +21,6 @@ def define_table_workflow(workflow_annotation: dict):
         annotations=workflow_annotation,
     )
 
-
 def define_table_dataset(dataset_annotation: dict = None):
     return Table.define(
         tname="Dataset",
@@ -89,7 +88,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
 
     execution_table = schema.create_table(define_table_execution(schema_name, annotations["execution_annotation"]))
 
-    dataset_table = schema.create_table(define_table_dataset(annotations.get("dataset_annotation")))
+    dataset_table = schema.create_table(define_table_dataset())
     dataset_table.create_reference(schema.create_table(
         Table.define_vocabulary("Dataset_Type", f'{schema_name}:{{RID}}')))
     schema.create_table(
@@ -104,7 +103,6 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
             Table.define_vocabulary("Execution_Metadata_Type", f'{schema_name}:{{RID}}')))
     schema.create_table(
         Table.define_association([("Execution_Metadata", execution_metadata_table), ("Execution", execution_table)]))
-
 
     # Execution Asset
     execution_assets_table = schema.create_table(

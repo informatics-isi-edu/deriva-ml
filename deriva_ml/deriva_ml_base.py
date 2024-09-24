@@ -30,6 +30,7 @@ from fontTools.svgLib.path import PathBuilder
 from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator
 
 from deriva_ml.execution_configuration import ExecutionConfiguration
+from deriva_ml.schema_setup.export_spec import generate_dataset_export_spec
 
 RID = NewType("RID", str)
 
@@ -297,7 +298,6 @@ class DerivaML:
                                       self.credential,
                                       session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
-        self.dataset_table = self.model.schemas[self.ml_schema].tables['Dataset']
         self.configuration = None
 
         self.start_time = datetime.now()
@@ -345,6 +345,10 @@ class DerivaML:
     @property
     def ml_path(self):
         return self.catalog.getPathBuilder().schemas[self.ml_schema]
+
+    @property
+    def dataset_table(self):
+        return self.model.schemas[self.ml_schema].tables['Dataset']
 
     @property
     def domain_path(self):
@@ -701,8 +705,12 @@ class DerivaML:
         """
         # Add table to map
         element_table = self._get_table(element)
-        return self.model.schemas[self.domain_schema].create_table(
+        table = self.model.schemas[self.domain_schema].create_table(
             Table.define_association([self.dataset_table, element_table]))
+        self.model = self.catalog.getCatalogModel()
+        self.dataset_table.annotations.update(generate_dataset_export_spec(self))
+        self.model.apply()
+        return table
 
     def list_dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
         """
