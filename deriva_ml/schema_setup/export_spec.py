@@ -2,6 +2,7 @@ from typing import Any
 
 from deriva.core.ermrest_model import FindAssociationResult
 from deriva.core.utils.core_utils import tag as deriva_tags
+from deriva.core.ermrest_model import Table, ForeignKey
 
 
 def export_vocabulary(ml) -> list[dict[str, Any]]:
@@ -28,6 +29,15 @@ def dataset_outputs(ml) -> list[dict[str, Any]]:
          "destination": {"type": "env", "params": {"query_keys": ["RID", "Description"]}}
          }
     ] + export_vocabulary(ml) # + export_dataset(ml)
+
+def table_dag(table: Table, nodes = None):
+    nodes = nodes or []
+    out_tables = {fk.pk_table for fk in table.foreign_keys}
+    in_tables = {fk.table for fk in table.referenced_by}
+    assert not(out_tables &  nodes)
+    assert not(in_tables & nodes)
+    nodes += out_tables + in_tables
+    return out_tables, in_tables
 
 
 def export_dataset_table(ml, assoc: FindAssociationResult):
