@@ -177,7 +177,7 @@ class VocabularyTerm(BaseModel):
     An entry in a vocabulary table.
     """
     name: str = Field(alias='Name')
-    synonyms: list[str] = Field(alias='Synonyms')
+    synonyms: Optional[list[str]] = Field(alias='Synonyms')
     id: str = Field(alias="ID")
     uri: str = Field(alias="URI")
     description: str = Field(alias="Description")
