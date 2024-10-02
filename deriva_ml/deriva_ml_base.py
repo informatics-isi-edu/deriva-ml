@@ -198,6 +198,10 @@ class FindFeatureResult(FindAssociationResult):
         self.feature_name = feature_name
         super().__init__(table, self_fkey, other_fkeys)
 
+    def __repr__(self) -> str:
+        return (f"FeatureResult({self.self_fkey.pk_table.name}, feature_name={self.feature_name}, "
+                f"table={self.table.name})")
+
 
 class FileUploadState(BaseModel):
     state: UploadState
@@ -386,7 +390,7 @@ class DerivaML:
             Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}', comment=comment)
         )
 
-    def isvocabulary(self, table_name: str | Table) -> Table:
+    def is_vocabulary(self, table_name: str | Table) -> Table:
         """
         Check if a given table is a controlled vocabulary table.
 
@@ -438,13 +442,17 @@ class DerivaML:
             self.model.apply()
         return asset_table
 
-    def isasset(self, table_name: str | Table) -> Table:
+    def is_association(self, table_name: str | Table, unqualified=True, pure=True) -> bool | set | int:
+        table = self._get_table(table_name)
+        return table.is_association(table, unqualified=unqualified, pure=pure)
+
+    def is_asset(self, table_name: str | Table) -> Table:
         asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
         table = self._get_table(table_name)
         return asset_columns.issubset({c.name for c in table.columns}) and table
 
     def find_assets(self) -> list[Table]:
-        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.isasset(t)]
+        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
     def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
                      version: str = "",
@@ -515,9 +523,9 @@ class DerivaML:
                 return m
 
         # Make sure that the provided assets or terms are actually assets or terms.
-        if not all(map(self.isasset, assets)):
+        if not all(map(self.is_asset, assets)):
             raise DerivaMLException(f"Invalid create_feature asset table.")
-        if not all(map(self.isvocabulary, terms)):
+        if not all(map(self.is_vocabulary, terms)):
             raise DerivaMLException(f"Invalid create_feature asset table.")
 
         # Get references to the necessary tables and make sure that the
@@ -853,7 +861,7 @@ class DerivaML:
         """
         synonyms = synonyms or []
         pb = self.catalog.getPathBuilder()
-        if not (table := self.isvocabulary(table)):
+        if not (table := self.is_vocabulary(table)):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
         schema_name = table.schema.name
@@ -886,7 +894,7 @@ class DerivaML:
           found in the vocabulary.
 
         """
-        vocab_table = self.isvocabulary(table)
+        vocab_table = self.is_vocabulary(table)
         if not vocab_table:
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
@@ -904,7 +912,7 @@ class DerivaML:
          - List[str]: A list of table names representing controlled vocabulary tables in the schema.
 
         """
-        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.isvocabulary(t)]
+        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
     def list_vocabulary_terms(self, table_name: str) -> Iterable[VocabularyTerm]:
         """
@@ -921,7 +929,7 @@ class DerivaML:
           a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
-        if not (table := self.isvocabulary(table_name)):
+        if not (table := self.is_vocabulary(table_name)):
             raise DerivaMLException(f"The table {table_name} is not a controlled vocabulary")
 
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]

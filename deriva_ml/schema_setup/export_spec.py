@@ -1,9 +1,11 @@
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from deriva.core.ermrest_model import FindAssociationResult
 from deriva.core.utils.core_utils import tag as deriva_tags
-from deriva.core.ermrest_model import Table, ForeignKey
+from deriva.core.ermrest_model import Table, ForeignKey, Schema
 
+if TYPE_CHECKING:
+    from deriva_ml.deriva_ml_base import DerivaML
 
 def export_vocabulary(ml) -> list[dict[str, Any]]:
     return [
@@ -30,22 +32,61 @@ def dataset_outputs(ml) -> list[dict[str, Any]]:
          }
     ] + export_vocabulary(ml) # + export_dataset(ml)
 
-def table_dag(table: Table, nodes = None):
-    nodes = nodes or []
-    out_tables = {fk.pk_table for fk in table.foreign_keys}
-    in_tables = {fk.table for fk in table.referenced_by}
-    assert not(out_tables &  nodes)
-    assert not(in_tables & nodes)
-    nodes += out_tables + in_tables
-    return out_tables, in_tables
+def table_dag(ml: DerivaML, path):
+    table = path[-1]
+    paths = [path]
+    if ml.is_vocabulary(table):
+        return paths
+    tables = {fk.pk_table for fk in table.foreign_keys if fk.pk_table != table}
+    tables |= {fk.table for fk in table.referenced_by if fk.table != table}
+    for t in tables:
+        if t == table:
+            pass
+        elif t in path:
+            pass
+        elif t.schema.name != ml.domain_schema:
+            pass
+        else:
+            child_paths = table_dag(ml, path=path + [t])
+            paths.extend([child_path for child_path in child_paths])
+    return paths
 
 
-def export_dataset_table(ml, assoc: FindAssociationResult):
+def export_dataset_table(ml: DerivaML, assoc: FindAssociationResult):
     def tname(t):
         return f"{t.schema.name}:{t.name}"
 
+    def map_component(component):
+        if ml.is_association(component):
+            pass
+        if ml.is_asset(componentn):
+            pass
+        else:
+            exports = [
+                {
+                    "source": {
+                        "api": "entity",
+                        "path": f"(RID)=({tname(atable)})/({dtable.name})=({tname(dtable)}:RID)"
+                    },
+                    "destination": {
+                        "name": dtable.name,
+                        "type": "csv"
+                    }
+                }]
+
+        return
+
+
+
+    paths = table_dag(ml, [ml.dataset_table])
+    for path in paths:
+        for component in path:
+           '/'.join([map_component(compenent)])
+
     atable = assoc.table
     dtable = assoc.other_fkeys.pop().pk_table
+    o = table_dag(ml, table=dtable, domain_schema=ml.domain_schema, parent=ml.dataset_table)
+    print(f"dag: {o}")
     exports = [
         {
             "source": {
@@ -61,7 +102,7 @@ def export_dataset_table(ml, assoc: FindAssociationResult):
     #          ml.model.schemas[table.schema.name].tables[table.name].foreign_keys:
     #      print("Referenced")
 
-    if ml.isasset(dtable.name):
+    if ml.is_asset(dtable.name):
         exports.append({
             "source": {
                 "api": "attribute",
@@ -81,7 +122,7 @@ def export_dataset(ml) -> list[dict[str, Any]]:
     :return:
     """
     return [spec for element in ml.dataset_table.find_associations(pure=False) for spec in
-            export_dataset_table(ml, element)]
+            export_dataset_table(ml, element) if element.table.name != "Dataset_Execution"]
 
 
 def generate_dataset_export_spec(ml: 'DerivaML'):
