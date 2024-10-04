@@ -1,41 +1,32 @@
-from typing import Any, TYPE_CHECKING
-
-from deriva.core.ermrest_model import FindAssociationResult
 from deriva.core.utils.core_utils import tag as deriva_tags
-from deriva.core.ermrest_model import Table, ForeignKey, Schema
+from deriva.core.ermrest_model import Table, Model
+from typing import Any
 
-if TYPE_CHECKING:
-    from deriva_ml.deriva_ml_base import DerivaML
 
-def export_vocabulary(ml) -> list[dict[str, Any]]:
+def is_vocabulary(t):
+    vocab_columns = {'Name', 'URI', 'Synonyms', 'Description', 'ID'}
+    return vocab_columns.issubset({c.name for c in t.columns}) and t
+
+
+def vocabulary_outputs(model: Model) -> list[dict[str, Any]]:
     return [
         {
-            "source": {
-                "api": "entity",
-                "path": f"{table.schema.name}:{table.name}",
-                "skip_root_path": True
+            'source': {
+                'api': 'entity',
+                'path': f'{table.schema.name}:{table.name}',
+                'skip_root_path': True
             },
-            "destination": {
-                "name": table.name,
-                "type": "csv"
+            'destination': {
+                'name': table.name,
+                'type': 'csv'
             }
-        } for table in ml.find_vocabularies()]
+        } for s in model.schemas.values() for table in s.tables.values() if is_vocabulary(table)]
 
 
-def dataset_outputs(ml) -> list[dict[str, Any]]:
-    return [
-        {"source": {"api": False, "skip_root_path": True},
-         "destination": {"type": "env", "params": {"query_keys": ["snaptime"]}}
-         },
-        {"source": {"api": "entity"},
-         "destination": {"type": "env", "params": {"query_keys": ["RID", "Description"]}}
-         }
-    ] + export_vocabulary(ml) # + export_dataset(ml)
-
-def table_dag(ml: DerivaML, path):
+def table_dag(model: Model, path, domain_schema):
     table = path[-1]
     paths = [path]
-    if ml.is_vocabulary(table):
+    if is_vocabulary(table):
         return paths
     tables = {fk.pk_table for fk in table.foreign_keys if fk.pk_table != table}
     tables |= {fk.table for fk in table.referenced_by if fk.table != table}
@@ -44,115 +35,100 @@ def table_dag(ml: DerivaML, path):
             pass
         elif t in path:
             pass
-        elif t.schema.name != ml.domain_schema:
+        elif t.schema.name != domain_schema:
             pass
         else:
-            child_paths = table_dag(ml, path=path + [t])
+            child_paths = table_dag(model, path=path + [t], domain_schema=domain_schema)
             paths.extend([child_path for child_path in child_paths])
     return paths
 
 
-def export_dataset_table(ml: DerivaML, assoc: FindAssociationResult):
+def export_dataset_element(model: Model, element: Table, domain_schema: str):
     def tname(t):
-        return f"{t.schema.name}:{t.name}"
+        return f'{t.schema.name}:{t.name}'
 
-    def map_component(component):
-        if ml.is_association(component):
-            pass
-        if ml.is_asset(componentn):
-            pass
-        else:
-            exports = [
-                {
-                    "source": {
-                        "api": "entity",
-                        "path": f"(RID)=({tname(atable)})/({dtable.name})=({tname(dtable)}:RID)"
-                    },
-                    "destination": {
-                        "name": dtable.name,
-                        "type": "csv"
-                    }
-                }]
+    def is_asset(t: Table) -> Table:
+        asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
+        return asset_columns.issubset({c.name for c in table.columns}) and t
 
-        return
-
-
-
-    paths = table_dag(ml, [ml.dataset_table])
-    for path in paths:
-        for component in path:
-           '/'.join([map_component(compenent)])
-
-    atable = assoc.table
-    dtable = assoc.other_fkeys.pop().pk_table
-    o = table_dag(ml, table=dtable, domain_schema=ml.domain_schema, parent=ml.dataset_table)
-    print(f"dag: {o}")
-    exports = [
-        {
-            "source": {
-                "api": "entity",
-                "path": f"(RID)=({tname(atable)})/({dtable.name})=({tname(dtable)}:RID)"
-            },
-            "destination": {
-                "name": dtable.name,
-                "type": "csv"
+    exports = []
+    for path in table_dag(model, [element], domain_schema):
+        table = path[-1]
+        if table.is_association():
+            continue
+        npath = '/'.join([tname(t) for t in path])
+        exports.append(
+            {
+                'source': {
+                    'api': 'entity',
+                    'path': f'{npath}'
+                },
+                'destination': {'name': table.name, 'type': 'csv'}
             }
-        }]
-    #  if ml.model.schemas[table.schema.name].tables[table.name].referenced_by or \
-    #          ml.model.schemas[table.schema.name].tables[table.name].foreign_keys:
-    #      print("Referenced")
-
-    if ml.is_asset(dtable.name):
-        exports.append({
-            "source": {
-                "api": "attribute",
-                "path": f"(RID)=({tname(atable)}:Dataset)/({dtable.name})=({tname(dtable)}:RID)/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5"
-            },
-            "destination": {"name": f"assets/{dtable.name}", "type": "fetch"}
-        }
         )
-
+        if is_asset(table):
+            exports.append({
+                    'source': {
+                        'api': 'attribute',
+                        'path': f'{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5'
+                    },
+                    'destination': {'name': f'assets/{table.name}', 'type': 'fetch'}
+                }
+            )
     return exports
 
 
-def export_dataset(ml) -> list[dict[str, Any]]:
+def dataset_outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
     """
-    Generate the export specificions for each of the associated dataset member types.
-    :param ml:
+    Generate the export specification for each of the associated dataset member types.
+    :param model:
+    :param domain_schema:
     :return:
     """
-    return [spec for element in ml.dataset_table.find_associations(pure=False) for spec in
-            export_dataset_table(ml, element) if element.table.name != "Dataset_Execution"]
+    dataset_table = model.schemas['deriva-ml'].tables['Dataset']
+    return [spec for element in dataset_table.find_associations(pure=False) for spec in
+            export_dataset_element(model, element.table, domain_schema) if element.table.name != 'Dataset_Execution']
 
 
-def generate_dataset_export_spec(ml: 'DerivaML'):
+def outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
+    return [
+        {'source': {'api': False, 'skip_root_path': True},
+         'destination': {'type': 'env', 'params': {'query_keys': ['snaptime']}}
+         },
+        {'source': {'api': 'entity'},
+         'destination': {'type': 'env', 'params': {'query_keys': ['RID', 'Description']}}
+         }
+    ] + vocabulary_outputs(model) + dataset_outputs(model, domain_schema)
+
+
+def generate_dataset_export_spec(model: Model, domain_schema) -> dict[str, Any]:
     return {
-        deriva_tags.export_fragment_definitions: {'dataset_export_outputs': dataset_outputs(ml)},
+        deriva_tags.export_fragment_definitions: {'dataset_export_outputs': outputs(model, domain_schema)},
         deriva_tags.export_2019: {
-            "detailed": {
-                "templates": [
+            'detailed': {
+                'templates': [
                     {
-                        "type": "BAG",
-                        "outputs": [{"fragment_key": "dataset_export_outputs"}],
-                        "displayname": "BDBag Download",
-                        "bag_idempotent": True,
+                        'type': 'BAG',
+                        'outputs': [{'fragment_key': 'dataset_export_outputs'}],
+                        'displayname': 'BDBag Download',
+                        'bag_idempotent': True,
                     },
                     {
-                        "type": "BAG",
-                        "outputs": [{"fragment_key": "dataset_export_outputs"}],
-                        "displayname": "BDBag to Cloud",
-                        "bag_idempotent": True,
-                        "postprocessors": [
+                        'type': 'BAG',
+                        'outputs': [{'fragment_key': 'dataset_export_outputs'}],
+                        'displayname': 'BDBag to Cloud',
+                        'bag_idempotent': True,
+                        'postprocessors': [
                             {
-                                "processor": "cloud_upload",
-                                "processor_params": {"acl": "public-read", "target_url": "s3://eye-ai-shared/"}
+                                'processor': 'cloud_upload',
+                                'processor_params': {'acl': 'public-read', 'target_url': 's3://eye-ai-shared/'}
                             },
                             {
-                                "processor": "identifier",
-                                "processor_params": {
-                                    "test": False,
-                                    "env_column_map": {"Dataset_RID": "{RID}@{snaptime}",
-                                                       "Description": "{Description}"}
+                                'processor': 'identifier',
+                                'processor_params': {
+                                    'test': False,
+                                    'env_column_map': {'Dataset_RID': '{RID}@{snaptime}',
+                                                       'Description': '{Description}'}
                                 }
                             }
                         ]

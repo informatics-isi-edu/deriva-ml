@@ -5,6 +5,7 @@ from requests import HTTPError
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
+from deriva_ml.schema_setup.export_spec import generate_dataset_export_spec
 
 
 def populate_test_catalog(model: Model, sname: str) -> None:
@@ -74,6 +75,9 @@ def create_test_catalog(hostname, domain_schema) -> ErmrestCatalog:
         create_ml_schema(model)
         create_domain_schema(model, domain_schema)
         populate_test_catalog(model, domain_schema)
+        dataset_table = model.schemas['deriva-ml'].tables['Dataset']
+        dataset_table.annotations.update(generate_dataset_export_spec(model, domain_schema))
+        model.apply()
     except Exception:
         # on failure, delete catalog and re-raise exception
         test_catalog.delete_ermrest_catalog(really=True)
