@@ -63,7 +63,7 @@ def export_dataset_element(model: Model, element: Table, domain_schema: str):
                     'api': 'entity',
                     'path': f'{npath}'
                 },
-                'destination': {'name': table.name, 'type': 'csv'}
+                'destination': {'name': '/'.join([p.name for p in path if not p.is_association()] + [table.name]), 'type': 'csv'}
             }
         )
         if is_asset(table):
