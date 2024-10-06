@@ -1,36 +1,35 @@
-import hashlib
-import json
-import logging
-import os
-import re
-import shutil
-import warnings
+
+from bdbag import bdbag_api as bdb
 from copy import deepcopy
 from datetime import datetime
-from enum import Enum
-from itertools import chain
-from pathlib import Path
-from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import List, Optional, Any, NewType, Iterable
-
-import pandas as pd
-import pkg_resources
-import requests
-from bdbag import bdbag_api as bdb
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.ermrest_catalog import ResolveRidResult
+from deriva.core.datapath import _CatalogWrapper
 from deriva.core.ermrest_model import FindAssociationResult
 from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.core_utils import tag as deriva_tags
-from deriva.transfer.upload.deriva_upload import GenericUploader
-from fontTools.svgLib.path import PathBuilder
-from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator
-
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.export_spec import generate_dataset_export_spec
+from deriva.transfer.upload.deriva_upload import GenericUploader
+from enum import Enum
+import hashlib
+from itertools import chain
+import json
+import logging
+import pkg_resources
+from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator
+import os
+from pathlib import Path
+import re
+import requests
+import shutil
+from tempfile import TemporaryDirectory, NamedTemporaryFile
+from typing import List, Optional, Any, NewType, Iterable
+import warnings
+
 
 RID = NewType('RID', str)
 
@@ -343,15 +342,11 @@ class DerivaML:
         return session_config
 
     @property
-    def pathBuilder(self) -> PathBuilder:
+    def pathBuilder(self) -> _CatalogWrapper:
         return self.catalog.getPathBuilder()
 
     @property
-    def ml_path(self):
-        return self.catalog.getPathBuilder().schemas[self.ml_schema]
-
-    @property
-    def dataset_table(self):
+    def dataset_table(self) -> Table:
         return self.model.schemas[self.ml_schema].tables['Dataset']
 
     @property
@@ -362,7 +357,8 @@ class DerivaML:
         """
         Return the table object corresponding to the given table name. If the table name appears in more
         than one schema, return the first one you find.
-        :param table:
+
+        :param table: A ERMRest table object or a sting that is the name of the table.
         :return: Table object.
         """
         if isinstance(table, Table):
@@ -386,24 +382,22 @@ class DerivaML:
         :return:
         """
         schema = schema or self.domain_schema
-        return self.model.schemas[self.domain_schema].create_table(
+        return self.model.schemas[schema].create_table(
             Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}', comment=comment)
         )
 
-    def is_vocabulary(self, table_name: str | Table) -> Table:
+    def is_vocabulary(self, table_name: str | Table) -> bool:
         """
         Check if a given table is a controlled vocabulary table.
 
-        Args:
-        - table_name (str): The name of the table.
+        param: table_name: A ERMRest table object or the name of the table.
 
-        Returns:
-        - Table: Table object if the table is a controlled vocabulary, False otherwise.
+        returns: Table object if the table is a controlled vocabulary, False otherwise.
 
         """
         vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
         table = self._get_table(table_name)
-        return vocab_columns.issubset({c.name.upper() for c in table.columns}) and table
+        return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
     def create_asset(self, asset_name: str, comment='', schema: str = None, upload_spec: bool = True) -> Table:
         """
@@ -446,10 +440,10 @@ class DerivaML:
         table = self._get_table(table_name)
         return table.is_association(unqualified=unqualified, pure=pure)
 
-    def is_asset(self, table_name: str | Table) -> Table:
+    def is_asset(self, table_name: str | Table) -> bool:
         asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
         table = self._get_table(table_name)
-        return asset_columns.issubset({c.name for c in table.columns}) and table
+        return asset_columns.issubset({c.name for c in table.columns})
 
     def find_assets(self) -> list[Table]:
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
@@ -473,7 +467,7 @@ class DerivaML:
         """
 
         # Check to make sure that the workflow is not already in the table. If its not, add it.
-        ml_schema_path = self.ml_path
+        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         try:
             url_column = ml_schema_path.Workflow.URL
             workflow_record = list(ml_schema_path.Workflow.filter(url_column == url).entities())[0]
@@ -861,8 +855,9 @@ class DerivaML:
         - EyeAIException: If the control vocabulary name already exists and exist_ok is False.
         """
         synonyms = synonyms or []
+        table = self._get_table(table)
         pb = self.catalog.getPathBuilder()
-        if not (table := self.is_vocabulary(table)):
+        if not (self.is_vocabulary(table)):
             raise DerivaMLException(f'The table {table} is not a controlled vocabulary')
 
         schema_name = table.schema.name
@@ -895,8 +890,8 @@ class DerivaML:
           found in the vocabulary.
 
         """
-        vocab_table = self.is_vocabulary(table)
-        if not vocab_table:
+        vocab_table = self._get_table(table)
+        if not self.is_vocabulary(vocab_table):
             raise DerivaMLException(f'The table {table} is not a controlled vocabulary')
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
         schema_path = self.catalog.getPathBuilder().schemas[schema_name]
@@ -930,7 +925,8 @@ class DerivaML:
           a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
-        if not (table := self.is_vocabulary(table_name)):
+        table = self._get_table(table_name)
+        if not (self.is_vocabulary(table_name)):
             raise DerivaMLException(f'The table {table_name} is not a controlled vocabulary')
 
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
@@ -954,7 +950,23 @@ class DerivaML:
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
-    def user_list(self) -> pd.DataFrame:
+    def cite(self, entity: dict) -> str:
+        """
+        Return a citation URL for the provided entity.
+        :param entity: A dict that contains the column values for a specific entity.
+        :return:  The PID for the provided entity.
+        """
+        if not isinstance(entity, dict):
+            raise DerivaMLException("Entity must be a tuple")
+        try:
+            self.resolve_rid(entity['RID'])
+            return f"https://{self.host_name}/id/{self.catalog_id}/{entity['RID']}"
+        except KeyError as e:
+            raise DerivaMLException(f"Entity {e} does not have RID column")
+        except DerivaMLException as _e:
+            raise DerivaMLException("Entity RID does not exist")
+
+    def user_list(self) -> list[dict[str, str]]:
         """
         Return a DataFrame containing user information of current catalog.
 
@@ -962,8 +974,8 @@ class DerivaML:
         - pd.DataFrame: DataFrame containing user information.
 
         """
-        user_path = self.catalog.getPathBuilder().schemas['public'].users.ERMrest_Client.path
-        return pd.DataFrame(user_path.entities().fetch())[['ID', 'Full_Name']]
+        user_path = self.pathBuilder.public.ERMrest_Client.path
+        return [{'ID': u['ID'], 'Full Name': u['Full_Name']} for u in user_path.entities().fetch()]
 
     @staticmethod
     def _get_checksum(url) -> str:
@@ -1175,7 +1187,7 @@ class DerivaML:
                 json.dump(config.model_dump_json(), fp)
                 fp.close()
                 configuration_rid = self._upload_execution_configuration_file(fp.name, description=config.description)
-        except Exception as e:
+        except Exception as _e:
             raise DerivaMLException(f'Error in execution configuration upload')
         return configuration_rid
 

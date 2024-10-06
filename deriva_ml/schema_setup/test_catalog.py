@@ -8,6 +8,7 @@ from requests import HTTPError
 from deriva.core import DerivaServer
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from deriva_ml.schema_setup.export_spec import generate_dataset_export_spec
+from deriva_ml.deriva_ml_base import DerivaML
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core import ErmrestCatalog, get_credential, urlquote
@@ -110,7 +111,7 @@ def create_domain_schema(model: Model, sname: str) -> None:
     image_table.create_reference(subject_table)
 
 
-def create_test_catalog(hostname, domain_schema) -> ErmrestCatalog:
+def create_test_catalog(hostname, domain_schema= 'test-schema') -> ErmrestCatalog:
     server = DerivaServer('https', hostname, credentials=get_credential(hostname))
     test_catalog = server.create_ermrest_catalog()
     model = test_catalog.getCatalogModel()
@@ -126,3 +127,11 @@ def create_test_catalog(hostname, domain_schema) -> ErmrestCatalog:
         test_catalog.delete_ermrest_catalog(really=True)
         raise
     return test_catalog
+
+
+class DemoML(DerivaML):
+    def __init(self, hostname, catalog_id, domain_schema='test-schema'):
+        super().__init__(hostname=hostname,
+                         catalog_id=catalog_id,
+                         domain_schema=domain_schema,
+                         model_version="1")
