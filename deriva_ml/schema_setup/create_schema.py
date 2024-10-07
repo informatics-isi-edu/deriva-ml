@@ -89,10 +89,13 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
     execution_table = schema.create_table(define_table_execution(schema_name, annotations["execution_annotation"]))
 
     dataset_table = schema.create_table(define_table_dataset())
-    dataset_table.create_reference(schema.create_table(
-        Table.define_vocabulary("Dataset_Type", f'{schema_name}:{{RID}}')))
+    dataset_type = schema.create_table(
+        Table.define_vocabulary("Dataset_Type", f'{schema_name}:{{RID}}'))
     schema.create_table(
-        Table.define_association(associates=[("Dataset_Table", dataset_table), ("Execution_Table", execution_table)])
+        Table.define_association(associates=[("Dataset", dataset_table), ("Dataset_Type", dataset_type)])
+    )
+    schema.create_table(
+        Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
     )
 
     # Execution Metadata

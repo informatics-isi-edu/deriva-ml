@@ -650,28 +650,44 @@ class DerivaML:
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
 
-    def create_dataset(self, ds_type: str, description: str) -> RID:
+    def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
+        :param ds_type: One or more dataset types.  Must be a term from the Dataset_Type controlled vocabulary.
         :param description:  Description of the dataset.
         :return: New dataset RID.
         """
         # Create the entry for the new dataset and get its RID.
-        if not self.lookup_term('Dataset_Type', ds_type):
-            raise DerivaMLException(f'Dataset type must be a vocabulary term.')
+        ds_types = [ds_type] if isinstance(ds_type, str) else ds_type
+        for ds_type in ds_types:
+            if not self.lookup_term('Dataset_Type', ds_type):
+                raise DerivaMLException(f'Dataset type must be a vocabulary term.')
         dataset_table_path = (
-            self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
-        return dataset_table_path.insert([{'Description': description, 'Dataset_Type': ds_type}])[0]['RID']
+            self.pathBuilder.schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
+        dataset = dataset_table_path.insert([{'Description': description, 'Dataset_Type': ds_type}])[0]['RID']
+
+        # Get the name of the association table between dataset and dataset_type.
+        atable = next(self.model.schemas[self.ml_schema].tables['Dataset_Type'].find_associations()).name
+        self.pathBuilder.schemas[self.ml_schema].tables[atable].insert(
+            [{'Dataset_Type': ds_type, 'Dataset': dataset} for ds_type in ds_types])
+        return dataset
 
     def find_datasets(self) -> Iterable[dict[str, Any]]:
         """
         Returns a list of currently available datasets.
         :return:
         """
-        dataset_path = self.catalog.getPathBuilder().schemas[self.dataset_table.schema.name].tables[
-            self.dataset_table.name]
-        return list(
-            dataset_path.entities().fetch())
+        # Get datapath to all the tables we will need: Dataset, Dataset_Type and the association table.
+        pb = self.pathBuilder
+        dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
+        atable = next(self.model.schemas['deriva-ml'].tables['Dataset_Type'].find_associations()).name
+        ml_path = pb.schemas[self.ml_schema]
+        dataset_type_path = ml_path.Dataset_Type
+        atable_path = ml_path.tables[atable]
+
+        # Get a list of all the dataset_type values associated with this dataset.
+        ds_type = [ds['Name'] for ds in dataset_path.link(atable_path).link(dataset_type_path).entities().fetch()]
+        return [e | {'Dataset_Type': ds_type} for e in dataset_path.entities().fetch()]
 
     def delete_dataset(self, dataset_rid: RID) -> None:
         """
@@ -697,7 +713,14 @@ class DerivaML:
         dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
 
     def list_dataset_element_types(self) -> Iterable[Table]:
-        return [a.other_fkeys.pop().pk_table for a in self.dataset_table.find_associations()]
+        """
+        Return the list of tables that can be included as members of a dataset.
+        :return:
+        """
+        def domain_table(table: Table) -> bool:
+            return table.schema.name == self.domain_schema
+
+        return [t for a in self.dataset_table.find_associations() if domain_table(t:=a.other_fkeys.pop().pk_table)]
 
     def add_dataset_element_type(self, element: str | Table) -> Table:
         """
@@ -721,7 +744,7 @@ class DerivaML:
         :param dataset_rid:
         :return:
         """
-        pb = self.catalog.getPathBuilder()
+        pb = self.pathBuilder
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
 
@@ -732,8 +755,10 @@ class DerivaML:
         # the appropriate association table.
         rid_list = {}
         for assoc_table in self.dataset_table.find_associations():
-            table_path = pb.schemas[assoc_table.table.schema.name].tables[assoc_table.name]
             other_fkey = assoc_table.other_fkeys.pop()
+            if other_fkey.table.schema.name != self.domain_schema:
+                continue
+            table_path = pb.schemas[assoc_table.table.schema.name].tables[assoc_table.name]
             dataset_column, element_column = assoc_table.self_fkey.columns[0], other_fkey.columns[0]
             element_table = other_fkey.pk_table.name
             dataset_path = table_path.columns[dataset_column.name]
