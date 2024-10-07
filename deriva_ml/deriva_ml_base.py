@@ -975,17 +975,15 @@ class DerivaML:
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
-    def cite(self, entity: dict) -> str:
+    def cite(self, entity: dict | str) -> str:
         """
         Return a citation URL for the provided entity.
         :param entity: A dict that contains the column values for a specific entity.
         :return:  The PID for the provided entity.
         """
-        if not isinstance(entity, dict):
-            raise DerivaMLException("Entity must be a tuple")
         try:
-            self.resolve_rid(entity['RID'])
-            return f"https://{self.host_name}/id/{self.catalog_id}/{entity['RID']}"
+            self.resolve_rid(rid:=entity if isinstance(entity, str) else entity['RID'])
+            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}"
         except KeyError as e:
             raise DerivaMLException(f"Entity {e} does not have RID column")
         except DerivaMLException as _e:

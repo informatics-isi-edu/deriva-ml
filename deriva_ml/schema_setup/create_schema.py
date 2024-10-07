@@ -88,7 +88,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
 
     execution_table = schema.create_table(define_table_execution(schema_name, annotations["execution_annotation"]))
 
-    dataset_table = schema.create_table(define_table_dataset())
+    dataset_table = schema.create_table(define_table_dataset(annotations["dataset_annotation"]))
     dataset_type = schema.create_table(
         Table.define_vocabulary("Dataset_Type", f'{schema_name}:{{RID}}'))
     schema.create_table(

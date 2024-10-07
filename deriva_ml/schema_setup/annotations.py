@@ -112,6 +112,12 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
         }
     }
 
+    dataset_annotation = {
+        # Setup Facet on types
+        # Make types in visible columns
+        # Have all connected values be visabile FK.
+    }
+
     schema_annotation = {
         'name_style': {'underline_space': True},
     }
@@ -233,6 +239,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
     }
 
     return {"workflow_annotation": workflow_annotation,
+            "dataset_annotation": dataset_annotation,
             "execution_annotation": execution_annotation,
             "execution_assets_annotation": execution_assets_annotation,
             "execution_metadata_annotation": execution_metadata_annotation,
