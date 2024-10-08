@@ -276,7 +276,7 @@ class DerivaML:
     def __init__(self,
                  hostname: str,
                  catalog_id: str,
-                 domain_schema: str,
+                 domain_schema: str = None,
                  project_name: str = None,
                  cache_dir: Optional[str] = None,
                  working_dir: Optional[str] = None,
@@ -293,10 +293,8 @@ class DerivaML:
         """
         self.host_name = hostname
         self.catalog_id = catalog_id
-        self.domain_schema = domain_schema
         self.ml_schema = ml_schema
         self.version = model_version
-        self.project_name = project_name or self.domain_schema
 
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
@@ -304,6 +302,10 @@ class DerivaML:
                                       session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
         self.configuration = None
+
+        builtin_schemas = ['public', self.ml_schema, 'www']
+        self.domain_schema = domain_schema or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
+        self.project_name = project_name or self.domain_schema
 
         self.start_time = datetime.now()
         self.status = Status.pending.value

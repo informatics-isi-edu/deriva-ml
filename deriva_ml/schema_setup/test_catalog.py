@@ -115,12 +115,7 @@ def create_test_catalog(hostname, domain_schema= 'test-schema', project_name='ml
     server = DerivaServer('https', hostname, credentials=get_credential(hostname))
     test_catalog = server.create_ermrest_catalog()
     model = test_catalog.getCatalogModel()
-    client_annotation = {
-        "tag:misd.isi.edu,2015:display": {"name": "Users"},
-        "tag:isrd.isi.edu,2016:table-display": {"row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}},
-        "tag:isrd.isi.edu,2016:visible-columns": {"compact": ["Full_Name", "Display_Name", "Email", "ID"]}
-    }
-    model.schemas['public'].tables['ERMrest_Client'].annotations.update(client_annotation)
+
     try:
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
@@ -136,9 +131,8 @@ def create_test_catalog(hostname, domain_schema= 'test-schema', project_name='ml
 
 
 class DemoML(DerivaML):
-    def __init(self, hostname, catalog_id, domain_schema='test-schema', project_name='ml-test'):
+    def __init__(self, hostname, catalog_id):
         super().__init__(hostname=hostname,
                          catalog_id=catalog_id,
-                         domain_schema=domain_schema,
-                         project_name=project_name,
+                         project_name='ml-test',
                          model_version="1")

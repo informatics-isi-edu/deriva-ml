@@ -74,6 +74,12 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
     # get annotations
     annotations = generate_annotation(ml_catalog.catalog_id, schema_name)
     model.annotations.update(annotations['catalog_annotation'])
+    client_annotation = {
+        "tag:misd.isi.edu,2015:display": {"name": "Users"},
+        "tag:isrd.isi.edu,2016:table-display": {"row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}},
+        "tag:isrd.isi.edu,2016:visible-columns": {"compact": ["Full_Name", "Display_Name", "Email", "ID"]}
+    }
+    model.schemas['public'].tables['ERMrest_Client'].annotations.update(client_annotation)
     model.apply()
 
     schema = model.create_schema(Schema.define(schema_name, annotations=annotations['schema_annotation']))
