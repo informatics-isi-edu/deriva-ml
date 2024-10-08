@@ -12,7 +12,7 @@ from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.core_utils import tag as deriva_tags
 from deriva_ml.execution_configuration import ExecutionConfiguration
-from deriva_ml.schema_setup.export_spec import generate_dataset_export_spec
+from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from enum import Enum
 import hashlib
@@ -277,6 +277,7 @@ class DerivaML:
                  hostname: str,
                  catalog_id: str,
                  domain_schema: str,
+                 project_name: str = None,
                  cache_dir: Optional[str] = None,
                  working_dir: Optional[str] = None,
                  model_version: str = '1',
@@ -295,6 +296,7 @@ class DerivaML:
         self.domain_schema = domain_schema
         self.ml_schema = ml_schema
         self.version = model_version
+        self.project_name = project_name or self.domain_schema
 
         self.credential = get_credential(hostname)
         self.catalog = ErmrestCatalog('https', hostname, catalog_id,
@@ -383,7 +385,7 @@ class DerivaML:
         """
         schema = schema or self.domain_schema
         return self.model.schemas[schema].create_table(
-            Table.define_vocabulary(vocab_name, f'{schema}:{{RID}}', comment=comment)
+            Table.define_vocabulary(vocab_name, f'{self.project_name}:{{RID}}', comment=comment)
         )
 
     def is_vocabulary(self, table_name: str | Table) -> bool:
@@ -734,7 +736,7 @@ class DerivaML:
             Table.define_association([self.dataset_table, element_table]))
         self.model = self.catalog.getCatalogModel()
         self.dataset_table.annotations.update(
-            generate_dataset_export_spec(self.model, self.domain_schema))
+            generate_dataset_annotations(self.model, self.domain_schema))
         self.model.apply()
         return table
 

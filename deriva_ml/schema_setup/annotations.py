@@ -123,6 +123,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
     }
 
     catalog_annotation = {
+        deriva_tags.display: {"name_style": { "underline_space": True}},
         deriva_tags.chaise_config: {
             "headTitle": "Catalog ML",
             "navbarBrandText": "ML Data Browser",
@@ -186,7 +187,13 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                         ]
                     }
                 ]
-            }
+            },
+            "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
+            "deleteRecord": True,
+            "showFaceting": True,
+            "shareCiteAcls": True,
+            "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
+            "resolverImplicitCatalog": catalog_id,
         },
         deriva_tags.bulk_upload:
             {"asset_mappings": [

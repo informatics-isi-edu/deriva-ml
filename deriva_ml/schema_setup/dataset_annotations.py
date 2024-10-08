@@ -63,17 +63,20 @@ def export_dataset_element(model: Model, element: Table, domain_schema: str):
                     'api': 'entity',
                     'path': f'{npath}'
                 },
-                'destination': {'name': '/'.join([p.name for p in path if not p.is_association()] + [table.name]), 'type': 'csv'}
+                'destination': {
+                    'name': '/'.join([p.name for p in path if not p.is_association()] + [table.name]),
+                    'type': 'csv'
+                }
             }
         )
         if is_asset(table):
             exports.append({
-                    'source': {
-                        'api': 'attribute',
-                        'path': f'{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5'
-                    },
-                    'destination': {'name': f'assets/{table.name}', 'type': 'fetch'}
-                }
+                'source': {
+                    'api': 'attribute',
+                    'path': f'{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5'
+                },
+                'destination': {'name': f'assets/{table.name}', 'type': 'fetch'}
+            }
             )
     return exports
 
@@ -85,9 +88,14 @@ def dataset_outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
     :param domain_schema:
     :return:
     """
+
     dataset_table = model.schemas['deriva-ml'].tables['Dataset']
     return [spec for element in dataset_table.find_associations(pure=False) for spec in
-            export_dataset_element(model, element.table, domain_schema) if element.table.name != 'Dataset_Execution']
+            export_dataset_element(model, element.table, domain_schema) if element.table.schema.name == domain_schema]
+
+
+def nested_dataset_outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
+    return []
 
 
 def outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
@@ -98,12 +106,79 @@ def outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
         {'source': {'api': 'entity'},
          'destination': {'type': 'env', 'params': {'query_keys': ['RID', 'Description']}}
          }
-    ] + vocabulary_outputs(model) + dataset_outputs(model, domain_schema)
+    ] + vocabulary_outputs(model) + dataset_outputs(model, domain_schema) + nested_dataset_outputs(model, domain_schema)
 
 
-def generate_dataset_export_spec(model: Model, domain_schema) -> dict[str, Any]:
+def dataset_visible_columns(model: Model) -> dict[str, Any]:
+    dataset_table = model.schemas['deriva-ml'].tables['Dataset']
+    rcb_name = next(
+        [fk.name[0].name, fk.name[1]] for fk in dataset_table.foreign_keys if fk.name[1] == "Dataset_RCB_fkey")
+    rmb_name = next(
+        [fk.name[0].name, fk.name[1]] for fk in dataset_table.foreign_keys if fk.name[1] == "Dataset_RMB_fkey")
+    return {
+        "*": [
+            "RID",
+            "Description",
+            {"display": {
+                "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
+            },
+                "markdown_name": "Annotation App"
+            },
+            rcb_name,
+            rmb_name
+        ],
+        'detailed': [
+            "RID",
+            "Description",
+            {'source': [{"inbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_fkey']},
+                        {"outbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_Type_fkey']}, 'RID'],
+             'markdown_name': 'Dataset Types'},
+            {"display": {
+                "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
+            },
+                "markdown_name": "Annotation App"
+            },
+            rcb_name,
+            rmb_name
+        ],
+        'filter': {
+            'and': [
+                {'source': 'RID'},
+                {'source': 'Description'},
+                {'source': [{"inbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_fkey']},
+                            {"outbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_Type_fkey']}, 'RID'],
+                 'markdown_name': 'Dataset Types'},
+                {'source': [{'outbound': rcb_name}, 'RID'], 'markdown_name': 'Created By'},
+                {'source': [{'outbound': rmb_name}, 'RID'], 'markdown_name': 'Modified By'},
+            ]
+        }
+    }
+
+
+def dataset_visible_fkeys(model: Model) -> dict[str, Any]:
+    def fkey_name(fk):
+        return [fk.name[0].name, fk.name[1]]
+
+    dataset_table = model.schemas['deriva-ml'].tables['Dataset']
+
+    source_list = [
+        {"source": [
+            {"inbound": fkey_name(fkey.self_fkey)},
+            {"outbound": fkey_name(other_fkey := fkey.other_fkeys.pop())},
+            "RID"
+        ],
+            "markdown_name": other_fkey.pk_table.name
+        }
+        for fkey in dataset_table.find_associations()
+    ]
+    return {'detailed': source_list}
+
+
+def generate_dataset_annotations(model: Model, domain_schema) -> dict[str, Any]:
     return {
         deriva_tags.export_fragment_definitions: {'dataset_export_outputs': outputs(model, domain_schema)},
+        deriva_tags.visible_columns: dataset_visible_columns(model),
+        deriva_tags.visible_foreign_keys: dataset_visible_fkeys(model),
         deriva_tags.export_2019: {
             'detailed': {
                 'templates': [

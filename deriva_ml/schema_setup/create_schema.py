@@ -66,7 +66,7 @@ def define_asset_execution_assets(sname: str, execution_assets_annotation: dict)
     return table_def
 
 
-def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
+def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name: str = None):
     ml_catalog: ErmrestCatalog = model.catalog
 
     if model.schemas.get(schema_name):
@@ -77,10 +77,9 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
     model.apply()
 
     schema = model.create_schema(Schema.define(schema_name, annotations=annotations['schema_annotation']))
-
+    project_name = project_name or schema_name
     # Workflow
-
-    schema.create_table(Table.define_vocabulary("Feature_Name", f'{schema_name}:{{RID}}'))
+    schema.create_table(Table.define_vocabulary("Feature_Name", f'{project_name}:{{RID}}'))
 
     workflow_table = schema.create_table(define_table_workflow(annotations["workflow_annotation"]))
     workflow_table.create_reference(schema.create_table(
@@ -90,7 +89,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
 
     dataset_table = schema.create_table(define_table_dataset(annotations["dataset_annotation"]))
     dataset_type = schema.create_table(
-        Table.define_vocabulary("Dataset_Type", f'{schema_name}:{{RID}}'))
+        Table.define_vocabulary("Dataset_Type", f'{project_name}:{{RID}}'))
     schema.create_table(
         Table.define_association(associates=[("Dataset", dataset_table), ("Dataset_Type", dataset_type)])
     )
@@ -103,7 +102,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
         define_asset_execution_metadata(schema.name, annotations["execution_metadata_annotation"]))
     execution_metadata_table.create_reference(
         schema.create_table(
-            Table.define_vocabulary("Execution_Metadata_Type", f'{schema_name}:{{RID}}')))
+            Table.define_vocabulary("Execution_Metadata_Type", f'{project_name}:{{RID}}')))
     schema.create_table(
         Table.define_association([("Execution_Metadata", execution_metadata_table), ("Execution", execution_table)]))
 
@@ -113,7 +112,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
     )
     execution_assets_table.create_reference(
         schema.create_table(
-            Table.define_vocabulary("Execution_Asset_Type", f'{schema_name}:{{RID}}')))
+            Table.define_vocabulary("Execution_Asset_Type", f'{project_name}:{{RID}}')))
     schema.create_table(
         Table.define_association([("Execution_Assets", execution_assets_table), ("Execution", execution_table)]))
 

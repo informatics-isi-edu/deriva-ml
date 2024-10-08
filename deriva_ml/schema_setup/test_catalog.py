@@ -7,7 +7,7 @@ from requests import HTTPError
 
 from deriva.core import DerivaServer
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
-from deriva_ml.schema_setup.export_spec import generate_dataset_export_spec
+from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.deriva_ml_base import DerivaML
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
@@ -111,16 +111,22 @@ def create_domain_schema(model: Model, sname: str) -> None:
     image_table.create_reference(subject_table)
 
 
-def create_test_catalog(hostname, domain_schema= 'test-schema') -> ErmrestCatalog:
+def create_test_catalog(hostname, domain_schema= 'test-schema', project_name='ml-test') -> ErmrestCatalog:
     server = DerivaServer('https', hostname, credentials=get_credential(hostname))
     test_catalog = server.create_ermrest_catalog()
     model = test_catalog.getCatalogModel()
+    client_annotation = {
+        "tag:misd.isi.edu,2015:display": {"name": "Users"},
+        "tag:isrd.isi.edu,2016:table-display": {"row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}},
+        "tag:isrd.isi.edu,2016:visible-columns": {"compact": ["Full_Name", "Display_Name", "Email", "ID"]}
+    }
+    model.schemas['public'].tables['ERMrest_Client'].annotations.update(client_annotation)
     try:
-        create_ml_schema(model)
+        create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
         populate_test_catalog(model, domain_schema)
         dataset_table = model.schemas['deriva-ml'].tables['Dataset']
-        dataset_table.annotations.update(generate_dataset_export_spec(model, domain_schema))
+        dataset_table.annotations.update(generate_dataset_annotations(model, domain_schema))
         model.apply()
     except Exception:
         # on failure, delete catalog and re-raise exception
@@ -130,8 +136,9 @@ def create_test_catalog(hostname, domain_schema= 'test-schema') -> ErmrestCatalo
 
 
 class DemoML(DerivaML):
-    def __init(self, hostname, catalog_id, domain_schema='test-schema'):
+    def __init(self, hostname, catalog_id, domain_schema='test-schema', project_name='ml-test'):
         super().__init__(hostname=hostname,
                          catalog_id=catalog_id,
                          domain_schema=domain_schema,
+                         project_name=project_name,
                          model_version="1")
