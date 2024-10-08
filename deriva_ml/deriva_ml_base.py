@@ -722,7 +722,7 @@ class DerivaML:
         :return:
         """
         def domain_table(table: Table) -> bool:
-            return table.schema.name == self.domain_schema
+            return table.schema.name == self.domain_schema or table.name == self.dataset_table.name
 
         return [t for a in self.dataset_table.find_associations() if domain_table(t:=a.other_fkeys.pop().pk_table)]
 
@@ -782,6 +782,10 @@ class DerivaML:
         :return:
         """
 
+        def check_dataset_cycle(member_rid, path = None):
+            path = path or set(dataset_rid)
+            return member_rid in path
+
         if validate:
             existing_rids = set(
                 m
@@ -801,14 +805,20 @@ class DerivaML:
             rid_info = self.resolve_rid(m)
             if rid_info.table.name not in association_map:
                 raise DerivaMLException(f'RID table: {rid_info.table.name} not part of dataset')
+            if rid_info.table == self.dataset_table and check_dataset_cycle(rid_info.rid):
+                raise DerivaMLException("Creating cycle of datasets is not allowed")
             dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
         # Now make the entries into the association tables.
-        schema_path = self.catalog.getPathBuilder().schemas[self.domain_schema]
+        pb = self.pathBuilder
+        print(association_map)
         for table, elements in dataset_elements.items():
+            schema_path = pb.schemas[self.ml_schema if table == 'Dataset' else self.domain_schema]
+            fk_column = 'Nested_Dataset' if table == 'Dataset' else table
+            print(f"table {table} elements {elements} {fk_column}")
             if len(elements):
                 # Find out the name of the column in the association table.
                 schema_path.tables[association_map[table]].insert(
-                    [{'Dataset': dataset_rid, table: e} for e in elements])
+                    [{'Dataset': dataset_rid, fk_column: e} for e in elements])
         return dataset_rid
 
     def add_execution(self, workflow_rid: str = '', datasets: List[str] = None,

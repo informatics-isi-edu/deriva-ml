@@ -103,6 +103,11 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
         Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
     )
 
+    # Nested datasets.
+    schema.create_table(
+        Table.define_association(associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)])
+    )
+
     # Execution Metadata
     execution_metadata_table = schema.create_table(
         define_asset_execution_metadata(schema.name, annotations["execution_metadata_annotation"]))
