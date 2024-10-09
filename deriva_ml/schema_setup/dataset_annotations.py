@@ -4,36 +4,6 @@ from deriva.core.ermrest_model import Table, Model
 from deriva.core.utils.core_utils import tag as deriva_tags
 
 
-def is_vocabulary(t):
-    vocab_columns = {'Name', 'URI', 'Synonyms', 'Description', 'ID'}
-    return vocab_columns.issubset({c.name for c in t.columns}) and t
-
-
-def vocabulary_outputs(model, writer: Callable[[Table], list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    vocabs = [table for s in model.schemas.values() for table in s.tables.values() if is_vocabulary(table)]
-    return [o for table in vocabs for o in writer(table)]
-
-
-def table_dag(model: Model, path, domain_schema):
-    table = path[-1]
-    paths = [path]
-    if is_vocabulary(table):
-        return paths
-    tables = {fk.pk_table for fk in table.foreign_keys if fk.pk_table != table}
-    tables |= {fk.table for fk in table.referenced_by if fk.table != table}
-    for t in tables:
-        if t == table:
-            pass
-        elif t in path:
-            pass
-        elif t.schema.name != domain_schema:
-            pass
-        else:
-            child_paths = table_dag(model, path=path + [t], domain_schema=domain_schema)
-            paths.extend([child_path for child_path in child_paths])
-    return paths
-
-
 def export_dataset_element(model: Model, domain_schema: str, element: Table) -> list[dict[str, Any]]:
     def tname(t):
         return f'{t.schema.name}:{t.name}'
@@ -107,6 +77,36 @@ def download_dataset_element(model: Model, domain_schema: str, element: Table) -
     return exports
 
 
+def is_vocabulary(t):
+    vocab_columns = {'Name', 'URI', 'Synonyms', 'Description', 'ID'}
+    return vocab_columns.issubset({c.name for c in t.columns}) and t
+
+
+def vocabulary_outputs(model, writer: Callable[[Table], list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    vocabs = [table for s in model.schemas.values() for table in s.tables.values() if is_vocabulary(table)]
+    return [o for table in vocabs for o in writer(table)]
+
+
+def table_dag(model: Model, path, domain_schema):
+    table = path[-1]
+    paths = [path]
+    if is_vocabulary(table):
+        return paths
+    tables = {fk.pk_table for fk in table.foreign_keys if fk.pk_table != table}
+    tables |= {fk.table for fk in table.referenced_by if fk.table != table}
+    for t in tables:
+        if t == table:
+            pass
+        elif t in path:
+            pass
+        elif t.schema.name != domain_schema:
+            pass
+        else:
+            child_paths = table_dag(model, path=path + [t], domain_schema=domain_schema)
+            paths.extend([child_path for child_path in child_paths])
+    return paths
+
+
 def dataset_outputs(model: Model, writer: Callable[[Table], list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """
     Generate the export specification for each of the associated dataset member types.
@@ -115,7 +115,7 @@ def dataset_outputs(model: Model, writer: Callable[[Table], list[dict[str, Any]]
     """
 
     dataset_table = model.schemas['deriva-ml'].tables['Dataset']
-    domain_schema = {s.name for s in model.schemas if s.name in {'deriva-ml', 'public', 'www'}}.pop()
+    domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
     return [spec for element in dataset_table.find_associations(pure=False) for spec in
             writer(element.table) if element.table.schema.name == domain_schema]
 
@@ -124,7 +124,10 @@ def nested_dataset_outputs(writer: Callable[[Table], list[dict[str, Any]]]) -> l
     return []
 
 
-def outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
+def outputs(model: Model) -> list[dict[str, Any]]:
+
+    domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
+
     def writer(table: Table) -> list[dict[str, Any]]:
         return export_dataset_element(model, domain_schema, table)
 
@@ -136,6 +139,16 @@ def outputs(model: Model, domain_schema: str) -> list[dict[str, Any]]:
          'destination': {'type': 'env', 'params': {'query_keys': ['RID', 'Description']}}
          }
     ] + vocabulary_outputs(model, writer) + dataset_outputs(model, writer) + nested_dataset_outputs(writer)
+
+
+def downloads(model: Model) -> list[dict[str, Any]]:
+
+    domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
+
+    def writer(table: Table) -> list[dict[str, Any]]:
+        return download_dataset_element(model, domain_schema, table)
+
+    return vocabulary_outputs(model, writer) + dataset_outputs(model, writer)
 
 
 def dataset_visible_columns(model: Model) -> dict[str, Any]:
@@ -203,9 +216,9 @@ def dataset_visible_fkeys(model: Model) -> dict[str, Any]:
     return {'detailed': source_list}
 
 
-def generate_dataset_annotations(model: Model, domain_schema) -> dict[str, Any]:
+def generate_dataset_annotations(model: Model) -> dict[str, Any]:
     return {
-        deriva_tags.export_fragment_definitions: {'dataset_export_outputs': outputs(model, domain_schema)},
+        deriva_tags.export_fragment_definitions: {'dataset_export_outputs': outputs(model)},
         deriva_tags.visible_columns: dataset_visible_columns(model),
         deriva_tags.visible_foreign_keys: dataset_visible_fkeys(model),
         deriva_tags.export_2019: {
@@ -253,45 +266,10 @@ def generate_dataset_annotations(model: Model, domain_schema) -> dict[str, Any]:
     }
 
 
-def dataset_download_element(model: Model, element: Table, domain_schema: str):
-    def tname(t):
-        return f'{t.schema.name}:{t.name}'
-
-    def is_asset(t: Table) -> Table:
-        asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
-        return asset_columns.issubset({c.name for c in table.columns}) and t
-
-    exports = []
-    for path in table_dag(model, [element], domain_schema):
-        table = path[-1]
-        if table.is_association():
-            continue
-        npath = '/'.join([tname(t) for t in path])
-        exports.append(
-            {
-                "processor": "csv",
-                "processor_params": {
-                    'query_path': f'/entity/{npath}?limit=none',
-                    'output_path': '/'.join([p.name for p in path if not p.is_association()] + [table.name])
-                }
-            }
-        )
-        if is_asset(table):
-            exports.append({
-                'processor': 'fetch',
-                'processor_params': {
-                    'query_path': f'/attribute/{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none',
-                    'output_path': f'assets/{table.name}'
-                }
-            }
-            )
-    return exports
-
-
-def generate_dataset_download_spec():
+def generate_dataset_download_spec(model):
     return {
         "bag": {
-            "bag_name": "Dataset_{RID}",
+            "bag_name": "Dataset_{Dataset_RID}",
             "bag_algorithms": ["md5"],
             "bag_archiver": "zip",
             "bag_metadata": {},
@@ -299,14 +277,16 @@ def generate_dataset_download_spec():
         },
         "catalog": {
             "host": "https://dev.eye-ai.org",
-            "catalog_id": "359",
+            "catalog_id": "eye-ai",
             "query_processors": [
                 {
                     "processor": "env",
                     "processor_params": {
                         "query_path": "/",
                         "output_path": "Dataset",
-                        "query_keys": ["snaptime"]
+                        "query_keys": [
+                            "snaptime"
+                        ]
                     }
                 },
                 {
@@ -316,21 +296,6 @@ def generate_dataset_download_spec():
                         "output_path": "Dataset",
                         "query_keys": ["RID", "Description"]
                     }
-                },
-                {
-                    "processor": "csv",
-                    "processor_params": {
-                        "query_path": "/entity/deriva-ml:Feature_Name?limit=none",
-                        "output_path": "Feature_Name"
-                    }
-                },
-                {
-                    "processor": "csv",
-                    "processor_params": {
-                        "query_path": "/entity/deriva-ml:Workflow_Type?limit=none",
-                        "output_path": "Workflow_Type"
-                    }
-                }
-            ]
+                }] + downloads(model)
         }
     }

@@ -4,7 +4,6 @@ import sys
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
-
 from deriva_ml.schema_setup.annotations import generate_annotation
 
 
