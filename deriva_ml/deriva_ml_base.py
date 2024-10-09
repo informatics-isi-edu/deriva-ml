@@ -741,7 +741,7 @@ class DerivaML:
             Table.define_association([self.dataset_table, element_table]))
         self.model = self.catalog.getCatalogModel()
         self.dataset_table.annotations.update(
-            generate_dataset_annotations(self.model, self.domain_schema))
+            generate_dataset_annotations(self.model))
         self.model.apply()
         return table
 
@@ -751,6 +751,7 @@ class DerivaML:
         :param dataset_rid:
         :return:
         """
+
         pb = self.pathBuilder
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         dataset_exists = list(dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).entities().fetch())
@@ -763,7 +764,8 @@ class DerivaML:
         rid_list = {}
         for assoc_table in self.dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
-            if other_fkey.table.schema.name != self.domain_schema:
+            if other_fkey.table.schema.name != self.domain_schema and assoc_table.name != "Dataset_Dataset":
+                # Look at domain tables and nested datasets.
                 continue
             table_path = pb.schemas[assoc_table.table.schema.name].tables[assoc_table.name]
             dataset_column, element_column = assoc_table.self_fkey.columns[0], other_fkey.columns[0]
@@ -1065,12 +1067,12 @@ class DerivaML:
             shutil.move(bag_path, bag_file)
         return bag_file, checksum_value
 
-    def materialize_bdbag(self, minid: str, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
+    def materialize_bdbag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
         """
         Materialize a BDBag into the cache directory. Validate its contents and return the path to the bag, and its RID.
 
         Args:
-        - minid (str): Minimum viable identifier (minid) of the bag.
+        - minid (str): RID or minimum viable identifier (minid) of the bag.
         - execution_rid (str): Resource Identifier (RID) of the execution to report status to.  If None, status is
                                 not updated.
 
@@ -1097,8 +1099,8 @@ class DerivaML:
             return True
 
         # request metadata
-        if minid.upper().startswith('MINID'):
-            r = requests.get(f'https://identifiers.org/{minid}', headers={'accept': 'application/json'})
+        if bag.upper().startswith('MINID'):
+            r = requests.get(f'https://identifiers.org/{bag}', headers={'accept': 'application/json'})
             metadata = r.json()['metadata']
             dataset_rid = metadata['Dataset_RID'].split('@')[0]
             checksum_value = ''
@@ -1106,11 +1108,11 @@ class DerivaML:
                 if checksum.get('function') == 'sha256':
                     checksum_value = checksum.get('value')
                     break
-            bag_path = minid
+            bag_path = bag
         else:
-            bag_path, checksum_value = self.download_dataset_bag(minid)
+            bag_path, checksum_value = self.download_dataset_bag(bag)
 
-        bag_dir = self.cache_dir / f'{dataset_rid}_{checksum_value}'
+        bag_dir = self.cache_dir / f'{bag}_{checksum_value}'
         bag_dir.mkdir(parents=True, exist_ok=True)
         validated_check = bag_dir / 'validated_check.txt'
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]

@@ -121,7 +121,7 @@ def create_test_catalog(hostname, domain_schema= 'test-schema', project_name='ml
         create_domain_schema(model, domain_schema)
         populate_test_catalog(model, domain_schema)
         dataset_table = model.schemas['deriva-ml'].tables['Dataset']
-        dataset_table.annotations.update(generate_dataset_annotations(model, domain_schema))
+        dataset_table.annotations.update(generate_dataset_annotations(model))
         model.apply()
     except Exception:
         # on failure, delete catalog and re-raise exception
