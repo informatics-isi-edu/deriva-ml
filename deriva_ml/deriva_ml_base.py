@@ -764,11 +764,14 @@ class DerivaML:
         rid_list = {}
         for assoc_table in self.dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
-            if other_fkey.table.schema.name != self.domain_schema and assoc_table.name != "Dataset_Dataset":
+            print(other_fkey.table.schema.name, other_fkey.pk_table.name, assoc_table.name)
+
+            if other_fkey.table.schema.name != self.domain_schema and other_fkey.pk_table.name != "Dataset":
                 # Look at domain tables and nested datasets.
                 continue
             table_path = pb.schemas[assoc_table.table.schema.name].tables[assoc_table.name]
             dataset_column, element_column = assoc_table.self_fkey.columns[0], other_fkey.columns[0]
+            print(dataset_column, element_column)
             element_table = other_fkey.pk_table.name
             dataset_path = table_path.columns[dataset_column.name]
             element_path = table_path.columns[element_column.name]
@@ -815,7 +818,6 @@ class DerivaML:
             dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
         # Now make the entries into the association tables.
         pb = self.pathBuilder
-        print(association_map)
         for table, elements in dataset_elements.items():
             schema_path = pb.schemas[self.ml_schema if table == 'Dataset' else self.domain_schema]
             fk_column = 'Nested_Dataset' if table == 'Dataset' else table

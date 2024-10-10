@@ -75,7 +75,7 @@ def vocabulary_specification(model, writer: Callable[[list[Table]], list[dict[st
     return [o for table in vocabs for o in writer([table])]
 
 
-def table_dag(model: Model, path) -> list[list[Table]]:
+def table_dag(model: Model, path, nested_dataset: bool = False) -> list[list[Table]]:
     domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
     table = path[-1]
     paths = [path]
@@ -89,12 +89,14 @@ def table_dag(model: Model, path) -> list[list[Table]]:
         if t == table or t in path:  # Skip over tables we have already seen
             pass
         elif t.name == "Dataset" and path[0].name == "Dataset_Dataset":  # Include nested datasets of level 1
-            paths.append(path + [t])
+            if not nested_dataset:
+                child_paths = table_dag(model, path=path + [t], nested_dataset=True)
+                paths.extend(child_paths)
         elif t.schema.name != domain_schema:  # Skip over tables in the ml-schema
             pass
         else:
             # Get all of the paths that extend the current path
-            child_paths = table_dag(model, path=path + [t])
+            child_paths = table_dag(model, path=path + [t], nested_dataset=nested_dataset)
             paths.extend(child_paths)
     return paths
 
