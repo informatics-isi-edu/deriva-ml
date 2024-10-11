@@ -1,5 +1,5 @@
 from tempfile import TemporaryDirectory
-
+import atexit
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
@@ -29,6 +29,7 @@ def upload_image_file(file: str, subject_rid: str, domain_schema, model: Model):
         md5 = hash_utils.compute_file_hashes(file, ['md5'])['md5'][1]
         sanitized_filename = urlquote(re.sub('[^a-zA-Z0-9_.-]', '_', md5 + '.' + file_name))
         hatrac_path = f'/hatrac/image_assets/{sanitized_filename}'
+        print(f"Uploading {sanitized_filename} to {hatrac_path}")
         hatrac_uri = hs.put_obj(hatrac_path,
                                 file,
                                 md5=md5,
@@ -99,6 +100,7 @@ def create_domain_schema(model: Model, sname: str) -> None:
         # Clean out any old junk....
         model.schemas[sname].drop()
 
+
     domain_schema = model.create_schema(Schema.define(sname, annotations={'name_style': {'underline_space': True}}))
     subject_table = domain_schema.create_table(
         Table.define("Subject", column_defs=[Column.define('Name', builtin_types.text)])
@@ -111,11 +113,15 @@ def create_domain_schema(model: Model, sname: str) -> None:
     image_table.create_reference(subject_table)
 
 
-def create_test_catalog(hostname, domain_schema= 'test-schema', project_name='ml-test') -> ErmrestCatalog:
+def destroy_test_catalog(catalog):
+    catalog.delete_ermrest_catalog(really=True)
+
+def create_test_catalog(hostname, domain_schema='test-schema', project_name='ml-test') -> ErmrestCatalog:
     server = DerivaServer('https', hostname, credentials=get_credential(hostname))
     test_catalog = server.create_ermrest_catalog()
-    model = test_catalog.getCatalogModel()
 
+    atexit.register(destroy_test_catalog, test_catalog)
+    model = test_catalog.getCatalogModel()
     try:
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
@@ -123,6 +129,7 @@ def create_test_catalog(hostname, domain_schema= 'test-schema', project_name='ml
         dataset_table = model.schemas['deriva-ml'].tables['Dataset']
         dataset_table.annotations.update(generate_dataset_annotations(model))
         model.apply()
+
     except Exception:
         # on failure, delete catalog and re-raise exception
         test_catalog.delete_ermrest_catalog(really=True)
@@ -131,8 +138,10 @@ def create_test_catalog(hostname, domain_schema= 'test-schema', project_name='ml
 
 
 class DemoML(DerivaML):
-    def __init__(self, hostname, catalog_id):
+    def __init__(self, hostname, catalog_id, cache_dir: str = None, working_dir: str = None):
         super().__init__(hostname=hostname,
                          catalog_id=catalog_id,
                          project_name='ml-test',
+                         cache_dir=cache_dir,
+                         working_dir=working_dir,
                          model_version="1")
