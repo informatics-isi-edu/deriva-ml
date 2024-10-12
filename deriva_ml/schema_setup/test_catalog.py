@@ -26,13 +26,13 @@ def upload_image_file(file: str, subject_rid: str, domain_schema, model: Model):
     file_size = file_path.stat().st_size
     try:
         hs = HatracStore('https', host_name, credential)
-        md5 = hash_utils.compute_file_hashes(file, ['md5'])['md5'][1]
-        sanitized_filename = urlquote(re.sub('[^a-zA-Z0-9_.-]', '_', md5 + '.' + file_name))
+        md5_hashes = hash_utils.compute_file_hashes(file, ['md5'])['md5']
+        sanitized_filename = urlquote(re.sub('[^a-zA-Z0-9_.-]', '_', md5_hashes[0] + '.' + file_name))
         hatrac_path = f'/hatrac/image_assets/{sanitized_filename}'
         print(f"Uploading {sanitized_filename} to {hatrac_path}")
         hatrac_uri = hs.put_obj(hatrac_path,
                                 file,
-                                md5=md5,
+                                md5=md5_hashes[1],
                                 content_type=mime_utils.guess_content_type(file),
                                 content_disposition="filename*=UTF-8''" + file_name)
     except Exception as e:
@@ -43,7 +43,7 @@ def upload_image_file(file: str, subject_rid: str, domain_schema, model: Model):
             [{'URL': hatrac_uri,
               'Filename': file_name,
               'Length': file_size,
-              'MD5': md5,
+              'MD5': md5_hashes[0],
               'Description': "A test image file",
               'Subject': subject_rid}])
     except Exception as e:

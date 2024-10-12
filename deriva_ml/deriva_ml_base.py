@@ -772,7 +772,7 @@ class DerivaML:
                 # Look at domain tables and nested datasets.
                 continue
             if target_table.name == "Dataset":
-                # find_assoc gives us the keys in the wrong position.
+                # find_assoc gives us the keys in the wrong position, so swap.
                 self_fkey, other_fkey = other_fkey, self_fkey
 
             target_path = pb.schemas[target_table.schema.name].tables[target_table.name]
@@ -1122,7 +1122,6 @@ class DerivaML:
         else:
             dataset_rid = bag
             bag_path, checksum_value = self.download_dataset_bag(dataset_rid)
-            print(f"downloaded bag {bag_path, checksum_value}")
 
         bag_dir = self.cache_dir / f'{bag}_{checksum_value}'
         bag_dir.mkdir(parents=True, exist_ok=True)
