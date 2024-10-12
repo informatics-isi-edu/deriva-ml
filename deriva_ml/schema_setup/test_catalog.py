@@ -17,41 +17,9 @@ from random import random
 import re
 from pathlib import Path
 
-
-def upload_image_file(file: str, subject_rid: str, domain_schema, model: Model):
-    host_name = model.catalog.deriva_server.server
-    credential = model.catalog.deriva_server.credentials
-    file_path = Path(file)
-    file_name = file_path.name
-    file_size = file_path.stat().st_size
-    try:
-        hs = HatracStore('https', host_name, credential)
-        md5_hashes = hash_utils.compute_file_hashes(file, ['md5'])['md5']
-        sanitized_filename = urlquote(re.sub('[^a-zA-Z0-9_.-]', '_', md5_hashes[0] + '.' + file_name))
-        hatrac_path = f'/hatrac/image_assets/{sanitized_filename}'
-        print(f"Uploading {sanitized_filename} to {hatrac_path}")
-        hatrac_uri = hs.put_obj(hatrac_path,
-                                file,
-                                md5=md5_hashes[1],
-                                content_type=mime_utils.guess_content_type(file),
-                                content_disposition="filename*=UTF-8''" + file_name)
-    except Exception as e:
-        raise e
-    try:
-        ipath = model.catalog.getPathBuilder().schemas[domain_schema].tables['Image']
-        return ipath.insert(
-            [{'URL': hatrac_uri,
-              'Filename': file_name,
-              'Length': file_size,
-              'MD5': md5_hashes[0],
-              'Description': "A test image file",
-              'Subject': subject_rid}])
-    except Exception as e:
-        raise e
-
-
-def populate_test_catalog(model: Model, sname: str) -> None:
+def populate_test_catalog(deriva_ml: DerivaML, sname: str) -> None:
     # Delete any vocabularies and features.
+    model = deriva_ml.model
     for trial in range(3):
         for t in [v for v in model.schemas[sname].tables.values() if v.name not in {"Subject", "Image"}]:
             try:
@@ -60,7 +28,7 @@ def populate_test_catalog(model: Model, sname: str) -> None:
                 pass
 
     # Empty out remaining tables.
-    pb = model.catalog.getPathBuilder()
+    pb = deriva_ml.pathBuilder
     domain_schema = pb.schemas[sname]
     retry = True
     while retry:
@@ -82,7 +50,9 @@ def populate_test_catalog(model: Model, sname: str) -> None:
             image_file = f"{tmpdir}/test_{s['RID']}.txt"
             with open(image_file, "w+") as f:
                 f.write(f"Hello there {random()}\n")
-            upload_image_file(image_file, s['RID'], sname, model)
+            deriva_ml.upload_file_asset(image_file, 'Image',
+                                        Subject=s['RID'],
+                                        Description='A test image')
 
 
 def create_domain_schema(model: Model, sname: str) -> None:
@@ -125,7 +95,8 @@ def create_test_catalog(hostname, domain_schema='test-schema', project_name='ml-
     try:
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
-        populate_test_catalog(model, domain_schema)
+        deriva_ml = DerivaML(hostname=hostname, catalog_id=test_catalog.catalog_id, project_name=project_name)
+        populate_test_catalog(deriva_ml, domain_schema)
         dataset_table = model.schemas['deriva-ml'].tables['Dataset']
         dataset_table.annotations.update(generate_dataset_annotations(model))
         model.apply()

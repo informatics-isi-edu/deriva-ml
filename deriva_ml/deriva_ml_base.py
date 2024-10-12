@@ -1,4 +1,3 @@
-
 from bdbag import bdbag_api as bdb
 from copy import deepcopy
 from datetime import datetime
@@ -32,7 +31,6 @@ import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import List, Optional, Any, NewType, Iterable
 import warnings
-
 
 RID = NewType('RID', str)
 
@@ -724,6 +722,7 @@ class DerivaML:
         Return the list of tables that can be included as members of a dataset.
         :return:
         """
+
         def domain_table(table: Table) -> bool:
             return table.schema.name == self.domain_schema or table.name == self.dataset_table.name
 
@@ -1164,6 +1163,45 @@ class DerivaML:
         hs = HatracStore('https', self.host_name, self.credential)
         hs.get_obj(path=asset_url, destfilename=dest_filename)
         return Path(dest_filename)
+
+    def upload_file_asset(self, file: str | Path, table: Table | str, **kwargs):
+        """
+        Upload the specified file into Hatrac and update the assocated asset table.
+        :param file:
+        :param table:
+        :param kwargs: Keyward arguements for values of additional columns to be added to the asset table.
+        :return:
+        """
+        table = self._get_table(table)
+        credential = self.model.catalog.deriva_server.credentials
+        file_path = Path(file)
+        file_name = file_path.name
+        file_size = file_path.stat().st_size
+        url_pattern = table.columns['URL'].annotations[deriva_tags.asset]['url_pattern']
+
+        # Get everything up to the filename  part of the
+        hatrac_path = url_pattern.replace('/{{MD5}}.{{Filename}}', '')
+        try:
+            hs = HatracStore('https', self.host_name, credential)
+            md5_hashes = hash_utils.compute_file_hashes(file, ['md5'])['md5']
+            sanitized_filename = urlquote(re.sub('[^a-zA-Z0-9_.-]', '_', md5_hashes[0] + '.' + file_name))
+            hatrac_path = f'{hatrac_path}{sanitized_filename}'
+            hatrac_uri = hs.put_obj(hatrac_path,
+                                    file,
+                                    md5=md5_hashes[1],
+                                    content_type=mime_utils.guess_content_type(file),
+                                    content_disposition="filename*=UTF-8''" + file_name)
+        except Exception as e:
+            raise e
+        try:
+            ipath = self.pathBuilder.schemas[table.schema.name].tables[table.name]
+            return ipath.insert(
+                [{'URL': hatrac_uri,
+                  'Filename': file_name,
+                  'Length': file_size,
+                  'MD5': md5_hashes[0]} | kwargs])
+        except Exception as e:
+            raise e
 
     def upload_assets(self, assets_dir: str | Path) -> dict[str, FileUploadState]:
         """

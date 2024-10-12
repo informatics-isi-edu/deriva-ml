@@ -46,7 +46,6 @@ def setUpModule():
     try:
         create_ml_schema(model)
         create_domain_schema(model, SNAME_DOMAIN)
-        populate_test_catalog(model, SNAME_DOMAIN)
     except Exception:
         # on failure, delete catalog and re-raise exception
         test_catalog.delete_ermrest_catalog(really=True)
@@ -72,16 +71,16 @@ class TestVocabulary(unittest.TestCase):
         pass
 
     def test_find_vocabularies(self):
-        populate_test_catalog(self.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         self.assertIn("Dataset_Type", [v.name for v in self.ml_instance.find_vocabularies()])
 
     def test_create_vocabulary(self):
-        populate_test_catalog(self.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         self.ml_instance.create_vocabulary("CV1", "A vocab")
         self.assertTrue(self.model.schemas[self.ml_instance.domain_schema].tables["CV1"])
 
     def test_add_term(self):
-        populate_test_catalog(self.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         self.ml_instance.create_vocabulary("CV1", "A vocab")
         self.assertEqual(len(self.ml_instance.list_vocabulary_terms("CV1")), 0)
         term = self.ml_instance.add_term("CV1", "T1", description="A vocab")
@@ -102,7 +101,7 @@ class TestFeatures(unittest.TestCase):
         self.model = self.ml_instance.model
 
     def test_create_feature(self):
-        populate_test_catalog(self.ml_instance.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         self.ml_instance.create_vocabulary("FeatureValue", "A vocab")
         self.ml_instance.add_term("FeatureValue", "V1", description="A Feature Vale")
 
@@ -152,14 +151,14 @@ class TestExecution(unittest.TestCase):
         self.files = os.path.dirname(__file__) + '/files'
 
     def test_upload_configuration(self):
-        populate_test_catalog(self.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         config_file = self.files + "/test-workflow-1.json"
         config = ExecutionConfiguration.load_configuration(config_file)
         rid = self.ml_instance.upload_execution_configuration(config)
         self.assertEqual(rid, self.ml_instance.retrieve_rid(rid)['RID'])
 
     def test_execution_1(self):
-        populate_test_catalog(self.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         exec_config = ExecutionConfiguration.load_configuration(self.files + "/test-workflow-1.json")
         configuration_record = self.ml_instance.initialize_execution(configuration=exec_config)
         with self.ml_instance.execution(configuration=configuration_record) as exec:
@@ -180,12 +179,12 @@ class TestDataset(unittest.TestCase):
         self.model = self.ml_instance.model
 
     def test_add_element_type(self):
-        populate_test_catalog(self.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         self.ml_instance.add_dataset_element_type("Subject")
         self.assertEqual(len(list(self.ml_instance.dataset_table.find_associations())), 2)
 
     def test_create_dataset(self) -> RID:
-        populate_test_catalog(self.model, SNAME_DOMAIN)
+        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
         self.ml_instance.add_dataset_element_type("Subject")
         type_rid = self.ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
         dataset_rid = self.ml_instance.create_dataset(type_rid.name, description="A Dataset")
