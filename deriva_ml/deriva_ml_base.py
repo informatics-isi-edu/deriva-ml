@@ -328,7 +328,7 @@ class DerivaML:
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
 
-        logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         if 'dirty' in self.version:
             logging.info(f'Loading dirty model.  Consider commiting and tagging: {self.version}')
 
@@ -696,8 +696,12 @@ class DerivaML:
         atable_path = ml_path.tables[atable]
 
         # Get a list of all the dataset_type values associated with this dataset.
+        datasets = []
+        for dataset in dataset_path.entities().fetch():
+            ds_types = atable_path.filter(atable_path.Dataset == dataset['RID']).attributes(atable_path.Dataset_Type).fetch()
+            datasets.append(dataset | {'Dataset_Type': [ds['Dataset_Type'] for ds in ds_types]})
         ds_type = [ds['Name'] for ds in dataset_path.link(atable_path).link(dataset_type_path).entities().fetch()]
-        return [e | {'Dataset_Type': ds_type} for e in dataset_path.entities().fetch()]
+        return datasets
 
     def delete_dataset(self, dataset_rid: RID) -> None:
         """
@@ -1017,7 +1021,7 @@ class DerivaML:
         """
         try:
             self.resolve_rid(rid := entity if isinstance(entity, str) else entity['RID'])
-            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot()}"
+            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot().snaptime}"
         except KeyError as e:
             raise DerivaMLException(f"Entity {e} does not have RID column")
         except DerivaMLException as _e:
