@@ -17,6 +17,7 @@ from random import random
 import re
 from pathlib import Path
 
+TEST_DATASET_SIZE = 20
 def populate_test_catalog(deriva_ml: DerivaML, sname: str) -> None:
     # Delete any vocabularies and features.
     model = deriva_ml.model
@@ -44,7 +45,7 @@ def populate_test_catalog(deriva_ml: DerivaML, sname: str) -> None:
     initialize_ml_schema(model, 'deriva-ml')
 
     subject = domain_schema.tables['Subject']
-    ss = subject.insert([{'Name': f"Thing{t + 1}"} for t in range(5)])
+    ss = subject.insert([{'Name': f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
     with TemporaryDirectory() as tmpdir:
         for s in ss:
             image_file = f"{tmpdir}/test_{s['RID']}.txt"

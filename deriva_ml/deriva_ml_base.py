@@ -356,7 +356,12 @@ class DerivaML:
 
     @property
     def domain_path(self):
-        return self.catalog.getPathBuilder().schemas[self.domain_schema]
+        """
+
+        :return: A new instance of a pathbuilder path to the domain schema.
+        """
+
+        return self.pathBuilder.schemas[self.domain_schema]
 
     def _get_table(self, table: str | Table) -> Table:
         """
@@ -498,7 +503,7 @@ class DerivaML:
                        metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
                        comment: str = '') -> type[Feature]:
         """
-        Create a new feasture that can be associated with a table. The feature can assocate a controlloed
+        Create a new featire that can be associated with a table. The feature can assocate a controlloed
         vocabulary term, an asset, or any other values with a specific instance of a object and and execution.
         :param feature_name:
         :param table:
@@ -798,6 +803,7 @@ class DerivaML:
         :return:
         """
 
+        members = set(members)
         def check_dataset_cycle(member_rid, path=None):
             path = path or set(dataset_rid)
             return member_rid in path
