@@ -1009,7 +1009,7 @@ class DerivaML:
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
-    def cite(self, entity: dict | str) -> str:
+    def cite(self, entity: dict | str, snapshot = True) -> str:
         """
         Return a citation URL for the provided entity.
         :param entity: A dict that contains the column values for a specific entity.
@@ -1017,7 +1017,7 @@ class DerivaML:
         """
         try:
             self.resolve_rid(rid := entity if isinstance(entity, str) else entity['RID'])
-            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}"
+            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot()}"
         except KeyError as e:
             raise DerivaMLException(f"Entity {e} does not have RID column")
         except DerivaMLException as _e:
