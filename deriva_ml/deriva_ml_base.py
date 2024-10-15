@@ -1080,7 +1080,7 @@ class DerivaML:
                 dataset_rid = re.match(r'_([\w/d]+).zip', bag_path)[1]
             else:
                 # Put current download spec into a file
-                with open('download_spec.json', 'w+') as ds:
+                with open(f'{tmp_dir}/download_spec.json', 'w+') as ds:
                     json.dump(generate_dataset_download_spec(self.model), ds)
                 downloader = GenericDownloader(
                     server={"catalog_id": self.catalog_id, "protocol": "https", "host": self.host_name},
