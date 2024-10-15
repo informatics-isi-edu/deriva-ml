@@ -1076,29 +1076,30 @@ class DerivaML:
 
         with TemporaryDirectory() as tmp_dir:
             if dataset_rid.startswith('minid'):
-                bag_path = fetch_single_file(dataset_rid, tmp_dir)
-                dataset_rid = re.match(r'_([\w/d]+).zip', bag_path)[1]
+                archive_path = fetch_single_file(dataset_rid, tmp_dir)
             else:
                 # Put current download spec into a file
-                with open(f'{tmp_dir}/download_spec.json', 'w+') as ds:
+                spec_file = f'{tmp_dir}/download_spec.json'
+                with open(spec_file, 'w+') as ds:
                     json.dump(generate_dataset_download_spec(self.model), ds)
                 downloader = GenericDownloader(
                     server={"catalog_id": self.catalog_id, "protocol": "https", "host": self.host_name},
-                    config_file='download_spec.json',
+                    config_file= spec_file,
                     output_dir=tmp_dir,
                     envars={"Dataset_RID": dataset_rid})
                 result = downloader.download()
-                bag_path = list(result.values())[0]["local_path"]
-            checksum_value = compute_file_hashes(bag_path, hashes=['sha256'])['sha256'][0]
+                archive_path = list(result.values())[0]["local_path"]
+            checksum_value = compute_file_hashes(archive_path, hashes=['sha256'])['sha256'][0]
             bag_dir = self.cache_dir / f'{dataset_rid}_{checksum_value}'
             bag_dir.mkdir(parents=True, exist_ok=True)
-            bag_file = f'{bag_dir}/Dataset_{dataset_rid}.zip'
-            shutil.move(bag_path, bag_file)
-            bag_structure = bdb.extract_bag(bag_file, bag_dir)
-            bdb.validate_bag_structure(bag_structure)
-            return Path(bag_structure), dataset_rid
+            if (bag_subdir := bag_dir / f"Dataset_{dataset_rid}").exists():
+                shutil.rmtree(bag_subdir)
 
-    def materialize_bdbag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
+            bag_path = bdb.extract_bag(archive_path, bag_dir)
+            bdb.validate_bag_structure(bag_path)
+            return Path(bag_path), dataset_rid
+
+    def materialize_dataset_bag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
         """
         Materialize a BDBag into the cache directory. Validate its contents and return the path to the bag, and its RID.
 
@@ -1134,7 +1135,6 @@ class DerivaML:
         bag_dir = bag_path.parent
         validated_check = bag_dir / 'validated_check.txt'
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
-        print(f"bags {bags}")
         if not bags:
             bag_path = bdb.materialize(bag_path,
                                        bag_dir,
