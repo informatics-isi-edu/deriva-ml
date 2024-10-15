@@ -1,4 +1,5 @@
 from bdbag import bdbag_api as bdb
+from bdbag.fetch.fetcher import fetch_single_file
 from copy import deepcopy
 from datetime import datetime
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
@@ -700,7 +701,6 @@ class DerivaML:
         for dataset in dataset_path.entities().fetch():
             ds_types = atable_path.filter(atable_path.Dataset == dataset['RID']).attributes(atable_path.Dataset_Type).fetch()
             datasets.append(dataset | {'Dataset_Type': [ds['Dataset_Type'] for ds in ds_types]})
-        ds_type = [ds['Name'] for ds in dataset_path.link(atable_path).link(dataset_type_path).entities().fetch()]
         return datasets
 
     def delete_dataset(self, dataset_rid: RID) -> None:
@@ -1064,27 +1064,39 @@ class DerivaML:
             checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
 
-    def download_dataset_bag(self, dataset_rid: RID) -> tuple[str, str]:
+    def download_dataset_bag(self, dataset_rid: RID | str) -> tuple[Path, RID]:
+        """
+        Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        that all of the metadata is correct
+        :param dataset_rid: The RID of a dataset or a minid to an existing bag.
+        :return: the location of the unpacked and validated dataset bag and the RID of the bag
+        """
         if not any([dataset_rid == ds['RID'] for ds in self.find_datasets()]):
             raise DerivaMLException(f'RID {dataset_rid} is not a dataset')
 
-        # Put current download spec into a file
         with TemporaryDirectory() as tmp_dir:
-            with open('download_spec.json', 'w+') as ds:
-                json.dump(generate_dataset_download_spec(self.model), ds)
-            downloader = GenericDownloader(
-                server={"catalog_id": self.catalog_id, "protocol": "https", "host": self.host_name},
-                config_file='download_spec.json',
-                output_dir=tmp_dir,
-                envars={"Dataset_RID": dataset_rid})
-            result = downloader.download()
-            bag_path = list(result.values())[0]["local_path"]
-            checksum_value = compute_file_hashes('download_spec.json', hashes=['sha256'])['sha256'][0]
+            if dataset_rid.startswith('minid'):
+                bag_path = fetch_single_file(dataset_rid, tmp_dir)
+                dataset_rid = re.match(r'_([\w/d]+).zip', bag_path)[1]
+            else:
+                # Put current download spec into a file
+                with open('download_spec.json', 'w+') as ds:
+                    json.dump(generate_dataset_download_spec(self.model), ds)
+                downloader = GenericDownloader(
+                    server={"catalog_id": self.catalog_id, "protocol": "https", "host": self.host_name},
+                    config_file='download_spec.json',
+                    output_dir=tmp_dir,
+                    envars={"Dataset_RID": dataset_rid})
+                result = downloader.download()
+                bag_path = list(result.values())[0]["local_path"]
+            checksum_value = compute_file_hashes(bag_path, hashes=['sha256'])['sha256'][0]
             bag_dir = self.cache_dir / f'{dataset_rid}_{checksum_value}'
             bag_dir.mkdir(parents=True, exist_ok=True)
             bag_file = f'{bag_dir}/Dataset_{dataset_rid}.zip'
             shutil.move(bag_path, bag_file)
-        return bag_file, checksum_value
+            bag_structure = bdb.extract_bag(bag_file, bag_dir)
+            bdb.validate_bag_structure(bag_structure)
+            return Path(bag_structure), dataset_rid
 
     def materialize_bdbag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
         """
@@ -1118,24 +1130,11 @@ class DerivaML:
             return True
 
         # request metadata
-        if bag.upper().startswith('MINID'):
-            r = requests.get(f'https://identifiers.org/{bag}', headers={'accept': 'application/json'})
-            metadata = r.json()['metadata']
-            dataset_rid = metadata['Dataset_RID'].split('@')[0]
-            checksum_value = ''
-            for checksum in r.json().get('checksums', []):
-                if checksum.get('function') == 'sha256':
-                    checksum_value = checksum.get('value')
-                    break
-            bag_path = bag
-        else:
-            dataset_rid = bag
-            bag_path, checksum_value = self.download_dataset_bag(dataset_rid)
-
-        bag_dir = self.cache_dir / f'{bag}_{checksum_value}'
-        bag_dir.mkdir(parents=True, exist_ok=True)
+        bag_path, dataset_rid = self.download_dataset_bag(bag)
+        bag_dir = bag_path.parent
         validated_check = bag_dir / 'validated_check.txt'
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
+        print(f"bags {bags}")
         if not bags:
             bag_path = bdb.materialize(bag_path,
                                        bag_dir,
