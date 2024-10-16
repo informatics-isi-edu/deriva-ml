@@ -1,3 +1,5 @@
+import enum
+
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
 from copy import deepcopy
@@ -81,6 +83,8 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
+class VocabularyTables(enum.Enum):
+    dataset_type = 'Dataset_Type'
 
 class ColumnDefinition(BaseModel):
     name: str

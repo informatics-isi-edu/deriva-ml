@@ -1,20 +1,32 @@
 from typing import Any, Callable
-from deriva.core.ermrest_model import Table, Model
+from deriva.core.ermrest_model import Table, Model, FindAssociationResult
 from deriva.core.utils.core_utils import tag as deriva_tags
 
 
 def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
+    """
+    Given a path to the data model, output an export specification for the path taken to get to the current table.
+    :param path:
+    :return:
+    """
+
+    # The table is the last element of the path.  Generate the ERMrest query by conversting the list of tables
+    # into a path in the form of /S:T1/S:T2/S:Table
+    # Generate the destination path in the file system using just the table names.
     table = path[-1]
     npath = '/'.join([f'{t.schema.name}:{t.name}' for t in path])
+    dname =  '/'.join([t.name for t in path] + [table.name])
     exports = [
         {
             'source': {'api': 'entity', 'path': f'{npath}'},
             'destination': {
-                'name': '/'.join([p.name for p in path if not p.is_association()] + [table.name]),
+                'name': dname,
                 'type': 'csv'
             }
         }
     ]
+
+    # If this table is an asset tabvle, then we need to output the files associated with the asset.
     asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
     if asset_columns.issubset({c.name for c in table.columns}):
         exports.append({
@@ -31,12 +43,13 @@ def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
 def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     table = path[-1]
     npath = '/'.join([f'{t.schema.name}:{t.name}' for t in path])
+    output_path = '/'.join([t.name for t in path] + [table.name])
     exports = [
         {
             "processor": "csv",
             "processor_params": {
                 'query_path': f'/entity/{npath}?limit=none',
-                'output_path': '/'.join([p.name for p in path if not p.is_association()] + [table.name])
+                'output_path': output_path
             }
         }
     ]
@@ -52,17 +65,6 @@ def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
         )
     return exports
 
-
-def table_specification(model: Model,
-                        element: Table,
-                        writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    exports = []
-    for path in table_dag(model, [element]):
-        table = path[-1]
-        if table.is_association():
-            continue
-        exports.extend(writer(path))
-    return exports
 
 
 def is_vocabulary(t):
@@ -82,7 +84,7 @@ def table_dag(model: Model, path, nested_dataset: bool = False) -> list[list[Tab
     if is_vocabulary(table):
         return paths
 
-    # Get all of the tables reachable from the end of the path avoiding T1<->T2 via referenced_by
+    # Get all the tables reachable from the end of the path avoiding T1<->T2 via referenced_by
     tables = {fk.pk_table for fk in table.foreign_keys if fk.pk_table != table}
     tables |= {fk.table for fk in table.referenced_by if fk.table != table}
     for t in tables:
@@ -95,10 +97,29 @@ def table_dag(model: Model, path, nested_dataset: bool = False) -> list[list[Tab
         elif t.schema.name != domain_schema:  # Skip over tables in the ml-schema
             pass
         else:
-            # Get all of the paths that extend the current path
+            # Get all the paths that extend the current path
             child_paths = table_dag(model, path=path + [t], nested_dataset=nested_dataset)
             paths.extend(child_paths)
     return paths
+
+def table_specification(model: Model,
+                        element: Table,
+                        writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """
+    Generate a specification for the provided dataset element.  Each element is a table type that can be directly
+    included in a dataset.
+    :param model: ERMrest model from the current catalog
+    :param element: A table that is directly associated with a dataset.
+    :param writer: Callable that can write a export spec, or a download speck.
+    :return:
+    """
+    exports = []
+    for path in table_dag(model, [element]):
+        table = path[-1]
+        if table.is_association(max_arity=3, pure=False):
+            continue
+        exports.extend(writer(path))
+    return exports
 
 
 def dataset_specification(model: Model, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
@@ -109,19 +130,34 @@ def dataset_specification(model: Model, writer: Callable[[list[Table]], list[dic
     :return:
     """
 
-    def element_filter(element):
-        return element.table.schema.name == domain_schema or element.name == "Dataset_Dataset"
+    def element_filter(assoc: FindAssociationResult) -> bool:
+        """
+        A dataset may have may other object associated with it. We only want to consider those association tables
+        that are in the domain sehema, or the table Dataset_Dataset, which is used for nested datasets.
+        :param assoc:
+        :return: True if element is an element to be included in export spec.
+        """
+        return assoc.table.schema.name == domain_schema or assoc.name == "Dataset_Dataset"
 
     dataset_table = model.schemas['deriva-ml'].tables['Dataset']
     domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
-    return [spec for element in dataset_table.find_associations(pure=False) for spec in
+
+    # Use the association tables connected to the dataset to generate specifications for all included tables
+    # in the domain schema, as well as any nested dataset.
+    return [spec for element in dataset_table.find_associations(max_arity=3, pure=False) for spec in
             table_specification(model, element.table, writer) if element_filter(element)]
 
 
 def export_outputs(model: Model) -> list[dict[str, Any]]:
+    """
+    Return and output specification for the datasets in the provided model
+    :param model: An ermrest model.
+    :return: An export specification suitble for Chaise.
+    """
     def writer(path: list[Table]) -> list[dict[str, Any]]:
         return export_dataset_element(path)
 
+    # Export specification is a specification for the datasets, plus any controlled vocabulary
     return [
         {'source': {'api': False, 'skip_root_path': True},
          'destination': {'type': 'env', 'params': {'query_keys': ['snaptime']}}
@@ -133,9 +169,15 @@ def export_outputs(model: Model) -> list[dict[str, Any]]:
 
 
 def processor_params(model: Model) -> list[dict[str, Any]]:
+    """
+
+    :param model: crurrent ERmrest Model
+    :return: a doenload specification for thae datasets in the provided model.
+    """
     def writer(path: list[Table]) -> list[dict[str, Any]]:
         return download_dataset_element(path)
 
+    # Downlosd spec is the spec for any controlled vocabulary and for the dataset.
     return vocabulary_specification(model, writer) + dataset_specification(model, writer)
 
 
@@ -199,7 +241,7 @@ def dataset_visible_fkeys(model: Model) -> dict[str, Any]:
         ],
             "markdown_name": other_fkey.pk_table.name
         }
-        for fkey in dataset_table.find_associations()
+        for fkey in dataset_table.find_associations(max_arity=3, pure=False)
     ]
     return {'detailed': source_list}
 
