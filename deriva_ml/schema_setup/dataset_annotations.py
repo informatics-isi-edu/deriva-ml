@@ -77,14 +77,23 @@ def vocabulary_specification(model, writer: Callable[[list[Table]], list[dict[st
     return [o for table in vocabs for o in writer([table])]
 
 
-def table_dag(model: Model, path, nested_dataset: bool = False) -> list[list[Table]]:
+def table_paths(model: Model, path, nested_dataset: bool = False) -> list[list[Table]]:
+    """
+    Recursively walk over the domain schema and extend the current path.
+    :param model:
+    :param path:
+    :param nested_dataset:
+    :return:
+    """
     domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
-    table = path[-1]
-    paths = [path]
+    table = path[-1]  # We are going to extend from the last table we have seed.
+    paths = [path]  # Output is a list of paths reachable by extending the current path.
+
+    # If the end of the path is is vocabulary table, we are at a terminal node in the ERD, so stop
     if is_vocabulary(table):
         return paths
 
-    # Get all the tables reachable from the end of the path avoiding T1<->T2 via referenced_by
+    # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
     tables = {fk.pk_table for fk in table.foreign_keys if fk.pk_table != table}
     tables |= {fk.table for fk in table.referenced_by if fk.table != table}
     for t in tables:
@@ -92,13 +101,13 @@ def table_dag(model: Model, path, nested_dataset: bool = False) -> list[list[Tab
             pass
         elif t.name == "Dataset" and path[0].name == "Dataset_Dataset":  # Include nested datasets of level 1
             if not nested_dataset:
-                child_paths = table_dag(model, path=path + [t], nested_dataset=True)
+                child_paths = table_paths(model, path=path + [t], nested_dataset=True)
                 paths.extend(child_paths)
         elif t.schema.name != domain_schema:  # Skip over tables in the ml-schema
             pass
         else:
             # Get all the paths that extend the current path
-            child_paths = table_dag(model, path=path + [t], nested_dataset=nested_dataset)
+            child_paths = table_paths(model, path=path + [t], nested_dataset=nested_dataset)
             paths.extend(child_paths)
     return paths
 
@@ -108,13 +117,13 @@ def table_specification(model: Model,
     """
     Generate a specification for the provided dataset element.  Each element is a table type that can be directly
     included in a dataset.
-    :param model: ERMrest model from the current catalog
+    :param model: ERMRest model from the current catalog
     :param element: A table that is directly associated with a dataset.
     :param writer: Callable that can write a export spec, or a download speck.
     :return:
     """
     exports = []
-    for path in table_dag(model, [element]):
+    for path in table_paths(model, [element]):
         table = path[-1]
         if table.is_association(max_arity=3, pure=False):
             continue
