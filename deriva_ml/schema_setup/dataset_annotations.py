@@ -15,7 +15,7 @@ def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     # Generate the destination path in the file system using just the table names.
     table = path[-1]
     npath = '/'.join([f'{t.schema.name}:{t.name}' for t in path])
-    dname =  '/'.join([t.name for t in path] + [table.name])
+    dname =  '/'.join([t.name for t in path if not t.is_association()] + [table.name])
     exports = [
         {
             'source': {'api': 'entity', 'path': f'{npath}'},
@@ -43,7 +43,7 @@ def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
 def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     table = path[-1]
     npath = '/'.join([f'{t.schema.name}:{t.name}' for t in path])
-    output_path = '/'.join([t.name for t in path] + [table.name])
+    output_path = '/'.join([p.name for p in path if not p.is_association()] + [table.name])
     exports = [
         {
             "processor": "csv",
@@ -130,32 +130,18 @@ def table_specification(model: Model,
         exports.extend(writer(path))
     return exports
 
-
-def dataset_specification(model: Model, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    """
-    Generate the export specification for each of the associated dataset member types.
-    :param model:
-    :param writer:
-    :return:
-    """
-
-    def element_filter(assoc: FindAssociationResult) -> bool:
-        """
-        A dataset may have may other object associated with it. We only want to consider those association tables
-        that are in the domain sehema, or the table Dataset_Dataset, which is used for nested datasets.
-        :param assoc:
-        :return: True if element is an element to be included in export spec.
-        """
-        return assoc.table.schema.name == domain_schema or assoc.name == "Dataset_Dataset"
-
+def dataset_specification(model: Model,
+                          writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
     dataset_table = model.schemas['deriva-ml'].tables['Dataset']
     domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
 
-    # Use the association tables connected to the dataset to generate specifications for all included tables
-    # in the domain schema, as well as any nested dataset.
-    return [spec for element in dataset_table.find_associations(max_arity=3, pure=False) for spec in
-            table_specification(model, element.table, writer) if element_filter(element)]
-
+    element_spec = []
+    for element in dataset_table.find_associations():
+        # A dataset may have may other object associated with it. We only want to consider those association tables
+        #  that are in the domain schema, or the table Dataset_Dataset, which is used for nested datasets.
+        if element.table.schema.name == domain_schema or element.name == "Dataset_Dataset":
+            element_spec.extend(table_specification(model, element.table, writer))
+    return vocabulary_specification(model, writer) + element_spec
 
 def export_outputs(model: Model) -> list[dict[str, Any]]:
     """
@@ -174,7 +160,7 @@ def export_outputs(model: Model) -> list[dict[str, Any]]:
         {'source': {'api': 'entity'},
          'destination': {'type': 'env', 'params': {'query_keys': ['RID', 'Description']}}
          }
-    ] + vocabulary_specification(model, writer) + dataset_specification(model, writer)
+    ] + dataset_specification(model, writer)
 
 
 def processor_params(model: Model) -> list[dict[str, Any]]:
@@ -187,7 +173,7 @@ def processor_params(model: Model) -> list[dict[str, Any]]:
         return download_dataset_element(path)
 
     # Downlosd spec is the spec for any controlled vocabulary and for the dataset.
-    return vocabulary_specification(model, writer) + dataset_specification(model, writer)
+    return dataset_specification(model, writer)
 
 
 def dataset_visible_columns(model: Model) -> dict[str, Any]:

@@ -19,7 +19,7 @@ from deriva_ml.schema_setup.dataset_annotations import generate_dataset_download
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.core.utils.hash_utils import compute_file_hashes
-from enum import Enum
+from enum import Enum, StrEnum
 import hashlib
 from itertools import chain
 import json
@@ -45,7 +45,7 @@ warnings.filterwarnings('ignore',
 
 
 # For some reason, deriva-py doesn't use the proper enum class!!
-class UploadState(str, Enum):
+class UploadState(StrEnum):
     success = 'Success'
     failed = 'Failed'
     pending = 'Pending'
@@ -83,7 +83,7 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
-class VocabularyTables(enum.Enum):
+class VocabularyTables(StrEnum):
     dataset_type = 'Dataset_Type'
 
 class ColumnDefinition(BaseModel):
