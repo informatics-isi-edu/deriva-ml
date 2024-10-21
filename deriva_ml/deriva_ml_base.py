@@ -1,5 +1,3 @@
-import enum
-
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
 from copy import deepcopy
@@ -83,8 +81,9 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
-class VocabularyTables(StrEnum):
+class cv_table(StrEnum):
     dataset_type = 'Dataset_Type'
+    workflow_type = 'Workflow_Type'
 
 class ColumnDefinition(BaseModel):
     name: str
@@ -495,7 +494,7 @@ class DerivaML:
                 'Description': description,
                 'Checksum': self._get_checksum(url),
                 'Version': version,
-                'Workflow_Type': self.lookup_term('Workflow_Type', workflow_type).name}
+                cv_table.workflow_type: self.lookup_term(cv_table.workflow_type, workflow_type).name}
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]['RID']
 
         return workflow_rid
@@ -668,23 +667,23 @@ class DerivaML:
     def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
-        :param ds_type: One or more dataset types.  Must be a term from the Dataset_Type controlled vocabulary.
+        :param ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
         :param description:  Description of the dataset.
         :return: New dataset RID.
         """
         # Create the entry for the new dataset and get its RID.
         ds_types = [ds_type] if isinstance(ds_type, str) else ds_type
         for ds_type in ds_types:
-            if not self.lookup_term('Dataset_Type', ds_type):
+            if not self.lookup_term(cv_table.dataset_type, ds_type):
                 raise DerivaMLException(f'Dataset type must be a vocabulary term.')
         dataset_table_path = (
             self.pathBuilder.schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
-        dataset = dataset_table_path.insert([{'Description': description, 'Dataset_Type': ds_type}])[0]['RID']
+        dataset = dataset_table_path.insert([{'Description': description, cv_table.dataset_type: ds_type}])[0]['RID']
 
         # Get the name of the association table between dataset and dataset_type.
-        atable = next(self.model.schemas[self.ml_schema].tables['Dataset_Type'].find_associations()).name
+        atable = next(self.model.schemas[self.ml_schema].tables[cv_table.dataset_type].find_associations()).name
         self.pathBuilder.schemas[self.ml_schema].tables[atable].insert(
-            [{'Dataset_Type': ds_type, 'Dataset': dataset} for ds_type in ds_types])
+            [{cv_table.dataset_type: ds_type, 'Dataset': dataset} for ds_type in ds_types])
         return dataset
 
     def find_datasets(self) -> Iterable[dict[str, Any]]:
@@ -692,19 +691,19 @@ class DerivaML:
         Returns a list of currently available datasets.
         :return:
         """
-        # Get datapath to all the tables we will need: Dataset, Dataset_Type and the association table.
+        # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
         pb = self.pathBuilder
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
-        atable = next(self.model.schemas['deriva-ml'].tables['Dataset_Type'].find_associations()).name
+        atable = next(self.model.schemas['deriva-ml'].tables[cv_table.dataset_type].find_associations()).name
         ml_path = pb.schemas[self.ml_schema]
-        dataset_type_path = ml_path.Dataset_Type
+        dataset_type_path = ml_path.cv_table.dataset_type
         atable_path = ml_path.tables[atable]
 
         # Get a list of all the dataset_type values associated with this dataset.
         datasets = []
         for dataset in dataset_path.entities().fetch():
             ds_types = atable_path.filter(atable_path.Dataset == dataset['RID']).attributes(atable_path.Dataset_Type).fetch()
-            datasets.append(dataset | {'Dataset_Type': [ds['Dataset_Type'] for ds in ds_types]})
+            datasets.append(dataset | {cv_table.dataset_type: [ds[cv_table.dataset_type] for ds in ds_types]})
         return datasets
 
     def delete_dataset(self, dataset_rid: RID) -> None:
@@ -1504,7 +1503,7 @@ class DerivaML:
         bag_paths = []
         for url in self.configuration.bdbag_url:
             self.update_status(Status.running, f'Inserting bag {url}... ', execution_rid)
-            bag_path, dataset_rid = self.materialize_bdbag(url, execution_rid)
+            bag_path, dataset_rid = self.materialize_dataset_bag(url, execution_rid)
             dataset_rids.append(dataset_rid)
             bag_paths.append(bag_path)
         # Insert workflow
