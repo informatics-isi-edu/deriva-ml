@@ -694,9 +694,9 @@ class DerivaML:
         # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
         pb = self.pathBuilder
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
-        atable = next(self.model.schemas['deriva-ml'].tables[cv_table.dataset_type].find_associations()).name
+        atable = next(self.model.schemas[self.ml_schema].tables[cv_table.dataset_type].find_associations()).name
         ml_path = pb.schemas[self.ml_schema]
-        dataset_type_path = ml_path.cv_table.dataset_type
+        dataset_type_path = ml_path.tables[cv_table.dataset_type]
         atable_path = ml_path.tables[atable]
 
         # Get a list of all the dataset_type values associated with this dataset.

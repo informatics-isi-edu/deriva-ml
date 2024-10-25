@@ -77,7 +77,7 @@ def vocabulary_specification(model, writer: Callable[[list[Table]], list[dict[st
     return [o for table in vocabs for o in writer([table])]
 
 def catalog_spec(model: Model, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    return writer(f"catalog / {model})
+    return writer(f"catalog / {model}")
 
 
 def table_paths(model: Model, path, nested_dataset: bool = False) -> list[list[Table]]:

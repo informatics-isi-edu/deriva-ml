@@ -1,5 +1,5 @@
 from pathlib import Path
-from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
+from deriva.core.ermrest_model import Model, Table
 from csv import DictReader, reader
 from urllib.parse import urlparse
 from typing import Any, Iterable
@@ -8,46 +8,42 @@ from collections import defaultdict
 class DatasetBag(object):
     def __init__(self, bag_path: Path | str):
         self.bag_path = Path(bag_path)
+        self.model = Model.fromfile('file-system', self.bag_path / 'data/schema.json')
+        self.domain_schema = [s for s in self.model.schemas if s not in ['deriva-ml', 'public', 'www']][0]
 
-    def localize_asset_table(self, path):
-        dpath = self.bag_path / "data"
-        path = Path(path)
+    def localize_asset_table(self) -> dict[str, str]:
         fetch_map = {}
         with open(self.bag_path / 'fetch.txt', newline='\n') as fetchfile:
             for row in fetchfile:
                 fields = row.split('\t')
-                fetch_map[urlparse(fields[0]).path] = fields[2].replace('\n', '')
-
-        with open(dpath / path, newline='') as csvfile:
-            object_table = [o for o in DictReader(csvfile)]
-
-        for o in object_table:
-            o['Filename'] = fetch_map[o['URL']]
-        return object_table
+                fetch_map[urlparse(fields[0]).path] = Path(fields[2].replace('\n', ''))
+        return fetch_map
 
     def list_features(self, table: str | Table) -> list[str]:
         pass
 
-    def is_asset(self, table: dict[str, Any]):
-        asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
-        return asset_columns.issubset({c for c in table.keys()})
+    def to_dict(self) -> dict[str, list[dict[str, Any]]]:
 
-    def _classify_tables(self):
-        dpath = self.bag_path / "data"
+        def is_asset(table_name: str) -> bool:
+            asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
+            table = self.model.schemas[self.domain_schema].tables[table_name]
+            return asset_columns.issubset({c.name for c in table.columns})
 
-        for path, subdirs, files in dpath.walk(top_down=False):
-            if not files:
-                print(f"Association table: {path.parent.name}")
-            if  subdirs == []:
+        dpath = self.bag_path / "data/Dataset"
+        object_table = {}
+        asset_map = self.localize_asset_table()
+        for path, subdirs, files in dpath.walk():
+            table = path.name
+            if f"{table}.csv" not in files:
+                # Some directories might be empty.
                 continue
-            table_name = path.stem
-            print(subdirs, files)
-            for target in subdirs:
-                with open(table_name / files[0], newline='') as csvfile:
-                    columns = reader(csvfile)
-                print(columns)
+            with open(path / f"{table}.csv", newline='') as csvfile:
+                object_table[table] = [o for o in DictReader(csvfile)]
+            if is_asset(table):
+                for o in object_table[table]:
+                    o['Filename'] = asset_map[o['URL']]
+        return object_table
 
-            # Determine if this ta
 
     def get_table(self, table):
         dpath = self.bag_path / "data" / table
