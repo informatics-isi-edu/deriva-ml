@@ -1,9 +1,114 @@
 import argparse
 import sys
 
-from deriva.core.ermrest_catalog import ErmrestCatalog
 from deriva.core.utils.core_utils import tag as deriva_tags
 
+# Here is the directory layout we want to support:
+#
+#  Execution_Assets
+#     asset_type
+#         file1, file2, ....   <- Need to update execution_asset association table.
+#  schema
+#     record_table
+#         record_table.csv
+#     asset_table
+#         file1, file2, ....
+#     target_table
+#         feature_name
+#             asset_name
+#                 file1, file2, ...
+#              feature_name.csv    <- needs to have asset_name column remapped before uploading
+#
+#
+
+ea_dir_regex = "(?i)^.*/Execution_Assets/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+feature_dir_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<target>[A-Za-z0-9]*)/(?P<feature_name>[A-Za-z0-9_]*)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+asset_dir_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+record_dir_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>.+?)[.]"
+
+bulk_upload_annotation = {
+    "asset_mappings": [
+        {
+            # Upload  any files that may have been created by the program execution.  These are  in the
+            # Execution_Metadata directory
+            "column_map": {
+                "MD5": "{md5}",
+                "URL": "{URI}",
+                "Length": "{file_size}",
+                "Filename": "{file_name}",
+                "Execution_Metadata_Type": "{execution_metadata_type_name}"
+            },
+            "file_pattern": "(?i)^.*/Execution_Metadata/(?P<execution_metadata_type>[A-Za-z0-9_]*)-(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
+            "target_table": ["deriva-ml", "Execution_Metadata"],
+            "checksum_types": ["sha256", "md5"],
+            "hatrac_options": {"versioned_urls": True},
+            "hatrac_templates": {
+                "hatrac_uri": "/hatrac/execution_metadata/{md5}.{file_name}",
+                "content-disposition": "filename*=UTF-8''{file_name}"
+            },
+            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+            "metadata_query_templates": [
+                "/entity/deriva-ml:Execution_Metadata_Type/Name={execution_metadata_type}/execution_metadata_type_name:=Name"
+            ],
+        },
+        {
+            # Upload the contents of the Execution_Assets directory.
+            "column_map": {
+                "MD5": "{md5}",
+                "URL": "{URI}",
+                "Length": "{file_size}",
+                "Filename": "{file_name}",
+                "Execution_Asset_Type": "{execution_asset_type_name}"
+            },
+            "file_pattern": ea_dir_regex,
+            "target_table": ["deriva-ml", "Execution_Assets"],
+            "checksum_types": ["sha256", "md5"],
+            "hatrac_options": {"versioned_urls": True},
+            "hatrac_templates": {
+                "hatrac_uri": "/hatrac/execution_assets/{md5}.{file_name}",
+                "content-disposition": "filename*=UTF-8''{file_name}"
+            },
+            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+            "metadata_query_templates": [
+                "/attribute/deriva-ml:Execution_Asset_Type/Name={execution_asset_type}/execution_asset_type_name:=Name"
+            ],
+        },
+        {
+            # Upload the assets for a feature table.
+            "column_map": {"MD5": "{md5}", "URL": "{URI}", "Length": "{file_size}", "Filename": "{file_name}"},
+            "file_pattern": feature_dir_regex,
+            "checksum_types": ["sha256", "md5"],
+            "hatrac_options": {"versioned_urls": True},
+            "hatrac_templates": {
+                "hatrac_uri": "/hatrac/{asset_name}/{md5}.{file_name}",
+                "content-disposition": "filename*=UTF-8''{file_name}"
+            },
+            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+            "metadata_query_templates": ["/entity/{schema}:{asset_name}"],
+        },
+        {
+            # Upload the contents of  an asset table.
+            "column_map": {"MD5": "{md5}", "URL": "{URI}", "Length": "{file_size}", "Filename": "{file_name}"},
+            "file_pattern": asset_dir_regex,  # Sets table, file_name, file_ext
+            "checksum_types": ["sha256", "md5"],
+            "hatrac_options": {"versioned_urls": True},
+            "hatrac_templates": {
+                "hatrac_uri": "/hatrac/{table}/{md5}.{file_name}",
+                "content-disposition": "filename*=UTF-8''{file_name}"
+            },
+            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+        },
+        {
+            #  Upload the records into a table
+            "asset_type": "table",
+            "default_columns": ["RID", "RCB", "RMB", "RCT", "RMT"],
+            "file_pattern": record_dir_regex,
+            "ext_pattern": "^.*[.](?P<file_ext>json|csv)$"
+        }
+    ],
+                "version_update_url": "https://github.com/informatics-isi-edu/deriva-client",
+                "version_compatibility": [[">=1.4.0", "<2.0.0"]]
+}
 
 def generate_annotation(catalog_id: str, schema: str) -> dict:
     workflow_annotation = {
@@ -195,54 +300,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
             "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
             "resolverImplicitCatalog": catalog_id,
         },
-        deriva_tags.bulk_upload:
-            {"asset_mappings": [
-                {"column_map": {
-                    "MD5": "{md5}",
-                    "URL": "{URI}",
-                    "Length": "{file_size}",
-                    "Filename": "{file_name}",
-                    "Execution_Asset_Type": "{execution_asset_type_name}"
-                },
-                    "file_pattern": "(?i)^.*/Execution_Assets/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$",
-                    "target_table": ["deriva-ml", "Execution_Assets"],
-                    "checksum_types": ["sha256", "md5"],
-                    "hatrac_options": {"versioned_urls": True},
-                    "hatrac_templates": {
-                        "hatrac_uri": "/hatrac/execution_assets/{md5}.{file_name}",
-                        "content-disposition": "filename*=UTF-8''{file_name}"
-                    },
-                    "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-                    "metadata_query_templates": [
-                        "/attribute/deriva-ml:Execution_Asset_Type/Name={execution_asset_type}/execution_asset_type_name:=Name"
-                    ],
-                    "create_record_before_upload": False
-                },
-                {
-                    "column_map": {
-                        "MD5": "{md5}",
-                        "URL": "{URI}",
-                        "Length": "{file_size}",
-                        "Filename": "{file_name}",
-                        "Execution_Metadata_Type": "{execution_metadata_type_name}"
-                    },
-                    "file_pattern": "(?i)^.*/Execution_Metadata/(?P<execution_metadata_type>[A-Za-z0-9_]*)-(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
-                    "target_table": ["deriva-ml", "Execution_Metadata"],
-                    "checksum_types": ["sha256", "md5"],
-                    "hatrac_options": {"versioned_urls": True},
-                    "hatrac_templates": {
-                        "hatrac_uri": "/hatrac/execution_metadata/{md5}.{file_name}",
-                        "content-disposition": "filename*=UTF-8''{file_name}"
-                    },
-                    "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-                    "metadata_query_templates": [
-                        "/attribute/deriva-ml:Execution_Metadata_Type/Name={execution_metadata_type}/execution_metadata_type_name:=Name"
-                    ],
-                    "create_record_before_upload": False
-                }],
-                "version_update_url": "https://github.com/informatics-isi-edu/deriva-client",
-                "version_compatibility": [[">=1.4.0", "<2.0.0"]]
-            }
+        deriva_tags.bulk_upload: bulk_upload_annotation,
     }
 
     return {"workflow_annotation": workflow_annotation,

@@ -1,5 +1,6 @@
 from typing import Any, Callable
-from deriva.core.ermrest_model import Table, Model, FindAssociationResult
+
+from deriva.core.ermrest_model import Table, Model
 from deriva.core.utils.core_utils import tag as deriva_tags
 
 
@@ -75,10 +76,6 @@ def is_vocabulary(t):
 def vocabulary_specification(model, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
     vocabs = [table for s in model.schemas.values() for table in s.tables.values() if is_vocabulary(table)]
     return [o for table in vocabs for o in writer([table])]
-
-def catalog_spec(model: Model, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    return writer(f"catalog / {model}")
-
 
 def table_paths(model: Model, path, nested_dataset: bool = False) -> list[list[Table]]:
     """
@@ -180,7 +177,7 @@ def dataset_specification(model: Model,
         #  that are in the domain schema, or the table Dataset_Dataset, which is used for nested datasets.
         if element.table.schema.name == domain_schema or element.name == "Dataset_Dataset":
             element_spec.extend(table_specification(model, element.table, writer))
-    return catalog_spec(model, writer) + vocabulary_specification(model, writer) + element_spec
+    return vocabulary_specification(model, writer) + element_spec
 
 def export_outputs(model: Model) -> list[dict[str, Any]]:
     """
@@ -198,7 +195,10 @@ def export_outputs(model: Model) -> list[dict[str, Any]]:
          },
         {'source': {'api': 'entity'},
          'destination': {'type': 'env', 'params': {'query_keys': ['RID', 'Description']}}
-         }
+         },
+        {'source': {"api": "schema", "skip_root_path": True},
+         'destination': {'type': 'json', 'name': 'schema'},
+        }
     ] + dataset_specification(model, writer)
 
 
@@ -212,7 +212,12 @@ def processor_params(model: Model) -> list[dict[str, Any]]:
         return download_dataset_element(path)
 
     # Downlosd spec is the spec for any controlled vocabulary and for the dataset.
-    return dataset_specification(model, writer)
+    return [
+        {
+            "processor": "json",
+            "processor_params": {'query_path': f'/schema', 'output_path': 'schema'}
+        }
+    ] + dataset_specification(model, writer)
 
 
 def dataset_visible_columns(model: Model) -> dict[str, Any]:

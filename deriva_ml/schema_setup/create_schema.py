@@ -5,7 +5,7 @@ from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
 from deriva_ml.schema_setup.annotations import generate_annotation
-from deriva_ml.deriva_ml_base import cv_table
+from deriva_ml.deriva_ml_base import MLVocab
 
 def define_table_workflow(workflow_annotation: dict):
     return Table.define(
@@ -88,15 +88,15 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
 
     workflow_table = schema.create_table(define_table_workflow(annotations["workflow_annotation"]))
     workflow_table.create_reference(schema.create_table(
-        Table.define_vocabulary(cv_table.workflow_type, f'{schema_name}:{{RID}}')))
+        Table.define_vocabulary(MLVocab.workflow_type, f'{schema_name}:{{RID}}')))
 
     execution_table = schema.create_table(define_table_execution(schema_name, annotations["execution_annotation"]))
 
     dataset_table = schema.create_table(define_table_dataset(annotations["dataset_annotation"]))
     dataset_type = schema.create_table(
-        Table.define_vocabulary(cv_table.dataset_type, f'{project_name}:{{RID}}'))
+        Table.define_vocabulary(MLVocab.dataset_type, f'{project_name}:{{RID}}'))
     schema.create_table(
-        Table.define_association(associates=[("Dataset", dataset_table), (cv_table.dataset_type, dataset_type)])
+        Table.define_association(associates=[("Dataset", dataset_table), (MLVocab.dataset_type, dataset_type)])
     )
     schema.create_table(
         Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])

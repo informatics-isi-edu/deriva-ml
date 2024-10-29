@@ -1,12 +1,11 @@
-from typing import List, Optional, Self
+from typing import Optional
 from pydantic import BaseModel
-from enum import Enum
 import json
 
 
 class Workflow(BaseModel):
     """
-    A specificiation of a workflow.  Must have a name, URI to the workflow instance, and a type.
+    A specification of a workflow.  Must have a name, URI to the workflow instance, and a type.
     """
     name: str
     url: str
@@ -19,25 +18,11 @@ class Execution(BaseModel):
     description: str
 
 
-class Term(str, Enum):
-    annotation = "AnnotationType"
-    workflow = "WorkflowType"
-    execution_asset = "ExecutionAssetType"
-    execution_metadata = "ExecutionMetadataType"
-
-
-class WorkflowTerm(BaseModel):
-    term: Term          # The vocaublary in which the term is found
-    name: str           # The term
-    description: str    # A description
-
-
 class ExecutionConfiguration(BaseModel):
     bdbag_url: list[str] = []
     models: list[str] = []      # List of RIDs to model files.
     workflow: Workflow
     execution: Execution
-    workflow_terms: list[WorkflowTerm] = []
     description: str = ""
 
 

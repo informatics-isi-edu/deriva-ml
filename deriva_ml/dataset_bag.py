@@ -4,12 +4,19 @@ from csv import DictReader, reader
 from urllib.parse import urlparse
 from typing import Any, Iterable
 from collections import defaultdict
+import sqlite3
 
 class DatasetBag(object):
     def __init__(self, bag_path: Path | str):
         self.bag_path = Path(bag_path)
         self.model = Model.fromfile('file-system', self.bag_path / 'data/schema.json')
         self.domain_schema = [s for s in self.model.schemas if s not in ['deriva-ml', 'public', 'www']][0]
+        self.dbase = sqlite3.connect(f"{self.domain_schema}.db")
+        cur = self.dbase.cursor()
+        for s in self.model.schemas:
+            for t in s.tables:
+                cur.execute(t.sqlite3_ddl())
+
 
     def localize_asset_table(self) -> dict[str, str]:
         fetch_map = {}
