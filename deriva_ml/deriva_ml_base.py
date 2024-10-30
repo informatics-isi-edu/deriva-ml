@@ -87,9 +87,11 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
+
 class MLVocab(StrEnum):
     dataset_type = 'Dataset_Type'
     workflow_type = 'Workflow_Type'
+
 
 class ColumnDefinition(BaseModel):
     name: str
@@ -203,7 +205,6 @@ class Feature(BaseModel):
     Table: str
 
 
-
 class FindFeatureResult(FindAssociationResult):
     """Wrapper for results of Table.find_associations()"""
 
@@ -269,7 +270,7 @@ class ConfigurationRecord(BaseModel):
     """
     caching_dir: Path
     working_dir: Path
- #   vocabs: dict[str, list[VocabularyTerm]]
+    #   vocabs: dict[str, list[VocabularyTerm]]
     execution_rid: RID
     workflow_rid: RID
     bag_paths: list[Path]
@@ -404,7 +405,7 @@ class DerivaML:
         table_path.mkdir(parents=True, exist_ok=True)
         return table_path / f"{table.name}.csv"
 
-    def asset_directory(self, table: str | Table, prefix: str | Path =None) -> Path:
+    def asset_directory(self, table: str | Table, prefix: str | Path = None) -> Path:
         """
         Return a local file path in which to place a files for an asset table.
         :param table:
@@ -629,9 +630,9 @@ class DerivaML:
 
         system_columns = {'RID', 'RMB', 'RCB', 'RCT', 'RMT'}  # We will want to skip over system columns
         feature_columns = {
-            c.name: (map_type(c, asset_columns), c.default or ...)
+                              c.name: (map_type(c, asset_columns), c.default or ...)
                               for c in assoc_table.columns if c.name not in system_columns
-        } | {c: (str | Path, ...) for c in asset_columns} | {'Table': (str, table.name)}
+                          } | {c: (str | Path, ...) for c in asset_columns} | {'Table': (str, table.name)}
 
         featureclass_name = f'{table.name}Feature{feature_name}'
         print(feature_columns)
@@ -640,33 +641,40 @@ class DerivaML:
     def _feature_table(self, feature: Feature) -> Table:
         """
         Return the feature table associated with the specified feature value class instance.
-        :param f: An instance of a feature class
+        :param feature: An instance of a feature class
         :return:
         """
         return next(f.table for f in self.find_features(feature.Table)
-         if f.feature_name == feature.Feature_Name)
+                    if f.feature_name == feature.Feature_Name)
 
-    def _feature_assets(self, table: Table, feature_name: str) -> set[str]:
-        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+    def _find_feature(self, table: Table | str, feature_name) -> Feature:
+        table = self._get_table(table)
+        try:
+            return next(f for f in self.find_features(table) if f.feature_name == feature_name)
+        except StopIteration:
+            raise DerivaMLException(f"Feature {table.name}:{feature_name} doesn't exist")
+
+    def _feature_assets(self, table: Table | str, feature_name: str) -> set[str]:
+        table = self._get_table(table)
+        feature = self._find_feature(table, feature_name)
         skip_columns = ['RMB', 'RCB', 'RCT', 'RMT', 'Feature_Name', 'Execution', table.name]
-        return {fk.column.table for fk in feature.table.foreign_keys
-                      if fk.column.name not in skip_columns and self.is_asset(fk.pk_table)}
+        return {fk.columns[0].table for fk in feature.table.foreign_keys
+                if fk.columns[0].name not in skip_columns and self.is_asset(fk.pk_table)}
 
-    def _is_feature_path(self, path: Path) -> Table | False:
+    def _is_feature_path(self, path: Path) -> FindFeatureResult | bool:
         """
         Return a feature table
         :param path:
         :return:
         """
         m = re.match(
-            "data/(?P<schema>\w+)/(?P<table>\w+)/(?P<feature>\w+)/(?P=feature).csv$",
-            path.name)
+            r".*/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P<feature>[-\w]+)/(?P=feature).csv$",
+            path.as_posix())
         if m:
             return list(f for f in self.find_features(m['table'])
-            if f.feature_name == m['feature_name'])[0].table
+                        if f.feature_name == m['feature'])[0]
         else:
             return False
-
 
     def drop_feature(self, feature_name: str, table: Table | str) -> bool:
         table = self._get_table(table)
@@ -708,7 +716,7 @@ class DerivaML:
         entries = feature_path.insert(f.model_dump() for f in features)
         return len(entries)
 
-    def upload_features(self,execution_rid: RID, execution_assets):
+    def upload_features(self, execution_rid: RID, execution_assets):
         pass
 
     def list_feature(self, table: Table | str, feature_name: str) -> _ResultSet:
@@ -762,7 +770,8 @@ class DerivaML:
         # Get a list of all the dataset_type values associated with this dataset.
         datasets = []
         for dataset in dataset_path.entities().fetch():
-            ds_types = atable_path.filter(atable_path.Dataset == dataset['RID']).attributes(atable_path.Dataset_Type).fetch()
+            ds_types = atable_path.filter(atable_path.Dataset == dataset['RID']).attributes(
+                atable_path.Dataset_Type).fetch()
             datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in ds_types]})
         return datasets
 
@@ -871,6 +880,7 @@ class DerivaML:
         """
 
         members = set(members)
+
         def check_dataset_cycle(member_rid, path=None):
             path = path or set(dataset_rid)
             return member_rid in path
@@ -1076,7 +1086,7 @@ class DerivaML:
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
-    def cite(self, entity: dict | str, snapshot = True) -> str:
+    def cite(self, entity: dict | str, snapshot=True) -> str:
         """
         Return a citation URL for the provided entity.
         :param entity: A dict that contains the column values for a specific entity.
@@ -1147,7 +1157,7 @@ class DerivaML:
                     json.dump(generate_dataset_download_spec(self.model), ds)
                 downloader = GenericDownloader(
                     server={"catalog_id": self.catalog_id, "protocol": "https", "host": self.host_name},
-                    config_file= spec_file,
+                    config_file=spec_file,
                     output_dir=tmp_dir,
                     envars={"Dataset_RID": dataset_rid})
                 result = downloader.download()
@@ -1463,7 +1473,8 @@ class DerivaML:
         self.catalog.getPathBuilder().schemas[self.ml_schema].tables[a_table].insert(entities)
         return results
 
-    def _update_execution_asset_table(self, execution_rid: RID, assets: dict[str, FileUploadState]) -> dict[str, FileUploadState]:
+    def _update_execution_asset_table(self, execution_rid: RID, assets: dict[str, FileUploadState]) -> dict[
+        str, FileUploadState]:
         ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
         asset_exec_entities = ml_schema_path.Execution_Assets_Execution.filter(
             ml_schema_path.Execution_Assets_Execution.Execution == execution_rid).entities()
@@ -1479,17 +1490,18 @@ class DerivaML:
                     entities.append({'Execution_Assets': rid, 'Execution': execution_rid})
         ml_schema_path.Execution_Assets_Execution.insert(entities)
 
-    def _update_feature_table(self, execution_rid, dir, assets: dict[str, FileUploadState]) -> None:
-        m = re.match(feature_value_regex, dir)
-        feature_name = m['feature_name']
-        feature_file = f"{m['file_name']}.{m['file_ext']}"
-        table = self._get_table(m['table'])
-        asset_columns = self._feature_assets(table, feature_name)
-        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+    def _update_feature_table(self,
+                              feature: FindFeatureResult,
+                              feature_file: Path,
+                              uploaded_files: dict[str, FileUploadState]) -> None:
+        table = feature.table
+
+        if not (asset_columns := self._feature_assets(table, feature.feature_name)):
+            return
 
         def clean_path(p: str):
             # Given an absolute path, return the path rooted in the upload directory.
-            return p.replace(self.execution_assets_path.name,'')
+            return p.replace(self.execution_assets_path.name, '')
 
         def map_path(e):
             for c in asset_columns:
@@ -1498,12 +1510,11 @@ class DerivaML:
 
         ml_schema_path = self.domain_path
         entities = []
-        asset_map = { clean_path(file): assets['Result']['RID']
-                      for file, asset in assets.items() if asset['State'] == 0 and asset['Result']}
-        with open(dir, 'r') as feature_table:
+        asset_map = {clean_path(file): uploaded_files['Result']['RID']
+                     for file, asset in uploaded_files.items() if asset['State'] == 0 and asset['Result']}
+        with open(feature_file, 'r') as feature_table:
             entities = [map_path(e) for e in csv.DictReader(feature_table)]
         self.domain_path.tables[feature_table].insert(entities)
-
 
     def upload_execution_assets(self, execution_rid: RID) -> dict[str, dict[str, FileUploadState]]:
         """
@@ -1539,13 +1550,13 @@ class DerivaML:
                     f'Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}')
             else:
                 if folder_path.contains("Execution_Assets"):
-                    print(f'processing ea')
                     self._update_execution_asset_table(execution_rid, result)
                 else:
-                    for table_path in folder_path.iterdir():
-                        if self._is_feature_path(table_path):
-                            print(f'processing feature {folder_path}')
-                            self._update_feature_table(execution_rid, folder_path)
+                    for table_path in folder_path.rglob('*.csv'):
+                        if feature := self._is_feature_path(table_path):
+                            self._update_feature_table(feature=feature,
+                                                       feature_path=table_path,
+                                                       uploaded_files=results)
         return results
 
     def execution_end(self, execution_rid: RID) -> None:
@@ -1601,15 +1612,15 @@ class DerivaML:
         execution_rid = self.add_execution(description=self.configuration.execution.description)
         # Insert terms
         self.update_status(Status.running, 'Inserting tags... ', execution_rid)
-     #  vocabs = {}
-     #   for term in configuration.workflow_terms:
-     #       term_record = self.add_term(table=term.term,
-     #                                   term_name=term.name,
-     #                                   description=term.description,
-     #                                   exists_ok=True)
-     #       term_records = vocabs.get(term.term, [])
-     #       term_records.append(term_record)
-     #       vocabs[term.term] = term_records
+        #  vocabs = {}
+        #   for term in configuration.workflow_terms:
+        #       term_record = self.add_term(table=term.term,
+        #                                   term_name=term.name,
+        #                                   description=term.description,
+        #                                   exists_ok=True)
+        #       term_records = vocabs.get(term.term, [])
+        #       term_records.append(term_record)
+        #       vocabs[term.term] = term_records
         # Materialize bdbag
         dataset_rids = []
         bag_paths = []
@@ -1646,7 +1657,7 @@ class DerivaML:
             execution_rid=execution_rid,
             workflow_rid=workflow_rid,
             bag_paths=bag_paths,
-        #    vocabs=vocabs,
+            #    vocabs=vocabs,
             assets_paths=assets_paths,
             configuration_path=configuration_path)
         # save runtime env
