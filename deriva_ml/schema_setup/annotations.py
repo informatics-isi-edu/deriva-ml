@@ -22,9 +22,10 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 #
 
 ea_dir_regex = "(?i)^.*/Execution_Assets/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-feature_dir_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<target>[A-Za-z0-9]*)/(?P<feature_name>[A-Za-z0-9_]*)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-asset_dir_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-record_dir_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>.+?)[.]"
+feature_value_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<target>[A-Za-z0-9]*)/(?P<feature_name>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+feature_asset_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<target>[A-Za-z0-9]*)/(?P<feature_name>[A-Za-z0-9_]*)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+asset_dir_regex =   "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+record_dir_regex =  "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>.+?)[.]"
 
 bulk_upload_annotation = {
     "asset_mappings": [
@@ -76,7 +77,7 @@ bulk_upload_annotation = {
         {
             # Upload the assets for a feature table.
             "column_map": {"MD5": "{md5}", "URL": "{URI}", "Length": "{file_size}", "Filename": "{file_name}"},
-            "file_pattern": feature_dir_regex,
+            "file_pattern": feature_asset_regex,
             "checksum_types": ["sha256", "md5"],
             "hatrac_options": {"versioned_urls": True},
             "hatrac_templates": {

@@ -14,6 +14,7 @@ from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.core_utils import tag as deriva_tags
 
+from annotations import feature_dir_regex, feature_value_regex
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_download_spec
@@ -589,11 +590,12 @@ class DerivaML:
         Create a pydantic model for entries into the specified feature table
         """
 
-        def validate_rid(rid):
-            try:
-                self.resolve_rid(rid)
-            except DerivaMLException as e:
-                raise ValidationError(str(e))
+        def validate_rid(rid, enable=False):
+            if enable:
+                try:
+                    self.resolve_rid(rid)
+                except DerivaMLException as e:
+                    raise ValidationError(str(e))
             return rid
 
         def map_type(c: Column, asset_columns: set[str]) -> UnionType | Type[str] | Type[int] | Type[float]:
@@ -645,6 +647,13 @@ class DerivaML:
             if col_names > {k.pk_table.name for k in a.other_fkeys} and feature_name in a.name:
                 break
         return a.table
+
+    def _feature_assets(self, table: Table, feature_name: str) -> set[str]:
+        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+        skip_key = feature.other_fkeys + {feature.self_key} + {fk for fk in feature.foreign_keys if fk.pk_table.schema.name == 'public'}
+        fkeys = [fk.pk_table for fk in feature.table.foreign_keys if
+         fk != feature.self_key and fk not in feature.other_fkeys and
+         k not in feature.other_fkeys and 'URL' in {c.name for c in k.pk_table.columns}]
 
     def drop_feature(self, feature_name: str, table: Table | str) -> bool:
         table = self._get_table(table)
@@ -1457,8 +1466,31 @@ class DerivaML:
                     entities.append({'Execution_Assets': rid, 'Execution': execution_rid})
         ml_schema_path.Execution_Assets_Execution.insert(entities)
 
-    def _update_feature_table(self, execution_rid, dir ) -> None:
-        pass
+    def _update_feature_table(self, execution_rid, dir, assets: dict[str, FileUploadState]) -> None:
+        m = re.match(feature_value_regex, dir)
+        feature_name = m.feature_name
+        feature_file = f"{m.file_name}.{m.file_ext}"
+        table = self._get_table(table)
+        feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+        feature_assets = [t.pk_table for t in feature.other_fkeys]
+        asset_columns = []
+        def clean_path(p: str):
+            return p.replace(self.execution_assets_path.name,'')
+
+        def map_path(e):
+            for c in asset_columns:
+                e[asset_column] = asset_map[e[asset_column]]
+            return e
+
+        self.find_features()
+        ml_schema_path = self.domain_path
+        entities = []
+        asset_map = { clean_path(file): assets['Result']['RID']
+                      for file, asset in assets.items() if asset['State'] == 0 and asset['Result']}
+        with open('feature.csv', 'r') as feature_table:
+            entities = [map_path(e) for e in csv.DictReader(feature_table)]
+
+        self.domain_path.tables[feature_table].insert(entities)
 
 
     def upload_execution_assets(self, execution_rid: RID) -> dict[str, dict[str, FileUploadState]]:
@@ -1478,7 +1510,7 @@ class DerivaML:
 
         """
         results = {}
-        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         for folder_path in self.execution_assets_path.iterdir():
             if not folder_path.is_dir():
                 continue
