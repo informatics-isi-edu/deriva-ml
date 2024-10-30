@@ -17,7 +17,7 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 #         feature_name
 #             asset_name
 #                 file1, file2, ...
-#              feature_name.csv    <- needs to have asset_name column remapped before uploading
+#             feature_name.csv    <- needs to have asset_name column remapped before uploading
 #
 #
 

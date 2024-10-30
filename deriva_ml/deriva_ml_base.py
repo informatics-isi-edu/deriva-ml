@@ -3,6 +3,7 @@ from types import UnionType
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
 from copy import deepcopy
+import csv
 from datetime import datetime
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
@@ -14,7 +15,7 @@ from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.core_utils import tag as deriva_tags
 
-from annotations import feature_dir_regex, feature_value_regex
+from deriva_ml.schema_setup.annotations import feature_value_regex
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_download_spec
@@ -197,7 +198,10 @@ class VocabularyTerm(BaseModel):
 
 
 class Feature(BaseModel):
-    pass
+    Execution: str
+    Feature_Name: str
+    Table: str
+
 
 
 class FindFeatureResult(FindAssociationResult):
@@ -627,33 +631,42 @@ class DerivaML:
         feature_columns = {
             c.name: (map_type(c, asset_columns), c.default or ...)
                               for c in assoc_table.columns if c.name not in system_columns
-        } | {c: (str | Path, ...) for c in asset_columns}
+        } | {c: (str | Path, ...) for c in asset_columns} | {'Table': (str, table.name)}
 
         featureclass_name = f'{table.name}Feature{feature_name}'
+        print(feature_columns)
         return create_model(featureclass_name, __base__=Feature, __validators__=validators, **feature_columns)
 
-    def _feature_table(self, f: Feature) -> Table:
+    def _feature_table(self, feature: Feature) -> Table:
         """
         Return the feature table associated with the specified feature value class instance.
         :param f: An instance of a feature class
         :return:
         """
-        col_names = set(f.model_fields.keys())  # All of the column names in the feature record.
-        feature_name = f.model_fields['Feature_Name'].default
-
-        for a in self.model.schemas[self.ml_schema].tables['Execution'].find_associations(
-                min_arity=3, max_arity=3, pure=False):
-            #  The column names in the keys of the association table are fully contained in the feature value
-            if col_names > {k.pk_table.name for k in a.other_fkeys} and feature_name in a.name:
-                break
-        return a.table
+        return next(f.table for f in self.find_features(feature.Table)
+         if f.feature_name == feature.Feature_Name)
 
     def _feature_assets(self, table: Table, feature_name: str) -> set[str]:
         feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
-        skip_key = feature.other_fkeys + {feature.self_key} + {fk for fk in feature.foreign_keys if fk.pk_table.schema.name == 'public'}
-        fkeys = [fk.pk_table for fk in feature.table.foreign_keys if
-         fk != feature.self_key and fk not in feature.other_fkeys and
-         k not in feature.other_fkeys and 'URL' in {c.name for c in k.pk_table.columns}]
+        skip_columns = ['RMB', 'RCB', 'RCT', 'RMT', 'Feature_Name', 'Execution', table.name]
+        return {fk.column.table for fk in feature.table.foreign_keys
+                      if fk.column.name not in skip_columns and self.is_asset(fk.pk_table)}
+
+    def _is_feature_path(self, path: Path) -> Table | False:
+        """
+        Return a feature table
+        :param path:
+        :return:
+        """
+        m = re.match(
+            "data/(?P<schema>\w+)/(?P<table>\w+)/(?P<feature>\w+)/(?P=feature).csv$",
+            path.name)
+        if m:
+            return list(f for f in self.find_features(m['table'])
+            if f.feature_name == m['feature_name'])[0].table
+        else:
+            return False
+
 
     def drop_feature(self, feature_name: str, table: Table | str) -> bool:
         table = self._get_table(table)
@@ -1468,28 +1481,27 @@ class DerivaML:
 
     def _update_feature_table(self, execution_rid, dir, assets: dict[str, FileUploadState]) -> None:
         m = re.match(feature_value_regex, dir)
-        feature_name = m.feature_name
-        feature_file = f"{m.file_name}.{m.file_ext}"
-        table = self._get_table(table)
+        feature_name = m['feature_name']
+        feature_file = f"{m['file_name']}.{m['file_ext']}"
+        table = self._get_table(m['table'])
+        asset_columns = self._feature_assets(table, feature_name)
         feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
-        feature_assets = [t.pk_table for t in feature.other_fkeys]
-        asset_columns = []
+
         def clean_path(p: str):
+            # Given an absolute path, return the path rooted in the upload directory.
             return p.replace(self.execution_assets_path.name,'')
 
         def map_path(e):
             for c in asset_columns:
-                e[asset_column] = asset_map[e[asset_column]]
+                e[c] = asset_map[e[c]]
             return e
 
-        self.find_features()
         ml_schema_path = self.domain_path
         entities = []
         asset_map = { clean_path(file): assets['Result']['RID']
                       for file, asset in assets.items() if asset['State'] == 0 and asset['Result']}
-        with open('feature.csv', 'r') as feature_table:
+        with open(dir, 'r') as feature_table:
             entities = [map_path(e) for e in csv.DictReader(feature_table)]
-
         self.domain_path.tables[feature_table].insert(entities)
 
 
@@ -1531,9 +1543,7 @@ class DerivaML:
                     self._update_execution_asset_table(execution_rid, result)
                 else:
                     for table_path in folder_path.iterdir():
-                        table_path.find_features()
-
-                        if self.is_feature(table_path.name):
+                        if self._is_feature_path(table_path):
                             print(f'processing feature {folder_path}')
                             self._update_feature_table(execution_rid, folder_path)
         return results
