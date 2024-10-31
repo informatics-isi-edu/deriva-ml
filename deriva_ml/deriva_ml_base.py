@@ -14,8 +14,6 @@ from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_ty
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.core_utils import tag as deriva_tags
-
-from deriva_ml.schema_setup.annotations import feature_value_regex
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_download_spec
@@ -36,7 +34,7 @@ import re
 import requests
 import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import List, Optional, Any, NewType, Iterable, Union, Type
+from typing import List, Optional, Any, NewType, Iterable, Type
 import warnings
 
 RID = NewType('RID', str)
@@ -647,7 +645,7 @@ class DerivaML:
         return next(f.table for f in self.find_features(feature.Table)
                     if f.feature_name == feature.Feature_Name)
 
-    def _find_feature(self, table: Table | str, feature_name) -> Feature:
+    def _find_feature(self, table: Table | str, feature_name) -> FindFeatureResult:
         table = self._get_table(table)
         try:
             return next(f for f in self.find_features(table) if f.feature_name == feature_name)
@@ -715,9 +713,6 @@ class DerivaML:
         feature_path = self.catalog.getPathBuilder().schemas[feature_table.schema.name].tables[feature_table.name]
         entries = feature_path.insert(f.model_dump() for f in features)
         return len(entries)
-
-    def upload_features(self, execution_rid: RID, execution_assets):
-        pass
 
     def list_feature(self, table: Table | str, feature_name: str) -> _ResultSet:
         """
@@ -1473,12 +1468,18 @@ class DerivaML:
         self.catalog.getPathBuilder().schemas[self.ml_schema].tables[a_table].insert(entities)
         return results
 
-    def _update_execution_asset_table(self, execution_rid: RID, assets: dict[str, FileUploadState]) -> dict[
-        str, FileUploadState]:
-        ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+    def _update_execution_asset_table(self, execution_rid: RID, assets: dict[str, FileUploadState]) -> None:
+        """
+        Assets associated with an execution must be linked to an execution entity after they are uploaded into
+        the catalog. This routine takes a list of uploaded assets and makes that assocation.
+        :param execution_rid:
+        :param assets:
+        :return:
+        """
+        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         asset_exec_entities = ml_schema_path.Execution_Assets_Execution.filter(
             ml_schema_path.Execution_Assets_Execution.Execution == execution_rid).entities()
-        assets_list = [e['Execution_Assets'] for e in asset_exec_entities]
+        assets_list = {e['Execution_Assets'] for e in asset_exec_entities}
 
         # Now got through the list of recently added assets, and add an entry for this asset if it
         # doesn't already exist.
@@ -1495,23 +1496,22 @@ class DerivaML:
                               feature_file: Path,
                               uploaded_files: dict[str, FileUploadState]) -> None:
         table = feature.table
-
-        if not (asset_columns := self._feature_assets(table, feature.feature_name)):
-            return
+        asset_columns = self._feature_assets(table, feature.feature_name)
 
         def clean_path(p: str):
             # Given an absolute path, return the path rooted in the upload directory.
             return p.replace(self.execution_assets_path.name, '')
 
         def map_path(e):
+            # Go through the asset columns and replace the file name with the RID for the uploaded file.
             for c in asset_columns:
                 e[c] = asset_map[e[c]]
             return e
 
-        ml_schema_path = self.domain_path
-        entities = []
+        # Create a map between a file name that appeared in the file to the RID of the uploaded file.
         asset_map = {clean_path(file): uploaded_files['Result']['RID']
                      for file, asset in uploaded_files.items() if asset['State'] == 0 and asset['Result']}
+
         with open(feature_file, 'r') as feature_table:
             entities = [map_path(e) for e in csv.DictReader(feature_table)]
         self.domain_path.tables[feature_table].insert(entities)
@@ -1533,7 +1533,6 @@ class DerivaML:
 
         """
         results = {}
-        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         for folder_path in self.execution_assets_path.iterdir():
             if not folder_path.is_dir():
                 continue
@@ -1550,12 +1549,14 @@ class DerivaML:
                     f'Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}')
             else:
                 if folder_path.contains("Execution_Assets"):
+                    # Execution assets need to be assocated with the execution record.
                     self._update_execution_asset_table(execution_rid, result)
                 else:
+                    # now look for
                     for table_path in folder_path.rglob('*.csv'):
                         if feature := self._is_feature_path(table_path):
                             self._update_feature_table(feature=feature,
-                                                       feature_path=table_path,
+                                                       feature_file=table_path,
                                                        uploaded_files=results)
         return results
 
@@ -1710,7 +1711,6 @@ class DerivaML:
         execution_rid = configuration.execution_rid
         try:
             uploaded_assets = self.upload_execution_assets(execution_rid)
-            self.upload_features(execution_rid, uploaded_assets)
             self.upload_execution_metadata(execution_rid)
             self.update_status(Status.completed,
                                'Successfully end the execution.',

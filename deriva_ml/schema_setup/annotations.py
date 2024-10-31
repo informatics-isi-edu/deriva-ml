@@ -21,12 +21,13 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 #
 #
 
-ea_dir_regex = "(?i)^.*/Execution_Assets/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-feature_value_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<target>[A-Za-z0-9]*)/(?P<feature_name>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-feature_asset_regex = "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<target>[A-Za-z0-9]*)/(?P<feature_name>[A-Za-z0-9_]*)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-asset_dir_regex =   "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-record_dir_regex =  "(?i)^.*/(?P<schema>[A-Za-z0-9_-]+)/(?P<table>.+?)[.]"
+feature_table = r'(?i)^.*/(?P<schema>[-\w]+)/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+/)'
 
+ea_dir_regex = r"(?i)^.*/Execution_Assets/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+feature_value_regex = feature_table + r'/(?P=feature_name)[.](?P<file_ext>[a-z0-9]*)$'
+feature_asset_regex = feature_table + r'/(?P<table>[-\w]+)/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$'
+asset_dir_regex = r"(?i)^.*/(?P<schema>[-\w]+)/(?P<table>[-\w]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+record_dir_regex = r"(?i)^.*/(?P<schema>[-\w]+)/(?P<table>[-_\w]+)/(?P=table)\.(csv|json)$"
 bulk_upload_annotation = {
     "asset_mappings": [
         {
@@ -85,7 +86,7 @@ bulk_upload_annotation = {
                 "content-disposition": "filename*=UTF-8''{file_name}"
             },
             "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-            "metadata_query_templates": ["/entity/{schema}:{asset_name}"],
+            "metadata_query_templates": ["/entity/{schema}:{table}//URL,MD5,Length,Filename"],
         },
         {
             # Upload the contents of  an asset table.
@@ -98,14 +99,15 @@ bulk_upload_annotation = {
                 "content-disposition": "filename*=UTF-8''{file_name}"
             },
             "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+            "metadata_query_templates": ["/entity/{schema}:{table}/URL,MD5,Length,Filename"],
         },
         {
-            #  Upload the records into a table
+            #  Upload the records into a feature table
             "asset_type": "table",
             "default_columns": ["RID", "RCB", "RMB", "RCT", "RMT"],
             "file_pattern": record_dir_regex,
             "ext_pattern": "^.*[.](?P<file_ext>json|csv)$"
-        }
+        },
     ],
                 "version_update_url": "https://github.com/informatics-isi-edu/deriva-client",
                 "version_compatibility": [[">=1.4.0", "<2.0.0"]]
