@@ -395,23 +395,25 @@ class DerivaML:
     def table_path(self, table: str | Table) -> Path:
         """
         Return a local file path in which to place a CSV to add values to a table on upload.
+        This needs to be kept in sync with bulk_upload specification.
         :param table:
         :return:
         """
         table = self._get_table(table)
-        table_path = self.execution_assets_path / table.schema.name / table.name
+        table_path = self.execution_assets_path / "deriva-ml" / table.schema.name / table.name
         table_path.mkdir(parents=True, exist_ok=True)
         return table_path / f"{table.name}.csv"
 
     def asset_directory(self, table: str | Table, prefix: str | Path = None) -> Path:
         """
-        Return a local file path in which to place a files for an asset table.
+        Return a local file path in which to place a files for an asset table.  This needs to be kept in sync with
+        bulk_upload specification
         :param table:
         :param prefix: Location of where to place files.  Defaults to execution_assets_path.
         """
         table = self._get_table(table)
         prefix = Path(prefix) or self.execution_assets_path
-        table_path = prefix / table.schema.name / table.name
+        table_path = prefix / "deriva-ml" / table.schema.name / "asset" / table.name
         table_path.mkdir(parents=True, exist_ok=True)
         return table_path
 
@@ -426,14 +428,14 @@ class DerivaML:
         of assocated asset table names and corresponding paths.
         """
         table = self._get_table(table)
-        table_path = self.execution_assets_path / table.schema.name / table.name / feature_name
+        table_path = self.execution_assets_path / "deriva-ml"/ table.schema.name / table.name / feature_name
         table_path.mkdir(parents=True, exist_ok=True)
         feature = [f for f in self.find_features(table) if f.feature_name == feature_name][0]
         asset_tables = [fk.pk_table.name for fk in feature.table.foreign_keys
                         if self.is_asset(fk.pk_table) and fk.pk_table != table]
         asset_paths = {}
         for asset_table in asset_tables:
-            asset_path = table_path / asset_table
+            asset_path = table_path / "asset" / asset_table
             asset_path.mkdir(parents=True, exist_ok=True)
             asset_paths[asset_table] = asset_path
         return table_path / f"{feature_name}.csv", asset_paths
@@ -633,7 +635,6 @@ class DerivaML:
                           } | {c: (str | Path, ...) for c in asset_columns} | {'Table': (str, table.name)}
 
         featureclass_name = f'{table.name}Feature{feature_name}'
-        print(feature_columns)
         return create_model(featureclass_name, __base__=Feature, __validators__=validators, **feature_columns)
 
     def _feature_table(self, feature: Feature) -> Table:
@@ -710,7 +711,7 @@ class DerivaML:
         """
         features = list(features)
         feature_table = self._feature_table(features[0])
-        feature_path = self.catalog.getPathBuilder().schemas[feature_table.schema.name].tables[feature_table.name]
+        feature_path = self.pathBuilder.schemas[feature_table.schema.name].tables[feature_table.name]
         entries = feature_path.insert(f.model_dump() for f in features)
         return len(entries)
 
@@ -1514,6 +1515,7 @@ class DerivaML:
 
         with open(feature_file, 'r') as feature_table:
             entities = [map_path(e) for e in csv.DictReader(feature_table)]
+        print(f"update feature table {entities}")
         self.domain_path.tables[feature_table].insert(entities)
 
     def upload_execution_assets(self, execution_rid: RID) -> dict[str, dict[str, FileUploadState]]:
@@ -1557,7 +1559,7 @@ class DerivaML:
                         if feature := self._is_feature_path(table_path):
                             self._update_feature_table(feature=feature,
                                                        feature_file=table_path,
-                                                       uploaded_files=results)
+                                                       uploaded_files=result)
         return results
 
     def execution_end(self, execution_rid: RID) -> None:
