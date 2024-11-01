@@ -1376,13 +1376,11 @@ class DerivaML:
 
         """
         try:
-            with NamedTemporaryFile('w', prefix='exec_config',
-                                    suffix='.json',
-                                    delete_on_close=False,
-                                    delete=True) as fp:
-                json.dump(config.model_dump_json(), fp)
-                fp.close()
-                configuration_rid = self._upload_execution_configuration_file(fp.name, description=config.description)
+            fp = NamedTemporaryFile('w+', prefix='exec_config', suffix='.json', delete=False)
+            json.dump(config.model_dump_json(), fp)
+            fp.close()
+            configuration_rid = self._upload_execution_configuration_file(fp.name, description=config.description)
+            os.remove(fp.name)
         except Exception as _e:
             raise DerivaMLException(f'Error in execution configuration upload')
         return configuration_rid
