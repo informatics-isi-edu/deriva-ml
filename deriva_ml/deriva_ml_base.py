@@ -21,7 +21,15 @@ from deriva_ml.schema_setup.dataset_annotations import generate_dataset_download
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.core.utils.hash_utils import compute_file_hashes
-from enum import Enum, StrEnum
+# from enum import Enum, StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
+
+import getpass
 import hashlib
 from itertools import chain
 import json
@@ -331,7 +339,7 @@ class DerivaML:
             self.cache_dir = Path(tdir.name)
         default_workdir = self.__class__.__name__ + '_working'
         if working_dir:
-            self.working_dir = Path(working_dir)
+            self.working_dir = Path(working_dir).joinpath(getpass.getuser(), default_workdir)
         else:
             tdir = tdir or TemporaryDirectory(delete=False)
             self.working_dir = Path(tdir.name) / default_workdir
@@ -341,6 +349,7 @@ class DerivaML:
 
         self.execution_assets_path.mkdir(parents=True, exist_ok=True)
         self.execution_metadata_path.mkdir(parents=True, exist_ok=True)
+        self.execution_features_path.mkdir(parents=True, exist_ok=True)
 
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         if 'dirty' in self.version:
@@ -1105,7 +1114,7 @@ class DerivaML:
 
         """
         user_path = self.pathBuilder.public.ERMrest_Client.path
-        return [{'ID': u['ID'], 'Full Name': u['Full_Name']} for u in user_path.entities().fetch()]
+        return [{'ID': u['ID'], 'Full_Name': u['Full_Name']} for u in user_path.entities().fetch()]
 
     @staticmethod
     def _get_checksum(url) -> str:
@@ -1425,7 +1434,7 @@ class DerivaML:
                   'Length': file_size,
                   'MD5': md5,
                   'Description': description,
-                  'Execution_Metadata_Type': 'Execution Config'}]))[0]['RID']
+                  'Execution_Metadata_Type': 'Execution_Config'}]))[0]['RID']
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(
