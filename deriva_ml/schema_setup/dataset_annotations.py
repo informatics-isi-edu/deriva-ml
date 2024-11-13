@@ -1,7 +1,9 @@
 from typing import Any, Callable
+from typing import Optional
 
 from deriva.core.ermrest_model import Table, Model
 from deriva.core.utils.core_utils import tag as deriva_tags
+from deriva_ml.dataset_bag import DatasetBag
 
 
 def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
@@ -77,58 +79,23 @@ def vocabulary_specification(model, writer: Callable[[list[Table]], list[dict[st
     vocabs = [table for s in model.schemas.values() for table in s.tables.values() if is_vocabulary(table)]
     return [o for table in vocabs for o in writer([table])]
 
-def table_paths(model: Model, path, nested_dataset: bool = False) -> list[list[Table]]:
+
+def table_paths(graph: dict[str, Any], path: Optional[list] = None) -> list[list[Table]]:
     """
     Recursively walk over the domain schema and extend the current path.
-    :param model:
-    :param path:
-    :param nested_dataset:
+    :param graph:
     :return:
     """
-    domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
-    table = path[-1]  # We are going to extend from the last table we have seed.
-    paths = [path]  # Output is a list of paths reachable by extending the current path.
+    path = path or []
+    paths = []
 
-    # If the end of the path is is vocabulary table, we are at a terminal node in the ERD, so stop
-    if is_vocabulary(table):
-        return paths
-
-    # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
-    tables = {fk.pk_table for fk in table.foreign_keys if fk.pk_table != table}
-    tables |= {fk.table for fk in table.referenced_by if fk.table != table}
-    for t in tables:
-        if t == table or t in path:  # Skip over tables we have already seen
-            pass
-        elif t.name == "Dataset" and path[0].name == "Dataset_Dataset":  # Include nested datasets of level 1
-            if not nested_dataset:
-                child_paths = table_paths(model, path=path + [t], nested_dataset=True)
-                paths.extend(child_paths)
-        elif t.schema.name != domain_schema:  # Skip over tables in the ml-schema
-            pass
-        else:
-            # Get all the paths that extend the current path
-            child_paths = table_paths(model, path=path + [t], nested_dataset=nested_dataset)
-            paths.extend(child_paths)
+    for node, children in graph.items():
+        new_path = path + [node]
+        paths.append(new_path)
+        for child in children:
+            paths.extend(table_paths(child, new_path))
     return paths
 
-def table_specification(model: Model,
-                        element: Table,
-                        writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    """
-    Generate a specification for the provided dataset element.  Each element is a table type that can be directly
-    included in a dataset.
-    :param model: ERMRest model from the current catalog
-    :param element: A table that is directly associated with a dataset.
-    :param writer: Callable that can write a export spec, or a download speck.
-    :return:
-    """
-    exports = []
-    for path in table_paths(model, [element]):
-        table = path[-1]
-        if table.is_association(max_arity=3, pure=False):
-            continue
-        exports.extend(writer(path))
-    return exports
 
 def dataset_specification(model: Model,
                           writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
@@ -150,14 +117,15 @@ def dataset_specification(model: Model,
                 cv1.csv
             CV2/
                 cv2.csv
-            T1/
-                t1.csv
-                T3/
-                    t3.csv
-                T4/
-                    t4.csv
-            T2/
-                t2.csf
+            Dataset/
+                T1/
+                    t1.csv
+                    T3/
+                        t3.csv
+                    T4/
+                        t4.csv
+                T2/
+                    t2.csv
             assets/
               T2
                 f1
@@ -176,7 +144,12 @@ def dataset_specification(model: Model,
         # A dataset may have may other object associated with it. We only want to consider those association tables
         #  that are in the domain schema, or the table Dataset_Dataset, which is used for nested datasets.
         if element.table.schema.name == domain_schema or element.name == "Dataset_Dataset":
-            element_spec.extend(table_specification(model, element.table, writer))
+            # Now generate all of the paths reachable from this node.
+            for path in table_paths(DatasetBag.schema_graph(model, element.table), [dataset_table]):
+                table = path[-1]
+                if table.is_association(max_arity=3, pure=False):
+                    continue
+                element_spec.extend(writer(path))
     return vocabulary_specification(model, writer) + element_spec
 
 def export_outputs(model: Model) -> list[dict[str, Any]]:

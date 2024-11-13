@@ -23,7 +23,7 @@ from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.core.utils.hash_utils import compute_file_hashes
 # from enum import Enum, StrEnum
 try:
-    from enum import StrEnum
+    from enum import Enum, StrEnum
 except ImportError:
     from enum import Enum
     class StrEnum(str, Enum):
