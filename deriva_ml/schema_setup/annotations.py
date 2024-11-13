@@ -1,5 +1,6 @@
 import argparse
 import sys
+from pathlib import Path
 
 from deriva.core.utils.core_utils import tag as deriva_tags
 
@@ -8,27 +9,47 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 #  Execution_Assets
 #     asset_type
 #         file1, file2, ....   <- Need to update execution_asset association table.
-#  catalog
-#    <schema>
-#         <record_table>
-#             record_table.csv
-#         <asset_table>
-#             file1, file2, ....
-#         <target_table>
-#             <feature_name>
-#                 <asset_table>
-#                     file1, file2, ...
-#                 <feature_name>.csv    <- needs to have asset_name column remapped before uploading
+#
+#   deriva-ml
+#     <schema>
+#         table
+#            <record_table>
+#                 record_table.csv
+#         asset
+#            <asset_table>
+#                 file1, file2, ....
+#         feature
+#            <target_table>
+#                <feature_name>
+#                       <asset_table>
+#                         file1, file2, ...
+#                     <feature_name>.csv    <- needs to have asset_name column remapped before uploading
 #
 
-
 ea_dir_regex = r"(?i)^.*/Execution_Assets/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-
-feature_table = r'(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)/'
-feature_value_regex = feature_table + r'(?P=feature_name)[.](?P<file_ext>[a-z0-9]*)$'
-feature_asset_regex = feature_table + r'asset/(?P<asset_table>[-\w]+)/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$'
+feature_table = r'(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/feature/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)/'
+feature_value_regex = feature_table + r'(?P=feature_name)[.](?P<file_ext>[(csv|json)]*)$'
+feature_asset_regex = feature_table + r'(?P<asset_table>[-\w]+)/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$'
 asset_dir_regex = r"(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/asset/(?P<asset_table>[-\w]*)/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
-record_regex = r"(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
+record_regex = r"(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/table/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
+
+def execution_asset_dir(asset_type) -> Path:
+    return Path(f'Execution_Assets/{asset_type}')
+
+def feature_value_path(schema, target_table, feature_name) -> Path:
+    return Path(f'deriva-ml/{schema}/feature/{target_table}/{feature_name}/{feature_name}.csv')
+
+def feature_asset_dir(schema, target_table, feature_name, asset_table) -> Path:
+    return Path(f'deriva-ml/{schema}/feature/{target_table}/{feature_name}/{asset_table}')
+
+def asset_dir(schema, asset_table) -> Path:
+    return Path(f'deriva-ml/{schema}/asset/{asset_table}')
+
+def table_path(schema, table) -> Path:
+    return Path(f'deriva-ml/{schema}/table/{table}/{table}.csv')
+
+
+
 bulk_upload_annotation = {
     "asset_mappings": [
         {
@@ -47,7 +68,7 @@ bulk_upload_annotation = {
             "hatrac_options": {"versioned_urls": True},
             "hatrac_templates": {
                 "hatrac_uri": "/hatrac/execution_metadata/{md5}.{file_name}",
-                "content-disposition": "filename*=UTF-8''{file_name}"
+                "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}"
             },
             "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
             "metadata_query_templates": [
@@ -69,7 +90,7 @@ bulk_upload_annotation = {
             "hatrac_options": {"versioned_urls": True},
             "hatrac_templates": {
                 "hatrac_uri": "/hatrac/execution_assets/{md5}.{file_name}",
-                "content-disposition": "filename*=UTF-8''{file_name}"
+                "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}"
             },
             "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
             "metadata_query_templates": [
@@ -97,7 +118,7 @@ bulk_upload_annotation = {
             "hatrac_options": {"versioned_urls": True},
             "hatrac_templates": {
                 "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
-                "content-disposition": "filename*=UTF-8''{file_name}"
+                "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}"
             },
             "target_table": ["{schema}", "{asset_table}"],
             "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",

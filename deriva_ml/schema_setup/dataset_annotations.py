@@ -17,7 +17,10 @@ def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     # into a path in the form of /S:T1/S:T2/S:Table
     # Generate the destination path in the file system using just the table names.
     table = path[-1]
-    npath = '/'.join([f'{t.schema.name}:{t.name}' for t in path])
+    print(path)
+    npath = "Dataset/RID={Dataset_RID}/" if path[0].name == "Dataset" else path[0].name
+    npath += '/'.join([f'{t.schema.name}:{t.name}' for t in path[1:]])
+
     dname =  '/'.join([t.name for t in path if not t.is_association()] + [table.name])
     exports = [
         {
@@ -45,7 +48,8 @@ def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
 
 def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     table = path[-1]
-    npath = '/'.join([f'{t.schema.name}:{t.name}' for t in path])
+    npath = "Dataset/RID={Dataset_RID}/" if path[0].name == "Dataset" else path[0].name
+    npath += '/'.join([f'{t.schema.name}:{t.name}' for t in path[1:]])
     output_path = '/'.join([p.name for p in path if not p.is_association()] + [table.name])
     exports = [
         {
@@ -80,7 +84,7 @@ def vocabulary_specification(model, writer: Callable[[list[Table]], list[dict[st
     return [o for table in vocabs for o in writer([table])]
 
 
-def table_paths(graph: dict[str, Any], path: Optional[list] = None) -> list[list[Table]]:
+def table_paths(graph: dict[str, Any], path: Optional[list[Table]] = None) -> list[list[Table]]:
     """
     Recursively walk over the domain schema and extend the current path.
     :param graph:
@@ -308,7 +312,7 @@ def generate_dataset_annotations(model: Model) -> dict[str, Any]:
     }
 
 
-def generate_dataset_download_spec(model):
+def generate_dataset_download_spec(model: Model) -> dict[str, Any]:
     return {
         "bag": {
             "bag_name": "Dataset_{Dataset_RID}",
@@ -318,8 +322,8 @@ def generate_dataset_download_spec(model):
             "bag_idempotent": True
         },
         "catalog": {
-            "host": "https://dev.eye-ai.org",
-            "catalog_id": "eye-ai",
+            "host": f"{model.catalog.deriva_server.scheme}://{model.catalog.deriva_server.server}",
+            "catalog_id": f"{model.catalog.catalog_id}",
             "query_processors": [
                                     {
                                         "processor": "env",

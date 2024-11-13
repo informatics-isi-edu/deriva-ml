@@ -132,7 +132,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
 def initialize_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
     catalog = model.catalog
     execution_metadata_type = catalog.getPathBuilder().schemas[schema_name].tables['Execution_Metadata_Type']
-    execution_metadata_type.insert([{'Name': 'Execution Config',
+    execution_metadata_type.insert([{'Name': 'Execution_Config',
                                      'Description': "Configuration File for execution metadata"},
                                     {'Name': "Runtime_Env",
                                      'Description': "Information about the execution environment"}],

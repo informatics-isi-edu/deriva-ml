@@ -17,6 +17,7 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_download_spec
+from deriva_ml.schema_setup.annotations import feature_asset_dir, feature_value_path, table_path, asset_dir
 
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva.transfer.download.deriva_download import GenericDownloader
@@ -409,9 +410,9 @@ class DerivaML:
         :return:
         """
         table = self._get_table(table)
-        table_path = self.execution_assets_path / "deriva-ml" / table.schema.name / table.name
-        table_path.mkdir(parents=True, exist_ok=True)
-        return table_path / f"{table.name}.csv"
+        tpath = self.execution_assets_path / table_path(schema=self.domain_schema, table=table.name)
+        tpath.mkdir(parents=True, exist_ok=True)
+        return tpath
 
     def asset_directory(self, table: str | Table, prefix: str | Path = None) -> Path:
         """
@@ -422,9 +423,10 @@ class DerivaML:
         """
         table = self._get_table(table)
         prefix = Path(prefix) or self.execution_assets_path
-        table_path = prefix / "deriva-ml" / table.schema.name / "asset" / table.name
-        table_path.mkdir(parents=True, exist_ok=True)
-        return table_path
+        # /deriva-ml/(?P<schema>[-\w]+)/asset/(?P<asset_table>[-\w]*)/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
+        apath = prefix / asset_dir(table.schema.name, table.name )
+        apath.mkdir(parents=True, exist_ok=True)
+        return apath
 
     def feature_paths(self, table: str | Table, feature_name: str) -> tuple[Path, dict[str, Path]]:
         """
@@ -434,20 +436,20 @@ class DerivaML:
         :param table:
         :param feature_name:
         :return: A tuple whose first element is the path for the feature values and whose second element is a dictionary
-        of assocated asset table names and corresponding paths.
+        of associated asset table names and corresponding paths.
         """
         table = self._get_table(table)
-        table_path = self.execution_assets_path / "deriva-ml"/ table.schema.name / table.name / feature_name
+        table_path = self.execution_assets_path / feature_value_path(table.schema.name, table.name, feature_name)
         table_path.mkdir(parents=True, exist_ok=True)
         feature = [f for f in self.find_features(table) if f.feature_name == feature_name][0]
         asset_tables = [fk.pk_table.name for fk in feature.table.foreign_keys
                         if self.is_asset(fk.pk_table) and fk.pk_table != table]
         asset_paths = {}
         for asset_table in asset_tables:
-            asset_path = table_path / "asset" / asset_table
+            asset_path = feature_asset_dir(table.schema.name, table.name, feature_name, asset_table)
             asset_path.mkdir(parents=True, exist_ok=True)
             asset_paths[asset_table] = asset_path
-        return table_path / f"{feature_name}.csv", asset_paths
+        return table_path, asset_paths
 
     def chaise_url(self, table: str | Table) -> str:
         table = self._get_table(table)
