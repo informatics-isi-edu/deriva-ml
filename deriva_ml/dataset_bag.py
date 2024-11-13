@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 from urllib.parse import urlparse
 import sqlite3
-from typing import Optional, Any
+from typing import Optional, Any, Generator
 
 class DatasetBag(object):
     def __init__(self, bag_path: Path | str):
@@ -122,13 +122,23 @@ class DatasetBag(object):
                                 object_table
                     )
 
-    def get_table(self, table: str):
+    def get_table(self, table: str) -> Generator[tuple, None, None]:
         schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
-        return self.dbase.execute(f'SELECT * FROM "{schema}:{table}"').fetchall()
+        result = self.dbase.execute(f'SELECT * FROM "{schema}:{table}"')
+        while row := result.fetchone():
+            yield row
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
         schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
         return pd.read_sql(f'SELECT * FROM "{schema}:{table}"', con=self.dbase)
+
+    def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+        schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
+        with self.dbase:
+            col_names = [c[1] for c in self.dbase.execute(f'PRAGMA table_info("{schema}:{table}")').fetchall()]
+            result = self.dbase.execute(f'SELECT * FROM "{schema}:{table}"')
+            while row := result.fetchone():
+                yield dict(zip(col_names, row))
 
     @staticmethod
     def delete_database(bag_path, schema):
