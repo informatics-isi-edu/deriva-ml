@@ -38,7 +38,7 @@ import hashlib
 from itertools import chain
 import json
 import logging
-import pkg_resources
+from importlib.metadata import distributions
 from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator, PrivateAttr
 import os
 from pathlib import Path
@@ -295,6 +295,17 @@ class ConfigurationRecord(BaseModel):
         frozen = True
         protected_namespaces = ()
 
+    def __str__(self):
+        items = [
+            f"caching_dir: {self.caching_dir}",
+            f"working_dir: {self.working_dir}",
+            f"execution_rid: {self.execution_rid}",
+            f"workflow_rid: {self.workflow_rid}",
+            f"bag_paths: {self.bag_paths}",
+            f"assets_paths: {self.assets_paths}",
+            f"configuration: {self.configuration}",
+        ]
+        return "\n".join(items)
 
 class DerivaML:
     """
@@ -353,7 +364,6 @@ class DerivaML:
             tdir = tdir or TemporaryDirectory(delete=False)
             self.working_dir = Path(tdir.name) / default_workdir
         self.working_dir.mkdir(parents=True, exist_ok=True)
-
         logging.basicConfig(level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
         if 'dirty' in self.version:
             logging.info(f'Loading dirty model.  Consider commiting and tagging: {self.version}')
@@ -1676,8 +1686,10 @@ class DerivaML:
 
         # Download model
         self.update_status(Status.running, 'Downloading models ...', execution_rid)
+        model_path = self.model_dir()
+        model_path.mkdir(parents=True, exist_ok=True)
         assets_paths = [self.download_execution_files('Execution_Assets', m, execution_rid,
-                                                      dest_dir=str(self.model_path))
+                                                      dest_dir=str(model_path))
                         for m in self.configuration.models]
         configuration_records = ConfigurationRecord(
             caching_dir=self.cache_dir,
@@ -1689,10 +1701,11 @@ class DerivaML:
             assets_paths=assets_paths,
             configuration=configuration)
         # save runtime env
-        runtime_env_file = str(self.execution_metadata_path) + '/Runtime_Env-python_environment_snapshot.txt'
-        with open(runtime_env_file, 'w') as file:
-            for package in pkg_resources.working_set:
-                file.write(str(package) + '\n')
+        runtime_env_dir = self.execution_metadata_directory('Runtime_Env')
+        with NamedTemporaryFile('w+', dir=runtime_env_dir, prefix='environment_snapshot_',
+                                suffix='.txt', delete=False) as fp:
+            for dist in distributions():
+                fp.write(f"{dist.metadata['Name']}=={dist.version}\n")
         self.start_time = datetime.now()
         self.update_status(Status.running, 'Initialize status finished.', execution_rid)
         return configuration_records

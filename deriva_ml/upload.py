@@ -24,8 +24,8 @@ import regex as re
 #                     <feature_name>.csv    <- needs to have asset_name column remapped before uploading
 #
 
-exec_asset_regex = r"(?i)^.*/deriva-ml/execution-asset/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-exec_metadata_regex = "(?i)^.*/execution-metadata/(?P<execution_metadata_type>[A-Za-z0-9_]*)-(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
+exec_asset_regex = r"(?i)^.*/execution-asset/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+exec_metadata_regex = "(?i)^.*/execution-metadata/(?P<execution_metadata_type>[A-Za-z0-9_]*)/(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
 feature_table = r'(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/feature/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)/'
 feature_value_regex = feature_table + r'(?P=feature_name)[.](?P<file_ext>[(csv|json)]*)$'
 feature_asset_regex = feature_table + r'(?P<asset_table>[-\w]+)/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$'
@@ -44,12 +44,12 @@ def execution_asset_dir(prefix: Path, asset_type: str) -> Path:
     :param asset_type: Type of execution asset
     :return:
     """
-    path = prefix / f'deriva-ml/execution-asset/{asset_type}'
+    path = prefix / f'execution-asset/{asset_type}'
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 def execution_metadata_dir(prefix: Path, metadata_type: str) -> Path:
-    path = prefix / f'deriva-ml/execution-metadata/{metadata_type}'
+    path = prefix / f'execution-metadata/{metadata_type}'
     path.mkdir(parents=True, exist_ok=True)
     return path
 
