@@ -19,12 +19,11 @@ class Execution(BaseModel):
 
 
 class ExecutionConfiguration(BaseModel):
-    bdbag_url: list[str] = []
+    bdbags: list[str] = []
     models: list[str] = []      # List of RIDs to model files.
     workflow: Workflow
     execution: Execution
     description: str = ""
-
 
     @staticmethod
     def load_configuration(file: str) -> "ExecutionConfiguration":

@@ -1,10 +1,8 @@
+from bdbag import bdbag_api as bdb
+from bdbag.fetch.fetcher import fetch_single_file
 import csv
 from copy import deepcopy
 from datetime import datetime
-from types import UnionType
-
-from bdbag import bdbag_api as bdb
-from bdbag.fetch.fetcher import fetch_single_file
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.datapath import _CatalogWrapper
@@ -35,18 +33,19 @@ except ImportError:
 
 import getpass
 import hashlib
+from importlib.metadata import distributions
 from itertools import chain
 import json
 import logging
-from importlib.metadata import distributions
-from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator, PrivateAttr
 import os
+from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator, PrivateAttr
 from pathlib import Path
 import re
 import requests
 import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import List, Optional, Any, NewType, Iterable, Type
+from typing import List, Optional, Any, NewType, Iterable, Type, Dict
+from types import UnionType
 import warnings
 
 RID = NewType('RID', str)
@@ -107,6 +106,9 @@ class MLVocab(StrEnum):
     dataset_type = 'Dataset_Type'
     workflow_type = 'Workflow_Type'
 
+class ExecMetadataVocab(StrEnum):
+    execution_config = 'Execution_Config'
+    runtime_env = 'Runtime_Env'
 
 class ColumnDefinition(BaseModel):
     name: str
@@ -295,6 +297,39 @@ class ConfigurationRecord(BaseModel):
         frozen = True
         protected_namespaces = ()
 
+    def execution_metadata_dir(self, metadata_type: str) -> Path:
+        return execution_metadata_dir(self.working_dir, metadata_type, self.exec_rid)
+
+    def model_dir(self):
+        path = self.working_dir / self.execution_rid / 'models'
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def feature_paths(self, table: str | Table, feature_name: str) -> tuple[Path, dict[str, Path]]:
+        """
+        Return the file path of where to place feature values, and assets for the named feature and table. A side
+        effect of calling this routine is that the directories in which to place th feature values and assets will be
+        created
+        :param table:
+        :param feature_name:
+        :return: A tuple whose first element is the path for the feature values and whose second element is a dictionary
+        of associated asset table names and corresponding paths.
+        """
+        table = self._get_table(table)
+        table_path = feature_value_path(self.working_dir, table.schema.name, table.name, feature_name)
+        feature = [f for f in self.find_features(table) if f.feature_name == feature_name][0]
+        asset_tables = [fk.pk_table.name for fk in feature.table.foreign_keys
+                        if self.is_asset(fk.pk_table) and fk.pk_table != table]
+        asset_paths = {
+            asset_table: feature_asset_dir(self.working_dir,
+                                           table.schema.name,
+                                           table.name,
+                                           feature_name,
+                                           asset_table)
+                for asset_table in asset_tables
+        }
+        return table_path, asset_paths
+
     def __str__(self):
         items = [
             f"caching_dir: {self.caching_dir}",
@@ -414,11 +449,9 @@ class DerivaML:
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
 
-    def execution_asset_directory(self, asset_type: str) -> Path:
-        return execution_asset_dir(self.working_dir, asset_type)
-
-    def execution_metadata_directory(self, metadata_type: str) -> Path:
-        return execution_metadata_dir(self.working_dir, metadata_type)
+    @property
+    def upload_root(self):
+        return self.working_dir
 
     def table_path(self, table: str | Table) -> Path:
         """
@@ -439,36 +472,8 @@ class DerivaML:
         prefix = Path(prefix) or self.working_dir
         return asset_dir(prefix, table.schema.name, table.name )
 
-    def feature_paths(self, table: str | Table, feature_name: str) -> tuple[Path, dict[str, Path]]:
-        """
-        Return the file path of where to place feature values, and assets for the named feature and table. A side
-        effect of calling this routine is that the directories in which to place th feature values and assets will be
-        created
-        :param table:
-        :param feature_name:
-        :return: A tuple whose first element is the path for the feature values and whose second element is a dictionary
-        of associated asset table names and corresponding paths.
-        """
-        table = self._get_table(table)
-        table_path = feature_value_path(self.working_dir, table.schema.name, table.name, feature_name)
-        feature = [f for f in self.find_features(table) if f.feature_name == feature_name][0]
-        asset_tables = [fk.pk_table.name for fk in feature.table.foreign_keys
-                        if self.is_asset(fk.pk_table) and fk.pk_table != table]
-        asset_paths = {
-            asset_table: feature_asset_dir(self.working_dir,
-                                           table.schema.name,
-                                           table.name,
-                                           feature_name,
-                                           asset_table)
-                for asset_table in asset_tables
-        }
-        return table_path, asset_paths
-
     def download_dir(self, cached: bool = False) -> Path:
         return self.cache_dir if cached else self.working_dir
-
-    def model_dir(self):
-        return self.working_dir / 'models'
 
     def chaise_url(self, table: str | Table) -> str:
         table = self._get_table(table)
@@ -1460,7 +1465,7 @@ class DerivaML:
                   'Length': file_size,
                   'MD5': md5,
                   'Description': description,
-                  'Execution_Metadata_Type': 'Execution_Config'}]))[0]['RID']
+                  'Execution_Metadata_Type': ExecMetadataVocab.execution_config}]))[0]['RID']
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(
@@ -1479,26 +1484,25 @@ class DerivaML:
         """
         self.update_status(Status.running, 'Uploading assets...', execution_rid)
         try:
-            results = self.upload_assets(str(self.execution_metadata_path))
+            results = self.upload_assets(str(self.execution_metadata_root))
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
             raise DerivaMLException(
-                f'Fail to upload the files in {self.execution_metadata_path}'
+                f'Fail to upload the files in {self.execution_metadata_root}'
                 f' to Execution_Metadata table. Error: {error}')
 
-        else:
-            ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
-            a_table = list(self.model.schemas[self.ml_schema].tables['Execution_Metadata'].find_associations())[0].name
-            meta_exec_entities = list(ml_schema_path.tables[a_table].filter(
-                ml_schema_path.tables[a_table].Execution == execution_rid).entities().fetch())
-            meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
-            entities = []
-            for metadata in results.values():
-                if metadata['State'] == 0 and metadata['Result'] is not None:
-                    rid = metadata['Result'].get('RID')
-                    if (rid is not None) and (rid not in meta_list):
-                        entities.append({'Execution_Metadata': rid, 'Execution': execution_rid})
+        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
+        a_table = list(self.model.schemas[self.ml_schema].tables['Execution_Metadata'].find_associations())[0].name
+        meta_exec_entities = list(ml_schema_path.tables[a_table].filter(
+            ml_schema_path.tables[a_table].Execution == execution_rid).entities().fetch())
+        meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
+        entities = []
+        for metadata in results.values():
+            if metadata['State'] == 0 and metadata['Result'] is not None:
+                rid = metadata['Result'].get('RID')
+                if (rid is not None) and (rid not in meta_list):
+                    entities.append({'Execution_Metadata': rid, 'Execution': execution_rid})
         self.pathBuilder.schemas[self.ml_schema].tables[a_table].insert(entities)
         return results
 
@@ -1551,7 +1555,7 @@ class DerivaML:
         print(f"update feature table {entities}")
         self.domain_path.tables[feature_table].insert(entities)
 
-    def upload_execution_assets(self, execution_rid: RID) -> dict[str, dict[str, FileUploadState]]:
+    def upload_execution_assets(self, execution_rid: RID) -> dict[str, FileUploadState]:
         """
         Upload execution assets at working_dir/Execution_assets.  This routine uploads the contents of the
         Execution_Assets directory, and then updates the execution_assets table in the ML schema to have references
@@ -1567,39 +1571,32 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the assets.
 
         """
-        results = {}
-        # execution_assets
-        # execution_metadata
-        #
-        for folder_path in self.upload_root_path.iterdir():
-            if not folder_path.is_dir():
-                continue
+        try:
+            result = self.upload_assets(self.upload_root)
+            self.update_status(Status.running, 'Uploading assets...', execution_rid)
+            self._update_execution_asset_table(execution_rid, result)
+        except Exception as e:
+            error = format_exception(e)
+            self.update_status(Status.failed, error, execution_rid)
+            raise DerivaMLException(
+                f'Fail to upload execution_assets. Error: {error}')
 
-            self.update_status(Status.running, f'Uploading assets {folder_path}...', execution_rid)
-            try:
-                print(f"Uploading {folder_path}")
-                result = self.upload_assets(str(folder_path))
-                self.update_status(Status.running, 'Uploading assets...', execution_rid)
-                results[str(folder_path)] = result
-            except Exception as e:
-                error = format_exception(e)
-                self.update_status(Status.failed, error, execution_rid)
-                raise DerivaMLException(
-                    f'Fail to upload the files in {folder_path} to Execution_Assets table. Error: {error}')
-            else:
-                print(f"Execution asset {folder_path} {is_execution_asset(folder_path)}")
-                if is_execution_asset(folder_path):
-                    # Execution assets need to be associated with the execution record.
-                    self._update_execution_asset_table(execution_rid, result)
-                else:
-                    # now look for
-                    print(f"Looking at {folder_path}")
-                    print(f'Features {[ p for p,_,_ in folder_path.walk() if self._is_feature_path(p)]}')
-                    for feature, fpath in [(f, p) for p,_,_ in folder_path.walk() if (f :=self._is_feature_path(p))]:
-                            self._update_feature_table(feature=feature,
-                                                       feature_file=fpath,
-                                                       uploaded_files=result)
-        return results
+        self.update_status(Status.running, f'Upload assets complete...', execution_rid)
+        return result
+        # Now patch up tables
+        #self.update_status(Status.running, f'Updating asset tables...', execution_rid)
+        #for dir,_,files in os.walk(self.upload_root):
+        #    if is_execution_asset(dir):
+        #        self._update_execution_asset_table(execution_rid, result)
+        #    elif m := is_metadata_path(dir):
+        #        feature =  m.feature_namme
+        #        self._update_feature_table(feature, dir, result)
+        #    elif (target, feature_name) := is_feature_path(dir) and 'assets' in subdirs:
+        #        feature_asset_rids = []
+        #        self._update_feature_table(feature=feature,
+        #                                       feature_file=fpath,
+        #                                       uploaded_files=result)#
+
 
     def execution_end(self, execution_rid: RID) -> None:
         """
@@ -1639,37 +1636,18 @@ class DerivaML:
         - DerivaMLException: If there is an issue initializing the execution.
 
         """
-        configuration_rid = self.upload_execution_configuration(configuration)
 
         try:
             self.configuration = ExecutionConfiguration.model_validate(configuration)
             logging.info('Configuration validation successful!')
         except ValidationError as e:
             raise DerivaMLException(f'configuration validation failed: {e}')
+
         # Insert Execution
         execution_rid = self.add_execution(description=self.configuration.execution.description)
-        # Insert terms
-        #self.update_status(Status.running, 'Inserting tags... ', execution_rid)
-        #  vocabs = {}
-        #   for term in configuration.workflow_terms:
-        #       term_record = self.add_term(table=term.term,
-        #                                   term_name=term.name,
-        #                                   description=term.description,
-        #                                   exists_ok=True)
-        #       term_records = vocabs.get(term.term, [])
-        #       term_records.append(term_record)
-        #       vocabs[term.term] = term_records
-        # Materialize bdbag
-        dataset_rids = []
-        bag_paths = []
-        for url in self.configuration.bdbag_url:
-            self.update_status(Status.running, f'Inserting bag {url}... ', execution_rid)
-            bag_path, dataset_rid = self.materialize_dataset_bag(url, execution_rid)
-            dataset_rids.append(dataset_rid)
-            bag_paths.append(bag_path)
         # Insert workflow
-        self.update_status(Status.running, 'Inserting workflow... ', execution_rid)
         try:
+            self.update_status(Status.running, 'Inserting workflow... ', execution_rid)
             workflow_rid = self.add_workflow(self.configuration.workflow.name,
                                              self.configuration.workflow.url,
                                              self.configuration.workflow.workflow_type,
@@ -1679,29 +1657,48 @@ class DerivaML:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
             raise DerivaMLException(f'Failed to insert workflow. Error: {error}')
+
+        # Materialize bdbag
+        dataset_rids = []
+        bag_paths = []
+        for bag in self.configuration.bdbags:
+            self.update_status(Status.running, f'Materialize bag {bag}... ', execution_rid)
+            bag_path, dataset_rid = self.materialize_dataset_bag(bag, execution_rid)
+            dataset_rids.append(dataset_rid)
+            bag_paths.append(bag_path)
+
+        # Download model
+        self.update_status(Status.running, 'Downloading models ...', execution_rid)
+        model_path = self.model_dir(execution_rid).as_posix()
+        assets_paths = [self.download_execution_files('Execution_Assets', m, execution_rid,
+                                                      dest_dir=model_path)
+                        for m in self.configuration.models]
+
+        configuration_records = ConfigurationRecord(
+            execution_rid=execution_rid,
+            caching_dir=self.cache_dir,
+            working_dir=self.working_dir,
+            workflow_rid=workflow_rid,
+            bag_paths=bag_paths,
+            assets_paths=assets_paths,
+            configuration=configuration)
+
+
+        # Save configuration details for later upload
+        cfile = self.execution_metadata_dir(ExecMetadataVocab.execution_config, execution_rid) / "configuration.json"
+        with open(cfile,'w+') as config_file:
+            json.dump(self.configuration.model_dump_json(), cfile)
+
+
         # Update execution info
         execution_rid = self.update_execution(execution_rid, workflow_rid, dataset_rids,
                                               self.configuration.execution.description)
         self.update_status(Status.running, 'Execution created ', execution_rid)
 
-        # Download model
-        self.update_status(Status.running, 'Downloading models ...', execution_rid)
-        model_path = self.model_dir()
-        model_path.mkdir(parents=True, exist_ok=True)
-        assets_paths = [self.download_execution_files('Execution_Assets', m, execution_rid,
-                                                      dest_dir=str(model_path))
-                        for m in self.configuration.models]
-        configuration_records = ConfigurationRecord(
-            caching_dir=self.cache_dir,
-            working_dir=self.working_dir,
-            execution_rid=execution_rid,
-            workflow_rid=workflow_rid,
-            bag_paths=bag_paths,
-            #    vocabs=vocabs,
-            assets_paths=assets_paths,
-            configuration=configuration)
+
+
         # save runtime env
-        runtime_env_dir = self.execution_metadata_directory('Runtime_Env')
+        runtime_env_dir = self.execution_metadata_dir(ExecMetadataVocab.runtime_env, execution_rid)
         with NamedTemporaryFile('w+', dir=runtime_env_dir, prefix='environment_snapshot_',
                                 suffix='.txt', delete=False) as fp:
             for dist in distributions():
@@ -1735,8 +1732,7 @@ class DerivaML:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
 
-    def upload_execution(self, configuration: ConfigurationRecord, clean_folder: bool = True) -> (
-            dict)[str, dict[str, FileUploadState]]:
+    def upload_execution(self, configuration: ConfigurationRecord, clean_folder: bool = True) -> None:
         """
         Upload all the assets and metadata associated with the current execution.
 
@@ -1750,7 +1746,8 @@ class DerivaML:
         """
         execution_rid = configuration.execution_rid
         try:
-            uploaded_assets = self.upload_execution_assets(execution_rid)
+            #uploaded_assets =
+            self.upload_execution_assets(execution_rid)
             self.upload_execution_metadata(execution_rid)
             self.update_status(Status.completed,
                                'Successfully end the execution.',
@@ -1758,7 +1755,6 @@ class DerivaML:
             if clean_folder:
                 self._clean_folder_contents(self.upload_root_path, execution_rid)
                 self._clean_folder_contents(self.execution_metadata_path, execution_rid)
-            return uploaded_assets
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)

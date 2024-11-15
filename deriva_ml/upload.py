@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 import regex as re
 
 # Here is the directory layout we support:
@@ -6,7 +7,7 @@ import regex as re
 #  execution-assets
 #     asset_type
 #         file1, file2, ....   <- Need to update execution_asset association table.
-#  execution-matadata
+#  execution-metadata
 #        xxx
 #   deriva-ml
 #     <schema>
@@ -24,59 +25,79 @@ import regex as re
 #                     <feature_name>.csv    <- needs to have asset_name column remapped before uploading
 #
 
-exec_asset_regex = r"(?i)^.*/execution-asset/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
-exec_metadata_regex = "(?i)^.*/execution-metadata/(?P<execution_metadata_type>[A-Za-z0-9_]*)/(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
-feature_table = r'(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/feature/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)/'
+exec_path = r'(?i)^.*/deriva-ml/((?P<execution_rid>[a-z]+)/)*'
+exec_asset_regex = exec_path + r"/execution-asset/(?P<execution_asset_type>[A-Za-z0-9_]*)/(?P<file_name>[A-Za-z0-9_-]*)[.](?P<file_ext>[a-z0-9]*)$"
+exec_metadata_regex = exec_path + "/execution-metadata/(?P<execution_metadata_type>[A-Za-z0-9_]*)/(?P<filename>[A-Za-z0-9_]*)[.](?P<file_ext>[a-z0-9]*)$",
+feature_table = exec_path + r'/deriva-ml/(?P<schema>[-\w]+)/feature/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)/'
 feature_value_regex = feature_table + r'(?P=feature_name)[.](?P<file_ext>[(csv|json)]*)$'
 feature_asset_regex = feature_table + r'(?P<asset_table>[-\w]+)/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$'
-asset_dir_regex = r"(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/asset/(?P<asset_table>[-\w]*)/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
-table_regex = r"(?i)^.*/deriva-ml/(?P<schema>[-\w]+)/table/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
+asset_dir_regex = exec_path + r"(?P<schema>[-\w]+)/asset/(?P<asset_table>[-\w]*)/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
+table_regex = exec_path + r"(?P<schema>[-\w]+)/table/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
 
-def upload_root_path(prefix: Path):
-    path = prefix / 'deriva-ml'
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-def execution_asset_dir(prefix: Path, asset_type: str) -> Path:
+def execution_asset_dir(prefix: Path, asset_type: str, exec_rid = Optional[None]) -> Path:
     """
     Return the path to a directory in which to place execution assets that are to be uploaded.
     :param prefix: Location of upload root directory
     :param asset_type: Type of execution asset
     :return:
     """
-    path = prefix / f'execution-asset/{asset_type}'
+    prefix = prefix / 'deriva-ml' / Path(exec_rid or "")
+    path = prefix / 'execution-asset' / asset_type
     path.mkdir(parents=True, exist_ok=True)
     return path
 
-def execution_metadata_dir(prefix: Path, metadata_type: str) -> Path:
-    path = prefix / f'execution-metadata/{metadata_type}'
+
+def execution_metadata_dir(prefix: Path, metadata_type: str, exec_rid: Optional[str] = None) -> Path:
+    """
+    Return the path to a directory in which to place execution metadata that are to be uploaded.
+    :param prefix:  Location in which to locate this directory
+    :param metadata_type:
+    :param exec_rid: Execution rid to be assocated with this metadata
+    :return:
+    """
+    prefix = prefix / 'deriva-ml' / Path(exec_rid or "")
+    path = prefix / 'execution-metadata' / metadata_type
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+def is_metadata_path(path: Path) -> re.Match:
+    return re.match(exec_asset_regex, path.as_posix())
 
 def is_execution_asset(path: Path) -> re.Match:
     return re.match(exec_asset_regex, path.as_posix())
 
-def is_feature_path(path: Path) -> re.Match:
-    return re.match(feature_table, path.as_posix())
+
+def is_feature_path(path: Path) -> Optional[tuple[str,str]]:
+    m = re.match(feature_table, path.as_posix())
+    return m['target_table'], m['feature_name'] if m else None
 
 
-def feature_value_path(prefix: Path, schema: str, target_table: str, feature_name: str) -> Path:
-    path = prefix / f'deriva-ml/{schema}/feature/{target_table}/{feature_name}'
+def feature_value_path(prefix: Path, schema: str, target_table: str, feature_name: str,
+                       exec_rid: Optional[str]) -> Path:
+    prefix = prefix / 'deriva-ml' / Path(exec_rid or "")
+    path = prefix / schema / 'feature' / target_table / feature_name
     path.mkdir(parents=True, exist_ok=True)
     return path / f'{feature_name}.csv'
 
-def feature_asset_dir(prefix: Path, schema: str, target_table: str, feature_name: str, asset_table: str) -> Path:
-    path = prefix / f'deriva-ml/{schema}/feature/{target_table}/{feature_name}/{asset_table}'
+
+def feature_asset_dir(prefix: Path, schema: str, target_table: str, feature_name: str, asset_table: str,
+                      exec_rid: Optional[str]) -> Path:
+    prefix = prefix / 'deriva-ml' / Path(exec_rid or "")
+    path = prefix / schema / 'feature' / target_table / feature_name / asset_table
     path.mkdir(parents=True, exist_ok=True)
     return path
 
-def asset_dir(prefix: Path, schema: str, asset_table: str) -> Path:
-    path = prefix / f'deriva-ml/{schema}/asset/{asset_table}'
+
+def asset_dir(prefix: Path, schema: str, asset_table: str, exec_rid: Optional[str]) -> Path:
+    prefix = prefix / 'deriva-ml' / Path(exec_rid or "")
+    path = prefix / schema / asset_table / asset_table
     path.mkdir(parents=True, exist_ok=True)
     return path
 
-def table_path(prefix: Path, schema: str, table: str) -> Path:
-    path =  prefix / f'deriva-ml/{schema}/table/{table}'
+
+def table_path(prefix: Path, schema: str, table: str, exec_rid: Optional[str]) -> Path:
+    prefix = prefix / 'deriva-ml' / Path(exec_rid or "")
+    path = prefix / schema / table / table
     path.mkdir(parents=True, exist_ok=True)
     return path / f'{table}.csv'
 
@@ -131,7 +152,7 @@ bulk_upload_configuration = {
         {
             # Upload the assets for a feature table.
             "column_map": {"MD5": "{md5}", "URL": "{URI}", "Length": "{file_size}", "Filename": "{file_name}"},
-            "file_pattern": feature_asset_regex, # Sets target_table, feature_name, asset_table
+            "file_pattern": feature_asset_regex,  # Sets target_table, feature_name, asset_table
             "target_table": ["{schema}", "{asset_table}"],
             "checksum_types": ["sha256", "md5"],
             "hatrac_options": {"versioned_urls": True},
@@ -171,6 +192,6 @@ bulk_upload_configuration = {
             "target_table": ["{schema}", "{table}"]
         },
     ],
-                "version_update_url": "https://github.com/informatics-isi-edu/deriva-client",
-                "version_compatibility": [[">=1.4.0", "<2.0.0"]]
+    "version_update_url": "https://github.com/informatics-isi-edu/deriva-client",
+    "version_compatibility": [[">=1.4.0", "<2.0.0"]]
 }
