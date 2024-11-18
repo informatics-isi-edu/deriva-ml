@@ -39,7 +39,7 @@ from itertools import chain
 import json
 import logging
 import os
-from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator
+from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator, computed_field
 from pathlib import Path
 import re
 import requests
@@ -357,6 +357,11 @@ class FileUploadState(BaseModel):
     state: UploadState
     status: str
     result: Any
+
+    @computed_field
+    @property
+    def rid(self) -> Optional[RID]:
+        return self.result and self.result['RID']
 
 
 class DerivaMLException(Exception):
@@ -1312,7 +1317,7 @@ class DerivaML:
         hs.get_obj(path=asset_url, destfilename=dest_filename)
         return Path(dest_filename)
 
-    def upload_file_asset(self, file: str | Path, table: Table | str, **kwargs):
+    def upload_file_asset(self, file: str | Path, table: Table | str, **kwargs) -> dict:
         """
         Upload the specified file into Hatrac and update the assocated asset table.
         :param file:
@@ -1392,7 +1397,7 @@ class DerivaML:
             [{'RID': execution_rid, 'Status': self.status, 'Status_Detail': status_detail}]
         )
 
-    def download_execution_files(self, table_name: str, file_rid: str, execution_rid='', dest_dir: str = '') -> Path:
+    def download_execution_file(self, table_name: str, file_rid: str, execution_rid='', dest_dir: str = '') -> Path:
         """
         Download execution assets.
 
@@ -1411,7 +1416,8 @@ class DerivaML:
         """
         ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         table = ml_schema_path.tables[table_name]
-        file_metadata = table.filter(table.RID == file_rid).entities()[0]
+        print(list(table.filter(table.RID == file_rid).entities()))
+        file_metadata = list(table.filter(table.RID == file_rid).entities())[0]
         file_url = file_metadata['URL']
         file_name = file_metadata['Filename']
         try:
@@ -1432,6 +1438,9 @@ class DerivaML:
                 table_path.insert([{table_name: file_rid, 'Execution': execution_rid}])
         self.update_status(Status.running, f'Successfully download {table_name}...', execution_rid)
         return Path(file_path)
+
+    def upload_execution_asset(self, file) -> dict[str, Any]:
+        return self.upload_file_asset(file, "Execution_Assets")
 
     def upload_execution_configuration(self, config: ExecutionConfiguration) -> RID:
         """
@@ -1574,7 +1583,7 @@ class DerivaML:
             entities = [map_path(e) for e in csv.DictReader(feature_values)]
         self.domain_path.tables[feature_table].insert(entities)
 
-    def _upload_execution_assets(self, configuration: ConfigurationRecord) -> dict[str, FileUploadState]:
+    def _upload_execution_dirs(self, configuration: ConfigurationRecord) -> dict[str, FileUploadState]:
         """
         Upload execution assets at working_dir/Execution_assets.  This routine uploads the contents of the
         Execution_Assets directory, and then updates the execution_assets table in the ML schema to have references
@@ -1706,8 +1715,10 @@ class DerivaML:
         # Download model
         self.update_status(Status.running, 'Downloading models ...', execution_rid)
         model_path = self.model_dir(execution_rid).as_posix()
-        model_paths = [self.download_execution_files(
-            'Execution_Assets', m, execution_rid,
+        model_paths = [self.download_execution_file(
+            table_name='Execution_Assets',
+            file_rid=m,
+            execution_rid=execution_rid,
             dest_dir=model_path) for m in configuration.models]
         configuration_record = ConfigurationRecord.ConfigurationRecordFactory(
             self,
@@ -1779,7 +1790,7 @@ class DerivaML:
         execution_rid = configuration.execution_rid
         try:
             #uploaded_assets =
-            self._upload_execution_assets(configuration)
+            self._upload_execution_dirs(configuration)
             self.update_status(Status.completed,
                                'Successfully end the execution.',
                                execution_rid)

@@ -9,6 +9,7 @@ except ImportError:
 class MLVocab(StrEnum):
     dataset_type = 'Dataset_Type'
     workflow_type = 'Workflow_Type'
+    execution_asset_type = 'Execution_Asset_Type'
 
 class ExecMetadataVocab(StrEnum):
     execution_config = 'Execution_Config'
