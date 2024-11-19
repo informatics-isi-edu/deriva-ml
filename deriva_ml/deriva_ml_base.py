@@ -1,6 +1,5 @@
 import csv
 from collections import defaultdict
-from copy import deepcopy
 from datetime import datetime
 
 from bdbag import bdbag_api as bdb
@@ -10,13 +9,12 @@ from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.datapath import _CatalogWrapper
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import FindAssociationResult
-from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
-from deriva.core.utils.core_utils import tag as deriva_tags
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
+from deriva_ml.deriva_definitions import *
 from deriva_ml.dataset_bag import generate_dataset_download_spec
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
@@ -39,7 +37,7 @@ from itertools import chain
 import json
 import logging
 import os
-from pydantic import BaseModel, ValidationError, model_serializer, Field, create_model, field_validator, computed_field
+from pydantic import BaseModel, ValidationError, Field, create_model, field_validator, computed_field
 from pathlib import Path
 import re
 import requests
@@ -61,137 +59,6 @@ warnings.filterwarnings('ignore',
                         message='fields may not start with an underscore',
                         category=Warning,
                         module='pydantic')
-
-
-# For some reason, deriva-py doesn't use the proper enum class!!
-class UploadState(Enum):
-    success = 0
-    failed = 1
-    pending = 2
-    running = 3
-    paused = 4
-    aborted = 5
-    cancelled = 6
-    timeout = 7
-
-
-class BuiltinTypes(Enum):
-    text = builtin_types.text
-    int2 = builtin_types.int2
-    jsonb = builtin_types.json
-    float8 = builtin_types.float8
-    timestamp = builtin_types.timestamp
-    int8 = builtin_types.int8
-    boolean = builtin_types.boolean
-    json = builtin_types.json
-    float4 = builtin_types.float4
-    int4 = builtin_types.int4
-    timestamptz = builtin_types.timestamptz
-    date = builtin_types.date
-    ermrest_rid = builtin_types.ermrest_rid
-    ermrest_rcb = builtin_types.ermrest_rcb
-    ermrest_rmb = builtin_types.ermrest_rmb
-    ermrest_rct = builtin_types.ermrest_rct
-    ermrest_rmt = builtin_types.ermrest_rmt
-    markdown = builtin_types.markdown
-    longtext = builtin_types.longtext
-    ermrest_curie = builtin_types.ermrest_curie
-    ermrest_uri = builtin_types.ermrest_uri
-    color_rgb_hex = builtin_types.color_rgb_hex
-    serial2 = builtin_types.serial2
-    serial4 = builtin_types.serial4
-    serial8 = builtin_types.serial8
-
-
-class ColumnDefinition(BaseModel):
-    name: str
-    type: BuiltinTypes
-    nullok: bool = True
-    default: Any = None
-    comment: str = None
-    acls: dict = {}
-    acl_bindings: dict = {}
-    annotations: dict = {}
-
-    @model_serializer()
-    def serialize_column_definition(self):
-        return Column.define(
-            cname=self.name,
-            ctype=self.type.value,
-            nullok=self.nullok,
-            default=self.default,
-            comment=self.comment,
-            acls=self.acls,
-            acl_bindings=self.acl_bindings,
-            annotations=self.annotations)
-
-
-class KeyDefinition(BaseModel):
-    colnames: Iterable[str]
-    constraint_names: Iterable[str]
-    comment: str = None
-    annotations: dict = {}
-
-    @model_serializer()
-    def serialize_key_definition(self):
-        return Key.define(
-            colnames=self.colnames,
-            constraint_names=self.constraint_names,
-            comment=self.comment,
-            annotations=self.annotations
-        )
-
-
-class ForeignKeyDefinition(BaseModel):
-    colnames: Iterable[str]
-    pk_sname: str
-    pk_tname: str
-    pk_colnames: Iterable[str]
-    constraint_names: Iterable[str] = []
-    on_update: str = 'NO ACTION'
-    on_delete: str = 'NO ACTION'
-    comment: str = None
-    acls: dict[str, Any] = {}
-    acl_bindings: dict[str, Any] = {}
-    annotations: dict[str, Any] = {}
-
-    @model_serializer()
-    def serialize_fk_definition(self):
-        return ForeignKey.define(
-            fk_colnames=self.colnames,
-            pk_sname=self.pk_sname,
-            pk_tname=self.pk_tname,
-            pk_colnames=self.pk_colnames,
-            on_update=self.on_update,
-            on_delete=self.on_delete,
-            comment=self.comment,
-            acls=self.acls,
-            acl_bindings=self.acl_bindings,
-            annotations=self.annotations
-        )
-
-
-class TableDefinition(BaseModel):
-    name: str
-    column_defs: Iterable[ColumnDefinition]
-    key_defs: Iterable[KeyDefinition] = []
-    fkey_defs: Iterable[ForeignKeyDefinition] = []
-    comment: str = None
-    acls: dict = {}
-    acl_bindings: dict = {}
-    annotations: dict = {}
-
-    @model_serializer()
-    def serialize_table_definition(self):
-        return Table.define(
-            tname=self.name,
-            column_defs=[c.model_dump() for c in self.column_defs],
-            key_defs=[k.model_dump() for k in self.key_defs],
-            fkey_defs=[fk.model_dump() for fk in self.fkey_defs],
-            comment=self.comment,
-            acls=self.acls,
-            acl_bindings=self.acl_bindings,
-            annotations=self.annotations)
 
 
 class VocabularyTerm(BaseModel):
@@ -244,10 +111,23 @@ class ConfigurationRecord(BaseModel):
         return cr
 
     @property
-    def execution_metadata_dir(self) -> Path:
+    def _execution_metadata_dir(self) -> Path:
+        """
+        Return a pathlib Path to the execution metadata directory. Files placed in this directory will be uploaded
+        to the catalog by the execution_upload method in an execution object.
+        :return:
+        """
         return upload.execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type='')
 
     def execution_metadata_path(self, metadata_type: str) -> Path:
+        """
+        Return a pathlib Path to the directory in which to place files of type metadata_type.  These files
+        are uploaded to the catalog as part of the execution of the upload_execution method in DerivaML.
+
+        :param metadata_type:  Type of metadata to be uploaded.  Must be a term in Metadata_Type controlled vocabulary.
+        :return: Path to the directory in which to place files of type metadata_type.
+        """
+        self._ml_object.lookup_term('Metadata_Type', metadata_type)   # Make sure metadata type exists.
         return upload.execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type)
 
     @property
@@ -255,6 +135,7 @@ class ConfigurationRecord(BaseModel):
         return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
 
     def execution_assets_path(self, metadata_type: str) -> Path:
+
         return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=metadata_type)
 
     @property
@@ -321,8 +202,6 @@ class ConfigurationRecord(BaseModel):
                                 schema=self._ml_object.domain_schema,
                                 asset_table=table)
 
-
-
     def __str__(self):
         items = [
             f"caching_dir: {self.caching_dir}",
@@ -341,15 +220,27 @@ class Feature(BaseModel):
     Feature_Name: str
 
 
-class FindFeatureResult(FindAssociationResult):
-    """Wrapper for results of Table.find_associations()"""
+class FindFeatureResult(BaseModel):
+    """
+    Wrapper for results of Table.find_associations()
+    """
+    feature_name: str
+    table: Table
+    self_fkey: ForeignKeyDefinition
+    other_fkeys: set[ForeignKeyDefinition]
 
-    def __init__(self, feature_name, table, self_fkey, other_fkeys):
-        self.feature_name = feature_name
-        super().__init__(table, self_fkey, other_fkeys)
+    @computed_field
+    @property
+    def name(self):
+        return self.table.name
+
+    @computed_field
+    @property
+    def schema(self):
+        return self.table.schema.name
 
     def __repr__(self) -> str:
-        return (f'FeatureResult({self.self_fkey.pk_table.name}, feature_name={self.feature_name}, '
+        return (f'FeatureResult({self.self_fkey.pk_tname}, feature_name={self.feature_name}, '
                 f'table={self.table.name})')
 
 
@@ -631,15 +522,18 @@ class DerivaML:
                        metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
                        comment: str = '') -> type[Feature]:
         """
-        Create a new feature that can be associated with a table. The feature can assocate a controlloed
+        Create a new feature that can be associated with a table. The feature can associate a controlled
         vocabulary term, an asset, or any other values with a specific instance of an object and  execution.
-        :param feature_name:
-        :param table:
-        :param terms:
-        :param assets:
-        :param metadata:
+        The value of a feature can be a set of terms, assets, or other scalar values.
+
+        :param feature_name: Name of the new feature to be defined
+        :param table: table name or object on which the feature is to be associated
+        :param terms: List of controlled vocabulary terms that will be part of the feature value
+        :param assets: List of asset table names or objects that will be part of the feature value
+        :param metadata: List of other value types that are associated with the feature
         :param comment:
-        :return:
+        :return: A Feature class that can be used to create instances of the feature.
+        :raise DerivaException: If the feature cannot be created.
         """
 
         terms = terms or []
@@ -667,6 +561,7 @@ class DerivaML:
         feature_name_table = self.model.schemas[self.ml_schema].tables['Feature_Name']
         feature_name_term = self.add_term('Feature_Name', feature_name, description=comment)
         atable_name = f'Execution_{table.name}_{feature_name_term.name}'
+        
         # Now create the association table that implements the feature.
         atable = self.model.schemas[self.domain_schema].create_table(
             table.define_association(
@@ -677,11 +572,17 @@ class DerivaML:
             )
         )
         atable.columns['Feature_Name'].alter(default=feature_name_term.name)
+        
         return self.feature_record_class(table, feature_name)
 
     def feature_record_class(self, table: str | Table, feature_name: str) -> type[Feature]:
         """"
         Create a pydantic model for entries into the specified feature table
+
+        :param table: table name or object on which the feature is to be associated
+        :param feature_name: name of the feature to be created
+        :return: A Feature class that can be used to create instances of the feature.
+
         """
 
         def validate_rid(rid, enable=False):
@@ -762,6 +663,9 @@ class DerivaML:
     def find_features(self, table: Table | str) -> Iterable[FindFeatureResult]:
         """
         List the names of the features in the specified table.
+
+        :param table: The table to find features for.
+        :return: An iterable of FeatureResult instances that describe the currrent features in the table.
         """
         table = self._get_table(table)
 
@@ -882,9 +786,11 @@ class DerivaML:
 
     def add_dataset_element_type(self, element: str | Table) -> Table:
         """
-        Add a new element type to a dataset.
-        :param element:
-        :return:
+        A dataset is a heterogeneous collection of object, each of which comes from a different table. This
+        routine makes it possible to add objects from the specified table to a dataset.
+
+        :param element: Name or the table or table object that is to be added to the dataset.
+        :return: The table object that was added to the dataset.
         """
         # Add table to map
         element_table = self._get_table(element)
@@ -900,7 +806,9 @@ class DerivaML:
         """
         Return a list of entities associated with a specific dataset.
         :param dataset_rid:
-        :return:
+
+        :return: Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
+                 were taken.
         """
 
         try:
@@ -943,9 +851,9 @@ class DerivaML:
                             validate: bool = True) -> RID:
         """
         Add additional elements to an existing dataset.
+
         :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
-        :param members: List of RIDs of me
-        mbers to add to the  dataset.
+        :param members: List of RIDs of members to add to the  dataset.
         :param validate: Check rid_list to make sure elements are not already in the dataset.
         :return:
         """
@@ -989,8 +897,8 @@ class DerivaML:
                     [{'Dataset': dataset_rid, fk_column: e} for e in elements])
         return dataset_rid
 
-    def add_execution(self, workflow_rid: str = '', datasets: List[str] = None,
-                      description: str = '') -> RID:
+    def _add_execution(self, workflow_rid: str = '', datasets: List[str] = None,
+                       description: str = '') -> RID:
         """
         Add an execution to the Execution table.
 
@@ -1212,6 +1120,7 @@ class DerivaML:
         """
         Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
+
         :param dataset_rid: The RID of a dataset or a minid to an existing bag.
         :return: the location of the unpacked and validated dataset bag and the RID of the bag
         """
@@ -1564,7 +1473,7 @@ class DerivaML:
     def _update_feature_table(self,
                               target_table: str,
                               feature_name: str,
-                              feature_file: str,
+                              feature_file: str | Path,
                               uploaded_files: dict[str, FileUploadState]) -> None:
 
         asset_columns = self.feature_record_class(target_table, feature_name).asset_columns
@@ -1616,7 +1525,7 @@ class DerivaML:
                 f'Fail to upload execution_assets. Error: {error}')
         try:
             self.update_status(Status.running, 'Uploading execution metadata...', configuration.execution_rid)
-            execution_metadata_files = self.upload_assets(configuration.execution_metadata_dir)
+            execution_metadata_files = self.upload_assets(configuration._execution_metadata_dir)
             self._update_execution_metadata_table(configuration.execution_rid, execution_metadata_files)
             results |= execution_metadata_files
         except Exception as e:
@@ -1670,20 +1579,12 @@ class DerivaML:
 
     def initialize_execution(self, configuration: ExecutionConfiguration) -> ConfigurationRecord:
         """
-        Initialize the execution by a configuration file in the Execution_Metadata table.
+        Initialize the execution by a configuration  in the Execution_Metadata table.
         Setup working directory and download all the assets and data.
 
-
-        Args:
-        - configuration_rid (str): Resource Identifier (RID) of the configuration.
-
-        Returns:
-        - ConfigurationRecord: Configurations' RID including Workflow, Execution, bag_paths(data directory),
-        asset_paths(model directory), and vocabs (dict of controlled vocabularies).
-
-        Raises:
-        - DerivaMLException: If there is an issue initializing the execution.
-
+        :param configuration: Configuration to initialize the execution with.
+        :return: ConfigurationRecord:
+        :raise DerivaMLException: If there is an issue initializing the execution.
         """
 
         try:
@@ -1693,7 +1594,7 @@ class DerivaML:
             raise DerivaMLException(f'configuration validation failed: {e}')
 
         # Insert Execution
-        execution_rid = self.add_execution(description=self.configuration.execution.description)
+        execution_rid = self._add_execution(description=self.configuration.execution.description)
         # Insert workflow
         try:
             self.update_status(Status.running, 'Inserting workflow... ', execution_rid)
@@ -1809,7 +1710,7 @@ class DerivaML:
 
 class DerivaMlExec:
     """
-    Context manager for managing DerivaML execution.
+    Context manager for managing DerivaML execution.  Provides status updates.
 
     Args:
     - catalog_ml: Instance of DerivaML class.

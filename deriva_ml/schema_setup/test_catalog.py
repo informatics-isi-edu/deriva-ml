@@ -9,13 +9,9 @@ from deriva.core import DerivaServer
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.deriva_ml_base import DerivaML
-from deriva.core.hatrac_store import HatracStore
-from deriva.core.utils import hash_utils, mime_utils
 from deriva.core import ErmrestCatalog, get_credential, urlquote
 
 from random import random
-import re
-from pathlib import Path
 
 TEST_DATASET_SIZE = 20
 def populate_test_catalog(deriva_ml: DerivaML, sname: str) -> None:

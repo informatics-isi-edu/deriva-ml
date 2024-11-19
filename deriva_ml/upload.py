@@ -105,8 +105,8 @@ def execution_metadata_dir(prefix: Path | str, exec_rid: str, metadata_type: str
     """
     Return the path to a directory in which to place execution metadata that are to be uploaded.
     :param prefix:  Location in which to locate this directory
-    :param metadata_type:
     :param exec_rid: Execution rid to be associated with this metadata
+    :param metadata_type: Controlled vocabulary term from vocabulary Metadata_Type
     :return:
     """
     path = execution_metadata_root(prefix, exec_rid) / metadata_type
