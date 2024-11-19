@@ -51,9 +51,9 @@ def populate_test_catalog(deriva_ml: DerivaML, sname: str) -> None:
             image_file = f"{tmpdir}/test_{s['RID']}.txt"
             with open(image_file, "w+") as f:
                 f.write(f"Hello there {random()}\n")
-            deriva_ml.upload_file_asset(image_file, 'Image',
-                                        Subject=s['RID'],
-                                        Description='A test image')
+            deriva_ml.upload_asset(image_file, 'Image',
+                                   Subject=s['RID'],
+                                   Description='A test image')
 
 
 def create_domain_schema(model: Model, sname: str) -> None:

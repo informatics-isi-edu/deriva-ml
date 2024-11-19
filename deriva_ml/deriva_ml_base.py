@@ -571,7 +571,7 @@ class DerivaML:
         """
         schema = schema or self.domain_schema
         asset_table = self.model.schemas[schema].create_table(
-            Table.define_asset(schema, asset_name, f'{schema}:{{RID}}', comment=comment))
+            Table.define_asset(schema, asset_name, comment=comment))
         return asset_table
 
     def is_association(self, table_name: str | Table, unqualified=True, pure=True) -> bool | set | int:
@@ -1317,23 +1317,24 @@ class DerivaML:
         hs.get_obj(path=asset_url, destfilename=dest_filename)
         return Path(dest_filename)
 
-    def upload_file_asset(self, file: str | Path, table: Table | str, **kwargs) -> dict:
+    def upload_asset(self, file: str | Path, table: Table | str, **kwargs) -> dict:
         """
         Upload the specified file into Hatrac and update the assocated asset table.
         :param file:
         :param table:
-        :param kwargs: Keyward arguements for values of additional columns to be added to the asset table.
+        :param kwargs: Keyword arguments for values of additional columns to be added to the asset table.
         :return:
         """
         table = self._get_table(table)
+        if not self.is_asset(table):
+            raise DerivaMLException(f'Table {table} is not an asset table.')
+
         credential = self.model.catalog.deriva_server.credentials
         file_path = Path(file)
         file_name = file_path.name
         file_size = file_path.stat().st_size
-        url_pattern = table.columns['URL'].annotations[deriva_tags.asset]['url_pattern']
-
         # Get everything up to the filename  part of the
-        hatrac_path = url_pattern.replace('/{{MD5}}.{{Filename}}', '')
+        hatrac_path = f'/hatrac/{table.name}/'
         try:
             hs = HatracStore('https', self.host_name, credential)
             md5_hashes = hash_utils.compute_file_hashes(file, ['md5'])['md5']
@@ -1348,11 +1349,11 @@ class DerivaML:
             raise e
         try:
             ipath = self.pathBuilder.schemas[table.schema.name].tables[table.name]
-            return ipath.insert(
+            return list(ipath.insert(
                 [{'URL': hatrac_uri,
                   'Filename': file_name,
                   'Length': file_size,
-                  'MD5': md5_hashes[0]} | kwargs])
+                  'MD5': md5_hashes[0]} | kwargs]))[0]
         except Exception as e:
             raise e
 
@@ -1374,10 +1375,9 @@ class DerivaML:
         uploader = GenericUploader(server={'host': self.host_name, 'protocol': 'https', 'catalog_id': self.catalog_id})
         uploader.getUpdatedConfig()
         uploader.scanDirectory(assets_dir)
-        results = uploader.uploadFiles()
         results = {
              path: FileUploadState(state=UploadState(result['State']), status=result['Status'], result=result['Result'])
-             for path, result in results.items()
+             for path, result in uploader.uploadFiles().items()
         }
         uploader.cleanup()
         return results
@@ -1397,7 +1397,7 @@ class DerivaML:
             [{'RID': execution_rid, 'Status': self.status, 'Status_Detail': status_detail}]
         )
 
-    def download_execution_file(self, table_name: str, file_rid: str, execution_rid='', dest_dir: str = '') -> Path:
+    def download_execution_file(self, file_rid: RID, execution_rid='', dest_dir: str = '') -> Path:
         """
         Download execution assets.
 
@@ -1414,14 +1414,18 @@ class DerivaML:
         - DerivaMLException: If there is an issue downloading the assets.
 
         """
-        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
-        table = ml_schema_path.tables[table_name]
-        print(list(table.filter(table.RID == file_rid).entities()))
-        file_metadata = list(table.filter(table.RID == file_rid).entities())[0]
+        table = self.resolve_rid(file_rid).table
+        if not self.is_asset(table):
+            raise DerivaMLException(f'Table {table} is not an asset table.')
+
+        pb = self.pathBuilder
+        ml_schema_path = pb.schemas[self.ml_schema]
+        table_path = pb.schemas[table.schema.name].tables[table.name]
+        file_metadata = list(table_path.filter(table_path.RID == file_rid).entities())[0]
         file_url = file_metadata['URL']
         file_name = file_metadata['Filename']
         try:
-            self.update_status(Status.running, f'Downloading {table_name}...', execution_rid)
+            self.update_status(Status.running, f'Downloading {table.name}...', execution_rid)
             file_path = self.download_asset(file_url, str(dest_dir) + '/' + file_name)
         except Exception as e:
             error = format_exception(e)
@@ -1429,18 +1433,18 @@ class DerivaML:
             raise DerivaMLException(f'Failed to download the file {file_rid}. Error: {error}')
 
         if execution_rid != '':
-            ass_table = table_name + '_Execution'
+            ass_table = table.name + '_Execution'
             ass_table_path = ml_schema_path.tables[ass_table]
-            exec_file_exec_entities = ass_table_path.filter(ass_table_path.columns[table_name] == file_rid).entities()
+            exec_file_exec_entities = ass_table_path.filter(ass_table_path.columns[table.name] == file_rid).entities()
             exec_list = [e['Execution'] for e in exec_file_exec_entities]
             if execution_rid not in exec_list:
-                table_path = self.pathBuilder.schemas[self.ml_schema].tables[ass_table]
-                table_path.insert([{table_name: file_rid, 'Execution': execution_rid}])
-        self.update_status(Status.running, f'Successfully download {table_name}...', execution_rid)
+                table_path = pb.schemas[self.ml_schema].tables[ass_table]
+                table_path.insert([{table.name: file_rid, 'Execution': execution_rid}])
+        self.update_status(Status.running, f'Successfully download {table.name}...', execution_rid)
         return Path(file_path)
 
-    def upload_execution_asset(self, file) -> dict[str, Any]:
-        return self.upload_file_asset(file, "Execution_Assets")
+    def upload_execution_asset(self, file, asset_type: str) -> dict[str, Any]:
+        return self.upload_asset(file, "Execution_Assets", Execution_Asset_Type=asset_type)
 
     def upload_execution_configuration(self, config: ExecutionConfiguration) -> RID:
         """
@@ -1716,7 +1720,6 @@ class DerivaML:
         self.update_status(Status.running, 'Downloading models ...', execution_rid)
         model_path = self.model_dir(execution_rid).as_posix()
         model_paths = [self.download_execution_file(
-            table_name='Execution_Assets',
             file_rid=m,
             execution_rid=execution_rid,
             dest_dir=model_path) for m in configuration.models]
