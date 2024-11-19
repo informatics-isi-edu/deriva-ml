@@ -15,6 +15,7 @@ class MLVocab(StrEnum):
     dataset_type = 'Dataset_Type'
     workflow_type = 'Workflow_Type'
     execution_asset_type = 'Execution_Asset_Type'
+    execution_metadata_type = 'Execution_Metadata_Type'
 
 class ExecMetadataVocab(StrEnum):
     """

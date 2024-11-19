@@ -127,7 +127,7 @@ class ConfigurationRecord(BaseModel):
         :param metadata_type:  Type of metadata to be uploaded.  Must be a term in Metadata_Type controlled vocabulary.
         :return: Path to the directory in which to place files of type metadata_type.
         """
-        self._ml_object.lookup_term('Metadata_Type', metadata_type)   # Make sure metadata type exists.
+        self._ml_object.lookup_term(MLVocab.execution_metadata_type, metadata_type)   # Make sure metadata type exists.
         return upload.execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type)
 
     @property
@@ -226,21 +226,24 @@ class FindFeatureResult(BaseModel):
     """
     feature_name: str
     table: Table
-    self_fkey: ForeignKeyDefinition
-    other_fkeys: set[ForeignKeyDefinition]
+    self_fkey: ForeignKey
+    other_fkeys: set[ForeignKey]
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @computed_field
     @property
-    def name(self):
+    def name(self) -> str:
         return self.table.name
 
     @computed_field
     @property
-    def schema(self):
+    def schema(self) -> str:
         return self.table.schema.name
 
     def __repr__(self) -> str:
-        return (f'FeatureResult({self.self_fkey.pk_tname}, feature_name={self.feature_name}, '
+        return (f'FeatureResult({self.self_fkey.pk_table}, feature_name={self.feature_name}, '
                 f'table={self.table.name})')
 
 
@@ -674,7 +677,6 @@ class DerivaML:
                 return a.table.columns['Feature_Name']
             except KeyError:
                 return False
-
         return [
             FindFeatureResult(
                 feature_name=a.name.replace(f'Execution_{table.name}_', ''),
