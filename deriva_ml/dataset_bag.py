@@ -134,8 +134,8 @@ def dataset_specification(model: Model,
             # Now generate all of the paths reachable from this node.
             for path in DatasetBag.table_paths(DatasetBag.schema_graph(model, element.table), [dataset_table]):
                 table = path[-1]
-                if table.is_association(max_arity=3, pure=False):
-                    continue
+               # if table.is_association(max_arity=3, pure=False):
+               #     continue
                 element_spec.extend(writer(path))
     return vocabulary_specification(model, writer) + element_spec
 
@@ -316,7 +316,6 @@ class DatasetBag(object):
         for path, subdirs, files in dpath.walk():
             table = path.name
             schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
-            print(path, subdirs, files)
             if f"{table}.csv" not in files:
                 continue   # Some directories might be empty.
             with open(path / f"{table}.csv", newline='') as csvfile:
@@ -325,7 +324,7 @@ class DatasetBag(object):
                 asset_indexes = (column_names.index('Filename'), column_names.index('URL')) if is_asset(table) else None
                 object_table = [localize_asset(o, asset_indexes) for o in csv_reader]
                 value_template = ','.join(['?'] * len(column_names))  # SQL placeholder for row (?,?..)
-                column_list = ','.join(column_names)
+                column_list = ','.join([f'"{c}"' for c in column_names])
                 with self.dbase:
                     self.dbase.executemany(
                         f'INSERT OR REPLACE INTO "{schema}:{table}" ({column_list}) VALUES ({value_template})',
