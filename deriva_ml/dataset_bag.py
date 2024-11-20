@@ -298,7 +298,7 @@ class DatasetBag(object):
         self.dbase.execute("DROP DATABASE")
 
     def _load_sqllite(self) -> None:
-        dpath = self.bag_path / "data/Dataset"
+        dpath = self.bag_path / "data"
         asset_map = self.localize_asset_table()
 
         def is_asset(table_name: str) -> bool:
@@ -316,7 +316,7 @@ class DatasetBag(object):
         for path, subdirs, files in dpath.walk():
             table = path.name
             schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
-
+            print(path, subdirs, files)
             if f"{table}.csv" not in files:
                 continue   # Some directories might be empty.
             with open(path / f"{table}.csv", newline='') as csvfile:
@@ -331,6 +331,11 @@ class DatasetBag(object):
                         f'INSERT OR REPLACE INTO "{schema}:{table}" ({column_list}) VALUES ({value_template})',
                                 object_table
                     )
+
+    def list_tables(self) -> list[str]:
+        with self.dbase:
+            return [t[0] for t in self.dbase.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;").fetchall()]
 
     def get_table(self, table: str) -> Generator[tuple, None, None]:
         schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
