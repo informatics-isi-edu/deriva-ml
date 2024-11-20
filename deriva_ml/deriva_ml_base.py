@@ -1131,6 +1131,14 @@ class DerivaML:
 
         with TemporaryDirectory() as tmp_dir:
             if dataset_rid.startswith('minid'):
+                r = requests.get(f"https://identifiers.org/{dataset_rid}", headers={'accept': 'application/json'})
+                metadata = r.json()['metadata']
+                dataset_rid = metadata['Dataset_RID'].split('@')[0]
+                checksum_value = ""
+                for checksum in r.json().get('checksums', []):
+                    if checksum.get('function') == 'sha256':
+                        checksum_value = checksum.get('value')
+                        break
                 archive_path = fetch_single_file(dataset_rid, tmp_dir)
             else:
                 # Put current download spec into a file
@@ -1144,14 +1152,14 @@ class DerivaML:
                     envars={"Dataset_RID": dataset_rid})
                 result = downloader.download()
                 archive_path = list(result.values())[0]["local_path"]
-            checksum_value = compute_file_hashes(archive_path, hashes=['sha256'])['sha256'][0]
+                checksum_value = compute_file_hashes(archive_path, hashes=['sha256'])['sha256'][0]
             bag_dir = self.cache_dir / f'{dataset_rid}_{checksum_value}'
-            bag_dir.mkdir(parents=True, exist_ok=True)
-            if (bag_subdir := bag_dir / f"Dataset_{dataset_rid}").exists():
-                shutil.rmtree(bag_subdir)
-
-            bag_path = bdb.extract_bag(archive_path, bag_dir)
-            bdb.validate_bag_structure(bag_path)
+            if not bag_dir.exists():
+                bag_dir.mkdir(parents=True, exist_ok=True)
+                bag_path = bdb.extract_bag(archive_path, bag_dir)
+                bdb.validate_bag_structure(bag_path)
+            else:
+                bag_path = bag_dir / f'Dataset_{dataset_rid}'
             return Path(bag_path), dataset_rid
 
     def materialize_dataset_bag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
@@ -1191,7 +1199,7 @@ class DerivaML:
         validated_check = bag_dir / 'validated_check.txt'
         bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
         if not bags:
-            bag_path = bdb.materialize(bag_path,
+            bag_path = bdb.materialize(bag_path.as_posix(),
                                        bag_dir,
                                        fetch_callback=fetch_progress_callback,
                                        validation_callback=validation_progress_callback)
