@@ -1283,14 +1283,19 @@ class DerivaML:
         - DerivaMLException: If there is an issue uploading the assets.
 
            """
-        uploader = GenericUploader(server={'host': self.host_name, 'protocol': 'https', 'catalog_id': self.catalog_id})
-        uploader.getUpdatedConfig()
-        uploader.scanDirectory(assets_dir)
-        results = {
-             path: FileUploadState(state=UploadState(result['State']), status=result['Status'], result=result['Result'])
-             for path, result in uploader.uploadFiles().items()
-        }
-        uploader.cleanup()
+        with TemporaryDirectory() as temp_dir:
+            spec_file = f'{temp_dir}/config.json'
+            with open(spec_file, 'w+') as cfile:
+                json.dump(upload.bulk_upload_configuration, cfile)
+            uploader = GenericUploader(server={'host': self.host_name, 'protocol': 'https', 'catalog_id': self.catalog_id},
+                                       config_file=spec_file)
+            uploader.getUpdatedConfig()
+            uploader.scanDirectory(assets_dir)
+            results = {
+                 path: FileUploadState(state=UploadState(result['State']), status=result['Status'], result=result['Result'])
+                 for path, result in uploader.uploadFiles().items()
+            }
+            uploader.cleanup()
         return results
 
     def update_status(self, new_status: Status, status_detail: str, execution_rid: str):
