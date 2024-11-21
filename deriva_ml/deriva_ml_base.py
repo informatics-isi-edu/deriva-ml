@@ -21,7 +21,6 @@ from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotati
 from deriva_ml.schema_setup.system_terms import MLVocab, ExecMetadataVocab
 import deriva_ml.upload as upload
 from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
-import urllib.parse as urlparse
 
 # from enum import Enum, StrEnum
 try:
@@ -427,7 +426,7 @@ class DerivaML:
     def chaise_url(self, table: str | Table) -> str:
         table = self._get_table(table)
         uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
-        return f'{uri}/{urlparse.quote(f"{table.schema.name}:{table.name}")}'
+        return f'{uri}/{urlquote(f"{table.schema.name}:{table.name}")}'
 
     def create_vocabulary(self, vocab_name: str, comment='', schema=None) -> Table:
         """
