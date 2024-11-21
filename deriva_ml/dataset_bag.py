@@ -313,12 +313,14 @@ class DatasetBag(object):
                 o[file_column] = asset_map[o[url_column]]
             return tuple(o)
 
-        for path, subdirs, files in dpath.walk():
-            table = path.name
+        # for path, subdirs, files in dpath.walk():
+        for csv_file in Path(dpath).rglob('*.csv'):          # table = path.name
+            table = csv_file.stem
             schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
-            if f"{table}.csv" not in files:
-                continue   # Some directories might be empty.
-            with open(path / f"{table}.csv", newline='') as csvfile:
+            # if f"{table}.csv" not in files:
+            #     continue   # Some directories might be empty.
+            # with open(path / f"{table}.csv", newline='') as csvfile:
+            with csv_file.open(newline='') as csvfile:
                 csv_reader = reader(csvfile)
                 column_names = next(csv_reader)
                 asset_indexes = (column_names.index('Filename'), column_names.index('URL')) if is_asset(table) else None
@@ -328,7 +330,7 @@ class DatasetBag(object):
                 with self.dbase:
                     self.dbase.executemany(
                         f'INSERT OR REPLACE INTO "{schema}:{table}" ({column_list}) VALUES ({value_template})',
-                                object_table
+                        object_table
                     )
 
     def list_tables(self) -> list[str]:
