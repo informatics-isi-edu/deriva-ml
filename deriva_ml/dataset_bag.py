@@ -310,7 +310,7 @@ class DatasetBag(object):
         def localize_asset(o: list, asset_indexes: Optional[tuple[int, int]]) -> tuple:
             if asset_indexes:
                 file_column, url_column = asset_indexes
-                o[file_column] = asset_map[o[url_column]]
+                o[file_column] = asset_map[o[url_column]] if o[url_column] else ''
             return tuple(o)
 
         # for path, subdirs, files in dpath.walk():

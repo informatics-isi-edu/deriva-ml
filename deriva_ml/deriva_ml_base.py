@@ -131,7 +131,11 @@ class ConfigurationRecord(BaseModel):
         return upload.execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type)
 
     @property
-    def execution_assets_dir(self) -> Path:
+    def _execution_assets_dir(self) -> Path:
+        """
+        Return a pathlib Path to the directory in which to place directories for execution_assets.
+        :return:
+        """
         return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
 
     def execution_assets_path(self, metadata_type: str) -> Path:
@@ -718,16 +722,17 @@ class DerivaML:
         """
         # Create the entry for the new dataset and get its RID.
         ds_types = [ds_type] if isinstance(ds_type, str) else ds_type
+        pb = self.pathBuilder
         for ds_type in ds_types:
             if not self.lookup_term(MLVocab.dataset_type, ds_type):
                 raise DerivaMLException(f'Dataset type must be a vocabulary term.')
         dataset_table_path = (
-            self.pathBuilder.schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
+            pb.schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
         dataset = dataset_table_path.insert([{'Description': description, MLVocab.dataset_type: ds_type}])[0]['RID']
 
         # Get the name of the association table between dataset and dataset_type.
         atable = next(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations()).name
-        self.pathBuilder.schemas[self.ml_schema].tables[atable].insert(
+        pb.schemas[self.ml_schema].tables[atable].insert(
             [{MLVocab.dataset_type: ds_type, 'Dataset': dataset} for ds_type in ds_types])
         return dataset
 
@@ -778,7 +783,7 @@ class DerivaML:
     def list_dataset_element_types(self) -> Iterable[Table]:
         """
         Return the list of tables that can be included as members of a dataset.
-        :return:
+        :return: An iterable of Table objects that can be included as an element of a dataset.
         """
 
         def domain_table(table: Table) -> bool:
@@ -1279,15 +1284,15 @@ class DerivaML:
     def upload_assets(self, assets_dir: str | Path) -> dict[str, FileUploadState]:
         """
         Upload assets from a directory. This routine assumes that the current upload specification includes a
-        configuration for the specified directory.
+        configuration for the specified directory.  Every asset in the specified directory is uploaded
 
-        Args:
+        :param:
         - assets_dir (str): Directory containing the assets to upload.
 
-        Returns:
+        :returns:
         - dict: Results of the upload operation.
 
-        Raises:
+        raises:
         - DerivaMLException: If there is an issue uploading the assets.
 
            """
@@ -1530,7 +1535,7 @@ class DerivaML:
         results = {}
         try:
             self.update_status(Status.running, 'Uploading execution assets...', configuration.execution_rid)
-            execution_asset_files = self.upload_assets(configuration.execution_assets_dir)
+            execution_asset_files = self.upload_assets(configuration._execution_assets_dir)
             self._update_execution_asset_table(configuration.execution_rid, execution_asset_files)
             results |= execution_asset_files
         except Exception as e:

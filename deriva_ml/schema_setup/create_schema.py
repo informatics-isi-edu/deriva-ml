@@ -3,9 +3,11 @@ import sys
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model
-from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey
+from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey, Key
+from deriva.core.utils.core_utils import tag as chaise_tags
 from deriva_ml.schema_setup.annotations import generate_annotation
 from deriva_ml.deriva_ml_base import MLVocab
+
 
 def define_table_workflow(workflow_annotation: dict):
     return Table.define(
@@ -64,6 +66,30 @@ def define_asset_execution_assets(sname: str, execution_assets_annotation: dict)
     )
     return table_def
 
+def create_www_schema(self):
+    """
+    Set up a new schema and tables to hold web-page like content.  The tables include a page table, and a asset
+    table that can have images that are referred to by the web page.  Pages are written using markdown.
+    :return:
+    """
+    self.logger.info('Configuring WWW schema')
+    www_schema = self.create_schema('WWW', comment='Schema for tables that will be displayed as web content')
+    www_schema.create_table(
+            'Page',
+            column_defs=[
+                Column.define('Title', 'text', nullok=False, comment='Unique title for the page'),
+                Column.define('Content', 'markdown', comment='Content of the page in markdown')
+            ],
+            key_defs=[Key.define(['Title'])],
+            annotations={
+                chaise_tags.table_display: {'detailed': {'hide_column_headers': True, 'collapse_toc_panel': True}
+                                            },
+                chaise_tags.visible_foreign_keys: {'detailed': {}},
+                chaise_tags.visible_columns: {'detailed': ['Content']}}
+
+        )
+
+    return self
 
 def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name: str = None):
     ml_catalog: ErmrestCatalog = model.catalog
@@ -126,8 +152,8 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
     schema.create_table(
         Table.define_association([("Execution_Assets", execution_assets_table), ("Execution", execution_table)]))
 
+    create_www_schema()
     initialize_ml_schema(model, schema_name)
-
 
 def initialize_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
     catalog = model.catalog
