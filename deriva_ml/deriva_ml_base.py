@@ -426,7 +426,7 @@ class DerivaML:
     def chaise_url(self, table: str | Table) -> str:
         table = self._get_table(table)
         uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
-        return f'{uri}/{table.schema.name}:{table.name}'
+        return f'{uri}/{urlquote(f"{table.schema.name}:{table.name}")}'
 
     def create_vocabulary(self, vocab_name: str, comment='', schema=None) -> Table:
         """
