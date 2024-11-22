@@ -1669,7 +1669,8 @@ class DerivaML:
             configuration=configuration)
 
         # Save configuration details for later upload
-        cfile = configuration_record.execution_metadata_path(ExecMetadataVocab.execution_config) / "configuration.json"
+        exec_config_path = ExecMetadataVocab.execution_config.value
+        cfile = configuration_record.execution_metadata_path(exec_config_path) / "configuration.json"
         with open(cfile, 'w',  encoding="utf-8") as config_file:
             json.dump(self.configuration.model_dump_json(), config_file)
 
@@ -1679,7 +1680,8 @@ class DerivaML:
         self.update_status(Status.running, 'Execution created ', execution_rid)
 
         # save runtime env
-        runtime_env_dir = configuration_record.execution_metadata_path(ExecMetadataVocab.runtime_env)
+        runtime_env_path = ExecMetadataVocab.runtime_env.value
+        runtime_env_dir = configuration_record.execution_metadata_path(runtime_env_path)
         with NamedTemporaryFile('w+', dir=runtime_env_dir, prefix='environment_snapshot_',
                                 suffix='.txt', delete=False) as fp:
             for dist in distributions():
