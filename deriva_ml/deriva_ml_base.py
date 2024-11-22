@@ -1556,10 +1556,23 @@ class DerivaML:
 
         self.update_status(Status.running, f'Updating features...', configuration.execution_rid)
         feature_assets = defaultdict(dict)
-        for p, _, files in configuration.feature_root.walk(top_down=False):
+
+        def traverse_bottom_up(directory: Path):
+            """
+            Traverses the directory tree in a bottom-up order.
+            """
+            entries = list(directory.iterdir())
+            for entry in entries:
+                if entry.is_dir():
+                    yield from traverse_bottom_up(entry)
+            yield directory
+
+        # for p, _, files in configuration.feature_root.walk(top_down=False):
+        for p in traverse_bottom_up(configuration.feature_root):
             if m := is_feature_asset_dir(p):
                 try:
-                    self.update_status(Status.running, f'Uploading feature {m["feature_name"]}...', configuration.execution_rid)
+                    self.update_status(Status.running, f'Uploading feature {m["feature_name"]}...',
+                                       configuration.execution_rid)
                     feature_assets[m['target_table'], m['feature_name']] = self.upload_assets(p)
                     results |= feature_assets[m['target_table'], m['feature_name']]
                 except Exception as e:
@@ -1568,10 +1581,16 @@ class DerivaML:
                     raise DerivaMLException(
                         f'Fail to upload execution metadata. Error: {error}')
             elif m := is_feature_dir(p):
-                self._update_feature_table(target_table=m['target_table'],
-                                           feature_name=m['feature_name'],
-                                           feature_file= p / files[0],
-                                           uploaded_files=feature_assets[m['target_table'], m['feature_name']])
+                # self._update_feature_table(target_table=m['target_table'],
+                #                            feature_name=m['feature_name'],
+                #                            feature_file=p / files[0],
+                #                            uploaded_files=feature_assets[m['target_table'], m['feature_name']])
+                files = list(p.iterdir())
+                if files:
+                    self._update_feature_table(target_table=m['target_table'],
+                                               feature_name=m['feature_name'],
+                                               feature_file=files[0],
+                                               uploaded_files=feature_assets[m['target_table'], m['feature_name']])
 
         self.update_status(Status.running, f'Upload assets complete', configuration.execution_rid)
         return results
@@ -1655,8 +1674,9 @@ class DerivaML:
             configuration=configuration)
 
         # Save configuration details for later upload
-        cfile = configuration_record.execution_metadata_path(ExecMetadataVocab.execution_config) / "configuration.json"
-        with open(cfile,'w',  encoding="utf-8") as config_file:
+        exec_config_path = ExecMetadataVocab.execution_config.value
+        cfile = configuration_record.execution_metadata_path(exec_config_path) / "configuration.json"
+        with open(cfile, 'w',  encoding="utf-8") as config_file:
             json.dump(self.configuration.model_dump_json(), config_file)
 
         # Update execution info
@@ -1665,7 +1685,8 @@ class DerivaML:
         self.update_status(Status.running, 'Execution created ', execution_rid)
 
         # save runtime env
-        runtime_env_dir = configuration_record.execution_metadata_path(ExecMetadataVocab.runtime_env)
+        runtime_env_path = ExecMetadataVocab.runtime_env.value
+        runtime_env_dir = configuration_record.execution_metadata_path(runtime_env_path)
         with NamedTemporaryFile('w+', dir=runtime_env_dir, prefix='environment_snapshot_',
                                 suffix='.txt', delete=False) as fp:
             for dist in distributions():
