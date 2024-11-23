@@ -66,19 +66,24 @@ def define_asset_execution_assets(sname: str, execution_assets_annotation: dict)
     )
     return table_def
 
-def create_www_schema(self):
+def create_www_schema(model: Model):
     """
     Set up a new schema and tables to hold web-page like content.  The tables include a page table, and a asset
     table that can have images that are referred to by the web page.  Pages are written using markdown.
     :return:
     """
-    self.logger.info('Configuring WWW schema')
-    www_schema = self.create_schema('WWW', comment='Schema for tables that will be displayed as web content')
+    if model.schemas.get('www'):
+        model.schemas['www'].drop(cascade=True)
+    www_schema = model.create_schema(
+        Schema.define(
+        'www', comment='Schema for tables that will be displayed as web content')
+    )
     www_schema.create_table(
+        Table.define(
             'Page',
             column_defs=[
-                Column.define('Title', 'text', nullok=False, comment='Unique title for the page'),
-                Column.define('Content', 'markdown', comment='Content of the page in markdown')
+                Column.define('Title', builtin_types.text, nullok=False, comment='Unique title for the page'),
+                Column.define('Content', builtin_types.markdown, comment='Content of the page in markdown')
             ],
             key_defs=[Key.define(['Title'])],
             annotations={
@@ -88,8 +93,9 @@ def create_www_schema(self):
                 chaise_tags.visible_columns: {'detailed': ['Content']}}
 
         )
+    )
 
-    return self
+    return www_schema
 
 def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name: str = None):
     ml_catalog: ErmrestCatalog = model.catalog
@@ -152,7 +158,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
     schema.create_table(
         Table.define_association([("Execution_Assets", execution_assets_table), ("Execution", execution_table)]))
 
-    create_www_schema()
+    create_www_schema(model)
     initialize_ml_schema(model, schema_name)
 
 def initialize_ml_schema(model: Model, schema_name: str = 'deriva-ml'):

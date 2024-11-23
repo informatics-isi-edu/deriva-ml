@@ -76,6 +76,12 @@ class VocabularyTerm(BaseModel):
         extra = 'ignore'
 
 
+class Feature(BaseModel):
+    """@DynamicAttrs"""
+    Execution: str
+    Feature_Name: str
+
+
 class ConfigurationRecord(BaseModel):
     """
     Data model representing configuration records.
@@ -206,6 +212,16 @@ class ConfigurationRecord(BaseModel):
                                 schema=self._ml_object.domain_schema,
                                 asset_table=table)
 
+    def write_feature(self, feature_list: Iterable[Feature]):
+        first_row = feature_list[0]
+        csv_path, _ = self.feature_paths(first_row.target_table.name, first_row.feature_name)
+        with open(csv_path, 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=first_row.columns)
+            writer.writeheader()
+            for iq in feature_list:
+                writer.writerow(iq.dict())
+
+
     def __str__(self):
         items = [
             f"caching_dir: {self.caching_dir}",
@@ -218,10 +234,7 @@ class ConfigurationRecord(BaseModel):
         ]
         return "\n".join(items)
 
-class Feature(BaseModel):
-    """@DynamicAttrs"""
-    Execution: str
-    Feature_Name: str
+
 
 
 class FindFeatureResult(BaseModel):
@@ -629,7 +642,7 @@ class DerivaML:
 
         system_columns = {'RID', 'RMB', 'RCB', 'RCT', 'RMT'}  # We will want to skip over system columns
         feature_columns = {
-                              c.name: (map_type(c, asset_columns), c.default or ...)
+                              c.name: (Optional[map_type(c, asset_columns)], c.default or None)
                               for c in assoc_table.columns if c.name not in system_columns
                           } | {c: (str | Path, ...) for c in asset_columns}
 
@@ -642,6 +655,8 @@ class DerivaML:
         setattr(model,'columns', [c for c in feature_columns])
         setattr(model,'asset_columns', asset_columns)
         setattr(model, 'feature_table', assoc_table)
+        setattr(model, 'target_table', table)
+        setattr(model, 'feature_name', feature_name)
         return model
 
     def _find_feature(self, table: Table | str, feature_name) -> FindFeatureResult:
