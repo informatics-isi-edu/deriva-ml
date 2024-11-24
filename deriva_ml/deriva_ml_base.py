@@ -1,7 +1,6 @@
 import csv
 from collections import defaultdict
 from datetime import datetime
-
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
@@ -43,7 +42,7 @@ import re
 import requests
 import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import List, Optional, Any, NewType, Iterable, Type
+from typing import List, Optional, Any, NewType, Iterable, Iterator, Type
 from types import UnionType
 import warnings
 
@@ -76,10 +75,14 @@ class VocabularyTerm(BaseModel):
         extra = 'ignore'
 
 
-class Feature(BaseModel):
+class FeatureRecord(BaseModel):
     """@DynamicAttrs"""
+    # model_dump of this feature should be compatible with feature table columns.
     Execution: str
-    Feature_Name: str
+    Feature_Name: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class ConfigurationRecord(BaseModel):
@@ -164,7 +167,7 @@ class ConfigurationRecord(BaseModel):
         """
         return upload.feature_root(self.working_dir, self.execution_rid)
 
-    def feature_paths(self, table: str | Table, feature_name: str) -> tuple[Path, dict[str, Path]]:
+    def feature_paths(self, table:  Table | str, feature_name: str) -> tuple[Path, dict[str, Path]]:
         """
         Return the file path of where to place feature values, and assets for the named feature and table. A side
         effect of calling this routine is that the directories in which to place th feature values and assets will be
@@ -174,19 +177,20 @@ class ConfigurationRecord(BaseModel):
         :return: A tuple whose first element is the path for the feature values and whose second element is a dictionary
         of associated asset table names and corresponding paths.**
         """
+        feature = self._ml_object.lookup_feature(table, feature_name)
+
         table_path = upload.feature_value_path(self.working_dir,
                                         schema=self._ml_object.domain_schema,
-                                        target_table=table,
+                                        target_table=feature.target_table.name,
                                         feature_name=feature_name,
                                         exec_rid=self.execution_rid)
-        feature = self._ml_object.feature_record_class(table, feature_name)
         asset_paths = {
-            asset_table: upload.feature_asset_dir(self.working_dir,
+            asset_table.name: upload.feature_asset_dir(self.working_dir,
                                         exec_rid=self.execution_rid,
                                         schema=self._ml_object.domain_schema,
-                                        target_table=table,
+                                        target_table=feature.target_table.name,
                                         feature_name=feature_name,
-                                        asset_table=asset_table)
+                                        asset_table=asset_table.name)
                 for asset_table in feature.asset_columns
         }
         return table_path, asset_paths
@@ -212,21 +216,27 @@ class ConfigurationRecord(BaseModel):
                                 schema=self._ml_object.domain_schema,
                                 asset_table=table)
 
-    def write_feature_file(self, feature_list: Iterable[Feature]):
+    def write_feature_file(self, features: Iterator[FeatureRecord] | Iterable[FeatureRecord]):
         """
-        Given a list of Feature records, write out a CSV file is the appropoprate assets directory so that this
+        Given a list of Feature records, write out a CSV file is the appropriate assets directory so that this
         feature gets uploaded when the execution is complete.
 
-        :param feature_list:
+        :param features:
         :return:
         """
-        first_row = feature_list[0]
-        csv_path, _ = self.feature_paths(first_row.target_table.name, first_row.feature_name)
+        features = features if isinstance(features, Iterator) else iter(features)
+        first_row = next(features)
+        feature: Feature = first_row.feature
+        csv_path, _ = self.feature_paths(feature.target_table.name, feature.feature_name)
+        fieldnames = {'Execution', 'Feature_Name', feature.target_table.name}
+        fieldnames |= {f.name for f in feature.feature_columns}
+        print(fieldnames)
         with open(csv_path, 'w') as f:
-            writer = csv.DictWriter(f, fieldnames=first_row.columns)
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            for iq in feature_list:
-                writer.writerow(iq.dict())
+            writer.writerow(first_row.model_dump())
+            for f in features:
+                writer.writerow(f.model_dump())
 
 
     def __str__(self):
@@ -244,31 +254,91 @@ class ConfigurationRecord(BaseModel):
 
 
 
-class FindFeatureResult(BaseModel):
+class Feature:
     """
     Wrapper for results of Table.find_associations()
     """
-    feature_name: str
-    table: Table
-    self_fkey: ForeignKey
-    other_fkeys: set[ForeignKey]
 
-    class Config:
-        arbitrary_types_allowed = True
+    def __init__(self, atable: FindAssociationResult):
+        self.feature_table = atable.table
+        self.target_table = atable.self_fkey.pk_table
+        self.feature_name = atable.table.columns['Feature_Name'].default
 
-    @computed_field
-    @property
-    def name(self) -> str:
-        return self.table.name
+        def is_asset(table):
+            asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
+            return asset_columns.issubset({c.name for c in table.columns})
 
-    @computed_field
-    @property
-    def schema(self) -> str:
-        return self.table.schema.name
+        def is_vocabulary(table):
+            vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
+            return vocab_columns.issubset({c.name.upper() for c in table.columns})
+
+        skip_columns = {'RID', 'RMB', 'RCB', 'RCT', 'RMT', 'Feature_Name', self.target_table.name, 'Execution' }
+        self.feature_columns =  {c for c in self.feature_table.columns if c.name not in skip_columns}
+
+        assoc_fkeys = {atable.self_fkey} |  atable.other_fkeys
+        self.asset_columns = {fk.pk_table for fk in self.feature_table.foreign_keys if
+                 fk not in assoc_fkeys  and is_asset(fk.pk_table)}
+
+        self.term_columns =  {fk.pk_table for fk in self.feature_table.foreign_keys if
+                              fk not in assoc_fkeys and is_vocabulary(fk.pk_table)}
+
+        self.value_columns = self.feature_columns - (self.asset_columns | self.term_columns)
+
+    def feature_record_class(self) -> type[FeatureRecord]:
+        """"
+        Create a pydantic model for entries into the specified feature table
+        :return: A Feature class that can be used to create instances of the feature.
+
+        """
+        def validate_rid(rid, enable=False):
+            if enable:
+                try:
+                    self.resolve_rid(rid)
+                except DerivaMLException as e:
+                    raise ValidationError(str(e))
+            return rid
+
+        def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
+            if c.name in {c.name for c in self.asset_columns}:
+                return str | Path
+            match c.type.typename:
+                case 'text':
+                    return str
+                case 'int2' | 'int4' | 'int8':
+                    return int
+                case 'float4', 'float8':
+                    return float
+                case _:
+                    return str
+
+        # Get the association table that implements the feature.
+
+        # Create feature class
+        validators = {'execution_validator': field_validator('Execution', mode='after')(validate_rid),
+                      'feature_name_validator': field_validator('Feature_Name', mode='after')(validate_rid)}
+
+        featureclass_name = f'{self.target_table.name}Feature{self.feature_name}'
+
+        # Create feature class
+        feature_columns = ({c.name: (Optional[map_type(c)] if c.nullok else map_type(c), c.default or None)
+                              for c in self.feature_columns} |
+                           {
+                               'Feature_Name': (str, self.feature_name),
+                               self.target_table.name: (str, ...)
+                        #      'feature': (Feature, Field(exclude=True, default=self))
+                            }
+        )
+        model = create_model(featureclass_name,
+                             __base__=FeatureRecord,
+                             __validators__=validators,
+                             **feature_columns)
+        setattr(model, 'feature', self)
+        #model.model_fields['feature'].default = self
+        return model
 
     def __repr__(self) -> str:
-        return (f'FeatureResult({self.self_fkey.pk_table}, feature_name={self.feature_name}, '
-                f'table={self.table.name})')
+        return (f'Feature(target_table={self.target_table.name}, feature_name={self.feature_name}, '
+                f'table={self.feature_table.name})')
 
 
 class FileUploadState(BaseModel):
@@ -542,12 +612,13 @@ class DerivaML:
         return workflow_rid
 
     def create_feature(self,
-                       feature_name: str,
                        table: Table | str,
+                       feature_name: str,
                        terms: list[Table | str] = None,
                        assets: list[Table | str] = None,
                        metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
-                       comment: str = '') -> type[Feature]:
+                       optional: Optional[list[str]] = None,
+                       comment: str = '') -> type[FeatureRecord]:
         """
         Create a new feature that can be associated with a table. The feature can associate a controlled
         vocabulary term, an asset, or any other values with a specific instance of an object and  execution.
@@ -566,6 +637,7 @@ class DerivaML:
         terms = terms or []
         assets = assets or []
         metadata = metadata or []
+        optional = optional or []
 
         def normalize_metadata(m: Key | Table | ColumnDefinition | str):
             if isinstance(m, str):
@@ -598,11 +670,13 @@ class DerivaML:
                 comment=comment
             )
         )
+        # Now set optional terms.
+        for c in optional:
+            atable.columns[c].alter(nullok=True)
         atable.columns['Feature_Name'].alter(default=feature_name_term.name)
-        
         return self.feature_record_class(table, feature_name)
 
-    def feature_record_class(self, table: str | Table, feature_name: str) -> type[Feature]:
+    def feature_record_class(self, table: str | Table, feature_name: str) -> type[FeatureRecord]:
         """"
         Create a pydantic model for entries into the specified feature table
 
@@ -611,84 +685,31 @@ class DerivaML:
         :return: A Feature class that can be used to create instances of the feature.
 
         """
+        return self.lookup_feature(table,  feature_name).feature_record_class()
 
-        def validate_rid(rid, enable=False):
-            if enable:
-                try:
-                    self.resolve_rid(rid)
-                except DerivaMLException as e:
-                    raise ValidationError(str(e))
-            return rid
-
-        def map_type(c: Column, asset_columns: set[str]) -> UnionType | Type[str] | Type[int] | Type[float]:
-            if c.name in asset_columns:
-                return str | Path
-            match c.type.typename:
-                case 'text':
-                    return str
-                case 'int2' | 'int4' | 'int8':
-                    return int
-                case 'float4', 'float8':
-                    return float
-                case _:
-                    return str
-
-        table = self._get_table(table)
-        # Get the association table that implements the feature.
-        if len(assoc := [a for a in self.find_features(table) if a.feature_name == feature_name]):
-            assoc = assoc[0]
-            assoc_table = assoc.table
-        else:
-            raise DerivaMLException(f"Table {table.name} doesn't have feature named {feature_name}.")
-        asset_columns = {fk.pk_table.name for fk in assoc_table.foreign_keys if
-                         fk != assoc.self_fkey and fk not in assoc.other_fkeys and self.is_asset(fk.pk_table)}
-
-        # Create feature class
-        validators = {'execution_validator': field_validator('Execution', mode='after')(validate_rid),
-                      'feature_name_validator': field_validator('Feature_Name', mode='after')(validate_rid)}
-
-        system_columns = {'RID', 'RMB', 'RCB', 'RCT', 'RMT'}  # We will want to skip over system columns
-        feature_columns = {
-                              c.name: (Optional[map_type(c, asset_columns)] if c.nullok else map_type(c, asset_columns),
-                                       c.default or None)
-                              for c in assoc_table.columns if c.name not in system_columns
-                          } | {c: (str | Path, ...) for c in asset_columns}
-
-        featureclass_name = f'{table.name}Feature{feature_name}'
-        model = create_model(featureclass_name, __base__=Feature, __validators__=validators, **feature_columns)
-
-        # Add an attribute that returns the names of the columns in a class.
-        setattr(model,'columns', [c for c in feature_columns])
-        setattr(model,'asset_columns', asset_columns)
-        setattr(model, 'feature_table', assoc_table)
-        setattr(model, 'target_table', table)
-        setattr(model, 'feature_name', feature_name)
-        return model
-
-    def _find_feature(self, table: Table | str, feature_name) -> FindFeatureResult:
-        table = self._get_table(table)
-        try:
-            return next(f for f in self.find_features(table) if f.feature_name == feature_name)
-        except StopIteration:
-            raise DerivaMLException(f"Feature {table.name}:{feature_name} doesn't exist")
-
-    def _feature_assets(self, table: Table | str, feature_name: str) -> set[str]:
-        table = self._get_table(table)
-        feature = self._find_feature(table, feature_name)
-        skip_columns = ['RMB', 'RCB', 'RCT', 'RMT', 'Feature_Name', 'Execution', table.name]
-        return {fk.columns[0].table for fk in feature.table.foreign_keys
-                if fk.columns[0].name not in skip_columns and self.is_asset(fk.pk_table)}
-
-    def drop_feature(self, feature_name: str, table: Table | str) -> bool:
+    def drop_feature(self, table: Table | str, feature_name: str) -> bool:
         table = self._get_table(table)
         try:
             feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
-            feature.table.drop()
+            feature.feature_table.drop()
             return True
         except StopIteration:
             return False
 
-    def find_features(self, table: Table | str) -> Iterable[FindFeatureResult]:
+    def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
+        """
+        Lookup the named feature associated with the provided table.
+        :param table:
+        :param feature_name:
+        :return: A Feature class that represents the requested feature.
+        :raise DerivaMLException: If the feature cannot be found.
+        """
+        try:
+            return [f for f in self.find_features(table) if f.feature_name == feature_name][0]
+        except IndexError:
+            raise DerivaMLException(f"Feature {table.name}:{feature_name} doesn't exist.")
+
+    def find_features(self, table: Table | str) -> Iterable[Feature]:
         """
         List the names of the features in the specified table.
 
@@ -698,30 +719,24 @@ class DerivaML:
         table = self._get_table(table)
 
         def is_feature(a: FindAssociationResult) -> bool:
-            try:
-                return a.table.columns['Feature_Name']
-            except KeyError:
-                return False
+            return {'Feature_Name', 'Execution', table.name}.issubset({c.name for c in a.table.columns})
+
         return [
-            FindFeatureResult(
-                feature_name=a.name.replace(f'Execution_{table.name}_', ''),
-                table=a.table,
-                self_fkey=a.self_fkey, other_fkeys=a.other_fkeys
-            ) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
+            Feature(a) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
         ]
 
-    def add_features(self, features: Iterable[Feature]) -> int:
+    def add_features(self, features: Iterable[FeatureRecord]) -> int:
         """
-        Add an attribute to the specified object.
-        :return: Number of attributed added
+        Add a set of new feature values to the catalog.
+        :return: Number of attributes added
         """
         features = list(features)
-        feature_table = features[0].feature_table
+        feature_table = features[0].feature.feature_table
         feature_path = self.pathBuilder.schemas[feature_table.schema.name].tables[feature_table.name]
         entries = feature_path.insert(f.model_dump() for f in features)
         return len(entries)
 
-    def list_feature(self, table: Table | str, feature_name: str) -> _ResultSet:
+    def list_feature_values(self, table: Table | str, feature_name: str) -> _ResultSet:
         """
         Return a dataframe containing all values of a feature associated with a table.
         :param table:
@@ -729,10 +744,9 @@ class DerivaML:
         :return:
         """
         table = self._get_table(table)
-        feature = next(f for f in self.find_features(table) if
-                       f.feature_name == feature_name)
+        feature = self.lookup_feature(table, feature_name)
         pb = self.catalog.getPathBuilder()
-        return pb.schemas[feature.table.schema.name].tables[feature.name].entities().fetch()
+        return pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
 
     def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
         """
@@ -1517,8 +1531,8 @@ class DerivaML:
                               feature_file: str | Path,
                               uploaded_files: dict[str, FileUploadState]) -> None:
 
-        asset_columns = self.feature_record_class(target_table, feature_name).asset_columns
-        feature_table = self.feature_record_class(target_table, feature_name).feature_table.name
+        asset_columns = [c.name for c in self.feature_record_class(target_table, feature_name).feature.asset_columns]
+        feature_table = self.feature_record_class(target_table, feature_name).feature.feature_table.name
 
         def clean_path(p: str):
             # Given an absolute path, return the path rooted in the upload directory.

@@ -139,7 +139,7 @@ class TestFeatures(unittest.TestCase):
             TestAsset=asset_rid,
             TestCol=23) for i in image_rids]
         self.ml_instance.add_features(feature_list)
-        features = self.ml_instance.list_feature("Image", "Feature1")
+        features = self.ml_instance.list_feature_values("Image", "Feature1")
         self.assertEqual(len(features), len(image_rids))
 
 
