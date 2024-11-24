@@ -702,6 +702,7 @@ class DerivaML:
         :return: A Feature class that represents the requested feature.
         :raise DerivaMLException: If the feature cannot be found.
         """
+        table = self._get_table(table)
         try:
             return [f for f in self.find_features(table) if f.feature_name == feature_name][0]
         except IndexError:
@@ -717,6 +718,7 @@ class DerivaML:
         table = self._get_table(table)
 
         def is_feature(a: FindAssociationResult) -> bool:
+            # return {'Feature_Name', 'Execution'}.issubset({c.name for c in a.table.columns})
             return {'Feature_Name', 'Execution', table.name}.issubset({c.name for c in a.table.columns})
 
         return [
