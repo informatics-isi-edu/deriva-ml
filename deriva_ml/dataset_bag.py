@@ -224,6 +224,7 @@ class DatasetBag(object):
         """
         Recursively walk over the domain schema and extend the current path.
         :param graph:
+        :param path:
         :return:
         """
         path = path or []

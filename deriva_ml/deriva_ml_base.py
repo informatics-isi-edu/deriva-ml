@@ -42,11 +42,9 @@ import re
 import requests
 import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import List, Optional, Any, NewType, Iterable, Iterator, Type, ClassVar
+from typing import List, Optional, Any, Iterable, Iterator, Type, ClassVar
 from types import UnionType
 import warnings
-
-RID = NewType('RID', str)
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
 warnings.filterwarnings('ignore',
@@ -1528,10 +1526,6 @@ class DerivaML:
 
         asset_columns = [c.name for c in self.feature_record_class(target_table, feature_name).feature.asset_columns]
         feature_table = self.feature_record_class(target_table, feature_name).feature.feature_table.name
-
-        def clean_path(p: str):
-            # Given an absolute path, return the path rooted in the upload directory.
-            return p.replace(self.working_dir.name, '')
 
         def map_path(e):
             # Go through the asset columns and replace the file name with the RID for the uploaded file.

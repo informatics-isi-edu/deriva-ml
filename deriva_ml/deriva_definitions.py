@@ -8,8 +8,8 @@ except ImportError:
 
 from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
 
-from pydantic import BaseModel, model_serializer
-from typing import Any, Iterable
+from pydantic import BaseModel, model_serializer, Field
+from typing import Any, Iterable, NewType, Optional
 import warnings
 
 
@@ -24,6 +24,7 @@ warnings.filterwarnings('ignore',
                         category=Warning,
                         module='pydantic')
 
+RID = NewType('RID', str)
 
 # For some reason, deriva-py doesn't use the proper enum class!!
 class UploadState(Enum):
@@ -70,9 +71,9 @@ class ColumnDefinition(BaseModel):
     nullok: bool = True
     default: Any = None
     comment: str = None
-    acls: dict = {}
-    acl_bindings: dict = {}
-    annotations: dict = {}
+    acls: dict = Field(default_factory=dict)
+    acl_bindings: dict = Field(default_factory=dict)
+    annotations: dict = Field(default_factory=dict)
 
     @model_serializer()
     def serialize_column_definition(self):
@@ -90,8 +91,8 @@ class ColumnDefinition(BaseModel):
 class KeyDefinition(BaseModel):
     colnames: Iterable[str]
     constraint_names: Iterable[str]
-    comment: str = None
-    annotations: dict = {}
+    comment: Optional[str] = None
+    annotations: dict = Field(default_factory=dict)
 
     @model_serializer()
     def serialize_key_definition(self):
@@ -108,13 +109,13 @@ class ForeignKeyDefinition(BaseModel):
     pk_sname: str
     pk_tname: str
     pk_colnames: Iterable[str]
-    constraint_names: Iterable[str] = []
+    constraint_names: Iterable[str] = Field(default_factory=list)
     on_update: str = 'NO ACTION'
     on_delete: str = 'NO ACTION'
     comment: str = None
-    acls: dict[str, Any] = {}
-    acl_bindings: dict[str, Any] = {}
-    annotations: dict[str, Any] = {}
+    acls: dict[str, Any] = Field(default_factory=dict)
+    acl_bindings: dict[str, Any] = Field(default_factory=dict)
+    annotations: dict[str, Any] = Field(default_factory=dict)
 
     @model_serializer()
     def serialize_fk_definition(self):
@@ -135,12 +136,12 @@ class ForeignKeyDefinition(BaseModel):
 class TableDefinition(BaseModel):
     name: str
     column_defs: Iterable[ColumnDefinition]
-    key_defs: Iterable[KeyDefinition] = []
-    fkey_defs: Iterable[ForeignKeyDefinition] = []
+    key_defs: Iterable[KeyDefinition] = Field(default_factory=list)
+    fkey_defs: Iterable[ForeignKeyDefinition] = Field(default_factory=list)
     comment: str = None
-    acls: dict = {}
-    acl_bindings: dict = {}
-    annotations: dict = {}
+    acls: dict = Field(default_factory=dict)
+    acl_bindings: dict = Field(default_factory=dict)
+    annotations: dict = Field(default_factory=dict)
 
     @model_serializer()
     def serialize_table_definition(self):

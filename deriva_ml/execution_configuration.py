@@ -1,6 +1,8 @@
+from deriva_ml.deriva_definitions import RID
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import json
+
 
 
 class Workflow(BaseModel):
@@ -19,8 +21,8 @@ class Execution(BaseModel):
 
 
 class ExecutionConfiguration(BaseModel):
-    bdbags: list[str] = []
-    models: list[str] = []      # List of RIDs to model files.
+    bdbags: list[str] = Field(default_factory=list)
+    models: list[RID] = Field(default_factory=list)      # List of RIDs to model files.
     workflow: Workflow
     execution: Execution
     description: str = ""

@@ -272,4 +272,3 @@ def test_upload():
     is_md = is_execution_metadata_dir(emd)
     is_ea = is_execution_asset_dir(ead)
     is_fa = is_feature_asset_dir(fa)
-    is_ad = is_asset_dir(ad)
