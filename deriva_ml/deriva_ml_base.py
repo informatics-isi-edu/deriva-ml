@@ -289,10 +289,10 @@ class Feature:
         self.feature_columns =  {c for c in self.feature_table.columns if c.name not in skip_columns}
 
         assoc_fkeys = {atable.self_fkey} |  atable.other_fkeys
-        self.asset_columns = {fk.pk_table for fk in self.feature_table.foreign_keys if
+        self.asset_columns = {fk.foreign_key_columns[0] for fk in self.feature_table.foreign_keys if
                  fk not in assoc_fkeys  and is_asset(fk.pk_table)}
 
-        self.term_columns =  {fk.pk_table for fk in self.feature_table.foreign_keys if
+        self.term_columns =  {fk.foreign_key_columns[0] for fk in self.feature_table.foreign_keys if
                               fk not in assoc_fkeys and is_vocabulary(fk.pk_table)}
 
         self.value_columns = self.feature_columns - (self.asset_columns | self.term_columns)
