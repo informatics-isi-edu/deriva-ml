@@ -83,6 +83,22 @@ class FeatureRecord(BaseModel):
         arbitrary_types_allowed = True
 
 
+    @classmethod
+    def feature_columns(cls) -> set[Column]:
+        return cls.feature.feature_columns
+
+    @classmethod
+    def asset_columns(cls) -> set[Column]:
+        return cls.feature.asset_columns
+
+    @classmethod
+    def term_columns(cls) -> set[Column]:
+        return cls.feature.term_columns
+
+    @classmethod
+    def value_columns(cls) -> set[Column]:
+        return cls.feature.value_columns
+
 class ConfigurationRecord(BaseModel):
     """
     Data model representing configuration records.
@@ -228,7 +244,6 @@ class ConfigurationRecord(BaseModel):
         csv_path, _ = self.feature_paths(feature.target_table.name, feature.feature_name)
         fieldnames = {'Execution', 'Feature_Name', feature.target_table.name}
         fieldnames |= {f.name for f in feature.feature_columns}
-        print(fieldnames)
         with open(csv_path, 'w') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
@@ -335,7 +350,7 @@ class Feature:
 
     def __repr__(self) -> str:
         return (f'Feature(target_table={self.target_table.name}, feature_name={self.feature_name}, '
-                f'table={self.feature_table.name})')
+                f'feature_table={self.feature_table.name})')
 
 
 class FileUploadState(BaseModel):
@@ -719,7 +734,9 @@ class DerivaML:
 
         def is_feature(a: FindAssociationResult) -> bool:
             # return {'Feature_Name', 'Execution'}.issubset({c.name for c in a.table.columns})
-            return {'Feature_Name', 'Execution', table.name}.issubset({c.name for c in a.table.columns})
+            return {'Feature_Name',
+                    'Execution',
+                    a.self_fkey.foreign_key_columns[0].name}.issubset({c.name for c in a.table.columns})
 
         return [
             Feature(a) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
