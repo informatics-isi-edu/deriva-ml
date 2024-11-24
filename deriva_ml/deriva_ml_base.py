@@ -42,7 +42,7 @@ import re
 import requests
 import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import List, Optional, Any, NewType, Iterable, Iterator, Type
+from typing import List, Optional, Any, NewType, Iterable, Iterator, Type, ClassVar
 from types import UnionType
 import warnings
 
@@ -76,10 +76,10 @@ class VocabularyTerm(BaseModel):
 
 
 class FeatureRecord(BaseModel):
-    """@DynamicAttrs"""
     # model_dump of this feature should be compatible with feature table columns.
     Execution: str
     Feature_Name: Optional[str] = None
+    feature: ClassVar[Optional['Feature']] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -226,7 +226,7 @@ class ConfigurationRecord(BaseModel):
         """
         features = features if isinstance(features, Iterator) else iter(features)
         first_row = next(features)
-        feature: Feature = first_row.feature
+        feature = first_row.feature
         csv_path, _ = self.feature_paths(feature.target_table.name, feature.feature_name)
         fieldnames = {'Execution', 'Feature_Name', feature.target_table.name}
         fieldnames |= {f.name for f in feature.feature_columns}
@@ -235,8 +235,8 @@ class ConfigurationRecord(BaseModel):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerow(first_row.model_dump())
-            for f in features:
-                writer.writerow(f.model_dump())
+            for feature in features:
+                writer.writerow(feature.model_dump())
 
 
     def __str__(self):
@@ -325,15 +325,14 @@ class Feature:
                            {
                                'Feature_Name': (str, self.feature_name),
                                self.target_table.name: (str, ...)
-                        #      'feature': (Feature, Field(exclude=True, default=self))
                             }
         )
         model = create_model(featureclass_name,
                              __base__=FeatureRecord,
                              __validators__=validators,
                              **feature_columns)
-        setattr(model, 'feature', self)
-        #model.model_fields['feature'].default = self
+        model.feature = self
+
         return model
 
     def __repr__(self) -> str:
@@ -629,6 +628,7 @@ class DerivaML:
         :param terms: List of controlled vocabulary terms that will be part of the feature value
         :param assets: List of asset table names or objects that will be part of the feature value
         :param metadata: List of other value types that are associated with the feature
+        :param optional: List of columns that are optional in the feature
         :param comment:
         :return: A Feature class that can be used to create instances of the feature.
         :raise DerivaException: If the feature cannot be created.
@@ -781,7 +781,6 @@ class DerivaML:
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
         atable = next(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations()).name
         ml_path = pb.schemas[self.ml_schema]
-        dataset_type_path = ml_path.tables[MLVocab.dataset_type]
         atable_path = ml_path.tables[atable]
 
         # Get a list of all the dataset_type values associated with this dataset.
@@ -1491,10 +1490,6 @@ class DerivaML:
         """
         ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         a_table = list(self.model.schemas[self.ml_schema].tables['Execution_Metadata'].find_associations())[0].name
-        meta_exec_entities = list(ml_schema_path.tables[a_table].filter(
-            ml_schema_path.tables[a_table].Execution == execution_rid).entities().fetch())
-        meta_list = [e['Execution_Metadata'] for e in meta_exec_entities]
-        entities = []
 
         def asset_rid(asset) -> str:
             return asset.state == UploadState.success and asset.result and asset.result['RID']
