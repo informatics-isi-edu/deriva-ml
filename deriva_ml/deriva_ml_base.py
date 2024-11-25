@@ -303,13 +303,6 @@ class Feature:
         :return: A Feature class that can be used to create instances of the feature.
 
         """
-        def validate_rid(rid, enable=False):
-            if enable:
-                try:
-                    self.ml_instance.resolve_rid(rid)
-                except DerivaMLException as e:
-                    raise ValidationError(str(e))
-            return rid
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
             if c.name in {c.name for c in self.asset_columns}:
@@ -342,7 +335,6 @@ class Feature:
         )
         model = create_model(featureclass_name,
                              __base__=FeatureRecord,
-                             __validators__=validators,
                              **feature_columns)
         model.feature = self
 
