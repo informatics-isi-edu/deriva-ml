@@ -82,7 +82,6 @@ class FeatureRecord(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-
     @classmethod
     def feature_columns(cls) -> set[Column]:
         return cls.feature.feature_columns
@@ -272,10 +271,11 @@ class Feature:
     Wrapper for results of Table.find_associations()
     """
 
-    def __init__(self, atable: FindAssociationResult):
+    def __init__(self, atable: FindAssociationResult, deriva_ml: 'DerivaML'):
         self.feature_table = atable.table
         self.target_table = atable.self_fkey.pk_table
         self.feature_name = atable.table.columns['Feature_Name'].default
+        self.ml_instance = deriva_ml
 
         def is_asset(table):
             asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
@@ -306,7 +306,7 @@ class Feature:
         def validate_rid(rid, enable=False):
             if enable:
                 try:
-                    self.resolve_rid(rid)
+                    self.ml_instance.resolve_rid(rid)
                 except DerivaMLException as e:
                     raise ValidationError(str(e))
             return rid
@@ -319,7 +319,7 @@ class Feature:
                     return str
                 case 'int2' | 'int4' | 'int8':
                     return int
-                case 'float4', 'float8':
+                case 'float4' | 'float8':
                     return float
                 case _:
                     return str
@@ -739,7 +739,7 @@ class DerivaML:
                     a.self_fkey.foreign_key_columns[0].name}.issubset({c.name for c in a.table.columns})
 
         return [
-            Feature(a) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
+            Feature(a, self) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
         ]
 
     def add_features(self, features: Iterable[FeatureRecord]) -> int:
@@ -1123,7 +1123,7 @@ class DerivaML:
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
-    def cite(self, entity: dict | str, snapshot=True) -> str:
+    def cite(self, entity: dict | str) -> str:
         """
         Return a citation URL for the provided entity.
         :param entity: A dict that contains the column values for a specific entity.
