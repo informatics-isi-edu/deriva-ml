@@ -3,16 +3,16 @@ from deriva.core.ermrest_model import Model, Table
 import logging
 from pathlib import Path
 import pandas as pd
-from urllib.parse import urlparse
 import sqlite3
 from typing import Optional, Any, Generator, Callable
+from urllib.parse import urlparse
 
 
 def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     """
-    Given a path to the data model, output an export specification for the path taken to get to the current table.
-    :param path:
-    :return:
+    Given a path in the data model, output an export specification for the path taken to get to the current table.
+    :param path: List of tables that trace the path through the data model.
+    :return:The export specification that will retrieve that data from the catalog and place it into a BDBag.
     """
 
     # The table is the last element of the path.  Generate the ERMrest query by conversting the list of tables
@@ -48,6 +48,11 @@ def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
 
 
 def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
+    """
+    Return the download specification for the data object indicated by a path through the data model.
+    :param path:
+    :return:
+    """
     table = path[-1]
     npath = "Dataset/RID={Dataset_RID}/" if path[0].name == "Dataset" else path[0].name
     npath += '/'.join([f'{t.schema.name}:{t.name}' for t in path[1:]])
@@ -61,6 +66,8 @@ def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
             }
         }
     ]
+
+    # If this table is an asset table, then we need to output the files associated with the asset.
     asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
     if asset_columns.issubset({c.name for c in table.columns}):
         exports.append({
@@ -74,7 +81,7 @@ def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     return exports
 
 
-def is_vocabulary(t):
+def is_vocabulary(t: Table) -> bool:
     vocab_columns = {'Name', 'URI', 'Synonyms', 'Description', 'ID'}
     return vocab_columns.issubset({c.name for c in t.columns}) and t
 
@@ -131,11 +138,8 @@ def dataset_specification(model: Model,
         # A dataset may have may other object associated with it. We only want to consider those association tables
         #  that are in the domain schema, or the table Dataset_Dataset, which is used for nested datasets.
         if element.table.schema.name == domain_schema or element.name == "Dataset_Dataset":
-            # Now generate all of the paths reachable from this node.
+            # Now generate all the paths reachable from this node.
             for path in DatasetBag.table_paths(DatasetBag.schema_graph(model, element.table), [dataset_table]):
-                table = path[-1]
-               # if table.is_association(max_arity=3, pure=False):
-               #     continue
                 element_spec.extend(writer(path))
     return vocabulary_specification(model, writer) + element_spec
 
@@ -204,28 +208,41 @@ def generate_dataset_download_spec(model: Model) -> dict[str, Any]:
 
 
 class DatasetBag(object):
+    """
+    DatasetBag is a class that manages a materialized bag.
+    """
     def __init__(self, bag_path: Path | str):
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
+        """
+        Initialize a DatasetBag instance.
+        :param bag_path: A path to a materialized BDbag.
+        """
         self.bag_path = Path(bag_path)
         self.dataset_rid = self.bag_path.name.replace('Dataset_','')
         self.model = Model.fromfile('file-system', self.bag_path / 'data/schema.json')
+
+        # Guess the domain schema name by eliminating all of the "builtin" schema.
         self.domain_schema = [s for s in self.model.schemas if s not in ['deriva-ml', 'public', 'www']][0]
         self.dbase = sqlite3.connect(f"{self.bag_path / self.domain_schema}.db")
+
+        # Create a sqlite database schema that contains all of the tables within the catalog from which the
+        # BDBag was created.
         with self.dbase:
             for t in self.model.schemas[self.domain_schema].tables.values():
                 self.dbase.execute(t.sqlite3_ddl())
             for t in self.model.schemas['deriva-ml'].tables.values():
                 self.dbase.execute(t.sqlite3_ddl())
+
+        # Load the database from the bag contents.
         self._load_sqllite()
 
     @staticmethod
     def table_paths(graph: dict[str, Any], path: Optional[list[Table]] = None) -> list[list[Table]]:
         """
-        Recursively walk over the domain schema and extend the current path.
-        :param graph:
-        :param path:
-        :return:
+        Recursively walk over the domain schema graph and extend the current path.
+        :param graph: An undirected, acyclic graph of schema.  Represented as a dictionary whose name is the table name.
+            and whose values are the child nodes of the table.
+        :param path: The path through the graph so far
+        :return: A list of all the paths through the graph.  Each path is a list of tables.
         """
         path = path or []
         paths = []
@@ -242,15 +259,26 @@ class DatasetBag(object):
                      node: str | Table,
                      visited_nodes: Optional[set] = None,
                      nested_dataset: bool = False) -> dict[str, Any]:
+        """
+        Generate an undirected, acyclic graph of domain schema. We do this by traversing the schema foreign key
+        relationships.  We stop when we hit the deriva-ml schema or when we reach a node that we have already seen.
+
+        :param model: Model to be turned into a graph.
+        :param node: Current (starting) node in the graph.
+        :param visited_nodes:
+        :param nested_dataset: Are we in a nested dataset, (i.e. have we seen the DataSet table).
+        :return:
+        """
         domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
         dataset_table = model.schemas['deriva-ml'].tables["Dataset"]
 
         def domain_table(table: Table) -> bool:
             return table.schema.name == domain_schema or table.name == "Dataset"
 
-
+        # Get a list of all the tables that can be directly included in a dataset.
         dataset_associations = [a.table for a in dataset_table.find_associations() if
                                 domain_table(a.other_fkeys.pop().pk_table)]
+
         visited_nodes = visited_nodes or set()
         graph = {node: []}
 
@@ -284,10 +312,15 @@ class DatasetBag(object):
         return graph
 
     def localize_asset_table(self) -> dict[str, str]:
+        """
+        Use the fetch.txt file in a bdbag to create a map from a URL to a local file path.
+        :return: Dictionary that maps a URL to a local file path.
+        """
         fetch_map = {}
         try:
             with open(self.bag_path / 'fetch.txt', newline='\n') as fetchfile:
                 for row in fetchfile:
+                    # Rows in fetch.text are tab seperated with URL filename.
                     fields = row.split('\t')
                     fetch_map[urlparse(fields[0]).path] = fields[2].replace('\n', '')
         except FileNotFoundError:
@@ -299,6 +332,14 @@ class DatasetBag(object):
         self.dbase.execute("DROP DATABASE")
 
     def _load_sqllite(self) -> None:
+        """
+        Load a SQLite database from a bdbag.  THis is done by looking for all of the CSV files in the bdbag directory.
+        If the file is for an asset table, update the FileName column of the table to have the local file path for
+        the materialized file.  Then load into the sqllite database.
+        Note: none of the foreign key constraints are included in the database.
+
+        :return:
+        """
         dpath = self.bag_path / "data"
         asset_map = self.localize_asset_table()
 
@@ -308,27 +349,37 @@ class DatasetBag(object):
             asset_table = self.model.schemas[schema].tables[table_name]
             return asset_columns.issubset({c.name for c in asset_table.columns})
 
-        def localize_asset(o: list, asset_indexes: Optional[tuple[int, int]]) -> tuple:
-            if asset_indexes:
+        def localize_asset(o: list, indexes: Optional[tuple[int, int]]) -> tuple:
+            """
+            Given a list of column values for a table, replace the FileName column with the local file name based on
+            the URL value.
+
+            :param o: List of values for each column in a table row.
+            :param indexes:  A tuple whose first element is the column index of the file name and whose second element
+                             is the index of the URL in an asset table.  Tuple is None if table is not an asset table.
+            :return: Tuple of updated column values.
+            """
+            if indexes:
                 file_column, url_column = asset_indexes
                 o[file_column] = asset_map[o[url_column]] if o[url_column] else ''
             return tuple(o)
 
-        # for path, subdirs, files in dpath.walk():
-        for csv_file in Path(dpath).rglob('*.csv'):          # table = path.name
+        # Find all of the CSV files in the subdirectory and load each file into the database.
+        for csv_file in Path(dpath).rglob('*.csv'):
             table = csv_file.stem
             schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
-            # if f"{table}.csv" not in files:
-            #     continue   # Some directories might be empty.
-            # with open(path / f"{table}.csv", newline='') as csvfile:
+
             with csv_file.open(newline='') as csvfile:
                 csv_reader = reader(csvfile)
                 column_names = next(csv_reader)
+
+                # Determine which columns in the table has the Filename and the URL
                 asset_indexes = (column_names.index('Filename'), column_names.index('URL')) if is_asset(table) else None
-                object_table = [localize_asset(o, asset_indexes) for o in csv_reader]
+
                 value_template = ','.join(['?'] * len(column_names))  # SQL placeholder for row (?,?..)
                 column_list = ','.join([f'"{c}"' for c in column_names])
                 with self.dbase:
+                    object_table = (localize_asset(o, asset_indexes) for o in csv_reader)
                     self.dbase.executemany(
                         f'INSERT OR REPLACE INTO "{schema}:{table}" ({column_list}) VALUES ({value_template})',
                         object_table
@@ -340,16 +391,31 @@ class DatasetBag(object):
                 "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;").fetchall()]
 
     def get_table(self, table: str) -> Generator[tuple, None, None]:
+        """
+        Retrieve the contents of the specified table
+        :param table:
+        :return: A generator that yields tuples of column values.
+        """
         schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
         result = self.dbase.execute(f'SELECT * FROM "{schema}:{table}"')
         while row := result.fetchone():
             yield row
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
+        """
+        Retrieve the contents of the specified table as a dataframe.
+        :param table: Table to retrieve data from.
+        :return: A dataframe containing the contents of the specified table.
+        """
         schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
         return pd.read_sql(f'SELECT * FROM "{schema}:{table}"', con=self.dbase)
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+        """
+        Retrieve the contents of the specified table as a dictionary.
+        :param table: Table to retrieve data from.
+        :return: A generator producing dictionaries containing the contents of the specified table as name/value pairs.
+        """
         schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'
         with self.dbase:
             col_names = [c[1] for c in self.dbase.execute(f'PRAGMA table_info("{schema}:{table}")').fetchall()]

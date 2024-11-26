@@ -129,6 +129,16 @@ def feature_dir(
 def feature_value_path(
     prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
 ) -> Path:
+    """
+    Return the path to a file in which to place feature values that are to be uploaded.  Values will either be
+    scalar, references to controlled vocabulary (Terms) or references to assets.
+    :param prefix: Location of upload root directory
+    :param exec_rid: RID of the execution to be associated with this feature.
+    :param schema: Domain schema name
+    :param target_table: Target table name for the feature.
+    :param feature_name: Name of the feature.
+    :return:
+    """
     return feature_dir(prefix, exec_rid, schema, target_table, feature_name) / f"{feature_name}.csv"
 
 
@@ -140,6 +150,16 @@ def feature_asset_dir(
     feature_name: str,
     asset_table: str,
 ) -> Path:
+    """
+    Return the path to a directory in which to place feature assets that are to be uploaded.
+    :param prefix:  Location of upload root directory
+    :param exec_rid: RID of the execution for the feature asset
+    :param schema: Domain schema
+    :param target_table: Name of the target table for the feature.
+    :param feature_name: Name of the feature
+    :param asset_table: Name of the asset table for the feature.
+    :return:
+    """
     path = feature_dir(prefix, exec_rid, schema, target_table, feature_name) / 'assets' / asset_table
 
     path.mkdir(parents=True, exist_ok=True)
@@ -147,12 +167,26 @@ def feature_asset_dir(
 
 
 def asset_dir(prefix: Path | str, schema: str, asset_table: str) -> Path:
+    """
+    Return the path to a directory in which to place assets that are to be uploaded.
+    :param prefix: Location of upload root directory
+    :param schema: Domain schema
+    :param asset_table: Name of the asset table
+    :return: Path to the directory in which to place assets
+    """
     path = upload_root(prefix) / 'assets' / schema / asset_table
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def table_path(prefix: Path | str, schema: str, table: str, exec_rid: str = "") -> Path:
+def table_path(prefix: Path | str, schema: str, table: str) -> Path:
+    """
+    Return the path to a file in which to place table values that are to be uploaded.
+    :param prefix: Location of upload root directory
+    :param schema: Domain schema
+    :param table: Name of the table to be uploade.
+    :return: Path to the file in which to place table values that are to be uploaded.
+    """
     path = upload_root(prefix) / 'table' / schema / table
     path.mkdir(parents=True, exist_ok=True)
     return path / f"{table}.csv"
@@ -265,10 +299,10 @@ bulk_upload_configuration = {
 def test_upload():
     ead = execution_assets_dir('foo', 'my-rid', 'my-asset')
     emd = execution_metadata_dir('foo', 'my-rid', 'my-metadata')
-    fp = feature_value_path('foo', 'my-rid', 'my-schema', 'my-target', 'my-feature')
+    _fp = feature_value_path('foo', 'my-rid', 'my-schema', 'my-target', 'my-feature')
     fa = feature_asset_dir('foo', 'my-rid', 'my-schema', 'my-target', 'my-feature', 'my-asset')
-    tp = table_path('foo', 'my-schema', 'my-table')
-    ad = asset_dir('foo', 'my-schema', 'my-asset')
-    is_md = is_execution_metadata_dir(emd)
-    is_ea = is_execution_asset_dir(ead)
-    is_fa = is_feature_asset_dir(fa)
+    _tp = table_path('foo', 'my-schema', 'my-table')
+    _ad = asset_dir('foo', 'my-schema', 'my-asset')
+    _is_md = is_execution_metadata_dir(emd)
+    _is_ea = is_execution_asset_dir(ead)
+    _is_fa = is_feature_asset_dir(fa)

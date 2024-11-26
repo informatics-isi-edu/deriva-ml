@@ -36,7 +36,7 @@ from itertools import chain
 import json
 import logging
 import os
-from pydantic import BaseModel, ValidationError, Field, create_model, field_validator, computed_field
+from pydantic import BaseModel, ValidationError, Field, create_model, computed_field
 from pathlib import Path
 import re
 import requests
@@ -76,7 +76,7 @@ class VocabularyTerm(BaseModel):
 class FeatureRecord(BaseModel):
     # model_dump of this feature should be compatible with feature table columns.
     Execution: str
-    Feature_Name: Optional[str] = None
+    Feature_Name: str
     feature: ClassVar[Optional['Feature']] = None
 
     class Config:
@@ -84,18 +84,34 @@ class FeatureRecord(BaseModel):
 
     @classmethod
     def feature_columns(cls) -> set[Column]:
+        """
+        Return the names of all  the columns that define the value of a feature.
+        :return: set of feature column names.
+        """
         return cls.feature.feature_columns
 
     @classmethod
     def asset_columns(cls) -> set[Column]:
+        """
+        Return the names of all  the columns of a feature that are assets.
+        :return:  set of asset column names.
+        """
         return cls.feature.asset_columns
 
     @classmethod
     def term_columns(cls) -> set[Column]:
+        """
+        Return the names of all  the columns of a feature that are controlled vocabulary terms.
+        :return: set of term column names.
+        """
         return cls.feature.term_columns
 
     @classmethod
     def value_columns(cls) -> set[Column]:
+        """
+        Return the names of all  the columns of a feature that are scale  values.
+        :return: set of value column names.
+        """
         return cls.feature.value_columns
 
 class ConfigurationRecord(BaseModel):
@@ -137,6 +153,7 @@ class ConfigurationRecord(BaseModel):
         """
         Return a pathlib Path to the execution metadata directory. Files placed in this directory will be uploaded
         to the catalog by the execution_upload method in an execution object.
+
         :return:
         """
         return upload.execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type='')
@@ -160,9 +177,15 @@ class ConfigurationRecord(BaseModel):
         """
         return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
 
-    def execution_assets_path(self, metadata_type: str) -> Path:
+    def execution_assets_path(self, asset_type: str) -> Path:
+        """
+        Return a pathlib Path to the directory in which to place files for the specified execution_asset type. These
+         files are uploaded as part of the upload_execution method in DerivaML class.
 
-        return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=metadata_type)
+        :param asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
+        :return: Path in which to place asset files.
+        """
+        return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
 
     @property
     def execution_root(self) -> Path:
@@ -175,7 +198,7 @@ class ConfigurationRecord(BaseModel):
     @property
     def feature_root(self) -> Path:
         """
-        Return the root path to all execution specific files.
+        The root path to all execution specific files.
         :return:
         """
         return upload.feature_root(self.working_dir, self.execution_rid)
@@ -211,38 +234,41 @@ class ConfigurationRecord(BaseModel):
     def table_path(self, table: str) -> Path:
         """
         Return a local file path in which to place a CSV to add values to a table on upload.
-        :param table:
-        :return:
+
+        :param table: Name of table to be uploaded.
+        :return: Pathlib path to the file in which to place table values.
         """
         return upload.table_path(self.working_dir,
                                  schema=self._ml_object.domain_schema,
-                                 table=table,
-                                 exec_rid=self.execution_rid)
+                                 table=table)
 
     def asset_directory(self, table: str) -> Path:
         """
         Return a local file path in which to place a files for an asset table.  This needs to be kept in sync with
-        bulk_upload specification
-        :param table:
+        bulk_upload specification.
+
+        :param table: Name of the asset table to be uploaded.
+        :return: Pathlib path to the directory in which to place asset files.
         """
         return upload.asset_dir(prefix=self.working_dir,
                                 schema=self._ml_object.domain_schema,
                                 asset_table=table)
 
-    def write_feature_file(self, features: Iterator[FeatureRecord] | Iterable[FeatureRecord]):
+    def write_feature_file(self, features: Iterator[FeatureRecord] | Iterable[FeatureRecord]) -> None:
         """
-        Given a list of Feature records, write out a CSV file is the appropriate assets directory so that this
+        Given a collection of Feature records, write out a CSV file is the appropriate assets directory so that this
         feature gets uploaded when the execution is complete.
 
-        :param features:
-        :return:
+        :param features: Iterable or Iterator of Feature records to write.
         """
         features = features if isinstance(features, Iterator) else iter(features)
         first_row = next(features)
         feature = first_row.feature
         csv_path, _ = self.feature_paths(feature.target_table.name, feature.feature_name)
+
         fieldnames = {'Execution', 'Feature_Name', feature.target_table.name}
         fieldnames |= {f.name for f in feature.feature_columns}
+
         with open(csv_path, 'w') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
@@ -271,11 +297,10 @@ class Feature:
     Wrapper for results of Table.find_associations()
     """
 
-    def __init__(self, atable: FindAssociationResult, deriva_ml: 'DerivaML'):
+    def __init__(self, atable: FindAssociationResult):
         self.feature_table = atable.table
         self.target_table = atable.self_fkey.pk_table
         self.feature_name = atable.table.columns['Feature_Name'].default
-        self.ml_instance = deriva_ml
 
         def is_asset(table):
             asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
@@ -320,23 +345,22 @@ class Feature:
         # Get the association table that implements the feature.
 
         # Create feature class
-        validators = {'execution_validator': field_validator('Execution', mode='after')(validate_rid),
-                      'feature_name_validator': field_validator('Feature_Name', mode='after')(validate_rid)}
-
         featureclass_name = f'{self.target_table.name}Feature{self.feature_name}'
 
-        # Create feature class
+        # Create feature class. To do this, we must determine the python type for each column and also if the
+        # column is optional or not based on its nulliblity.
         feature_columns = ({c.name: (Optional[map_type(c)] if c.nullok else map_type(c), c.default or None)
                               for c in self.feature_columns} |
                            {
-                               'Feature_Name': (str, self.feature_name),
+                               'Feature_Name': (str, self.feature_name),  # Set default value for Feature_Name
                                self.target_table.name: (str, ...)
                             }
         )
-        model = create_model(featureclass_name,
-                             __base__=FeatureRecord,
-                             **feature_columns)
-        model.feature = self
+        docstring = f'Class to capture fields in a feature {self.feature_name} on table {self.target_table}. Feature columns include:\n'
+        docstring += '\n'.join([f'    {c.name}' for c in self.feature_columns])
+
+        model = create_model(featureclass_name, __base__=FeatureRecord, __doc__=docstring, **feature_columns)
+        model.feature = self  # Set value of class variable within the feature class definition.
 
         return model
 
@@ -464,6 +488,10 @@ class DerivaML:
 
     @property
     def pathBuilder(self) -> _CatalogWrapper:
+        """
+        Get a new instance of a pathbuilder object.
+        :return: pathbuilder object.
+        """
         return self.catalog.getPathBuilder()
 
     @property
@@ -473,8 +501,9 @@ class DerivaML:
     @property
     def domain_path(self):
         """
+        Get a new instance of a pathBuilder object to the domain schema.
 
-        :return: A new instance of a pathbuilder path to the domain schema.
+        :return: A new instance of a pathBuilder path to the domain schema.
         """
 
         return self.pathBuilder.schemas[self.domain_schema]
@@ -495,6 +524,12 @@ class DerivaML:
         raise DerivaMLException(f"The table {table} doesn't exist.")
 
     def model_dir(self, execution_rid: RID) -> Path:
+        """
+        Return the directory in which models downloaded as part of initializing an execution are placed.
+
+        :param execution_rid: Execution RID for the current execution.
+        :return: PathLib path object to model directory.
+        """
         path = self.working_dir / execution_rid / 'models'
         path.mkdir(parents=True, exist_ok=True)
         return path
@@ -502,6 +537,7 @@ class DerivaML:
     def table_path(self, table: str | Table) -> Path:
         """
         Return a local file path in which to place a CSV to add values to a table on upload.
+
         :param table:
         :return:
         """
@@ -522,6 +558,12 @@ class DerivaML:
         return self.cache_dir if cached else self.working_dir
 
     def chaise_url(self, table: str | Table) -> str:
+        """
+        Return a Chaise URL to the specified table.
+
+        :param table: Table to be browsed
+        :return: URL to the table in Chaise format.
+        """
         table = self._get_table(table)
         uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
         return f'{uri}/{urlquote(f"{table.schema.name}:{table.name}")}'
@@ -530,7 +572,7 @@ class DerivaML:
         """
         Create a controlled vocabulary table with the given vocab name.
         :param vocab_name: Name of the controlled vocabulary table.
-        :param comment:
+        :param comment: Description of the vocabulary table.
         :param schema: Schema in which to create the controlled vocabulary table.  Defaults to domain_schema.
         :return:
         """
@@ -544,7 +586,6 @@ class DerivaML:
         Check if a given table is a controlled vocabulary table.
 
         param: table_name: A ERMRest table object or the name of the table.
-
         returns: Table object if the table is a controlled vocabulary, False otherwise.
 
         """
@@ -555,11 +596,11 @@ class DerivaML:
     def create_asset(self, asset_name: str, comment='', schema: str = None) -> Table:
         """
         Create an asset table with the given asset name.
-        will work with this table.
-        :param asset_name:
-        :param comment:
-        :param schema:
-        :return:
+
+        :param asset_name: Name of the asset table.
+        :param comment: Description of the asset table.
+        :param schema: Schema in which to create the asset table.  Defaults to domain_schema.
+        :return: Table object for the asset table.
         """
         schema = schema or self.domain_schema
         asset_table = self.model.schemas[schema].create_table(
@@ -578,9 +619,9 @@ class DerivaML:
     def find_assets(self) -> list[Table]:
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
-    def add_workflow(self, workflow_name: str, url: str, workflow_type: str,
-                     version: str = '',
-                     description: str = '') -> RID:
+    def _add_workflow(self, workflow_name: str, url: str, workflow_type: str,
+                      version: str = '',
+                      description: str = '') -> RID:
         """
         Add a workflow to the Workflow table.
 
@@ -596,7 +637,7 @@ class DerivaML:
 
         """
 
-        # Check to make sure that the workflow is not already in the table. If its not, add it.
+        # Check to make sure that the workflow is not already in the table. If it's not, add it.
         ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         try:
             url_column = ml_schema_path.Workflow.URL
@@ -616,7 +657,7 @@ class DerivaML:
         return workflow_rid
 
     def create_feature(self,
-                       table: Table | str,
+                       target_table: Table | str,
                        feature_name: str,
                        terms: list[Table | str] = None,
                        assets: list[Table | str] = None,
@@ -626,10 +667,9 @@ class DerivaML:
         """
         Create a new feature that can be associated with a table. The feature can associate a controlled
         vocabulary term, an asset, or any other values with a specific instance of an object and  execution.
-        The value of a feature can be a set of terms, assets, or other scalar values.
 
         :param feature_name: Name of the new feature to be defined
-        :param table: table name or object on which the feature is to be associated
+        :param target_table: table name or object on which the feature is to be associated
         :param terms: List of controlled vocabulary terms that will be part of the feature value
         :param assets: List of asset table names or objects that will be part of the feature value
         :param metadata: List of other value types that are associated with the feature
@@ -660,17 +700,17 @@ class DerivaML:
 
         # Get references to the necessary tables and make sure that the
         # provided feature name exists.
-        table = self._get_table(table)
+        target_table = self._get_table(target_table)
         execution = self.model.schemas[self.ml_schema].tables['Execution']
         feature_name_table = self.model.schemas[self.ml_schema].tables['Feature_Name']
         feature_name_term = self.add_term('Feature_Name', feature_name, description=comment)
-        atable_name = f'Execution_{table.name}_{feature_name_term.name}'
+        atable_name = f'Execution_{target_table.name}_{feature_name_term.name}'
         
         # Now create the association table that implements the feature.
         atable = self.model.schemas[self.domain_schema].create_table(
-            table.define_association(
+            target_table.define_association(
                 table_name=atable_name,
-                associates=[execution, table, feature_name_table],
+                associates=[execution, target_table, feature_name_table],
                 metadata=[normalize_metadata(m) for m in chain(assets, terms, metadata)],
                 comment=comment
             )
@@ -679,7 +719,7 @@ class DerivaML:
         for c in optional:
             atable.columns[c].alter(nullok=True)
         atable.columns['Feature_Name'].alter(default=feature_name_term.name)
-        return self.feature_record_class(table, feature_name)
+        return self.feature_record_class(target_table, feature_name)
 
     def feature_record_class(self, table: str | Table, feature_name: str) -> type[FeatureRecord]:
         """"
@@ -720,7 +760,7 @@ class DerivaML:
         List the names of the features in the specified table.
 
         :param table: The table to find features for.
-        :return: An iterable of FeatureResult instances that describe the currrent features in the table.
+        :return: An iterable of FeatureResult instances that describe the current features in the table.
         """
         table = self._get_table(table)
 
@@ -731,7 +771,7 @@ class DerivaML:
                     a.self_fkey.foreign_key_columns[0].name}.issubset({c.name for c in a.table.columns})
 
         return [
-            Feature(a, self) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
+            Feature(a) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
         ]
 
     def add_features(self, features: Iterable[FeatureRecord]) -> int:
@@ -928,7 +968,7 @@ class DerivaML:
         dataset_elements = {}
         association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in
                            self.dataset_table.find_associations()}
-        # Get a list of all of the types of objects that can be linked to a dataset.
+        # Get a list of all the types of objects that can be linked to a dataset.
         for m in members:
             rid_info = self.resolve_rid(m)
             if rid_info.table.name not in association_map:
@@ -1075,9 +1115,9 @@ class DerivaML:
         """
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
-    def list_vocabulary_terms(self, table_name: str) -> Iterable[VocabularyTerm]:
+    def list_vocabulary_terms(self, table_name: str) -> list[VocabularyTerm]:
         """
-        Return the dataframe of terms that are in a vocabulary table.
+        Return an list of terms that are in a vocabulary table.
 
         Args:
         - table_name (str): The name of the controlled vocabulary table.
@@ -1099,6 +1139,7 @@ class DerivaML:
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
         """
         Return a named tuple with information about the specified RID.
+
         :param rid:
         :return:
         """
@@ -1118,6 +1159,7 @@ class DerivaML:
     def cite(self, entity: dict | str) -> str:
         """
         Return a citation URL for the provided entity.
+
         :param entity: A dict that contains the column values for a specific entity.
         :return:  The PID for the provided entity.
         """
@@ -1131,10 +1173,10 @@ class DerivaML:
 
     def user_list(self) -> list[dict[str, str]]:
         """
-        Return a DataFrame containing user information of current catalog.
+        Return a list containing user information of current catalog.
 
         Returns:
-        - pd.DataFrame: DataFrame containing user information.
+        - a list: DataFrame containing user information.
 
         """
         user_path = self.pathBuilder.public.ERMrest_Client.path
@@ -1179,6 +1221,7 @@ class DerivaML:
 
         with TemporaryDirectory() as tmp_dir:
             if dataset_rid.startswith('minid'):
+                # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
                 r = requests.get(f"https://identifiers.org/{dataset_rid}", headers={'accept': 'application/json'})
                 metadata = r.json()['metadata']
                 dataset_rid = metadata['Dataset_RID'].split('@')[0]
@@ -1189,7 +1232,9 @@ class DerivaML:
                         break
                 archive_path = fetch_single_file(dataset_rid, tmp_dir)
             else:
-                # Put current download spec into a file
+                # We are given the RID to a dataset, so we are going to have to export as a bag and place into
+                # local file system.  The first step is to generate a downloadspec to create the bag, put the sped
+                # into a local file and then use the downloader to create and download the desired bdbag.
                 spec_file = f'{tmp_dir}/download_spec.json'
                 with open(spec_file, 'w', encoding="utf-8") as ds:
                     json.dump(generate_dataset_download_spec(self.model), ds)
@@ -1201,30 +1246,24 @@ class DerivaML:
                 result = downloader.download()
                 archive_path = list(result.values())[0]["local_path"]
                 checksum_value = compute_file_hashes(archive_path, hashes=['sha256'])['sha256'][0]
+
+            # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
+            # it.  If not, then we need to extract the contents of the archive into our cache directory.
             bag_dir = self.cache_dir / f'{dataset_rid}_{checksum_value}'
-            if not bag_dir.exists():
+            if bag_dir.exists():
+                bag_path = (bag_dir / f'Dataset_{dataset_rid}').as_posix()
+            else:
                 bag_dir.mkdir(parents=True, exist_ok=True)
                 bag_path = bdb.extract_bag(archive_path, bag_dir)
-                bdb.validate_bag_structure(bag_path)
-            else:
-                bag_path = bag_dir / f'Dataset_{dataset_rid}'
+            bdb.validate_bag_structure(bag_path)
             return Path(bag_path), dataset_rid
 
     def materialize_dataset_bag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
         """
-        Materialize a BDBag into the cache directory. Validate its contents and return the path to the bag, and its RID.
-
-        Args:
-        - minid (str): RID or minimum viable identifier (minid) of the bag.
-        - execution_rid (str): Resource Identifier (RID) of the execution to report status to.  If None, status is
-                                not updated.
-
-        Returns:
-        - tuple: Tuple containing the path to the bag and the RID of the associated dataset.
-
-        Raises:
-        - DerivaMLException: If there is an issue materializing the bag.
-
+        Materialize a dataset bag into a local directory
+        :param bag: A MINID to an existing bag or a RID of the dataset that should be downloaded.
+        :param execution_rid:  RID of the execution for which this bag should be materialized. Used to update status.
+        :return:
         """
 
         def fetch_progress_callback(current, total):
@@ -1245,24 +1284,13 @@ class DerivaML:
         bag_path, dataset_rid = self.download_dataset_bag(bag)
         bag_dir = bag_path.parent
         validated_check = bag_dir / 'validated_check.txt'
-        bags = [str(item) for item in bag_dir.iterdir() if item.is_dir()]
-        if not bags:
-            bag_path = bdb.materialize(bag_path.as_posix(),
-                                       bag_dir,
-                                       fetch_callback=fetch_progress_callback,
-                                       validation_callback=validation_progress_callback)
+
+        # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
+        if not validated_check.exists():
+            bdb.materialize(bag_path.as_posix(),
+                            fetch_callback=fetch_progress_callback,
+                            validation_callback=validation_progress_callback)
             validated_check.touch()
-        else:
-            is_bag = [bdb.is_bag(bag) for bag in bags]
-            if sum(is_bag) != 1:
-                raise DerivaMLException(f'Invalid bag directory: {bag_dir}')
-            else:
-                bag_path = bags[is_bag.index(True)]
-                if not validated_check.exists():
-                    bdb.materialize(bag_path,
-                                    fetch_callback=fetch_progress_callback,
-                                    validation_callback=validation_progress_callback)
-                    validated_check.touch()
         return Path(bag_path), dataset_rid
 
     def download_asset(self, asset_url: str, dest_filename: str) -> Path:
@@ -1286,9 +1314,9 @@ class DerivaML:
 
     def upload_asset(self, file: str | Path, table: Table | str, **kwargs) -> dict:
         """
-        Upload the specified file into Hatrac and update the assocated asset table.
-        :param file:
-        :param table:
+        Upload the specified file into Hatrac and update the associated asset table.
+        :param file: path to the file to upload.
+        :param table: Name of the asset table
         :param kwargs: Keyword arguments for values of additional columns to be added to the asset table.
         :return:
         """
@@ -1302,11 +1330,13 @@ class DerivaML:
         file_size = file_path.stat().st_size
         # Get everything up to the filename  part of the
         hatrac_path = f'/hatrac/{table.name}/'
+        hs = HatracStore('https', self.host_name, credential)
+        md5_hashes = hash_utils.compute_file_hashes(file, ['md5'])['md5']
+        sanitized_filename = urlquote(re.sub('[^a-zA-Z0-9_.-]', '_', md5_hashes[0] + '.' + file_name))
+        hatrac_path = f'{hatrac_path}{sanitized_filename}'
+
         try:
-            hs = HatracStore('https', self.host_name, credential)
-            md5_hashes = hash_utils.compute_file_hashes(file, ['md5'])['md5']
-            sanitized_filename = urlquote(re.sub('[^a-zA-Z0-9_.-]', '_', md5_hashes[0] + '.' + file_name))
-            hatrac_path = f'{hatrac_path}{sanitized_filename}'
+            # Upload the file to hatrac.
             hatrac_uri = hs.put_obj(hatrac_path,
                                     file,
                                     md5=md5_hashes[1],
@@ -1315,6 +1345,7 @@ class DerivaML:
         except Exception as e:
             raise e
         try:
+            # Now update the asset table.
             ipath = self.pathBuilder.schemas[table.schema.name].tables[table.name]
             return list(ipath.insert(
                 [{'URL': hatrac_uri,
@@ -1369,7 +1400,7 @@ class DerivaML:
             [{'RID': execution_rid, 'Status': self.status, 'Status_Detail': status_detail}]
         )
 
-    def download_execution_file(self, file_rid: RID, execution_rid='', dest_dir: str = '') -> Path:
+    def _download_execution_file(self, file_rid: RID, execution_rid='', dest_dir: str = '') -> Path:
         """
         Download execution assets.
 
@@ -1415,7 +1446,7 @@ class DerivaML:
         self.update_status(Status.running, f'Successfully download {table.name}...', execution_rid)
         return Path(file_path)
 
-    def upload_execution_asset(self, file, asset_type: str) -> dict[str, Any]:
+    def _upload_execution_asset(self, file, asset_type: str) -> dict[str, Any]:
         return self.upload_asset(file, "Execution_Assets", Execution_Asset_Type=asset_type)
 
     def upload_execution_configuration(self, config: ExecutionConfiguration) -> RID:
@@ -1445,8 +1476,8 @@ class DerivaML:
         Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
         configuration in hatrac
 
-        :param configuration_rid:  RID that should be to an asset table that referst to an exectuion configuration
-        :return: A ExecutionConfiguration object for configurated by the parameters in the configuration file.
+        :param configuration_rid:  RID that should be to an asset table that refers to an execution configuration
+        :return: A ExecutionConfiguration object for configured by the parameters in the configuration file.
         """
         configuration = self.retrieve_rid(configuration_rid)
         with NamedTemporaryFile('w+', delete_on_close=False, suffix='.json') as dest_file:
@@ -1510,7 +1541,7 @@ class DerivaML:
     def _update_execution_asset_table(self, execution_rid: RID, assets: dict[str, FileUploadState]) -> None:
         """
         Assets associated with an execution must be linked to an execution entity after they are uploaded into
-        the catalog. This routine takes a list of uploaded assets and makes that assocation.
+        the catalog. This routine takes a list of uploaded assets and makes that association.
         :param execution_rid:
         :param assets:
         :return:
@@ -1672,11 +1703,11 @@ class DerivaML:
         # Insert workflow
         try:
             self.update_status(Status.running, 'Inserting workflow... ', execution_rid)
-            workflow_rid = self.add_workflow(self.configuration.workflow.name,
-                                             self.configuration.workflow.url,
-                                             self.configuration.workflow.workflow_type,
-                                             self.configuration.workflow.version,
-                                             self.configuration.workflow.description)
+            workflow_rid = self._add_workflow(self.configuration.workflow.name,
+                                              self.configuration.workflow.url,
+                                              self.configuration.workflow.workflow_type,
+                                              self.configuration.workflow.version,
+                                              self.configuration.workflow.description)
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error, execution_rid)
@@ -1694,7 +1725,7 @@ class DerivaML:
         # Download model
         self.update_status(Status.running, 'Downloading models ...', execution_rid)
         model_path = self.model_dir(execution_rid).as_posix()
-        model_paths = [self.download_execution_file(
+        model_paths = [self._download_execution_file(
             file_rid=m,
             execution_rid=execution_rid,
             dest_dir=model_path) for m in configuration.models]

@@ -66,6 +66,10 @@ class BuiltinTypes(Enum):
 
 
 class ColumnDefinition(BaseModel):
+    """
+    Pydantic model for deriva_py Column.define
+    """
+
     name: str
     type: BuiltinTypes
     nullok: bool = True
@@ -105,6 +109,9 @@ class KeyDefinition(BaseModel):
 
 
 class ForeignKeyDefinition(BaseModel):
+    """
+    Pydantic model for deriva_py ForeignKey.define
+    """
     colnames: Iterable[str]
     pk_sname: str
     pk_tname: str
