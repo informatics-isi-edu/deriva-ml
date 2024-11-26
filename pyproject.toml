@@ -12,6 +12,16 @@ authors = [
 description = "Utilities to simplify use of Dervia and Pandas"
 readme = "README.md"
 requires-python = ">=3.8"
+dependencies = [
+    "bdbag~=1.7.3",
+    "deriva~=1.7.4",
+    "pandas~=2.2.3",
+    "ipython~=8.29.0",
+    "regex~=2024.7.24",
+    "setuptools-git-versioning~=2.0.0",
+    "requests~=2.32.3",
+    "pydantic~=2.10.1",
+]
 
 
 [tool.setuptools.package-data]
