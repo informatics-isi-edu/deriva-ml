@@ -7,7 +7,6 @@ except ImportError:
         pass
 
 from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
-
 from pydantic import BaseModel, model_serializer, Field
 from typing import Any, Iterable, NewType, Optional
 import warnings

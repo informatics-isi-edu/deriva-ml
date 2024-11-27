@@ -14,7 +14,7 @@ from typing import Optional
 
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException, RID, ColumnDefinition, BuiltinTypes
 from deriva_ml.schema_setup.create_schema import create_ml_schema
-from deriva_ml.schema_setup.test_catalog import create_domain_schema, populate_test_catalog
+from test_catalog import create_domain_schema, populate_test_catalog
 from deriva_ml.execution_configuration import ExecutionConfiguration
 
 try:

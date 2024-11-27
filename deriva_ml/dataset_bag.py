@@ -95,7 +95,7 @@ def dataset_specification(model: Model,
                           writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """
     Output a download/export specification for a dataset.  Each element of the dataset will be placed in its own dir
-    The top level data directory of the resulting BDBag will have one sub-directory for element type. the subdirectory
+    The top level data directory of the resulting BDBag will have one subdirectory for element type. the subdirectory
     will contain the CSV indicating which elements of that type are present in the dataset, and then there will be a
     subdirectories for each object that is reachable from the dataset members.
 
@@ -220,11 +220,11 @@ class DatasetBag(object):
         self.dataset_rid = self.bag_path.name.replace('Dataset_','')
         self.model = Model.fromfile('file-system', self.bag_path / 'data/schema.json')
 
-        # Guess the domain schema name by eliminating all of the "builtin" schema.
+        # Guess the domain schema name by eliminating all the "builtin" schema.
         self.domain_schema = [s for s in self.model.schemas if s not in ['deriva-ml', 'public', 'www']][0]
         self.dbase = sqlite3.connect(f"{self.bag_path / self.domain_schema}.db")
 
-        # Create a sqlite database schema that contains all of the tables within the catalog from which the
+        # Create a sqlite database schema that contains all the tables within the catalog from which the
         # BDBag was created.
         with self.dbase:
             for t in self.model.schemas[self.domain_schema].tables.values():
@@ -266,7 +266,7 @@ class DatasetBag(object):
         :param model: Model to be turned into a graph.
         :param node: Current (starting) node in the graph.
         :param visited_nodes:
-        :param nested_dataset: Are we in a nested dataset, (i.e. have we seen the DataSet table).
+        :param nested_dataset: Are we in a nested dataset, (i.e. have we seen the DataSet table)?
         :return:
         """
         domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
@@ -283,8 +283,8 @@ class DatasetBag(object):
         graph = {node: []}
 
         def include_node(child: Table):
-            # Include node in the graph if its not a loopback from fk<-> refered_by, you have not already been to the
-            # node, its not a association table back to the dataset, or it is a nested dataset.
+            # Include node in the graph if it's not a loopback from fk<-> refered_by, you have not already been to the
+            # node, it's not an association table back to the dataset, or it is a nested dataset.
             return (
                     (
                             child != node and
@@ -333,7 +333,7 @@ class DatasetBag(object):
 
     def _load_sqllite(self) -> None:
         """
-        Load a SQLite database from a bdbag.  THis is done by looking for all of the CSV files in the bdbag directory.
+        Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.
         If the file is for an asset table, update the FileName column of the table to have the local file path for
         the materialized file.  Then load into the sqllite database.
         Note: none of the foreign key constraints are included in the database.
@@ -364,7 +364,7 @@ class DatasetBag(object):
                 o[file_column] = asset_map[o[url_column]] if o[url_column] else ''
             return tuple(o)
 
-        # Find all of the CSV files in the subdirectory and load each file into the database.
+        # Find all the CSV files in the subdirectory and load each file into the database.
         for csv_file in Path(dpath).rglob('*.csv'):
             table = csv_file.stem
             schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else 'deriva-ml'

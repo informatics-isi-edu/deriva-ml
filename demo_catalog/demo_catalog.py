@@ -9,12 +9,14 @@ from deriva.core import DerivaServer
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.deriva_ml_base import DerivaML
-from deriva.core import ErmrestCatalog, get_credential, urlquote
+from deriva.core import ErmrestCatalog, get_credential
 
 from random import random
+import sys
 
 TEST_DATASET_SIZE = 20
-def populate_test_catalog(deriva_ml: DerivaML, sname: str) -> None:
+
+def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
     # Delete any vocabularies and features.
     model = deriva_ml.model
     for trial in range(3):
@@ -80,20 +82,20 @@ def create_domain_schema(model: Model, sname: str) -> None:
     image_table.create_reference(subject_table)
 
 
-def destroy_test_catalog(catalog):
+def destroy_demo_catalog(catalog):
     catalog.delete_ermrest_catalog(really=True)
 
-def create_test_catalog(hostname, domain_schema='test-schema', project_name='ml-test') -> ErmrestCatalog:
+def create_demo_catalog(hostname, domain_schema='test-schema', project_name='ml-test') -> ErmrestCatalog:
     server = DerivaServer('https', hostname, credentials=get_credential(hostname))
     test_catalog = server.create_ermrest_catalog()
 
-    atexit.register(destroy_test_catalog, test_catalog)
+    atexit.register(destroy_demo_catalog, test_catalog)
     model = test_catalog.getCatalogModel()
     try:
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
         deriva_ml = DerivaML(hostname=hostname, catalog_id=test_catalog.catalog_id, project_name=project_name)
-        populate_test_catalog(deriva_ml, domain_schema)
+        populate_demo_catalog(deriva_ml, domain_schema)
         dataset_table = model.schemas['deriva-ml'].tables['Dataset']
         dataset_table.annotations.update(generate_dataset_annotations(model))
         model.apply()
@@ -112,4 +114,5 @@ class DemoML(DerivaML):
                          project_name='ml-test',
                          cache_dir=cache_dir,
                          working_dir=working_dir,
-                         model_version="1")
+                         model_version=sys.modules[globals()["__package__"]].__version__,
+)
