@@ -6,9 +6,9 @@ from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
 
 from deriva.core import DerivaServer
-from src.deriva_ml import initialize_ml_schema, create_ml_schema
-from src.deriva_ml import generate_dataset_annotations
-from src.deriva_ml import DerivaML
+from deriva_ml.schema_setup import initialize_ml_schema, create_ml_schema
+from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
+from deriva_ml import DerivaML
 from deriva.core import ErmrestCatalog, get_credential
 
 from random import random
