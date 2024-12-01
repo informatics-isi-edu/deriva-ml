@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from deriva.core.utils.core_utils import tag as deriva_tags
-from deriva_ml.upload import bulk_upload_configuration
+from src.deriva_ml import bulk_upload_configuration
 
 def generate_annotation(catalog_id: str, schema: str) -> dict:
     workflow_annotation = {

@@ -1,4 +1,4 @@
-from deriva_ml.deriva_definitions import RID
+from src.deriva_ml import RID
 from typing import Optional
 from pydantic import BaseModel, Field
 import json

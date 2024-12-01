@@ -13,13 +13,13 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from deriva_ml.deriva_definitions import *
-from deriva_ml.dataset_bag import generate_dataset_download_spec
-from deriva_ml.execution_configuration import ExecutionConfiguration
-from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
-from deriva_ml.schema_setup.system_terms import MLVocab, ExecMetadataVocab
-import deriva_ml.upload as upload
-from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
+from src.deriva_ml import *
+from src.deriva_ml import generate_dataset_download_spec
+from src.deriva_ml import ExecutionConfiguration
+from src.deriva_ml import generate_dataset_annotations
+from src.deriva_ml import MLVocab, ExecMetadataVocab
+from src import deriva_ml as upload
+from src.deriva_ml import is_feature_dir, is_feature_asset_dir
 
 # from enum import Enum, StrEnum
 try:
@@ -566,7 +566,56 @@ class DerivaML:
         """
         table = self._get_table(table)
         uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
-        return f'{uri}/{urlquote(f"{table.schema.name}:{table.name}")}'
+        return f'{uri}/{urlquote(table.schema.name)}:{urlquote(table.name)}'
+
+    def cite(self, entity: dict | str) -> str:
+        """
+        Return a citation URL for the provided entity.
+
+        :param entity: A dict that contains the column values for a specific entity.
+        :return:  The PID for the provided entity.
+        """
+        try:
+            self.resolve_rid(rid := entity if isinstance(entity, str) else entity['RID'])
+            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot().snaptime}"
+        except KeyError as e:
+            raise DerivaMLException(f"Entity {e} does not have RID column")
+        except DerivaMLException as _e:
+            raise DerivaMLException("Entity RID does not exist")
+
+    def user_list(self) -> list[dict[str, str]]:
+        """
+        Return a list containing user information of current catalog.
+
+        Returns:
+        - a list: DataFrame containing user information.
+
+        """
+        user_path = self.pathBuilder.public.ERMrest_Client.path
+        return [{'ID': u['ID'], 'Full_Name': u['Full_Name']} for u in user_path.entities().fetch()]
+
+    def resolve_rid(self, rid: RID) -> ResolveRidResult:
+        """
+        Return a named tuple with information about the specified RID.
+
+        :param rid:
+        :return:
+        """
+        try:
+            return self.catalog.resolve_rid(rid, self.model)
+        except KeyError as _e:
+            raise DerivaMLException(f'Invalid RID {rid}')
+
+    def retrieve_rid(self, rid: RID) -> dict[str, Any]:
+        """
+        Return a dictionary that represents the values of the specified RID.
+        :param rid:
+        :return:
+        """
+        return self.resolve_rid(rid).datapath.entities().fetch()[0]
+
+    def add_page(self, title: str, content: str) -> None:
+        self.pathBuilder.www.tables[self.domain_schema].insert([{'Title': title, 'Content': content}])
 
     def create_vocabulary(self, vocab_name: str, comment='', schema=None) -> Table:
         """
@@ -1135,52 +1184,6 @@ class DerivaML:
             raise DerivaMLException(f'The table {table_name} is not a controlled vocabulary')
 
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
-
-    def resolve_rid(self, rid: RID) -> ResolveRidResult:
-        """
-        Return a named tuple with information about the specified RID.
-
-        :param rid:
-        :return:
-        """
-        try:
-            return self.catalog.resolve_rid(rid, self.model)
-        except KeyError as _e:
-            raise DerivaMLException(f'Invalid RID {rid}')
-
-    def retrieve_rid(self, rid: RID) -> dict[str, Any]:
-        """
-        Return a dictionary that represents the values of the specified RID.
-        :param rid:
-        :return:
-        """
-        return self.resolve_rid(rid).datapath.entities().fetch()[0]
-
-    def cite(self, entity: dict | str) -> str:
-        """
-        Return a citation URL for the provided entity.
-
-        :param entity: A dict that contains the column values for a specific entity.
-        :return:  The PID for the provided entity.
-        """
-        try:
-            self.resolve_rid(rid := entity if isinstance(entity, str) else entity['RID'])
-            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot().snaptime}"
-        except KeyError as e:
-            raise DerivaMLException(f"Entity {e} does not have RID column")
-        except DerivaMLException as _e:
-            raise DerivaMLException("Entity RID does not exist")
-
-    def user_list(self) -> list[dict[str, str]]:
-        """
-        Return a list containing user information of current catalog.
-
-        Returns:
-        - a list: DataFrame containing user information.
-
-        """
-        user_path = self.pathBuilder.public.ERMrest_Client.path
-        return [{'ID': u['ID'], 'Full_Name': u['Full_Name']} for u in user_path.entities().fetch()]
 
     @staticmethod
     def _get_checksum(url) -> str:

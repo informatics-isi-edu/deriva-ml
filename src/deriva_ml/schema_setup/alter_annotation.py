@@ -1,7 +1,7 @@
 import sys
 import argparse
 from deriva.core import DerivaServer, get_credential, ErmrestCatalog
-from deriva_ml.schema_setup.annotations import generate_annotation
+from src.deriva_ml import generate_annotation
 
 
 def alter_table_annotation(catalog: ErmrestCatalog, schema_name: str, table_name: str, annotation: dict):

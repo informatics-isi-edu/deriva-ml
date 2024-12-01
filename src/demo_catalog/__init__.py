@@ -1,5 +1,4 @@
 from importlib.metadata import version, PackageNotFoundError
-from demo_catalog.demo_catalog import create_demo_catalog, DemoML
 from pathlib import Path
 import subprocess
 import sys
