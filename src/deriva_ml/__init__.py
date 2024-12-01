@@ -1,4 +1,5 @@
-from src.deriva_ml import DerivaML
-from src.deriva_ml import ExecutionConfiguration, Workflow, Execution
-from src.deriva_ml import DatasetBag
-from src.deriva_ml import MLVocab, ExecMetadataVocab
+from deriva_ml.deriva_ml_base import DerivaML
+from deriva_ml.execution_configuration import ExecutionConfiguration, Workflow, Execution
+from deriva_ml.dataset_bag import DatasetBag
+from deriva_ml.deriva_definitions import ColumnDefinition, TableDefinition, BuiltinTypes
+from deriva_ml.schema_setup.system_terms import MLVocab, ExecMetadataVocab

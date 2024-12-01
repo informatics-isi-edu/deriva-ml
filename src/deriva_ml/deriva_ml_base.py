@@ -7,19 +7,19 @@ from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquo
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.datapath import _CatalogWrapper
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import FindAssociationResult
+from deriva.core.ermrest_model import FindAssociationResult, Column, Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from src.deriva_ml import *
-from src.deriva_ml import generate_dataset_download_spec
-from src.deriva_ml import ExecutionConfiguration
-from src.deriva_ml import generate_dataset_annotations
-from src.deriva_ml import MLVocab, ExecMetadataVocab
-from src import deriva_ml as upload
-from src.deriva_ml import is_feature_dir, is_feature_asset_dir
+from deriva_ml.deriva_definitions import Key, ColumnDefinition, RID, UploadState
+from deriva_ml.dataset_bag import generate_dataset_download_spec
+from deriva_ml.execution_configuration import ExecutionConfiguration
+from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
+from deriva_ml.schema_setup.system_terms import MLVocab, ExecMetadataVocab
+import deriva_ml.upload as upload
+from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
 
 # from enum import Enum, StrEnum
 try:
