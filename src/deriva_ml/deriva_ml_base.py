@@ -1005,7 +1005,7 @@ class DerivaML:
 
         if validate:
             existing_rids = set(
-                m
+                m['RID']
                 for ms in self.list_dataset_members(dataset_rid).values()
                 for m in ms
             )
