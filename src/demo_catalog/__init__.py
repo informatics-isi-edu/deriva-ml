@@ -2,6 +2,7 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 import subprocess
 import sys
+from demo_catalog.demo_catalog import DemoML, create_demo_catalog
 
 repo_path = Path(__file__).parents[1]
 in_repo = (repo_path / Path(".git")).is_dir()

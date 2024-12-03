@@ -1,5 +1,4 @@
-from typing import Any, Callable
-from typing import Optional
+from typing import Any
 
 from deriva.core.ermrest_model import Model
 from deriva.core.utils.core_utils import tag as deriva_tags

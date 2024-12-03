@@ -855,13 +855,15 @@ class DerivaML:
         """
         # Create the entry for the new dataset and get its RID.
         ds_types = [ds_type] if isinstance(ds_type, str) else ds_type
+
         pb = self.pathBuilder
         for ds_type in ds_types:
             if not self.lookup_term(MLVocab.dataset_type, ds_type):
                 raise DerivaMLException(f'Dataset type must be a vocabulary term.')
         dataset_table_path = (
             pb.schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
-        dataset = dataset_table_path.insert([{'Description': description, MLVocab.dataset_type: ds_type}])[0]['RID']
+        dataset = dataset_table_path.insert([{'Description': description,
+                                              MLVocab.dataset_type: ds_type}])[0]['RID']
 
         # Get the name of the association table between dataset and dataset_type.
         atable = next(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations()).name
@@ -941,7 +943,56 @@ class DerivaML:
         self.model.apply()
         return table
 
-    def list_dataset_members(self, dataset_rid: RID) -> dict[Table, RID]:
+    def list_dataset_parent(self, dataset_rid: RID) -> Optional[RID]:
+        """
+        Given a dataset RID, return a RID of the parent dataset.
+        :param dataset_rid:
+        :return: RID of the parent dataset.
+        """
+        rid_record = self.resolve_rid(dataset_rid)
+        if rid_record.table.name != self.dataset_table.name:
+            raise DerivaMLException(f'RID: {dataset_rid} does not belong to dataset {self.dataset_table.name}')
+        return self.retrieve_rid(dataset_rid)['Dataset_Parent']
+
+
+    def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
+        """
+        Given a dataset RID, return a RID of the parent dataset.
+        :param dataset_rid:
+        :return: RID of the parent dataset.
+        """
+
+        return self.list_dataset_members(dataset_rid)['Dataset']
+
+    def is_nested_dataset(self, dataset_rid) -> dict[str, list[dict[str, list]]]:
+        """
+        Return the structure of a nested dataset, the result is a dictionary whose key is a dataset rid and whose
+        value is the list of children datasets.
+        :param dataset_rid:
+        :return:
+        """
+        return {dataset_rid: [self.is_nested_dataset(d) for d in self.list_dataset_children(dataset_rid)]}
+
+    def set_dataset_parent(self, dataset_rid: RID, dataset_parent: RID) -> Optional[RID]:
+        """
+        Given a dataset RID, return a RID of the parent dataset.
+        :param dataset_rid:
+        :return: RID of the parent dataset.
+        """
+
+        # Make sure the RIDs are both valid.
+        rid_info = self.resolve_rid(dataset_rid).datapath
+        if rid_info.table.name != self.dataset_table.name:
+            raise DerivaMLException(f'RID: {dataset_rid} does not belong to dataset {self.dataset_table.name}')
+        dataset_path = rid_info.datapath
+
+        if self.resolve_rid(dataset_parent).table.name != self.dataset_table.name:
+            raise DerivaMLException(f'RID: {dataset_parent} does not belong to dataset {self.dataset_table.name}')
+
+        dataset_path.insert([{'RID': dataset_rid, 'Dataset_Parent': dataset_parent}])
+        return dataset_rid
+
+    def list_dataset_members(self, dataset_rid: RID) -> dict[str, list[RID]]:
         """
         Return a list of entities associated with a specific dataset.
         :param dataset_rid:
@@ -1030,6 +1081,7 @@ class DerivaML:
         for table, elements in dataset_elements.items():
             schema_path = pb.schemas[self.ml_schema if table == 'Dataset' else self.domain_schema]
             fk_column = 'Nested_Dataset' if table == 'Dataset' else table
+
             if len(elements):
                 # Find out the name of the column in the association table.
                 schema_path.tables[association_map[table]].insert(
