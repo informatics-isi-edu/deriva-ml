@@ -15,7 +15,7 @@ requires-python = ">=3.8"
 dependencies = [
     "bdbag~=1.7.3",
     "deriva~=1.7.4",
-    "pandas~=2.2.3",
+    "pandas",
     "ipython~=8.29.0",
     "regex~=2024.7.24",
     "setuptools-git-versioning~=2.0.0",
@@ -23,11 +23,13 @@ dependencies = [
     "pydantic~=2.10.1",
 ]
 
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 # include VERSION file to a package
 deriva_ml = ["deriva_ml/VERSION"]
-
+demo_catalog = ["demo_catalog/VERSION"]
 
 [tool.setuptools-git-versioning]
 enabled = true

@@ -1,1 +1,0 @@
-from deriva_ml.schema_setup.create_schema import create_ml_schema
