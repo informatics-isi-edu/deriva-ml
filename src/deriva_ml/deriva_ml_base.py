@@ -459,13 +459,13 @@ class DerivaML:
             self.cache_dir = Path(cache_dir)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
         else:
-            tdir = TemporaryDirectory(delete=False)
+            tdir = TemporaryDirectory()
             self.cache_dir = Path(tdir.name)
         default_workdir = self.__class__.__name__ + '_working'
         if working_dir:
             self.working_dir = Path(working_dir).joinpath(getpass.getuser(), default_workdir)
         else:
-            tdir = tdir or TemporaryDirectory(delete=False)
+            tdir = tdir or TemporaryDirectory()
             self.working_dir = Path(tdir.name) / default_workdir
         self.working_dir.mkdir(parents=True, exist_ok=True)
         logging.basicConfig(level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
