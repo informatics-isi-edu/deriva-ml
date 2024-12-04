@@ -10,7 +10,7 @@ from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml import DerivaML
 from deriva.core import ErmrestCatalog, get_credential
-
+from importlib import metadata
 from random import random
 import sys
 
