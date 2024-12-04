@@ -316,6 +316,8 @@ class Feature:
         self.feature_columns =  {c for c in self.feature_table.columns if c.name not in skip_columns}
 
         assoc_fkeys = {atable.self_fkey} |  atable.other_fkeys
+
+        # Determine the role of each column in the feature outside of the FK columns.
         self.asset_columns = {fk.foreign_key_columns[0] for fk in self.feature_table.foreign_keys if
                  fk not in assoc_fkeys  and is_asset(fk.pk_table)}
 
@@ -332,6 +334,11 @@ class Feature:
         """
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
+            """
+            Map a dervia type into a pydantic model type.
+            :param c:  column to be mapped
+            :return: pydantic model type
+            """
             if c.name in {c.name for c in self.asset_columns}:
                 return str | Path
             match c.type.typename:
@@ -344,9 +351,6 @@ class Feature:
                 case _:
                     return str
 
-        # Get the association table that implements the feature.
-
-        # Create feature class
         featureclass_name = f'{self.target_table.name}Feature{self.feature_name}'
 
         # Create feature class. To do this, we must determine the python type for each column and also if the
@@ -589,8 +593,7 @@ class DerivaML:
         """
         Return a list containing user information of current catalog.
 
-        Returns:
-        - a list: DataFrame containing user information.
+        :return: a list of dictionaries containing user information.
 
         """
         user_path = self.pathBuilder.public.ERMrest_Client.path
@@ -774,7 +777,8 @@ class DerivaML:
 
     def feature_record_class(self, table: str | Table, feature_name: str) -> type[FeatureRecord]:
         """"
-        Create a pydantic model for entries into the specified feature table
+        Create a pydantic model for entries into the specified feature table.  For information on how to
+        See the pydantic documentation for more details about the pydantic model.
 
         :param table: table name or object on which the feature is to be associated
         :param feature_name: name of the feature to be created
