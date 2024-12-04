@@ -10,7 +10,7 @@ from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml import DerivaML
 from deriva.core import ErmrestCatalog, get_credential
-from importlib import metadata
+from importlib.metadata import version
 from random import random
 import sys
 
@@ -114,5 +114,5 @@ class DemoML(DerivaML):
                          project_name='ml-test',
                          cache_dir=cache_dir,
                          working_dir=working_dir,
-                         model_version=sys.modules[globals()["__package__"]].__version__,
+                         model_version=version('deriva-ml') # Normally this would be the module with the derived class.
 )
