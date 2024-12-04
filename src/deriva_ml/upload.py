@@ -184,7 +184,7 @@ def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     Return the path to a file in which to place table values that are to be uploaded.
     :param prefix: Location of upload root directory
     :param schema: Domain schema
-    :param table: Name of the table to be uploade.
+    :param table: Name of the table to be uploaded.
     :return: Path to the file in which to place table values that are to be uploaded.
     """
     path = upload_root(prefix) / 'table' / schema / table

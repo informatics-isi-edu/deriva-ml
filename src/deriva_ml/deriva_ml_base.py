@@ -13,13 +13,15 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from deriva_ml.deriva_definitions import Key, ColumnDefinition, RID, UploadState
-from deriva_ml.dataset_bag import generate_dataset_download_spec
-from deriva_ml.execution_configuration import ExecutionConfiguration
-from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
-from deriva_ml.schema_setup.system_terms import MLVocab, ExecMetadataVocab
-import deriva_ml.upload as upload
-from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
+from .deriva_definitions import Key, ColumnDefinition, RID, UploadState
+from .dataset_bag import generate_dataset_download_spec
+from .execution_configuration import ExecutionConfiguration
+from .schema_setup.dataset_annotations import generate_dataset_annotations
+from .schema_setup.system_terms import MLVocab, ExecMetadataVocab
+from .upload import is_feature_dir, is_feature_asset_dir
+from .upload import execution_metadata_dir, execution_assets_dir, asset_dir, execution_root
+from .upload import table_path, bulk_upload_configuration
+from .upload import feature_root, feature_asset_dir, feature_value_path
 
 # from enum import Enum, StrEnum
 try:
@@ -156,7 +158,7 @@ class ConfigurationRecord(BaseModel):
 
         :return:
         """
-        return upload.execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type='')
+        return execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type='')
 
     def execution_metadata_path(self, metadata_type: str) -> Path:
         """
@@ -167,7 +169,7 @@ class ConfigurationRecord(BaseModel):
         :return: Path to the directory in which to place files of type metadata_type.
         """
         self._ml_object.lookup_term(MLVocab.execution_metadata_type, metadata_type)   # Make sure metadata type exists.
-        return upload.execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type)
+        return execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type)
 
     @property
     def _execution_assets_dir(self) -> Path:
@@ -175,7 +177,7 @@ class ConfigurationRecord(BaseModel):
         Return a pathlib Path to the directory in which to place directories for execution_assets.
         :return:
         """
-        return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
+        return execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
 
     def execution_assets_path(self, asset_type: str) -> Path:
         """
@@ -185,7 +187,7 @@ class ConfigurationRecord(BaseModel):
         :param asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
         :return: Path in which to place asset files.
         """
-        return upload.execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
+        return execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
 
     @property
     def execution_root(self) -> Path:
@@ -193,7 +195,7 @@ class ConfigurationRecord(BaseModel):
         Return the root path to all execution specific files.
         :return:
         """
-        return upload.execution_root(self.working_dir, self.execution_rid)
+        return execution_root(self.working_dir, self.execution_rid)
 
     @property
     def feature_root(self) -> Path:
@@ -201,7 +203,7 @@ class ConfigurationRecord(BaseModel):
         The root path to all execution specific files.
         :return:
         """
-        return upload.feature_root(self.working_dir, self.execution_rid)
+        return feature_root(self.working_dir, self.execution_rid)
 
     def feature_paths(self, table:  Table | str, feature_name: str) -> tuple[Path, dict[str, Path]]:
         """
@@ -215,13 +217,13 @@ class ConfigurationRecord(BaseModel):
         """
         feature = self._ml_object.lookup_feature(table, feature_name)
 
-        table_path = upload.feature_value_path(self.working_dir,
+        tpath = feature_value_path(self.working_dir,
                                         schema=self._ml_object.domain_schema,
                                         target_table=feature.target_table.name,
                                         feature_name=feature_name,
                                         exec_rid=self.execution_rid)
         asset_paths = {
-            asset_table.name: upload.feature_asset_dir(self.working_dir,
+            asset_table.name: feature_asset_dir(self.working_dir,
                                         exec_rid=self.execution_rid,
                                         schema=self._ml_object.domain_schema,
                                         target_table=feature.target_table.name,
@@ -229,7 +231,7 @@ class ConfigurationRecord(BaseModel):
                                         asset_table=asset_table.name)
                 for asset_table in feature.asset_columns
         }
-        return table_path, asset_paths
+        return tpath, asset_paths
 
     def table_path(self, table: str) -> Path:
         """
@@ -238,7 +240,7 @@ class ConfigurationRecord(BaseModel):
         :param table: Name of table to be uploaded.
         :return: Pathlib path to the file in which to place table values.
         """
-        return upload.table_path(self.working_dir,
+        return table_path(self.working_dir,
                                  schema=self._ml_object.domain_schema,
                                  table=table)
 
@@ -250,7 +252,7 @@ class ConfigurationRecord(BaseModel):
         :param table: Name of the asset table to be uploaded.
         :return: Pathlib path to the directory in which to place asset files.
         """
-        return upload.asset_dir(prefix=self.working_dir,
+        return asset_dir(prefix=self.working_dir,
                                 schema=self._ml_object.domain_schema,
                                 asset_table=table)
 
@@ -541,7 +543,7 @@ class DerivaML:
         :param table:
         :return:
         """
-        return upload.table_path(self.working_dir, schema=self.domain_schema, table=self._get_table(table).name)
+        return table_path(self.working_dir, schema=self.domain_schema, table=self._get_table(table).name)
 
     def asset_directory(self, table: str | Table, prefix: str | Path = None) -> Path:
         """
@@ -552,7 +554,7 @@ class DerivaML:
         """
         table = self._get_table(table)
         prefix = Path(prefix) or self.working_dir
-        return upload.asset_dir(prefix, table.schema.name, table.name)
+        return asset_dir(prefix, table.schema.name, table.name)
 
     def download_dir(self, cached: bool = False) -> Path:
         return self.cache_dir if cached else self.working_dir
@@ -902,9 +904,9 @@ class DerivaML:
         pb = self.catalog.getPathBuilder()
         for assoc_table in self.dataset_table.find_associations(self.dataset_table):
             schema_path = pb.schemas[assoc_table.table.schema.name]
-            table_path = schema_path.tables[assoc_table.name]
-            dataset_column_path = table_path.columns[assoc_table.self_fkey.columns[0].name]
-            dataset_entries = table_path.filter(dataset_column_path == dataset_rid)
+            tpath = schema_path.tables[assoc_table.name]
+            dataset_column_path = tpath.columns[assoc_table.self_fkey.columns[0].name]
+            dataset_entries = tpath.filter(dataset_column_path == dataset_rid)
             try:
                 dataset_entries.delete()
             except DataPathException:
@@ -961,7 +963,6 @@ class DerivaML:
         :param dataset_rid:
         :return: RID of the parent dataset.
         """
-
         return self.list_dataset_members(dataset_rid)['Dataset']
 
     def is_nested_dataset(self, dataset_rid) -> dict[str, list[dict[str, list]]]:
@@ -972,25 +973,6 @@ class DerivaML:
         :return:
         """
         return {dataset_rid: [self.is_nested_dataset(d) for d in self.list_dataset_children(dataset_rid)]}
-
-    def set_dataset_parent(self, dataset_rid: RID, dataset_parent: RID) -> Optional[RID]:
-        """
-        Given a dataset RID, return a RID of the parent dataset.
-        :param dataset_rid:
-        :return: RID of the parent dataset.
-        """
-
-        # Make sure the RIDs are both valid.
-        rid_info = self.resolve_rid(dataset_rid).datapath
-        if rid_info.table.name != self.dataset_table.name:
-            raise DerivaMLException(f'RID: {dataset_rid} does not belong to dataset {self.dataset_table.name}')
-        dataset_path = rid_info.datapath
-
-        if self.resolve_rid(dataset_parent).table.name != self.dataset_table.name:
-            raise DerivaMLException(f'RID: {dataset_parent} does not belong to dataset {self.dataset_table.name}')
-
-        dataset_path.insert([{'RID': dataset_rid, 'Dataset_Parent': dataset_parent}])
-        return dataset_rid
 
     def list_dataset_members(self, dataset_rid: RID) -> dict[str, list[RID]]:
         """
@@ -1428,7 +1410,7 @@ class DerivaML:
         with TemporaryDirectory() as temp_dir:
             spec_file = f'{temp_dir}/config.json'
             with open(spec_file, 'w+') as cfile:
-                json.dump(upload.bulk_upload_configuration, cfile)
+                json.dump(bulk_upload_configuration, cfile)
             uploader = GenericUploader(server={'host': self.host_name, 'protocol': 'https', 'catalog_id': self.catalog_id},
                                        config_file=spec_file)
             uploader.getUpdatedConfig()
@@ -1478,8 +1460,8 @@ class DerivaML:
 
         pb = self.pathBuilder
         ml_schema_path = pb.schemas[self.ml_schema]
-        table_path = pb.schemas[table.schema.name].tables[table.name]
-        file_metadata = list(table_path.filter(table_path.RID == file_rid).entities())[0]
+        tpath = pb.schemas[table.schema.name].tables[table.name]
+        file_metadata = list(tpath.filter(tpath.RID == file_rid).entities())[0]
         file_url = file_metadata['URL']
         file_name = file_metadata['Filename']
         try:
@@ -1496,8 +1478,8 @@ class DerivaML:
             exec_file_exec_entities = ass_table_path.filter(ass_table_path.columns[table.name] == file_rid).entities()
             exec_list = [e['Execution'] for e in exec_file_exec_entities]
             if execution_rid not in exec_list:
-                table_path = pb.schemas[self.ml_schema].tables[ass_table]
-                table_path.insert([{table.name: file_rid, 'Execution': execution_rid}])
+                tpath = pb.schemas[self.ml_schema].tables[ass_table]
+                tpath.insert([{table.name: file_rid, 'Execution': execution_rid}])
         self.update_status(Status.running, f'Successfully download {table.name}...', execution_rid)
         return Path(file_path)
 
