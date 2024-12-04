@@ -114,5 +114,5 @@ class DemoML(DerivaML):
                          project_name='ml-test',
                          cache_dir=cache_dir,
                          working_dir=working_dir,
-                         model_version=version('deriva-ml') # Normally this would be the module with the derived class.
+                         model_version=version(__name__.split('.')[0])
 )
