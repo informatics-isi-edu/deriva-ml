@@ -15,7 +15,6 @@ requires-python = ">=3.8"
 dependencies = [
     "deriva~=1.7.4",
     "pandas",
-    "ipython~=8.29.0",
     "regex~=2024.7.24",
     "pydantic~=2.10.1",
 ]
