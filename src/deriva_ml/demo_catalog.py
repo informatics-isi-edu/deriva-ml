@@ -10,7 +10,11 @@ from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml import DerivaML
 from deriva.core import ErmrestCatalog, get_credential
+from deriva.config.acl_config import AclConfig
+
+
 from importlib.metadata import version
+from importlib.resources import files
 from random import random
 import sys
 
@@ -86,11 +90,16 @@ def destroy_demo_catalog(catalog):
     catalog.delete_ermrest_catalog(really=True)
 
 def create_demo_catalog(hostname, domain_schema='test-schema', project_name='ml-test') -> ErmrestCatalog:
-    server = DerivaServer('https', hostname, credentials=get_credential(hostname))
+    credentials = get_credential(hostname)
+    server = DerivaServer('https', hostname, credentials=credentials)
     test_catalog = server.create_ermrest_catalog()
 
     atexit.register(destroy_demo_catalog, test_catalog)
     model = test_catalog.getCatalogModel()
+
+    policy_file = files('deriva_ml.schema_setup').joinpath('policy.json')
+    AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
+
     try:
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
