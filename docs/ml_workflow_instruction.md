@@ -15,7 +15,7 @@ To install Deriva-ML and its dependencies, use the following commands:
 !pip install git+https://github.com/informatics-isi-edu/deriva-ml 
 !pip install git+https://github.com/informatics-isi-edu/eye-ai-ml
 ```
-## 1. A Notebook workflow
+## A Notebook workflow
 The Deriva-ML notebook workflow consists of an end-to-end process that includes:
 - Data migration from the catalog to the runtime environment. 
 - Data preprocessing. 
