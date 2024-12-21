@@ -986,15 +986,6 @@ class DerivaML:
         """
         return self.list_dataset_members(dataset_rid)['Dataset']
 
-    def is_nested_dataset(self, dataset_rid) -> dict[str, list[dict[str, list]]]:
-        """
-        Return the structure of a nested dataset, the result is a dictionary whose key is a dataset rid and whose
-        value is the list of children datasets.
-        :param dataset_rid:
-        :return:
-        """
-        return {dataset_rid: [self.is_nested_dataset(d) for d in self.list_dataset_children(dataset_rid)]}
-
     def list_dataset_members(self, dataset_rid: RID, recurse = False) -> dict[str, list[RID]]:
         """
         Return a list of entities associated with a specific dataset.
@@ -1042,7 +1033,7 @@ class DerivaML:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d['RID'] for d in target_entities]
                 for ds in nested_datasets:
-                    for k, v in self.list_dataset_members(ds, recurse=False):
+                    for k, v in self.list_dataset_members(ds, recurse=False).items():
                         members[k].extend(v)
         return members
 

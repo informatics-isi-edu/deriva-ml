@@ -26,7 +26,7 @@ def define_table_dataset(dataset_annotation: dict = None):
     return Table.define(
         tname="Dataset",
         column_defs=[
-            Column.define("Version", builtin_types.text, default="1.1.0", nullok=True),
+            Column.define("Version", builtin_types.text, default="1.0.0", nullok=True),
             Column.define("Description", builtin_types.markdown)],
         annotations=dataset_annotation if dataset_annotation is not None else {},
     )
