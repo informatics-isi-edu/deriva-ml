@@ -7,7 +7,6 @@ import sqlite3
 from typing import Optional, Any, Generator, Callable
 from urllib.parse import urlparse
 
-
 def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
     """
     Given a path in the data model, output an export specification for the path taken to get to the current table.

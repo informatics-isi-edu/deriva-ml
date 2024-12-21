@@ -4,10 +4,10 @@
     "isrd-staff": ["https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b"],
     "isrd-testers": ["https://auth.globus.org/9d596ac6-22b9-11e6-b519-22000aef184d"],
 
-    "project-admins":   ["https://auth.globus.org/22a3c6de-ac96-11ed-9ee9-e76911c8323b"],
-    "project-curators": ["https://auth.globus.org/0f73cf21-ac97-11ed-afa6-2d4f948b9e21"],
-    "project-writers":  ["https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53"],
-    "project-users":    ["https://auth.globus.org/ba972c88-ac96-11ed-9b41-0551c8802154"],
+    "project-admins":   [],
+    "project-curators": [],
+    "project-writers":  [],
+    "project-users":    [],
 
     "empty": [],
     "public": ["*"],
