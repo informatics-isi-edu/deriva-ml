@@ -119,8 +119,8 @@ configuration: bdbags=['2-7K8W'] models=['2-4JR6']
 In the notebook environment, you can save the downloaded dataset in to a `DatasetBag`.
 It is built on top of an `sqLite` database, enabling easy access to the tables by table name and datasets curation.
 - Build DatasetBag from downloaded data: `ds_bag = DatasetBag(configuration_record.bag_paths[i])`
-- Find all the tables in the database by `ds_bag_i.list_tables()`
-- Load the data in a table to pandas.DataFrame by `ds_bag.list_tables(table_name)`
+- Find all the tables in the database by `ds_bag.list_tables()`
+- Load the data in a table to pandas.DataFrame by `ds_bag.get_table_as_dataframe(table_name)`
 
 ### Step4: ML Execution
 Run ML algorithms within a managed context. This ensures execution status is logged back to the catalog.
