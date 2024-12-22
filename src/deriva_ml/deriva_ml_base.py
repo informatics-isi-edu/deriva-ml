@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import datetime
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
+from collections import defaultdict
 from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquote, DEFAULT_SESSION_CONFIG
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.datapath import _CatalogWrapper
@@ -852,11 +853,14 @@ class DerivaML:
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
 
-    def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
+    def create_dataset(self, ds_type: str | list[str],
+                       description: str,
+                       execution: Optional[ConfigurationRecord]) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
         :param ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
         :param description:  Description of the dataset.
+        :param execution: Execution under which the dataset will be created.
         :return: New dataset RID.
         """
         # Create the entry for the new dataset and get its RID.
@@ -875,6 +879,9 @@ class DerivaML:
         atable = next(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations()).name
         pb.schemas[self.ml_schema].tables[atable].insert(
             [{MLVocab.dataset_type: ds_type, 'Dataset': dataset} for ds_type in ds_types])
+        if execution is not None:
+            pb.schemas[self.ml_schema].Dataset_Execution.insert(
+                [{'Dataset': dataset, 'Execution': execution.execution_rid}])
         return dataset
 
     def find_datasets(self) -> Iterable[dict[str, Any]]:
@@ -897,20 +904,30 @@ class DerivaML:
             datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in ds_types]})
         return datasets
 
-    def delete_dataset(self, dataset_rid: RID) -> None:
+    def delete_dataset(self, dataset_rid: RID, recurse = False) -> None:
         """
         Delete a dataset from the catalog.
         :param dataset_rid:  RID of the dataset to delete.
+        :param recursive: If True, delete the dataset along with any nested dataset.
         :return:
         """
         # Get association table entries for this dataset
         # Delete association table entries
-        pb = self.catalog.getPathBuilder()
+        pb = self.pathBuilder
         for assoc_table in self.dataset_table.find_associations(self.dataset_table):
-            schema_path = pb.schemas[assoc_table.table.schema.name]
+            other_fkey = assoc_table.other_fkeys.pop()
+            self_fkey = assoc_table.self_fkey
+            target_table = other_fkey.pk_table
+            member_table = assoc_table.table
+
+            schema_path = pb.schemas[member_table.schema.name]
             tpath = schema_path.tables[assoc_table.name]
-            dataset_column_path = tpath.columns[assoc_table.self_fkey.columns[0].name]
+            dataset_column_path = tpath.columns[self_fkey.columns[0].name]
             dataset_entries = tpath.filter(dataset_column_path == dataset_rid)
+            if recurse and target_table == self.dataset_table:
+                # Nested table
+                for dataset in dataset_entries:
+                    self.delete_dataset(dataset['RID'], recurse)
             try:
                 dataset_entries.delete()
             except DataPathException:
@@ -969,16 +986,7 @@ class DerivaML:
         """
         return self.list_dataset_members(dataset_rid)['Dataset']
 
-    def is_nested_dataset(self, dataset_rid) -> dict[str, list[dict[str, list]]]:
-        """
-        Return the structure of a nested dataset, the result is a dictionary whose key is a dataset rid and whose
-        value is the list of children datasets.
-        :param dataset_rid:
-        :return:
-        """
-        return {dataset_rid: [self.is_nested_dataset(d) for d in self.list_dataset_children(dataset_rid)]}
-
-    def list_dataset_members(self, dataset_rid: RID) -> dict[str, list[RID]]:
+    def list_dataset_members(self, dataset_rid: RID, recurse = False) -> dict[str, list[RID]]:
         """
         Return a list of entities associated with a specific dataset.
         :param dataset_rid:
@@ -995,7 +1003,7 @@ class DerivaML:
 
         # Look at each of the element types that might be in the dataset and get the list of rid for them from
         # the appropriate association table.
-        member_list = {}
+        members = defaultdict(list)
         pb = self.pathBuilder
         for assoc_table in self.dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
@@ -1003,10 +1011,10 @@ class DerivaML:
             target_table = other_fkey.pk_table
             member_table = assoc_table.table
 
-            if target_table.schema.name != self.domain_schema and target_table.name != "Dataset":
+            if target_table.schema.name != self.domain_schema and target_table != self.dataset_table:
                 # Look at domain tables and nested datasets.
                 continue
-            if target_table.name == "Dataset":
+            if target_table == self.dataset_table:
                 # find_assoc gives us the keys in the wrong position, so swap.
                 self_fkey, other_fkey = other_fkey, self_fkey
 
@@ -1020,8 +1028,14 @@ class DerivaML:
             path.link(target_path,
                       on=(member_path.columns[member_link[0]] == target_path.columns[member_link[1]]))
             target_entities = path.entities().fetch()
-            member_list.setdefault(target_table.name, []).extend(target_entities)
-        return member_list
+            members[target_table.name].extend(target_entities)
+            if recurse and target_table == self.dataset_table:
+                # Get the members for all the nested datasets and add to the member list.
+                nested_datasets = [d['RID'] for d in target_entities]
+                for ds in nested_datasets:
+                    for k, v in self.list_dataset_members(ds, recurse=False).items():
+                        members[k].extend(v)
+        return members
 
     def add_dataset_members(self, dataset_rid: Optional[RID], members: list[RID],
                             validate: bool = True) -> RID:
@@ -1074,7 +1088,8 @@ class DerivaML:
                     [{'Dataset': dataset_rid, fk_column: e} for e in elements])
         return dataset_rid
 
-    def _add_execution(self, workflow_rid: str = '', datasets: List[str] = None,
+    def _add_execution(self, workflow_rid: str = '',
+                       datasets: List[str] = None,
                        description: str = '') -> RID:
         """
         Add an execution to the Execution table.
