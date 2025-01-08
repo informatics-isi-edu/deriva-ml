@@ -7,7 +7,7 @@ except ImportError:
         pass
 
 from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
-from pydantic import BaseModel, model_serializer, Field
+from pydantic import BaseModel, model_serializer, Field, computed_field
 from typing import Any, Iterable, NewType, Optional
 import warnings
 
@@ -25,6 +25,7 @@ warnings.filterwarnings('ignore',
 
 RID = NewType('RID', str)
 
+
 # For some reason, deriva-py doesn't use the proper enum class!!
 class UploadState(Enum):
     success = 0
@@ -35,6 +36,33 @@ class UploadState(Enum):
     aborted = 5
     cancelled = 6
     timeout = 7
+
+class FileUploadState(BaseModel):
+    state: UploadState
+    status: str
+    result: Any
+
+    @computed_field
+    @property
+    def rid(self) -> Optional[RID]:
+        return self.result and self.result['RID']
+
+class Status(Enum):
+    """
+    Enumeration class defining execution status.
+
+    Attributes:
+    - running: Execution is currently running.
+    - pending: Execution is pending.
+    - completed: Execution has been completed successfully.
+    - failed: Execution has failed.
+
+    """
+    running = 'Running'
+    pending = 'Pending'
+    completed = 'Completed'
+    failed = 'Failed'
+
 
 class BuiltinTypes(Enum):
     text = builtin_types.text

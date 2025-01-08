@@ -8,7 +8,7 @@ from requests import HTTPError
 from deriva.core import DerivaServer
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
-from deriva_ml import DerivaML
+from deriva_ml import DerivaML, ColumnDefinition, BuiltinTypes, MLVocab, Workflow, Execution, ExecutionConfiguration
 from deriva.core import ErmrestCatalog, get_credential
 from deriva.config.acl_config import AclConfig
 
@@ -16,7 +16,6 @@ from deriva.config.acl_config import AclConfig
 from importlib.metadata import version
 from importlib.resources import files
 from random import random
-import sys
 
 TEST_DATASET_SIZE = 20
 
@@ -58,6 +57,86 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
                                    Description='A test image')
 
 
+def create_demo_datasets(deriva_ml: DerivaML) -> None:
+    deriva_ml.add_dataset_element_type("Subject")
+    deriva_ml.add_dataset_element_type("Image")
+
+    # Create a new dataset
+    deriva_ml.add_term(MLVocab.dataset_type, "DemoSet", description="A test dataset")
+    deriva_ml.add_term(MLVocab.dataset_type, 'Partitioned', description="A partitioned dataset for ML training.")
+    deriva_ml.add_term(MLVocab.dataset_type, "Subject", description="A test dataset")
+    deriva_ml.add_term(MLVocab.dataset_type, "Image", description="A test dataset")
+    deriva_ml.add_term(MLVocab.dataset_type, "Training", description="Training dataset")
+    deriva_ml.add_term(MLVocab.dataset_type, "Testing", description="Training dataset")
+    deriva_ml.add_term(MLVocab.dataset_type, "Validation", description="Validation dataset")
+
+    deriva_ml.add_term(MLVocab.workflow_type, "Create Dataset Notebook", description="A Workflow that creates a new dataset")
+
+    # Now let's create model configuration for our program.
+    api_workflow = Workflow(
+        name="API Workflow",
+        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/Notebooks/DerivaML%20Dataset.ipynb",
+        workflow_type="Create Dataset Notebook"
+    )
+
+    dataset_execution = deriva_ml.initialize_execution(
+        ExecutionConfiguration(
+            execution=Execution(description="Dataset Creation Execution"),
+            workflow=api_workflow,
+            description="Our Sample Workflow instance")
+    )
+
+    pb = deriva_ml.pathBuilder.schemas[deriva_ml.domain_schema]
+    subject_path = pb.Subject
+    image_path = pb.Image
+
+    # Get images and subjects.  Join images with subjects.
+    images = {i['Subject']: i['RID'] for i in image_path.attributes(image_path.RID, image_path.Subject).fetch()}
+    subjects = [s | {'Image': images[s['RID']]}
+                for s in subject_path.attributes(subject_path.RID, subject_path.Name).fetch()]
+
+
+    def thing_number(name: str) -> int:
+        return int(name.replace('Thing', ''))
+
+    training_rids = [s['Image'] for s in subjects if thing_number(s['Name']) % 3 == 0]
+    testing_rids = [s['Image'] for s in subjects if thing_number(s['Name']) % 3 == 1]
+    validation_rids = [s['Image'] for s in subjects if thing_number(s['Name']) % 3 == 2]
+
+    nested_dataset = deriva_ml.create_dataset(['Partitioned', 'Image'],
+                                                description='A nested dataset for machine learning',
+                                                execution=dataset_execution)
+    training_dataset = deriva_ml.create_dataset('Training', description='An image dataset for training',
+                                                  execution=dataset_execution)
+    testing_dataset = deriva_ml.create_dataset('Testing', description='A image dataset for testing',
+                                                 execution=dataset_execution)
+    validation_dataset = deriva_ml.create_dataset('Validation', description='A image dataset for validation',
+                                                    execution=dataset_execution)
+    deriva_ml.add_dataset_members(dataset_rid=nested_dataset,
+                                    members=[training_dataset, testing_dataset, validation_dataset])
+    deriva_ml.add_dataset_members(dataset_rid=training_dataset, members=training_rids)
+    deriva_ml.add_dataset_members(dataset_rid=testing_dataset, members=testing_rids)
+    deriva_ml.add_dataset_members(dataset_rid=validation_dataset, members=validation_rids)
+
+def create_demo_features(deriva_ml: DerivaML) -> None:
+    deriva_ml.create_vocabulary("SubjectHealth", "A vocab")
+    deriva_ml.add_term("SubjectHealth", "Sick", description="The subject self reports that they are sick")
+    deriva_ml.add_term("SubjectHealth", "Well", description="The subject self reports that they feel well")
+
+    deriva_ml.create_vocabulary("ImageQuality", "Controlled vocabulary for image quality")
+    deriva_ml.add_term("ImageQuality", "Good", description="The image is good")
+    deriva_ml.add_term("ImageQuality", "Bad", description="The image is bad")
+
+    box_asset = deriva_ml.create_asset("BoundingBox", comment="A file that contains a cropped version of a image")
+
+    deriva_ml.create_feature("Subject", "Health",
+                                        terms=["SubjectHealth"],
+                                        metadata=[ColumnDefinition(name='Scale', type=BuiltinTypes.int2, nullok=True)],
+                           optional=['Scale'])
+
+    deriva_ml.create_feature('Image', 'BoundingBox', assets=[box_asset])
+    deriva_ml.create_feature('Image', 'Quality', terms=["ImageQuality"])
+
 def create_domain_schema(model: Model, sname: str) -> None:
     """
     Create a domain schema.  Assumes that the ml-schema has already been created.
@@ -89,7 +168,8 @@ def create_domain_schema(model: Model, sname: str) -> None:
 def destroy_demo_catalog(catalog):
     catalog.delete_ermrest_catalog(really=True)
 
-def create_demo_catalog(hostname, domain_schema='test-schema', project_name='ml-test') -> ErmrestCatalog:
+def create_demo_catalog(hostname, domain_schema='test-schema', project_name='ml-test',
+                        create_features=False, create_datasets=False) -> ErmrestCatalog:
     credentials = get_credential(hostname)
     server = DerivaServer('https', hostname, credentials=credentials)
     test_catalog = server.create_ermrest_catalog()
@@ -105,6 +185,10 @@ def create_demo_catalog(hostname, domain_schema='test-schema', project_name='ml-
         create_domain_schema(model, domain_schema)
         deriva_ml = DerivaML(hostname=hostname, catalog_id=test_catalog.catalog_id, project_name=project_name)
         populate_demo_catalog(deriva_ml, domain_schema)
+        if create_features:
+            create_demo_features(deriva_ml)
+        if create_datasets:
+            create_demo_datasets(deriva_ml)
         dataset_table = model.schemas['deriva-ml'].tables['Dataset']
         dataset_table.annotations.update(generate_dataset_annotations(model))
         model.apply()
