@@ -17,7 +17,6 @@ import logging
 import os
 import requests
 import shutil
-from typing import Any
 from tempfile import NamedTemporaryFile
 from pathlib import Path
 from pydantic import ValidationError
@@ -219,8 +218,9 @@ class Execution:
         try:
             self.update_status(Status.running, 'Uploading execution assets...')
             execution_asset_files = self._ml_object.upload_assets(self._execution_assets_dir)
-            self._update_execution_asset_table(self.execution_rid, execution_asset_files)
-            results |= execution_asset_files
+            self._update_execution_asset_table(execution_asset_files)
+            prefix_path = f'{self._execution_assets_dir.as_posix()}/'
+            results |= {k.replace(prefix_path,''): v for k,v in execution_asset_files.items()}
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
@@ -230,7 +230,8 @@ class Execution:
             self.update_status(Status.running, 'Uploading execution metadata...')
             execution_metadata_files = self._ml_object.upload_assets(self._execution_metadata_dir)
             self._update_execution_metadata_table(execution_metadata_files)
-            results |= execution_metadata_files
+            prefix_path = f'{self._execution_metadata_dir.as_posix()}/'
+            results |= {k.replace(prefix_path,''): v for k,v in execution_metadata_files.items()}
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
@@ -277,7 +278,7 @@ class Execution:
         self.update_status(Status.running, f'Upload assets complete')
         return results
 
-    def upload_execution(self, clean_folder: bool = True) -> None:
+    def upload_execution_outputs(self, clean_folder: bool = True) -> dict[str, FileUploadState]:
         """
         Upload all the assets and metadata associated with the current execution.
 
@@ -290,16 +291,17 @@ class Execution:
 
         """
         try:
-            #uploaded_assets =
-            self._upload_execution_dirs()
+            uploaded_assets = self._upload_execution_dirs()
             self.update_status(Status.completed,
                                'Successfully end the execution.')
             if clean_folder:
                 self._clean_folder_contents(self.execution_root)
+            return uploaded_assets
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
             raise e
+
 
     def _asset_dir(self) -> Path:
         """
@@ -309,9 +311,6 @@ class Execution:
         path = self.working_dir / self.execution_rid / 'assets'
         path.mkdir(parents=True, exist_ok=True)
         return path
-
-    def upload_execution_asset(self, file, asset_type: str) -> dict[str, Any]:
-        return self._ml_object.upload_asset(file, "Execution_Assets", Execution_Asset_Type=asset_type)
 
     def _download_execution_file(self, file_rid: RID, dest_dir: str = '') -> Path:
         """
@@ -412,18 +411,16 @@ class Execution:
             entities = [map_path(e) for e in csv.DictReader(feature_values)]
         self._ml_object.domain_path.tables[feature_table].insert(entities)
 
-
-    def _update_execution_asset_table(self, execution_rid: RID, assets: dict[str, FileUploadState]) -> None:
+    def _update_execution_asset_table(self, assets: dict[str, FileUploadState]) -> None:
         """
         Assets associated with an execution must be linked to an execution entity after they are uploaded into
         the catalog. This routine takes a list of uploaded assets and makes that association.
-        :param execution_rid:
         :param assets:
         :return:
         """
         ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         asset_exec_entities = ml_schema_path.Execution_Assets_Execution.filter(
-            ml_schema_path.Execution_Assets_Execution.Execution == execution_rid).entities()
+            ml_schema_path.Execution_Assets_Execution.Execution == self.execution_rid).entities()
         existing_assets = {e['Execution_Assets'] for e in asset_exec_entities}
 
         # Now got through the list of recently added assets, and add an entry for this asset if it
@@ -431,9 +428,10 @@ class Execution:
         def asset_rid(asset) -> str:
             return asset.state == UploadState.success and asset.result and asset.result['RID']
 
-        entities = [{'Execution_Assets': rid, 'Execution': execution_rid}
+        entities = [{'Execution_Assets': rid, 'Execution': self.execution_rid}
                     for asset in assets.values() if (rid := asset_rid(asset)) not in existing_assets]
         ml_schema_path.Execution_Assets_Execution.insert(entities)
+
     @property
     def _execution_metadata_dir(self) -> Path:
         """
