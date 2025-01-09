@@ -91,6 +91,21 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
+class MLVocab(StrEnum):
+    """
+    Names of controlled vocabulary for various types within DerivaML.
+    """
+    dataset_type = 'Dataset_Type'
+    workflow_type = 'Workflow_Type'
+    execution_asset_type = 'Execution_Asset_Type'
+    execution_metadata_type = 'Execution_Metadata_Type'
+
+class ExecMetadataVocab(StrEnum):
+    """
+    Predefined execution metatadata types.
+    """
+    execution_config = 'Execution_Config'
+    runtime_env = 'Runtime_Env'
 
 class ColumnDefinition(BaseModel):
     """
@@ -189,3 +204,15 @@ class TableDefinition(BaseModel):
             acl_bindings=self.acl_bindings,
             annotations=self.annotations)
 
+class DerivaMLException(Exception):
+    """
+    Exception class specific to DerivaML module.
+
+    Args:
+    - msg (str): Optional message for the exception.
+
+    """
+
+    def __init__(self, msg=''):
+        super().__init__(msg)
+        self._msg = msg

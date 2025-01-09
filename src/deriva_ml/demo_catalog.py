@@ -79,11 +79,9 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
         workflow_type="Create Dataset Notebook"
     )
 
-    dataset_execution = deriva_ml.initialize_execution(
-        ExecutionConfiguration(
-            execution=Execution(description="Dataset Creation Execution"),
-            workflow=api_workflow,
-            description="Our Sample Workflow instance")
+    dataset_execution = Execution(
+        ExecutionConfiguration(workflow=api_workflow, description="Create demo dataset"),
+        deriva_ml
     )
 
     pb = deriva_ml.pathBuilder.schemas[deriva_ml.domain_schema]
@@ -105,13 +103,13 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
 
     nested_dataset = deriva_ml.create_dataset(['Partitioned', 'Image'],
                                                 description='A nested dataset for machine learning',
-                                                execution=dataset_execution)
+                                                execution_rid=dataset_execution.execution_rid)
     training_dataset = deriva_ml.create_dataset('Training', description='An image dataset for training',
-                                                  execution=dataset_execution)
+                                                  execution_rid=dataset_execution.execution_rid)
     testing_dataset = deriva_ml.create_dataset('Testing', description='A image dataset for testing',
-                                                 execution=dataset_execution)
+                                                 execution_rid=dataset_execution.execution_rid)
     validation_dataset = deriva_ml.create_dataset('Validation', description='A image dataset for validation',
-                                                    execution=dataset_execution)
+                                                    execution_rid=dataset_execution.execution_rid)
     deriva_ml.add_dataset_members(dataset_rid=nested_dataset,
                                     members=[training_dataset, testing_dataset, validation_dataset])
     deriva_ml.add_dataset_members(dataset_rid=training_dataset, members=training_rids)

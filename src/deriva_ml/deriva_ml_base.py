@@ -1,4 +1,3 @@
-import csv
 from datetime import datetime
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
@@ -13,11 +12,12 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from .deriva_definitions import Key, ColumnDefinition, RID, UploadState, Status
 from .dataset_bag import generate_dataset_download_spec
+from .deriva_definitions import Key, ColumnDefinition, RID, UploadState, Status, FileUploadState, DerivaMLException
+from .deriva_definitions import MLVocab, ExecMetadataVocab
 from .execution_configuration import ExecutionConfiguration
+import deriva_ml.execution
 from .schema_setup.dataset_annotations import generate_dataset_annotations
-from .schema_setup.system_terms import MLVocab, ExecMetadataVocab
 from .upload import asset_dir
 from .upload import table_path, bulk_upload_configuration
 
@@ -30,31 +30,17 @@ except ImportError:
         pass
 
 import getpass
-import hashlib
 from itertools import chain
 import json
 import logging
 import os
-from pydantic import BaseModel, Field, create_model, computed_field
+from pydantic import BaseModel, Field, create_model
 from pathlib import Path
 import re
 import requests
-import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import  Optional, Any, Iterable, Type, ClassVar
 from types import UnionType
-import warnings
-
-# We are going to use schema as a field name and this collides with method in pydantic base class
-warnings.filterwarnings('ignore',
-                        message='Field name "schema"',
-                        category=Warning,
-                        module='pydantic')
-
-warnings.filterwarnings('ignore',
-                        message='fields may not start with an underscore',
-                        category=Warning,
-                        module='pydantic')
 
 
 class VocabularyTerm(BaseModel):
@@ -70,19 +56,6 @@ class VocabularyTerm(BaseModel):
 
     class Config:
         extra = 'ignore'
-
-class DerivaMLException(Exception):
-    """
-    Exception class specific to DerivaML module.
-
-    Args:
-    - msg (str): Optional message for the exception.
-
-    """
-
-    def __init__(self, msg=''):
-        super().__init__(msg)
-        self._msg = msg
 
 
 class SemanticVersion(Enum):
@@ -349,17 +322,6 @@ class DerivaML:
             if table in s.tables.keys():
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
-
-    def asset_dir(self, execution_rid: RID) -> Path:
-        """
-        Return the directory in which assets downloaded as part of initializing an execution are placed.
-
-        :param execution_rid: Execution RID for the current execution.
-        :return: PathLib path object to model directory.
-        """
-        path = self.working_dir / execution_rid / 'assets'
-        path.mkdir(parents=True, exist_ok=True)
-        return path
 
     def table_path(self, table: str | Table) -> Path:
         """
@@ -643,7 +605,7 @@ class DerivaML:
         Create a new dataset from the specified list of RIDs.
         :param ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
         :param description:  Description of the dataset.
-        :param execution: Execution under which the dataset will be created.
+        :param execution_rid: Execution under which the dataset will be created.
         :return: New dataset RID.
         """
         # Create the entry for the new dataset and get its RID.
@@ -691,7 +653,7 @@ class DerivaML:
         """
         Delete a dataset from the catalog.
         :param dataset_rid:  RID of the dataset to delete.
-        :param recursive: If True, delete the dataset along with any nested dataset.
+        :param recurse: If True, delete the dataset along with any nested dataset.
         :return:
         """
         # Get association table entries for this dataset
@@ -773,6 +735,7 @@ class DerivaML:
         """
         Return a list of entities associated with a specific dataset.
         :param dataset_rid:
+        :param recurse: If this is a nested dataset, list the members of the contained datasets
 
         :return: Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
                  were taken.
@@ -971,32 +934,6 @@ class DerivaML:
 
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
-    @staticmethod
-    def _get_checksum(url) -> str:
-        """
-        Get the checksum of a file from a URL.
-
-        Args:
-        - url: URL of the file.
-
-        Returns:
-        - str: Checksum of the file.
-
-        Raises:
-        - DerivaMLException: If the URL is invalid or the file cannot be accessed.
-
-        """
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-        except Exception:
-            raise DerivaMLException(f'Invalid URL: {url}')
-        else:
-            sha256_hash = hashlib.sha256()
-            sha256_hash.update(response.content)
-            checksum = 'SHA-256: ' + sha256_hash.hexdigest()
-        return checksum
-
     def download_dataset_bag(self, bag: RID | str,
                              materialize:bool = True,
                              execution_rid: Optional[RID] = None)  -> tuple[Path, RID]:
@@ -1009,10 +946,60 @@ class DerivaML:
         :param execution_rid:
         :return: the location of the unpacked and validated dataset bag and the RID of the bag
         """
-        return self.materialize_dataset_bag(bag, execution_rid) if materialize else self._download_dataset_bag(bag)
+        return self._materialize_dataset_bag(bag, execution_rid) if materialize else self._download_dataset_bag(bag)
+
+    def _download_dataset_bag(self, dataset_rid: RID | str) -> tuple[Path, RID]:
+        """
+        Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        that all the metadata is correct
+
+        :param dataset_rid: The RID of a dataset or a minid to an existing bag.
+        :return: the location of the unpacked and validated dataset bag and the RID of the bag
+        """
+        if not any([dataset_rid == ds['RID'] for ds in self.find_datasets()]):
+            raise DerivaMLException(f'RID {dataset_rid} is not a dataset')
+
+        with TemporaryDirectory() as tmp_dir:
+            if dataset_rid.startswith('minid'):
+                # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
+                r = requests.get(f"https://identifiers.org/{dataset_rid}", headers={'accept': 'application/json'})
+                metadata = r.json()['metadata']
+                dataset_rid = metadata['Dataset_RID'].split('@')[0]
+                checksum_value = ""
+                for checksum in r.json().get('checksums', []):
+                    if checksum.get('function') == 'sha256':
+                        checksum_value = checksum.get('value')
+                        break
+                archive_path = fetch_single_file(dataset_rid, tmp_dir)
+            else:
+                # We are given the RID to a dataset, so we are going to have to export as a bag and place into
+                # local file system.  The first step is to generate a downloadspec to create the bag, put the sped
+                # into a local file and then use the downloader to create and download the desired bdbag.
+                spec_file = f'{tmp_dir}/download_spec.json'
+                with open(spec_file, 'w', encoding="utf-8") as ds:
+                    json.dump(generate_dataset_download_spec(self.model), ds)
+                downloader = GenericDownloader(
+                    server={"catalog_id": self.catalog_id, "protocol": "https", "host": self.host_name},
+                    config_file=spec_file,
+                    output_dir=tmp_dir,
+                    envars={"Dataset_RID": dataset_rid})
+                result = downloader.download()
+                archive_path = list(result.values())[0]["local_path"]
+                checksum_value = compute_file_hashes(archive_path, hashes=['sha256'])['sha256'][0]
+
+            # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
+            # it.  If not, then we need to extract the contents of the archive into our cache directory.
+            bag_dir = self.cache_dir / f'{dataset_rid}_{checksum_value}'
+            if bag_dir.exists():
+                bag_path = (bag_dir / f'Dataset_{dataset_rid}').as_posix()
+            else:
+                bag_dir.mkdir(parents=True, exist_ok=True)
+                bag_path = bdb.extract_bag(archive_path, bag_dir)
+            bdb.validate_bag_structure(bag_path)
+            return Path(bag_path), dataset_rid
 
 
-    def materialize_dataset_bag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
+    def _materialize_dataset_bag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
         """
         Materialize a dataset bag into a local directory
         :param bag: A MINID to an existing bag or a RID of the dataset that should be downloaded.
@@ -1221,6 +1208,9 @@ class DerivaML:
             error = format_exception(e)
             raise DerivaMLException(
                 f'Failed to update Execution_Asset table with configuration file metadata. Error: {error}')
+
+    def create_execution(self, configuration: ExecutionConfiguration) -> deriva_ml.execution.Execution:
+        return deriva_ml.execution.Execution(configuration, self)
 
 
 
