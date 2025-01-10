@@ -15,8 +15,8 @@ class Workflow(BaseModel):
 
 
 class ExecutionConfiguration(BaseModel):
-    datasets: list[str] = []
-    assets: list[RID] = []      # List of RIDs to model files.
+    datasets: list[RID|str] = []
+    assets: list[RID|str] = []      # List of RIDs to model files.
     workflow: Workflow
     description: str = ""
 
