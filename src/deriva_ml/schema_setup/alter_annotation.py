@@ -30,7 +30,7 @@ def main():
     alter_table_annotation(catalog, args.schema_name, 'Workflow', annotations["workflow_annotation"])
     alter_table_annotation(catalog, args.schema_name, 'Execution', annotations["execution_annotation"])
     alter_table_annotation(catalog, args.schema_name, 'Execution_Metadata', annotations["execution_metadata_annotation"])
-    alter_table_annotation(catalog, args.schema_name, 'Execution_Assets', annotations["execution_assets_annotation"])
+    alter_table_annotation(catalog, args.schema_name, 'Execution_Asset', annotations["execution_asset_annotation"])
     alter_schema_annotation(catalog, args.schema_name, annotations["schema_annotation"])
 
 if __name__ == "__main__":

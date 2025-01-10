@@ -158,7 +158,7 @@ def create_domain_schema(model: Model, sname: str) -> None:
 
     image_table = domain_schema.create_table(
         Table.define_asset(sname=sname, tname='Image',
-                           hatrac_template='/hatrac/image_assets/{{MD5}}.{{Filename}}',
+                           hatrac_template='/hatrac/image_asset/{{MD5}}.{{Filename}}',
                            column_defs=[Column.define("Name", builtin_types.text)]))
     image_table.create_reference(subject_table)
 

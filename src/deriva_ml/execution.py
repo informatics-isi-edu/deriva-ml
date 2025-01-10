@@ -7,7 +7,7 @@ from deriva_ml.deriva_ml_base import DerivaML, FeatureRecord
 from deriva_ml.deriva_definitions import RID, Status, FileUploadState, UploadState, MLVocab, DerivaMLException, ExecMetadataVocab
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
-from deriva_ml.upload import execution_metadata_dir, execution_assets_dir, asset_dir, execution_root
+from deriva_ml.upload import execution_metadata_dir, execution_asset_dir, asset_dir, execution_root
 from deriva_ml.upload import table_path
 from deriva_ml.upload import feature_root, feature_asset_dir, feature_value_path
 import hashlib
@@ -182,7 +182,7 @@ class Execution:
 
         Returns:
         - dict: Uploaded assets with key as assets' suborder name,
-        values as an ordered dictionary with RID and metadata in the Execution_Assets table.
+        values as an ordered dictionary with RID and metadata in the Execution_Asset table.
 
         """
         duration = datetime.now() - self.start_time
@@ -196,8 +196,8 @@ class Execution:
 
     def _upload_execution_dirs(self) -> dict[str, FileUploadState]:
         """
-        Upload execution assets at working_dir/Execution_assets.  This routine uploads the contents of the
-        Execution_Assets directory, and then updates the execution_assets table in the ML schema to have references
+        Upload execution assets at working_dir/Execution_asset.  This routine uploads the contents of the
+        Execution_Asset directory, and then updates the execution_asset table in the ML schema to have references
         to these newly uploaded files.
 
         Args:
@@ -213,9 +213,9 @@ class Execution:
         results = {}
         try:
             self.update_status(Status.running, 'Uploading execution assets...')
-            execution_asset_files = self._ml_object.upload_assets(self._execution_assets_dir)
+            execution_asset_files = self._ml_object.upload_assets(self._execution_asset_dir)
             self._update_execution_asset_table(execution_asset_files)
-            prefix_path = f'{self._execution_assets_dir.as_posix()}/'
+            prefix_path = f'{self._execution_asset_dir.as_posix()}/'
             results |= {k.replace(prefix_path,''): v for k,v in execution_asset_files.items()}
         except Exception as e:
             error = format_exception(e)
@@ -264,7 +264,7 @@ class Execution:
                 #                            feature_name=m['feature_name'],
                 #                            feature_file=p / files[0],
                 #                            uploaded_files=feature_assets[m['target_table'], m['feature_name']])
-                files = list(p.iterdir())
+                files = [f for f in p.iterdir() if f.is_file()]
                 if files:
                     self._update_feature_table(target_table=m['target_table'],
                                                feature_name=m['feature_name'],
@@ -283,7 +283,7 @@ class Execution:
 
         Returns:
         - dict: Uploaded assets with key as assets' suborder name,
-        values as an ordered dictionary with RID and metadata in the Execution_Assets table.
+        values as an ordered dictionary with RID and metadata in the Execution_Asset table.
 
         """
         try:
@@ -304,7 +304,7 @@ class Execution:
         Return the directory in which assets downloaded as part of initializing an execution are placed.
         :return: PathLib path object to model directory.
         """
-        path = self.working_dir / self.execution_rid / 'assets'
+        path = self.working_dir / self.execution_rid / 'asset'
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -313,7 +313,7 @@ class Execution:
         Download execution assets.
 
         Args:
-            - table_name (str): Name of the table (Execution_Assets or Execution_Metadata)
+            - table_name (str): Name of the table (Execution_Asset or Execution_Metadata)
             - file_rid (str): Resource Identifier (RID) of the file.
             - dest_dir (str): Destination directory for the downloaded assets.
 
@@ -415,18 +415,18 @@ class Execution:
         :return:
         """
         ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        asset_exec_entities = ml_schema_path.Execution_Assets_Execution.filter(
-            ml_schema_path.Execution_Assets_Execution.Execution == self.execution_rid).entities()
-        existing_assets = {e['Execution_Assets'] for e in asset_exec_entities}
+        asset_exec_entities = ml_schema_path.Execution_Asset_Execution.filter(
+            ml_schema_path.Execution_Asset_Execution.Execution == self.execution_rid).entities()
+        existing_assets = {e['Execution_Asset'] for e in asset_exec_entities}
 
         # Now got through the list of recently added assets, and add an entry for this asset if it
         # doesn't already exist.
         def asset_rid(asset) -> str:
             return asset.state == UploadState.success and asset.result and asset.result['RID']
 
-        entities = [{'Execution_Assets': rid, 'Execution': self.execution_rid}
+        entities = [{'Execution_Asset': rid, 'Execution': self.execution_rid}
                     for asset in assets.values() if (rid := asset_rid(asset)) not in existing_assets]
-        ml_schema_path.Execution_Assets_Execution.insert(entities)
+        ml_schema_path.Execution_Asset_Execution.insert(entities)
 
     @property
     def _execution_metadata_dir(self) -> Path:
@@ -450,14 +450,14 @@ class Execution:
         return execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type)
 
     @property
-    def _execution_assets_dir(self) -> Path:
+    def _execution_asset_dir(self) -> Path:
         """
         Return a pathlib Path to the directory in which to place directories for execution_assets.
         :return:
         """
-        return execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
+        return execution_asset_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
 
-    def execution_assets_path(self, asset_type: str) -> Path:
+    def execution_asset_path(self, asset_type: str) -> Path:
         """
         Return a pathlib Path to the directory in which to place files for the specified execution_asset type. These
          files are uploaded as part of the upload_execution method in DerivaML class.
@@ -465,7 +465,7 @@ class Execution:
         :param asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
         :return: Path in which to place asset files.
         """
-        return execution_assets_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
+        return execution_asset_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
 
     @property
     def execution_root(self) -> Path:
@@ -559,6 +559,15 @@ class Execution:
             for feature in features:
                 writer.writerow(feature.model_dump())
 
+    def create_dataset(self, ds_type: str | list[str], description) -> RID:
+        """
+        Create os dataset of specified types.
+        :param ds_type:
+        :param description:
+        :return:
+        """
+        return self._ml_object.create_dataset(ds_type, description, self.execution_rid)
+
     def __str__(self):
         items = [
             f"caching_dir: {self.cache_dir}",
@@ -624,8 +633,8 @@ class DerivaMLExec:
     def asset_directory(self, table: str) -> Path:
         return self.execution.asset_directory(table)
 
-    def execution_assets_path(self, asset_type: str) -> Path:
-        return self.execution.execution_assets_path(asset_type)
+    def execution_asset_path(self, asset_type: str) -> Path:
+        return self.execution.execution_asset_path(asset_type)
 
     def execution_metadata_path(self, metadata_type: str) -> Path:
         return self.execution.execution_metadata_path(metadata_type)
