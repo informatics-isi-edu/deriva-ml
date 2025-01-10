@@ -12,14 +12,13 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from .dataset_bag import generate_dataset_download_spec
-from .deriva_definitions import Key, ColumnDefinition, RID, UploadState, Status, FileUploadState, DerivaMLException
-from .deriva_definitions import MLVocab, ExecMetadataVocab
-from .execution_configuration import ExecutionConfiguration
-import deriva_ml.execution
-from .schema_setup.dataset_annotations import generate_dataset_annotations
-from .upload import asset_dir
-from .upload import table_path, bulk_upload_configuration
+from deriva_ml.dataset_bag import generate_dataset_download_spec
+from deriva_ml.deriva_definitions import Key, ColumnDefinition, RID, UploadState, Status, FileUploadState, DerivaMLException
+from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
+from deriva_ml.execution_configuration import ExecutionConfiguration
+from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
+from deriva_ml.upload import asset_dir
+from deriva_ml.upload import table_path, bulk_upload_configuration
 
 # from enum import Enum, StrEnum
 try:
@@ -1209,9 +1208,6 @@ class DerivaML:
             raise DerivaMLException(
                 f'Failed to update Execution_Asset table with configuration file metadata. Error: {error}')
 
-    def create_execution(self, configuration: ExecutionConfiguration) -> deriva_ml.execution.Execution:
-        return deriva_ml.execution.Execution(configuration, self)
-
-
-
-
+    def create_execution(self, configuration: ExecutionConfiguration) -> 'Execution':
+        from deriva_ml.execution import Execution
+        return Execution(configuration, self)

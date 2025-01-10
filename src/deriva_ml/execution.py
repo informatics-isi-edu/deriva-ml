@@ -3,13 +3,13 @@ from datetime import datetime
 from collections import defaultdict
 from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
-from .deriva_ml_base import DerivaML, FeatureRecord
-from .deriva_definitions import RID, Status, FileUploadState, UploadState, MLVocab, DerivaMLException, ExecMetadataVocab
-from .execution_configuration import ExecutionConfiguration
-from .upload import is_feature_dir, is_feature_asset_dir
-from .upload import execution_metadata_dir, execution_assets_dir, asset_dir, execution_root
-from .upload import table_path
-from .upload import feature_root, feature_asset_dir, feature_value_path
+from deriva_ml.deriva_ml_base import DerivaML, FeatureRecord
+from deriva_ml.deriva_definitions import RID, Status, FileUploadState, UploadState, MLVocab, DerivaMLException, ExecMetadataVocab
+from deriva_ml.execution_configuration import ExecutionConfiguration
+from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
+from deriva_ml.upload import execution_metadata_dir, execution_assets_dir, asset_dir, execution_root
+from deriva_ml.upload import table_path
+from deriva_ml.upload import feature_root, feature_asset_dir, feature_value_path
 import hashlib
 from importlib.metadata import distributions
 import json
@@ -107,7 +107,6 @@ class Execution:
 
         :raise DerivaMLException: If there is an issue initializing the execution.
         """
-
         # Materialize bdbag
         self.dataset_rids = []
         for dataset in self.configuration.datasets:
@@ -125,9 +124,6 @@ class Execution:
         asset_path = self._asset_dir().as_posix()
         self.asset_paths = [self._download_execution_file(file_rid=m,dest_dir=asset_path)
                             for m in self.configuration.assets]
-        if self.configuration.assets:
-            schema_path.Execution_Assets.insert([{'Execution_Assets': e, 'Execution': self.execution_rid}
-                                                 for e in self.configuration.assets])
 
         # Save configuration details for later upload
         exec_config_path = ExecMetadataVocab.execution_config.value
@@ -538,6 +534,9 @@ class Execution:
                                 schema=self._ml_object.domain_schema,
                                 asset_table=table)
 
+    def execute(self) -> 'DerivaMLExec':
+        return DerivaMLExec(self)
+
     def write_feature_file(self, features: Iterator[FeatureRecord] | Iterable[FeatureRecord]) -> None:
         """
         Given a collection of Feature records, write out a CSV file in the appropriate assets directory so that this
@@ -573,7 +572,7 @@ class Execution:
         return "\n".join(items)
 
 
-class DerivaMlExec:
+class DerivaMLExec:
     """
     Context manager for managing DerivaML execution.  Provides status updates.
 
@@ -584,7 +583,7 @@ class DerivaMlExec:
     """
 
     def __init__(self, execution: Execution):
-        self.configuration = execution
+        self.execution = execution
         self.execution_rid = execution.execution_rid
         self.start_time = datetime.now()
         self.uploaded_assets = None
@@ -597,7 +596,7 @@ class DerivaMlExec:
         - self: The instance itself.
 
         """
-        self.configuration.update_status(Status.running,'Start ML algorithm.')
+        self.execution.update_status(Status.running,'Start ML algorithm.')
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
@@ -614,10 +613,33 @@ class DerivaMlExec:
 
          """
         if not exc_type:
-            self.configuration.update_status(Status.running,'Successfully run Ml.')
-            self.configuration.execution_end(self.execution_rid)
+            self.execution.update_status(Status.running,'Successfully run Ml.')
+            self.execution.execution_end(self.execution_rid)
         else:
-            self.configuration.update_status(Status.failed,
+            self.execution.update_status(Status.failed,
                                           f'Exception type: {exc_type}, Exception value: {exc_value}')
             logging.error(f'Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}')
             return False
+
+    def asset_directory(self, table: str) -> Path:
+        return self.execution.asset_directory(table)
+
+    def execution_assets_path(self, asset_type: str) -> Path:
+        return self.execution.execution_assets_path(asset_type)
+
+    def execution_metadata_path(self, metadata_type: str) -> Path:
+        return self.execution.execution_metadata_path(metadata_type)
+
+    @property
+    def execution_root(self) -> Path:
+        return self.execution.execution_root
+
+    def feature_paths(self,table: Table|str, feature_name: str):
+        return self.execution.feature_paths(table, feature_name)
+
+    @property
+    def feature_root(self):
+        return self.execution.feature_root
+
+    def table_path(self, table: Table|str) -> Path:
+        return self.execution.table_path(table)
