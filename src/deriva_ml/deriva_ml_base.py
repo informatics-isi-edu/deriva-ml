@@ -146,7 +146,7 @@ class Feature:
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
             """
-            Map a dervia type into a pydantic model type.
+            Map a deriva type into a pydantic model type.
             :param c:  column to be mapped
             :return: pydantic model type
             """
@@ -285,6 +285,13 @@ class DerivaML:
         return tuple(map(int, self.retrieve_rid(dataset_rid)['Version'].split('.')))
 
     def increment_dataset_version(self, dataset_rid: RID, component: SemanticVersion) -> tuple[int, ...]:
+        """
+        Increment the version of the specified dataset.
+        :param dataset_rid: RID to a dataset
+        :param component:  Which version of the dataset to increment.
+        :return: new version of the dataset.
+        :raise DerivaMLException: if provided RID is not to a dataset.
+        """
         major, minor, patch = self.dataset_version(dataset_rid)
         match component:
             case SemanticVersion.major:
@@ -301,7 +308,6 @@ class DerivaML:
     def domain_path(self):
         """
         Get a new instance of a pathBuilder object to the domain schema.
-
         :return: A new instance of a pathBuilder path to the domain schema.
         """
 
@@ -397,7 +403,7 @@ class DerivaML:
         """
         Return a dictionary that represents the values of the specified RID.
         :param rid:
-        :return:
+        :return: A dictionary that represents the values of the specified RID.
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
@@ -587,7 +593,7 @@ class DerivaML:
 
     def list_feature_values(self, table: Table | str, feature_name: str) -> _ResultSet:
         """
-        Return a dataframe containing all values of a feature associated with a table.
+        Return a datapath resultset containing all values of a feature associated with a table.
         :param table:
         :param feature_name:
         :return:
@@ -599,12 +605,14 @@ class DerivaML:
 
     def create_dataset(self, ds_type: str | list[str],
                        description: str,
-                       execution_rid: Optional[RID] = None) -> RID:
+                       execution_rid: Optional[RID] = None,
+                       version: tuple[int,int,int] = (1,0,0)) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
         :param ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
         :param description:  Description of the dataset.
         :param execution_rid: Execution under which the dataset will be created.
+        :param version: Version of the dataset.
         :return: New dataset RID.
         """
         # Create the entry for the new dataset and get its RID.
@@ -617,7 +625,8 @@ class DerivaML:
         dataset_table_path = (
             pb.schemas[self.dataset_table.schema.name].tables)[self.dataset_table.name]
         dataset = dataset_table_path.insert([{'Description': description,
-                                              MLVocab.dataset_type: ds_type}])[0]['RID']
+                                              MLVocab.dataset_type: ds_type,
+                                              'Version': f'{version[0]}.{version[1]}.{version[2]}'}])[0]['RID']
 
         # Get the name of the association table between dataset and dataset_type.
         atable = next(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations()).name
@@ -652,7 +661,7 @@ class DerivaML:
         """
         Delete a dataset from the catalog.
         :param dataset_rid:  RID of the dataset to delete.
-        :param recurse: If True, delete the dataset along with any nested dataset.
+        :param recurse: If True, delete the dataset along with any nested datasets.
         :return:
         """
         # Get association table entries for this dataset
@@ -694,7 +703,7 @@ class DerivaML:
 
     def add_dataset_element_type(self, element: str | Table) -> Table:
         """
-        A dataset is a heterogeneous collection of object, each of which comes from a different table. This
+        A dataset is a heterogeneous collection of objects, each of which comes from a different table. This
         routine makes it possible to add objects from the specified table to a dataset.
 
         :param element: Name or the table or table object that is to be added to the dataset.
@@ -710,27 +719,30 @@ class DerivaML:
         self.model.apply()
         return table
 
-    def list_dataset_parent(self, dataset_rid: RID) -> Optional[RID]:
+    def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
         """
-        Given a dataset RID, return a RID of the parent dataset.
+        Given a dataset RID, return a list of RIDs of the parent datasets.
         :param dataset_rid:
         :return: RID of the parent dataset.
         """
         rid_record = self.resolve_rid(dataset_rid)
         if rid_record.table.name != self.dataset_table.name:
             raise DerivaMLException(f'RID: {dataset_rid} does not belong to dataset {self.dataset_table.name}')
-        return self.retrieve_rid(dataset_rid)['Dataset_Parent']
-
+        # Get association table for nested datasets
+        atable_path = self.pathBuilder.schemas[self.ml_schema].Dataset_Dataset
+        return [ p['Dataset']  for p in
+            atable_path.filter(atable_path.Nested_Dataset ==  dataset_rid).entities().fetch()
+        ]
 
     def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
         """
-        Given a dataset RID, return a RID of the parent dataset.
+        Given a dataset RID, return a list of RIDs of any nested datasets.
         :param dataset_rid:
-        :return: RID of the parent dataset.
+        :return: list of RIDs of nested datasets.
         """
-        return self.list_dataset_members(dataset_rid)['Dataset']
+        return [d['RID'] for d in self.list_dataset_members(dataset_rid)['Dataset']]
 
-    def list_dataset_members(self, dataset_rid: RID, recurse = False) -> dict[str, list[RID]]:
+    def list_dataset_members(self, dataset_rid: RID, recurse = False) -> dict[str, list[dict[str, Any]]]:
         """
         Return a list of entities associated with a specific dataset.
         :param dataset_rid:
