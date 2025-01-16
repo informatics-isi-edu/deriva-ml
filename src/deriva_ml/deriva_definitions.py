@@ -7,7 +7,7 @@ except ImportError:
         pass
 
 from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
-from pydantic import BaseModel, model_serializer, Field
+from pydantic import BaseModel, model_serializer, Field, computed_field
 from typing import Any, Iterable, NewType, Optional
 import warnings
 
@@ -25,6 +25,7 @@ warnings.filterwarnings('ignore',
 
 RID = NewType('RID', str)
 
+
 # For some reason, deriva-py doesn't use the proper enum class!!
 class UploadState(Enum):
     success = 0
@@ -35,6 +36,33 @@ class UploadState(Enum):
     aborted = 5
     cancelled = 6
     timeout = 7
+
+class FileUploadState(BaseModel):
+    state: UploadState
+    status: str
+    result: Any
+
+    @computed_field
+    @property
+    def rid(self) -> Optional[RID]:
+        return self.result and self.result['RID']
+
+class Status(Enum):
+    """
+    Enumeration class defining execution status.
+
+    Attributes:
+    - running: Execution is currently running.
+    - pending: Execution is pending.
+    - completed: Execution has been completed successfully.
+    - failed: Execution has failed.
+
+    """
+    running = 'Running'
+    pending = 'Pending'
+    completed = 'Completed'
+    failed = 'Failed'
+
 
 class BuiltinTypes(Enum):
     text = builtin_types.text
@@ -63,6 +91,21 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
+class MLVocab(StrEnum):
+    """
+    Names of controlled vocabulary for various types within DerivaML.
+    """
+    dataset_type = 'Dataset_Type'
+    workflow_type = 'Workflow_Type'
+    execution_asset_type = 'Execution_Asset_Type'
+    execution_metadata_type = 'Execution_Metadata_Type'
+
+class ExecMetadataVocab(StrEnum):
+    """
+    Predefined execution metatadata types.
+    """
+    execution_config = 'Execution_Config'
+    runtime_env = 'Runtime_Env'
 
 class ColumnDefinition(BaseModel):
     """
@@ -161,3 +204,15 @@ class TableDefinition(BaseModel):
             acl_bindings=self.acl_bindings,
             annotations=self.annotations)
 
+class DerivaMLException(Exception):
+    """
+    Exception class specific to DerivaML module.
+
+    Args:
+    - msg (str): Optional message for the exception.
+
+    """
+
+    def __init__(self, msg=''):
+        super().__init__(msg)
+        self._msg = msg
