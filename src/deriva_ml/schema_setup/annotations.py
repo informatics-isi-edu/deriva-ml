@@ -41,9 +41,9 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 },
                 {
                     "source": [
-                        {"inbound": [schema, "Execution_Assets_Execution_Execution_fkey"]},
-                        {"outbound": [schema, "Execution_Assets_Execution_Execution_Assets_fkey"]}, "RID"],
-                    "markdown_name": "Execution Assets"
+                        {"inbound": [schema, "Execution_Asset_Execution_Execution_fkey"]},
+                        {"outbound": [schema, "Execution_Asset_Execution_Execution_Asset_fkey"]}, "RID"],
+                    "markdown_name": "Execution Asset"
                 },
                 {
                     "source": [{"inbound": [schema, "Execution_Metadata_Execution_fkey"]}, "RID"],
@@ -53,7 +53,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
         }
     }
 
-    execution_assets_annotation = {
+    execution_asset_annotation = {
         deriva_tags.table_display: {
             "row_name": {
                 "row_markdown_pattern": "{{{Filename}}}"
@@ -64,13 +64,13 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 "RID",
                 "URL",
                 "Description",
-                "Length", [schema, "Execution_Assets_Execution_Asset_Type_fkey"],
+                "Length", [schema, "Execution_Asset_Execution_Asset_Type_fkey"],
                 # {
                 #     "display": {
                 #         "template_engine": "handlebars",
                 #         "markdown_pattern": "{{#if (eq  _Execution_Asset_Type \"2-5QME\")}}\n ::: iframe []("
                 #                             "https://dev.eye-ai.org/~vivi/deriva-webapps/plot/?config=test-line"
-                #                             "-plot&Execution_Assets_RID={{{RID}}}){class=chaise-autofill "
+                #                             "-plot&Execution_Asset_RID={{{RID}}}){class=chaise-autofill "
                 #                             "style=\"min-width: 500px; min-height: 300px;\"} \\n:::\n {{/if}}"
                 #     },
                 #     "markdown_name": "ROC Plot"
@@ -87,7 +87,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 #         "template_engine": "handlebars",
                 #         "markdown_pattern": "{{#if (eq _Execution_Asset_Type \"2-5QME\")}} ::: iframe []("
                 #                             "https://dev.eye-ai.org/~vivi/deriva-webapps/plot/?config=test-line"
-                #                             "-plot&Execution_Assets_RID={{{RID}}}){style=\"min-width:1000px; "
+                #                             "-plot&Execution_Asset_RID={{{RID}}}){style=\"min-width:1000px; "
                 #                             "min-height:700px; height:70vh;\" class=\"chaise-autofill\"} \\n::: {"
                 #                             "{/if}}"
                 #     },
@@ -98,7 +98,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 "Description",
                 "Length",
                 "MD5",
-                [schema, "Execution_Assets_Execution_Asset_Type_fkey"]
+                [schema, "Execution_Asset_Execution_Asset_Type_fkey"]
             ]
         }
     }
@@ -172,8 +172,8 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                                 "name": "Execution Metadata Type"
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Assets",
-                                "name": "Execution Assets"
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset",
+                                "name": "Execution Asset"
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset_Type",
@@ -200,7 +200,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
     return {"workflow_annotation": workflow_annotation,
             "dataset_annotation": dataset_annotation,
             "execution_annotation": execution_annotation,
-            "execution_assets_annotation": execution_assets_annotation,
+            "execution_asset_annotation": execution_asset_annotation,
             "execution_metadata_annotation": execution_metadata_annotation,
             "schema_annotation": schema_annotation,
             "catalog_annotation": catalog_annotation,

@@ -7,7 +7,7 @@ import regex as re
 #  deriva-ml/
 #       execution
 #           <execution_rid>
-#               execution-assets
+#               execution-asset
 #                   <asset_type>
 #                       file1, file2, ....   <- Need to update execution_asset association table.
 #               execution-metadata
@@ -16,7 +16,7 @@ import regex as re
 #                   <schema>
 #                       <target_table>
 #                            <feature_name>
-#                                   assets
+#                                   asset
 #                                       <asset_table>
 #                                           file1, file2, ...
 #                           <feature_name>.csv    <- needs to have asset_name column remapped before uploading
@@ -32,18 +32,18 @@ import regex as re
 
 upload_root_regex = r"(?i)^.*/deriva-ml"
 exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"
-exec_asset_dir_regex = exec_dir_regex + r"/execution-assets/(?P<execution_asset_type>[-\w]+)"
+exec_asset_dir_regex = exec_dir_regex + r"/execution-asset/(?P<execution_asset_type>[-\w]+)"
 exec_asset_regex = exec_asset_dir_regex + r"/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]+)$"
 exec_metadata_dir_regex = exec_dir_regex + r'/execution-metadata/(?P<execution_metadata_type>[-\w]+)'
 exec_metadata_regex = exec_metadata_dir_regex + r'/(?P<filename>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$'
 feature_dir_regex = exec_dir_regex + r'/feature'
 feature_table_dir_regex = feature_dir_regex + r"/(?P<schema>[-\w]+)/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)"
 feature_value_regex = feature_table_dir_regex + r"/(?P=feature_name)[.](?P<file_ext>[(csv|json)]*)$"
-feature_asset_dir_regex =  feature_table_dir_regex + r"/assets/(?P<asset_table>[-\w]+)"
+feature_asset_dir_regex =  feature_table_dir_regex + r"/asset/(?P<asset_table>[-\w]+)"
 feature_asset_regex = feature_asset_dir_regex + r'/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$'
 asset_path_regex = (
     upload_root_regex
-    + r"/assets/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
+    + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
 )
 table_regex = exec_dir_regex + r"/table/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
 
@@ -76,8 +76,8 @@ def execution_root(prefix: Path | str, exec_rid) -> Path:
     return path
 
 
-def execution_assets_root(prefix: Path | str, exec_rid: str) -> Path:
-    path = execution_root(prefix, exec_rid) / "execution-assets"
+def execution_asset_root(prefix: Path | str, exec_rid: str) -> Path:
+    path = execution_root(prefix, exec_rid) / "execution-asset"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -88,7 +88,7 @@ def execution_metadata_root(prefix: Path | str, exec_rid: str) -> Path:
     return path
 
 
-def execution_assets_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
+def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
     """
     Return the path to a directory in which to place execution assets that are to be uploaded.
     :param prefix: Location of upload root directory
@@ -96,7 +96,7 @@ def execution_assets_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> 
     :param exec_rid: RID of the execution asset
     :return:
     """
-    path = execution_assets_root(prefix, exec_rid) / asset_type
+    path = execution_asset_root(prefix, exec_rid) / asset_type
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -160,7 +160,7 @@ def feature_asset_dir(
     :param asset_table: Name of the asset table for the feature.
     :return:
     """
-    path = feature_dir(prefix, exec_rid, schema, target_table, feature_name) / 'assets' / asset_table
+    path = feature_dir(prefix, exec_rid, schema, target_table, feature_name) / 'asset' / asset_table
 
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -174,7 +174,7 @@ def asset_dir(prefix: Path | str, schema: str, asset_table: str) -> Path:
     :param asset_table: Name of the asset table
     :return: Path to the directory in which to place assets
     """
-    path = upload_root(prefix) / 'assets' / schema / asset_table
+    path = upload_root(prefix) / 'asset' / schema / asset_table
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -218,7 +218,7 @@ bulk_upload_configuration = {
             ],
         },
         {
-            # Upload the contents of the Execution_Assets directory.
+            # Upload the contents of the Execution_Asset directory.
             "column_map": {
                 "MD5": "{md5}",
                 "URL": "{URI}",
@@ -227,11 +227,11 @@ bulk_upload_configuration = {
                 "Execution_Asset_Type": "{execution_asset_type_name}",
             },
             "file_pattern": exec_asset_regex,
-            "target_table": ["deriva-ml", "Execution_Assets"],
+            "target_table": ["deriva-ml", "Execution_Asset"],
             "checksum_types": ["sha256", "md5"],
             "hatrac_options": {"versioned_urls": True},
             "hatrac_templates": {
-                "hatrac_uri": "/hatrac/execution_assets/{md5}.{file_name}",
+                "hatrac_uri": "/hatrac/execution_asset/{md5}.{file_name}",
                 "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
             },
             "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
@@ -297,7 +297,7 @@ bulk_upload_configuration = {
 }
 
 def test_upload():
-    ead = execution_assets_dir('foo', 'my-rid', 'my-asset')
+    ead = execution_asset_dir('foo', 'my-rid', 'my-asset')
     emd = execution_metadata_dir('foo', 'my-rid', 'my-metadata')
     _fp = feature_value_path('foo', 'my-rid', 'my-schema', 'my-target', 'my-feature')
     fa = feature_asset_dir('foo', 'my-rid', 'my-schema', 'my-target', 'my-feature', 'my-asset')

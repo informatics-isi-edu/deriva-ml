@@ -59,12 +59,12 @@ def define_asset_execution_metadata(sname: str, execution_metadata_annotation: d
     )
 
 
-def define_asset_execution_assets(sname: str, execution_assets_annotation: dict):
+def define_asset_execution_asset(sname: str, execution_asset_annotation: dict):
     table_def = Table.define_asset(
         sname=sname,
-        tname="Execution_Assets",
-        hatrac_template="/hatrac/execution_assets/{{MD5}}.{{Filename}}",
-        annotations=execution_assets_annotation,
+        tname="Execution_Asset",
+        hatrac_template="/hatrac/execution_asset/{{MD5}}.{{Filename}}",
+        annotations=execution_asset_annotation,
     )
     return table_def
 
@@ -151,14 +151,14 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
         Table.define_association([("Execution_Metadata", execution_metadata_table), ("Execution", execution_table)]))
 
     # Execution Asset
-    execution_assets_table = schema.create_table(
-        define_asset_execution_assets(schema.name, annotations["execution_assets_annotation"])
+    execution_asset_table = schema.create_table(
+        define_asset_execution_asset(schema.name, annotations["execution_asset_annotation"])
     )
-    execution_assets_table.create_reference(
+    execution_asset_table.create_reference(
         schema.create_table(
             Table.define_vocabulary("Execution_Asset_Type", f'{project_name}:{{RID}}')))
     schema.create_table(
-        Table.define_association([("Execution_Assets", execution_assets_table), ("Execution", execution_table)]))
+        Table.define_association([("Execution_Asset", execution_asset_table), ("Execution", execution_table)]))
 
     create_www_schema(model)
     initialize_ml_schema(model, schema_name)

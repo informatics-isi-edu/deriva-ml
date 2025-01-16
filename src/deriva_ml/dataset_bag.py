@@ -40,7 +40,7 @@ def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
                 'api': 'attribute',
                 'path': f'{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5'
             },
-            'destination': {'name': f'assets/{table.name}', 'type': 'fetch'}
+            'destination': {'name': f'asset/{table.name}', 'type': 'fetch'}
         }
         )
     return exports
@@ -73,7 +73,7 @@ def download_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
             'processor': 'fetch',
             'processor_params': {
                 'query_path': f'/attribute/{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none',
-                'output_path': f'assets/{table.name}'
+                'output_path': f'asset/{table.name}'
             }
         }
         )
@@ -119,7 +119,7 @@ def dataset_specification(model: Model,
                         t4.csv
                 T2/
                     t2.csv
-            assets/
+            asset/
               T2
                 f1
                 f2
