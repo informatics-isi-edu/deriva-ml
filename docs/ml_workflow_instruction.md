@@ -94,25 +94,20 @@ Initialize the execution by `ml_instance.initialize_execution(config)`.
 A full record of directory of cached data and files, and rids of current execution will be returned.\
 Example:
 ```python
+# RID of source dataset, if any.
+source_dataset = <dataset_rid>
+
 # Add Workflow Vocab terms
 ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A test Workflow for new DM")
+
 # Workflow instance
 test_workflow = Workflow(
     name="Test Sample Workflow",
     url="https://github.com/***",
     workflow_type="Test Workflow"
 )
-# Set to False if you only need the metadata from the bag, and not the assets.
-download_assets = True
 
-# Configuration instance
-config = ExecutionConfiguration(
-    bdbags=[<dataset_rid_1>,<dataset_rid_2>],
-    models = [<execution_asset_rid>],
-    execution=Execution(description="Sample Test Execution"),
-    workflow=test_workflow,
-    description="Our Test Workflow instance")
-
+# Configuration instance.
 config = ExecutionConfiguration(
     # Comment out the following line if you don't need the assets.
     datasets=[dataset_rid1, dataset_rid2, ...] if download_assets else [],
@@ -166,8 +161,13 @@ Save and upload outputs to the catalog, categorized into:
 Ensure that the metadata and asset types exist in the catalog before uploading.
 ```python
 # Add controlled vocabulary terms for metadata and assets
-ml_instance.add_term(vc.Execution_Metadata_Type, "Example Metadata", description="Metadata description")
-ml_instance.add_term(vc.Execution_Asset_Type, "Example Asset", description="Asset description")
+ml_instance.add_term(vc.Execution_Metadata_Type, "Example_Metadata_Type", description="Metadata Type description")
+ml_instance.add_term(vc.Execution_Asset_Type, "Example_Asset_Type", description="Asset Type description")
+
+metadata_path = execution.execution_metadata_path(Example_Metadata_Type)
+asset_path = execution.execution_assets_path(Example_Asset_Type)
+
+# Save files to metadata path and asset path.
 
 # Upload files to the catalog
 execution.upload_execution_outputs(clean_folder=True)
