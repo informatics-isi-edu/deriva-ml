@@ -160,8 +160,8 @@ with ml_instance.execution(configuration=configuration_record) as exec:
 ### Step5: Upload results
 Save and upload outputs to the catalog, categorized into:
 
-[//]: # (- Metadata: Stored in the directory obtained by `execution.asset_directory`.)
-- Assets: Stored in the directory obtained by `execution.asset_directory`.
+- Metadata: Stored in the directory obtained by `execution.execution_metadata_path(<metadata_type>)`.
+- Assets: Stored in the directory obtained by `execution.execution_assets_path(<asset_type>)`.
 
 Ensure that the metadata and asset types exist in the catalog before uploading.
 ```python
