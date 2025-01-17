@@ -25,7 +25,7 @@ The method including the following categories:
 #### Installation
 To install Deriva-ML and its dependencies, use the following commands:
 ```
-$ sudo pip install deriva
+$ pip install deriva
 $ pip install deirva-ml 
 $ pip install <catalog-ML>
 ```
