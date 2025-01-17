@@ -212,6 +212,7 @@ class TableDefinition(BaseModel):
 class Table(BaseModel):
     name: str
     ermrest_table: Optional[em.Table] = None
+    __ml_instance__ = Optional[em.Model]
 
     @model_validator(mode='before')
     @classmethod
@@ -222,6 +223,13 @@ class Table(BaseModel):
                 'ermrest_table': v,
             }
         return v
+
+    @model_validator(mode='after')
+    def validate_self(self, values):
+        if isinstance(values['self'].model, em.Model):
+            self.ermrest_table = values['self'].model
+            # Perform validation on self here
+        return values
 
 
 class DerivaMLException(Exception):
