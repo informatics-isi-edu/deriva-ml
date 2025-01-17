@@ -33,7 +33,7 @@ from itertools import chain
 import json
 import logging
 import os
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, create_model, validate_call, ConfigDict
 from pathlib import Path
 import re
 import requests
@@ -128,7 +128,7 @@ class Feature:
 
         assoc_fkeys = {atable.self_fkey} |  atable.other_fkeys
 
-        # Determine the role of each column in the feature outside of the FK columns.
+        # Determine the role of each column in the feature outside the FK columns.
         self.asset_columns = {fk.foreign_key_columns[0] for fk in self.feature_table.foreign_keys if
                  fk not in assoc_fkeys  and is_asset(fk.pk_table)}
 
@@ -176,7 +176,10 @@ class Feature:
         docstring = f'Class to capture fields in a feature {self.feature_name} on table {self.target_table}. Feature columns include:\n'
         docstring += '\n'.join([f'    {c.name}' for c in self.feature_columns])
 
-        model = create_model(featureclass_name, __base__=FeatureRecord, __doc__=docstring, **feature_columns)
+        model = create_model(featureclass_name,
+                             __config__= ConfigDict(arbitrary_types_allowed=True),
+                             __base__=FeatureRecord,
+                             __doc__=docstring, **feature_columns)
         model.feature = self  # Set value of class variable within the feature class definition.
 
         return model
@@ -580,6 +583,7 @@ class DerivaML:
             Feature(a) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
         ]
 
+    @validate_call
     def add_features(self, features: Iterable[FeatureRecord]) -> int:
         """
         Add a set of new feature values to the catalog.
@@ -603,6 +607,7 @@ class DerivaML:
         pb = self.catalog.getPathBuilder()
         return pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
 
+    @validate_call
     def create_dataset(self, ds_type: str | list[str],
                        description: str,
                        execution_rid: Optional[RID] = None,
@@ -657,6 +662,7 @@ class DerivaML:
             datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in ds_types]})
         return datasets
 
+    @validate_call
     def delete_dataset(self, dataset_rid: RID, recurse = False) -> None:
         """
         Delete a dataset from the catalog.
@@ -719,6 +725,7 @@ class DerivaML:
         self.model.apply()
         return table
 
+    @validate_call
     def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
         """
         Given a dataset RID, return a list of RIDs of the parent datasets.
@@ -734,6 +741,7 @@ class DerivaML:
             atable_path.filter(atable_path.Nested_Dataset ==  dataset_rid).entities().fetch()
         ]
 
+    @validate_call
     def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
         """
         Given a dataset RID, return a list of RIDs of any nested datasets.
@@ -742,6 +750,7 @@ class DerivaML:
         """
         return [d['RID'] for d in self.list_dataset_members(dataset_rid)['Dataset']]
 
+    @validate_call
     def list_dataset_members(self, dataset_rid: RID, recurse = False) -> dict[str, list[dict[str, Any]]]:
         """
         Return a list of entities associated with a specific dataset.
@@ -845,6 +854,7 @@ class DerivaML:
                     [{'Dataset': dataset_rid, fk_column: e} for e in elements])
         return dataset_rid
 
+    @validate_call
     def add_term(self,
                  table: str | Table,
                  term_name: str,
@@ -945,6 +955,7 @@ class DerivaML:
 
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
+    @validate_call
     def download_dataset_bag(self, bag: RID | str,
                              materialize:bool = True,
                              execution_rid: Optional[RID] = None)  -> tuple[Path, RID]:
@@ -1064,7 +1075,8 @@ class DerivaML:
         hs.get_obj(path=asset_url, destfilename=dest_filename)
         return Path(dest_filename)
 
-    def upload_asset(self, file: str | Path, table: Table | str, **kwargs) -> dict:
+    @validate_call
+    def upload_asset(self, file: Path, table: Table | str, **kwargs) -> dict:
         """
         Upload the specified file into Hatrac and update the associated asset table.
         :param file: path to the file to upload.
@@ -1220,6 +1232,7 @@ class DerivaML:
             raise DerivaMLException(
                 f'Failed to update Execution_Asset table with configuration file metadata. Error: {error}')
 
+    @validate_call
     def create_execution(self, configuration: ExecutionConfiguration) -> 'Execution':
         from deriva_ml.execution import Execution
         return Execution(configuration, self)

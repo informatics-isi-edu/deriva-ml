@@ -5,7 +5,7 @@ from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
 from deriva_ml.deriva_ml_base import DerivaML, FeatureRecord
 from deriva_ml.deriva_definitions import RID, Status, FileUploadState, UploadState, MLVocab, DerivaMLException, ExecMetadataVocab
-from deriva_ml.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution_configuration import ExecutionConfiguration, DatasetSpec
 from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
 from deriva_ml.upload import execution_metadata_dir, execution_asset_dir, asset_dir, execution_root
 from deriva_ml.upload import table_path
@@ -19,8 +19,8 @@ import requests
 import shutil
 from tempfile import NamedTemporaryFile
 from pathlib import Path
-from pydantic import ValidationError
-from typing import Iterator, Iterable
+from pydantic import ValidationError, validate_call
+from typing import Iterable
 
 
 class Execution:
@@ -110,8 +110,12 @@ class Execution:
         # Materialize bdbag
         self.dataset_rids = []
         for dataset in self.configuration.datasets:
+            dataset_rid, materialize = dataset.rid, dataset.materialize if isinstance(dataset, DatasetSpec) else (dataset, True)
             self.update_status(Status.running, f'Materialize bag {dataset}... ')
-            bag_path, dataset_rid = self._ml_object.download_dataset_bag(dataset, execution_rid=self.execution_rid)
+            bag_path, dataset_rid = self._ml_object.download_dataset_bag(
+                dataset_rid,
+                execution_rid=self.execution_rid,
+                materialize=materialize)
             self.dataset_rids.append(dataset_rid)
             self.dataset_paths.append(bag_path)
         # Update execution info
@@ -167,23 +171,16 @@ class Execution:
             checksum = 'SHA-256: ' + sha256_hash.hexdigest()
         return checksum
 
+    @validate_call
     def update_status(self, status: Status, msg: str):
         self.status = status.value
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
             [{'RID': self.execution_rid, 'Status': self.status, 'Status_Detail': msg}]
         )
 
-    def execution_end(self, execution_rid: RID) -> None:
+    def execution_end(self) -> None:
         """
         Finish the execution and update the duration and status of execution.
-
-        Args:
-        - execution_rid (str): Resource Identifier (RID) of the execution.
-
-        Returns:
-        - dict: Uploaded assets with key as assets' suborder name,
-        values as an ordered dictionary with RID and metadata in the Execution_Asset table.
-
         """
         duration = datetime.now() - self.start_time
         hours, remainder = divmod(duration.total_seconds(), 3600)
@@ -192,7 +189,7 @@ class Execution:
 
         self.update_status(Status.running, 'Algorithm execution ended.')
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
-            [{'RID': execution_rid, 'Duration': duration}])
+            [{'RID': self.execution_rid, 'Duration': duration}])
 
     def _upload_execution_dirs(self) -> dict[str, FileUploadState]:
         """
@@ -465,6 +462,8 @@ class Execution:
         :param asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
         :return: Path in which to place asset files.
         """
+        if not self._ml_object.is_asset(asset_type):
+            raise DerivaMLException(f"Execution_asset_path argument:'{asset_type}' is not an asset.")
         return execution_asset_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
 
     @property
@@ -537,15 +536,17 @@ class Execution:
     def execute(self) -> 'DerivaMLExec':
         return DerivaMLExec(self)
 
-    def write_feature_file(self, features: Iterator[FeatureRecord] | Iterable[FeatureRecord]) -> None:
+    @validate_call
+    def write_feature_file(self, features: Iterable[FeatureRecord]) -> None:
         """
         Given a collection of Feature records, write out a CSV file in the appropriate assets directory so that this
         feature gets uploaded when the execution is complete.
 
-        :param features: Iterable or Iterator of Feature records to write.
+        :param features: Iterable of Feature records to write.
         """
-        features = features if isinstance(features, Iterator) else iter(features)
-        first_row = next(features)
+
+        feature_iter =  iter(features)
+        first_row = next(feature_iter)
         feature = first_row.feature
         csv_path, _ = self.feature_paths(feature.target_table.name, feature.feature_name)
 
@@ -556,9 +557,10 @@ class Execution:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerow(first_row.model_dump())
-            for feature in features:
+            for feature in feature_iter:
                 writer.writerow(feature.model_dump())
 
+    @validate_call
     def create_dataset(self, ds_type: str | list[str], description) -> RID:
         """
         Create os dataset of specified types.
@@ -623,7 +625,7 @@ class DerivaMLExec:
          """
         if not exc_type:
             self.execution.update_status(Status.running,'Successfully run Ml.')
-            self.execution.execution_end(self.execution_rid)
+            self.execution.execution_end()
         else:
             self.execution.update_status(Status.failed,
                                           f'Exception type: {exc_type}, Exception value: {exc_value}')

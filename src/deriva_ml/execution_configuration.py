@@ -1,7 +1,9 @@
+from docutils.frontend import validate_dependency_file
+
 from .deriva_definitions import RID
 import json
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, field_validator, conlist, model_validator
+from typing import Optional, Any
 
 class Workflow(BaseModel):
     """
@@ -20,9 +22,28 @@ class Workflow(BaseModel):
     version: Optional[str] = None
     description: str = None
 
+class DatasetSpec(BaseModel):
+    rid: RID
+    materialize: bool = True
+
+    @model_validator(mode='before')
+    @classmethod
+    def check_card_number_not_present(cls, data: Any) -> dict[str, str|bool]:
+        # If you are just given a string, assume its a rid and put into dict for further validation.
+        return {'rid': data} if isinstance(data, str) else data
 
 class ExecutionConfiguration(BaseModel):
-    datasets: list[RID|str] = []
+    """
+    Define the parameters that are used to configure a specific execution.
+    :param datasets: List of dataset RIDS, MINIDS for datasets to be downloaded prior to execution.  By default,
+                     all  the datasets are materialized. However, if the assets associated with a dataset are not
+                     needed, a dictionary that defines the rid and the materialization parameter for the
+                     download_dataset_bag method can be specified, e.g.  datasets=[{'rid': RID, 'materialize': True}].
+    :param assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
+    :param workflow: A workflow instance.  Must have a name, URI to the workflow instance, and a type.
+    :param description: A description of the execution.  Can use markdown format.
+    """
+    datasets: conlist(DatasetSpec) = []
     assets: list[RID|str] = []      # List of RIDs to model files.
     workflow: Workflow
     description: str = ""

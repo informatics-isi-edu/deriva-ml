@@ -1,4 +1,6 @@
 # from enum import Enum, StrEnum
+from nltk.cluster import em
+
 try:
     from enum import Enum, StrEnum
 except ImportError:
@@ -6,9 +8,10 @@ except ImportError:
     class StrEnum(str, Enum):
         pass
 
-from deriva.core.ermrest_model import Table, Column, ForeignKey, Key, builtin_types
-from pydantic import BaseModel, model_serializer, Field, computed_field
-from typing import Any, Iterable, NewType, Optional
+import deriva.core.ermrest_model as em
+from deriva.core.ermrest_model import builtin_types
+from pydantic import BaseModel, model_serializer, Field, computed_field, model_validator
+from typing import Any, Iterable, Optional, Annotated
 import warnings
 
 
@@ -23,8 +26,10 @@ warnings.filterwarnings('ignore',
                         category=Warning,
                         module='pydantic')
 
-RID = NewType('RID', str)
+rid_regex = r"^(?:[A-Z\d]{4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)$"
+RID = Annotated[str, Field(pattern=rid_regex)]
 
+DerivaSystemColumns = ['RCT', 'RMT', 'RCB', 'RMB']
 
 # For some reason, deriva-py doesn't use the proper enum class!!
 class UploadState(Enum):
@@ -123,7 +128,7 @@ class ColumnDefinition(BaseModel):
 
     @model_serializer()
     def serialize_column_definition(self):
-        return Column.define(
+        return em.Column.define(
             cname=self.name,
             ctype=self.type.value,
             nullok=self.nullok,
@@ -142,7 +147,7 @@ class KeyDefinition(BaseModel):
 
     @model_serializer()
     def serialize_key_definition(self):
-        return Key.define(
+        return em.Key.define(
             colnames=self.colnames,
             constraint_names=self.constraint_names,
             comment=self.comment,
@@ -168,7 +173,7 @@ class ForeignKeyDefinition(BaseModel):
 
     @model_serializer()
     def serialize_fk_definition(self):
-        return ForeignKey.define(
+        return em.ForeignKey.define(
             fk_colnames=self.colnames,
             pk_sname=self.pk_sname,
             pk_tname=self.pk_tname,
@@ -194,7 +199,7 @@ class TableDefinition(BaseModel):
 
     @model_serializer()
     def serialize_table_definition(self):
-        return Table.define(
+        return em.Table.define(
             tname=self.name,
             column_defs=[c.model_dump() for c in self.column_defs],
             key_defs=[k.model_dump() for k in self.key_defs],
@@ -203,6 +208,21 @@ class TableDefinition(BaseModel):
             acls=self.acls,
             acl_bindings=self.acl_bindings,
             annotations=self.annotations)
+
+class Table(BaseModel):
+    name: str
+    ermrest_table: Optional[em.Table] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate(cls, v) -> Any:
+        if isinstance(v, em.Table):
+            return {
+                'name': v.name,
+                'ermrest_table': v,
+            }
+        return v
+
 
 class DerivaMLException(Exception):
     """
