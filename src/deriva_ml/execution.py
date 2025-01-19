@@ -4,7 +4,8 @@ from collections import defaultdict
 from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
 from deriva_ml.deriva_ml_base import DerivaML, FeatureRecord
-from deriva_ml.deriva_definitions import RID, Status, FileUploadState, UploadState, MLVocab, DerivaMLException, ExecMetadataVocab
+from deriva_ml.deriva_definitions import RID, Status, FileUploadState, UploadState, DerivaMLException
+from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
 from deriva_ml.execution_configuration import ExecutionConfiguration, DatasetSpec
 from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
 from deriva_ml.upload import execution_metadata_dir, execution_asset_dir, asset_dir, execution_root
@@ -52,7 +53,7 @@ class Execution:
         self.configuration = configuration
         self._ml_object = ml_object
         self.start_time = None
-        self.status = Status.pending.value
+        self.status = Status.pending
 
         self.working_dir = self._ml_object.working_dir
         self.cache_dir = self._ml_object.cache_dir
@@ -150,14 +151,9 @@ class Execution:
         """
         Get the checksum of a file from a URL.
 
-        Args:
-        - url: URL of the file.
-
-        Returns:
-        - str: Checksum of the file.
-
-        Raises:
-        - DerivaMLException: If the URL is invalid or the file cannot be accessed.
+        :param: url: URL of the file.
+        :returns: str: Checksum of the file.
+        :raises:  DerivaMLException: If the URL is invalid or the file cannot be accessed.
 
         """
         try:
@@ -173,9 +169,9 @@ class Execution:
 
     @validate_call
     def update_status(self, status: Status, msg: str):
-        self.status = status.value
+        self.status = status
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
-            [{'RID': self.execution_rid, 'Status': self.status, 'Status_Detail': msg}]
+            [{'RID': self.execution_rid, 'Status': self.status.value, 'Status_Detail': msg}]
         )
 
     def execution_end(self) -> None:
@@ -196,9 +192,6 @@ class Execution:
         Upload execution assets at working_dir/Execution_asset.  This routine uploads the contents of the
         Execution_Asset directory, and then updates the execution_asset table in the ML schema to have references
         to these newly uploaded files.
-
-        Args:
-        - execution_rid (str): Resource Identifier (RID) of the execution.
 
         Returns:
         - dict: Results of the upload operation.
@@ -244,7 +237,6 @@ class Execution:
                     yield from traverse_bottom_up(entry)
             yield directory
 
-        # for p, _, files in configuration.feature_root.walk(top_down=False):
         for p in traverse_bottom_up(self.feature_root):
             if m := is_feature_asset_dir(p):
                 try:
@@ -257,10 +249,6 @@ class Execution:
                     raise DerivaMLException(
                         f'Fail to upload execution metadata. Error: {error}')
             elif m := is_feature_dir(p):
-                # self._update_feature_table(target_table=m['target_table'],
-                #                            feature_name=m['feature_name'],
-                #                            feature_file=p / files[0],
-                #                            uploaded_files=feature_assets[m['target_table'], m['feature_name']])
                 files = [f for f in p.iterdir() if f.is_file()]
                 if files:
                     self._update_feature_table(target_table=m['target_table'],
@@ -275,11 +263,7 @@ class Execution:
         """
         Upload all the assets and metadata associated with the current execution.
 
-        Args:
-        - execution_rid (str): Resource Identifier (RID) of the execution.
-
-        Returns:
-        - dict: Uploaded assets with key as assets' suborder name,
+        :return: dict: Results of the upload operation. Uploaded assets with key as assets' suborder name,
         values as an ordered dictionary with RID and metadata in the Execution_Asset table.
 
         """
@@ -310,7 +294,6 @@ class Execution:
         Download execution assets.
 
         Args:
-            - table_name (str): Name of the table (Execution_Asset or Execution_Metadata)
             - file_rid (str): Resource Identifier (RID) of the file.
             - dest_dir (str): Destination directory for the downloaded assets.
 
@@ -364,9 +347,6 @@ class Execution:
     def _update_execution_metadata_table(self, assets: dict[str, FileUploadState]) -> None:
         """
         Upload execution metadata at working_dir/Execution_metadata.
-
-        Args:
-        - execution_rid (str): Resource Identifier (RID) of the execution.
 
         Raises:
         - DerivaMLException: If there is an issue uploading the metadata.
@@ -462,8 +442,6 @@ class Execution:
         :param asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
         :return: Path in which to place asset files.
         """
-        if not self._ml_object.is_asset(asset_type):
-            raise DerivaMLException(f"Execution_asset_path argument:'{asset_type}' is not an asset.")
         return execution_asset_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
 
     @property
@@ -529,6 +507,8 @@ class Execution:
         :param table: Name of the asset table to be uploaded.
         :return: Pathlib path to the directory in which to place asset files.
         """
+        if not self._ml_object.is_asset(table):
+            raise DerivaMLException(f"Execution_asset_path argument:'{table}' is not an asset.")
         return asset_dir(prefix=self.working_dir,
                                 schema=self._ml_object.domain_schema,
                                 asset_table=table)

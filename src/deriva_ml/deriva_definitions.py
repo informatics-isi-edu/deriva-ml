@@ -1,16 +1,7 @@
-# from enum import Enum, StrEnum
-from nltk.cluster import em
-
-try:
-    from enum import Enum, StrEnum
-except ImportError:
-    from enum import Enum
-    class StrEnum(str, Enum):
-        pass
-
 import deriva.core.ermrest_model as em
 from deriva.core.ermrest_model import builtin_types
-from pydantic import BaseModel, model_serializer, Field, computed_field, model_validator
+from enum import Enum
+from pydantic import BaseModel, model_serializer, Field, computed_field
 from typing import Any, Iterable, Optional, Annotated
 import warnings
 
@@ -26,7 +17,8 @@ warnings.filterwarnings('ignore',
                         category=Warning,
                         module='pydantic')
 
-rid_regex = r"^(?:[A-Z\d]{4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)$"
+
+rid_regex = r"^(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)$"
 RID = Annotated[str, Field(pattern=rid_regex)]
 
 DerivaSystemColumns = ['RCT', 'RMT', 'RCB', 'RMB']
@@ -42,6 +34,9 @@ class UploadState(Enum):
     cancelled = 6
     timeout = 7
 
+class StrEnum(str, Enum):
+    pass
+
 class FileUploadState(BaseModel):
     state: UploadState
     status: str
@@ -52,7 +47,7 @@ class FileUploadState(BaseModel):
     def rid(self) -> Optional[RID]:
         return self.result and self.result['RID']
 
-class Status(Enum):
+class Status(StrEnum):
     """
     Enumeration class defining execution status.
 
@@ -208,28 +203,6 @@ class TableDefinition(BaseModel):
             acls=self.acls,
             acl_bindings=self.acl_bindings,
             annotations=self.annotations)
-
-class Table(BaseModel):
-    name: str
-    ermrest_table: Optional[em.Table] = None
-    __ml_instance__ = Optional[em.Model]
-
-    @model_validator(mode='before')
-    @classmethod
-    def validate(cls, v) -> Any:
-        if isinstance(v, em.Table):
-            return {
-                'name': v.name,
-                'ermrest_table': v,
-            }
-        return v
-
-    @model_validator(mode='after')
-    def validate_self(self, values):
-        if isinstance(values['self'].model, em.Model):
-            self.ermrest_table = values['self'].model
-            # Perform validation on self here
-        return values
 
 
 class DerivaMLException(Exception):

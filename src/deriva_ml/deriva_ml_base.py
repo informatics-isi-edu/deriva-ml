@@ -6,28 +6,21 @@ from deriva.core import ErmrestCatalog, get_credential, format_exception, urlquo
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.datapath import _CatalogWrapper
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import FindAssociationResult, Column, Table
+from deriva.core.ermrest_model import FindAssociationResult, Column, Key, Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva_ml.dataset_bag import generate_dataset_download_spec
-from deriva_ml.deriva_definitions import Key, ColumnDefinition, RID, UploadState, Status, FileUploadState, DerivaMLException
+from deriva_ml.deriva_definitions import ColumnDefinition
+from deriva_ml.deriva_definitions import  RID, UploadState, Status, FileUploadState, DerivaMLException
 from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
 from deriva_ml.upload import asset_dir
 from deriva_ml.upload import table_path, bulk_upload_configuration
-
-# from enum import Enum, StrEnum
-try:
-    from enum import Enum, StrEnum
-except ImportError:
-    from enum import Enum
-    class StrEnum(str, Enum):
-        pass
-
+from enum import Enum
 import getpass
 from itertools import chain
 import json
@@ -38,9 +31,11 @@ from pathlib import Path
 import re
 import requests
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import  Optional, Any, Iterable, Type, ClassVar
+from typing import  Optional, Any, Iterable, Type, ClassVar, TYPE_CHECKING
 from types import UnionType
 
+if TYPE_CHECKING:
+    from deriva_ml.execution import Execution
 
 class VocabularyTerm(BaseModel):
     """
@@ -177,7 +172,6 @@ class Feature:
         docstring += '\n'.join([f'    {c.name}' for c in self.feature_columns])
 
         model = create_model(featureclass_name,
-                             __config__= ConfigDict(arbitrary_types_allowed=True),
                              __base__=FeatureRecord,
                              __doc__=docstring, **feature_columns)
         model.feature = self  # Set value of class variable within the feature class definition.
@@ -321,7 +315,7 @@ class DerivaML:
         Return the table object corresponding to the given table name. If the table name appears in more
         than one schema, return the first one you find.
 
-        :param table: A ERMRest table object or a sting that is the name of the table.
+        :param table: A ERMRest table object or a string that is the name of the table.
         :return: Table object.
         """
         if isinstance(table, Table):
@@ -464,6 +458,7 @@ class DerivaML:
     def find_assets(self) -> list[Table]:
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_feature(self,
                        target_table: Table | str,
                        feature_name: str,
@@ -564,6 +559,7 @@ class DerivaML:
         except IndexError:
             raise DerivaMLException(f"Feature {table.name}:{feature_name} doesn't exist.")
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def find_features(self, table: Table | str) -> Iterable[Feature]:
         """
         List the names of the features in the specified table.
@@ -595,6 +591,7 @@ class DerivaML:
         entries = feature_path.insert(f.model_dump() for f in features)
         return len(entries)
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_feature_values(self, table: Table | str, feature_name: str) -> _ResultSet:
         """
         Return a datapath resultset containing all values of a feature associated with a table.
@@ -707,6 +704,7 @@ class DerivaML:
 
         return [t for a in self.dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
         """
         A dataset is a heterogeneous collection of objects, each of which comes from a different table. This
@@ -803,6 +801,7 @@ class DerivaML:
                         members[k].extend(v)
         return members
 
+    @validate_call
     def add_dataset_members(self, dataset_rid: Optional[RID], members: list[RID],
                             validate: bool = True) -> RID:
         """
@@ -854,7 +853,7 @@ class DerivaML:
                     [{'Dataset': dataset_rid, fk_column: e} for e in elements])
         return dataset_rid
 
-    @validate_call
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_term(self,
                  table: str | Table,
                  term_name: str,
@@ -898,21 +897,17 @@ class DerivaML:
             # Check vocabulary
         return term_id
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
         """
         Given a term name, return the vocabulary record.  Can provide either the term name
          or a synonym for the term.
-        Args:
-        - table_name (str): The name of the controlled vocabulary table.
-        - term_name (str): The name of the term to look up.
 
-        Returns:
-        - str: The entry the associated term or synonym.
-
-        Raises:
-        - EyeAIException: If the schema or vocabulary table doesn't exist, or if the term is not
+        :param table: The name of the controlled vocabulary table or a ERMrest table object..
+        :param term_name:  The name of the term to look up.
+        :return: The entry the associated term or synonym.
+        :raises DerivaException: If the schema or vocabulary table doesn't exist, or if the term is not
           found in the vocabulary.
-
         """
         vocab_table = self._get_table(table)
         if not self.is_vocabulary(vocab_table):
@@ -934,24 +929,19 @@ class DerivaML:
         """
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
-    def list_vocabulary_terms(self, table_name: str) -> list[VocabularyTerm]:
+    def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
         """
         Return an list of terms that are in a vocabulary table.
 
-        Args:
-        - table_name (str): The name of the controlled vocabulary table.
-
-        Returns:
-        - Iterable: A iterable containing the terms in the specified controlled vocabulary table.
-
-        Raises:
-        - DerivaMLException: If the schema or vocabulary table doesn't exist, or if the table is not
+        :param table: The name of the controlled vocabulary table or a ERMrest table object.
+        :return: The list of terms that are in a vocabulary table.
+        :raises DerivaMLException: If the schema or vocabulary table doesn't exist, or if the table is not
           a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
-        table = self._get_table(table_name)
-        if not (self.is_vocabulary(table_name)):
-            raise DerivaMLException(f'The table {table_name} is not a controlled vocabulary')
+        table = self._get_table(table)
+        if not (self.is_vocabulary(table)):
+            raise DerivaMLException(f'The table {table} is not a controlled vocabulary')
 
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
@@ -1032,16 +1022,19 @@ class DerivaML:
         def fetch_progress_callback(current, total):
             msg = f'Materializing bag: {current} of {total} file(s) downloaded.'
             if execution_rid:
-                self.update_status(Status.running, msg, execution_rid)
+                self._update_status(Status.running, msg, execution_rid)
             logging.info(msg)
             return True
 
         def validation_progress_callback(current, total):
             msg = f'Validating bag: {current} of {total} file(s) validated.'
             if execution_rid:
-                self.update_status(Status.running, msg, execution_rid)
+                self._update_status(Status.running, msg, execution_rid)
             logging.info(msg)
             return True
+
+        if self.resolve_rid(execution_rid).table.name != "Execution":
+                        raise DerivaMLException(f'RID {execution_rid} is not an execution')
 
         # request metadata
         bag_path, dataset_rid = self._download_dataset_bag(bag)
@@ -1058,24 +1051,17 @@ class DerivaML:
 
     def download_asset(self, asset_url: str, dest_filename: str) -> Path:
         """
-        Download an asset from a URL.
+        Download an asset from a URL and place it in a local directory.
 
-        Args:
-        - asset_url (str): URL of the asset.
-        - dest_filename (str): Destination filename.
-
-        Returns:
-        - str: Path to the downloaded asset.
-
-        Raises:
-        - DerivaMLException: If there is an issue downloading the asset.
-
+        :param asset_url:  URL of the asset.
+        :param dest_filename: Destination filename.
+        :return: A  Path object to the downloaded asset.
         """
         hs = HatracStore('https', self.host_name, self.credential)
         hs.get_obj(path=asset_url, destfilename=dest_filename)
         return Path(dest_filename)
 
-    @validate_call
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def upload_asset(self, file: Path, table: Table | str, **kwargs) -> dict:
         """
         Upload the specified file into Hatrac and update the associated asset table.
@@ -1149,14 +1135,14 @@ class DerivaML:
             uploader.cleanup()
         return results
 
-    def update_status(self, new_status: Status, status_detail: str, execution_rid: str):
+    def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID):
         """
-        Update the status of an execution.
+        Update the status of an execution in the catalog.
 
         Args:
-        - new_status (Status): New status.
-        - status_detail (str): Details of the status.
-        - execution_rid (str): Resource Identifier (RID) of the execution.
+       :param new_status: New status.
+       :param status_detail: Details of the status.
+       :param execution_rid: Resource Identifier (RID) of the execution.
 
         """
         self.status = new_status.value
