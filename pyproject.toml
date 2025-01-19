@@ -9,7 +9,7 @@ dynamic = ["version"]
 authors = [
     {name = "ISRD", email = "isrd-dev@isi.edu"},
 ]
-description = "Utilities to simplify use of Dervia and Pandas"
+description = "Utilities to simplify use of Dervia and Pandas to create reproducable ML pipelines"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [

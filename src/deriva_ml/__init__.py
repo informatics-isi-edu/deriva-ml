@@ -11,12 +11,13 @@ __all__ = [
     'UploadState',
     'MLVocab',
     'ExecMetadataVocab',
-    'RID'
+    'RID',
+    'DerivaSystemColumns'
 ]
 
 from .execution_configuration import ExecutionConfiguration, Workflow
 from .execution import Execution
 from .dataset_bag import DatasetBag
 from .deriva_definitions import ColumnDefinition, TableDefinition, BuiltinTypes, UploadState, FileUploadState, RID
-from .deriva_definitions import DerivaMLException, MLVocab, ExecMetadataVocab
+from .deriva_definitions import DerivaMLException, MLVocab, ExecMetadataVocab, DerivaSystemColumns
 from .deriva_ml_base import DerivaML
