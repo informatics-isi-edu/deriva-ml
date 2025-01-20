@@ -1,0 +1,16 @@
+site_name: DerivaML
+site_url: https://sitename.exampl
+theme:
+   name: material
+   palette:
+      scheme: slate
+      primary: green
+      accent: purple
+
+plugins:
+- search
+- mkdocstrings:
+    handlers:
+      python:
+        options:
+          docstring_style: sphinx
