@@ -64,6 +64,7 @@ class DatasetBag(object):
     def _localize_asset_table(self) -> dict[str, str]:
         """
         Use the fetch.txt file in a bdbag to create a map from a URL to a local file path.
+
         :return: Dictionary that maps a URL to a local file path.
         """
         fetch_map = {}
