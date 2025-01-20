@@ -8,7 +8,8 @@ from requests import HTTPError
 from deriva.core import DerivaServer
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
-from deriva_ml import DerivaML, ColumnDefinition, BuiltinTypes, MLVocab, Workflow, Execution, ExecutionConfiguration
+from deriva_ml.execution import Execution
+from deriva_ml import DerivaML, ColumnDefinition, BuiltinTypes, MLVocab, Workflow, ExecutionConfiguration
 from deriva.core import ErmrestCatalog, get_credential
 from deriva.config.acl_config import AclConfig
 

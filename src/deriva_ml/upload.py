@@ -90,7 +90,7 @@ def execution_metadata_root(prefix: Path | str, exec_rid: str) -> Path:
 
 def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
     """
-    Return the path to a directory in which to place execution assets that are to be uploaded.
+    Return the path to a directory in which to place execution assets of a specified type are to be uploaded.
     :param prefix: Location of upload root directory
     :param asset_type: Type of execution asset
     :param exec_rid: RID of the execution asset
@@ -103,7 +103,8 @@ def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> P
 
 def execution_metadata_dir(prefix: Path | str, exec_rid: str, metadata_type: str) -> Path:
     """
-    Return the path to a directory in which to place execution metadata that are to be uploaded.
+    Return the path to a directory in which to place execution metadata of a specified type are to be uploaded.
+
     :param prefix:  Location in which to locate this directory
     :param exec_rid: Execution rid to be associated with this metadata
     :param metadata_type: Controlled vocabulary term from vocabulary Metadata_Type
@@ -130,7 +131,7 @@ def feature_value_path(
     prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
 ) -> Path:
     """
-    Return the path to a file in which to place feature values that are to be uploaded.  Values will either be
+    Return the path to a CSV file in which to place feature values that are to be uploaded.  Values will either be
     scalar, references to controlled vocabulary (Terms) or references to assets.
     :param prefix: Location of upload root directory
     :param exec_rid: RID of the execution to be associated with this feature.
@@ -151,7 +152,8 @@ def feature_asset_dir(
     asset_table: str,
 ) -> Path:
     """
-    Return the path to a directory in which to place feature assets that are to be uploaded.
+    Return the path to a directory in which to place feature assets for a named feature are to be uploaded.
+
     :param prefix:  Location of upload root directory
     :param exec_rid: RID of the execution for the feature asset
     :param schema: Domain schema
@@ -181,7 +183,7 @@ def asset_dir(prefix: Path | str, schema: str, asset_table: str) -> Path:
 
 def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     """
-    Return the path to a file in which to place table values that are to be uploaded.
+    Return the path to a CSV file in which to place table values that are to be uploaded.
     :param prefix: Location of upload root directory
     :param schema: Domain schema
     :param table: Name of the table to be uploaded.

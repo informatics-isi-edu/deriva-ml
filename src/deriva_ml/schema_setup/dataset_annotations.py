@@ -3,7 +3,7 @@ from typing import Any
 from deriva.core.ermrest_model import Model
 from deriva.core.utils.core_utils import tag as deriva_tags
 
-from ..dataset_bag import export_outputs
+from deriva_ml.dataset_specification import export_outputs
 
 def dataset_visible_columns(model: Model) -> dict[str, Any]:
     dataset_table = model.schemas['deriva-ml'].tables['Dataset']

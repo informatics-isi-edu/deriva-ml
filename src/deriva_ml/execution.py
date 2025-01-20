@@ -8,7 +8,7 @@ from deriva_ml.deriva_definitions import RID, Status, FileUploadState, UploadSta
 from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
 from deriva_ml.execution_configuration import ExecutionConfiguration, DatasetSpec
 from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
-from deriva_ml.upload import execution_metadata_dir, execution_asset_dir, asset_dir, execution_root
+from deriva_ml.upload import execution_metadata_dir, execution_asset_dir, execution_root
 from deriva_ml.upload import table_path
 from deriva_ml.upload import feature_root, feature_asset_dir, feature_value_path
 import hashlib
@@ -26,17 +26,36 @@ from typing import Iterable
 
 class Execution:
     """
-    Data model representing configuration records.
+    The Execution class is used to capture the context of an activity within DerivaML.  While these are primarly
+    computational, manual processes can be represented by an execution as well.
+
+    Within DerivaML, Executions are used to provide providence. Every dataset and data file that is generated is
+    associated with an execution, which records which program and input parameters were used to generate that data.
+
+    Execution objects are created from an ExecutionConfiguration, which provides infomation about what DerivaML
+    datasets will be used, what additional files (assets) are required, what code is being run (Workflow) and an
+    optional description of the Execution.  Side effects of creating an exeuction object are:
+
+    1. An execution record is created in the catalog and the RID of that record is recorded,
+    2. Any specified datasets are downloaded and materialized
+    3. Any additional required assets are downloaded.
+
+    Once execution is complete, a method can be called to upload any data produced by the execution. In addition, the
+    Execution object provides methods for locating where to find downloaded datasets and assets, and also where to
+    place any data that may be uploaded.
+
+    Finally, the execution object can update its current state in the DerivaML catalog, allowing users to remotely
+    track the progress of their execution.
 
     Attributes:
-    - vocabs (dict): Dictionary containing vocabulary terms with key as vocabulary table name,
-    and values as a list of dict containing name, rid pairs.
-    - execution_rid (str): Execution identifier in catalog.
-    - workflow_rid (str): Workflow identifier in catalog.
-    - bag_paths (list): List of paths to bag files.
-    - asset_paths (list): List of paths to assets.
-    - configuration(Path): Path to the configuration file.
 
+    Methods:
+        create_dataset
+        execution
+        execution_asset_path
+        exectution_start
+        execution_stop
+        feature_paths
     """
     def __init__(self,
         configuration: ExecutionConfiguration,
@@ -168,13 +187,23 @@ class Execution:
         return checksum
 
     @validate_call
-    def update_status(self, status: Status, msg: str):
+    def update_status(self, status: Status, msg: str) -> None:
+        """
+        Update the status information in the execution record in the DerivaML catalog.
+        :param status:  A value from the Status Enum
+        :param msg:  Additional information about the status
+        :return:
+        """
         self.status = status
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
             [{'RID': self.execution_rid, 'Status': self.status.value, 'Status_Detail': msg}]
         )
 
-    def execution_end(self) -> None:
+    def execution_start(self) -> None:
+        self.start_time = datetime.now()
+        self.update_status(Status.running, f'Start ML algorithm ...')
+
+    def execution_stop(self) -> None:
         """
         Finish the execution and update the duration and status of execution.
         """
@@ -237,7 +266,7 @@ class Execution:
                     yield from traverse_bottom_up(entry)
             yield directory
 
-        for p in traverse_bottom_up(self.feature_root):
+        for p in traverse_bottom_up(self._feature_root):
             if m := is_feature_asset_dir(p):
                 try:
                     self.update_status(Status.running, f'Uploading feature {m["feature_name"]}...')
@@ -261,7 +290,8 @@ class Execution:
 
     def upload_execution_outputs(self, clean_folder: bool = True) -> dict[str, FileUploadState]:
         """
-        Upload all the assets and metadata associated with the current execution.
+        Upload all the assets and metadata associated with the current execution.  This will include any new assets,
+        features, or table values.
 
         :return: dict: Results of the upload operation. Uploaded assets with key as assets' suborder name,
         values as an ordered dictionary with RID and metadata in the Execution_Asset table.
@@ -272,7 +302,7 @@ class Execution:
             self.update_status(Status.completed,
                                'Successfully end the execution.')
             if clean_folder:
-                self._clean_folder_contents(self.execution_root)
+                self._clean_folder_contents(self._execution_root)
             return uploaded_assets
         except Exception as e:
             error = format_exception(e)
@@ -441,11 +471,14 @@ class Execution:
 
         :param asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
         :return: Path in which to place asset files.
+        :raise DerivaException: If the asset type is not defined.
         """
+        self._ml_object.lookup_term(MLVocab.execution_asset_type, asset_type)
+
         return execution_asset_dir(self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type)
 
     @property
-    def execution_root(self) -> Path:
+    def _execution_root(self) -> Path:
         """
         Return the root path to all execution specific files.
         :return:
@@ -453,7 +486,7 @@ class Execution:
         return execution_root(self.working_dir, self.execution_rid)
 
     @property
-    def feature_root(self) -> Path:
+    def _feature_root(self) -> Path:
         """
         The root path to all execution specific files.
         :return:
@@ -490,30 +523,23 @@ class Execution:
 
     def table_path(self, table: str) -> Path:
         """
-        Return a local file path in which to place a CSV to add values to a table on upload.
+        Return a local file path to a CSV to add values to a table on upload.
 
         :param table: Name of table to be uploaded.
         :return: Pathlib path to the file in which to place table values.
         """
+        if table not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables:
+            raise DerivaMLException("Table '{}' not found in domain schema".format(table))
+
         return table_path(self.working_dir,
                                  schema=self._ml_object.domain_schema,
                                  table=table)
 
-    def asset_directory(self, table: str) -> Path:
-        """
-        Return a local file path in which to place a files for an asset table.  This needs to be kept in sync with
-        bulk_upload specification.
-
-        :param table: Name of the asset table to be uploaded.
-        :return: Pathlib path to the directory in which to place asset files.
-        """
-        if not self._ml_object.is_asset(table):
-            raise DerivaMLException(f"Execution_asset_path argument:'{table}' is not an asset.")
-        return asset_dir(prefix=self.working_dir,
-                                schema=self._ml_object.domain_schema,
-                                asset_table=table)
-
     def execute(self) -> 'DerivaMLExec':
+        """
+        Generate a context manager for a DerivaML execution.
+        :return:
+        """
         return DerivaMLExec(self)
 
     @validate_call
@@ -565,7 +591,8 @@ class Execution:
 
 class DerivaMLExec:
     """
-    Context manager for managing DerivaML execution.  Provides status updates.
+    Context manager for managing DerivaML execution.  Provides status updates.  For convenience, asset discovery and
+    creation functions from the Execution object are provided.
 
     Args:
     - catalog_ml: Instance of DerivaML class.
@@ -587,7 +614,7 @@ class DerivaMLExec:
         - self: The instance itself.
 
         """
-        self.execution.update_status(Status.running,'Start ML algorithm.')
+        self.execution.execution_start()
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
@@ -605,15 +632,12 @@ class DerivaMLExec:
          """
         if not exc_type:
             self.execution.update_status(Status.running,'Successfully run Ml.')
-            self.execution.execution_end()
+            self.execution.execution_stop()
         else:
             self.execution.update_status(Status.failed,
                                           f'Exception type: {exc_type}, Exception value: {exc_value}')
             logging.error(f'Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}')
             return False
-
-    def asset_directory(self, table: str) -> Path:
-        return self.execution.asset_directory(table)
 
     def execution_asset_path(self, asset_type: str) -> Path:
         return self.execution.execution_asset_path(asset_type)
@@ -621,16 +645,8 @@ class DerivaMLExec:
     def execution_metadata_path(self, metadata_type: str) -> Path:
         return self.execution.execution_metadata_path(metadata_type)
 
-    @property
-    def execution_root(self) -> Path:
-        return self.execution.execution_root
-
     def feature_paths(self,table: Table|str, feature_name: str):
         return self.execution.feature_paths(table, feature_name)
-
-    @property
-    def feature_root(self):
-        return self.execution.feature_root
 
     def table_path(self, table: Table|str) -> Path:
         return self.execution.table_path(table)

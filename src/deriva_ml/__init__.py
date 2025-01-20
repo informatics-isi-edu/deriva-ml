@@ -16,7 +16,6 @@ __all__ = [
 ]
 
 from .execution_configuration import ExecutionConfiguration, Workflow
-from .execution import Execution
 from .dataset_bag import DatasetBag
 from .deriva_definitions import ColumnDefinition, TableDefinition, BuiltinTypes, UploadState, FileUploadState, RID
 from .deriva_definitions import DerivaMLException, MLVocab, ExecMetadataVocab, DerivaSystemColumns

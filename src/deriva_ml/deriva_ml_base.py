@@ -12,7 +12,7 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from deriva_ml.dataset_bag import generate_dataset_download_spec
+from deriva_ml.dataset_specification import generate_dataset_download_spec
 from deriva_ml.deriva_definitions import ColumnDefinition
 from deriva_ml.deriva_definitions import  RID, UploadState, Status, FileUploadState, DerivaMLException
 from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
@@ -342,6 +342,9 @@ class DerivaML:
         :param prefix: Location of where to place files.  Defaults to execution_assets_path.
         """
         table = self._get_table(table)
+        if not self.is_asset(table):
+            raise DerivaMLException(f'The table {table} is not an asset table.')
+
         prefix = Path(prefix) or self.working_dir
         return asset_dir(prefix, table.schema.name, table.name)
 
@@ -901,7 +904,7 @@ class DerivaML:
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
         """
         Given a term name, return the vocabulary record.  Can provide either the term name
-         or a synonym for the term.
+         or a synonym for the term.  Generate an exception if the term is not in the vocabulary.
 
         :param table: The name of the controlled vocabulary table or a ERMrest table object..
         :param term_name:  The name of the term to look up.
