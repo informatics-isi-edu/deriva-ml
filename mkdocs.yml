@@ -1,5 +1,5 @@
 site_name: DerivaML
-site_url: https://sitename.exampl
+site_url: https://informatics-isi-edu.github.io/deriva-ml
 theme:
    name: material
    palette:

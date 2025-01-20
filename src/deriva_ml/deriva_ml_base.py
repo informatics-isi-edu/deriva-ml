@@ -71,7 +71,7 @@ class SemanticVersion(Enum):
     """
     Simple enumeration for semantic versioning.
     """
-
+    
     major = 'major'
     minor = 'minor'
     patch = 'patch'
