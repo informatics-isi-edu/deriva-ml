@@ -22,6 +22,7 @@ plugins:
           separate_signature: true
           show_signature_annotations: true
           line_length: 40
+          annotations_path: brief
 - mkdocs-jupyter
 
 nav:
