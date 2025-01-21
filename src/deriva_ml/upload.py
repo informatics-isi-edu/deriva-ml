@@ -1,34 +1,40 @@
+"""
+This module provides functions that help stucture local directories for uploading to a DerivaML catalog, and
+generating an upload specification for those directories.
+
+Here is the directory layout we support:
+
+  deriva-ml/
+       execution
+           <execution_rid>
+               execution-asset
+                   <asset_type>
+                       file1, file2, ....   <- Need to update execution_asset association table.
+               execution-metadata
+                   <metadata_type>
+               feature
+                   <schema>
+                       <target_table>
+                            <feature_name>
+                                   asset
+                                       <asset_table>
+                                           file1, file2, ...
+                           <feature_name>.csv    <- needs to have asset_name column remapped before uploading
+            table
+               <schema>
+                   <record_table>
+                      record_table.csv
+            asset
+               <schema>
+                   <asset_table>
+                     file1, file2, ....
+
+"""
+
 from pathlib import Path
 from typing import Optional
 import regex as re
 
-# Here is the directory layout we support:
-#
-#  deriva-ml/
-#       execution
-#           <execution_rid>
-#               execution-asset
-#                   <asset_type>
-#                       file1, file2, ....   <- Need to update execution_asset association table.
-#               execution-metadata
-#                   <metadata_type>
-#               feature
-#                   <schema>
-#                       <target_table>
-#                            <feature_name>
-#                                   asset
-#                                       <asset_table>
-#                                           file1, file2, ...
-#                           <feature_name>.csv    <- needs to have asset_name column remapped before uploading
-#            table
-#               <schema>
-#                   <record_table>
-#                      record_table.csv
-#            asset
-#               <schema>
-#                   <asset_table>
-#                     file1, file2, ....
-#
 
 upload_root_regex = r"(?i)^.*/deriva-ml"
 exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"

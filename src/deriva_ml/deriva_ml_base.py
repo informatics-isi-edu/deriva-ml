@@ -304,6 +304,7 @@ class DerivaML:
     def pathBuilder(self) -> _CatalogWrapper:
         """
         Get a new instance of a pathbuilder object.
+
         :return: pathbuilder object.
         """
         return self.catalog.getPathBuilder()
@@ -614,6 +615,7 @@ class DerivaML:
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
         """
         Lookup the named feature associated with the provided table.
+
         :param table:
         :param feature_name:
         :return: A Feature class that represents the requested feature.
@@ -661,6 +663,7 @@ class DerivaML:
     def list_feature_values(self, table: Table | str, feature_name: str) -> _ResultSet:
         """
         Return a datapath resultset containing all values of a feature associated with a table.
+
         :param table:
         :param feature_name:
         :return:
@@ -677,6 +680,7 @@ class DerivaML:
                        version: tuple[int,int,int] = (1,0,0)) -> RID:
         """
         Create a new dataset from the specified list of RIDs.
+
         :param ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
         :param description:  Description of the dataset.
         :param execution_rid: Execution under which the dataset will be created.
@@ -730,6 +734,7 @@ class DerivaML:
     def delete_dataset(self, dataset_rid: RID, recurse = False) -> None:
         """
         Delete a dataset from the catalog.
+
         :param dataset_rid:  RID of the dataset to delete.
         :param recurse: If True, delete the dataset along with any nested datasets.
         :return:
@@ -763,6 +768,7 @@ class DerivaML:
     def list_dataset_element_types(self) -> Iterable[Table]:
         """
         Return the list of tables that can be included as members of a dataset.
+
         :return: An iterable of Table objects that can be included as an element of a dataset.
         """
 
@@ -794,6 +800,7 @@ class DerivaML:
     def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
         """
         Given a dataset RID, return a list of RIDs of the parent datasets.
+
         :param dataset_rid:
         :return: RID of the parent dataset.
         """
@@ -810,6 +817,7 @@ class DerivaML:
     def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
         """
         Given a dataset RID, return a list of RIDs of any nested datasets.
+
         :param dataset_rid:
         :return: list of RIDs of nested datasets.
         """
@@ -870,7 +878,7 @@ class DerivaML:
 
     @validate_call
     def add_dataset_members(self, dataset_rid: Optional[RID], members: list[RID],
-                            validate: bool = True) -> RID:
+                            validate: bool = True) -> None:
         """
         Add additional elements to an existing dataset.
 
@@ -918,7 +926,6 @@ class DerivaML:
                 # Find out the name of the column in the association table.
                 schema_path.tables[association_map[table]].insert(
                     [{'Dataset': dataset_rid, fk_column: e} for e in elements])
-        return dataset_rid
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_term(self,
@@ -1210,10 +1217,8 @@ class DerivaML:
         """
         Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
 
-        Args:
-        - config_file (str): Path to the configuration file.
-        - desc (str): Description of the configuration.
-
+        :param config: A execution configuration.
+        :return: RID of the newly created configuration file.
         :raises DerivaMLException: If there is an issue uploading the configuration.
 
         """

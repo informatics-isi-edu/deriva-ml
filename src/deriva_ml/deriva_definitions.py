@@ -1,3 +1,8 @@
+"""
+Shared definitions that are used in different DerivaML modules.
+"""
+
+
 import deriva.core.ermrest_model as em
 from deriva.core.ermrest_model import builtin_types
 from enum import Enum

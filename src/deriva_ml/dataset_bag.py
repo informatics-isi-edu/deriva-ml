@@ -23,10 +23,10 @@ class DatasetBag(object):
     to the table name using the convention SchemaName:TableName.  Methods in DatasetBag that have table names as the
     argument will perform the appropriate name mappings.
 
-    Attributes:
-        dbase: A connection to the sqlite database.
-        domain_schema The name of the domain schema for the dataset.
-        dataset_rid: The name of the dataset
+    :ivar dbase: A connection to the sqlite database.
+    :ivar domain_schema: The name of the domain schema for the dataset.
+    :ivar dataset_rid: The name of the dataset
+    :ivar model: The ERMRest model from which the dataset was generated.
 
     Methods:
         get_table(self, table: str) -> Generator[tuple, None, None]
