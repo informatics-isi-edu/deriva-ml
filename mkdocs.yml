@@ -2,16 +2,20 @@ site_name: DerivaML
 site_url: https://informatics-isi-edu.github.io/deriva-ml
 theme:
    name: material
+   logo: assets/deriva-logo.png
    features:
        - navigation.instant
        - navigation.expand
+       - navigation.footer
    palette:
       scheme: slate
-      primary: green
-      accent: purple
+      primary: black
+      accent: blue
+   copyright: "© Copyright 2025, USC Information Sciences Institute, Informatics Systems Research Division."
 
 plugins:
 - search
+
 - mkdocstrings:
     handlers:
       python:
@@ -23,7 +27,9 @@ plugins:
           show_signature_annotations: true
           line_length: 40
           annotations_path: brief
-- mkdocs-jupyter
+- mkdocs-jupyter:
+   include: ["*.ipynb"]
+   include_source: True
 
 nav:
   - Home: index.md

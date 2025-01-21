@@ -10,8 +10,8 @@ class Workflow(BaseModel):
 
     :ivar name: The name of the workflow
     :ivar url: The URI to the workflow instance.  In most cases should be a GitHub URI to the code being executed.
-    :ivar  workflow_type: The type of the workflow.  Must be an existing controlled vocabulary term.
-    :ivar  version: The version of the workflow instance.  Should follow semantic versioning.
+    :ivar workflow_type: The type of the workflow.  Must be an existing controlled vocabulary term.
+    :ivar version: The version of the workflow instance.  Should follow semantic versioning.
     :ivar description: A description of the workflow instance.  Can be in markdown format.
     """
     name: str
