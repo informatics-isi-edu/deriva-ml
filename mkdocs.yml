@@ -19,6 +19,8 @@ plugins:
           - src  # Search for modules in the 'src' directory
         options:
           docstring_style: sphinx
+          separate_signature: true
+          show_signature_annotations: true
 - mkdocs-jupyter
 
 nav:
