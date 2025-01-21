@@ -1,4 +1,4 @@
-# Documentation for ExecutionConfiguration class in DerivaML
+# ExecutionConfiguration class
 
 ::: deriva_ml.execution_configuration
     handler: python

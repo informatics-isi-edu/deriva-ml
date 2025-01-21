@@ -2,6 +2,8 @@ site_name: DerivaML
 site_url: https://informatics-isi-edu.github.io/deriva-ml
 theme:
    name: material
+   features:
+       - navigation.instant
    palette:
       scheme: slate
       primary: green
@@ -14,3 +16,17 @@ plugins:
       python:
         options:
           docstring_style: sphinx
+
+
+nav:
+  - Home: index.md
+  - User Guide:
+    - Creating a workflow: ml_workflow_instruction.md
+    - DerivaML Structure: deriva_ml_structure.md
+    - VM Docs: VM_setup_instruction.md
+  - Library Documentation:
+    - DerivaML: deriva_ml_base.md
+    - DatasetBag: dataset_bag.md
+    - Execution: execution.md
+    - ExecutionConfiguration: execution_configuration.md
+  - Release Notes: release-notes.md

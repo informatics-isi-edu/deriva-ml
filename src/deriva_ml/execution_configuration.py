@@ -1,20 +1,18 @@
-from docutils.frontend import validate_dependency_file
-
 from .deriva_definitions import RID
 import json
-from pydantic import BaseModel, field_validator, conlist, model_validator
+from pydantic import BaseModel, conlist, model_validator
 from typing import Optional, Any
 
 class Workflow(BaseModel):
     """
     A specification of a workflow.  Must have a name, URI to the workflow instance, and a type.  The workflow type
-    needs to be an existing controlled vocabulary term.
+    needs to be an existing-controlled vocabulary term.
 
-    :param name: The name of the workflow
-    :param type:  The name of an existing controlled vocabulary term.
-    :param uri: The URI to the workflow instance.  In most cases should be a GitHub URI to the code being executed.
-    :param version: The version of the workflow instance.  Should follow semantic versioning.
-    :param description: A description of the workflow instance.  Can be in markdown format.
+    :attribute name: The name of the workflow
+    :attribute url: The URI to the workflow instance.  In most cases should be a GitHub URI to the code being executed.
+    :attribute workflow_type: The type of the workflow.  Must be an existing controlled vocabulary term.
+    :attribute version: The version of the workflow instance.  Should follow semantic versioning.
+    :attribute description: A description of the workflow instance.  Can be in markdown format.
     """
     name: str
     url: str
@@ -35,13 +33,13 @@ class DatasetSpec(BaseModel):
 class ExecutionConfiguration(BaseModel):
     """
     Define the parameters that are used to configure a specific execution.
-    :param datasets: List of dataset RIDS, MINIDS for datasets to be downloaded prior to execution.  By default,
+    :attribute datasets: List of dataset RIDS, MINIDS for datasets to be downloaded prior to execution.  By default,
                      all  the datasets are materialized. However, if the assets associated with a dataset are not
                      needed, a dictionary that defines the rid and the materialization parameter for the
                      download_dataset_bag method can be specified, e.g.  datasets=[{'rid': RID, 'materialize': True}].
-    :param assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
-    :param workflow: A workflow instance.  Must have a name, URI to the workflow instance, and a type.
-    :param description: A description of the execution.  Can use markdown format.
+    :attribute assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
+    :attribute workflow: A workflow instance.  Must have a name, URI to the workflow instance, and a type.
+    :attribute description: A description of the execution.  Can use markdown format.
     """
     datasets: conlist(DatasetSpec) = []
     assets: list[RID|str] = []      # List of RIDs to model files.
