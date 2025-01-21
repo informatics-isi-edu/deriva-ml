@@ -21,7 +21,7 @@ plugins:
           docstring_style: sphinx
           separate_signature: true
           show_signature_annotations: true
-          line_length: 60
+          line_length: 40
 - mkdocs-jupyter
 
 nav:
