@@ -49,10 +49,9 @@ class Execution:
 
     Attributes:
 
-    Methods:
-        create_dataset
-        execution
-        execution_asset_path
+    :member create_dataset: Create a new dataset
+    :member execution: 
+    :member execution_asset_path: Get the path to the local execution assets directory
         exectution_start
         execution_stop
         feature_paths
