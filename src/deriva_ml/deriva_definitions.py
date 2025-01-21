@@ -53,14 +53,13 @@ class FileUploadState(BaseModel):
         return self.result and self.result['RID']
 
 class Status(StrEnum):
-    """
-    Enumeration class defining execution status.
+    """Enumeration class defining execution status.
 
     Attributes:
-    - running: Execution is currently running.
-    - pending: Execution is pending.
-    - completed: Execution has been completed successfully.
-    - failed: Execution has failed.
+        running: Execution is currently running.
+        pending: Execution is pending.
+        completed: Execution has been completed successfully.
+        failed: Execution has failed.
 
     """
     running = 'Running'
@@ -97,9 +96,7 @@ class BuiltinTypes(Enum):
     serial8 = builtin_types.serial8
 
 class MLVocab(StrEnum):
-    """
-    Names of controlled vocabulary for various types within DerivaML.
-    """
+    """Names of controlled vocabulary for various types within DerivaML."""
     dataset_type = 'Dataset_Type'
     workflow_type = 'Workflow_Type'
     execution_asset_type = 'Execution_Asset_Type'
@@ -113,9 +110,7 @@ class ExecMetadataVocab(StrEnum):
     runtime_env = 'Runtime_Env'
 
 class ColumnDefinition(BaseModel):
-    """
-    Pydantic model for deriva_py Column.define
-    """
+    """Pydantic model for deriva_py Column.define"""
 
     name: str
     type: BuiltinTypes
@@ -156,9 +151,7 @@ class KeyDefinition(BaseModel):
 
 
 class ForeignKeyDefinition(BaseModel):
-    """
-    Pydantic model for deriva_py ForeignKey.define
-    """
+    """Pydantic model for deriva_py ForeignKey.define"""
     colnames: Iterable[str]
     pk_sname: str
     pk_tname: str
@@ -211,12 +204,10 @@ class TableDefinition(BaseModel):
 
 
 class DerivaMLException(Exception):
-    """
-    Exception class specific to DerivaML module.
+    """Exception class specific to DerivaML module.
 
     Args:
-    - msg (str): Optional message for the exception.
-
+        msg (str): Optional message for the exception.
     """
 
     def __init__(self, msg=''):

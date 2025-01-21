@@ -22,7 +22,7 @@ plugins:
         paths:
           - src  # Search for modules in the 'src' directory
         options:
-          docstring_style: sphinx
+          docstring_style: google
           separate_signature: true
           show_signature_annotations: true
           line_length: 40

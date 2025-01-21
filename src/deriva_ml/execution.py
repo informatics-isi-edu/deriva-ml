@@ -25,36 +25,26 @@ from typing import Iterable
 
 
 class Execution:
-    """
-    The Execution class is used to capture the context of an activity within DerivaML.  While these are primarly
+    """The Execution class is used to capture the context of an activity within DerivaML.  While these are primarly
     computational, manual processes can be represented by an execution as well.
-
+    
     Within DerivaML, Executions are used to provide providence. Every dataset and data file that is generated is
     associated with an execution, which records which program and input parameters were used to generate that data.
-
+    
     Execution objects are created from an ExecutionConfiguration, which provides infomation about what DerivaML
     datasets will be used, what additional files (assets) are required, what code is being run (Workflow) and an
     optional description of the Execution.  Side effects of creating an exeuction object are:
-
+    
     1. An execution record is created in the catalog and the RID of that record is recorded,
     2. Any specified datasets are downloaded and materialized
     3. Any additional required assets are downloaded.
-
+    
     Once execution is complete, a method can be called to upload any data produced by the execution. In addition, the
     Execution object provides methods for locating where to find downloaded datasets and assets, and also where to
     place any data that may be uploaded.
-
+    
     Finally, the execution object can update its current state in the DerivaML catalog, allowing users to remotely
     track the progress of their execution.
-
-    Attributes:
-
-    :member create_dataset: Create a new dataset
-    :member execution: 
-    :member execution_asset_path: Get the path to the local execution assets directory
-        exectution_start
-        execution_stop
-        feature_paths
     """
     def __init__(self,
         configuration: ExecutionConfiguration,
@@ -83,18 +73,17 @@ class Execution:
         self._initialize_execution()
 
     def _add_workflow(self) -> RID:
-        """
-        Add a workflow to the Workflow table.
+        """Add a workflow to the Workflow table.
 
         Args:
-        - workflow_name (str): Name of the workflow.
-        - url (str): URL of the workflow.
-        - workflow_type (str): Type of the workflow.
-        - version (str): Version of the workflow.
-        - description (str): Description of the workflow.
+            workflow_name(str): Name of the workflow.
+          - url(str): URL of the workflow.
+          - workflow_type(str): Type of the workflow.
+          - version(str): Version of the workflow.
+          - description(str): Description of the workflow.
 
         Returns:
-        - str: Resource Identifier (RID) of the added workflow.
+          - str: Resource Identifier (RID) of the added workflow.
 
         """
         workflow = self.configuration.workflow
@@ -120,11 +109,15 @@ class Execution:
         return workflow_rid
 
     def _initialize_execution(self) -> None:
-        """
-        Initialize the execution by a configuration  in the Execution_Metadata table.
+        """Initialize the execution by a configuration  in the Execution_Metadata table.
         Setup working directory and download all the assets and data.
-
+        
         :raise DerivaMLException: If there is an issue initializing the execution.
+
+        Args:
+
+        Returns:
+
         """
         # Materialize bdbag
         self.dataset_rids = []
@@ -166,12 +159,13 @@ class Execution:
 
     @staticmethod
     def _get_checksum(url) -> str:
-        """
-        Get the checksum of a file from a URL.
+        """Get the checksum of a file from a URL.
 
-        :param: url: URL of the file.
-        :returns: str: Checksum of the file.
-        :raises:  DerivaMLException: If the URL is invalid or the file cannot be accessed.
+        Args:
+          url: 
+
+        Returns:
+          str: Checksum of the file.
 
         """
         try:
@@ -187,11 +181,11 @@ class Execution:
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
-        """
-        Update the status information in the execution record in the DerivaML catalog.
-        :param status:  A value from the Status Enum
-        :param msg:  Additional information about the status
-        :return:
+        """Update the status information in the execution record in the DerivaML catalog.
+
+        Args:
+            status: A value from the Status Enum
+            msg: Additional information about the status
         """
         self.status = status
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
@@ -199,13 +193,12 @@ class Execution:
         )
 
     def execution_start(self) -> None:
+        """ """
         self.start_time = datetime.now()
         self.update_status(Status.running, f'Start ML algorithm ...')
 
     def execution_stop(self) -> None:
-        """
-        Finish the execution and update the duration and status of execution.
-        """
+        """Finish the execution and update the duration and status of execution."""
         duration = datetime.now() - self.start_time
         hours, remainder = divmod(duration.total_seconds(), 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -216,17 +209,17 @@ class Execution:
             [{'RID': self.execution_rid, 'Duration': duration}])
 
     def _upload_execution_dirs(self) -> dict[str, FileUploadState]:
-        """
-        Upload execution assets at working_dir/Execution_asset.  This routine uploads the contents of the
+        """Upload execution assets at working_dir/Execution_asset.
+
+        This routine uploads the contents of the
         Execution_Asset directory, and then updates the execution_asset table in the ML schema to have references
         to these newly uploaded files.
 
         Returns:
-        - dict: Results of the upload operation.
+          - dict: Results of the upload operation.
 
         Raises:
-        - DerivaMLException: If there is an issue uploading the assets.
-
+          - DerivaMLException: If there is an issue uploading the assets.
         """
         results = {}
         try:
@@ -256,8 +249,13 @@ class Execution:
         feature_assets = defaultdict(dict)
 
         def traverse_bottom_up(directory: Path):
-            """
-            Traverses the directory tree in a bottom-up order.
+            """Traverses the directory tree in a bottom-up order.
+
+            Args:
+              directory: Path: 
+
+            Returns:
+
             """
             entries = list(directory.iterdir())
             for entry in entries:
@@ -288,13 +286,16 @@ class Execution:
         return results
 
     def upload_execution_outputs(self, clean_folder: bool = True) -> dict[str, FileUploadState]:
-        """
-        Upload all the assets and metadata associated with the current execution.  This will include any new assets,
-        features, or table values.
+        """Upload all the assets and metadata associated with the current execution.
 
-        :return: dict: Results of the upload operation. Uploaded assets with key as assets' suborder name,
-        values as an ordered dictionary with RID and metadata in the Execution_Asset table.
+        This will include any new assets, features, or table values.
 
+        Args:
+            clean_folder: bool:  (Default value = True)
+
+        Returns:
+            Results of the upload operation. Uploaded assets with key as assets' suborder name, values as an
+            ordered dictionary with RID and metadata in the Execution_Asset table.
         """
         try:
             uploaded_assets = self._upload_execution_dirs()
@@ -308,30 +309,31 @@ class Execution:
             self.update_status(Status.failed, error)
             raise e
 
-
     def _asset_dir(self) -> Path:
         """
-        Return the directory in which assets downloaded as part of initializing an execution are placed.
-        :return: PathLib path object to model directory.
+
+        Args:
+
+        Returns:
+          :return: PathLib path object to model directory.
+
         """
         path = self.working_dir / self.execution_rid / 'asset'
         path.mkdir(parents=True, exist_ok=True)
         return path
 
     def _download_execution_file(self, file_rid: RID, dest_dir: str = '') -> Path:
-        """
-        Download execution assets.
+        """Download execution assets.
 
         Args:
-            - file_rid (str): Resource Identifier (RID) of the file.
-            - dest_dir (str): Destination directory for the downloaded assets.
+            file_rid(str): Resource Identifier (RID) of the file.
+            dest_dir(str): Destination directory for the downloaded assets.
 
         Returns:
-        - Path: Path to the downloaded asset.
+          - Path: Path to the downloaded asset.
 
         Raises:
-        - DerivaMLException: If there is an issue downloading the assets.
-
+          - DerivaMLException: If there is an issue downloading the assets.
         """
         table = self._ml_object.resolve_rid(file_rid).table
         if not self._ml_object.is_asset(table):
@@ -362,6 +364,11 @@ class Execution:
         return Path(file_path)
 
     def _clean_folder_contents(self, folder_path: Path):
+        """
+
+        Args:
+            folder_path: Path:
+        """
         try:
             with os.scandir(folder_path) as entries:
                 for entry in entries:
@@ -374,17 +381,27 @@ class Execution:
             self.update_status(Status.failed, error)
 
     def _update_execution_metadata_table(self, assets: dict[str, FileUploadState]) -> None:
-        """
-        Upload execution metadata at working_dir/Execution_metadata.
+        """Upload execution metadata at working_dir/Execution_metadata.
+
+        Args:
+            assets: dict[str:
+            FileUploadState]:
 
         Raises:
-        - DerivaMLException: If there is an issue uploading the metadata.
-
+          - DerivaMLException: If there is an issue uploading the metadata.
         """
         ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         a_table = list(self._ml_object.model.schemas[self._ml_object.ml_schema].tables['Execution_Metadata'].find_associations())[0].name
 
         def asset_rid(asset) -> str:
+            """
+
+            Args:
+              asset: 
+
+            Returns:
+
+            """
             return asset.state == UploadState.success and asset.result and asset.result['RID']
 
         entities = [{'Execution_Metadata': rid, 'Execution': self.execution_rid} for asset in assets.values() if
@@ -396,11 +413,27 @@ class Execution:
                               feature_name: str,
                               feature_file: str | Path,
                               uploaded_files: dict[str, FileUploadState]) -> None:
+        """
+
+        Args:
+            target_table: str:
+            feature_name: str:
+            feature_file: str | Path:
+            uploaded_files: dict[str: FileUploadState]:
+        """
 
         asset_columns = [c.name for c in self._ml_object.feature_record_class(target_table, feature_name).feature.asset_columns]
         feature_table = self._ml_object.feature_record_class(target_table, feature_name).feature.feature_table.name
 
         def map_path(e):
+            """
+
+            Args:
+              e: 
+
+            Returns:
+
+            """
             # Go through the asset columns and replace the file name with the RID for the uploaded file.
             for c in asset_columns:
                 e[c] = asset_map[e[c]]
@@ -414,11 +447,13 @@ class Execution:
         self._ml_object.domain_path.tables[feature_table].insert(entities)
 
     def _update_execution_asset_table(self, assets: dict[str, FileUploadState]) -> None:
-        """
-        Assets associated with an execution must be linked to an execution entity after they are uploaded into
+        """Assets associated with an execution must be linked to an execution entity after they are uploaded into
         the catalog. This routine takes a list of uploaded assets and makes that association.
-        :param assets:
-        :return:
+
+        Args:
+            assets: return:
+            assets: dict[str:
+            FileUploadState]:
         """
         ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         asset_exec_entities = ml_schema_path.Execution_Asset_Execution.filter(
@@ -428,6 +463,14 @@ class Execution:
         # Now got through the list of recently added assets, and add an entry for this asset if it
         # doesn't already exist.
         def asset_rid(asset) -> str:
+            """
+
+            Args:
+                asset:
+
+            Returns:
+                RID of the asset
+            """
             return asset.state == UploadState.success and asset.result and asset.result['RID']
 
         entities = [{'Execution_Asset': rid, 'Execution': self.execution_rid}
@@ -437,20 +480,27 @@ class Execution:
     @property
     def _execution_metadata_dir(self) -> Path:
         """
-        Return a pathlib Path to the execution metadata directory. Files placed in this directory will be uploaded
-        to the catalog by the execution_upload method in an execution object.
 
-        :return:
+        Args:
+
+        Returns:
+          to the catalog by the execution_upload method in an execution object.
+          
+          :return:
+
         """
         return execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type='')
 
     def execution_metadata_path(self, metadata_type: str) -> Path:
-        """
-        Return a pathlib Path to the directory in which to place files of type metadata_type.  These files
-        are uploaded to the catalog as part of the execution of the upload_execution method in DerivaML.
+        """Return a pathlib Path to the directory in which to place files of type metadata_type.
 
-        :param metadata_type:  Type of metadata to be uploaded.  Must be a term in Metadata_Type controlled vocabulary.
-        :return: Path to the directory in which to place files of type metadata_type.
+        These files are uploaded to the catalog as part of the execution of the upload_execution method in DerivaML.
+
+        Args:
+            metadata_type: Type of metadata to be uploaded.  Must be a term in Metadata_Type controlled vocabulary.
+
+        Returns:
+            Path to the directory in which to place files of type metadata_type.
         """
         self._ml_object.lookup_term(MLVocab.execution_metadata_type, metadata_type)   # Make sure metadata type exists.
         return execution_metadata_dir(self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type)
@@ -458,19 +508,28 @@ class Execution:
     @property
     def _execution_asset_dir(self) -> Path:
         """
-        Return a pathlib Path to the directory in which to place directories for execution_assets.
-        :return:
+
+        Args:
+
+        Returns:
+          :return:
+
         """
         return execution_asset_dir(self.working_dir, exec_rid=self.execution_rid, asset_type='')
 
     def execution_asset_path(self, asset_type: str) -> Path:
-        """
-        Return a pathlib Path to the directory in which to place files for the specified execution_asset type. These
-         files are uploaded as part of the upload_execution method in DerivaML class.
+        """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
 
-        :param asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
-        :return: Path in which to place asset files.
-        :raise DerivaException: If the asset type is not defined.
+        These files are uploaded as part of the upload_execution method in DerivaML class.
+
+        Args:
+            asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
+
+        Returns:
+            Path in which to place asset files.
+
+        Raises:
+            DerivaException: If the asset type is not defined.
         """
         self._ml_object.lookup_term(MLVocab.execution_asset_type, asset_type)
 
@@ -479,28 +538,40 @@ class Execution:
     @property
     def _execution_root(self) -> Path:
         """
-        Return the root path to all execution specific files.
-        :return:
+
+        Args:
+
+        Returns:
+          :return:
+
         """
         return execution_root(self.working_dir, self.execution_rid)
 
     @property
     def _feature_root(self) -> Path:
-        """
-        The root path to all execution specific files.
+        """The root path to all execution specific files.
         :return:
+
+        Args:
+
+        Returns:
+
         """
         return feature_root(self.working_dir, self.execution_rid)
 
     def feature_paths(self, table:  Table | str, feature_name: str) -> tuple[Path, dict[str, Path]]:
-        """
-        Return the file path of where to place feature values, and assets for the named feature and table. A side
-        effect of calling this routine is that the directories in which to place th feature values and assets will be
-        created
-        :param table:
-        :param feature_name:
-        :return: A tuple whose first element is the path for the feature values and whose second element is a dictionary
-        of associated asset table names and corresponding paths.**
+        """Return the file path of where to place feature values, and assets for the named feature and table.
+
+        A side effect of calling this routine is that the directories in which to place the feature values and assets
+        will be created
+
+        Args:
+            table: The table with which the feature is associated.
+            feature_name: Name of the feature
+
+        Returns:
+            A tuple whose first element is the path for the feature values and whose second element is a dictionary
+            of associated asset table names and corresponding paths.
         """
         feature = self._ml_object.lookup_feature(table, feature_name)
 
@@ -521,11 +592,13 @@ class Execution:
         return tpath, asset_paths
 
     def table_path(self, table: str) -> Path:
-        """
-        Return a local file path to a CSV to add values to a table on upload.
+        """Return a local file path to a CSV to add values to a table on upload.
 
-        :param table: Name of table to be uploaded.
-        :return: Pathlib path to the file in which to place table values.
+        Args:
+            table: Name of table to be uploaded.
+
+        Returns:
+            Pathlib path to the file in which to place table values.
         """
         if table not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables:
             raise DerivaMLException("Table '{}' not found in domain schema".format(table))
@@ -535,19 +608,20 @@ class Execution:
                                  table=table)
 
     def execute(self) -> 'DerivaMLExec':
-        """
-        Generate a context manager for a DerivaML execution.
-        :return:
+        """Generate a context manager for a DerivaML execution.
+
+        Returns:
+            A DerivaMLExec object
         """
         return DerivaMLExec(self)
 
     @validate_call
     def write_feature_file(self, features: Iterable[FeatureRecord]) -> None:
-        """
-        Given a collection of Feature records, write out a CSV file in the appropriate assets directory so that this
+        """Given a collection of Feature records, write out a CSV file in the appropriate assets directory so that this
         feature gets uploaded when the execution is complete.
 
-        :param features: Iterable of Feature records to write.
+        Args:
+            features: Iterable of Feature records to write.
         """
 
         feature_iter =  iter(features)
@@ -567,11 +641,14 @@ class Execution:
 
     @validate_call
     def create_dataset(self, ds_type: str | list[str], description) -> RID:
-        """
-        Create os dataset of specified types.
-        :param ds_type:
-        :param description:
-        :return:
+        """Create os dataset of specified types.
+
+        Args:
+            ds_type: param description:
+            description: Markdown description of the dataset being created.
+
+        Returns:
+            RID of the newly created dataset.
         """
         return self._ml_object.create_dataset(ds_type, description, self.execution_rid)
 
@@ -589,14 +666,10 @@ class Execution:
 
 
 class DerivaMLExec:
-    """
-    Context manager for managing DerivaML execution.  Provides status updates.  For convenience, asset discovery and
-    creation functions from the Execution object are provided.
+    """Context manager for managing DerivaML execution.
 
-    Args:
-    - catalog_ml: Instance of DerivaML class.
-    - execution_rid (str): Execution resource identifier.
-
+     Provides status updates.  For convenience, asset discovery and creation functions from the
+     Execution object are provided.
     """
 
     def __init__(self, execution: Execution):
@@ -621,13 +694,12 @@ class DerivaMLExec:
          Method invoked when exiting the context.
 
          Args:
-         - exc_type: Exception type.
-         - exc_value: Exception value.
-         - exc_tb: Exception traceback.
+            exc_type: Exception type.
+            exc_value: Exception value.
+            exc_tb: Exception traceback.
 
          Returns:
-         - bool: True if execution completed successfully, False otherwise.
-
+            bool: True if execution completed successfully, False otherwise.
          """
         if not exc_type:
             self.execution.update_status(Status.running,'Successfully run Ml.')
@@ -639,13 +711,50 @@ class DerivaMLExec:
             return False
 
     def execution_asset_path(self, asset_type: str) -> Path:
+        """Return path to wher execution assets of specifed type should be placed.
+
+        Args:
+            asset_type: str:
+
+        Returns:
+            Path to the directory in which to place asset files.
+        """
         return self.execution.execution_asset_path(asset_type)
 
     def execution_metadata_path(self, metadata_type: str) -> Path:
+        """Return path to where execution metadata of specified type should be placed.
+
+        Args:
+            metadata_type: Term from metddata type vocabulary.
+
+        Returns:
+            Path to the directory in which to place metadata files.
+        """
         return self.execution.execution_metadata_path(metadata_type)
 
-    def feature_paths(self,table: Table|str, feature_name: str):
+    def feature_paths(self,table: Table|str, feature_name: str) -> tuple[Path, dict[str, Path]]:
+        """Return the file path of where to place feature values, and assets for the named feature and table.
+
+        A side effect of calling this routine is that the directories in which to place the feature values and assets
+        will be created
+
+        Args:
+            table: The table with which the feature is associated.
+            feature_name: Name of the feature
+
+        Returns:
+            A tuple whose first element is the path for the feature values and whose second element is a dictionary
+            of associated asset table names and corresponding paths.
+        """
         return self.execution.feature_paths(table, feature_name)
 
     def table_path(self, table: Table|str) -> Path:
+        """
+
+        Args:
+          table: Table|str: 
+
+        Returns:
+
+        """
         return self.execution.table_path(table)

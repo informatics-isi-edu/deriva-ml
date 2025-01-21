@@ -47,15 +47,20 @@ if TYPE_CHECKING:
     from deriva_ml.execution import Execution
 
 class VocabularyTerm(BaseModel):
-    """
-    An entry in a vocabulary table.
+    """An entry in a vocabulary table.
 
-    :ivar name: Name of vocabulary term
-    :iver synonyms: List of alternative names for the term
-    :ivar id: CURI identifier for the term
-    :ivar uri: Unique URI for the term.
-    :ivar description: A description of the meaning of the term
-    :ivar rid: Resource identifier assigned to the term
+    Attributes:
+       name: Name of vocabulary term
+       synonyms: List of alternative names for the term
+       id: CURI identifier for the term
+       uri: Unique URI for the term.
+       description: A description of the meaning of the term
+       rid: Resource identifier assigned to the term
+
+    Args:
+
+    Returns:
+
     """
     name: str = Field(alias='Name')
     synonyms: Optional[list[str]] = Field(alias='Synonyms')
@@ -65,13 +70,12 @@ class VocabularyTerm(BaseModel):
     rid: str = Field(alias='RID')
 
     class Config:
+        """ """
         extra = 'ignore'
 
 
 class SemanticVersion(Enum):
-    """
-    Simple enumeration for semantic versioning.
-    """
+    """Simple enumeration for semantic versioning."""
 
     major = 'major'
     minor = 'minor'
@@ -79,9 +83,13 @@ class SemanticVersion(Enum):
 
 
 class FeatureRecord(BaseModel):
-    """
-    Base class for feature records.  Feature records are pydantic models which are dynamically generated and
+    """Base class for feature records.  Feature records are pydantic models which are dynamically generated and
     describe all of the columns of a feature.
+
+    Args:
+
+    Returns:
+
     """
     # model_dump of this feature should be compatible with feature table columns.
     Execution: str
@@ -89,49 +97,60 @@ class FeatureRecord(BaseModel):
     feature: ClassVar[Optional['Feature']] = None
 
     class Config:
+        """ """
         arbitrary_types_allowed = True
 
     @classmethod
     def feature_columns(cls) -> set[Column]:
         """
-        Return the names of all  the columns that define the value of a feature.
 
-        :return: set of feature column names.
+        Args:
+
+        Returns:
+          :return: set of feature column names.
+
         """
         return cls.feature.feature_columns
 
     @classmethod
     def asset_columns(cls) -> set[Column]:
         """
-        Return the names of all  the columns of a feature that are assets.
 
-        :return:  set of asset column names.
+        Args:
+
+        Returns:
+          A set of asset column names.
+
         """
         return cls.feature.asset_columns
 
     @classmethod
     def term_columns(cls) -> set[Column]:
         """
-        Return the names of all  the columns of a feature that are controlled vocabulary terms.
 
-        :return: set of term column names.
+        Args:
+
+        Returns:
+          :return: set of term column names.
+
         """
         return cls.feature.term_columns
 
     @classmethod
     def value_columns(cls) -> set[Column]:
         """
-        Return the names of all  the columns of a feature that are scale  values.
 
-        :return: set of value column names.
+        Args:
+
+        Returns:
+          A set of value column names.
+
         """
         return cls.feature.value_columns
 
 
 class Feature:
-    """
-    Wrapper for results of Table.find_associations()
-    """
+    """Wrapper for results of Table.find_associations()"""
 
     def __init__(self, atable: FindAssociationResult):
         self.feature_table = atable.table
@@ -139,10 +158,26 @@ class Feature:
         self.feature_name = atable.table.columns['Feature_Name'].default
 
         def is_asset(table):
+            """
+
+            Args:
+              table: 
+
+            Returns:
+
+            """
             asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
             return asset_columns.issubset({c.name for c in table.columns})
 
         def is_vocabulary(table):
+            """
+
+            Args:
+              table: 
+
+            Returns:
+
+            """
             vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
             return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
@@ -161,19 +196,21 @@ class Feature:
         self.value_columns = self.feature_columns - (self.asset_columns | self.term_columns)
 
     def feature_record_class(self) -> type[FeatureRecord]:
-        """"
-        Create a pydantic model for entries into the specified feature table
+        """"Create a pydantic model for entries into the specified feature table
 
-        :return: A Feature class that can be used to create instances of the feature.
-
+        Returns:
+            A Feature class that can be used to create instances of the feature.
         """
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
-            """
-            Map a deriva type into a pydantic model type.
+            """Map a deriva type into a pydantic model type.
 
-            :param c:  column to be mapped
-            :return: pydantic model type
+            Args:
+                c: column to be mapped
+                c: Column:
+
+            Returns:
+                A pydantic model type
             """
             if c.name in {c.name for c in self.asset_columns}:
                 return str | Path
@@ -214,17 +251,17 @@ class Feature:
 
 
 class DerivaML:
-    """
-    Base class for ML operations on a Deriva catalog.  This class is intended to be used as a base class on which
-    more domain specific interfaces are built.
+    """Base class for ML operations on a Deriva catalog.
 
-    :ivar host_name: Hostname of the Deriva server.
-    :ivar catalog_id: Catalog ID. Either and identifier, or a catalog name.
-    :ivar domain_schema: Schema name for domain specific tables and relationships.
-    :ivar model: ERMRest model for the catalog
-    :ivar pathBuilder: An instance of a datapath pathbuilder object.
-    :ivar dataset_table: The ERMrest table that contains datasets in the catalog.
+    This class is intended to be used as a base class on which more domain specific interfaces are built.
 
+    Attributes:
+        host_name: Hostname of the Deriva server.
+        catalog_id: Catalog ID. Either and identifier, or a catalog name.
+        domain_schema: Schema name for domain specific tables and relationships.
+        model: ERMRest model for the catalog
+        pathBuilder: An instance of a datapath pathbuilder object.
+        dataset_table: The ERMrest table that contains datasets in the catalog.
     """
 
     def __init__(self,
@@ -237,18 +274,18 @@ class DerivaML:
                  model_version: str = '1',
                  ml_schema: str ='deriva-ml',
                  logging_level=logging.WARNING):
-        """
+        """Create and initialize a DerivaML instance.
 
-        Create and initialize a DerivaML instance. This method will connect to a catalog, and initialize local
-        configuration for the ML execution.  This class is intended to be used as a base class on which domain-specific
-        interfaces are built.
+        This method will connect to a catalog, and initialize local configuration for the ML execution.
+        This class is intended to be used as a base class on which domain-specific interfaces are built.
 
-        :param hostname: Hostname of the Deriva server.
-        :param catalog_id: Catalog ID. Either and identifier, or a catalog name.
-        :param domain_schema: Schema name for domain specific tables and relationships.
-        :param cache_dir: Directory path for caching data downloaded from the Deriva server as bdbag.
-        :param working_dir: Directory path for storing data used by or generated by any computations.
-        :param model_version: A string that indicates the version model.  Typically passed in via
+        Args:
+            hostname: Hostname of the Deriva server.
+            catalog_id: Catalog ID. Either and identifier, or a catalog name.
+            domain_schema: Schema name for domain specific tables and relationships.
+            cache_dir: Directory path for caching data downloaded from the Deriva server as bdbag.
+            working_dir: Directory path for storing data used by or generated by any computations.
+            model_version: A string that indicates the version model.  Typically passed in via
         """
         self.host_name = hostname
         self.catalog_id = catalog_id
@@ -288,6 +325,7 @@ class DerivaML:
 
     @staticmethod
     def _get_session_config():
+        """ """
         session_config = DEFAULT_SESSION_CONFIG.copy()
         session_config.update({
             # our PUT/POST to ermrest is idempotent
@@ -302,27 +340,23 @@ class DerivaML:
 
     @property
     def pathBuilder(self) -> _CatalogWrapper:
-        """
-        Get a new instance of a pathbuilder object.
-
-        :return: pathbuilder object.
-        """
+        """Get a new instance of a pathBuilder object."""
         return self.catalog.getPathBuilder()
 
     @property
     def dataset_table(self) -> Table:
-        """
-
-        :return: The dataset table for the DerivaML instance.
-        """
+        """The dataset table for the DerivaML instance."""
         return self.model.schemas[self.ml_schema].tables['Dataset']
 
     def dataset_version(self, dataset_rid: RID) -> tuple[int, ...]:
-        """
-        Retrieve the version of the specified dataset.
+        """Retrieve the version of the specified dataset.
 
-        :param dataset_rid:
-        :return: A tuple with the semantic version of the dataset.
+        Args:
+            dataset_rid: return: A tuple with the semantic version of the dataset.
+            dataset_rid: RID:
+
+        Returns:
+            A tuple with the semantic version of the dataset.
         """
         rid_record = self.resolve_rid(dataset_rid)
         if rid_record.table.name != self.dataset_table.name:
@@ -330,13 +364,19 @@ class DerivaML:
         return tuple(map(int, self.retrieve_rid(dataset_rid)['Version'].split('.')))
 
     def increment_dataset_version(self, dataset_rid: RID, component: SemanticVersion) -> tuple[int, ...]:
-        """
-        Increment the version of the specified dataset.
+        """Increment the version of the specified dataset.
 
-        :param dataset_rid: RID to a dataset
-        :param component:  Which version of the dataset to increment.
-        :return: new version of the dataset.
-        :raise DerivaMLException: if provided RID is not to a dataset.
+        Args:
+          dataset_rid: RID to a dataset
+          component: Which version of the dataset to increment.
+          dataset_rid: RID: 
+          component: SemanticVersion: 
+
+        Returns:
+          new vsemantic ersion of the dataset as a 3-tuple
+
+        Raises:
+          DerivaMLException: if provided RID is not to a dataset.
         """
         major, minor, patch = self.dataset_version(dataset_rid)
         match component:
@@ -352,21 +392,21 @@ class DerivaML:
 
     @property
     def domain_path(self):
-        """
-        Get a new instance of a pathBuilder object to the domain schema.
-
-        :return: A new instance of a pathBuilder path to the domain schema.
-        """
+        """Get a new instance of a pathBuilder object to the domain schema"""
 
         return self.pathBuilder.schemas[self.domain_schema]
 
     def _get_table(self, table: str | Table) -> Table:
-        """
-        Return the table object corresponding to the given table name. If the table name appears in more
-        than one schema, return the first one you find.
+        """Return the table object corresponding to the given table name.
 
-        :param table: A ERMRest table object or a string that is the name of the table.
-        :return: Table object.
+        If the table name appears in more than one schema, return the first one you find.
+
+        Args:
+          table: A ERMRest table object or a string that is the name of the table.
+          table: str | Table: 
+
+        Returns:
+          Table object.
         """
         if isinstance(table, Table):
             return table
@@ -376,21 +416,26 @@ class DerivaML:
         raise DerivaMLException(f"The table {table} doesn't exist.")
 
     def table_path(self, table: str | Table) -> Path:
-        """
-        Return a local file path in which to place a CSV to add values to a table on upload.
+        """Return a local file path in which to place a CSV to add values to a table on upload.
 
-        :param table:
-        :return:
+        Args:
+          table: return:
+          table: str | Table: 
+
+        Returns:
+            Path to a CSV file in which to add values to a table on upload.
         """
         return table_path(self.working_dir, schema=self.domain_schema, table=self._get_table(table).name)
 
     def asset_directory(self, table: str | Table, prefix: str | Path = None) -> Path:
-        """
-        Return a local file path in which to place a files for an asset table.  This needs to be kept in sync with
-        bulk_upload specification
+        """Return a local file path in which to place a files for an asset table.  T
 
-        :param table:
-        :param prefix: Location of where to place files.  Defaults to execution_assets_path.
+        Args:
+            table: Location of where to place files.  Defaults to execution_assets_path.
+            prefix: Root path to asset directory.
+
+        Returns:
+            Path to the directory in which asset files should be placed.
         """
         table = self._get_table(table)
         if not self.is_asset(table):
@@ -400,25 +445,41 @@ class DerivaML:
         return asset_dir(prefix, table.schema.name, table.name)
 
     def download_dir(self, cached: bool = False) -> Path:
+        """Location where downloaded files are placed.
+
+        Args:
+          cached: bool:  (Default value = False)
+
+        Returns:
+
+        """
         return self.cache_dir if cached else self.working_dir
 
     def chaise_url(self, table: str | Table) -> str:
-        """
-        Return a Chaise URL to the specified table.
+        """Return a Chaise URL to the specified table.
 
-        :param table: Table to be browsed
-        :return: URL to the table in Chaise format.
+        Args:
+            table: Table to be browsed
+            table: str | Table:
+
+        Returns:
+            URL to the table in Chaise format.
         """
         table = self._get_table(table)
         uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
         return f'{uri}/{urlquote(table.schema.name)}:{urlquote(table.name)}'
 
     def cite(self, entity: dict | str) -> str:
-        """
-        Return a citation URL for the provided entity.
+        """Return a citation URL for the provided entity.
 
-        :param entity: A dict that contains the column values for a specific entity.
-        :return:  The PID for the provided entity.
+        Args:
+            entity: A dict that contains the column values for a specific entity or a RID.
+
+        Returns:
+            The URI for the provided entity.
+
+        Raises:
+            DerivaMLException: if provided RID does not exist.
         """
         try:
             self.resolve_rid(rid := entity if isinstance(entity, str) else entity['RID'])
@@ -429,22 +490,28 @@ class DerivaML:
             raise DerivaMLException("Entity RID does not exist")
 
     def user_list(self) -> list[dict[str, str]]:
-        """
-        Return a list containing user information of current catalog.
+        """List of users in the catalog
 
-        :return: a list of dictionaries containing user information.
+        Args:
+
+        Returns:
+          A list of dictionaries containing user information.
 
         """
         user_path = self.pathBuilder.public.ERMrest_Client.path
         return [{'ID': u['ID'], 'Full_Name': u['Full_Name']} for u in user_path.entities().fetch()]
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
-        """
-        Return a named tuple with information about the specified RID.
+        """Return a named tuple with information about the specified RID.
 
-        :param rid:
-        :return: Information about the specified RID.
-        :raises DerivaMLException: if the RID doesn't exist.
+        Args:
+            rid: RID of the object of interest
+
+        Returns:
+            ResolveRidResult which has information about the specified RID.
+
+        Raises:
+          DerivaMLException: if the RID doesn't exist.
         """
         try:
             return self.catalog.resolve_rid(rid, self.model)
@@ -452,26 +519,42 @@ class DerivaML:
             raise DerivaMLException(f'Invalid RID {rid}')
 
     def retrieve_rid(self, rid: RID) -> dict[str, Any]:
-        """
-        Return a dictionary that represents the values of the specified RID.
+        """Return a dictionary that represents the values of the specified RID.
 
-        :param rid:
-        :return: A dictionary that represents the values of the specified RID.
-        :raises DerivaMLException: if the RID doesn't exist.'
+        Args:
+            rid: RID of the object of interest
+
+        Returns:
+          A dictionary that represents the values of the specified RID.
+
+        Raises:
+          DerivaMLException: if the RID doesn't exist.'
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
     def add_page(self, title: str, content: str) -> None:
+        """
+
+        Args:
+          title: str: 
+          content: str: 
+
+        Returns:
+
+        """
         self.pathBuilder.www.tables[self.domain_schema].insert([{'Title': title, 'Content': content}])
 
     def create_vocabulary(self, vocab_name: str, comment='', schema=None) -> Table:
-        """
-        Create a controlled vocabulary table with the given vocab name.
+        """Create a controlled vocabulary table with the given vocab name.
 
-        :param vocab_name: Name of the controlled vocabulary table.
-        :param comment: Description of the vocabulary table.
-        :param schema: Schema in which to create the controlled vocabulary table.  Defaults to domain_schema.
-        :return: An ERMRest table object for the newly created vocabulary table.
+        Args:
+            vocab_name: Name of the controlled vocabulary table.
+            comment: Description of the vocabulary table. (Default value = '')
+            schema: Schema in which to create the controlled vocabulary table.  Defaults to domain_schema.
+            vocab_name: str:
+
+        Returns:
+            An ERMRest table object for the newly created vocabulary table.
         """
         schema = schema or self.domain_schema
         return self.model.schemas[schema].create_table(
@@ -479,12 +562,17 @@ class DerivaML:
         )
 
     def is_vocabulary(self, table_name: str | Table) -> bool:
-        """
-        Check if a given table is a controlled vocabulary table.
+        """Check if a given table is a controlled vocabulary table.
 
-        :param table_name: A ERMRest table object or the name of the table.
-        :return: Table object if the table is a controlled vocabulary, False otherwise.
-        :raises DerivaMLException: if the table doesn't exist.
+        Args:
+          table_name: A ERMRest table object or the name of the table.
+          table_name: str | Table: 
+
+        Returns:
+          Table object if the table is a controlled vocabulary, False otherwise.
+
+        Raises:
+          DerivaMLException: if the table doesn't exist.
 
         """
         vocab_columns = {'NAME', 'URI', 'SYNONYMS', 'DESCRIPTION', 'ID'}
@@ -492,13 +580,17 @@ class DerivaML:
         return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
     def create_asset(self, asset_name: str, comment='', schema: str = None) -> Table:
-        """
-        Create an asset table with the given asset name.
+        """Create an asset table with the given asset name.
 
-        :param asset_name: Name of the asset table.
-        :param comment: Description of the asset table.
-        :param schema: Schema in which to create the asset table.  Defaults to domain_schema.
-        :return: Table object for the asset table.
+        Args:
+            asset_name: Name of the asset table.
+            comment: Description of the asset table. (Default value = '')
+            schema: Schema in which to create the asset table.  Defaults to domain_schema.
+            asset_name: str:
+            schema: str:  (Default value = None)
+
+        Returns:
+            Table object for the asset table.
         """
         schema = schema or self.domain_schema
         asset_table = self.model.schemas[schema].create_table(
@@ -506,23 +598,37 @@ class DerivaML:
         return asset_table
 
     def is_association(self, table_name: str | Table, unqualified=True, pure=True) -> bool | set | int:
-        """
-        Check the specified table to see if it is an association table.  If it is, return the
+        """Check the specified table to see if it is an association table.
 
-        :param table_name:
-        :param unqualified:
-        :param pure:
-        :return:
+        Args:
+            table_name: param unqualified:
+            pure: return: (Default value = True)
+            table_name: str | Table:
+            unqualified:  (Default value = True)
+
+        Returns:
+
+
         """
         table = self._get_table(table_name)
         return table.is_association(unqualified=unqualified, pure=pure)
 
     def is_asset(self, table_name: str | Table) -> bool:
+        """True if the specified table is an asset table.
+
+        Args:
+            table_name: str | Table:
+
+        Returns:
+            True if the specified table is an asset table, False otherwise.
+
+        """
         asset_columns = {'Filename', 'URL', 'Length', 'MD5', 'Description'}
         table = self._get_table(table_name)
         return asset_columns.issubset({c.name for c in table.columns})
 
     def find_assets(self) -> list[Table]:
+        """ """
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -534,19 +640,25 @@ class DerivaML:
                        metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
                        optional: Optional[list[str]] = None,
                        comment: str = '') -> type[FeatureRecord]:
-        """
-        Create a new feature that can be associated with a table. The feature can associate a controlled
-        vocabulary term, an asset, or any other values with a specific instance of an object and  execution.
+        """Create a new feature that can be associated with a table.
 
-        :param feature_name: Name of the new feature to be defined
-        :param target_table: table name or object on which the feature is to be associated
-        :param terms: List of controlled vocabulary terms that will be part of the feature value
-        :param assets: List of asset table names or objects that will be part of the feature value
-        :param metadata: List of other value types that are associated with the feature
-        :param optional: List of columns that are optional in the feature
-        :param comment:
-        :return: A Feature class that can be used to create instances of the feature.
-        :raise DerivaException: If the feature cannot be created.
+        The feature can associate a controlled vocabulary term, an asset, or any other values with a s
+        pecific instance of an object and  execution.
+
+        Args:
+            feature_name: Name of the new feature to be defined
+            target_table: table name or object on which the feature is to be associated
+            terms: List of controlled vocabulary terms that will be part of the feature value
+            assets: List of asset table names or objects that will be part of the feature value
+            metadata: List of other value types that are associated with the feature
+            optional: List of columns that are optional in the feature
+            comment: return: A Feature class that can be used to create instances of the feature.
+
+        Returns:
+            A Feature class that can be used to create instances of the feature.
+
+        Raises:
+            DerivaException: If the feature cannot be created.
         """
 
         terms = terms or []
@@ -555,6 +667,14 @@ class DerivaML:
         optional = optional or []
 
         def normalize_metadata(m: Key | Table | ColumnDefinition | str):
+            """
+
+            Args:
+              m: Key | Table | ColumnDefinition | str: 
+
+            Returns:
+
+            """
             if isinstance(m, str):
                 return self._get_table(m)
             elif isinstance(m, ColumnDefinition):
@@ -592,18 +712,31 @@ class DerivaML:
         return self.feature_record_class(target_table, feature_name)
 
     def feature_record_class(self, table: str | Table, feature_name: str) -> type[FeatureRecord]:
-        """"
-        Create a pydantic model for entries into the specified feature table.  For information on how to
+        """"Create a pydantic model for entries into the specified feature table.
+
+        For information on how to
         See the pydantic documentation for more details about the pydantic model.
 
-        :param table: table name or object on which the feature is to be associated
-        :param feature_name: name of the feature to be created
-        :return: A Feature class that can be used to create instances of the feature.
+        Args:
+            table: table name or object on which the feature is to be associated
+            feature_name: name of the feature to be created
+            table: str | Table:
+            feature_name: str:
 
+        Returns:
+            A Feature class that can be used to create instances of the feature.
         """
         return self.lookup_feature(table,  feature_name).feature_record_class()
 
     def drop_feature(self, table: Table | str, feature_name: str) -> bool:
+        """
+
+        Args:
+          table: Table | str: 
+          feature_name: str: 
+
+        Returns:
+        """
         table = self._get_table(table)
         try:
             feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
@@ -613,13 +746,18 @@ class DerivaML:
             return False
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
-        """
-        Lookup the named feature associated with the provided table.
+        """Lookup the named feature associated with the provided table.
 
-        :param table:
-        :param feature_name:
-        :return: A Feature class that represents the requested feature.
-        :raise DerivaMLException: If the feature cannot be found.
+        Args:
+            table: param feature_name:
+            table: str | Table:
+            feature_name: str:
+
+        Returns:
+            A Feature class that represents the requested feature.
+
+        Raises:
+          DerivaMLException: If the feature cannot be found.
         """
         table = self._get_table(table)
         try:
@@ -629,15 +767,26 @@ class DerivaML:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def find_features(self, table: Table | str) -> Iterable[Feature]:
-        """
-        List the names of the features in the specified table.
+        """List the names of the features in the specified table.
 
-        :param table: The table to find features for.
-        :return: An iterable of FeatureResult instances that describe the current features in the table.
+        Args:
+            table: The table to find features for.
+            table: Table | str:
+
+        Returns:
+            An iterable of FeatureResult instances that describe the current features in the table.
         """
         table = self._get_table(table)
 
         def is_feature(a: FindAssociationResult) -> bool:
+            """
+
+            Args:
+              a: FindAssociationResult: 
+
+            Returns:
+
+            """
             # return {'Feature_Name', 'Execution'}.issubset({c.name for c in a.table.columns})
             return {'Feature_Name',
                     'Execution',
@@ -649,9 +798,13 @@ class DerivaML:
 
     @validate_call
     def add_features(self, features: Iterable[FeatureRecord]) -> int:
-        """
-        Add a set of new feature values to the catalog.
-        :return: Number of attributes added
+        """Add a set of new feature values to the catalog.
+
+        Args:
+          features: Iterable[FeatureRecord]: 
+
+        Returns:
+            Number of attributes added
         """
         features = list(features)
         feature_table = features[0].feature.feature_table
@@ -661,12 +814,15 @@ class DerivaML:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_feature_values(self, table: Table | str, feature_name: str) -> _ResultSet:
-        """
-        Return a datapath resultset containing all values of a feature associated with a table.
+        """Return a datapath resultset containing all values of a feature associated with a table.
 
-        :param table:
-        :param feature_name:
-        :return:
+        Args:
+            table: param feature_name:
+            table: Table | str:
+            feature_name: str:
+
+        Returns:
+
         """
         table = self._get_table(table)
         feature = self.lookup_feature(table, feature_name)
@@ -678,14 +834,21 @@ class DerivaML:
                        description: str,
                        execution_rid: Optional[RID] = None,
                        version: tuple[int,int,int] = (1,0,0)) -> RID:
-        """
-        Create a new dataset from the specified list of RIDs.
+        """Create a new dataset from the specified list of RIDs.
 
-        :param ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
-        :param description:  Description of the dataset.
-        :param execution_rid: Execution under which the dataset will be created.
-        :param version: Version of the dataset.
-        :return: New dataset RID.
+        Args:
+            ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
+            description: Description of the dataset.
+            execution_rid: Execution under which the dataset will be created.
+            version: Version of the dataset.
+            ds_type: str | list[str]:
+            description: str:
+            execution_rid: Optional[RID]:  (Default value = None)
+            version: tuple[int: int: int]
+
+        Returns:
+            New dataset RID.
+
         """
         # Create the entry for the new dataset and get its RID.
         ds_types = [ds_type] if isinstance(ds_type, str) else ds_type
@@ -710,10 +873,10 @@ class DerivaML:
         return dataset
 
     def find_datasets(self) -> Iterable[dict[str, Any]]:
-        """
-        Returns a list of currently available datasets.
+        """Returns a list of currently available datasets.
 
-        :return:  list of currently available datasets.
+        Returns:
+             list of currently available datasets.
         """
         # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
         pb = self.pathBuilder
@@ -732,12 +895,12 @@ class DerivaML:
 
     @validate_call
     def delete_dataset(self, dataset_rid: RID, recurse = False) -> None:
-        """
-        Delete a dataset from the catalog.
+        """Delete a dataset from the catalog.
 
-        :param dataset_rid:  RID of the dataset to delete.
-        :param recurse: If True, delete the dataset along with any nested datasets.
-        :return:
+        Args:
+            dataset_rid: RID of the dataset to delete.
+            recurse: If True, delete the dataset along with any nested datasets. (Default value = False)
+            dataset_rid: RID:
         """
         # Get association table entries for this dataset
         # Delete association table entries
@@ -766,25 +929,36 @@ class DerivaML:
         dataset_path.filter(dataset_path.columns['RID'] == dataset_rid).delete()
 
     def list_dataset_element_types(self) -> Iterable[Table]:
-        """
-        Return the list of tables that can be included as members of a dataset.
+        """List the types of entities that can be added to a dataset.
 
-        :return: An iterable of Table objects that can be included as an element of a dataset.
+        Returns:
+          :return: An iterable of Table objects that can be included as an element of a dataset.
         """
 
         def domain_table(table: Table) -> bool:
+            """
+
+            Args:
+              table: Table: 
+
+            Returns:
+
+            """
             return table.schema.name == self.domain_schema or table.name == self.dataset_table.name
 
         return [t for a in self.dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
-        """
-        A dataset is a heterogeneous collection of objects, each of which comes from a different table. This
+        """A dataset is a heterogeneous collection of objects, each of which comes from a different table. This
         routine makes it possible to add objects from the specified table to a dataset.
 
-        :param element: Name or the table or table object that is to be added to the dataset.
-        :return: The table object that was added to the dataset.
+        Args:
+            element: Name or the table or table object that is to be added to the dataset.
+            element: str | Table:
+
+        Returns:
+            The table object that was added to the dataset.
         """
         # Add table to map
         element_table = self._get_table(element)
@@ -798,11 +972,14 @@ class DerivaML:
 
     @validate_call
     def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
-        """
-        Given a dataset RID, return a list of RIDs of the parent datasets.
+        """Given a dataset RID, return a list of RIDs of the parent datasets.
 
-        :param dataset_rid:
-        :return: RID of the parent dataset.
+        Args:
+            dataset_rid: return: RID of the parent dataset.
+            dataset_rid: RID:
+
+        Returns:
+            RID of the parent dataset.
         """
         rid_record = self.resolve_rid(dataset_rid)
         if rid_record.table.name != self.dataset_table.name:
@@ -815,23 +992,29 @@ class DerivaML:
 
     @validate_call
     def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
-        """
-        Given a dataset RID, return a list of RIDs of any nested datasets.
+        """Given a dataset RID, return a list of RIDs of any nested datasets.
 
-        :param dataset_rid:
-        :return: list of RIDs of nested datasets.
+        Args:
+            dataset_rid: A dataset RID.
+
+        Returns:
+          list of RIDs of nested datasets.
+
         """
         return [d['RID'] for d in self.list_dataset_members(dataset_rid)['Dataset']]
 
     @validate_call
     def list_dataset_members(self, dataset_rid: RID, recurse = False) -> dict[str, list[dict[str, Any]]]:
-        """
-        Return a list of entities associated with a specific dataset.
-        :param dataset_rid:
-        :param recurse: If this is a nested dataset, list the members of the contained datasets
+        """Return a list of entities associated with a specific dataset.
 
-        :return: Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
-                 were taken.
+        Args:
+            dataset_rid: param recurse: If this is a nested dataset, list the members of the contained datasets
+            dataset_rid: RID:
+             recurse:  (Default value = False)
+
+        Returns:
+            Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
+            were taken.
         """
 
         try:
@@ -879,18 +1062,29 @@ class DerivaML:
     @validate_call
     def add_dataset_members(self, dataset_rid: Optional[RID], members: list[RID],
                             validate: bool = True) -> None:
-        """
-        Add additional elements to an existing dataset.
+        """Add additional elements to an existing dataset.
 
-        :param dataset_rid: RID of dataset to extend or None if new dataset is to be created.
-        :param members: List of RIDs of members to add to the  dataset.
-        :param validate: Check rid_list to make sure elements are not already in the dataset.
-        :return:
+        Args:
+            dataset_rid: RID of dataset to extend or None if new dataset is to be created.
+            members: List of RIDs of members to add to the  dataset.
+            validate: Check rid_list to make sure elements are not already in the dataset.
+            dataset_rid: Optional[RID]:
+            members: list[RID]:
+            validate: bool:  (Default value = True)
         """
 
         members = set(members)
 
         def check_dataset_cycle(member_rid, path=None):
+            """
+
+            Args:
+              member_rid: 
+              path:  (Default value = None)
+
+            Returns:
+
+            """
             path = path or set(dataset_rid)
             return member_rid in path
 
@@ -934,18 +1128,23 @@ class DerivaML:
                  description: str,
                  synonyms: Optional[list[str]] = None,
                  exists_ok: bool = True) -> VocabularyTerm:
-        """
-        Creates a new control vocabulary term in the control vocabulary table.
+        """Creates a new control vocabulary term in the control vocabulary table.
+        
+        Args:
 
         Args:
-        :param table: The name of the control vocabulary table.
-        :param term_name: The name of the new control vocabulary.
-        :param description: The description of the new control vocabulary.
-        :param synonyms: Optional list of synonyms for the new control vocabulary. Defaults to an empty list.
-        :param exists_ok: Optional flag indicating whether to allow creation if the control vocabulary name
-          already exists. Defaults to True.
-        :return: The RID of the newly created control vocabulary.
-        :raises DerivaException: If the control vocabulary name already exists and exist_ok is False.
+            table: The name of the control vocabulary table.
+            term_name: The name of the new control vocabulary.
+            description: The description of the new control vocabulary.
+            synonyms: Optional list of synonyms for the new control vocabulary. Defaults to an empty list.
+            exists_ok: Optional flag indicating whether to allow creation if the control vocabulary name
+                already exists. Defaults to True.
+
+        Returns:
+          The RID of the newly created control vocabulary.
+
+        Raises:
+          DerivaException: If the control vocabulary name already exists and exist_ok is False.
         """
         synonyms = synonyms or []
         table = self._get_table(table)
@@ -969,15 +1168,19 @@ class DerivaML:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
-        """
-        Given a term name, return the vocabulary record.  Can provide either the term name
+        """Given a term name, return the vocabulary record.  Can provide either the term name
          or a synonym for the term.  Generate an exception if the term is not in the vocabulary.
 
-        :param table: The name of the controlled vocabulary table or a ERMrest table object..
-        :param term_name:  The name of the term to look up.
-        :return: The entry the associated term or synonym.
-        :raises DerivaException: If the schema or vocabulary table doesn't exist, or if the term is not
-          found in the vocabulary.
+        Args:
+            table: The name of the controlled vocabulary table or a ERMrest table object..
+            term_name: The name of the term to look up.
+
+        Returns:
+          The entry the associated term or synonym.
+
+        Raises:
+          DerivaException: If the schema or vocabulary table doesn't exist, or if the term is not
+            found in the vocabulary.
         """
         vocab_table = self._get_table(table)
         if not self.is_vocabulary(vocab_table):
@@ -990,22 +1193,22 @@ class DerivaML:
         raise DerivaMLException(f'Term {term_name} is not in vocabulary {table_name}')
 
     def find_vocabularies(self) -> Iterable[Table]:
-        """
-        Return a list of all the controlled vocabulary tables in the domain schema.
-
-        return:  A list of table names representing controlled vocabulary tables in the schema.
-
-        """
+        """Return a list of all the controlled vocabulary tables in the domain schema."""
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
     def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
-        """
-        Return an list of terms that are in a vocabulary table.
+        """Return an list of terms that are in a vocabulary table.
 
-        :param table: The name of the controlled vocabulary table or a ERMrest table object.
-        :return: The list of terms that are in a vocabulary table.
-        :raises DerivaMLException: If the schema or vocabulary table doesn't exist, or if the table is not
-          a controlled vocabulary.
+        Args:
+            table: The name of the controlled vocabulary table or a ERMrest table object.
+            table: str | Table:
+
+        Returns:
+            The list of terms that are in a vocabulary table.
+
+        Raises:
+            DerivaMLException: If the schema or vocabulary table doesn't exist, or if the table is not
+                a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
         table = self._get_table(table)
@@ -1018,24 +1221,29 @@ class DerivaML:
     def download_dataset_bag(self, bag: RID | str,
                              materialize:bool = True,
                              execution_rid: Optional[RID] = None)  -> tuple[Path, RID]:
-        """
-        Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
 
-        :param bag: The RID of a dataset or a minid to an existing bag.
-        :param materialize: Materalize the bag, rather than just downloading it.
-        :param execution_rid:
-        :return: the location of the unpacked and validated dataset bag and the RID of the bag
+        Args:
+            bag: The RID of a dataset or a minid to an existing bag.
+            materialize: Materalize the bag, rather than just downloading it.
+            execution_rid: return: the location of the unpacked and validated dataset bag and the RID of the bag
+
+        Returns:
+            the location of the unpacked and validated dataset bag and the RID of the bag
         """
         return self._materialize_dataset_bag(bag, execution_rid) if materialize else self._download_dataset_bag(bag)
 
     def _download_dataset_bag(self, dataset_rid: RID | str) -> tuple[Path, RID]:
-        """
-        Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
 
-        :param dataset_rid: The RID of a dataset or a minid to an existing bag.
-        :return: the location of the unpacked and validated dataset bag and the RID of the bag
+        Args:
+            dataset_rid: The RID of a dataset or a minid to an existing bag.
+             dataset_rid: RID | str:
+
+        Returns:
+            the location of the unpacked and validated dataset bag and the RID of the bag
         """
         if not any([dataset_rid == ds['RID'] for ds in self.find_datasets()]):
             raise DerivaMLException(f'RID {dataset_rid} is not a dataset')
@@ -1081,14 +1289,28 @@ class DerivaML:
 
 
     def _materialize_dataset_bag(self, bag: str | RID, execution_rid: Optional[RID] = None) -> tuple[Path, RID]:
-        """
-        Materialize a dataset bag into a local directory
-        :param bag: A MINID to an existing bag or a RID of the dataset that should be downloaded.
-        :param execution_rid:  RID of the execution for which this bag should be materialized. Used to update status.
-        :return:
+        """Materialize a dataset bag into a local directory
+
+        Args:
+            bag: A MINID to an existing bag or a RID of the dataset that should be downloaded.
+            execution_rid: RID of the execution for which this bag should be materialized. Used to update status.
+            bag: str | RID:
+            execution_rid: Optional[RID]:  (Default value = None)
+
+        Returns:
+
         """
 
         def fetch_progress_callback(current, total):
+            """
+
+            Args:
+              current: 
+              total: 
+
+            Returns:
+
+            """
             msg = f'Materializing bag: {current} of {total} file(s) downloaded.'
             if execution_rid:
                 self._update_status(Status.running, msg, execution_rid)
@@ -1096,6 +1318,15 @@ class DerivaML:
             return True
 
         def validation_progress_callback(current, total):
+            """
+
+            Args:
+              current: 
+              total: 
+
+            Returns:
+
+            """
             msg = f'Validating bag: {current} of {total} file(s) validated.'
             if execution_rid:
                 self._update_status(Status.running, msg, execution_rid)
@@ -1119,12 +1350,14 @@ class DerivaML:
         return Path(bag_path), dataset_rid
 
     def download_asset(self, asset_url: str, dest_filename: str) -> Path:
-        """
-        Download an asset from a URL and place it in a local directory.
+        """Download an asset from a URL and place it in a local directory.
 
-        :param asset_url:  URL of the asset.
-        :param dest_filename: Destination filename.
-        :return: A  Path object to the downloaded asset.
+        Args:
+            asset_url: URL of the asset.
+            dest_filename: Destination filename.
+
+        Returns:
+            A  Path object to the downloaded asset.
         """
         hs = HatracStore('https', self.host_name, self.credential)
         hs.get_obj(path=asset_url, destfilename=dest_filename)
@@ -1132,12 +1365,15 @@ class DerivaML:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def upload_asset(self, file: Path, table: Table | str, **kwargs) -> dict:
-        """
-        Upload the specified file into Hatrac and update the associated asset table.
-        :param file: path to the file to upload.
-        :param table: Name of the asset table
-        :param kwargs: Keyword arguments for values of additional columns to be added to the asset table.
-        :return:
+        """Upload the specified file into Hatrac and update the associated asset table.
+
+        Args:
+            file: path to the file to upload.
+            table: Name of the asset table
+            kwargs: Keyword arguments for values of additional columns to be added to the asset table.
+
+        Returns:
+
         """
         table = self._get_table(table)
         if not self.is_asset(table):
@@ -1175,14 +1411,18 @@ class DerivaML:
             raise e
 
     def upload_assets(self, assets_dir: str | Path) -> dict[str, FileUploadState]:
-        """
-        Upload assets from a directory. This routine assumes that the current upload specification includes a
+        """Upload assets from a directory. This routine assumes that the current upload specification includes a
         configuration for the specified directory.  Every asset in the specified directory is uploaded
 
-        :param assets_dir: Directory containing the assets to upload.
-        :return: Results of the upload operation.
-        :raises DerivaMLException: If there is an issue uploading the assets.
-           """
+        Args:
+            assets_dir: Directory containing the assets to upload.
+
+        Returns:
+            Results of the upload operation.
+
+        Raises:
+            DerivaMLException: If there is an issue uploading the assets.
+        """
         with TemporaryDirectory() as temp_dir:
             spec_file = f'{temp_dir}/config.json'
             with open(spec_file, 'w+') as cfile:
@@ -1199,13 +1439,17 @@ class DerivaML:
         return results
 
     def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID):
-        """
-        Update the status of an execution in the catalog.
+        """Update the status of an execution in the catalog.
 
         Args:
-       :param new_status: New status.
-       :param status_detail: Details of the status.
-       :param execution_rid: Resource Identifier (RID) of the execution.
+            new_status: New status.
+            status_detail: Details of the status.
+            execution_rid: Resource Identifier (RID) of the execution.
+            new_status: Status:
+            status_detail: str:
+             execution_rid: RID:
+
+        Returns:
 
         """
         self.status = new_status.value
@@ -1214,13 +1458,16 @@ class DerivaML:
         )
 
     def upload_execution_configuration(self, config: ExecutionConfiguration) -> RID:
-        """
-        Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
+        """Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
 
-        :param config: A execution configuration.
-        :return: RID of the newly created configuration file.
-        :raises DerivaMLException: If there is an issue uploading the configuration.
+        Args:
+            config: A execution configuration.
 
+        Returns:
+            RID of the newly created configuration file.
+
+        Raises:
+             DerivaMLException: If there is an issue uploading the configuration.
         """
         try:
             fp = NamedTemporaryFile('w+', prefix='exec_config', suffix='.json', delete=False)
@@ -1233,12 +1480,14 @@ class DerivaML:
         return configuration_rid
 
     def download_execution_configuration(self, configuration_rid: RID) -> ExecutionConfiguration:
-        """
-        Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
+        """Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
         configuration in hatrac
 
-        :param configuration_rid:  RID that should be to an asset table that refers to an execution configuration
-        :return: A ExecutionConfiguration object for configured by the parameters in the configuration file.
+        Args:
+            configuration_rid: RID that should be to an asset table that refers to an execution configuration
+
+        Returns:
+            A ExecutionConfiguration object for configured by the parameters in the configuration file.
         """
         configuration = self.retrieve_rid(configuration_rid)
         with NamedTemporaryFile('w+', delete_on_close=False, suffix='.json') as dest_file:
@@ -1247,6 +1496,15 @@ class DerivaML:
             return ExecutionConfiguration.load_configuration(dest_file.name)
 
     def _upload_execution_configuration_file(self, config_file: str, description: str) -> RID:
+        """
+
+        Args:
+            config_file: str:
+            description: str:
+
+        Returns:
+
+        """
         file_path = Path(config_file)
         file_name = file_path.name
         file_size = file_path.stat().st_size
@@ -1280,5 +1538,13 @@ class DerivaML:
 
     @validate_call
     def create_execution(self, configuration: ExecutionConfiguration) -> 'Execution':
+        """Create an execution object
+
+        Args:
+            configuration: ExecutionConfiguration:
+
+        Returns:
+            An execution object.
+        """
         from deriva_ml.execution import Execution
         return Execution(configuration, self)

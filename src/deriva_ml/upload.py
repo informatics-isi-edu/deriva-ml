@@ -55,52 +55,124 @@ table_regex = exec_dir_regex + r"/table/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P
 
 
 def is_execution_metadata_dir(path: Path) -> Optional[re.Match]:
+    """
+
+    Args:
+      path: Path: 
+
+    Returns:
+        Regex match object from metadata_dir_regex.
+    """
     return re.match(exec_metadata_dir_regex + '$', path.as_posix())
 
 
 def is_execution_asset_dir(path: Path) -> Optional[re.Match]:
+    """
+    Args:
+      path: Path: 
+
+    Returns:
+
+    """
     return re.match(exec_asset_dir_regex + '$', path.as_posix())
 
 
 def is_feature_dir(path: Path) -> Optional[re.Match]:
+    """
+
+    Args:
+      path: Path: 
+
+    Returns:
+
+    """
     return re.match(feature_table_dir_regex + '$', path.as_posix())
 
 
 def is_feature_asset_dir(path: Path) -> Optional[re.Match]:
+    """
+
+    Args:
+      path: Path: 
+
+    Returns:
+
+    """
     return re.match(feature_asset_dir_regex + '$', path.as_posix())
 
 
 def upload_root(prefix: Path | str) -> Path:
+    """
+
+    Args:
+      prefix: Path | str: 
+
+    Returns:
+
+    """
     path = Path(prefix) / "deriva-ml"
     path.mkdir(exist_ok=True, parents=True)
     return path
 
 
 def execution_root(prefix: Path | str, exec_rid) -> Path:
+    """
+
+    Args:
+      prefix: Path | str: 
+      exec_rid: 
+
+    Returns:
+
+    """
     path = upload_root(prefix) / "execution" / exec_rid
     path.mkdir(exist_ok=True, parents=True)
     return path
 
 
 def execution_asset_root(prefix: Path | str, exec_rid: str) -> Path:
+    """
+
+    Args:
+      prefix: Path | str: 
+      exec_rid: str: 
+
+    Returns:
+
+    """
     path = execution_root(prefix, exec_rid) / "execution-asset"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def execution_metadata_root(prefix: Path | str, exec_rid: str) -> Path:
+    """
+
+    Args:
+      prefix: Path | str: 
+      exec_rid: str: 
+
+    Returns:
+
+    """
     path = execution_root(prefix, exec_rid) / "execution-metadata"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
-    """
-    Return the path to a directory in which to place execution assets of a specified type are to be uploaded.
-    :param prefix: Location of upload root directory
-    :param asset_type: Type of execution asset
-    :param exec_rid: RID of the execution asset
-    :return:
+    """Return the path to a directory in which to place execution assets of a specified type are to be uploaded.
+
+    Args:
+      prefix: Location of upload root directory
+      asset_type: Type of execution asset
+      exec_rid: RID of the execution asset
+      prefix: Path | str: 
+      exec_rid: str: 
+      asset_type: str: 
+
+    Returns:
+
     """
     path = execution_asset_root(prefix, exec_rid) / asset_type
     path.mkdir(parents=True, exist_ok=True)
@@ -108,19 +180,30 @@ def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> P
 
 
 def execution_metadata_dir(prefix: Path | str, exec_rid: str, metadata_type: str) -> Path:
-    """
-    Return the path to a directory in which to place execution metadata of a specified type are to be uploaded.
+    """Return the path to a directory in which to place execution metadata of a specified type are to be uploaded.
 
-    :param prefix:  Location in which to locate this directory
-    :param exec_rid: Execution rid to be associated with this metadata
-    :param metadata_type: Controlled vocabulary term from vocabulary Metadata_Type
-    :return:
+    Args:
+        prefix: Location in which to locate this directory
+        exec_rid: Execution rid to be associated with this metadata
+        metadata_type: Controlled vocabulary term from vocabulary Metadata_Type
+
+    Returns:
+        Path to the metadata directory
     """
     path = execution_metadata_root(prefix, exec_rid) / metadata_type
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 def feature_root(prefix: Path | str, exec_rid: str) -> Path:
+    """
+
+    Args:
+      prefix: Path | str: 
+      exec_rid: str: 
+
+    Returns:
+
+    """
     path = execution_root(prefix, exec_rid) / 'feature'
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -128,6 +211,18 @@ def feature_root(prefix: Path | str, exec_rid: str) -> Path:
 def feature_dir(
     prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
 ) -> Path:
+    """
+
+    Args:
+        prefix: Path | str:
+        exec_rid: str:
+        schema: str:
+        target_table: str:
+        feature_name: str:
+
+    Returns:
+
+    """
     path = feature_root(prefix, exec_rid) / schema / target_table / feature_name
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -136,15 +231,18 @@ def feature_dir(
 def feature_value_path(
     prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
 ) -> Path:
-    """
-    Return the path to a CSV file in which to place feature values that are to be uploaded.  Values will either be
+    """Return the path to a CSV file in which to place feature values that are to be uploaded.  Values will either be
     scalar, references to controlled vocabulary (Terms) or references to assets.
-    :param prefix: Location of upload root directory
-    :param exec_rid: RID of the execution to be associated with this feature.
-    :param schema: Domain schema name
-    :param target_table: Target table name for the feature.
-    :param feature_name: Name of the feature.
-    :return:
+
+    Args:
+        prefix: Location of upload root directory
+        exec_rid: RID of the execution to be associated with this feature.
+        schema: Domain schema name
+        target_table: Target table name for the feature.
+        feature_name: Name of the feature.
+
+    Returns:
+        Path to CSV file in which to place feature values
     """
     return feature_dir(prefix, exec_rid, schema, target_table, feature_name) / f"{feature_name}.csv"
 
@@ -157,16 +255,18 @@ def feature_asset_dir(
     feature_name: str,
     asset_table: str,
 ) -> Path:
-    """
-    Return the path to a directory in which to place feature assets for a named feature are to be uploaded.
+    """Return the path to a directory in which to place feature assets for a named feature are to be uploaded.
 
-    :param prefix:  Location of upload root directory
-    :param exec_rid: RID of the execution for the feature asset
-    :param schema: Domain schema
-    :param target_table: Name of the target table for the feature.
-    :param feature_name: Name of the feature
-    :param asset_table: Name of the asset table for the feature.
-    :return:
+    Args:
+        prefix: Location of upload root directory
+        exec_rid: RID of the execution for the feature asset
+        schema: Domain schema
+        target_table: Name of the target table for the feature.
+        feature_name: Name of the feature
+        asset_table: Name of the asset table for the feature.
+
+    Returns:
+        Path to directory in which feature asset files are placed.
     """
     path = feature_dir(prefix, exec_rid, schema, target_table, feature_name) / 'asset' / asset_table
 
@@ -175,12 +275,15 @@ def feature_asset_dir(
 
 
 def asset_dir(prefix: Path | str, schema: str, asset_table: str) -> Path:
-    """
-    Return the path to a directory in which to place assets that are to be uploaded.
-    :param prefix: Location of upload root directory
-    :param schema: Domain schema
-    :param asset_table: Name of the asset table
-    :return: Path to the directory in which to place assets
+    """Return the path to a directory in which to place assets that are to be uploaded.
+
+    Args:
+        prefix: Location of upload root directory
+        schema: Domain schema
+        asset_table: Name of the asset table
+
+    Returns:
+        Path to the directory in which to place assets
     """
     path = upload_root(prefix) / 'asset' / schema / asset_table
     path.mkdir(parents=True, exist_ok=True)
@@ -188,12 +291,15 @@ def asset_dir(prefix: Path | str, schema: str, asset_table: str) -> Path:
 
 
 def table_path(prefix: Path | str, schema: str, table: str) -> Path:
-    """
-    Return the path to a CSV file in which to place table values that are to be uploaded.
-    :param prefix: Location of upload root directory
-    :param schema: Domain schema
-    :param table: Name of the table to be uploaded.
-    :return: Path to the file in which to place table values that are to be uploaded.
+    """Return the path to a CSV file in which to place table values that are to be uploaded.
+
+    Args:
+        prefix: Location of upload root directory
+        schema: Domain schema
+        table: Name of the table to be uploaded.
+
+    Returns:
+        Path to the file in which to place table values that are to be uploaded.
     """
     path = upload_root(prefix) / 'table' / schema / table
     path.mkdir(parents=True, exist_ok=True)
@@ -305,6 +411,7 @@ bulk_upload_configuration = {
 }
 
 def test_upload():
+    """ """
     ead = execution_asset_dir('foo', 'my-rid', 'my-asset')
     emd = execution_metadata_dir('foo', 'my-rid', 'my-metadata')
     _fp = feature_value_path('foo', 'my-rid', 'my-schema', 'my-target', 'my-feature')
