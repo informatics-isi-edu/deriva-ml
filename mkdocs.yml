@@ -4,6 +4,7 @@ theme:
    name: material
    features:
        - navigation.instant
+       - navigation.expand
    palette:
       scheme: slate
       primary: green
@@ -18,7 +19,7 @@ plugins:
           - src  # Search for modules in the 'src' directory
         options:
           docstring_style: sphinx
-
+- mkdocs-jupyter
 
 nav:
   - Home: index.md
@@ -26,6 +27,11 @@ nav:
     - Creating a workflow: ml_workflow_instruction.md
     - DerivaML Structure: deriva_ml_structure.md
     - VM Docs: VM_setup_instruction.md
+  - Notebooks:
+    - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
+    - Execution: 'Notebooks/DerivaML Execution.ipynb'
+    - Features : 'Notebooks/DerivaML Features.ipynb'
+    - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
   - Library Documentation:
     - DerivaML: deriva_ml_base.md
     - DatasetBag: dataset_bag.md

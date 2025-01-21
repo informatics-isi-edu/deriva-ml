@@ -1,8 +1,10 @@
-# Welcome to MkDocs
+# Welcome to DerivaML
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+DerivaML is a library designed to improve the reproducibility of machine learning experiments.  
 
-## Commands
+
+
+##
 
 * `mkdocs new [dir-name]` - Create a new project.
 * `mkdocs serve` - Start the live-reloading docs server.
