@@ -21,7 +21,7 @@ import shutil
 from tempfile import NamedTemporaryFile
 from pathlib import Path
 from pydantic import ValidationError, validate_call
-from typing import Iterable
+from typing import Iterable, Any
 
 
 class Execution:
@@ -640,7 +640,7 @@ class Execution:
                 writer.writerow(feature.model_dump())
 
     @validate_call
-    def create_dataset(self, ds_type: str | list[str], description) -> RID:
+    def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
         """Create os dataset of specified types.
 
         Args:
@@ -689,7 +689,7 @@ class DerivaMLExec:
         self.execution.execution_start()
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> bool:
         """
          Method invoked when exiting the context.
 

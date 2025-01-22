@@ -76,7 +76,7 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
     # Now let's create model configuration for our program.
     api_workflow = Workflow(
         name="API Workflow",
-        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/Notebooks/DerivaML%20Dataset.ipynb",
+        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/src/deriva_ml/demo_catalog.py",
         workflow_type="Create Dataset Notebook"
     )
 

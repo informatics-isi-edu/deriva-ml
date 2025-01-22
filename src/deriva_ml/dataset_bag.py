@@ -38,7 +38,8 @@ class DatasetBag(object):
         """
         Initialize a DatasetBag instance.
 
-        :param bag_path: A path to a materialized BDbag as returned by download_dataset_bag or create_execution.
+        Args:
+            bag_path: A path to a materialized BDbag as returned by download_dataset_bag or create_execution.
         """
         self.bag_path = Path(bag_path)
         self.dataset_rid = self.bag_path.name.replace('Dataset_','')
@@ -234,7 +235,7 @@ class DatasetBag(object):
                 yield dict(zip(col_names, row))
 
     @staticmethod
-    def delete_database(bag_path, schema):
+    def delete_database(bag_path: Path, schema: str):
         """
 
         Args:

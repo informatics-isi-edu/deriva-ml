@@ -455,18 +455,22 @@ class DerivaML:
         """
         return self.cache_dir if cached else self.working_dir
 
-    def chaise_url(self, table: str | Table) -> str:
+    def chaise_url(self, table: RID | Table) -> str:
         """Return a Chaise URL to the specified table.
 
         Args:
-            table: Table to be browsed
+            table: Table or RID to be visited
             table: str | Table:
 
         Returns:
             URL to the table in Chaise format.
         """
-        table = self._get_table(table)
-        uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
+        try:
+            table = self._get_table(table)
+            uri = self.catalog.get_server_uri().replace('ermrest/catalog/', 'chaise/recordset/#')
+        except DerivaMLException:
+            # Perhaps we have a RID....
+            uri = self.cite(table)
         return f'{uri}/{urlquote(table.schema.name)}:{urlquote(table.name)}'
 
     def cite(self, entity: dict | str) -> str:
@@ -481,6 +485,9 @@ class DerivaML:
         Raises:
             DerivaMLException: if provided RID does not exist.
         """
+        if entity.startswith(f'https://{self.host_name}/id/{self.catalog_id}/'):
+            # Already got a citation...
+            return entity
         try:
             self.resolve_rid(rid := entity if isinstance(entity, str) else entity['RID'])
             return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot().snaptime}"
@@ -544,7 +551,7 @@ class DerivaML:
         """
         self.pathBuilder.www.tables[self.domain_schema].insert([{'Title': title, 'Content': content}])
 
-    def create_vocabulary(self, vocab_name: str, comment='', schema=None) -> Table:
+    def create_vocabulary(self, vocab_name: str, comment: str = '', schema: Optional[str] =None) -> Table:
         """Create a controlled vocabulary table with the given vocab name.
 
         Args:
@@ -579,7 +586,7 @@ class DerivaML:
         table = self._get_table(table_name)
         return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
-    def create_asset(self, asset_name: str, comment='', schema: str = None) -> Table:
+    def create_asset(self, asset_name: str, comment: str ='', schema: str = None) -> Table:
         """Create an asset table with the given asset name.
 
         Args:
@@ -597,7 +604,7 @@ class DerivaML:
             Table.define_asset(schema, asset_name, comment=comment))
         return asset_table
 
-    def is_association(self, table_name: str | Table, unqualified=True, pure=True) -> bool | set | int:
+    def is_association(self, table_name: str | Table, unqualified: bool = True, pure: bool =True) -> bool | set | int:
         """Check the specified table to see if it is an association table.
 
         Args:
@@ -894,7 +901,7 @@ class DerivaML:
         return datasets
 
     @validate_call
-    def delete_dataset(self, dataset_rid: RID, recurse = False) -> None:
+    def delete_dataset(self, dataset_rid: RID, recurse: bool = False) -> None:
         """Delete a dataset from the catalog.
 
         Args:
@@ -1004,13 +1011,13 @@ class DerivaML:
         return [d['RID'] for d in self.list_dataset_members(dataset_rid)['Dataset']]
 
     @validate_call
-    def list_dataset_members(self, dataset_rid: RID, recurse = False) -> dict[str, list[dict[str, Any]]]:
+    def list_dataset_members(self, dataset_rid: RID, recurse : bool= False) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
         Args:
             dataset_rid: param recurse: If this is a nested dataset, list the members of the contained datasets
             dataset_rid: RID:
-             recurse:  (Default value = False)
+            recurse:  (Default value = False)
 
         Returns:
             Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
