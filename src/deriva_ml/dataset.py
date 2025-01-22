@@ -5,14 +5,19 @@ THis module defines the DataSet class with is used to manipulate n
 from deriva.core.ermrest_model import Model, Table
 from typing import  Any, Callable, Optional
 
-# This file contains routines that generate upload and download specifications for DerivaML datasets.
+from deriva_ml import ML_SCHEMA
+
 
 class Dataset:
     """
     Class to manipulate a dataset.
     """
-    def __init__(self, ml_instance: 'DerivaML'):
-        self.ml_instance = ml_instance
+    def __init__(self, model: Model):
+        self._model = model
+        self.catalog = self._model.catalog
+        self.ml_schema = ML_SCHEMA
+        self.domain_schema = [s for s in model.schemas if s.name not in ['deriva-ml', 'www', 'public']].pop()
+        self.table = self._model.schemas[self.ml_schema].tables['Dataset']
 
 
     def export_dataset_element(self, path: list[Table]) -> list[dict[str, Any]]:
@@ -55,7 +60,6 @@ class Dataset:
             )
         return exports
 
-
     def download_dataset_element(self, path: list[Table]) -> list[dict[str, Any]]:
         """Return the download specification for the data object indicated by a path through the data model.
 
@@ -92,7 +96,6 @@ class Dataset:
             )
         return exports
 
-
     def is_vocabulary(self, t: Table) -> bool:
         """
 
@@ -106,17 +109,16 @@ class Dataset:
         return vocab_columns.issubset({c.name for c in t.columns}) and t
 
 
-    def vocabulary_specification(self, model, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    def vocabulary_specification(self, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
         """
 
         Args:
-          model:
           writer: Callable[[list[Table]]: list[dict[str: Any]]]:
 
         Returns:
 
         """
-        vocabs = [table for s in model.schemas.values() for table in s.tables.values() if self.is_vocabulary(table)]
+        vocabs = [table for s in self._model.schemas.values() for table in s.tables.values() if self.is_vocabulary(table)]
         return [o for table in vocabs for o in writer([table])]
 
 
@@ -143,29 +145,28 @@ class Dataset:
                 paths.extend(self.table_paths(child, new_path))
         return paths
 
+    def _dataset_nesting_depth(self) -> int:
+        return 2
 
-    def nested_dataset_schema_graph(self, model: Model)  -> dict[Table, list[dict[Table, list]]]:
-        dataset_table = model.schemas['deriva-ml'].tables["Dataset"]
-        return {model.schemas['deriva-ml'].tables['Dataset_Dataset']: [self.schema_graph(model, dataset_table)]}
+    def nested_dataset_schema_graph(self)  -> dict[Table, list[dict[Table, list]]]:
+        dataset_table = self._model.schemas['deriva-ml'].tables["Dataset"]
+        return {self._model.schemas['deriva-ml'].tables['Dataset_Dataset']: [self.schema_graph(dataset_table)]}
 
-    def schema_graph(self, model: Model,
-                     node: Table,
-                     visited_nodes: Optional[set] = None) -> dict[Table, list[dict[Table, list]]]:
+    def schema_graph(self, node: Table, visited_nodes: Optional[set] = None) -> dict[Table, list[dict[Table, list]]]:
         """Generate an undirected, acyclic graph of domain schema. We do this by traversing the schema foreign key
         relationships.  We stop when we hit the deriva-ml schema or when we reach a node that we have already seen.
 
         Nested datasets need to be unfolded
 
         Args:
-          model: Model to be turned into a graph.
           node: Current (starting) node in the graph.
           visited_nodes: param nested_dataset: Are we in a nested dataset, (i.e. have we seen the DataSet table)?
 
         Returns:
             Graph of the schema, starting from node.
         """
-        domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
-        dataset_table = model.schemas['deriva-ml'].tables["Dataset"]
+        domain_schema = {s for s in self._model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
+        dataset_table = self._model.schemas['deriva-ml'].tables["Dataset"]
 
         def domain_table(table: Table) -> bool:
             """Returns True if the table is in the domain schema."""
@@ -197,12 +198,11 @@ class Dataset:
                 # If the end of the path is a vocabulary table, we are at a terminal node in the ERD, so stop
                 continue
             # Get all the paths that extend the current path
-            graph[node].append(self.schema_graph(model, t, new_visited_nodes))
+            graph[node].append(self.schema_graph(t, new_visited_nodes))
         return graph
 
 
-    def dataset_specification(self, model: Model,
-                              writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    def dataset_specification(self, writer: Callable[[list[Table]], list[dict[str, Any]]]) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset.  Each element of the dataset will be placed in its own dir
         The top level data directory of the resulting BDBag will have one subdirectory for element type. the subdirectory
         will contain the CSV indicating which elements of that type are present in the dataset, and then there will be a
@@ -235,35 +235,29 @@ class Dataset:
                     f2
 
         Args:
-          model: param writer:
-          model: Model:
           writer: Callable[[list[Table]]: list[dict[str:  Any]]]:
 
         Returns:
 
         """
-        dataset_table = model.schemas['deriva-ml'].tables['Dataset']
-        domain_schema = {s for s in model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
+        domain_schema = {s for s in self._model.schemas if s not in {'deriva-ml', 'public', 'www'}}.pop()
 
         element_spec = []
-        for path in self.table_paths(self.nested_dataset_schema_graph(model), [dataset_table]):
+        for path in self.table_paths(self.nested_dataset_schema_graph(), [self.table]):
             element_spec.extend(writer(path))
-        for element in dataset_table.find_associations():
+        for element in self.table.find_associations():
             # A dataset may have may other object associated with it. We only want to consider those association tables
             #  that are in the domain schema, or the table Dataset_Dataset, which is used for nested datasets.
             if element.schema.name != domain_schema:
                 continue
                 # Now generate all the paths reachable from this node.
-            for path in self.table_paths(self.schema_graph(model, element.table), [dataset_table]):
+            for path in self.table_paths(self.schema_graph(element.table), [self.table]):
                 element_spec.extend(writer(path))
-        return self.vocabulary_specification(model, writer) + element_spec
+        return self.vocabulary_specification(writer) + element_spec
 
 
-    def export_outputs(self, model: Model) -> list[dict[str, Any]]:
+    def export_outputs(self) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
-
-        Args:
-          model: An ermrest model.
 
         Returns:
           An export specification suitable for Chaise.
@@ -290,15 +284,11 @@ class Dataset:
             {'source': {"api": "schema", "skip_root_path": True},
              'destination': {'type': 'json', 'name': 'schema'},
              }
-        ] + self.dataset_specification(model, writer)
+        ] + self.dataset_specification(writer)
 
 
-    def processor_params(self, model: Model) -> list[dict[str, Any]]:
+    def processor_params(self) -> list[dict[str, Any]]:
         """
-
-        Args:
-          model: current ERMrest Model
-
         Returns:
           a download specification for the datasets in the provided model.
 
@@ -320,13 +310,10 @@ class Dataset:
                 "processor": "json",
                 "processor_params": {'query_path': f'/schema', 'output_path': 'schema'}
             }
-        ] + self.dataset_specification(model, writer)
+        ] + self.dataset_specification(writer)
 
-    def generate_dataset_download_spec(self, model: Model) -> dict[str, Any]:
+    def generate_dataset_download_spec(self) -> dict[str, Any]:
         """
-
-        Args:
-          model: Model:
 
         Returns:
         """
@@ -339,15 +326,15 @@ class Dataset:
                 "bag_idempotent": True
             },
             "catalog": {
-                "host": f"{model.catalog.deriva_server.scheme}://{model.catalog.deriva_server.server}",
-                "catalog_id": f"{model.catalog.catalog_id}",
+                "host": f"{self._model.catalog.deriva_server.scheme}://{self.catalog.deriva_server.server}",
+                "catalog_id": f"{self.catalog.catalog_id}",
                 "query_processors":
                     [
                         {
                             "processor": "env",
                             "processor_params": {"query_path": "/", "output_path": "Dataset", "query_keys": ["snaptime"]}
                         }
-                    ] + self.processor_params(model)
+                    ] + self.processor_params()
             }
         }
 

@@ -2,8 +2,7 @@ from typing import Any
 
 from deriva.core.ermrest_model import Model
 from deriva.core.utils.core_utils import tag as deriva_tags
-
-from deriva_ml.dataset_specification import export_outputs
+from deriva_ml.dataset import Dataset
 
 def dataset_visible_columns(model: Model) -> dict[str, Any]:
     dataset_table = model.schemas['deriva-ml'].tables['Dataset']
@@ -71,8 +70,9 @@ def dataset_visible_fkeys(model: Model) -> dict[str, Any]:
 
 
 def generate_dataset_annotations(model: Model) -> dict[str, Any]:
+    ds = Dataset(model)
     return {
-        deriva_tags.export_fragment_definitions: {'dataset_export_outputs': export_outputs(model)},
+        deriva_tags.export_fragment_definitions: {'dataset_export_outputs': ds.export_outputs()},
         deriva_tags.visible_columns: dataset_visible_columns(model),
         deriva_tags.visible_foreign_keys: dataset_visible_fkeys(model),
         deriva_tags.export_2019: {

@@ -21,7 +21,7 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.core.utils.hash_utils import compute_file_hashes
 from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from deriva_ml.dataset_specification import generate_dataset_download_spec
+from deriva_ml.dataset import Dataset
 from deriva_ml.deriva_definitions import ColumnDefinition
 from deriva_ml.deriva_definitions import  RID, UploadState, Status, FileUploadState, DerivaMLException
 from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
@@ -298,6 +298,7 @@ class DerivaML:
                                       session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
         self.configuration = None
+        self._dataset = Dataset(self.model, self.model)
 
         builtin_schemas = ['public', self.ml_schema, 'www']
         self.domain_schema = domain_schema or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
@@ -346,7 +347,7 @@ class DerivaML:
     @property
     def dataset_table(self) -> Table:
         """The dataset table for the DerivaML instance."""
-        return self.model.schemas[self.ml_schema].tables['Dataset']
+        return self._dataset.table()
 
     def dataset_version(self, dataset_rid: RID) -> tuple[int, ...]:
         """Retrieve the version of the specified dataset.
