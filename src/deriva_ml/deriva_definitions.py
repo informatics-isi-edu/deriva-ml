@@ -10,6 +10,7 @@ from pydantic import BaseModel, model_serializer, Field, computed_field
 from typing import Any, Iterable, Optional, Annotated
 import warnings
 
+ML_SCHEMA = 'deriva-ml'
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
 warnings.filterwarnings('ignore',

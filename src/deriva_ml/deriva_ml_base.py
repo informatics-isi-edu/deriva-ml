@@ -23,7 +23,7 @@ from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from deriva_ml.dataset import Dataset
 from deriva_ml.deriva_definitions import ColumnDefinition
-from deriva_ml.deriva_definitions import  RID, UploadState, Status, FileUploadState, DerivaMLException
+from deriva_ml.deriva_definitions import  RID, UploadState, Status, FileUploadState, DerivaMLException, ML_SCHEMA
 from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
 from deriva_ml.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
@@ -260,8 +260,6 @@ class DerivaML:
         catalog_id: Catalog ID. Either and identifier, or a catalog name.
         domain_schema: Schema name for domain specific tables and relationships.
         model: ERMRest model for the catalog
-        pathBuilder: An instance of a datapath pathbuilder object.
-        dataset_table: The ERMrest table that contains datasets in the catalog.
     """
 
     def __init__(self,
@@ -272,7 +270,7 @@ class DerivaML:
                  cache_dir: Optional[str] = None,
                  working_dir: Optional[str] = None,
                  model_version: str = '1',
-                 ml_schema: str ='deriva-ml',
+                 ml_schema: str =ML_SCHEMA,
                  logging_level=logging.WARNING):
         """Create and initialize a DerivaML instance.
 
@@ -298,7 +296,7 @@ class DerivaML:
                                       session_config=self._get_session_config())
         self.model = self.catalog.getCatalogModel()
         self.configuration = None
-        self._dataset = Dataset(self.model, self.model)
+        self._dataset = Dataset(self.model)
 
         builtin_schemas = ['public', self.ml_schema, 'www']
         self.domain_schema = domain_schema or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
@@ -347,7 +345,7 @@ class DerivaML:
     @property
     def dataset_table(self) -> Table:
         """The dataset table for the DerivaML instance."""
-        return self._dataset.table()
+        return self._dataset.table
 
     def dataset_version(self, dataset_rid: RID) -> tuple[int, ...]:
         """Retrieve the version of the specified dataset.
@@ -944,14 +942,6 @@ class DerivaML:
         """
 
         def domain_table(table: Table) -> bool:
-            """
-
-            Args:
-              table: Table: 
-
-            Returns:
-
-            """
             return table.schema.name == self.domain_schema or table.name == self.dataset_table.name
 
         return [t for a in self.dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
@@ -1274,7 +1264,7 @@ class DerivaML:
                 # into a local file and then use the downloader to create and download the desired bdbag.
                 spec_file = f'{tmp_dir}/download_spec.json'
                 with open(spec_file, 'w', encoding="utf-8") as ds:
-                    json.dump(generate_dataset_download_spec(self.model), ds)
+                    json.dump(self._dataset.generate_dataset_download_spec(), ds)
                 downloader = GenericDownloader(
                     server={"catalog_id": self.catalog_id, "protocol": "https", "host": self.host_name},
                     config_file=spec_file,
@@ -1531,7 +1521,7 @@ class DerivaML:
             raise DerivaMLException(
                 f"Failed to upload execution configuration file {config_file} to object store. Error: {error}")
         try:
-            ml_schema_path = self.catalog.getPathBuilder().schemas[self.ml_schema]
+            ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
             return list(ml_schema_path.tables['Execution_Metadata'].insert(
                 [{'URL': hatrac_uri,
                   'Filename': file_name,
