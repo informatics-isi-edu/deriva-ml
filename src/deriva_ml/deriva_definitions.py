@@ -3,12 +3,13 @@ Shared definitions that are used in different DerivaML modules.
 """
 
 
+import warnings
+from enum import Enum
+from typing import Any, Iterable, Optional, Annotated
+
 import deriva.core.ermrest_model as em
 from deriva.core.ermrest_model import builtin_types
-from enum import Enum
 from pydantic import BaseModel, model_serializer, Field, computed_field
-from typing import Any, Iterable, Optional, Annotated
-import warnings
 
 ML_SCHEMA = 'deriva-ml'
 

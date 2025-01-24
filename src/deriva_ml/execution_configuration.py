@@ -1,7 +1,10 @@
-from .deriva_definitions import RID
 import json
-from pydantic import BaseModel, conlist, model_validator
 from typing import Optional, Any
+
+from pydantic import BaseModel, conlist, model_validator
+
+from .deriva_definitions import RID
+
 
 class Workflow(BaseModel):
     """A specification of a workflow.  Must have a name, URI to the workflow instance, and a type.  The workflow type

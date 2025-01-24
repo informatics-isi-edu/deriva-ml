@@ -1,12 +1,15 @@
-from csv import reader
-from deriva.core.ermrest_model import Model
-from deriva_ml.deriva_ml_base import DerivaMLException
 import logging
-from pathlib import Path
-import pandas as pd
 import sqlite3
+from csv import reader
+from pathlib import Path
 from typing import Optional, Any, Generator
 from urllib.parse import urlparse
+
+import pandas as pd
+from deriva.core.ermrest_model import Model
+
+from deriva_ml.deriva_ml_base import DerivaMLException
+
 
 class DatasetBag(object):
     """DatasetBag is a class that manages a materialized bag.  It is created from a locally materialized BDBag for a

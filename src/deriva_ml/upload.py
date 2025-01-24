@@ -33,8 +33,8 @@ Here is the directory layout we support:
 
 from pathlib import Path
 from typing import Optional
-import regex as re
 
+import regex as re
 
 upload_root_regex = r"(?i)^.*/deriva-ml"
 exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"
