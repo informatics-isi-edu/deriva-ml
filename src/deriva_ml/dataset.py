@@ -2,9 +2,11 @@
 THis module defines the DataSet class with is used to manipulate n
 """
 
-from deriva.core.ermrest_model import Model, Table
-from deriva_ml.deriva_definitions import ML_SCHEMA
 from typing import Any, Callable, Optional
+
+from deriva.core.ermrest_model import Model, Table
+
+from deriva_ml.deriva_definitions import ML_SCHEMA
 
 
 class Dataset:
@@ -217,7 +219,7 @@ class Dataset:
             return (
                 child != node
                 and child not in visited_nodes
-                and child.schema.name == self._domain_schema
+                and child.schema.name == self._domain_schema or child.name == 'Dataset_Dataset_Type'
             )
 
         # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
@@ -275,7 +277,9 @@ class Dataset:
             A dataset specification.
         """
         element_spec = []
-        for path in self._table_paths(self._nested_dataset_schema_graph(), [self.table]):
+        for path in self._table_paths(
+            self._nested_dataset_schema_graph(), [self.table]
+        ):
             element_spec.extend(writer(path))
         for element in self.table.find_associations():
             # A dataset may have may other object associated with it. We only want to consider those association tables

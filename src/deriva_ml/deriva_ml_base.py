@@ -254,13 +254,14 @@ class Feature:
             """
             if c.name in {c.name for c in self.asset_columns}:
                 return str | Path
+
             match c.type.typename:
                 case "text":
                     return str
                 case "int2" | "int4" | "int8":
-                    return int
+                     return int
                 case "float4" | "float8":
-                    return float
+                   return float
                 case _:
                     return str
 
@@ -355,7 +356,7 @@ class DerivaML:
         )
         self.model = self.catalog.getCatalogModel()
         self.configuration = None
-        self.dataset_table = self.model.schemas[self.ml_schema].tables['Dataset']
+        self.dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
 
         builtin_schemas = ["public", self.ml_schema, "www"]
         self.domain_schema = (
@@ -1445,7 +1446,7 @@ class DerivaML:
         Args:
             bag: The RID of a dataset or a minid to an existing bag.
             materialize: Materalize the bag, rather than just downloading it.
-            execution_rid: return: the location of the unpacked and validated dataset bag and the RID of the bag
+            execution_rid: RID of execution object requesting the download.  Used to update status.
 
         Returns:
             the location of the unpacked and validated dataset bag and the RID of the bag
@@ -1566,7 +1567,7 @@ class DerivaML:
             logging.info(msg)
             return True
 
-        if self.resolve_rid(execution_rid).table.name != "Execution":
+        if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
 
         # request metadata
@@ -1761,9 +1762,7 @@ class DerivaML:
             A ExecutionConfiguration object for configured by the parameters in the configuration file.
         """
         configuration = self.retrieve_rid(configuration_rid)
-        with NamedTemporaryFile(
-            "w+", delete=False, suffix=".json"
-        ) as dest_file:
+        with NamedTemporaryFile("w+", delete=False, suffix=".json") as dest_file:
             hs = HatracStore("https", self.host_name, self.credential)
             hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
             return ExecutionConfiguration.load_configuration(dest_file.name)
@@ -1824,7 +1823,7 @@ class DerivaML:
                 f"Failed to update Execution_Asset table with configuration file metadata. Error: {error}"
             )
 
-    #@validate_call
+    # @validate_call
     def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":
         """Create an execution object
 
