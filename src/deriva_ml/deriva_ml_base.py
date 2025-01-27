@@ -1221,7 +1221,6 @@ class DerivaML:
             member_link = tuple(
                 c.name for c in next(iter(other_fkey.column_map.items()))
             )
-
             path = pb.schemas[member_table.schema.name].tables[member_table.name].path
             path.filter(member_path.Dataset == dataset_rid)
             path.link(

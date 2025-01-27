@@ -26,11 +26,15 @@ class Dataset:
         self.table = self._model.schemas[self.ml_schema].tables["Dataset"]
 
     @staticmethod
-    def export_dataset_element(path: list[Table]) -> list[dict[str, Any]]:
+    def export_dataset_element(
+        spath: str, dpath: str, table: Table
+    ) -> list[dict[str, Any]]:
         """Given a path in the data model, output an export specification for the path taken to get to the current table.
 
         Args:
-          path: List of tables that trace the path through the data model.
+          spath: Source path
+          dpath: Destination path
+          table: Table referenced to by the path
 
         Returns:
           The export specification that will retrieve that data from the catalog and place it into a BDBag.
@@ -38,19 +42,11 @@ class Dataset:
         # The table is the last element of the path.  Generate the ERMrest query by conversting the list of tables
         # into a path in the form of /S:T1/S:T2/S:Table
         # Generate the destination path in the file system using just the table names.
-        table = path[-1]
-        npath = (
-            "Dataset/RID={Dataset_RID}/" if path[0].name == "Dataset" else path[0].name
-        )
-        npath += "/".join([f"{t.schema.name}:{t.name}" for t in path[1:]])
 
-        dname = "/".join(
-            [t.name for t in path if not t.is_association()] + [table.name]
-        )
         exports = [
             {
-                "source": {"api": "entity", "path": f"{npath}"},
-                "destination": {"name": dname, "type": "csv"},
+                "source": {"api": "entity", "path": spath},
+                "destination": {"name": dpath, "type": "csv"},
             }
         ]
 
@@ -61,36 +57,32 @@ class Dataset:
                 {
                     "source": {
                         "api": "attribute",
-                        "path": f"{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5",
+                        "path": f"{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5",
                     },
                     "destination": {"name": f"asset/{table.name}", "type": "fetch"},
                 }
             )
         return exports
 
-    def download_dataset_element(self, path: list[Table]) -> list[dict[str, Any]]:
+    def download_dataset_element(
+        self, spath, dpath, table: Table
+    ) -> list[dict[str, Any]]:
         """Return the download specification for the data object indicated by a path through the data model.
 
         Args:
-          path: list[Table]:
+          spath: Source path
+          dpath: Destination path
+          table: Table referenced to by the path
 
         Returns:
-
+          The download specification that will retrieve that data from the catalog and place it into a BDBag.
         """
-        table = path[-1]
-        npath = (
-            "Dataset/RID={Dataset_RID}/" if path[0].name == "Dataset" else path[0].name
-        )
-        npath += "/".join([f"{t.schema.name}:{t.name}" for t in path[1:]])
-        output_path = "/".join(
-            [p.name for p in path if not p.is_association()] + [table.name]
-        )
         exports = [
             {
                 "processor": "csv",
                 "processor_params": {
-                    "query_path": f"/entity/{npath}?limit=none",
-                    "output_path": output_path,
+                    "query_path": f"/entity/{spath}?limit=none",
+                    "output_path": dpath,
                 },
             }
         ]
@@ -102,7 +94,7 @@ class Dataset:
                 {
                     "processor": "fetch",
                     "processor_params": {
-                        "query_path": f"/attribute/{npath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none",
+                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none",
                         "output_path": f"asset/{table.name}",
                     },
                 }
@@ -123,7 +115,7 @@ class Dataset:
         return vocab_columns.issubset({c.name for c in t.columns}) and t
 
     def _vocabulary_specification(
-        self, writer: Callable[[list[Table]], list[dict[str, Any]]]
+        self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
     ) -> list[dict[str, Any]]:
         """
 
@@ -139,34 +131,64 @@ class Dataset:
             for table in s.tables.values()
             if self._is_vocabulary(table)
         ]
-        return [o for table in vocabs for o in writer([table])]
+        return [
+            o
+            for table in vocabs
+            for o in writer(f"{table.schema.name}:{table.name}", table.name, table)
+        ]
 
-    def _table_paths(
+    def _domain_table_paths(
         self,
         graph: dict[Table, list[dict[Table, Any]]],
-        path: Optional[list[Table]] = None,
-    ) -> list[list[Table]]:
+        spath: str = None,
+        dpath: str = None,
+        sprefix: str = "deriva-ml:Dataset/RID={Dataset_RID}",
+        dprefix: str = "Dataset",
+    ) -> list[tuple[str, str, Table]]:
         """Recursively walk over the domain schema graph and extend the current path.
 
         Args:
             graph: An undirected, acyclic graph of schema.  Represented as a dictionary whose name is the table name.
                 and whose values are the child nodes of the table.
-            path: The path through the graph so far
-
+            spath: Source path so far
+            dpath: Destination path so far
+            sprefix: Initial path to be included.  Allows for nested datasets
+            dprefix: Initial path to be included.  Allows for nested datasets
 
         Returns:
           A list of all the paths through the graph.  Each path is a list of tables.
 
         """
-        path = path or []
+        source_path = spath or sprefix
+        dest_path = dpath or dprefix
         paths = []
-
         for node, children in graph.items():
-            new_path = path + [node]
-            paths.append(new_path)
+            if node.name == "Dataset":
+                new_spath = sprefix
+                new_dpath = dprefix
+            else:
+                new_spath = source_path + f"/{node.schema.name}:{node.name}"
+                new_dpath = dest_path + f"/{node.name}"
+            paths.append((new_spath, new_dpath, node))
             for child in children:
-                paths.extend(self._table_paths(child, new_path))
+                paths.extend(self._domain_table_paths(child, new_spath, new_dpath))
         return paths
+
+    def _table_paths(self, graph) -> list[tuple[str, str, Table]]:
+        sprefix, dprefix = (
+            "deriva-ml:Dataset/RID={Dataset_RID}",
+            "Dataset",
+        )
+        table_paths = self._domain_table_paths(graph, sprefix=sprefix, dprefix=dprefix)
+        dataset_dataset_table = self._model.schemas[self.ml_schema].tables['Dataset_Dataset']
+        nested_sprefix = sprefix
+        nested_dprefix = dprefix
+        for i in range(1,self._dataset_nesting_depth()):
+            nested_sprefix += f'/DD{i}:=deriva-ml:Dataset_Dataset/D{i}:=(Nested_Dataset)=(deriva-ml:Dataset:RID)'
+            nested_dprefix += f'/Dataset_Dataset/Dataset'
+            table_paths.append((nested_sprefix, nested_dprefix, dataset_dataset_table))  # Get CSV for nested datasets.
+            table_paths.extend(self._domain_table_paths(graph, sprefix=nested_sprefix, dprefix=nested_dprefix))
+        return table_paths
 
     def _dataset_nesting_depth(self) -> int:
         ds_path = (
@@ -178,14 +200,7 @@ class Dataset:
             ds_path.attributes(ds_path.Dataset, ds_path.Nested_Dataset).fetch()
         )
         tree_depth = 3
-        return 3
-
-    def _nested_dataset_schema_graph(self) -> dict[Table, list[dict[Table, list]]]:
-        dataset_dataset = self._model.schemas["deriva-ml"].tables["Dataset_Dataset"]
-        nested_graph = {dataset_dataset: [self._schema_graph(self.table)]}
-        for i in range(self._dataset_nesting_depth() - 1):
-            nested_graph = {dataset_dataset: [{self.table: [nested_graph]}]}
-        return nested_graph
+        return 2
 
     def _schema_graph(
         self, node: Table, visited_nodes: Optional[set] = None
@@ -203,10 +218,6 @@ class Dataset:
             Graph of the schema, starting from node.
         """
 
-        def domain_table(table: Table) -> bool:
-            """Returns True if the table is in the domain schema."""
-            return table.schema.name == self._domain_schema
-
         visited_nodes = visited_nodes or set()
         graph = {node: []}
 
@@ -219,7 +230,8 @@ class Dataset:
             return (
                 child != node
                 and child not in visited_nodes
-                and child.schema.name == self._domain_schema or child.name == 'Dataset_Dataset_Type'
+                and child.schema.name == self._domain_schema
+                or child.name == "Dataset_Dataset"
             )
 
         # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
@@ -237,7 +249,7 @@ class Dataset:
         return graph
 
     def _dataset_specification(
-        self, writer: Callable[[list[Table]], list[dict[str, Any]]]
+        self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
     ) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset.  Each element of the dataset will be placed in its own dir
         The top level data directory of the resulting BDBag will have one subdirectory for element type. the subdirectory
@@ -277,20 +289,8 @@ class Dataset:
             A dataset specification.
         """
         element_spec = []
-        for path in self._table_paths(
-            self._nested_dataset_schema_graph(), [self.table]
-        ):
-            element_spec.extend(writer(path))
-        for element in self.table.find_associations():
-            # A dataset may have may other object associated with it. We only want to consider those association tables
-            #  that are in the domain schema, or the table Dataset_Dataset, which is used for nested datasets.
-            if element.schema.name != self._domain_schema:
-                continue
-                # Now generate all the paths reachable from this node.
-            for path in self._table_paths(
-                self._schema_graph(element.table), [self.table]
-            ):
-                element_spec.extend(writer(path))
+        for path in self._table_paths(self._schema_graph(self.table)):
+            element_spec.extend(writer(*path))
         return self._vocabulary_specification(writer) + element_spec
 
     def export_outputs(self) -> list[dict[str, Any]]:
@@ -300,16 +300,18 @@ class Dataset:
           An export specification suitable for Chaise.
         """
 
-        def writer(path: list[Table]) -> list[dict[str, Any]]:
+        def writer(spath: str, dpath: str, table: Table) -> list[dict[str, Any]]:
             """
 
             Args:
-              path: list[Table]:
+              spath: list[Table]:
+              dpath: list[Table]:
+              table: Table
 
             Returns:
-
+                An export specification suitable for Chaise.
             """
-            return self.export_dataset_element(path)
+            return self.export_dataset_element(spath, dpath, table)
 
         # Export specification is a specification for the datasets, plus any controlled vocabulary
         return [
@@ -337,16 +339,18 @@ class Dataset:
 
         """
 
-        def writer(path: list[Table]) -> list[dict[str, Any]]:
+        def writer(spath: str, dpath: str, table: Table) -> list[dict[str, Any]]:
             """
 
             Args:
-              path: list[Table]:
+              spath:
+              dpath:
+              table: Table
 
             Returns:
 
             """
-            return self.download_dataset_element(path)
+            return self.download_dataset_element(spath, dpath, table)
 
         # Download spec is the spec for any controlled vocabulary and for the dataset.
         return [

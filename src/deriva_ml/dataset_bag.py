@@ -246,32 +246,37 @@ class DatasetBag(object):
             if target_table == self.dataset_table:
                 # find_assoc gives us the keys in the wrong position, so swap.
                 self_fkey, other_fkey = other_fkey, self_fkey
-            #result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
-            #while row := result.fetchone():
-            #    yield row
+            sql_target = self._normalize_table_name(target_table.name)
+            sql_member = self._normalize_table_name(member_table.name)
 
-            #target_path = pb.schemas[target_table.schema.name].tables[target_table.name]
-            #member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
             # Get the names of the columns that we are going to need for linking
             member_link = tuple(
                 c.name for c in next(iter(other_fkey.column_map.items()))
             )
-            sql_member = self._normalize_table_name(member_table.name)
-            sql_target = self._normalize_table_name(target_table.name)
-            print(f'member_table: {sql_member} target_table: {sql_target}')
-            print(member_link)
-            sql_cmd = f"SELECT * from {sql_member}, {sql_target} WHERE '{self.dataset_rid}' == RID;"
-            print(sql_cmd)
-            #path = pb.schemas[member_table.schema.name].tables[member_table.name].path
-            #SELECT * from dataset_table join associate_table  JOIN
-            #path.filter(member_path.Dataset == dataset_rid)
-            #path.link(
-            #    target_path,
-            #    on=(
-            #            member_path.columns[member_link[0]]
-            #            == target_path.columns[member_link[1]]
-            #    ),
-            #)
+
+            with self.dbase:
+                col_names = [
+                    c[1]
+                    for c in self.dbase.execute(
+                        f'PRAGMA table_info("{sql_target}")'
+                    ).fetchall()
+                ]
+                print(sql_member)
+                print(col_names)
+                print(self.dataset_rid)
+                print(member_link)
+
+                sql_cmd = (
+                    f'SELECT * FROM "{sql_member}" WHERE "{self.dataset_rid}" = "{sql_member}.Dataset";'
+                        #   f'JOIN "{sql_target}" ON "{sql_member}.{member_link[0]}" = "{sql_target}.{member_link[1]}" '
+                        #   f'WHERE "{self.dataset_rid}" = "{sql_member}.Dataset";'
+                              )
+
+                print(sql_cmd)
+                target_entities = self.dbase.execute(sql_cmd).fetchall()
+                print(target_entities)
+                members[target_table.name].extend(target_entities)
+
             target_entities = [] # path.entities().fetch()
             members[target_table.name].extend(target_entities)
             if recurse and target_table.name == self.dataset_table:
