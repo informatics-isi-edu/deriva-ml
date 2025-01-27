@@ -183,11 +183,16 @@ class Dataset:
         dataset_dataset_table = self._model.schemas[self.ml_schema].tables['Dataset_Dataset']
         nested_sprefix = sprefix
         nested_dprefix = dprefix
-        for i in range(1,self._dataset_nesting_depth()):
-            nested_sprefix += f'/DD{i}:=deriva-ml:Dataset_Dataset/D{i}:=(Nested_Dataset)=(deriva-ml:Dataset:RID)'
-            nested_dprefix += f'/Dataset_Dataset/Dataset'
-            table_paths.append((nested_sprefix, nested_dprefix, dataset_dataset_table))  # Get CSV for nested datasets.
-            table_paths.extend(self._domain_table_paths(graph, sprefix=nested_sprefix, dprefix=nested_dprefix))
+        for i in range(1, 3):
+        #    nested_sprefix += f'/DD{i}:=deriva-ml:Dataset_Dataset/D{i+1}:=(Nested_Dataset)=(deriva-ml:Dataset:RID)'
+            nested_sprefix += f'/(RID)=(deriva-ml:Dataset_Dataset:Dataset)'
+            nested_dprefix += f'/Dataset_Dataset'
+            table_paths.append((nested_sprefix, nested_dprefix, dataset_dataset_table))
+            nested_sprefix += f'/(Nested_Dataset)=(deriva-ml:Dataset:RID)'
+            nested_dprefix += f'/Dataset'
+            table_paths.append((nested_sprefix, nested_dprefix, self.table))
+        # Get CSV for nested datasets.
+            table_paths.extend(self._domain_table_paths(graph, sprefix=nested_sprefix, dprefix=nested_dprefix)[1:])
         return table_paths
 
     def _dataset_nesting_depth(self) -> int:
@@ -231,7 +236,6 @@ class Dataset:
                 child != node
                 and child not in visited_nodes
                 and child.schema.name == self._domain_schema
-                or child.name == "Dataset_Dataset"
             )
 
         # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by

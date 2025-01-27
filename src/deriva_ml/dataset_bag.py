@@ -215,7 +215,7 @@ class DatasetBag(object):
             )
         return datasets
 
-    def list_dataset_members(self, recurse: bool = False) -> Generator[str, None, None]:
+    def list_dataset_members(self, recurse: bool = False) -> defaultdict:
         """Return a list of entities associated with a specific dataset.
 
          Args:
@@ -261,18 +261,12 @@ class DatasetBag(object):
                         f'PRAGMA table_info("{sql_target}")'
                     ).fetchall()
                 ]
-                print(sql_member)
-                print(col_names)
-                print(self.dataset_rid)
-                print(member_link)
 
                 sql_cmd = (
-                    f'SELECT * FROM "{sql_member}" WHERE "{self.dataset_rid}" = "{sql_member}.Dataset";'
-                        #   f'JOIN "{sql_target}" ON "{sql_member}.{member_link[0]}" = "{sql_target}.{member_link[1]}" '
-                        #   f'WHERE "{self.dataset_rid}" = "{sql_member}.Dataset";'
+                    f'SELECT * FROM "{sql_member}" '
+                           f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
+                           f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
                               )
-
-                print(sql_cmd)
                 target_entities = self.dbase.execute(sql_cmd).fetchall()
                 print(target_entities)
                 members[target_table.name].extend(target_entities)
