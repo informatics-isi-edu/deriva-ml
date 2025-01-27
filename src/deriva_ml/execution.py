@@ -151,6 +151,7 @@ class Execution:
             )
             self.dataset_rids.append(dataset_rid)
             self.dataset_paths.append(bag_path)
+        self.dataset_bags = DatasetBag(self.dataset_paths)
         # Update execution info
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         if self.dataset_rids:

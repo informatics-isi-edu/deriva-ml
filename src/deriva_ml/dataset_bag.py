@@ -3,13 +3,14 @@ import sqlite3
 from collections import defaultdict
 from csv import reader
 from pathlib import Path
-from typing import Optional, Any, Generator, Iterable
+from pydantic import validate_call
+from typing import Optional, Any, Generator
 from urllib.parse import urlparse
 
 import pandas as pd
 from deriva.core.ermrest_model import Model
 
-from deriva_ml.deriva_definitions import ML_SCHEMA, MLVocab
+from deriva_ml.deriva_definitions import ML_SCHEMA, MLVocab, RID
 from deriva_ml.deriva_ml_base import DerivaMLException
 
 
@@ -28,7 +29,6 @@ class DatasetBag(object):
     argument will perform the appropriate name mappings.
 
     Attributes:
-        dbase: A connection to the sqlite database.
         domain_schema: The name of the domain schema for the dataset.
         dataset_rid: The name of the dataset
         model: The ERMRest model from which the dataset was generated.
@@ -40,37 +40,45 @@ class DatasetBag(object):
         list_tables(self) -> list[str]
     """
 
-    def __init__(self, bag_path: Path | str):
+    DBase = sqlite3.connect('dataset.db')
+    Model_Loaded: bool = False
+
+    @validate_call
+    def __init__(self, bag_paths: list[Path | str] or Path ):
         """
         Initialize a DatasetBag instance.
 
         Args:
-            bag_path: A path to a materialized BDbag as returned by download_dataset_bag or create_execution.
+            bag_paths: A path to a materialized BDbag as returned by download_dataset_bag or create_execution.
         """
-        self.bag_path = Path(bag_path)
-        self.dataset_rid = self.bag_path.name.replace("Dataset_", "")
-        self.model = Model.fromfile("file-system", self.bag_path / "data/schema.json")
+        bag_path = [bag_paths] if isinstance(bag_paths, str) else bag_paths
+        self.bag_paths = [Path(bag_path)] if isinstance(bag_path, str) else [Path(path) for path in bag_paths]
+
+        self.dataset_rids = [p.name.replace("Dataset_", "") for p in self.bag_paths]
+        self.model = Model.fromfile("file-system", self.bag_paths[0] / "data/schema.json")
         # Guess the domain schema name by eliminating all the "builtin" schema.
         self.domain_schema = [
             s for s in self.model.schemas if s not in ["deriva-ml", "public", "www"]
         ][0]
         self.ml_schema = ML_SCHEMA
 
-        self.dbase = sqlite3.connect(f"{self.bag_path / self.domain_schema}.db")
         self.dataset_table = self.model.schemas[self.ml_schema].tables['Dataset']
 
         # Create a sqlite database schema that contains all the tables within the catalog from which the
         # BDBag was created.
-        with self.dbase:
-            for t in self.model.schemas[self.domain_schema].tables.values():
-                self.dbase.execute(t.sqlite3_ddl())
-            for t in self.model.schemas["deriva-ml"].tables.values():
-                self.dbase.execute(t.sqlite3_ddl())
+        if not DatasetBag.Model_Loaded:
+            with DatasetBag.DBase:
+                for t in self.model.schemas[self.domain_schema].tables.values():
+                    DatasetBag.DBase.execute(t.sqlite3_ddl())
+                for t in self.model.schemas["deriva-ml"].tables.values():
+                    DatasetBag.DBase.execute(t.sqlite3_ddl())
+            DatasetBag.Model_Loaded = True
 
         # Load the database from the bag contents.
-        self._load_sqllite()
+        for path in self.bag_paths:
+            self._load_sqllite(path)
 
-    def _localize_asset_table(self) -> dict[str, str]:
+    def _localize_asset_table(self, bag_path: Path) -> dict[str, str]:
         """Use the fetch.txt file in a bdbag to create a map from a URL to a local file path.
 
         Returns:
@@ -79,7 +87,7 @@ class DatasetBag(object):
         """
         fetch_map = {}
         try:
-            with open(self.bag_path / "fetch.txt", newline="\n") as fetchfile:
+            with open(bag_path / "fetch.txt", newline="\n") as fetchfile:
                 for row in fetchfile:
                     # Rows in fetch.text are tab seperated with URL filename.
                     fields = row.split("\t")
@@ -91,56 +99,56 @@ class DatasetBag(object):
     def _reset_dbase(self):
         """ """
         DatasetBag.delete_database(self.bag_path, self.domain_schema)
-        self.dbase.execute("DROP DATABASE")
+        DatasetBag.DBase.execute("DROP DATABASE")
 
-    def _load_sqllite(self) -> None:
+    def _is_asset(self, table_name: str) -> bool:
+        """
+
+        Args:
+          table_name: str:
+
+        Returns:
+
+        """
+        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
+        sname = (
+            self.domain_schema
+            if table_name in self.model.schemas[self.domain_schema].tables
+            else "deriva-ml"
+        )
+        asset_table = self.model.schemas[sname].tables[table_name]
+        return asset_columns.issubset({c.name for c in asset_table.columns})
+
+
+    def _localize_asset(self, o: list, indexes: Optional[tuple[int, int]]) -> tuple:
+        """Given a list of column values for a table, replace the FileName column with the local file name based on
+        the URL value.
+
+        Args:
+          o: List of values for each column in a table row.
+          indexes: A tuple whose first element is the column index of the file name and whose second element
+        is the index of the URL in an asset table.  Tuple is None if table is not an asset table.
+          o: list:
+          indexes: Optional[tuple[int: int]]:
+
+        Returns:
+          Tuple of updated column values.
+
+        """
+        if indexes:
+            file_column, url_column = asset_indexes
+            o[file_column] = asset_map[o[url_column]] if o[url_column] else ""
+        return tuple(o)
+
+    def _load_sqllite(self, bag_path: Path) -> None:
         """Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.
 
         If the file is for an asset table, update the FileName column of the table to have the local file path for
         the materialized file.  Then load into the sqllite database.
         Note: none of the foreign key constraints are included in the database.
         """
-        dpath = self.bag_path / "data"
-        asset_map = self._localize_asset_table()
-
-        def is_asset(table_name: str) -> bool:
-            """
-
-            Args:
-              table_name: str:
-
-            Returns:
-
-            """
-            asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
-            sname = (
-                self.domain_schema
-                if table_name in self.model.schemas[self.domain_schema].tables
-                else "deriva-ml"
-            )
-            asset_table = self.model.schemas[sname].tables[table_name]
-            return asset_columns.issubset({c.name for c in asset_table.columns})
-
-        def localize_asset(o: list, indexes: Optional[tuple[int, int]]) -> tuple:
-            """Given a list of column values for a table, replace the FileName column with the local file name based on
-            the URL value.
-
-            Args:
-              o: List of values for each column in a table row.
-              indexes: A tuple whose first element is the column index of the file name and whose second element
-            is the index of the URL in an asset table.  Tuple is None if table is not an asset table.
-              o: list:
-              indexes: Optional[tuple[int:
-              int]]:
-
-            Returns:
-              Tuple of updated column values.
-
-            """
-            if indexes:
-                file_column, url_column = asset_indexes
-                o[file_column] = asset_map[o[url_column]] if o[url_column] else ""
-            return tuple(o)
+        dpath = bag_path / "data"
+        asset_map = self._localize_asset_table(dpath)
 
         # Find all the CSV files in the subdirectory and load each file into the database.
         for csv_file in Path(dpath).rglob("*.csv"):
@@ -158,7 +166,7 @@ class DatasetBag(object):
                 # Determine which columns in the table has the Filename and the URL
                 asset_indexes = (
                     (column_names.index("Filename"), column_names.index("URL"))
-                    if is_asset(table)
+                    if self._is_asset(table)
                     else None
                 )
 
@@ -166,11 +174,11 @@ class DatasetBag(object):
                     ["?"] * len(column_names)
                 )  # SQL placeholder for row (?,?..)
                 column_list = ",".join([f'"{c}"' for c in column_names])
-                with self.dbase:
+                with DatasetBag.DBase:
                     object_table = (
-                        localize_asset(o, asset_indexes) for o in csv_reader
+                        self._localize_asset(o, asset_indexes, asset_map) for o in csv_reader
                     )
-                    self.dbase.executemany(
+                    DatasetBag.DBase.executemany(
                         f'INSERT OR REPLACE INTO "{schema}:{table}" ({column_list}) VALUES ({value_template})',
                         object_table,
                     )
@@ -181,10 +189,10 @@ class DatasetBag(object):
         Returns:
             A list of table names.  These names are all qualified with the Deriva schema name.
         """
-        with self.dbase:
+        with DatasetBag.DBase:
             return [
                 t[0]
-                for t in self.dbase.execute(
+                for t in DatasetBag.DBase.execute(
                     "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;"
                 ).fetchall()
             ]
@@ -215,12 +223,11 @@ class DatasetBag(object):
             )
         return datasets
 
+    @validate_call
     def list_dataset_members(self, recurse: bool = False) -> defaultdict:
         """Return a list of entities associated with a specific dataset.
 
          Args:
-             dataset_rid: param recurse: If this is a nested dataset, list the members of the contained datasets
-             dataset_rid: RID:
              recurse:  (Default value = False)
 
          Returns:
@@ -254,21 +261,13 @@ class DatasetBag(object):
                 c.name for c in next(iter(other_fkey.column_map.items()))
             )
 
-            with self.dbase:
-                col_names = [
-                    c[1]
-                    for c in self.dbase.execute(
-                        f'PRAGMA table_info("{sql_target}")'
-                    ).fetchall()
-                ]
-
+            with DatasetBag.DBase:
                 sql_cmd = (
                     f'SELECT * FROM "{sql_member}" '
                            f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
                            f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
                               )
-                target_entities = self.dbase.execute(sql_cmd).fetchall()
-                print(target_entities)
+                target_entities = DatasetBag.DBase.execute(sql_cmd).fetchall()
                 members[target_table.name].extend(target_entities)
 
             target_entities = [] # path.entities().fetch()
@@ -281,11 +280,23 @@ class DatasetBag(object):
                         members[k].extend(v)
         return members
 
+    @validate_call
+    def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
+        """Given a dataset RID, return a list of RIDs of any nested datasets.
+
+        Args:
+            dataset_rid: A dataset RID.
+
+        Returns:
+          list of RIDs of nested datasets.
+
+        """
+        return [d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
+
     def _normalize_table_name(self, table: str) -> str:
         """Attempt to insert the schema into a table name if its not provided.
 
         Args:
-          table_name: return: table name with schema included.
           table: str:
 
         Returns:
@@ -318,7 +329,7 @@ class DatasetBag(object):
 
         """
         table_name = self._normalize_table_name(table)
-        result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
+        result = DatasetBag.DBase.execute(f'SELECT * FROM "{table_name}"')
         while row := result.fetchone():
             yield row
 
@@ -337,7 +348,7 @@ class DatasetBag(object):
         """
         table_name = self._normalize_table_name(table)
         print(table_name)
-        return pd.read_sql(f'SELECT * FROM "{table_name}"', con=self.dbase)
+        return pd.read_sql(f'SELECT * FROM "{table_name}"', con=DatasetBag.DBase)
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
@@ -350,14 +361,14 @@ class DatasetBag(object):
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
         table_name = self._normalize_table_name(table)
-        with self.dbase:
+        with DatasetBag.DBase:
             col_names = [
                 c[1]
-                for c in self.dbase.execute(
+                for c in DatasetBag.DBase.execute(
                     f'PRAGMA table_info("{table_name}")'
                 ).fetchall()
             ]
-            result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
+            result = DatasetBag.DBase.execute(f'SELECT * FROM "{table_name}"')
             while row := result.fetchone():
                 yield dict(zip(col_names, row))
 
