@@ -16,21 +16,21 @@ from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
 from pydantic import ValidationError, validate_call
 
-from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
-from deriva_ml.deriva_definitions import (
+from .deriva_definitions import MLVocab, ExecMetadataVocab
+from .deriva_definitions import (
     RID,
     Status,
     FileUploadState,
     UploadState,
     DerivaMLException,
 )
-from deriva_ml.deriva_ml_base import DerivaML, FeatureRecord
-from deriva_ml.dataset_bag import DatasetBag
-from deriva_ml.execution_configuration import ExecutionConfiguration, DatasetSpec
-from deriva_ml.upload import execution_metadata_dir, execution_asset_dir, execution_root
-from deriva_ml.upload import feature_root, feature_asset_dir, feature_value_path
-from deriva_ml.upload import is_feature_dir, is_feature_asset_dir
-from deriva_ml.upload import table_path
+from .deriva_ml_base import DerivaML, FeatureRecord
+from .dataset_bag import DatasetBag
+from .execution_configuration import ExecutionConfiguration, DatasetSpec
+from .upload import execution_metadata_dir, execution_asset_dir, execution_root
+from .upload import feature_root, feature_asset_dir, feature_value_path
+from .upload import is_feature_dir, is_feature_asset_dir
+from .upload import table_path
 
 
 class Execution:
@@ -89,7 +89,6 @@ class Execution:
         """Add a workflow to the Workflow table.
 
         Args:
-            workflow_name(str): Name of the workflow.
           - url(str): URL of the workflow.
           - workflow_type(str): Type of the workflow.
           - version(str): Version of the workflow.
@@ -140,14 +139,9 @@ class Execution:
         # Materialize bdbag
         self.dataset_rids = []
         for dataset in self.configuration.datasets:
-            dataset_rid, materialize = dataset.rid, (
-                dataset.materialize
-                if isinstance(dataset, DatasetSpec)
-                else (dataset, True)
-            )
-            self.update_status(Status.running, f"Materialize bag {dataset}... ")
+            self.update_status(Status.running, f"Materialize bag {dataset.rid}... ")
             bag_path, dataset_rid = self._ml_object.download_dataset_bag(
-                dataset_rid, execution_rid=self.execution_rid, materialize=materialize
+                dataset.rid, execution_rid=self.execution_rid, materialize=dataset.materialize
             )
             self.dataset_rids.append(dataset_rid)
             self.dataset_paths.append(bag_path)
@@ -180,11 +174,11 @@ class Execution:
         runtime_env_path = ExecMetadataVocab.runtime_env.value
         runtime_env_dir = self.execution_metadata_path(runtime_env_path)
         with NamedTemporaryFile(
-            "w+",
-            dir=runtime_env_dir,
-            prefix="environment_snapshot_",
-            suffix=".txt",
-            delete=False,
+                "w+",
+                dir=runtime_env_dir,
+                prefix="environment_snapshot_",
+                suffix=".txt",
+                delete=False,
         ) as fp:
             for dist in distributions():
                 fp.write(f"{dist.metadata['Name']}=={dist.version}\n")
@@ -345,7 +339,7 @@ class Execution:
         return results
 
     def upload_execution_outputs(
-        self, clean_folder: bool = True
+            self, clean_folder: bool = True
     ) -> dict[str, FileUploadState]:
         """Upload all the assets and metadata associated with the current execution.
 
@@ -447,7 +441,7 @@ class Execution:
             self.update_status(Status.failed, error)
 
     def _update_execution_metadata_table(
-        self, assets: dict[str, FileUploadState]
+            self, assets: dict[str, FileUploadState]
     ) -> None:
         """Upload execution metadata at working_dir/Execution_metadata.
 
@@ -475,9 +469,9 @@ class Execution:
 
             """
             return (
-                asset.state == UploadState.success
-                and asset.result
-                and asset.result["RID"]
+                    asset.state == UploadState.success
+                    and asset.result
+                    and asset.result["RID"]
             )
 
         entities = [
@@ -488,11 +482,11 @@ class Execution:
         ml_schema_path.tables[a_table].insert(entities)
 
     def _update_feature_table(
-        self,
-        target_table: str,
-        feature_name: str,
-        feature_file: str | Path,
-        uploaded_files: dict[str, FileUploadState],
+            self,
+            target_table: str,
+            feature_name: str,
+            feature_file: str | Path,
+            uploaded_files: dict[str, FileUploadState],
     ) -> None:
         """
 
@@ -564,9 +558,9 @@ class Execution:
                 RID of the asset
             """
             return (
-                asset.state == UploadState.success
-                and asset.result
-                and asset.result["RID"]
+                    asset.state == UploadState.success
+                    and asset.result
+                    and asset.result["RID"]
             )
 
         entities = [
@@ -669,7 +663,7 @@ class Execution:
         return feature_root(self.working_dir, self.execution_rid)
 
     def feature_paths(
-        self, table: Table | str, feature_name: str
+            self, table: Table | str, feature_name: str
     ) -> tuple[Path, dict[str, Path]]:
         """Return the file path of where to place feature values, and assets for the named feature and table.
 
@@ -716,8 +710,8 @@ class Execution:
             Pathlib path to the file in which to place table values.
         """
         if (
-            table
-            not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables
+                table
+                not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables
         ):
             raise DerivaMLException(
                 "Table '{}' not found in domain schema".format(table)
@@ -864,7 +858,7 @@ class DerivaMLExec:
         return self.execution.execution_metadata_path(metadata_type)
 
     def feature_paths(
-        self, table: Table | str, feature_name: str
+            self, table: Table | str, feature_name: str
     ) -> tuple[Path, dict[str, Path]]:
         """Return the file path of where to place feature values, and assets for the named feature and table.
 

@@ -4,14 +4,14 @@ from collections import defaultdict
 from csv import reader
 from pathlib import Path
 from pydantic import validate_call
-from typing import Optional, Any, Generator
+from typing import Any, Generator, Optional
 from urllib.parse import urlparse
 
 import pandas as pd
 from deriva.core.ermrest_model import Model
 
-from deriva_ml.deriva_definitions import ML_SCHEMA, MLVocab, RID
-from deriva_ml.deriva_ml_base import DerivaMLException
+from .deriva_definitions import ML_SCHEMA, MLVocab, RID
+from .deriva_ml_base import DerivaMLException
 
 
 class DatasetBag(object):
@@ -30,8 +30,7 @@ class DatasetBag(object):
 
     Attributes:
         domain_schema: The name of the domain schema for the dataset.
-        dataset_rid: The name of the dataset
-        model: The ERMRest model from which the dataset was generated.
+        dataset_rids: The name of the dataset
 
     Methods:
         get_table(self, table: str) -> Generator[tuple, None, None]
@@ -40,11 +39,11 @@ class DatasetBag(object):
         list_tables(self) -> list[str]
     """
 
-    DBase = sqlite3.connect('dataset.db')
-    Model_Loaded: bool = False
+    DBase: Optional[sqlite3.Connection] = None
+    Model: Optional[Model] = None
 
     @validate_call
-    def __init__(self, bag_paths: list[Path | str] or Path ):
+    def __init__(self, bag_paths: list[Path | str] | Path):
         """
         Initialize a DatasetBag instance.
 
@@ -53,32 +52,32 @@ class DatasetBag(object):
         """
         bag_path = [bag_paths] if isinstance(bag_paths, str) else bag_paths
         self.bag_paths = [Path(bag_path)] if isinstance(bag_path, str) else [Path(path) for path in bag_paths]
-
         self.dataset_rids = [p.name.replace("Dataset_", "") for p in self.bag_paths]
-        self.model = Model.fromfile("file-system", self.bag_paths[0] / "data/schema.json")
-        # Guess the domain schema name by eliminating all the "builtin" schema.
-        self.domain_schema = [
-            s for s in self.model.schemas if s not in ["deriva-ml", "public", "www"]
-        ][0]
-        self.ml_schema = ML_SCHEMA
 
-        self.dataset_table = self.model.schemas[self.ml_schema].tables['Dataset']
+        if not DatasetBag.Model:
+            DatasetBag.Model = Model.fromfile("file-system", self.bag_paths[0] / "data/schema.json")
+            DatasetBag.DBase = sqlite3.connect('dataset.db')
 
-        # Create a sqlite database schema that contains all the tables within the catalog from which the
-        # BDBag was created.
-        if not DatasetBag.Model_Loaded:
+            # Guess the domain schema name by eliminating all the "builtin" schema.
+            self.domain_schema = [
+                s for s in DatasetBag.Model.schemas if s not in ["deriva-ml", "public", "www"]][0]
+            self.ml_schema = ML_SCHEMA
+            # Create a sqlite database schema that contains all the tables within the catalog from which the
+            # BDBag was created.
             with DatasetBag.DBase:
-                for t in self.model.schemas[self.domain_schema].tables.values():
+                for t in DatasetBag.Model.schemas[self.domain_schema].tables.values():
                     DatasetBag.DBase.execute(t.sqlite3_ddl())
-                for t in self.model.schemas["deriva-ml"].tables.values():
+                for t in DatasetBag.Model.schemas["deriva-ml"].tables.values():
                     DatasetBag.DBase.execute(t.sqlite3_ddl())
-            DatasetBag.Model_Loaded = True
+
+            self.dataset_table = DatasetBag.Model.schemas[self.ml_schema].tables['Dataset']
 
         # Load the database from the bag contents.
         for path in self.bag_paths:
             self._load_sqllite(path)
 
-    def _localize_asset_table(self, bag_path: Path) -> dict[str, str]:
+    @staticmethod
+    def _localize_asset_table(bag_path: Path) -> dict[str, str]:
         """Use the fetch.txt file in a bdbag to create a map from a URL to a local file path.
 
         Returns:
@@ -93,12 +92,13 @@ class DatasetBag(object):
                     fields = row.split("\t")
                     fetch_map[urlparse(fields[0]).path] = fields[2].replace("\n", "")
         except FileNotFoundError:
-            logging.info(f"No downloaded assets in bag {self.dataset_rid}")
+            dataset_rid = bag_path.name.replace("Dataset_", "")
+            logging.info(f"No downloaded assets in bag {dataset_rid}")
         return fetch_map
 
     def _reset_dbase(self):
         """ """
-        DatasetBag.delete_database(self.bag_path, self.domain_schema)
+        DatasetBag.delete_database(self.bag_paths, self.domain_schema)
         DatasetBag.DBase.execute("DROP DATABASE")
 
     def _is_asset(self, table_name: str) -> bool:
@@ -113,14 +113,14 @@ class DatasetBag(object):
         asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
         sname = (
             self.domain_schema
-            if table_name in self.model.schemas[self.domain_schema].tables
+            if table_name in DatasetBag.Model.schemas[self.domain_schema].tables
             else "deriva-ml"
         )
-        asset_table = self.model.schemas[sname].tables[table_name]
+        asset_table = DatasetBag.Model.schemas[sname].tables[table_name]
         return asset_columns.issubset({c.name for c in asset_table.columns})
 
-
-    def _localize_asset(self, o: list, indexes: Optional[tuple[int, int]]) -> tuple:
+    @staticmethod
+    def _localize_asset(o: list, indexes: tuple[int, int], asset_map: dict[str, str]) -> tuple:
         """Given a list of column values for a table, replace the FileName column with the local file name based on
         the URL value.
 
@@ -136,7 +136,7 @@ class DatasetBag(object):
 
         """
         if indexes:
-            file_column, url_column = asset_indexes
+            file_column, url_column = indexes
             o[file_column] = asset_map[o[url_column]] if o[url_column] else ""
         return tuple(o)
 
@@ -148,14 +148,14 @@ class DatasetBag(object):
         Note: none of the foreign key constraints are included in the database.
         """
         dpath = bag_path / "data"
-        asset_map = self._localize_asset_table(dpath)
+        asset_map = DatasetBag._localize_asset_table(dpath)  # Map of remote to local assets.
 
         # Find all the CSV files in the subdirectory and load each file into the database.
         for csv_file in Path(dpath).rglob("*.csv"):
             table = csv_file.stem
             schema = (
                 self.domain_schema
-                if table in self.model.schemas[self.domain_schema].tables
+                if table in DatasetBag.Model.schemas[self.domain_schema].tables
                 else "deriva-ml"
             )
 
@@ -197,7 +197,6 @@ class DatasetBag(object):
                 ).fetchall()
             ]
 
-
     def find_datasets(self) -> list[dict[str, Any]]:
         """Returns a list of currently available datasets.
 
@@ -224,11 +223,12 @@ class DatasetBag(object):
         return datasets
 
     @validate_call
-    def list_dataset_members(self, recurse: bool = False) -> defaultdict:
+    def list_dataset_members(self, dataset_rid: Optional[RID], recurse: bool = False) -> defaultdict:
         """Return a list of entities associated with a specific dataset.
 
          Args:
-             recurse:  (Default value = False)
+            dataset_rid: RID of the dataset to list
+            recurse:  (Default value = False)
 
          Returns:
              Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
@@ -264,13 +264,13 @@ class DatasetBag(object):
             with DatasetBag.DBase:
                 sql_cmd = (
                     f'SELECT * FROM "{sql_member}" '
-                           f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
-                           f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
-                              )
+                    f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
+                    f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
+                )
                 target_entities = DatasetBag.DBase.execute(sql_cmd).fetchall()
                 members[target_table.name].extend(target_entities)
 
-            target_entities = [] # path.entities().fetch()
+            target_entities = []  # path.entities().fetch()
             members[target_table.name].extend(target_entities)
             if recurse and target_table.name == self.dataset_table:
                 # Get the members for all the nested datasets and add to the member list.
@@ -294,7 +294,7 @@ class DatasetBag(object):
         return [d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
 
     def _normalize_table_name(self, table: str) -> str:
-        """Attempt to insert the schema into a table name if its not provided.
+        """Attempt to insert the schema into a table name if it's not provided.
 
         Args:
           table: str:
@@ -308,11 +308,11 @@ class DatasetBag(object):
             [sname, tname] = table.split(":")
         except ValueError:
             tname = table
-            for sname, s in self.model.schemas.items():
+            for sname, s in DatasetBag.Model.schemas.items():
                 if table in s.tables:
                     break
         try:
-            _ = self.model.schemas[sname].tables[tname]
+            _ = DatasetBag.Model.schemas[sname].tables[tname]
             return f"{sname}:{tname}"
         except KeyError:
             raise DerivaMLException(f'Table name "{table}" does not exist.')

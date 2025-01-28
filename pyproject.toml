@@ -12,7 +12,6 @@ authors = [
 description = "Utilities to simplify use of Dervia and Pandas to create reproducable ML pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
-target_verstion = "3.10"
 dependencies = [
     "deriva~=1.7.4",
     "pandas",

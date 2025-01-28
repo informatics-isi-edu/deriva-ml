@@ -43,10 +43,10 @@ from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import BaseModel, Field, create_model, validate_call, ConfigDict
 
-from deriva_ml.execution_configuration import ExecutionConfiguration
-from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
-from deriva_ml.upload import asset_dir
-from deriva_ml.upload import table_path, bulk_upload_configuration
+from .execution_configuration import ExecutionConfiguration
+from .schema_setup.dataset_annotations import generate_dataset_annotations
+from .upload import asset_dir
+from .upload import table_path, bulk_upload_configuration
 from .dataset import Dataset
 from .deriva_definitions import ColumnDefinition
 from .deriva_definitions import MLVocab, ExecMetadataVocab
@@ -60,7 +60,7 @@ from .deriva_definitions import (
 )
 
 if TYPE_CHECKING:
-    from deriva_ml.execution import Execution
+    from .execution import Execution
 
 
 class VocabularyTerm(BaseModel):
@@ -232,7 +232,7 @@ class Feature:
         }
 
         self.value_columns = self.feature_columns - (
-            self.asset_columns | self.term_columns
+                self.asset_columns | self.term_columns
         )
 
     def feature_record_class(self) -> type[FeatureRecord]:
@@ -259,9 +259,9 @@ class Feature:
                 case "text":
                     return str
                 case "int2" | "int4" | "int8":
-                     return int
+                    return int
                 case "float4" | "float8":
-                   return float
+                    return float
                 case _:
                     return str
 
@@ -270,18 +270,18 @@ class Feature:
         # Create feature class. To do this, we must determine the python type for each column and also if the
         # column is optional or not based on its nulliblity.
         feature_columns = {
-            c.name: (
-                Optional[map_type(c)] if c.nullok else map_type(c),
-                c.default or None,
-            )
-            for c in self.feature_columns
-        } | {
-            "Feature_Name": (
-                str,
-                self.feature_name,
-            ),  # Set default value for Feature_Name
-            self.target_table.name: (str, ...),
-        }
+                              c.name: (
+                                  Optional[map_type(c)] if c.nullok else map_type(c),
+                                  c.default or None,
+                              )
+                              for c in self.feature_columns
+                          } | {
+                              "Feature_Name": (
+                                  str,
+                                  self.feature_name,
+                              ),  # Set default value for Feature_Name
+                              self.target_table.name: (str, ...),
+                          }
         docstring = f"Class to capture fields in a feature {self.feature_name} on table {self.target_table}. Feature columns include:\n"
         docstring += "\n".join([f"    {c.name}" for c in self.feature_columns])
 
@@ -317,16 +317,16 @@ class DerivaML:
     """
 
     def __init__(
-        self,
-        hostname: str,
-        catalog_id: str | int,
-        domain_schema: str = None,
-        project_name: str = None,
-        cache_dir: Optional[str] = None,
-        working_dir: Optional[str] = None,
-        model_version: str = "1",
-        ml_schema: str = ML_SCHEMA,
-        logging_level=logging.WARNING,
+            self,
+            hostname: str,
+            catalog_id: str | int,
+            domain_schema: str = None,
+            project_name: str = None,
+            cache_dir: Optional[str] = None,
+            working_dir: Optional[str] = None,
+            model_version: str = "1",
+            ml_schema: str = ML_SCHEMA,
+            logging_level=logging.WARNING,
     ):
         """Create and initialize a DerivaML instance.
 
@@ -360,8 +360,8 @@ class DerivaML:
 
         builtin_schemas = ["public", self.ml_schema, "www"]
         self.domain_schema = (
-            domain_schema
-            or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
+                domain_schema
+                or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
         )
         self.project_name = project_name or self.domain_schema
 
@@ -431,7 +431,7 @@ class DerivaML:
         return tuple(map(int, self.retrieve_rid(dataset_rid)["Version"].split(".")))
 
     def increment_dataset_version(
-        self, dataset_rid: RID, component: SemanticVersion
+            self, dataset_rid: RID, component: SemanticVersion
     ) -> tuple[int, ...]:
         """Increment the version of the specified dataset.
 
@@ -638,7 +638,7 @@ class DerivaML:
         )
 
     def create_vocabulary(
-        self, vocab_name: str, comment: str = "", schema: Optional[str] = None
+            self, vocab_name: str, comment: str = "", schema: Optional[str] = None
     ) -> Table:
         """Create a controlled vocabulary table with the given vocab name.
 
@@ -677,7 +677,7 @@ class DerivaML:
         return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
     def create_asset(
-        self, asset_name: str, comment: str = "", schema: str = None
+            self, asset_name: str, comment: str = "", schema: str = None
     ) -> Table:
         """Create an asset table with the given asset name.
 
@@ -698,7 +698,7 @@ class DerivaML:
         return asset_table
 
     def is_association(
-        self, table_name: str | Table, unqualified: bool = True, pure: bool = True
+            self, table_name: str | Table, unqualified: bool = True, pure: bool = True
     ) -> bool | set | int:
         """Check the specified table to see if it is an association table.
 
@@ -740,14 +740,14 @@ class DerivaML:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_feature(
-        self,
-        target_table: Table | str,
-        feature_name: str,
-        terms: list[Table | str] = None,
-        assets: list[Table | str] = None,
-        metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
-        optional: Optional[list[str]] = None,
-        comment: str = "",
+            self,
+            target_table: Table | str,
+            feature_name: str,
+            terms: list[Table | str] = None,
+            assets: list[Table | str] = None,
+            metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
+            optional: Optional[list[str]] = None,
+            comment: str = "",
     ) -> type[FeatureRecord]:
         """Create a new feature that can be associated with a table.
 
@@ -825,7 +825,7 @@ class DerivaML:
         return self.feature_record_class(target_table, feature_name)
 
     def feature_record_class(
-        self, table: str | Table, feature_name: str
+            self, table: str | Table, feature_name: str
     ) -> type[FeatureRecord]:
         """ "Create a pydantic model for entries into the specified feature table.
 
@@ -963,11 +963,11 @@ class DerivaML:
 
     @validate_call
     def create_dataset(
-        self,
-        ds_type: str | list[str],
-        description: str,
-        execution_rid: Optional[RID] = None,
-        version: tuple[int, int, int] = (1, 0, 0),
+            self,
+            ds_type: str | list[str],
+            description: str,
+            execution_rid: Optional[RID] = None,
+            version: tuple[int, int, int] = (1, 0, 0),
     ) -> RID:
         """Create a new dataset from the specified list of RIDs.
 
@@ -1102,8 +1102,8 @@ class DerivaML:
 
         def domain_table(table: Table) -> bool:
             return (
-                table.schema.name == self.domain_schema
-                or table.name == self.dataset_table.name
+                    table.schema.name == self.domain_schema
+                    or table.name == self.dataset_table.name
             )
 
         return [
@@ -1175,7 +1175,7 @@ class DerivaML:
 
     @validate_call
     def list_dataset_members(
-        self, dataset_rid: RID, recurse: bool = False
+            self, dataset_rid: RID, recurse: bool = False
     ) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
@@ -1206,8 +1206,8 @@ class DerivaML:
             member_table = assoc_table.table
 
             if (
-                target_table.schema.name != self.domain_schema
-                and target_table != self.dataset_table
+                    target_table.schema.name != self.domain_schema
+                    and target_table != self.dataset_table
             ):
                 # Look at domain tables and nested datasets.
                 continue
@@ -1226,8 +1226,8 @@ class DerivaML:
             path.link(
                 target_path,
                 on=(
-                    member_path.columns[member_link[0]]
-                    == target_path.columns[member_link[1]]
+                        member_path.columns[member_link[0]]
+                        == target_path.columns[member_link[1]]
                 ),
             )
             target_entities = path.entities().fetch()
@@ -1242,7 +1242,7 @@ class DerivaML:
 
     @validate_call
     def add_dataset_members(
-        self, dataset_rid: Optional[RID], members: list[RID], validate: bool = True
+            self, dataset_rid: Optional[RID], members: list[RID], validate: bool = True
     ) -> None:
         """Add additional elements to an existing dataset.
 
@@ -1296,7 +1296,7 @@ class DerivaML:
                     f"RID table: {rid_info.table.name} not part of dataset"
                 )
             if rid_info.table == self.dataset_table and check_dataset_cycle(
-                rid_info.rid
+                    rid_info.rid
             ):
                 raise DerivaMLException("Creating cycle of datasets is not allowed")
             dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
@@ -1316,12 +1316,12 @@ class DerivaML:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_term(
-        self,
-        table: str | Table,
-        term_name: str,
-        description: str,
-        synonyms: Optional[list[str]] = None,
-        exists_ok: bool = True,
+            self,
+            table: str | Table,
+            term_name: str,
+            description: str,
+            synonyms: Optional[list[str]] = None,
+            exists_ok: bool = True,
     ) -> VocabularyTerm:
         """Creates a new control vocabulary term in the control vocabulary table.
 
@@ -1394,7 +1394,7 @@ class DerivaML:
         schema_path = self.catalog.getPathBuilder().schemas[schema_name]
         for term in schema_path.tables[table_name].entities():
             if term_name == term["Name"] or (
-                term["Synonyms"] and term_name in term["Synonyms"]
+                    term["Synonyms"] and term_name in term["Synonyms"]
             ):
                 return VocabularyTerm.model_validate(term)
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
@@ -1434,10 +1434,10 @@ class DerivaML:
 
     @validate_call
     def download_dataset_bag(
-        self,
-        bag: RID | str,
-        materialize: bool = True,
-        execution_rid: Optional[RID] = None,
+            self,
+            bag: RID | str,
+            materialize: bool = True,
+            execution_rid: Optional[RID] = None,
     ) -> tuple[Path, RID]:
         """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
@@ -1520,7 +1520,7 @@ class DerivaML:
             return Path(bag_path), dataset_rid
 
     def _materialize_dataset_bag(
-        self, bag: str | RID, execution_rid: Optional[RID] = None
+            self, bag: str | RID, execution_rid: Optional[RID] = None
     ) -> tuple[Path, RID]:
         """Materialize a dataset bag into a local directory
 
@@ -1696,7 +1696,7 @@ class DerivaML:
         return results
 
     def _update_status(
-        self, new_status: Status, status_detail: str, execution_rid: RID
+            self, new_status: Status, status_detail: str, execution_rid: RID
     ):
         """Update the status of an execution in the catalog.
 
@@ -1749,7 +1749,7 @@ class DerivaML:
         return configuration_rid
 
     def download_execution_configuration(
-        self, configuration_rid: RID
+            self, configuration_rid: RID
     ) -> ExecutionConfiguration:
         """Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
         configuration in hatrac
@@ -1767,7 +1767,7 @@ class DerivaML:
             return ExecutionConfiguration.load_configuration(dest_file.name)
 
     def _upload_execution_configuration_file(
-        self, config_file: str, description: str
+            self, config_file: str, description: str
     ) -> RID:
         """
 
@@ -1832,6 +1832,6 @@ class DerivaML:
         Returns:
             An execution object.
         """
-        from deriva_ml.execution import Execution
+        from .execution import Execution
 
         return Execution(configuration, self)
