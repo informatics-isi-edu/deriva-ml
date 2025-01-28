@@ -4,6 +4,7 @@ from collections import defaultdict
 from copy import copy
 from csv import reader
 from pathlib import Path
+import tempfile
 from typing import Any, Generator, Optional
 from urllib.parse import urlparse
 
@@ -54,6 +55,7 @@ class DatasetBag(object):
         """
 
         if dataset in DatasetBag._rids_loaded:
+            # We have already loaded this RID already, so just pick up the info and return.
             self.bag_path = DatasetBag._rids_loaded[dataset]
             self.dataset_rid = dataset
             self._ml_schema = ML_SCHEMA
@@ -62,9 +64,12 @@ class DatasetBag(object):
             self.dataset_rid = dataset.name.replace("Dataset_", "")
             self._ml_schema = ML_SCHEMA
             if self.bag_path not in DatasetBag._paths_loaded:
+                # This is the first time we have seen this bag, so we need to create a database for it and
+                # load it up.
                 self._create_database()
                 self._domain_schema = self._guess_domain_schema()
                 self._ml_schema = ML_SCHEMA
+                self._load_model()
                 self._load_sqllite()
                 DatasetBag._paths_loaded.add(self.bag_path)
                 DatasetBag._rids_loaded[self.dataset_rid] = self.bag_path
@@ -91,9 +96,10 @@ class DatasetBag(object):
             DatasetBag._model = Model.fromfile(
                 "file-system", self.bag_path / "data/schema.json"
             )
-            DatasetBag.dbase = sqlite3.connect("dataset.db")
+            dbase_file = tempfile.TemporaryDirectory(delete=False).name + "/dataset.db"
+            DatasetBag.dbase = sqlite3.connect(dbase_file)
 
-    def _load_database(self):
+    def _load_model(self):
         # Create a sqlite database schema that contains all the tables within the catalog from which the
         # BDBag was created.
         with DatasetBag.dbase:
@@ -115,7 +121,8 @@ class DatasetBag(object):
                 for row in fetchfile:
                     # Rows in fetch.text are tab seperated with URL filename.
                     fields = row.split("\t")
-                    fetch_map[urlparse(fields[0]).path] = fields[2].replace("\n", "")
+                    local_path =  f'{self.bag_path}/{fields[2].replace("\n", "")}'
+                    fetch_map[urlparse(fields[0]).path] = local_path
         except FileNotFoundError:
             dataset_rid = self.bag_path.name.replace("Dataset_", "")
             logging.info(f"No downloaded assets in bag {dataset_rid}")

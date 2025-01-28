@@ -138,11 +138,13 @@ class Execution:
         """
         # Materialize bdbag
         self.dataset_rids = []
+        self.datasets: list[DatasetBag] = []
         for dataset in self.configuration.datasets:
             self.update_status(Status.running, f"Materialize bag {dataset.rid}... ")
             bag_path, dataset_rid = self._ml_object.download_dataset_bag(
                 dataset.rid, execution_rid=self.execution_rid, materialize=dataset.materialize
             )
+            self.datasets.append(DatasetBag(bag_path))
             self.dataset_rids.append(dataset_rid)
             self.dataset_paths.append(bag_path)
         # Update execution info
