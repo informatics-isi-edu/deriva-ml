@@ -26,7 +26,7 @@ from .deriva_definitions import (
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset_bag import DatasetBag
-from .execution_configuration import ExecutionConfiguration, DatasetSpec
+from .execution_configuration import ExecutionConfiguration
 from .upload import execution_metadata_dir, execution_asset_dir, execution_root
 from .upload import feature_root, feature_asset_dir, feature_value_path
 from .upload import is_feature_dir, is_feature_asset_dir
