@@ -96,7 +96,7 @@ class DatasetBag(object):
             DatasetBag._model = Model.fromfile(
                 "file-system", self.bag_path / "data/schema.json"
             )
-            dbase_file = tempfile.TemporaryDirectory(delete=False).name + "/dataset.db"
+            dbase_file = tempfile.TemporaryDirectory().name + "/dataset.db"
             DatasetBag.dbase = sqlite3.connect(dbase_file)
 
     def _load_model(self):
