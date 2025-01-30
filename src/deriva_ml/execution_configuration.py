@@ -23,14 +23,20 @@ class Workflow(BaseModel):
     version: Optional[str] = None
     description: str = None
 
+
 class DatasetSpec(BaseModel):
-    """ """
+    """Represent a dataset in a execution configuration dataset list
+
+     Args:
+         rid: A dataset RID
+         materialize: If False, do not materialize datasets, only download table data, no assets.  Defaults to True
+     """
     rid: RID
     materialize: bool = True
 
     @model_validator(mode='before')
     @classmethod
-    def check_card_number_not_present(cls, data: Any) -> dict[str, str|bool]:
+    def _check_card_number_not_present(cls, data: Any) -> dict[str, str|bool]:
         """
 
         Args:
@@ -41,6 +47,7 @@ class DatasetSpec(BaseModel):
         """
         # If you are just given a string, assume its a rid and put into dict for further validation.
         return {'rid': data} if isinstance(data, str) else data
+
 
 class ExecutionConfiguration(BaseModel):
     """Define the parameters that are used to configure a specific execution.
