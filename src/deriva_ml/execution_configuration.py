@@ -39,7 +39,7 @@ class DatasetSpec(BaseModel):
     def _check_card_number_not_present(cls, data: Any) -> dict[str, str|bool]:
         """
 
-        Args:
+        Attributes:
           data: Any: 
 
         Returns:
