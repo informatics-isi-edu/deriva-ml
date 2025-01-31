@@ -99,6 +99,7 @@ class DatasetBag(object):
             )
             dir_path = dir_path or Path(tempfile.mkdtemp())
             dbase_file = dir_path / "dataset.db"
+            print(f"Creating database file: {dbase_file}")
             DatasetBag.dbase = sqlite3.connect(dbase_file)
 
     def _load_model(self):
