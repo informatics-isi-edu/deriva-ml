@@ -144,7 +144,7 @@ class Execution:
             bag_path, dataset_rid = self._ml_object.download_dataset_bag(
                 dataset.rid, execution_rid=self.execution_rid, materialize=dataset.materialize
             )
-            self.datasets.append(DatasetBag(bag_path))
+            self.datasets.append(DatasetBag(bag_path, self._ml_object.working_dir))
             self.dataset_rids.append(dataset_rid)
             self.dataset_paths.append(bag_path)
         # Update execution info

@@ -46,12 +46,13 @@ class DatasetBag(object):
     _paths_loaded: set[Path] = set()
 
     @validate_call
-    def __init__(self, dataset: Path | RID) -> None:
+    def __init__(self, dataset: Path | RID, dbase_dir: Optional[Path] = None) -> None:
         """
         Initialize a DatasetBag instance.
 
         Args:
             dataset: A path to a BDBag or a dataset, or the RID of an already loaded dataset.
+            dbase_dir: Optional path as to where to place the sqllite database file.
         """
 
         if dataset in DatasetBag._rids_loaded:
@@ -66,7 +67,7 @@ class DatasetBag(object):
             if self.bag_path not in DatasetBag._paths_loaded:
                 # This is the first time we have seen this bag, so we need to create a database for it and
                 # load it up.
-                self._create_database()
+                self._create_database(dbase_dir)
                 self._domain_schema = self._guess_domain_schema()
                 self._ml_schema = ML_SCHEMA
                 self._load_model()
@@ -91,12 +92,13 @@ class DatasetBag(object):
             if s not in ["deriva-ml", "public", "www"]
         ][0]
 
-    def _create_database(self) -> None:
+    def _create_database(self, dir_path: Optional[Path] = None) -> None:
         if not DatasetBag._model:
             DatasetBag._model = Model.fromfile(
                 "file-system", self.bag_path / "data/schema.json"
             )
-            dbase_file = tempfile.TemporaryDirectory().name + "/dataset.db"
+            dir_path = dir_path or Path(tempfile.mkdtemp())
+            dbase_file = dir_path / "dataset.db"
             DatasetBag.dbase = sqlite3.connect(dbase_file)
 
     def _load_model(self):
