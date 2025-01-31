@@ -15,5 +15,5 @@ https://www.eye-ai.org/id/1-000C@32S-W6DS-GAMG
 We obtained this RID using the Cite button on the user interface.   
 
 Within the DerivaML class, a URI version of a RID can be obtained using the
-[DerivaML.cite](/deriva_ml_base/#deriva_ml.deriva_ml_base.DerivaML.cite) method.
+[DerivaML.cite](../code-docs/deriva_ml_base/#deriva_ml.deriva_ml_base.DerivaML.cite) method.
 
