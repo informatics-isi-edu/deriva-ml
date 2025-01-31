@@ -44,4 +44,4 @@ git config filter.strip-notebook-output.required true
 ```
 
 # Start a Notebook Workflow
-See [ML Workflow Instruction](ml_workflow_instruction.md)
+See [ML Workflow Instruction](user-guide/ml_workflow_instruction.md)

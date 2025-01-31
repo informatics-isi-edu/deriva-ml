@@ -1599,7 +1599,7 @@ class DerivaML:
         return Path(dest_filename)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def upload_asset(self, file: Path | str, table: Table | str, **kwargs) -> dict:
+    def upload_asset(self, file: Path | str, table: Table | str, **kwargs: Any) -> dict:
         """Upload the specified file into Hatrac and update the associated asset table.
 
         Args:

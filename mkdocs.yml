@@ -34,17 +34,20 @@ plugins:
 nav:
   - Home: index.md
   - User Guide:
-    - Creating a workflow: ml_workflow_instruction.md
+    - Installing deriva-ml: user-guide/install.md
+    - Identifying things in deriva-ml: user-guide/identifiers.md
+    - Creating a workflow: user-guide/ml_workflow_instruction.md
     - DerivaML Structure: deriva_ml_structure.md
+    - Configuring an Execution: user-guide/execution-configuration.md
     - VM Docs: VM_setup_instruction.md
-  - Notebooks:
+  - Sample Notebooks:
     - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
     - Execution: 'Notebooks/DerivaML Execution.ipynb'
     - Features : 'Notebooks/DerivaML Features.ipynb'
     - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
   - Library Documentation:
-    - DerivaML: deriva_ml_base.md
-    - DatasetBag: dataset_bag.md
-    - Execution: execution.md
-    - ExecutionConfiguration: execution_configuration.md
+    - DerivaML: code-docs/deriva_ml_base.md
+    - DatasetBag: code-docs/dataset_bag.md
+    - Execution: code-docs/execution.md
+    - ExecutionConfiguration: code-docs/execution_configuration.md
   - Release Notes: release-notes.md

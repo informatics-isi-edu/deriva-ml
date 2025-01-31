@@ -34,10 +34,10 @@ class DatasetBag(object):
         dbase: A sqlite database that has the contents of all the tables in the dataset.
 
     Methods:
-        get_table(self, table: str) -> Generator[tuple, None, None]
-        get_table_as_dataframe(self, table: str) -> pd.DataFrame
-        get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]
-        list_tables(self) -> list[str]
+        get_table(table: str) -> Generator[tuple, None, None]
+        get_table_as_dataframe(table: str) -> pd.DataFrame
+        get_table_as_dict(table: str) -> Generator[dict[str, Any], None, None]
+        list_tables() -> list[str]
     """
 
     dbase: Optional[sqlite3.Connection] = None

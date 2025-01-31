@@ -27,7 +27,7 @@ class Workflow(BaseModel):
 class DatasetSpec(BaseModel):
     """Represent a dataset in a execution configuration dataset list
 
-     Args:
+     Attributes:
          rid: A dataset RID
          materialize: If False, do not materialize datasets, only download table data, no assets.  Defaults to True
      """
