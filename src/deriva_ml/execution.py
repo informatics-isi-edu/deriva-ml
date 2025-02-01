@@ -1,3 +1,6 @@
+from bdbag import bdbag_api as bdb
+from bdbag.fetch.fetcher import fetch_single_file
+
 import csv
 import hashlib
 import json
@@ -8,12 +11,13 @@ from collections import defaultdict
 from datetime import datetime
 from importlib.metadata import distributions
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import Iterable, Any
-
 import requests
+from tempfile import NamedTemporaryFile, TemporaryDirectory
+from typing import Iterable, Any, Optional
 from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
+from deriva.core.utils.hash_utils import compute_file_hashes
+from deriva.transfer.download.deriva_download import GenericDownloader
 from pydantic import ValidationError, validate_call
 
 from .deriva_definitions import MLVocab, ExecMetadataVocab
@@ -25,6 +29,7 @@ from .deriva_definitions import (
     DerivaMLException,
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
+from .dataset import Dataset
 from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
 from .upload import execution_metadata_dir, execution_asset_dir, execution_root
@@ -141,8 +146,9 @@ class Execution:
         self.datasets: list[DatasetBag] = []
         for dataset in self.configuration.datasets:
             self.update_status(Status.running, f"Materialize bag {dataset.rid}... ")
-            bag_path, dataset_rid = self._ml_object.download_dataset_bag(
-                dataset.rid, execution_rid=self.execution_rid, materialize=dataset.materialize
+            bag_path, dataset_rid = self.download_dataset_bag(
+                dataset.rid,
+                materialize=dataset.materialize,
             )
             self.datasets.append(DatasetBag(bag_path, self._ml_object.working_dir))
             self.dataset_rids.append(dataset_rid)
@@ -175,11 +181,11 @@ class Execution:
         runtime_env_path = ExecMetadataVocab.runtime_env.value
         runtime_env_dir = self.execution_metadata_path(runtime_env_path)
         with NamedTemporaryFile(
-                "w+",
-                dir=runtime_env_dir,
-                prefix="environment_snapshot_",
-                suffix=".txt",
-                delete=False,
+            "w+",
+            dir=runtime_env_dir,
+            prefix="environment_snapshot_",
+            suffix=".txt",
+            delete=False,
         ) as fp:
             for dist in distributions():
                 fp.write(f"{dist.metadata['Name']}=={dist.version}\n")
@@ -207,6 +213,163 @@ class Execution:
             sha256_hash.update(response.content)
             checksum = "SHA-256: " + sha256_hash.hexdigest()
         return checksum
+
+    @validate_call
+    def download_dataset_bag(
+        self,
+        bag: RID | str,
+        materialize: bool = True,
+    ) -> tuple[Path, RID]:
+        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        that all the metadata is correct
+
+        Args:
+            bag: The RID of a dataset or a minid to an existing bag.
+            materialize: Materalize the bag, rather than just downloading it.
+
+        Returns:
+            the location of the unpacked and validated dataset bag and the RID of the bag
+        """
+        return (
+            self._materialize_dataset_bag(bag, self.execution_rid)
+            if materialize
+            else self._download_dataset_bag(bag)
+        )
+
+    def _download_dataset_bag(self, dataset_rid: RID | str) -> tuple[Path, RID]:
+        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        that all the metadata is correct
+
+        Args:
+            dataset_rid: The RID of a dataset or a minid to an existing bag.
+             dataset_rid: RID | str:
+
+        Returns:
+            the location of the unpacked and validated dataset bag and the RID of the bag
+        """
+        if not any(
+            [dataset_rid == ds["RID"] for ds in self._ml_object.find_datasets()]
+        ):
+            raise DerivaMLException(f"RID {dataset_rid} is not a dataset")
+
+        with TemporaryDirectory() as tmp_dir:
+            if dataset_rid.startswith("minid"):
+                # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
+                r = requests.get(
+                    f"https://identifiers.org/{dataset_rid}",
+                    headers={"accept": "application/json"},
+                )
+                metadata = r.json()["metadata"]
+                dataset_rid = metadata["Dataset_RID"].split("@")[0]
+                checksum_value = ""
+                for checksum in r.json().get("checksums", []):
+                    if checksum.get("function") == "sha256":
+                        checksum_value = checksum.get("value")
+                        break
+                archive_path = fetch_single_file(dataset_rid, tmp_dir)
+            else:
+                # We are given the RID to a dataset, so we are going to have to export as a bag and place into
+                # local file system.  The first step is to generate a downloadspec to create the bag, put the sped
+                # into a local file and then use the downloader to create and download the desired bdbag.
+                spec_file = f"{tmp_dir}/download_spec.json"
+                with open(spec_file, "w", encoding="utf-8") as ds:
+                    json.dump(
+                        Dataset(self._ml_object.model).generate_dataset_download_spec(),
+                        ds,
+                    )
+                downloader = GenericDownloader(
+                    server={
+                        "catalog_id": self._ml_object.catalog_id,
+                        "protocol": "https",
+                        "host": self._ml_object.host_name,
+                    },
+                    config_file=spec_file,
+                    output_dir=tmp_dir,
+                    envars={"Dataset_RID": dataset_rid},
+                )
+                result = downloader.download()
+                archive_path = list(result.values())[0]["local_path"]
+                checksum_value = compute_file_hashes(archive_path, hashes=["sha256"])[
+                    "sha256"
+                ][0]
+
+            # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
+            # it.  If not, then we need to extract the contents of the archive into our cache directory.
+            bag_dir = self.cache_dir / f"{dataset_rid}_{checksum_value}"
+            if bag_dir.exists():
+                bag_path = (bag_dir / f"Dataset_{dataset_rid}").as_posix()
+            else:
+                bag_dir.mkdir(parents=True, exist_ok=True)
+                bag_path = bdb.extract_bag(archive_path, bag_dir)
+            bdb.validate_bag_structure(bag_path)
+            return Path(bag_path), dataset_rid
+
+    def _materialize_dataset_bag(
+        self, bag: str | RID, execution_rid: Optional[RID] = None
+    ) -> tuple[Path, RID]:
+        """Materialize a dataset bag into a local directory
+
+        Args:
+            bag: A MINID to an existing bag or a RID of the dataset that should be downloaded.
+            execution_rid: RID of the execution for which this bag should be materialized. Used to update status.
+            bag: str | RID:
+            execution_rid: Optional[RID]:  (Default value = None)
+
+        Returns:
+
+        """
+        def fetch_progress_callback(current, total):
+            """
+
+            Args:
+              current:
+              total:
+
+            Returns:
+
+            """
+            msg = f"Materializing bag: {current} of {total} file(s) downloaded."
+            if execution_rid:
+                self.update_status(Status.running, msg, execution_rid)
+            logging.info(msg)
+            return True
+
+        def validation_progress_callback(current, total):
+            """
+
+            Args:
+              current:
+              total:
+
+            Returns:
+
+            """
+            msg = f"Validating bag: {current} of {total} file(s) validated."
+            if execution_rid:
+                self.update_status(Status.running, msg, execution_rid)
+            logging.info(msg)
+            return True
+
+        if (
+            execution_rid
+            and self._ml_object.resolve_rid(execution_rid).table.name != "Execution"
+        ):
+            raise DerivaMLException(f"RID {execution_rid} is not an execution")
+
+        # request metadata
+        bag_path, dataset_rid = self._download_dataset_bag(bag)
+        bag_dir = bag_path.parent
+        validated_check = bag_dir / "validated_check.txt"
+
+        # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
+        if not validated_check.exists():
+            bdb.materialize(
+                bag_path.as_posix(),
+                fetch_callback=fetch_progress_callback,
+                validation_callback=validation_progress_callback,
+            )
+            validated_check.touch()
+        return Path(bag_path), dataset_rid
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
@@ -340,7 +503,7 @@ class Execution:
         return results
 
     def upload_execution_outputs(
-            self, clean_folder: bool = True
+        self, clean_folder: bool = True
     ) -> dict[str, FileUploadState]:
         """Upload all the assets and metadata associated with the current execution.
 
@@ -442,7 +605,7 @@ class Execution:
             self.update_status(Status.failed, error)
 
     def _update_execution_metadata_table(
-            self, assets: dict[str, FileUploadState]
+        self, assets: dict[str, FileUploadState]
     ) -> None:
         """Upload execution metadata at working_dir/Execution_metadata.
 
@@ -470,9 +633,9 @@ class Execution:
 
             """
             return (
-                    asset.state == UploadState.success
-                    and asset.result
-                    and asset.result["RID"]
+                asset.state == UploadState.success
+                and asset.result
+                and asset.result["RID"]
             )
 
         entities = [
@@ -483,11 +646,11 @@ class Execution:
         ml_schema_path.tables[a_table].insert(entities)
 
     def _update_feature_table(
-            self,
-            target_table: str,
-            feature_name: str,
-            feature_file: str | Path,
-            uploaded_files: dict[str, FileUploadState],
+        self,
+        target_table: str,
+        feature_name: str,
+        feature_file: str | Path,
+        uploaded_files: dict[str, FileUploadState],
     ) -> None:
         """
 
@@ -559,9 +722,9 @@ class Execution:
                 RID of the asset
             """
             return (
-                    asset.state == UploadState.success
-                    and asset.result
-                    and asset.result["RID"]
+                asset.state == UploadState.success
+                and asset.result
+                and asset.result["RID"]
             )
 
         entities = [
@@ -664,7 +827,7 @@ class Execution:
         return feature_root(self.working_dir, self.execution_rid)
 
     def feature_paths(
-            self, table: Table | str, feature_name: str
+        self, table: Table | str, feature_name: str
     ) -> tuple[Path, dict[str, Path]]:
         """Return the file path of where to place feature values, and assets for the named feature and table.
 
@@ -711,8 +874,8 @@ class Execution:
             Pathlib path to the file in which to place table values.
         """
         if (
-                table
-                not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables
+            table
+            not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables
         ):
             raise DerivaMLException(
                 "Table '{}' not found in domain schema".format(table)
@@ -769,11 +932,6 @@ class Execution:
         """
         return self._ml_object.create_dataset(ds_type, description, self.execution_rid)
 
-    @validate_call
-    def download_dataset_bag(self, rid: RID) -> tuple[Path, Any]:
-        """Download the specified dataset into a local directory and return a dataset description."""
-        return self._ml_object.download_dataset_bag(rid)
-
     def __str__(self):
         items = [
             f"caching_dir: {self.cache_dir}",
@@ -826,6 +984,7 @@ class DerivaMLExec:
         if not exc_type:
             self.execution.update_status(Status.running, "Successfully run Ml.")
             self.execution.execution_stop()
+            return True
         else:
             self.execution.update_status(
                 Status.failed,
@@ -859,7 +1018,7 @@ class DerivaMLExec:
         return self.execution.execution_metadata_path(metadata_type)
 
     def feature_paths(
-            self, table: Table | str, feature_name: str
+        self, table: Table | str, feature_name: str
     ) -> tuple[Path, dict[str, Path]]:
         """Return the file path of where to place feature values, and assets for the named feature and table.
 

@@ -22,9 +22,6 @@ from tempfile import mkdtemp,  NamedTemporaryFile, TemporaryDirectory
 from types import UnionType
 from typing import Optional, Any, Iterable, Type, ClassVar, TYPE_CHECKING
 
-import requests
-from bdbag import bdbag_api as bdb
-from bdbag.fetch.fetcher import fetch_single_file
 from deriva.core import (
     ErmrestCatalog,
     get_credential,
@@ -38,8 +35,6 @@ from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import FindAssociationResult, Column, Key, Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
-from deriva.core.utils.hash_utils import compute_file_hashes
-from deriva.transfer.download.deriva_download import GenericDownloader
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import BaseModel, Field, create_model, validate_call, ConfigDict
 
@@ -47,7 +42,6 @@ from .execution_configuration import ExecutionConfiguration
 from .schema_setup.dataset_annotations import generate_dataset_annotations
 from .upload import asset_dir
 from .upload import table_path, bulk_upload_configuration
-from .dataset import Dataset
 from .deriva_definitions import ColumnDefinition
 from .deriva_definitions import MLVocab, ExecMetadataVocab
 from .deriva_definitions import (
@@ -1364,7 +1358,7 @@ class DerivaML:
                     defaults={"ID", "URI"},
                 )[0]
             )
-        except DataPathException:
+        except DataPathException as e:
             term_id = self.lookup_term(table, term_name)
             if not exists_ok:
                 raise DerivaMLException(f"{term_name} already exists")
@@ -1431,158 +1425,6 @@ class DerivaML:
             VocabularyTerm(**v)
             for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()
         ]
-
-    @validate_call
-    def download_dataset_bag(
-            self,
-            bag: RID | str,
-            materialize: bool = True,
-            execution_rid: Optional[RID] = None,
-    ) -> tuple[Path, RID]:
-        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
-        that all the metadata is correct
-
-        Args:
-            bag: The RID of a dataset or a minid to an existing bag.
-            materialize: Materalize the bag, rather than just downloading it.
-            execution_rid: RID of execution object requesting the download.  Used to update status.
-
-        Returns:
-            the location of the unpacked and validated dataset bag and the RID of the bag
-        """
-        return (
-            self._materialize_dataset_bag(bag, execution_rid)
-            if materialize
-            else self._download_dataset_bag(bag)
-        )
-
-    def _download_dataset_bag(self, dataset_rid: RID | str) -> tuple[Path, RID]:
-        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
-        that all the metadata is correct
-
-        Args:
-            dataset_rid: The RID of a dataset or a minid to an existing bag.
-             dataset_rid: RID | str:
-
-        Returns:
-            the location of the unpacked and validated dataset bag and the RID of the bag
-        """
-        if not any([dataset_rid == ds["RID"] for ds in self.find_datasets()]):
-            raise DerivaMLException(f"RID {dataset_rid} is not a dataset")
-
-        with TemporaryDirectory() as tmp_dir:
-            if dataset_rid.startswith("minid"):
-                # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
-                r = requests.get(
-                    f"https://identifiers.org/{dataset_rid}",
-                    headers={"accept": "application/json"},
-                )
-                metadata = r.json()["metadata"]
-                dataset_rid = metadata["Dataset_RID"].split("@")[0]
-                checksum_value = ""
-                for checksum in r.json().get("checksums", []):
-                    if checksum.get("function") == "sha256":
-                        checksum_value = checksum.get("value")
-                        break
-                archive_path = fetch_single_file(dataset_rid, tmp_dir)
-            else:
-                # We are given the RID to a dataset, so we are going to have to export as a bag and place into
-                # local file system.  The first step is to generate a downloadspec to create the bag, put the sped
-                # into a local file and then use the downloader to create and download the desired bdbag.
-                spec_file = f"{tmp_dir}/download_spec.json"
-                with open(spec_file, "w", encoding="utf-8") as ds:
-                    json.dump(Dataset(self.model).generate_dataset_download_spec(), ds)
-                downloader = GenericDownloader(
-                    server={
-                        "catalog_id": self.catalog_id,
-                        "protocol": "https",
-                        "host": self.host_name,
-                    },
-                    config_file=spec_file,
-                    output_dir=tmp_dir,
-                    envars={"Dataset_RID": dataset_rid},
-                )
-                result = downloader.download()
-                archive_path = list(result.values())[0]["local_path"]
-                checksum_value = compute_file_hashes(archive_path, hashes=["sha256"])[
-                    "sha256"
-                ][0]
-
-            # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
-            # it.  If not, then we need to extract the contents of the archive into our cache directory.
-            bag_dir = self.cache_dir / f"{dataset_rid}_{checksum_value}"
-            if bag_dir.exists():
-                bag_path = (bag_dir / f"Dataset_{dataset_rid}").as_posix()
-            else:
-                bag_dir.mkdir(parents=True, exist_ok=True)
-                bag_path = bdb.extract_bag(archive_path, bag_dir)
-            bdb.validate_bag_structure(bag_path)
-            return Path(bag_path), dataset_rid
-
-    def _materialize_dataset_bag(
-            self, bag: str | RID, execution_rid: Optional[RID] = None
-    ) -> tuple[Path, RID]:
-        """Materialize a dataset bag into a local directory
-
-        Args:
-            bag: A MINID to an existing bag or a RID of the dataset that should be downloaded.
-            execution_rid: RID of the execution for which this bag should be materialized. Used to update status.
-            bag: str | RID:
-            execution_rid: Optional[RID]:  (Default value = None)
-
-        Returns:
-
-        """
-
-        def fetch_progress_callback(current, total):
-            """
-
-            Args:
-              current:
-              total:
-
-            Returns:
-
-            """
-            msg = f"Materializing bag: {current} of {total} file(s) downloaded."
-            if execution_rid:
-                self._update_status(Status.running, msg, execution_rid)
-            logging.info(msg)
-            return True
-
-        def validation_progress_callback(current, total):
-            """
-
-            Args:
-              current:
-              total:
-
-            Returns:
-
-            """
-            msg = f"Validating bag: {current} of {total} file(s) validated."
-            if execution_rid:
-                self._update_status(Status.running, msg, execution_rid)
-            logging.info(msg)
-            return True
-
-        if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
-            raise DerivaMLException(f"RID {execution_rid} is not an execution")
-
-        # request metadata
-        bag_path, dataset_rid = self._download_dataset_bag(bag)
-        bag_dir = bag_path.parent
-        validated_check = bag_dir / "validated_check.txt"
-
-        # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
-        if not validated_check.exists():
-            bdb.materialize(
-                bag_path.as_posix(),
-                fetch_callback=fetch_progress_callback,
-                validation_callback=validation_progress_callback,
-            )
-            validated_check.touch()
-        return Path(bag_path), dataset_rid
 
     def download_asset(self, asset_url: str, dest_filename: str) -> Path:
         """Download an asset from a URL and place it in a local directory.
