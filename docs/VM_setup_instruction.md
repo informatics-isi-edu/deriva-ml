@@ -19,7 +19,11 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
 3. Substitute `<github-username>` and `<github-token>` with the appropriate values accordingly, then execute:
    ```bash
    echo "https://<github-username>:<github-token>@github.com" > ~/.git-credentials && chmod 600 ~/.git-credentials
-   ```
+
+4. Enable credential storage
+    ```bash
+   git config --global credential.helper store
+    ```
 
 # Clone Catalog-ml and Catalog-exec repo
 1. Create a directory in your homedir for GitHub Repos `mkdir Repos`
@@ -28,7 +32,6 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
    Example:
 
    ```bash
-   git clone https://github.com/informatics-isi-edu/eye-ai-ml.git
    git clone https://github.com/informatics-isi-edu/eye-ai-exec.git
     ```
 3. Change the notebook and Catalog-ML tools accordingly.
