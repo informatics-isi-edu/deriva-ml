@@ -4,6 +4,7 @@ THis module defines the DataSet class with is used to manipulate n
 
 from collections import defaultdict
 from typing import Any, Callable, Optional, Iterable
+from deriva.core.ermrest_catalog import ErmrestCatalog
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.datapath import DataPathException
 
@@ -13,6 +14,7 @@ from .deriva_definitions import (
     SemanticVersion,
     DerivaMLException,
     MLVocab,
+    _get_session_config,
 )
 from .schema_setup.dataset_annotations import generate_dataset_annotations
 from .deriva_definitions import VocabularyTerm
@@ -28,13 +30,24 @@ class Dataset:
         table: ERMrest table holding dataset information.
     """
 
-    def __init__(self, model: Model):
+    def __init__(self, model: Model, snapshot: str = ""):
         self._model = model
         self._ml_schema = ML_SCHEMA
         self._domain_schema = [
             s for s in model.schemas if s not in ["deriva-ml", "www", "public"]
         ].pop()
         self.table = self._model.schemas[self._ml_schema].tables["Dataset"]
+        self._snapshot = snapshot
+        self._snapshot_catalog = (
+            ErmrestCatalog(
+                "https",
+                self._model.catalog.hostname,
+                f"{self._model.catalog.catalog_id}@{self._snapshot}",
+                _get_session_config(),
+            )
+            if self._snapshot != ""
+            else None
+        )
 
     def _is_dataset_rid(self, rid: RID) -> bool:
         rid_record = self._model.catalog.resolve_rid(rid)
@@ -70,9 +83,12 @@ class Dataset:
         )
 
     def dataset_version_history(self, dataset_rid: RID) -> list[SemanticVersion]:
-        path = self._model.catalog.getPathbuilder().schemas[self._ml_schema].tables["DatasetVersion"]
-        return [path.filter(path.Dataset == dataset_rid).entities().fetch()
-
+        path = (
+            self._model.catalog.getPathbuilder()
+            .schemas[self._ml_schema]
+            .tables["DatasetVersion"]
+        )
+        return [path.filter(path.Dataset == dataset_rid).entities().fetch()]
 
     def increment_dataset_version(
         self,
@@ -109,9 +125,7 @@ class Dataset:
                 patch += 1
         dataset_path = schema_path.tables[self.table.name]
         semantic_version = f"{major}.{minor}.{patch}"
-        dataset_path.update(
-            [{"RID": dataset_rid, "Version": semantic_version}]
-        )
+        dataset_path.update([{"RID": dataset_rid, "Version": semantic_version}])
         snapshot = self._model.catalog.latest_snapshot().snaptime
         schema_path.tables["DatasetVersion"].insert(
             [
@@ -228,7 +242,9 @@ class Dataset:
 
         pb = self._model.catalog.getPathBuilder()
         for ds_type in ds_types:
-            vocab_table = self._model.schemas[self._ml_schema].tables[MLVocab.dataset_type]
+            vocab_table = self._model.schemas[self._ml_schema].tables[
+                MLVocab.dataset_type
+            ]
             if not self._lookup_term(vocab_table, ds_type):
                 raise DerivaMLException(f"Dataset type must be a vocabulary term.")
         dataset_table_path = pb.schemas[self.table.schema.name].tables[self.table.name]
@@ -312,7 +328,9 @@ class Dataset:
             )
         # Get association table for nested datasets
         atable_path = (
-            self._model.catalog.getPathBuilder().schemas[self._ml_schema].Dataset_Dataset
+            self._model.catalog.getPathBuilder()
+            .schemas[self._ml_schema]
+            .Dataset_Dataset
         )
         return [
             p["Dataset"]

@@ -25,7 +25,6 @@ from deriva.core import (
     get_credential,
     format_exception,
     urlquote,
-    DEFAULT_SESSION_CONFIG,
 )
 from deriva.core.datapath import DataPathException, _ResultSet
 from deriva.core.datapath import _CatalogWrapper
@@ -345,22 +344,6 @@ class DerivaML:
                 f"Loading dirty model.  Consider commiting and tagging: {self.version}"
             )
 
-    @staticmethod
-    def _get_session_config():
-        """ """
-        session_config = DEFAULT_SESSION_CONFIG.copy()
-        session_config.update(
-            {
-                # our PUT/POST to ermrest is idempotent
-                "allow_retry_on_all_methods": True,
-                # do more retries before aborting
-                "retry_read": 8,
-                "retry_connect": 5,
-                # increase delay factor * 2**(n-1) for Nth retry
-                "retry_backoff_factor": 5,
-            }
-        )
-        return session_config
 
     @property
     def pathBuilder(self) -> _CatalogWrapper:

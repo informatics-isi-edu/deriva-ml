@@ -10,7 +10,7 @@ from typing import Any, Iterable, Optional, Annotated
 import deriva.core.ermrest_model as em
 from deriva.core.ermrest_model import builtin_types
 from pydantic import BaseModel, model_serializer, Field, computed_field
-
+from deriva.core import DEFAULT_SESSION_CONFIG
 ML_SCHEMA = 'deriva-ml'
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
@@ -243,6 +243,23 @@ class TableDefinition(BaseModel):
             acl_bindings=self.acl_bindings,
             annotations=self.annotations)
 
+
+
+def _get_session_config():
+    """ """
+    session_config = DEFAULT_SESSION_CONFIG.copy()
+    session_config.update(
+        {
+            # our PUT/POST to ermrest is idempotent
+            "allow_retry_on_all_methods": True,
+            # do more retries before aborting
+            "retry_read": 8,
+            "retry_connect": 5,
+            # increase delay factor * 2**(n-1) for Nth retry
+            "retry_backoff_factor": 5,
+        }
+    )
+    return session_config
 
 class DerivaMLException(Exception):
     """Exception class specific to DerivaML module.
