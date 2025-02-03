@@ -19,6 +19,7 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
 3. Substitute `<github-username>` and `<github-token>` with the appropriate values accordingly, then execute:
    ```bash
    echo "https://<github-username>:<github-token>@github.com" > ~/.git-credentials && chmod 600 ~/.git-credentials
+   ```
 
 4. Enable credential storage
     ```bash
