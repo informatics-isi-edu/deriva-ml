@@ -1524,17 +1524,19 @@ class DerivaML:
                 },
                 config_file=spec_file,
             )
-            uploader.getUpdatedConfig()
-            uploader.scanDirectory(assets_dir)
-            results = {
-                path: FileUploadState(
-                    state=UploadState(result["State"]),
-                    status=result["Status"],
-                    result=result["Result"],
-                )
-                for path, result in uploader.uploadFiles().items()
-            }
-            uploader.cleanup()
+            try:
+                uploader.getUpdatedConfig()
+                uploader.scanDirectory(assets_dir)
+                results = {
+                    path: FileUploadState(
+                        state=UploadState(result["State"]),
+                        status=result["Status"],
+                        result=result["Result"],
+                    )
+                    for path, result in uploader.uploadFiles().items()
+                }
+            finally:
+                uploader.cleanup()
         return results
 
     def _update_status(
