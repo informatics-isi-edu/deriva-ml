@@ -70,7 +70,9 @@ class Dataset:
         )
 
     def dataset_version_history(self, dataset_rid: RID) -> list[SemanticVersion]:
-        pass
+        path = self._model.catalog.getPathbuilder().schemas[self._ml_schema].tables["DatasetVersion"]
+        return [path.filter(path.Dataset == dataset_rid).entities().fetch()
+
 
     def increment_dataset_version(
         self,
@@ -400,6 +402,7 @@ class Dataset:
                 schema_path.tables[association_map[table]].insert(
                     [{"Dataset": dataset_rid, fk_column: e} for e in elements]
                 )
+        self.increment_dataset_version(dataset_rid, SemanticVersion.minor)
 
     @validate_call
     def list_dataset_members(
