@@ -18,4 +18,5 @@ An overview of the design and operational aspects of DerivaML can be found in th
 > [PDF](assets/deriva-ml.pdf)
 
 The data model design in Deriva Catalog:
+
 ![minid](assets/ERD.png)
