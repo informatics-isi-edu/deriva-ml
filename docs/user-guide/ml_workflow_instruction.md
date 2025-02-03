@@ -79,7 +79,8 @@ Before starting execution:
 - Cache all required files in the caching directory.
 
 - **Configuration Parameters**
-- datasets: List of dataset rids found in the catalog's Dataset table.
+- datasets: List of dictionary that contains dataset rids found in the catalog's Dataset table, and a flag to 
+  indicate whether download the assets or not.
 - assets: List of execution asset rids from the Execution_Assets table.
 - execution: A descriptive Execution object.
 - workflow: A Workflow object, including its type and associated code scripts.
@@ -110,7 +111,8 @@ test_workflow = Workflow(
 # Configuration instance.
 config = ExecutionConfiguration(
     # Comment out the following line if you don't need the assets.
-    datasets=[dataset_rid1, dataset_rid2, ...] if download_assets else [],
+    # Materialize set to False if you only need the metadata from the bag, and not the assets.
+    datasets= [{'rid':source_dataset, 'materialize':True}],
     assets=[asset_rid1, asset_rid2, ...],
     workflow=test_workflow,
     description="Our Test Workflow instance")
@@ -165,7 +167,7 @@ ml_instance.add_term(vc.Execution_Metadata_Type, "Example_Metadata_Type", descri
 ml_instance.add_term(vc.Execution_Asset_Type, "Example_Asset_Type", description="Asset Type description")
 
 metadata_path = execution.execution_metadata_path(Example_Metadata_Type)
-asset_path = execution.execution_assets_path(Example_Asset_Type)
+asset_path = execution.execution_asset_path(Example_Asset_Type)
 
 # Save files to metadata path and asset path.
 
