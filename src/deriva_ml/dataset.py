@@ -1,13 +1,23 @@
 """
 THis module defines the DataSet class with is used to manipulate n
 """
+
 from collections import defaultdict
-from typing import Any, Callable, Optional
-
+from typing import Any, Callable, Optional, Iterable
 from deriva.core.ermrest_model import Model, Table
+from deriva.core.datapath import DataPathException
 
-from deriva_ml.deriva_definitions import ML_SCHEMA, RID, SemanticVersion, DerivaMLException
-from pydantic import validate_call
+from .deriva_definitions import (
+    ML_SCHEMA,
+    RID,
+    SemanticVersion,
+    DerivaMLException,
+    MLVocab,
+)
+from .schema_setup.dataset_annotations import generate_dataset_annotations
+
+from pydantic import validate_call, ConfigDict
+
 
 class Dataset:
     """
@@ -29,6 +39,12 @@ class Dataset:
         rid_record = self._model.catalog.resolve_rid(rid)
         return rid_record.table == self.table
 
+    def _resolve_rid(self, rid: RID):
+        try:
+            return self._model.catalog.resolve_rid(rid, self._model)
+        except KeyError as _e:
+            raise DerivaMLException(f"Invalid RID {rid}")
+
     def dataset_version(self, dataset_rid: RID) -> tuple[int, ...]:
         """Retrieve the version of the specified dataset.
 
@@ -43,22 +59,33 @@ class Dataset:
             raise DerivaMLException(
                 f"RID: {dataset_rid} does not belong to dataset {self.table.name}"
             )
-        return tuple(map(int, self._model.catalog.retrieve_rid(dataset_rid, self._model)["Version"].split(".")))
+        return tuple(
+            map(
+                int,
+                self._model.catalog.retrieve_rid(dataset_rid, self._model)[
+                    "Version"
+                ].split("."),
+            )
+        )
+
+    def dataset_version_history(self, dataset_rid: RID) -> list[SemanticVersion]
+        pass
 
     def increment_dataset_version(
-            self, dataset_rid: RID, component: SemanticVersion,
-            description: Optional[str] = ""
+        self,
+        dataset_rid: RID,
+        component: SemanticVersion,
+        description: Optional[str] = "",
     ) -> tuple[int, ...]:
         """Increment the version of the specified dataset.
 
         Args:
           dataset_rid: RID to a dataset
           component: Which version of the dataset to increment.
-          dataset_rid: RID:
-          component: SemanticVersion:
+          description: Description of the version of the dataset.
 
         Returns:
-          new vsemantic ersion of the dataset as a 3-tuple
+          new semantic ersion of the dataset as a 3-tuple
 
         Raises:
           DerivaMLException: if provided RID is not to a dataset.
@@ -69,7 +96,7 @@ class Dataset:
             raise DerivaMLException(f'RID "{dataset_rid}" is not a dataset')
 
         major, minor, patch = self.dataset_version(dataset_rid)
-        schema_path = self._model.catalog.getPathBuilder.schemas[self.ml_schema]
+        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
         match component:
             case SemanticVersion.major:
                 major += 1
@@ -83,27 +110,312 @@ class Dataset:
         )
         version_table = self._model.catalog.get_s
         snapshot = self._model.catalog.latest_snapshot().snaptime
-        schema_path.tables['DatasetVersion'].insert([{'Dataset': dataset_rid, 'SemanticVerion': semantic_version, 'SnapshotID': snapshot, 'Description': description}])
+        schema_path.tables["DatasetVersion"].insert(
+            [
+                {
+                    "Dataset": dataset_rid,
+                    "SemanticVerion": semantic_version,
+                    "SnapshotID": snapshot,
+                    "Description": description,
+                }
+            ]
+        )
         dataset_path.update(
             [{"RID": dataset_rid, "Version": f"{major}.{minor}.{patch}"}]
         )
         return major, minor, patch
 
+    def list_dataset_element_types(self) -> Iterable[Table]:
+        """List the types of entities that can be added to a dataset.
+
+        Returns:
+          :return: An iterable of Table objects that can be included as an element of a dataset.
+        """
+
+        def domain_table(table: Table) -> bool:
+            return (
+                    table.schema.name == self._domain_schema
+                    or table.name == self.table.name
+            )
+
+        return [
+            t
+            for a in self.table.find_associations()
+            if domain_table(t := a.other_fkeys.pop().pk_table)
+        ]
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def add_dataset_element_type(self, element_table: Table) -> Table:
+        """A dataset is a heterogeneous collection of objects, each of which comes from a different table. This
+        routine makes it possible to add objects from the specified table to a dataset.
+
+        Args:
+            element_table: Table object that is to be added to the dataset.
+
+        Returns:
+            The table object that was added to the dataset.
+        """
+        # Add table to map
+        table = self._model.schemas[self._domain_schema].create_table(
+            Table.define_association([self.table, element_table])
+        )
+
+        # self.model = self.catalog.getCatalogModel()
+        self.table.annotations.update(generate_dataset_annotations(self._model))
+        self._model.apply()
+        return table
+
+    def find_datasets(self) -> Iterable[dict[str, Any]]:
+        """Returns a list of currently available datasets.
+
+        Returns:
+             list of currently available datasets.
+        """
+        # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
+        pb = self._model.catalog.getPathBuilder()
+        dataset_path = pb.schemas[self.table.schema.name].tables[self.table.name]
+        atable = next(
+            self._model.schemas[self.ml_schema]
+            .tables[MLVocab.dataset_type]
+            .find_associations()
+        ).name
+        ml_path = pb.schemas[self.ml_schema]
+        atable_path = ml_path.tables[atable]
+
+        # Get a list of all the dataset_type values associated with this dataset.
+        datasets = []
+        for dataset in dataset_path.entities().fetch():
+            ds_types = (
+                atable_path.filter(atable_path.Dataset == dataset["RID"])
+                .attributes(atable_path.Dataset_Type)
+                .fetch()
+            )
+            datasets.append(
+                dataset
+                | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in ds_types]}
+            )
+        return datasets
+
+    @validate_call
+    def create_dataset(
+        self,
+        ds_type: str | list[str],
+        description: str,
+        execution_rid: Optional[RID] = None,
+        version: tuple[int, int, int] = (1, 0, 0),
+    ) -> RID:
+        """Create a new dataset from the specified list of RIDs.
+
+        Args:
+            ds_type: One or more dataset types.  Must be a term from the DatasetType controlled vocabulary.
+            description: Description of the dataset.
+            execution_rid: Execution under which the dataset will be created.
+            version: Version of the dataset.
+            ds_type: str | list[str]:
+            description: str:
+            execution_rid: Optional[RID]:  (Default value = None)
+            version: tuple[int: int: int]
+
+        Returns:
+            New dataset RID.
+
+        """
+        # Create the entry for the new dataset and get its RID.
+        ds_types = [ds_type] if isinstance(ds_type, str) else ds_type
+
+        pb = self._model.catalog.getPathBuilder()
+        for ds_type in ds_types:
+            if not self.lookup_term(MLVocab.dataset_type, ds_type):
+                raise DerivaMLException(f"Dataset type must be a vocabulary term.")
+        dataset_table_path = pb.schemas[self.table.schema.name].tables[self.table.name]
+        dataset = dataset_table_path.insert(
+            [
+                {
+                    "Description": description,
+                    MLVocab.dataset_type: ds_type,
+                    "Version": f"{version[0]}.{version[1]}.{version[2]}",
+                }
+            ]
+        )[0]["RID"]
+
+        # Get the name of the association table between dataset and dataset_type.
+        atable = next(
+            self._model.schemas[self.ml_schema]
+            .tables[MLVocab.dataset_type]
+            .find_associations()
+        ).name
+        pb.schemas[self.ml_schema].tables[atable].insert(
+            [
+                {MLVocab.dataset_type: ds_type, "Dataset": dataset}
+                for ds_type in ds_types
+            ]
+        )
+        if execution_rid is not None:
+            pb.schemas[self.ml_schema].Dataset_Execution.insert(
+                [{"Dataset": dataset, "Execution": execution_rid}]
+            )
+        return dataset
+
+    @validate_call
+    def delete_dataset(self, dataset_rid: RID, recurse: bool = False) -> None:
+        """Delete a dataset from the catalog.
+
+        Args:
+            dataset_rid: RID of the dataset to delete.
+            recurse: If True, delete the dataset along with any nested datasets. (Default value = False)
+            dataset_rid: RID:
+        """
+        # Get association table entries for this dataset
+        # Delete association table entries
+        pb = self._model.catalog.getPathBuilder()
+        for assoc_table in self.table.find_associations(self.table):
+            other_fkey = assoc_table.other_fkeys.pop()
+            self_fkey = assoc_table.self_fkey
+            target_table = other_fkey.pk_table
+            member_table = assoc_table.table
+
+            schema_path = pb.schemas[member_table.schema.name]
+            tpath = schema_path.tables[assoc_table.name]
+            dataset_column_path = tpath.columns[self_fkey.columns[0].name]
+            dataset_entries = tpath.filter(dataset_column_path == dataset_rid)
+            if recurse and target_table == self.table:
+                # Nested table
+                for dataset in dataset_entries:
+                    self.delete_dataset(dataset["RID"], recurse)
+            try:
+                dataset_entries.delete()
+            except DataPathException:
+                pass
+
+        # Delete dataset.
+        dataset_path = pb.schemas[self.table.schema.name].tables[self.table.name]
+        dataset_path.filter(dataset_path.columns["RID"] == dataset_rid).delete()
+
+    @validate_call
+    def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
+        """Given a dataset RID, return a list of RIDs of the parent datasets.
+
+        Args:
+            dataset_rid: return: RID of the parent dataset.
+
+        Returns:
+            RID of the parent dataset.
+        """
+        rid_record = self._resolve_rid(dataset_rid)
+        if rid_record.table.name != self.table.name:
+            raise DerivaMLException(
+                f"RID: {dataset_rid} does not belong to dataset {self.table.name}"
+            )
+        # Get association table for nested datasets
+        atable_path = (
+            self._model.catalog.getPathBuilder().schemas[self.ml_schema].Dataset_Dataset
+        )
+        return [
+            p["Dataset"]
+            for p in atable_path.filter(atable_path.Nested_Dataset == dataset_rid)
+            .entities()
+            .fetch()
+        ]
+
+    @validate_call
+    def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
+        """Given a dataset RID, return a list of RIDs of any nested datasets.
+
+        Args:
+            dataset_rid: A dataset RID.
+
+        Returns:
+          list of RIDs of nested datasets.
+
+        """
+        return [d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
+
+    @validate_call
+    def add_dataset_members(
+        self, dataset_rid: Optional[RID], members: list[RID], validate: bool = True
+    ) -> None:
+        """Add additional elements to an existing dataset.
+
+        Args:
+            dataset_rid: RID of dataset to extend or None if new dataset is to be created.
+            members: List of RIDs of members to add to the  dataset.
+            validate: Check rid_list to make sure elements are not already in the dataset.
+        """
+
+        members = set(members)
+
+        def check_dataset_cycle(member_rid, path=None):
+            """
+
+            Args:
+              member_rid:
+              path:  (Default value = None)
+
+            Returns:
+
+            """
+            path = path or set(dataset_rid)
+            return member_rid in path
+
+        if validate:
+            existing_rids = set(
+                m["RID"]
+                for ms in self.list_dataset_members(dataset_rid).values()
+                for m in ms
+            )
+            if overlap := set(existing_rids).intersection(members):
+                raise DerivaMLException(
+                    f"Attempting to add existing member to dataset {dataset_rid}: {overlap}"
+                )
+
+        # Now go through every rid to be added to the data set and sort them based on what association table entries
+        # need to be made.
+        dataset_elements = {}
+        association_map = {
+            a.other_fkeys.pop().pk_table.name: a.table.name
+            for a in self.table.find_associations()
+        }
+        # Get a list of all the types of objects that can be linked to a dataset.
+        for m in members:
+            rid_info = self._resolve_rid(m)
+            if rid_info.table.name not in association_map:
+                raise DerivaMLException(
+                    f"RID table: {rid_info.table.name} not part of dataset"
+                )
+            if rid_info.table == self.table and check_dataset_cycle(rid_info.rid):
+                raise DerivaMLException("Creating cycle of datasets is not allowed")
+            dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
+        # Now make the entries into the association tables.
+        pb = self._model.catalog.getPathBuilder()
+        for table, elements in dataset_elements.items():
+            schema_path = pb.schemas[
+                self.ml_schema if table == "Dataset" else self._domain_schema
+            ]
+            fk_column = "Nested_Dataset" if table == "Dataset" else table
+
+            if len(elements):
+                # Find out the name of the column in the association table.
+                schema_path.tables[association_map[table]].insert(
+                    [{"Dataset": dataset_rid, fk_column: e} for e in elements]
+                )
 
     @validate_call
     def list_dataset_members(
-            self, dataset_rid: RID, version = Optional[SemanticVersion], recurse: bool = False
+        self, dataset_rid: RID, version=Optional[SemanticVersion], recurse: bool = False
     ) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
         Args:
             dataset_rid: param recurse: If this is a nested dataset, list the members of the contained datasets
-            dataset_rid: RID:
+            version: Semantic version of the dataset to be returned.
             recurse:  (Default value = False)
 
         Returns:
             Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
             were taken.
+
+        Raises:
+            DerivaMLException: if the RID doesn't exist. or semantic version doesn't match existing version.
         """
 
         try:
@@ -123,8 +435,8 @@ class Dataset:
             member_table = assoc_table.table
 
             if (
-                    target_table.schema.name != self._domain_schema
-                    and target_table != self.table
+                target_table.schema.name != self._domain_schema
+                and target_table != self.table
             ):
                 # Look at domain tables and nested datasets.
                 continue
@@ -143,8 +455,8 @@ class Dataset:
             path.link(
                 target_path,
                 on=(
-                        member_path.columns[member_link[0]]
-                        == target_path.columns[member_link[1]]
+                    member_path.columns[member_link[0]]
+                    == target_path.columns[member_link[1]]
                 ),
             )
             target_entities = path.entities().fetch()
@@ -312,19 +624,25 @@ class Dataset:
             "Dataset",
         )
         table_paths = self._domain_table_paths(graph, sprefix=sprefix, dprefix=dprefix)
-        dataset_dataset_table = self._model.schemas[self.ml_schema].tables['Dataset_Dataset']
+        dataset_dataset_table = self._model.schemas[self.ml_schema].tables[
+            "Dataset_Dataset"
+        ]
         nested_sprefix = sprefix
         nested_dprefix = dprefix
         for i in range(1, 3):
-        #    nested_sprefix += f'/DD{i}:=deriva-ml:Dataset_Dataset/D{i+1}:=(Nested_Dataset)=(deriva-ml:Dataset:RID)'
-            nested_sprefix += f'/(RID)=(deriva-ml:Dataset_Dataset:Dataset)'
-            nested_dprefix += f'/Dataset_Dataset'
+            #    nested_sprefix += f'/DD{i}:=deriva-ml:Dataset_Dataset/D{i+1}:=(Nested_Dataset)=(deriva-ml:Dataset:RID)'
+            nested_sprefix += f"/(RID)=(deriva-ml:Dataset_Dataset:Dataset)"
+            nested_dprefix += f"/Dataset_Dataset"
             table_paths.append((nested_sprefix, nested_dprefix, dataset_dataset_table))
-            nested_sprefix += f'/(Nested_Dataset)=(deriva-ml:Dataset:RID)'
-            nested_dprefix += f'/Dataset'
+            nested_sprefix += f"/(Nested_Dataset)=(deriva-ml:Dataset:RID)"
+            nested_dprefix += f"/Dataset"
             table_paths.append((nested_sprefix, nested_dprefix, self.table))
-        # Get CSV for nested datasets.
-            table_paths.extend(self._domain_table_paths(graph, sprefix=nested_sprefix, dprefix=nested_dprefix)[1:])
+            # Get CSV for nested datasets.
+            table_paths.extend(
+                self._domain_table_paths(
+                    graph, sprefix=nested_sprefix, dprefix=nested_dprefix
+                )[1:]
+            )
         return table_paths
 
     def _dataset_nesting_depth(self) -> int:
