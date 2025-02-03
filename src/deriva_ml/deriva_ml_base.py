@@ -1,5 +1,5 @@
 """
-`deriva_ml_base.py` is the core module for the Deriva ML project.  This module implements the DeriaML class, which is
+`deriva_ml_base.py` is the core module for the Deriva ML project.  This module implements the DerivaML class, which is
 the primary interface to the Deriva based catalogs.  The module also implements the Feature and Vocabulary functions
 in the DerivaML.
 
@@ -34,14 +34,14 @@ from deriva.core.ermrest_model import FindAssociationResult, Column, Key, Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from pydantic import BaseModel, Field, create_model, validate_call, ConfigDict
+from pydantic import BaseModel, create_model, validate_call, ConfigDict
 
 from .dataset import Dataset
 from .execution_configuration import ExecutionConfiguration
 from .upload import asset_dir
 from .upload import table_path, bulk_upload_configuration
 from .deriva_definitions import ColumnDefinition
-from .deriva_definitions import ExecMetadataVocab
+from .deriva_definitions import ExecMetadataVocab, VocabularyTerm
 from .deriva_definitions import (
     RID,
     UploadState,
@@ -53,36 +53,6 @@ from .deriva_definitions import (
 
 if TYPE_CHECKING:
     from .execution import Execution
-
-
-class VocabularyTerm(BaseModel):
-    """An entry in a vocabulary table.
-
-    Attributes:
-       name: Name of vocabulary term
-       synonyms: List of alternative names for the term
-       id: CURI identifier for the term
-       uri: Unique URI for the term.
-       description: A description of the meaning of the term
-       rid: Resource identifier assigned to the term
-
-    Args:
-
-    Returns:
-
-    """
-
-    name: str = Field(alias="Name")
-    synonyms: Optional[list[str]] = Field(alias="Synonyms")
-    id: str = Field(alias="ID")
-    uri: str = Field(alias="URI")
-    description: str = Field(alias="Description")
-    rid: str = Field(alias="RID")
-
-    class Config:
-        """ """
-
-        extra = "ignore"
 
 
 class FeatureRecord(BaseModel):
@@ -220,7 +190,7 @@ class Feature:
         )
 
     def feature_record_class(self) -> type[FeatureRecord]:
-        """ "Create a pydantic model for entries into the specified feature table
+        """Create a pydantic model for entries into the specified feature table
 
         Returns:
             A Feature class that can be used to create instances of the feature.
@@ -564,7 +534,7 @@ class DerivaML:
           A dictionary that represents the values of the specified RID.
 
         Raises:
-          DerivaMLException: if the RID doesn't exist.'
+          DerivaMLException: if the RID doesn't exist.
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
@@ -696,8 +666,8 @@ class DerivaML:
     ) -> type[FeatureRecord]:
         """Create a new feature that can be associated with a table.
 
-        The feature can associate a controlled vocabulary term, an asset, or any other values with a s
-        pecific instance of an object and  execution.
+        The feature can associate a controlled vocabulary term, an asset, or any other values with
+        a specific instance of an object and  execution.
 
         Args:
             feature_name: Name of the new feature to be defined
@@ -772,7 +742,7 @@ class DerivaML:
     def feature_record_class(
         self, table: str | Table, feature_name: str
     ) -> type[FeatureRecord]:
-        """ "Create a pydantic model for entries into the specified feature table.
+        """Create a pydantic model for entries into the specified feature table.
 
         For information on how to
         See the pydantic documentation for more details about the pydantic model.
@@ -1086,7 +1056,7 @@ class DerivaML:
          or a synonym for the term.  Generate an exception if the term is not in the vocabulary.
 
         Args:
-            table: The name of the controlled vocabulary table or a ERMrest table object..
+            table: The name of the controlled vocabulary table or a ERMrest table object.
             term_name: The name of the term to look up.
 
         Returns:

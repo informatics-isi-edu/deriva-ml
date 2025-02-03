@@ -15,6 +15,7 @@ from .deriva_definitions import (
     MLVocab,
 )
 from .schema_setup.dataset_annotations import generate_dataset_annotations
+from .deriva_definitions import VocabularyTerm
 
 from pydantic import validate_call, ConfigDict
 
@@ -29,11 +30,11 @@ class Dataset:
 
     def __init__(self, model: Model):
         self._model = model
-        self.ml_schema = ML_SCHEMA
+        self._ml_schema = ML_SCHEMA
         self._domain_schema = [
             s for s in model.schemas if s not in ["deriva-ml", "www", "public"]
         ].pop()
-        self.table = self._model.schemas[self.ml_schema].tables["Dataset"]
+        self.table = self._model.schemas[self._ml_schema].tables["Dataset"]
 
     def _is_dataset_rid(self, rid: RID) -> bool:
         rid_record = self._model.catalog.resolve_rid(rid)
@@ -68,7 +69,7 @@ class Dataset:
             )
         )
 
-    def dataset_version_history(self, dataset_rid: RID) -> list[SemanticVersion]
+    def dataset_version_history(self, dataset_rid: RID) -> list[SemanticVersion]:
         pass
 
     def increment_dataset_version(
@@ -96,7 +97,7 @@ class Dataset:
             raise DerivaMLException(f'RID "{dataset_rid}" is not a dataset')
 
         major, minor, patch = self.dataset_version(dataset_rid)
-        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
+        schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         match component:
             case SemanticVersion.major:
                 major += 1
@@ -105,16 +106,16 @@ class Dataset:
             case SemanticVersion.patch:
                 patch += 1
         dataset_path = schema_path.tables[self.table.name]
+        semantic_version = f"{major}.{minor}.{patch}"
         dataset_path.update(
-            [{"RID": dataset_rid, "Version": f"{major}.{minor}.{patch}"}]
+            [{"RID": dataset_rid, "Version": semantic_version}]
         )
-        version_table = self._model.catalog.get_s
         snapshot = self._model.catalog.latest_snapshot().snaptime
         schema_path.tables["DatasetVersion"].insert(
             [
                 {
                     "Dataset": dataset_rid,
-                    "SemanticVerion": semantic_version,
+                    "Version": semantic_version,
                     "SnapshotID": snapshot,
                     "Description": description,
                 }
@@ -134,8 +135,8 @@ class Dataset:
 
         def domain_table(table: Table) -> bool:
             return (
-                    table.schema.name == self._domain_schema
-                    or table.name == self.table.name
+                table.schema.name == self._domain_schema
+                or table.name == self.table.name
             )
 
         return [
@@ -175,11 +176,11 @@ class Dataset:
         pb = self._model.catalog.getPathBuilder()
         dataset_path = pb.schemas[self.table.schema.name].tables[self.table.name]
         atable = next(
-            self._model.schemas[self.ml_schema]
+            self._model.schemas[self._ml_schema]
             .tables[MLVocab.dataset_type]
             .find_associations()
         ).name
-        ml_path = pb.schemas[self.ml_schema]
+        ml_path = pb.schemas[self._ml_schema]
         atable_path = ml_path.tables[atable]
 
         # Get a list of all the dataset_type values associated with this dataset.
@@ -225,7 +226,8 @@ class Dataset:
 
         pb = self._model.catalog.getPathBuilder()
         for ds_type in ds_types:
-            if not self.lookup_term(MLVocab.dataset_type, ds_type):
+            vocab_table = self._model.schemas[self._ml_schema].tables[MLVocab.dataset_type]
+            if not self._lookup_term(vocab_table, ds_type):
                 raise DerivaMLException(f"Dataset type must be a vocabulary term.")
         dataset_table_path = pb.schemas[self.table.schema.name].tables[self.table.name]
         dataset = dataset_table_path.insert(
@@ -240,18 +242,18 @@ class Dataset:
 
         # Get the name of the association table between dataset and dataset_type.
         atable = next(
-            self._model.schemas[self.ml_schema]
+            self._model.schemas[self._ml_schema]
             .tables[MLVocab.dataset_type]
             .find_associations()
         ).name
-        pb.schemas[self.ml_schema].tables[atable].insert(
+        pb.schemas[self._ml_schema].tables[atable].insert(
             [
                 {MLVocab.dataset_type: ds_type, "Dataset": dataset}
                 for ds_type in ds_types
             ]
         )
         if execution_rid is not None:
-            pb.schemas[self.ml_schema].Dataset_Execution.insert(
+            pb.schemas[self._ml_schema].Dataset_Execution.insert(
                 [{"Dataset": dataset, "Execution": execution_rid}]
             )
         return dataset
@@ -308,7 +310,7 @@ class Dataset:
             )
         # Get association table for nested datasets
         atable_path = (
-            self._model.catalog.getPathBuilder().schemas[self.ml_schema].Dataset_Dataset
+            self._model.catalog.getPathBuilder().schemas[self._ml_schema].Dataset_Dataset
         )
         return [
             p["Dataset"]
@@ -389,7 +391,7 @@ class Dataset:
         pb = self._model.catalog.getPathBuilder()
         for table, elements in dataset_elements.items():
             schema_path = pb.schemas[
-                self.ml_schema if table == "Dataset" else self._domain_schema
+                self._ml_schema if table == "Dataset" else self._domain_schema
             ]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
 
@@ -558,6 +560,32 @@ class Dataset:
         vocab_columns = {"Name", "URI", "Synonyms", "Description", "ID"}
         return vocab_columns.issubset({c.name for c in t.columns}) and t
 
+    def _lookup_term(self, vocab_table: Table, term_name: str) -> VocabularyTerm:
+        """Given a term name, return the vocabulary record.  Can provide either the term name
+         or a synonym for the term.  Generate an exception if the term is not in the vocabulary.
+
+        Args:
+            vocab_table: The name of the controlled vocabulary table or a ERMrest table object..
+            term_name: The name of the term to look up.
+
+        Returns:
+          The entry the associated term or synonym.
+
+        Raises:
+          DerivaException: If the schema or vocabulary table doesn't exist, or if the term is not
+            found in the vocabulary.
+        """
+        if not self._is_vocabulary(vocab_table):
+            raise DerivaMLException(f"{vocab_table.name} not a vocabulary")
+        schema_name, table_name = vocab_table.schema.name, vocab_table.name
+        schema_path = self._model.catalog.getPathBuilder().schemas[schema_name]
+        for term in schema_path.tables[table_name].entities():
+            if term_name == term["Name"] or (
+                term["Synonyms"] and term_name in term["Synonyms"]
+            ):
+                return VocabularyTerm.model_validate(term)
+        raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
+
     def _vocabulary_specification(
         self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
     ) -> list[dict[str, Any]]:
@@ -624,7 +652,7 @@ class Dataset:
             "Dataset",
         )
         table_paths = self._domain_table_paths(graph, sprefix=sprefix, dprefix=dprefix)
-        dataset_dataset_table = self._model.schemas[self.ml_schema].tables[
+        dataset_dataset_table = self._model.schemas[self._ml_schema].tables[
             "Dataset_Dataset"
         ]
         nested_sprefix = sprefix

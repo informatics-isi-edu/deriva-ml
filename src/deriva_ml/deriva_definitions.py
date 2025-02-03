@@ -120,6 +120,36 @@ class ExecMetadataVocab(StrEnum):
     execution_config = 'Execution_Config'
     runtime_env = 'Runtime_Env'
 
+class VocabularyTerm(BaseModel):
+    """An entry in a vocabulary table.
+
+    Attributes:
+       name: Name of vocabulary term
+       synonyms: List of alternative names for the term
+       id: CURI identifier for the term
+       uri: Unique URI for the term.
+       description: A description of the meaning of the term
+       rid: Resource identifier assigned to the term
+
+    Args:
+
+    Returns:
+
+    """
+
+    name: str = Field(alias="Name")
+    synonyms: Optional[list[str]] = Field(alias="Synonyms")
+    id: str = Field(alias="ID")
+    uri: str = Field(alias="URI")
+    description: str = Field(alias="Description")
+    rid: str = Field(alias="RID")
+
+    class Config:
+        """ """
+
+        extra = "ignore"
+
+
 class ColumnDefinition(BaseModel):
     """Pydantic model for deriva_py Column.define"""
 
