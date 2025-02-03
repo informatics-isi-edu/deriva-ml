@@ -38,7 +38,7 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
 3. Change the notebook and Catalog-ML tools accordingly.
 4. Push the changes after test.
 
-# Setup GitHub To Work Nicely With Jupityer Notebooks.
+# Setup GitHub To Work Nicely With Jupyter Notebooks.
 
 Execute the following commands in the terminal, under Github repo directories:
 ```
