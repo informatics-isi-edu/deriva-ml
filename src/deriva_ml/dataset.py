@@ -1,13 +1,13 @@
 """
 THis module defines the DataSet class with is used to manipulate n
 """
-
+from collections import defaultdict
 from typing import Any, Callable, Optional
 
 from deriva.core.ermrest_model import Model, Table
 
-from deriva_ml.deriva_definitions import ML_SCHEMA
-
+from deriva_ml.deriva_definitions import ML_SCHEMA, RID, SemanticVersion, DerivaMLException
+from pydantic import validate_call
 
 class Dataset:
     """
@@ -24,6 +24,138 @@ class Dataset:
             s for s in model.schemas if s not in ["deriva-ml", "www", "public"]
         ].pop()
         self.table = self._model.schemas[self.ml_schema].tables["Dataset"]
+
+    def _is_dataset_rid(self, rid: RID) -> bool:
+        rid_record = self._model.catalog.resolve_rid(rid)
+        return rid_record.table == self.table
+
+    def dataset_version(self, dataset_rid: RID) -> tuple[int, ...]:
+        """Retrieve the version of the specified dataset.
+
+        Args:
+            dataset_rid: return: A tuple with the semantic version of the dataset.
+            dataset_rid: RID:
+
+        Returns:
+            A tuple with the semantic version of the dataset.
+        """
+        if not self._is_dataset_rid(dataset_rid):
+            raise DerivaMLException(
+                f"RID: {dataset_rid} does not belong to dataset {self.table.name}"
+            )
+        return tuple(map(int, self._model.catalog.retrieve_rid(dataset_rid, self._model)["Version"].split(".")))
+
+    def increment_dataset_version(
+            self, dataset_rid: RID, component: SemanticVersion,
+            description: Optional[str] = ""
+    ) -> tuple[int, ...]:
+        """Increment the version of the specified dataset.
+
+        Args:
+          dataset_rid: RID to a dataset
+          component: Which version of the dataset to increment.
+          dataset_rid: RID:
+          component: SemanticVersion:
+
+        Returns:
+          new vsemantic ersion of the dataset as a 3-tuple
+
+        Raises:
+          DerivaMLException: if provided RID is not to a dataset.
+        """
+
+        # Makesure that the RID is to a dataset
+        if self._model.catalog.resolve_rid(dataset_rid).table != self.table.name:
+            raise DerivaMLException(f'RID "{dataset_rid}" is not a dataset')
+
+        major, minor, patch = self.dataset_version(dataset_rid)
+        schema_path = self._model.catalog.getPathBuilder.schemas[self.ml_schema]
+        match component:
+            case SemanticVersion.major:
+                major += 1
+            case SemanticVersion.minor:
+                minor += 1
+            case SemanticVersion.patch:
+                patch += 1
+        dataset_path = schema_path.tables[self.table.name]
+        dataset_path.update(
+            [{"RID": dataset_rid, "Version": f"{major}.{minor}.{patch}"}]
+        )
+        version_table = self._model.catalog.get_s
+        snapshot = self._model.catalog.latest_snapshot().snaptime
+        schema_path.tables['DatasetVersion'].insert([{'Dataset': dataset_rid, 'SemanticVerion': semantic_version, 'SnapshotID': snapshot, 'Description': description}])
+        dataset_path.update(
+            [{"RID": dataset_rid, "Version": f"{major}.{minor}.{patch}"}]
+        )
+        return major, minor, patch
+
+
+    @validate_call
+    def list_dataset_members(
+            self, dataset_rid: RID, version = Optional[SemanticVersion], recurse: bool = False
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return a list of entities associated with a specific dataset.
+
+        Args:
+            dataset_rid: param recurse: If this is a nested dataset, list the members of the contained datasets
+            dataset_rid: RID:
+            recurse:  (Default value = False)
+
+        Returns:
+            Dictionary of entities associated with a specific dataset.  Key is the table from which the elements
+            were taken.
+        """
+
+        try:
+            if not self._is_dataset_rid(dataset_rid):
+                raise DerivaMLException(f"RID is not for a dataset: {dataset_rid}")
+        except DerivaMLException:
+            raise DerivaMLException(f"Invalid RID: {dataset_rid}")
+
+        # Look at each of the element types that might be in the dataset and get the list of rid for them from
+        # the appropriate association table.
+        members = defaultdict(list)
+        pb = self._model.catalog.getPathBuilder()
+        for assoc_table in self.table.find_associations():
+            other_fkey = assoc_table.other_fkeys.pop()
+            self_fkey = assoc_table.self_fkey
+            target_table = other_fkey.pk_table
+            member_table = assoc_table.table
+
+            if (
+                    target_table.schema.name != self._domain_schema
+                    and target_table != self.table
+            ):
+                # Look at domain tables and nested datasets.
+                continue
+            if target_table == self.table:
+                # find_assoc gives us the keys in the wrong position, so swap.
+                self_fkey, other_fkey = other_fkey, self_fkey
+
+            target_path = pb.schemas[target_table.schema.name].tables[target_table.name]
+            member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
+            # Get the names of the columns that we are going to need for linking
+            member_link = tuple(
+                c.name for c in next(iter(other_fkey.column_map.items()))
+            )
+            path = pb.schemas[member_table.schema.name].tables[member_table.name].path
+            path.filter(member_path.Dataset == dataset_rid)
+            path.link(
+                target_path,
+                on=(
+                        member_path.columns[member_link[0]]
+                        == target_path.columns[member_link[1]]
+                ),
+            )
+            target_entities = path.entities().fetch()
+            members[target_table.name].extend(target_entities)
+            if recurse and target_table == self.table:
+                # Get the members for all the nested datasets and add to the member list.
+                nested_datasets = [d["RID"] for d in target_entities]
+                for ds in nested_datasets:
+                    for k, v in self.list_dataset_members(ds, recurse=False).items():
+                        members[k].extend(v)
+        return members
 
     @staticmethod
     def export_dataset_element(

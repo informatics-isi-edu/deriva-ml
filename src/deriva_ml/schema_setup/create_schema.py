@@ -33,6 +33,20 @@ def define_table_dataset(dataset_annotation: dict = None):
     )
 
 
+def define_table_dataset_version(sname: str, dataset_version_annotation: dict = None):
+    return Table.define(
+        tname="DatasetVersion",
+        column_defs=[
+            Column.define("Dataset", builtin_types.text),
+            Column.define("SemanticVersion", builtin_types.text, default="1.0.0", nullok=False),
+            Column.define("CatalogSnapshot", builtin_types.text, nullok=False),
+            Column.define("Description", builtin_types.markdown)],
+        annotations=dataset_version_annotation if dataset_version_annotation is not None else {},
+        key_defs=[Key.define(['Dataset', 'SemanticVersion'])],
+        fkey_defs=[ForeignKey.define(["Dataset"], sname, "Dataset", ["RID"])],
+    )
+
+
 def define_table_execution(sname: str, execution_annotation: dict):
     table_def = Table.define(
         "Execution",
@@ -136,6 +150,8 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
     schema.create_table(
         Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
     )
+
+    schema.create_table(define_table_dataset_version(schema_name))
 
     # Nested datasets.
     schema.create_table(

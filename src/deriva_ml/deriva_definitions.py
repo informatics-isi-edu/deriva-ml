@@ -97,6 +97,15 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
+
+class SemanticVersion(Enum):
+    """Simple enumeration for semantic versioning."""
+
+    major = "major"
+    minor = "minor"
+    patch = "patch"
+
+
 class MLVocab(StrEnum):
     """Names of controlled vocabulary for various types within DerivaML."""
     dataset_type = 'Dataset_Type'
