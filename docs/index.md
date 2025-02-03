@@ -17,6 +17,5 @@ An overview of the design and operational aspects of DerivaML can be found in th
 > In 2024 IEEE 20th International Conference on e-Science (e-Science), pp. 1-10. IEEE, 2024.
 > [PDF](assets/deriva-ml.pdf)
 
-
-Put ERD here too
-
+The data model design in Deriva Catalog:
+![minid](assets/ERD.png)
