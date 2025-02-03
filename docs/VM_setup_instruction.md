@@ -17,12 +17,12 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
 1. Create a GitHub classic access token with repo scope(s) from: https://github.com/settings/tokens
 2. Open Terminal on the VM
 3. Substitute `<github-username>` and `<github-token>` with the appropriate values accordingly, then execute:
-   ```bash
+   ```
    echo "https://<github-username>:<github-token>@github.com" > ~/.git-credentials && chmod 600 ~/.git-credentials
    ```
 
 4. Enable credential storage
-    ```bash
+    ```
    git config --global credential.helper store
     ```
 
@@ -32,7 +32,7 @@ After this step, you can see "My-Tensorflow" section on Luncher page:
     
    Example:
 
-   ```bash
+   ```
    git clone https://github.com/informatics-isi-edu/eye-ai-exec.git
     ```
 3. Change the notebook and Catalog-ML tools accordingly.
