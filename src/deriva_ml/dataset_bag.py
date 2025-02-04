@@ -124,8 +124,8 @@ class DatasetBag(object):
                 for row in fetchfile:
                     # Rows in fetch.text are tab seperated with URL filename.
                     fields = row.split("\t")
-                    local_file = fields[2].replace('\n', "")
-                    local_path =  f'{self.bag_path}/{local_file}'
+                    local_file = fields[2].replace("\n", "")
+                    local_path = f"{self.bag_path}/{local_file}"
                     fetch_map[urlparse(fields[0]).path] = local_path
         except FileNotFoundError:
             dataset_rid = self.bag_path.name.replace("Dataset_", "")
