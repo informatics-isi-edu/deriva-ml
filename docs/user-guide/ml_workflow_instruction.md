@@ -98,7 +98,7 @@ Initialize the execution by `ml_instance.initialize_execution(config)`.
 A full record of directory of cached data and files, and rids of current execution will be returned.\
 Example:
 ```python
-# RID of source dataset, if any.
+# RID of source dataset_table, if any.
 source_dataset = <dataset_rid>
 
 # Add Workflow Vocab terms
