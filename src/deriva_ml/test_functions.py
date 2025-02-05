@@ -1,14 +1,10 @@
 
-from .deriva_ml import DatasetBag
-form .deriva_ml import DerivaML
-from deriva_ml import MLVocab as vc
-from deriva_ml.dataset import Dataset
-from deriva_ml.execution_configuration import ExecutionConfiguration, Workflow
-from deriva_ml.demo_catalog import create_demo_catalog, DemoML
+from deriva_ml import MLVocab as vc, ExecutionConfiguration, Workflow, DerivaML, DatasetBag
+from deriva_ml.demo_catalog import create_demo_catalog
 
 host = 'dev.eye-ai.org'
 catalog_id = "eye-ai"
-source_dataset = '2-39FY'
+source_dataset = '2-7K8W'
 create_catalog = False
 
 gnl = GlobusNativeLogin(host=host)
@@ -45,4 +41,20 @@ def create_execution():
 
 
 
+from deriva.core import ErmrestCatalog, get_credential
+from deriva.core.deriva_server import DerivaServer
+from deriva_ml.schema_setup.create_schema import create_ml_schema
+from demo_catalog import create_domain_schema, create_demo_datasets
+from deriva_ml import DerivaML
+server = DerivaServer("https", 'dev.eye-ai.org', credentials=get_credential('dev.eye-ai.org'))
+test_catalog = server.create_ermrest_catalog()
+model = test_catalog.getCatalogModel()
+create_ml_schema(model, project_name='foo')
+create_domain_schema(model, 'demo')
+deriva_ml = DerivaML(
+    hostname='dev.eye-ai.org',
+    catalog_id=test_catalog.catalog_id,
+    project_name='foo',
+)
+create_demo_datasets(deriva_ml)
 

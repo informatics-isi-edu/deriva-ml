@@ -6,7 +6,7 @@ from deriva_ml.schema_setup.annotations import generate_annotation
 
 def alter_table_annotation(catalog: ErmrestCatalog, schema_name: str, table_name: str, annotation: dict):
     model_root = catalog.getCatalogModel()
-    table = model_root.table(schema_name, table_name)
+    table = model_root.dataset_table(schema_name, table_name)
     table.alter(annotations=annotation)
     model_root.apply()
 

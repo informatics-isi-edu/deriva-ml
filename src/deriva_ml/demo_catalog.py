@@ -22,7 +22,7 @@ from deriva_ml import (
 )
 from deriva_ml.execution import Execution
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
-from deriva_ml.schema_setup.dataset_annotations import generate_dataset_annotations
+from deriva_ml.dataset import Dataset
 
 TEST_DATASET_SIZE = 20
 
@@ -73,25 +73,25 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
     deriva_ml.add_dataset_element_type("Subject")
     deriva_ml.add_dataset_element_type("Image")
 
-    # Create a new dataset
-    deriva_ml.add_term(MLVocab.dataset_type, "DemoSet", description="A test dataset")
+    # Create a new dataset_table
+    deriva_ml.add_term(MLVocab.dataset_type, "DemoSet", description="A test dataset_table")
     deriva_ml.add_term(
         MLVocab.dataset_type,
         "Partitioned",
-        description="A partitioned dataset for ML training.",
+        description="A partitioned dataset_table for ML training.",
     )
-    deriva_ml.add_term(MLVocab.dataset_type, "Subject", description="A test dataset")
-    deriva_ml.add_term(MLVocab.dataset_type, "Image", description="A test dataset")
-    deriva_ml.add_term(MLVocab.dataset_type, "Training", description="Training dataset")
-    deriva_ml.add_term(MLVocab.dataset_type, "Testing", description="Training dataset")
+    deriva_ml.add_term(MLVocab.dataset_type, "Subject", description="A test dataset_table")
+    deriva_ml.add_term(MLVocab.dataset_type, "Image", description="A test dataset_table")
+    deriva_ml.add_term(MLVocab.dataset_type, "Training", description="Training dataset_table")
+    deriva_ml.add_term(MLVocab.dataset_type, "Testing", description="Training dataset_table")
     deriva_ml.add_term(
-        MLVocab.dataset_type, "Validation", description="Validation dataset"
+        MLVocab.dataset_type, "Validation", description="Validation dataset_table"
     )
 
     deriva_ml.add_term(
         MLVocab.workflow_type,
         "Create Dataset Notebook",
-        description="A Workflow that creates a new dataset",
+        description="A Workflow that creates a new dataset_table",
     )
 
     # Now let's create model configuration for our program.
@@ -103,7 +103,7 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
 
     dataset_execution = Execution(
         ExecutionConfiguration(
-            workflow=api_workflow, description="Create demo dataset"
+            workflow=api_workflow, description="Create demo dataset_table"
         ),
         deriva_ml,
     )
@@ -131,22 +131,22 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
 
     nested_dataset = deriva_ml.create_dataset(
         ["Partitioned", "Image"],
-        description="A nested dataset for machine learning",
+        description="A nested dataset_table for machine learning",
         execution_rid=dataset_execution.execution_rid,
     )
     training_dataset = deriva_ml.create_dataset(
         "Training",
-        description="An image dataset for training",
+        description="An image dataset_table for training",
         execution_rid=dataset_execution.execution_rid,
     )
     testing_dataset = deriva_ml.create_dataset(
         "Testing",
-        description="A image dataset for testing",
+        description="A image dataset_table for testing",
         execution_rid=dataset_execution.execution_rid,
     )
     validation_dataset = deriva_ml.create_dataset(
         "Validation",
-        description="A image dataset for validation",
+        description="A image dataset_table for validation",
         execution_rid=dataset_execution.execution_rid,
     )
     deriva_ml.add_dataset_members(
@@ -238,16 +238,16 @@ def create_demo_catalog(
     project_name="ml-test",
     create_features=False,
     create_datasets=False,
+    on_exit_delete=True,
 ) -> ErmrestCatalog:
     credentials = get_credential(hostname)
     server = DerivaServer("https", hostname, credentials=credentials)
     test_catalog = server.create_ermrest_catalog()
 
-    atexit.register(destroy_demo_catalog, test_catalog)
+    if on_exit_delete:
+        atexit.register(destroy_demo_catalog, test_catalog)
     model = test_catalog.getCatalogModel()
 
-    policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
-    AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
 
     try:
         create_ml_schema(model, project_name=project_name)
@@ -263,8 +263,10 @@ def create_demo_catalog(
         if create_datasets:
             create_demo_datasets(deriva_ml)
         dataset_table = model.schemas["deriva-ml"].tables["Dataset"]
-        dataset_table.annotations.update(generate_dataset_annotations(model))
+        dataset_table.annotations.update(Dataset(model).generate_dataset_annotations())
         model.apply()
+        policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
+        AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
 
     except Exception:
         # on failure, delete catalog and re-raise exception

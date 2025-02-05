@@ -4,10 +4,10 @@
     "isrd-staff": ["https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b"],
     "isrd-testers": ["https://auth.globus.org/9d596ac6-22b9-11e6-b519-22000aef184d"],
 
-    "project-admins":   [],
-    "project-curators": [],
-    "project-writers":  [],
-    "project-users":    [],
+    "project-admins":   ["isrd-systems"],
+    "project-curators": ["isrd-systems"],
+    "project-writers":  ["isrd-systems"],
+    "project-users":    ["isrd-systems"],
 
     "empty": [],
     "public": ["*"],

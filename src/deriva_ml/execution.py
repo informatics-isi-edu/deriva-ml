@@ -30,7 +30,7 @@ from .deriva_definitions import (
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset import Dataset
-from .dataset_bag import DatasetBag
+from .dataset_bag import DatasetBag, DatabaseModel
 from .execution_configuration import ExecutionConfiguration
 from .upload import execution_metadata_dir, execution_asset_dir, execution_root
 from .upload import feature_root, feature_asset_dir, feature_value_path
@@ -42,7 +42,7 @@ class Execution:
     """The Execution class is used to capture the context of an activity within DerivaML.  While these are primarly
     computational, manual processes can be represented by an execution as well.
 
-    Within DerivaML, Executions are used to provide providence. Every dataset and data file that is generated is
+    Within DerivaML, Executions are used to provide providence. Every dataset_table and data file that is generated is
     associated with an execution, which records which program and input parameters were used to generate that data.
 
     Execution objects are created from an ExecutionConfiguration, which provides infomation about what DerivaML
@@ -150,7 +150,8 @@ class Execution:
                 dataset.rid,
                 materialize=dataset.materialize,
             )
-            self.datasets.append(DatasetBag(bag_path, self._ml_object.working_dir))
+            database = DatabaseModel.create(bag_path,  self._ml_object.working_dir)
+            self.datasets.append(database.get_dataset(dataset_rid))
             self.dataset_rids.append(dataset_rid)
             self.dataset_paths.append(bag_path)
         # Update execution info
@@ -220,15 +221,15 @@ class Execution:
         bag: RID | str,
         materialize: bool = True,
     ) -> tuple[Path, RID]:
-        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
 
         Args:
-            bag: The RID of a dataset or a minid to an existing bag.
+            bag: The RID of a dataset_table or a minid to an existing bag.
             materialize: Materalize the bag, rather than just downloading it.
 
         Returns:
-            the location of the unpacked and validated dataset bag and the RID of the bag
+            the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
         return (
             self._materialize_dataset_bag(bag, self.execution_rid)
@@ -237,20 +238,20 @@ class Execution:
         )
 
     def _download_dataset_bag(self, dataset_rid: RID | str) -> tuple[Path, RID]:
-        """Given a RID to a dataset, or a MINID to an existing bag, download the bag file, extract it and validate
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
 
         Args:
-            dataset_rid: The RID of a dataset or a minid to an existing bag.
+            dataset_rid: The RID of a dataset_table or a minid to an existing bag.
              dataset_rid: RID | str:
 
         Returns:
-            the location of the unpacked and validated dataset bag and the RID of the bag
+            the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
         if not any(
             [dataset_rid == ds["RID"] for ds in self._ml_object.find_datasets()]
         ):
-            raise DerivaMLException(f"RID {dataset_rid} is not a dataset")
+            raise DerivaMLException(f"RID {dataset_rid} is not a dataset_table")
 
         with TemporaryDirectory() as tmp_dir:
             if dataset_rid.startswith("minid"):
@@ -268,7 +269,7 @@ class Execution:
                         break
                 archive_path = fetch_single_file(dataset_rid, tmp_dir)
             else:
-                # We are given the RID to a dataset, so we are going to have to export as a bag and place into
+                # We are given the RID to a dataset_table, so we are going to have to export as a bag and place into
                 # local file system.  The first step is to generate a downloadspec to create the bag, put the sped
                 # into a local file and then use the downloader to create and download the desired bdbag.
                 spec_file = f"{tmp_dir}/download_spec.json"
@@ -307,10 +308,10 @@ class Execution:
     def _materialize_dataset_bag(
         self, bag: str | RID, execution_rid: Optional[RID] = None
     ) -> tuple[Path, RID]:
-        """Materialize a dataset bag into a local directory
+        """Materialize a dataset_table bag into a local directory
 
         Args:
-            bag: A MINID to an existing bag or a RID of the dataset that should be downloaded.
+            bag: A MINID to an existing bag or a RID of the dataset_table that should be downloaded.
             execution_rid: RID of the execution for which this bag should be materialized. Used to update status.
             bag: str | RID:
             execution_rid: Optional[RID]:  (Default value = None)
@@ -330,7 +331,7 @@ class Execution:
             """
             msg = f"Materializing bag: {current} of {total} file(s) downloaded."
             if execution_rid:
-                self.update_status(Status.running, msg, execution_rid)
+                self.update_status(Status.running, msg)
             logging.info(msg)
             return True
 
@@ -346,7 +347,7 @@ class Execution:
             """
             msg = f"Validating bag: {current} of {total} file(s) validated."
             if execution_rid:
-                self.update_status(Status.running, msg, execution_rid)
+                self.update_status(Status.running, msg)
             logging.info(msg)
             return True
 
@@ -921,14 +922,14 @@ class Execution:
 
     @validate_call
     def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
-        """Create os dataset of specified types.
+        """Create os dataset_table of specified types.
 
         Args:
             ds_type: param description:
-            description: Markdown description of the dataset being created.
+            description: Markdown description of the dataset_table being created.
 
         Returns:
-            RID of the newly created dataset.
+            RID of the newly created dataset_table.
         """
         return self._ml_object.create_dataset(ds_type, description, self.execution_rid)
 

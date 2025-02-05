@@ -25,10 +25,10 @@ class Workflow(BaseModel):
 
 
 class DatasetSpec(BaseModel):
-    """Represent a dataset in a execution configuration dataset list
+    """Represent a dataset_table in a execution configuration dataset_table list
 
      Attributes:
-         rid: A dataset RID
+         rid: A dataset_table RID
          materialize: If False, do not materialize datasets, only download table data, no assets.  Defaults to True
      """
     rid: RID
@@ -53,8 +53,8 @@ class ExecutionConfiguration(BaseModel):
     """Define the parameters that are used to configure a specific execution.
 
     Attributes:
-        datasets: List of dataset RIDS, MINIDS for datasets to be downloaded prior to execution.  By default,
-                     all  the datasets are materialized. However, if the assets associated with a dataset are not
+        datasets: List of dataset_table RIDS, MINIDS for datasets to be downloaded prior to execution.  By default,
+                     all  the datasets are materialized. However, if the assets associated with a dataset_table are not
                      needed, a dictionary that defines the rid and the materialization parameter for the
                      download_dataset_bag method can be specified, e.g.  datasets=[{'rid': RID, 'materialize': True}].
         assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
