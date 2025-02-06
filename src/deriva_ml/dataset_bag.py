@@ -33,36 +33,32 @@ class DatabaseModel:
     _paths_loaded: dict[Path:"DatabaseModel"] = {}
 
     @classmethod
-    def create(cls, bag_path, dbase_dir: Optional[Path] = None):
-        o = cls._paths_loaded[bag_path]
+    @validate_call
+    def create(cls, bag_path: Path, dbase_dir: Optional[Path] = None):
+        o = cls._paths_loaded.get(bag_path.as_posix())
         if o:
             return o
         return cls(bag_path, dbase_dir)
 
     def __init__(self, bag_path: Path, dbase_dir: Optional[Path] = None) -> None:
         self.bag_path = bag_path
-        DatabaseModel._paths_loaded[self.bag_path] = self
+        DatabaseModel._paths_loaded[self.bag_path.as_posix()] = self
 
         dir_path = dbase_dir or Path(tempfile.mkdtemp())
         dbase_file = dir_path / "dataset_table.db"
         self.dbase = sqlite3.connect(dbase_file)
 
         self._model = Model.fromfile("file-system", self.bag_path / "data/schema.json")
-        self._load_model()
         self.domain_schema = self._guess_domain_schema()
+        self._load_model()
         self.ml_schema = ML_SCHEMA
         self._load_sqllite()
 
         self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
         # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
+        sql_dataset = self.normalize_table_name('Dataset')
         with self.dbase:
-            sql_cmd = f'SELECT * FROM "Dataset"'
-            dataset_column = self.dataset_table.columns.index(
-                self.dataset_table.columns["Dataset"]
-            )
-            self.dataset_rids = [
-                t[dataset_column] for t in self.dbase.execute(sql_cmd).fetchall()
-            ]
+            self.dataset_rids = [t[0] for t in self.dbase.execute(f'SELECT "RID" FROM "{sql_dataset}"').fetchall()]
 
     def _load_model(self) -> None:
         # Create a sqlite database schema that contains all the tables within the catalog from which the
@@ -198,8 +194,7 @@ class DatabaseModel:
             DerivaException if the RID doesn't exist.
         """
         if rid in self.dataset_rids:
-            version = "1.0.0"
-            return DatasetBag(rid, version, self)
+            return DatasetBag(rid, self)
         else:
             raise DerivaMLException(f"RID {rid} does not exist in database catalog.")
 
@@ -342,7 +337,7 @@ class DatasetBag:
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def __init__(self, rid: RID, version: str, dbase: DatabaseModel) -> None:
+    def __init__(self, rid: RID, dbase: DatabaseModel) -> None:
         """
         Initialize a DatasetBag instance.
 
@@ -354,8 +349,11 @@ class DatasetBag:
 
         self.database = dbase
         self.dataset_rid = rid
-        self.version = version
         self.dataset_table = self.database.dataset_table
+        with dbase.dbase as db:
+            dataset_table = dbase.normalize_table_name('Dataset')
+            sql_cmd = f'SELECT Version from "{dataset_table}" where RID="{self.dataset_rid}"'
+            self.version = db.execute(sql_cmd).fetchone()[0]
 
     def list_tables(self) -> list[str]:
         """List the names of the tables in the catalog

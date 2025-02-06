@@ -1265,6 +1265,6 @@ class DerivaML(Dataset):
         Returns:
             An execution object.
         """
-        from .execution import Execution
+        from execution import Execution
 
         return Execution(configuration, self)

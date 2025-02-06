@@ -29,7 +29,6 @@ from typing import Any, Callable, Optional, Iterable
 
 from deriva_definitions import ML_SCHEMA, RID, DerivaMLException, MLVocab, Status
 
-
 class SemanticVersion(Enum):
     """Simple enumeration for semantic versioning."""
 
@@ -72,9 +71,10 @@ class Dataset:
             raise DerivaMLException(
                 f"RID: {dataset_rid} does not belong to dataset_table {self.dataset_table.name}"
             )
+        version = self._model.catalog.resolve_rid(dataset_rid).datapath.entities().fetch()[0]['Version']
         return tuple(
             map(
-                int, self._model.catalog.retrieve_rid(dataset_rid)["Version"].split(".")
+                int, version.split('.')
             )
         )
 
@@ -465,6 +465,7 @@ class Dataset:
                 schema_path.tables[association_map[table]].insert(
                     [{"Dataset": dataset_rid, fk_column: e} for e in elements]
                 )
+        self.increment_dataset_version(dataset_rid, SemanticVersion.minor)
 
     @validate_call
     def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
@@ -622,7 +623,7 @@ class Dataset:
     def _table_paths(self, graph) -> list[tuple[str, str, Table]]:
         sprefix, dprefix = (
             "deriva-ml:Dataset/RID={Dataset_RID}",
-            "Dataset/{Dataset_Version}",
+            "Dataset",
         )
         table_paths = self._domain_table_paths(graph, sprefix=sprefix, dprefix=dprefix)
         dataset_dataset_table = self._model.schemas[self.ml_schema].tables[
@@ -635,7 +636,7 @@ class Dataset:
             nested_dprefix += f"/Dataset_Dataset"
             table_paths.append((nested_sprefix, nested_dprefix, dataset_dataset_table))
             nested_sprefix += f"/(Nested_Dataset)=(deriva-ml:Dataset:RID)"
-            nested_dprefix += f"/Dataset/{{Dataset_Version{i+1}}}"
+            nested_dprefix += f"/Dataset"
             table_paths.append((nested_sprefix, nested_dprefix, self.dataset_table))
             # Get CSV for nested datasets.
             table_paths.extend(
@@ -809,16 +810,15 @@ class Dataset:
 
                 try:
                     exporter = DerivaExport(
-                        host=self._model.catalog.host_name,
+                        host=self._model.catalog.deriva_server.server,
                         catalog_id=self._model.catalog.catalog_id,
                         config_file=spec_file,
                         output_dir=tmp_dir,
                         envars={
-                            "Dataset_RID": dataset_rid,
-                            "Dataset_Version": self.dataset_version(dataset_rid),
+                            "Dataset_RID": dataset_rid
                         },
                     )
-                    result = exporter.export()
+                    archive_path = exporter.export()
                 except (
                     DerivaDownloadError,
                     DerivaDownloadConfigurationError,
@@ -827,7 +827,6 @@ class Dataset:
                     DerivaDownloadTimeoutError,
                 ) as e:
                     raise DerivaMLException(format_exception(e))
-                archive_path = list(result.values())[0]["local_path"]
                 checksum_value = compute_file_hashes(archive_path, hashes=["sha256"])[
                     "sha256"
                 ][0]
@@ -858,7 +857,7 @@ class Dataset:
         """
 
         def update_status(status: Status, msg: str) -> None:
-            self._model.catalog.getPathBUilder().schemas[
+            self._model.catalog.getPathBuilder().schemas[
                 self.ml_schema
             ].Execution.update(
                 [
@@ -1019,13 +1018,7 @@ class Dataset:
         nested_depth = self._dataset_nesting_depth()
         return {
             "env": {
-                "Dataset_RID": "{Dataset_RID}",
-                "Dataset_Version": "{Dataset_Version}",
-            }
-            | {
-                f"Dataset_Version{i+1}": f"{{Dataset_Version{i+1}}}"
-                for i in range(nested_depth)
-            },
+                "Dataset_RID": "{Dataset_RID}"},
             "bag": {
                 "bag_name": "Dataset_{Dataset_RID}",
                 "bag_algorithms": ["md5"],
