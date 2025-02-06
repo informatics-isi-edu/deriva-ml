@@ -391,7 +391,7 @@ class DatasetBag:
             other_fkey = assoc_table.other_fkeys.pop()
             self_fkey = assoc_table.self_fkey
             target_table = other_fkey.pk_table
-            member_table = assoc_table.dataset_table
+            member_table = assoc_table.table
 
             if (
                 target_table.schema.name != self.database.domain_schema
