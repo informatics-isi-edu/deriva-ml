@@ -1,6 +1,3 @@
-from bdbag import bdbag_api as bdb
-from bdbag.fetch.fetcher import fetch_single_file
-
 import csv
 import hashlib
 import json
@@ -12,30 +9,28 @@ from datetime import datetime
 from importlib.metadata import distributions
 from pathlib import Path
 import requests
-from tempfile import NamedTemporaryFile, TemporaryDirectory
-from typing import Iterable, Any, Optional
+from tempfile import NamedTemporaryFile
+from typing import Iterable, Any
 from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
-from deriva.core.utils.hash_utils import compute_file_hashes
-from deriva.transfer.download.deriva_download import GenericDownloader
-from pydantic import ValidationError, validate_call
+from pydantic import ValidationError, validate_call, ConfigDict
 
-from .deriva_definitions import MLVocab, ExecMetadataVocab
-from .deriva_definitions import (
+from deriva_definitions import MLVocab, ExecMetadataVocab
+from deriva_definitions import (
     RID,
     Status,
     FileUploadState,
     UploadState,
     DerivaMLException,
 )
-from .deriva_ml_base import DerivaML, FeatureRecord
-from .dataset import Dataset
-from .dataset_bag import DatasetBag, DatabaseModel
-from .execution_configuration import ExecutionConfiguration
-from .upload import execution_metadata_dir, execution_asset_dir, execution_root
-from .upload import feature_root, feature_asset_dir, feature_value_path
-from .upload import is_feature_dir, is_feature_asset_dir
-from .upload import table_path
+from deriva_ml_base import DerivaML, FeatureRecord
+from dataset import Dataset
+from dataset_bag import DatasetBag, DatabaseModel
+from execution_configuration import ExecutionConfiguration
+from upload import execution_metadata_dir, execution_asset_dir, execution_root
+from upload import feature_root, feature_asset_dir, feature_value_path
+from upload import is_feature_dir, is_feature_asset_dir
+from upload import table_path
 
 
 class Execution:
@@ -60,14 +55,8 @@ class Execution:
     Finally, the execution object can update its current state in the DerivaML catalog, allowing users to remotely
     track the progress of their execution.
     """
-
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def __init__(self, configuration: ExecutionConfiguration, ml_object: "DerivaML"):
-        try:
-            self.configuration = ExecutionConfiguration.model_validate(configuration)
-            logging.info("Configuration validation successful!")
-        except ValidationError as e:
-            raise DerivaMLException(f"configuration validation failed: {e}")
-
         self.dataset_paths: list[Path] = []
         self.asset_paths: list[Path] = []
         self.configuration = configuration
@@ -150,7 +139,7 @@ class Execution:
                 dataset.rid,
                 materialize=dataset.materialize,
             )
-            database = DatabaseModel.create(bag_path,  self._ml_object.working_dir)
+            database = DatabaseModel.create(bag_path, self._ml_object.working_dir)
             self.datasets.append(database.get_dataset(dataset_rid))
             self.dataset_rids.append(dataset_rid)
             self.dataset_paths.append(bag_path)
@@ -231,146 +220,12 @@ class Execution:
         Returns:
             the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
+        ds = Dataset(self._ml_object.model)
         return (
-            self._materialize_dataset_bag(bag, self.execution_rid)
+            ds.materialize_dataset_bag(bag, cache_dir=self.cache_dir, execution_rid=self.execution_rid)
             if materialize
-            else self._download_dataset_bag(bag)
+            else ds.download_dataset_bag(bag, cache_dir=self.cache_dir)
         )
-
-    def _download_dataset_bag(self, dataset_rid: RID | str) -> tuple[Path, RID]:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
-        that all the metadata is correct
-
-        Args:
-            dataset_rid: The RID of a dataset_table or a minid to an existing bag.
-             dataset_rid: RID | str:
-
-        Returns:
-            the location of the unpacked and validated dataset_table bag and the RID of the bag
-        """
-        if not any(
-            [dataset_rid == ds["RID"] for ds in self._ml_object.find_datasets()]
-        ):
-            raise DerivaMLException(f"RID {dataset_rid} is not a dataset_table")
-
-        with TemporaryDirectory() as tmp_dir:
-            if dataset_rid.startswith("minid"):
-                # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
-                r = requests.get(
-                    f"https://identifiers.org/{dataset_rid}",
-                    headers={"accept": "application/json"},
-                )
-                metadata = r.json()["metadata"]
-                dataset_rid = metadata["Dataset_RID"].split("@")[0]
-                checksum_value = ""
-                for checksum in r.json().get("checksums", []):
-                    if checksum.get("function") == "sha256":
-                        checksum_value = checksum.get("value")
-                        break
-                archive_path = fetch_single_file(dataset_rid, tmp_dir)
-            else:
-                # We are given the RID to a dataset_table, so we are going to have to export as a bag and place into
-                # local file system.  The first step is to generate a downloadspec to create the bag, put the sped
-                # into a local file and then use the downloader to create and download the desired bdbag.
-                spec_file = f"{tmp_dir}/download_spec.json"
-                with open(spec_file, "w", encoding="utf-8") as ds:
-                    json.dump(
-                        Dataset(self._ml_object.model).generate_dataset_download_spec(),
-                        ds,
-                    )
-                downloader = GenericDownloader(
-                    server={
-                        "catalog_id": self._ml_object.catalog_id,
-                        "protocol": "https",
-                        "host": self._ml_object.host_name,
-                    },
-                    config_file=spec_file,
-                    output_dir=tmp_dir,
-                    envars={"Dataset_RID": dataset_rid},
-                )
-                result = downloader.download()
-                archive_path = list(result.values())[0]["local_path"]
-                checksum_value = compute_file_hashes(archive_path, hashes=["sha256"])[
-                    "sha256"
-                ][0]
-
-            # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
-            # it.  If not, then we need to extract the contents of the archive into our cache directory.
-            bag_dir = self.cache_dir / f"{dataset_rid}_{checksum_value}"
-            if bag_dir.exists():
-                bag_path = (bag_dir / f"Dataset_{dataset_rid}").as_posix()
-            else:
-                bag_dir.mkdir(parents=True, exist_ok=True)
-                bag_path = bdb.extract_bag(archive_path, bag_dir)
-            bdb.validate_bag_structure(bag_path)
-            return Path(bag_path), dataset_rid
-
-    def _materialize_dataset_bag(
-        self, bag: str | RID, execution_rid: Optional[RID] = None
-    ) -> tuple[Path, RID]:
-        """Materialize a dataset_table bag into a local directory
-
-        Args:
-            bag: A MINID to an existing bag or a RID of the dataset_table that should be downloaded.
-            execution_rid: RID of the execution for which this bag should be materialized. Used to update status.
-            bag: str | RID:
-            execution_rid: Optional[RID]:  (Default value = None)
-
-        Returns:
-
-        """
-        def fetch_progress_callback(current, total):
-            """
-
-            Args:
-              current:
-              total:
-
-            Returns:
-
-            """
-            msg = f"Materializing bag: {current} of {total} file(s) downloaded."
-            if execution_rid:
-                self.update_status(Status.running, msg)
-            logging.info(msg)
-            return True
-
-        def validation_progress_callback(current, total):
-            """
-
-            Args:
-              current:
-              total:
-
-            Returns:
-
-            """
-            msg = f"Validating bag: {current} of {total} file(s) validated."
-            if execution_rid:
-                self.update_status(Status.running, msg)
-            logging.info(msg)
-            return True
-
-        if (
-            execution_rid
-            and self._ml_object.resolve_rid(execution_rid).table.name != "Execution"
-        ):
-            raise DerivaMLException(f"RID {execution_rid} is not an execution")
-
-        # request metadata
-        bag_path, dataset_rid = self._download_dataset_bag(bag)
-        bag_dir = bag_path.parent
-        validated_check = bag_dir / "validated_check.txt"
-
-        # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
-        if not validated_check.exists():
-            bdb.materialize(
-                bag_path.as_posix(),
-                fetch_callback=fetch_progress_callback,
-                validation_callback=validation_progress_callback,
-            )
-            validated_check.touch()
-        return Path(bag_path), dataset_rid
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
@@ -922,14 +777,14 @@ class Execution:
 
     @validate_call
     def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
-        """Create os dataset_table of specified types.
+        """Create a new dataset with specified types.
 
         Args:
             ds_type: param description:
-            description: Markdown description of the dataset_table being created.
+            description: Markdown description of the dataset being created.
 
         Returns:
-            RID of the newly created dataset_table.
+            RID of the newly created dataset.
         """
         return self._ml_object.create_dataset(ds_type, description, self.execution_rid)
 

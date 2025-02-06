@@ -3,7 +3,7 @@ from typing import Optional, Any
 
 from pydantic import BaseModel, conlist, model_validator
 
-from .deriva_definitions import RID
+from deriva_definitions import RID
 
 
 class Workflow(BaseModel):

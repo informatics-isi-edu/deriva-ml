@@ -2,15 +2,32 @@
 THis module defines the DataSet class with is used to manipulate n
 """
 
+from bdbag.fetch.fetcher import fetch_single_file
+from bdbag import bdbag_api as bdb
 from collections import defaultdict
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.datapath import DataPathException
-from deriva.core.utils.core_utils import tag as deriva_tags
+from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
+from deriva.core.utils.hash_utils import compute_file_hashes
+from deriva.transfer.download.deriva_export import DerivaExport
+from deriva.transfer.download.deriva_download import (
+    DerivaDownloadConfigurationError,
+    DerivaDownloadError,
+    DerivaDownloadAuthenticationError,
+    DerivaDownloadAuthorizationError,
+    DerivaDownloadTimeoutError,
+)
 from enum import Enum
+import json
+import logging
+from pathlib import Path
+
 from pydantic import validate_call, ConfigDict
+import requests
+from tempfile import TemporaryDirectory
 from typing import Any, Callable, Optional, Iterable
 
-from .deriva_definitions import ML_SCHEMA, RID, DerivaMLException, MLVocab
+from deriva_definitions import ML_SCHEMA, RID, DerivaMLException, MLVocab, Status
 
 
 class SemanticVersion(Enum):
@@ -37,7 +54,6 @@ class Dataset:
         ].pop()
         self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
 
-
     def dataset_version(self, dataset_rid: RID) -> tuple[int, ...]:
         """Retrieve the version of the specified dataset_table.
 
@@ -51,12 +67,16 @@ class Dataset:
         try:
             rid_record = self._model.catalog.resolve_rid(dataset_rid)
         except KeyError:
-            raise DerivaMLException(f'Could not resolve {dataset_rid}.')
-        if rid_record.table.name != self.dataset_table.dataset_table.name:
+            raise DerivaMLException(f"Could not resolve {dataset_rid}.")
+        if rid_record.table.name != self.dataset_table.name:
             raise DerivaMLException(
-                f"RID: {dataset_rid} does not belong to dataset_table {self.dataset_table.dataset_table.name}"
+                f"RID: {dataset_rid} does not belong to dataset_table {self.dataset_table.name}"
             )
-        return tuple(map(int, self._model.catalog.retrieve_rid(dataset_rid)["Version"].split(".")))
+        return tuple(
+            map(
+                int, self._model.catalog.retrieve_rid(dataset_rid)["Version"].split(".")
+            )
+        )
 
     def increment_dataset_version(
         self, dataset_rid: RID, component: SemanticVersion
@@ -86,7 +106,7 @@ class Dataset:
         dataset_path = (
             self._model.catalog.getPathBuilder()
             .schemas[self.ml_schema]
-            .tables[self.dataset_table.dataset_table.name]
+            .tables[self.dataset_table.name]
         )
         dataset_path.update(
             [{"RID": dataset_rid, "Version": f"{major}.{minor}.{patch}"}]
@@ -117,8 +137,12 @@ class Dataset:
             New dataset_table RID.
 
         """
-        type_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema].tables[MLVocab.dataset_type.name]
-        defined_types  = list(type_path.entities().fetch())
+        type_path = (
+            self._model.catalog.getPathBuilder()
+            .schemas[self.ml_schema]
+            .tables[MLVocab.dataset_type.value]
+        )
+        defined_types = list(type_path.entities().fetch())
 
         def check_dataset_type(ds_type: str) -> bool:
             for term in defined_types:
@@ -177,17 +201,17 @@ class Dataset:
         # Get association table entries for this dataset_table
         # Delete association table entries
         pb = self._model.catalog.getPathBuilder()
-        for assoc_table in self.dataset_table.dataset_table.find_associations(self.dataset_table.dataset_table):
+        for assoc_table in self.dataset_table.find_associations(self.dataset_table):
             other_fkey = assoc_table.other_fkeys.pop()
             self_fkey = assoc_table.self_fkey
             target_table = other_fkey.pk_table
-            member_table = assoc_table.dataset_table
+            member_table = assoc_table.table
 
             schema_path = pb.schemas[member_table.schema.name]
             tpath = schema_path.tables[assoc_table.name]
             dataset_column_path = tpath.columns[self_fkey.columns[0].name]
             dataset_entries = tpath.filter(dataset_column_path == dataset_rid)
-            if recurse and target_table == self.dataset_table.dataset_table:
+            if recurse and target_table == self.dataset_table:
                 # Nested table
                 for dataset in dataset_entries:
                     self.delete_dataset(dataset["RID"], recurse)
@@ -197,8 +221,8 @@ class Dataset:
                 pass
 
         # Delete dataset_table.
-        dataset_path = pb.schemas[self.dataset_table.dataset_table.schema.name].tables[
-            self.dataset_table.dataset_table.name
+        dataset_path = pb.schemas[self.dataset_table.schema.name].tables[
+            self.dataset_table.name
         ]
         dataset_path.filter(dataset_path.columns["RID"] == dataset_rid).delete()
 
@@ -210,8 +234,8 @@ class Dataset:
         """
         # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
         pb = self._model.catalog.getPathBuilder()
-        dataset_path = pb.schemas[self.dataset_table.dataset_table.schema.name].tables[
-            self.dataset_table.dataset_table.name
+        dataset_path = pb.schemas[self.dataset_table.schema.name].tables[
+            self.dataset_table.name
         ]
         atable = next(
             self._model.schemas[self.ml_schema]
@@ -245,12 +269,12 @@ class Dataset:
         def domain_table(table: Table) -> bool:
             return (
                 table.schema.name == self._domain_schema
-                or table.name == self.dataset_table.dataset_table.name
+                or table.name == self.dataset_table.name
             )
 
         return [
             t
-            for a in self.dataset_table.dataset_table.find_associations()
+            for a in self.dataset_table.find_associations()
             if domain_table(t := a.other_fkeys.pop().pk_table)
         ]
 
@@ -310,8 +334,13 @@ class Dataset:
         """
 
         try:
-            if self._model.catalog.resolve_rid(dataset_rid).dataset_table != self.dataset_table:
-                raise DerivaMLException(f"RID is not for a dataset_table: {dataset_rid}")
+            if (
+                self._model.catalog.resolve_rid(dataset_rid).table.name
+                != self.dataset_table.name
+            ):
+                raise DerivaMLException(
+                    f"RID is not for a dataset_table: {dataset_rid}"
+                )
         except KeyError:
             raise DerivaMLException(f"Invalid RID: {dataset_rid}")
 
@@ -323,7 +352,7 @@ class Dataset:
             other_fkey = assoc_table.other_fkeys.pop()
             self_fkey = assoc_table.self_fkey
             target_table = other_fkey.pk_table
-            member_table = assoc_table.dataset_table
+            member_table = assoc_table.table
 
             if (
                 target_table.schema.name != self._domain_schema
@@ -405,7 +434,7 @@ class Dataset:
         # need to be made.
         dataset_elements = {}
         association_map = {
-            a.other_fkeys.pop().pk_table.name: a.dataset_table.name
+            a.other_fkeys.pop().pk_table.name: a.table.name
             for a in self.dataset_table.find_associations()
         }
         # Get a list of all the types of objects that can be linked to a dataset_table.
@@ -414,13 +443,15 @@ class Dataset:
                 rid_info = self._model.catalog.resolve_rid(m)
             except KeyError:
                 raise DerivaMLException(f"Invalid RID: {m}")
-            if rid_info.dataset_table.name not in association_map:
+            if rid_info.table.name not in association_map:
                 raise DerivaMLException(
-                    f"RID table: {rid_info.dataset_table.name} not part of dataset_table"
+                    f"RID table: {rid_info.table.name} not part of dataset_table"
                 )
-            if rid_info.dataset_table == self.dataset_table and check_dataset_cycle(rid_info.rid):
+            if rid_info.table == self.dataset_table and check_dataset_cycle(
+                rid_info.rid
+            ):
                 raise DerivaMLException("Creating cycle of datasets is not allowed")
-            dataset_elements.setdefault(rid_info.dataset_table.name, []).append(rid_info.rid)
+            dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
         # Now make the entries into the association tables.
         pb = self._model.catalog.getPathBuilder()
         for table, elements in dataset_elements.items():
@@ -451,7 +482,7 @@ class Dataset:
         except KeyError as _e:
             raise DerivaMLException(f"Invalid RID {dataset_rid}")
 
-        if rid_record.dataset_table.name != self.dataset_table.name:
+        if rid_record.table.name != self.dataset_table.name:
             raise DerivaMLException(
                 f"RID: {dataset_rid} does not belong to dataset_table {self.dataset_table.name}"
             )
@@ -604,7 +635,7 @@ class Dataset:
             nested_dprefix += f"/Dataset_Dataset"
             table_paths.append((nested_sprefix, nested_dprefix, dataset_dataset_table))
             nested_sprefix += f"/(Nested_Dataset)=(deriva-ml:Dataset:RID)"
-            nested_dprefix += f"/Dataset/{{Dataset_Version{i}}}"
+            nested_dprefix += f"/Dataset/{{Dataset_Version{i+1}}}"
             table_paths.append((nested_sprefix, nested_dprefix, self.dataset_table))
             # Get CSV for nested datasets.
             table_paths.extend(
@@ -618,12 +649,15 @@ class Dataset:
         def children_depth(
             dataset_rid: RID, nested_datasets: dict[RID, list[RID]]
         ) -> int:
-            children = nested_datasets[dataset_rid]
-            return (
-                max(map(lambda x: children_depth(x, nested_datasets), children)) + 1
-                if children
-                else 1
-            )
+            try:
+                children = nested_datasets[dataset_rid]
+                return (
+                    max(map(lambda x: children_depth(x, nested_datasets), children)) + 1
+                    if children
+                    else 1
+                )
+            except KeyError:
+                return 0
 
         # Build up the dataset_table nesting graph...
         pb = (
@@ -635,7 +669,9 @@ class Dataset:
         for ds in pb.entities().fetch():
             nested_dataset[ds["Dataset"]].append(ds["Nested_Dataset"])
         return (
-            max(map(lambda ds: children_depth(ds, nested_dataset), nested_dataset))
+            max(
+                map(lambda ds: children_depth(ds, dict(nested_dataset)), nested_dataset)
+            )
             if nested_dataset
             else 0
         )
@@ -665,7 +701,6 @@ class Dataset:
             Include node in the graph if it's not a loopback from fk<-> referred_by, you have not already been to the
             node.
             """
-            print(node, child, self._domain_schema)
             return (
                 child != node
                 and child not in visited_nodes
@@ -674,8 +709,7 @@ class Dataset:
 
         # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
         nodes = {fk.pk_table for fk in node.foreign_keys if include_node(fk.pk_table)}
-        nodes |= {fk.dataset_table for fk in node.referenced_by if include_node(fk.table)}
-        print(f'node: {node}, {node.foreign_keys} nodes: {nodes}')
+        nodes |= {fk.table for fk in node.referenced_by if include_node(fk.table)}
         for t in nodes:
             new_visited_nodes = visited_nodes.copy()
             new_visited_nodes.add(t)
@@ -730,6 +764,146 @@ class Dataset:
         for path in self._table_paths(self._schema_graph(self.dataset_table)):
             element_spec.extend(writer(*path))
         return self._vocabulary_specification(writer) + element_spec
+
+    def download_dataset_bag(
+        self, dataset_rid: RID | str, cache_dir: Path
+    ) -> tuple[Path, RID]:
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
+        that all the metadata is correct
+
+        Args:
+            dataset_rid: The RID of a dataset_table or a minid to an existing bag.
+            cache_dir: Path to the directory to store the bag file.
+
+        Returns:
+            the location of the unpacked and validated dataset_table bag and the RID of the bag
+        """
+        if not any([dataset_rid == ds["RID"] for ds in self.find_datasets()]):
+            raise DerivaMLException(f"RID {dataset_rid} is not a dataset_table")
+
+        with TemporaryDirectory() as tmp_dir:
+            if dataset_rid.startswith("minid"):
+                # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
+                r = requests.get(
+                    f"https://identifiers.org/{dataset_rid}",
+                    headers={"accept": "application/json"},
+                )
+                metadata = r.json()["metadata"]
+                dataset_rid = metadata["Dataset_RID"].split("@")[0]
+                checksum_value = ""
+                for checksum in r.json().get("checksums", []):
+                    if checksum.get("function") == "sha256":
+                        checksum_value = checksum.get("value")
+                        break
+                archive_path = fetch_single_file(dataset_rid, tmp_dir)
+            else:
+                # We are given the RID to a dataset_table, so we are going to have to export as a bag and place into
+                # local file system.  The first step is to generate a downloadspec to create the bag, put the sped
+                # into a local file and then use the downloader to create and download the desired bdbag.
+                spec_file = f"{tmp_dir}/download_spec.json"
+                with open(spec_file, "w", encoding="utf-8") as ds:
+                    json.dump(
+                        self.generate_dataset_download_spec(),
+                        ds,
+                    )
+
+                try:
+                    exporter = DerivaExport(
+                        host=self._model.catalog.host_name,
+                        catalog_id=self._model.catalog.catalog_id,
+                        config_file=spec_file,
+                        output_dir=tmp_dir,
+                        envars={
+                            "Dataset_RID": dataset_rid,
+                            "Dataset_Version": self.dataset_version(dataset_rid),
+                        },
+                    )
+                    result = exporter.export()
+                except (
+                    DerivaDownloadError,
+                    DerivaDownloadConfigurationError,
+                    DerivaDownloadAuthenticationError,
+                    DerivaDownloadAuthorizationError,
+                    DerivaDownloadTimeoutError,
+                ) as e:
+                    raise DerivaMLException(format_exception(e))
+                archive_path = list(result.values())[0]["local_path"]
+                checksum_value = compute_file_hashes(archive_path, hashes=["sha256"])[
+                    "sha256"
+                ][0]
+
+            # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
+            # it.  If not, then we need to extract the contents of the archive into our cache directory.
+            bag_dir = cache_dir / f"{dataset_rid}_{checksum_value}"
+            if bag_dir.exists():
+                bag_path = (bag_dir / f"Dataset_{dataset_rid}").as_posix()
+            else:
+                bag_dir.mkdir(parents=True, exist_ok=True)
+                bag_path = bdb.extract_bag(archive_path, bag_dir)
+            bdb.validate_bag_structure(bag_path)
+            return Path(bag_path), dataset_rid
+
+    def materialize_dataset_bag(
+        self, bag: str | RID, cache_dir: Path, execution_rid: Optional[RID] = None
+    ) -> tuple[Path, RID]:
+        """Materialize a dataset_table bag into a local directory
+
+        Args:
+            bag: A MINID to an existing bag or a RID of the dataset_table that should be downloaded.
+            execution_rid: RID of the execution for which this bag should be materialized. Used to update status.
+            cache_dir: Path of where to put the bag file.
+
+        Returns:
+
+        """
+
+        def update_status(status: Status, msg: str) -> None:
+            self._model.catalog.getPathBUilder().schemas[
+                self.ml_schema
+            ].Execution.update(
+                [
+                    {
+                        "RID": execution_rid,
+                        "Status": status.value,
+                        "Status_Detail": msg,
+                    }
+                ]
+            )
+
+        def fetch_progress_callback(current, total):
+            msg = f"Materializing bag: {current} of {total} file(s) downloaded."
+            if execution_rid:
+                update_status(Status.running, msg)
+            logging.info(msg)
+            return True
+
+        def validation_progress_callback(current, total):
+            msg = f"Validating bag: {current} of {total} file(s) validated."
+            if execution_rid:
+                update_status(Status.running, msg)
+            logging.info(msg)
+            return True
+
+        if (
+            execution_rid
+            and self._model.catalog.resolve_rid(execution_rid).table.name != "Execution"
+        ):
+            raise DerivaMLException(f"RID {execution_rid} is not an execution")
+
+        # request metadata
+        bag_path, dataset_rid = self.download_dataset_bag(bag, cache_dir)
+        bag_dir = bag_path.parent
+        validated_check = bag_dir / "validated_check.txt"
+
+        # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
+        if not validated_check.exists():
+            bdb.materialize(
+                bag_path.as_posix(),
+                fetch_callback=fetch_progress_callback,
+                validation_callback=validation_progress_callback,
+            )
+            validated_check.touch()
+        return Path(bag_path), dataset_rid
 
     def export_outputs(self) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
@@ -877,113 +1051,162 @@ class Dataset:
         }
 
     def dataset_visible_columns(self) -> dict[str, Any]:
-        dataset_table = self._model.schemas['deriva-ml'].tables['Dataset']
+        dataset_table = self._model.schemas["deriva-ml"].tables["Dataset"]
         rcb_name = next(
-            [fk.name[0].name, fk.name[1]] for fk in dataset_table.foreign_keys if fk.name[1] == "Dataset_RCB_fkey")
+            [fk.name[0].name, fk.name[1]]
+            for fk in dataset_table.foreign_keys
+            if fk.name[1] == "Dataset_RCB_fkey"
+        )
         rmb_name = next(
-            [fk.name[0].name, fk.name[1]] for fk in dataset_table.foreign_keys if fk.name[1] == "Dataset_RMB_fkey")
+            [fk.name[0].name, fk.name[1]]
+            for fk in dataset_table.foreign_keys
+            if fk.name[1] == "Dataset_RMB_fkey"
+        )
         return {
             "*": [
                 "RID",
                 "Description",
-                {"display": {
-                    "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
-                },
-                    "markdown_name": "Annotation App"
+                {
+                    "display": {
+                        "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
+                    },
+                    "markdown_name": "Annotation App",
                 },
                 rcb_name,
-                rmb_name
+                rmb_name,
             ],
-            'detailed': [
+            "detailed": [
                 "RID",
                 "Description",
-                {'source': [{"inbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_fkey']},
-                            {"outbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_Type_fkey']}, 'RID'],
-                 'markdown_name': 'Dataset Types'},
-                {"display": {
-                    "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
+                {
+                    "source": [
+                        {"inbound": ["deriva-ml", "Dataset_Dataset_Type_Dataset_fkey"]},
+                        {
+                            "outbound": [
+                                "deriva-ml",
+                                "Dataset_Dataset_Type_Dataset_Type_fkey",
+                            ]
+                        },
+                        "RID",
+                    ],
+                    "markdown_name": "Dataset Types",
                 },
-                    "markdown_name": "Annotation App"
+                {
+                    "display": {
+                        "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
+                    },
+                    "markdown_name": "Annotation App",
                 },
                 rcb_name,
-                rmb_name
+                rmb_name,
             ],
-            'filter': {
-                'and': [
-                    {'source': 'RID'},
-                    {'source': 'Description'},
-                    {'source': [{"inbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_fkey']},
-                                {"outbound": ['deriva-ml', 'Dataset_Dataset_Type_Dataset_Type_fkey']}, 'RID'],
-                     'markdown_name': 'Dataset Types'},
-                    {'source': [{'outbound': rcb_name}, 'RID'], 'markdown_name': 'Created By'},
-                    {'source': [{'outbound': rmb_name}, 'RID'], 'markdown_name': 'Modified By'},
+            "filter": {
+                "and": [
+                    {"source": "RID"},
+                    {"source": "Description"},
+                    {
+                        "source": [
+                            {
+                                "inbound": [
+                                    "deriva-ml",
+                                    "Dataset_Dataset_Type_Dataset_fkey",
+                                ]
+                            },
+                            {
+                                "outbound": [
+                                    "deriva-ml",
+                                    "Dataset_Dataset_Type_Dataset_Type_fkey",
+                                ]
+                            },
+                            "RID",
+                        ],
+                        "markdown_name": "Dataset Types",
+                    },
+                    {
+                        "source": [{"outbound": rcb_name}, "RID"],
+                        "markdown_name": "Created By",
+                    },
+                    {
+                        "source": [{"outbound": rmb_name}, "RID"],
+                        "markdown_name": "Modified By",
+                    },
                 ]
-            }
+            },
         }
 
     def dataset_visible_fkeys(self) -> dict[str, Any]:
         def fkey_name(fk):
             return [fk.name[0].name, fk.name[1]]
 
-        dataset_table = self._model.schemas['deriva-ml'].tables['Dataset']
+        dataset_table = self._model.schemas["deriva-ml"].tables["Dataset"]
 
         source_list = [
-            {"source": [
-                {"inbound": fkey_name(fkey.self_fkey)},
-                {"outbound": fkey_name(other_fkey := fkey.other_fkeys.pop())},
-                "RID"
-            ],
-                "markdown_name": other_fkey.pk_table.name
+            {
+                "source": [
+                    {"inbound": fkey_name(fkey.self_fkey)},
+                    {"outbound": fkey_name(other_fkey := fkey.other_fkeys.pop())},
+                    "RID",
+                ],
+                "markdown_name": other_fkey.pk_table.name,
             }
             for fkey in dataset_table.find_associations(max_arity=3, pure=False)
         ]
-        return {'detailed': source_list}
+        return {"detailed": source_list}
 
     def generate_dataset_annotations(self) -> dict[str, Any]:
         return {
-            deriva_tags.export_fragment_definitions: {'dataset_export_outputs': self.export_outputs()},
+            deriva_tags.export_fragment_definitions: {
+                "dataset_export_outputs": self.export_outputs()
+            },
             deriva_tags.visible_columns: self.dataset_visible_columns(),
             deriva_tags.visible_foreign_keys: self.dataset_visible_fkeys(),
             deriva_tags.export_2019: {
-                'detailed': {
-                    'templates': [
+                "detailed": {
+                    "templates": [
                         {
-                            'type': 'BAG',
-                            'outputs': [{'fragment_key': 'dataset_export_outputs'}],
-                            'displayname': 'BDBag Download',
-                            'bag_idempotent': True,
-                            'postprocessors': [
+                            "type": "BAG",
+                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
+                            "displayname": "BDBag Download",
+                            "bag_idempotent": True,
+                            "postprocessors": [
                                 {
-                                    'processor': 'identifier',
-                                    'processor_params': {
-                                        'test': False,
-                                        'env_column_map': {'Dataset_RID': '{RID}@{snaptime}',
-                                                           'Description': '{Description}'}
-                                    }
+                                    "processor": "identifier",
+                                    "processor_params": {
+                                        "test": False,
+                                        "env_column_map": {
+                                            "Dataset_RID": "{RID}@{snaptime}",
+                                            "Description": "{Description}",
+                                        },
+                                    },
                                 }
-                            ]
+                            ],
                         },
                         {
-                            'type': 'BAG',
-                            'outputs': [{'fragment_key': 'dataset_export_outputs'}],
-                            'displayname': 'BDBag to Cloud',
-                            'bag_idempotent': True,
-                            'postprocessors': [
+                            "type": "BAG",
+                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
+                            "displayname": "BDBag to Cloud",
+                            "bag_idempotent": True,
+                            "postprocessors": [
                                 {
-                                    'processor': 'cloud_upload',
-                                    'processor_params': {'acl': 'public-read', 'target_url': 's3://eye-ai-shared/'}
+                                    "processor": "cloud_upload",
+                                    "processor_params": {
+                                        "acl": "public-read",
+                                        "target_url": "s3://eye-ai-shared/",
+                                    },
                                 },
                                 {
-                                    'processor': 'identifier',
-                                    'processor_params': {
-                                        'test': False,
-                                        'env_column_map': {'Dataset_RID': '{RID}@{snaptime}',
-                                                           'Description': '{Description}'}
-                                    }
-                                }
-                            ]
-                        }
+                                    "processor": "identifier",
+                                    "processor_params": {
+                                        "test": False,
+                                        "env_column_map": {
+                                            "Dataset_RID": "{RID}@{snaptime}",
+                                            "Description": "{Description}",
+                                        },
+                                    },
+                                },
+                            ],
+                        },
                     ]
                 }
-            }
+            },
         }

@@ -36,13 +36,13 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import BaseModel, Field, create_model, validate_call, ConfigDict
 
-from .execution_configuration import ExecutionConfiguration
-from .dataset import Dataset
-from .upload import asset_dir
-from .upload import table_path, bulk_upload_configuration
-from .deriva_definitions import ColumnDefinition
-from .deriva_definitions import ExecMetadataVocab
-from .deriva_definitions import (
+from execution_configuration import ExecutionConfiguration
+from dataset import Dataset
+from upload import asset_dir
+from upload import table_path, bulk_upload_configuration
+from deriva_definitions import ColumnDefinition
+from deriva_definitions import ExecMetadataVocab
+from deriva_definitions import (
     RID,
     UploadState,
     Status,

@@ -12,17 +12,12 @@ from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
 
-from deriva_ml import (
-    DerivaML,
-    ColumnDefinition,
-    BuiltinTypes,
-    MLVocab,
-    Workflow,
-    ExecutionConfiguration,
-)
-from deriva_ml.execution import Execution
-from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
-from deriva_ml.dataset import Dataset
+from execution_configuration import ExecutionConfiguration, Workflow
+from deriva_definitions import MLVocab, BuiltinTypes, ColumnDefinition
+from execution import Execution
+from schema_setup.create_schema import initialize_ml_schema, create_ml_schema
+from dataset import Dataset
+from deriva_ml_base import DerivaML
 
 TEST_DATASET_SIZE = 20
 
@@ -262,9 +257,9 @@ def create_demo_catalog(
             create_demo_features(deriva_ml)
         if create_datasets:
             create_demo_datasets(deriva_ml)
-        dataset_table = model.schemas["deriva-ml"].tables["Dataset"]
-        dataset_table.annotations.update(Dataset(model).generate_dataset_annotations())
-        model.apply()
+        dataset_table = deriva_ml.dataset_table
+        dataset_table.annotations.update(Dataset(deriva_ml.model).generate_dataset_annotations())
+        deriva_ml.model.apply()
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
         AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
 
