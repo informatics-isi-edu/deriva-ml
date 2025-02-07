@@ -33,7 +33,7 @@ Here is the directory layout we support:
 
 from pathlib import Path
 from typing import Optional
-
+from deriva_definitions import RID
 import regex as re
 
 upload_root_regex = r"(?i)^.*/deriva-ml"
@@ -129,6 +129,17 @@ def execution_root(prefix: Path | str, exec_rid) -> Path:
     path.mkdir(exist_ok=True, parents=True)
     return path
 
+def execution_rids(prefix: Path | str) -> list[RID]:
+    """
+
+    Args:
+        prefix: Path to upload directory
+
+    Returns:
+        List of execution RIDS that are currently being uploaded
+    """
+    path = upload_root(prefix) / "execution"
+    return [d.name for d in path.iterdir()]
 
 def execution_asset_root(prefix: Path | str, exec_rid: str) -> Path:
     """

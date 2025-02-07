@@ -1,8 +1,9 @@
 import json
 from typing import Optional, Any
 
-from pydantic import BaseModel, conlist, model_validator
+from pydantic import BaseModel, conlist, model_validator, ConfigDict, field_serializer
 
+from dataset import DatasetVersion
 from deriva_definitions import RID
 
 
@@ -23,7 +24,6 @@ class Workflow(BaseModel):
     version: Optional[str] = None
     description: str = None
 
-
 class DatasetSpec(BaseModel):
     """Represent a dataset_table in a execution configuration dataset_table list
 
@@ -33,20 +33,19 @@ class DatasetSpec(BaseModel):
      """
     rid: RID
     materialize: bool = True
+    version: DatasetVersion = DatasetVersion(1, 0, 0)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode='before')
     @classmethod
-    def _check_card_number_not_present(cls, data: Any) -> dict[str, str|bool]:
-        """
-
-        Attributes:
-          data: Any: 
-
-        Returns:
-
-        """
+    def _check_bare_rid(cls, data: Any) -> dict[str, str|bool]:
         # If you are just given a string, assume its a rid and put into dict for further validation.
         return {'rid': data} if isinstance(data, str) else data
+
+    @field_serializer('version', when_used='json')
+    def serialize_version(self, version: DatasetVersion):
+        return str(version)
 
 
 class ExecutionConfiguration(BaseModel):
@@ -65,6 +64,8 @@ class ExecutionConfiguration(BaseModel):
     assets: list[RID|str] = []      # List of RIDs to model files.
     workflow: Workflow
     description: str = ""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @staticmethod
     def load_configuration(file: str) -> "ExecutionConfiguration":

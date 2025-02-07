@@ -12,8 +12,7 @@ import pandas as pd
 from deriva.core.ermrest_model import Model
 from pydantic import validate_call, ConfigDict
 
-from deriva_definitions import ML_SCHEMA, MLVocab, RID
-from deriva_ml_base import DerivaMLException
+from deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
 
 
 class DatabaseModel:

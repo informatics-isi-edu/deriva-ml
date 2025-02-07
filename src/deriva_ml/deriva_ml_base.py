@@ -19,7 +19,6 @@ from pathlib import Path
 from tempfile import mkdtemp,  NamedTemporaryFile, TemporaryDirectory
 from types import UnionType
 from typing import Optional, Any, Iterable, Type, ClassVar, TYPE_CHECKING
-
 from deriva.core import (
     ErmrestCatalog,
     get_credential,
@@ -39,7 +38,7 @@ from pydantic import BaseModel, Field, create_model, validate_call, ConfigDict
 from execution_configuration import ExecutionConfiguration
 from dataset import Dataset
 from upload import asset_dir
-from upload import table_path, bulk_upload_configuration
+from upload import table_path, bulk_upload_configuration, execution_rids, execution_metadata_dir
 from deriva_definitions import ColumnDefinition
 from deriva_definitions import ExecMetadataVocab
 from deriva_definitions import (
@@ -334,24 +333,6 @@ class DerivaML(Dataset):
             session_config=self._get_session_config(),
         )
         self.model = self.catalog.getCatalogModel()
-        super().__init__(self.model)
-
-        self.host_name = hostname
-        self.catalog_id = catalog_id
-        self.ml_schema = ml_schema
-        self.version = model_version
-        self.configuration = None
-        #self.dataset_table = Dataset(self.model)
-
-        builtin_schemas = ["public", self.ml_schema, "www"]
-        self.domain_schema = (
-                domain_schema
-                or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
-        )
-        self.project_name = project_name or self.domain_schema
-
-        self.start_time = datetime.now()
-        self.status = Status.pending.value
         tdir = None
         if cache_dir:
             self.cache_dir = Path(cache_dir)
@@ -368,6 +349,25 @@ class DerivaML(Dataset):
             tdir = tdir or mkdtemp()
             self.working_dir = Path(tdir) / default_workdir
         self.working_dir.mkdir(parents=True, exist_ok=True)
+
+        super().__init__(self.model, self.cache_dir)
+
+        self.host_name = hostname
+        self.catalog_id = catalog_id
+        self.ml_schema = ml_schema
+        self.version = model_version
+        self.configuration = None
+
+        builtin_schemas = ["public", self.ml_schema, "www"]
+        self.domain_schema = (
+                domain_schema
+                or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
+        )
+        self.project_name = project_name or self.domain_schema
+
+        self.start_time = datetime.now()
+        self.status = Status.pending.value
+
         logging.basicConfig(
             level=logging_level, format="%(asctime)s - %(levelname)s - %(message)s"
         )
@@ -1088,7 +1088,7 @@ class DerivaML(Dataset):
         except Exception as e:
             raise e
 
-    def upload_assets(self, assets_dir: str | Path) -> dict[str, FileUploadState]:
+    def upload_assets(self, assets_dir: str | Path) -> dict[Any, FileUploadState] | None:
         """Upload assets from a directory. This routine assumes that the current upload specification includes a
         configuration for the specified directory.  Every asset in the specified directory is uploaded
 
@@ -1256,7 +1256,7 @@ class DerivaML(Dataset):
             )
 
     # @validate_call
-    def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":
+    def create_execution(self, configuration: ExecutionConfiguration) -> 'Execution':
         """Create an execution object
 
         Args:
@@ -1268,3 +1268,14 @@ class DerivaML(Dataset):
         from execution import Execution
 
         return Execution(configuration, self)
+
+    @validate_call
+    def restore_execution(self, execution_rid: RID) -> 'Execution':
+        from execution import Execution
+
+        # Find path to execution
+        execution_rid = execution_rids(self.working_dir)[0]
+        exec_config_path = ExecMetadataVocab.execution_config.value
+        cfile = execution_metadata_dir(exec_config_path, execution_rid, exec_config_path) / "configuration.json"
+        configuration = ExecutionConfiguration.load_configuration(cfile)
+        return Execution(configuration, self, reload=True)

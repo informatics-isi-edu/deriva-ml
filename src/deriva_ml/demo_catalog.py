@@ -258,7 +258,7 @@ def create_demo_catalog(
         if create_datasets:
             create_demo_datasets(deriva_ml)
         dataset_table = deriva_ml.dataset_table
-        dataset_table.annotations.update(Dataset(deriva_ml.model).generate_dataset_annotations())
+        dataset_table.annotations.update(Dataset(deriva_ml.model, deriva_ml.cache_dir).generate_dataset_annotations())
         deriva_ml.model.apply()
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
         AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
