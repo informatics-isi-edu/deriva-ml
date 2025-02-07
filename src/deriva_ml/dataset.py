@@ -15,17 +15,22 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadAuthorizationError,
     DerivaDownloadTimeoutError,
 )
+from scipy.spatial import minkowski_distance
+
 from deriva_definitions import ML_SCHEMA, RID, DerivaMLException, MLVocab, Status
+from datetime import datetime
 from enum import Enum
 import json
 import logging
 from pathlib import Path
-from pydantic import validate_call, ConfigDict
+from pydantic import validate_call, ConfigDict, Base64UrlStr
 import requests
 from semver import Version
 
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import Any, Callable, Optional, Iterable
+
+from history import iso_to_snap
 
 
 class VersionPart(Enum):
@@ -58,8 +63,27 @@ class Dataset:
         self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
         self._cache_dir = cache_dir
 
+    def _synchronize_dataset_versions(self):
+        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
+        dataset_path = schema_path.tables["Dataset"]
+        dataset_version_path = schema_path.tables["DatasetVersion"]
+        datasets = dataset_path.attributes(dataset_path.RID, dataset_path.RMT, dataset_path.Version).fetch()
+
+    def dataset_history(self, dataset_rid) -> list(DatasetVersion):
+        version_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema].tables["Dataset_Version"]
+        return [DatasetVersion.parse(v['Version'])
+                for v in version_path.filter(version_path.Dataset == dataset_rid).entitites().fetch()]
+
+    def _dataset_version_snapshot(self, dataset_rid) -> str:
+        dataset_version = self.dataset_version(dataset_rid)
+        version_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema].tables["Dataset_Version"]
+        dataset_version = list(version_path.filter(
+            version_path.Dataset == dataset_rid & version_path.Version == str(dataset_version)).attributes(
+            version_path.RCT).fetch())[0]
+        return iso_to_snap(dataset_version['RCT'])
+
     def dataset_version(self, dataset_rid: RID) -> DatasetVersion:
-        """Retrieve the version of the specified dataset_table.
+        """Retrieve the current version of the specified dataset_table.
 
         Args:
             dataset_rid: return: A tuple with the semantic version of the dataset_table.
@@ -139,7 +163,7 @@ class Dataset:
 
         """
 
-        version = version or DatasetVersion(0,1,0)
+        version = version or DatasetVersion(0, 1, 0)
 
         type_path = (
             self._model.catalog.getPathBuilder()
@@ -794,17 +818,9 @@ class Dataset:
         snaptime = self._model.catalog.latest_snapshot().snaptime
         return f'{self._model.catalog.catalog_id}@{snaptime}'
 
-    def _download_dataset_bag(
-            self, dataset_rid: RID | str, version: DatasetVersion
-    ) -> tuple[Path, RID, str]:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
-        that all the metadata is correct
-
-        Args:
-            dataset_rid: The RID of a dataset_table or a minid to an existing bag.
-        Returns:
-            the location of the unpacked and validated dataset_table bag and the RID of the bag
-        """
+    def get_dataset_minid(self, dataset_rid: RID, version: Optional[DatasetVersion] = None, create: bool = True) -> str:
+        if ds := [v for v in self.dataset_history(dataset_rid) if v == version]:
+            return ds[0]['minid']
 
         with TemporaryDirectory() as tmp_dir:
             if dataset_rid.startswith('minid'):
@@ -846,29 +862,46 @@ class Dataset:
                 ) as e:
                     raise DerivaMLException(format_exception(e))
 
-            # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
-            r = requests.get(minid_page_url, headers={"accept": "application/json"})
-            metadata = r.json()["metadata"]
-            minid = r.json()['compact_uri']
-            bag_url = r.json()['location'][0]
-            bag_dataset_rid = metadata["Dataset_RID"]
-            dataset_rid = bag_dataset_rid.split("@")[0]
-            checksum_value = ""
-            for checksum in r.json().get("checksums", []):
-                if checksum.get("function") == "sha256":
-                    checksum_value = checksum.get("value")
-                    break
+            self.update_dataset_version(dataset_rid, version, minid_page_url)
+            return minid_page_url
 
-            # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
-            # it.  If not, then we need to extract the contents of the archive into our cache directory.
-            bag_dir = self._cache_dir / f"{dataset_rid}_{checksum_value}"
-            if bag_dir.exists():
-                bag_path = (bag_dir / f"Dataset_{dataset_rid}").as_posix()
-            else:
-                bag_dir.mkdir(parents=True, exist_ok=True)
-                archive_path = fetch_single_file(bag_url, f'{tmp_dir}/Dataset_{dataset_rid}.zip')
+    def _download_dataset_bag(
+            self, dataset_rid: RID | str, version: DatasetVersion
+    ) -> tuple[Path, RID, str]:
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
+        that all the metadata is correct
+
+        Args:
+            dataset_rid: The RID of a dataset_table or a minid to an existing bag.
+        Returns:
+            the location of the unpacked and validated dataset_table bag and the RID of the bag
+        """
+        minid_page_url = self.get_dataset_minid(dataset_rid, version=version)
+
+        # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
+        r = requests.get(minid_page_url, headers={"accept": "application/json"})
+        metadata = r.json()["metadata"]
+        minid = r.json()['compact_uri']
+        bag_url = r.json()['location'][0]
+        bag_dataset_rid = metadata["Dataset_RID"]
+        dataset_rid = bag_dataset_rid.split("@")[0]
+        checksum_value = ""
+        for checksum in r.json().get("checksums", []):
+            if checksum.get("function") == "sha256":
+                checksum_value = checksum.get("value")
+                break
+
+        # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
+        # it.  If not, then we need to extract the contents of the archive into our cache directory.
+        bag_dir = self._cache_dir / f"{dataset_rid}_{checksum_value}"
+        if bag_dir.exists():
+            bag_path = (bag_dir / f"Dataset_{dataset_rid}").as_posix()
+        else:
+            bag_dir.mkdir(parents=True, exist_ok=True)
+            with NamedTemporaryFile(suffix=f'Dataset_{dataset_rid}.zip') as zip_file:
+                archive_path = fetch_single_file(bag_url, zip_file.name)
                 bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())
-                bdb.validate_bag_structure(bag_path)
+            bdb.validate_bag_structure(bag_path)
         return Path(bag_path), dataset_rid, minid
 
     def _materialize_dataset_bag(

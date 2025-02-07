@@ -5,6 +5,7 @@ from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey, Key
 from deriva.core.utils.core_utils import tag as chaise_tags
+from docutils.nodes import description
 
 from deriva_ml import MLVocab
 from deriva_ml.schema_setup.annotations import generate_annotation
@@ -23,6 +24,7 @@ def define_table_workflow(workflow_annotation: dict):
         annotations=workflow_annotation,
     )
 
+
 def define_table_dataset(dataset_annotation: dict = None):
     return Table.define(
         tname="Dataset",
@@ -30,6 +32,20 @@ def define_table_dataset(dataset_annotation: dict = None):
             Column.define("Version", builtin_types.text, default="1.0.0", nullok=True),
             Column.define("Description", builtin_types.markdown)],
         annotations=dataset_annotation if dataset_annotation is not None else {},
+    )
+
+
+def define_table_dataset_version(sname: str, dataset_version_annotation: dict = None):
+    return Table.define(
+        tname="Dataset_Version",
+        column_defs=[
+            Column.define("Version", builtin_types.text, comment='Semantic version of dataset'),
+            Column.define("Description", builtin_types.markdown),
+            Column.define("Dataset", builtin_types.text, comment="RID of dataset"),
+            Column.define("MINID", builtin_types.text, comment='URL to MINID for dataset'),
+        ],
+        key_defs=[Key.define(['Dataset', 'Version'])],
+        fkey_defs=[ForeignKey.define(['Dataset'], sname, ['Dataset'], ['RID'])]
     )
 
 
@@ -69,6 +85,7 @@ def define_asset_execution_asset(sname: str, execution_asset_annotation: dict):
     )
     return table_def
 
+
 def create_www_schema(model: Model):
     """
     Set up a new schema and tables to hold web-page like content.  The tables include a page table, and a asset
@@ -79,7 +96,7 @@ def create_www_schema(model: Model):
         model.schemas['www'].drop(cascade=True)
     www_schema = model.create_schema(
         Schema.define(
-        'www', comment='Schema for tables that will be displayed as web content')
+            'www', comment='Schema for tables that will be displayed as web content')
     )
     www_schema.create_table(
         Table.define(
@@ -99,6 +116,7 @@ def create_www_schema(model: Model):
     )
 
     return www_schema
+
 
 def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name: str = None):
     ml_catalog: ErmrestCatalog = model.catalog
@@ -137,6 +155,8 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
         Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
     )
 
+    schema.create_table(define_table_dataset_version(schema_name))
+
     # Nested datasets.
     schema.create_table(
         Table.define_association(associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)])
@@ -163,6 +183,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
 
     create_www_schema(model)
     initialize_ml_schema(model, schema_name)
+
 
 def initialize_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
     catalog = model.catalog
