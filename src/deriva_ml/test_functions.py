@@ -1,12 +1,19 @@
-from deriva_ml.demo_catalog import create_demo_catalog, DemoML
-from deriva_ml  import Workflow, ExecutionConfiguration, MLVocab as vc
-
 host = 'dev.eye-ai.org'
 catalog_id = "eye-ai"
 
 #source_dataset = '2-7K8W'
 source_dataset = '3R6'
 create_catalog = False
+
+from deriva_ml.demo_catalog import create_demo_catalog, DemoML
+from deriva_ml import Workflow, ExecutionConfiguration, MLVocab as vc
+
+def setup():
+    host = 'dev.eye-ai.org'
+    test_catalog = create_demo_catalog(host, 'test-schema', create_features=True, create_datasets=True)
+    ml_instance = DemoML(host, test_catalog.catalog_id)
+    config = execution_test(ml_instance)
+    return ml_instance, config
 
 def lac_test():
     source_dataset = '2-7K8W'

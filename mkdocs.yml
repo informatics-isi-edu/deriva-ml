@@ -36,6 +36,7 @@ nav:
   - User Guide:
     - Installing deriva-ml: user-guide/install.md
     - Identifying things in deriva-ml: user-guide/identifiers.md
+    - Datasets: user-guide/datasets.md
     - Creating a workflow: user-guide/ml_workflow_instruction.md
     - DerivaML Structure: deriva_ml_structure.md
     - Configuring an Execution: user-guide/execution-configuration.md

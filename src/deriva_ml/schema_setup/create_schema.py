@@ -5,7 +5,6 @@ from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey, Key
 from deriva.core.utils.core_utils import tag as chaise_tags
-from docutils.nodes import description
 
 from deriva_ml import MLVocab
 from deriva_ml.schema_setup.annotations import generate_annotation
@@ -25,11 +24,10 @@ def define_table_workflow(workflow_annotation: dict):
     )
 
 
-def define_table_dataset(dataset_annotation: dict = None):
+def define_table_dataset(sname, dataset_annotation: dict = None):
     return Table.define(
         tname="Dataset",
         column_defs=[
-            Column.define("Version", builtin_types.text, default="1.0.0", nullok=True),
             Column.define("Description", builtin_types.markdown)],
         annotations=dataset_annotation if dataset_annotation is not None else {},
     )
@@ -39,13 +37,12 @@ def define_table_dataset_version(sname: str, dataset_version_annotation: dict = 
     return Table.define(
         tname="Dataset_Version",
         column_defs=[
-            Column.define("Version", builtin_types.text, comment='Semantic version of dataset'),
+            Column.define("Version", builtin_types.text, default="0.1.0", comment='Semantic version of dataset'),
             Column.define("Description", builtin_types.markdown),
             Column.define("Dataset", builtin_types.text, comment="RID of dataset"),
             Column.define("Minid", builtin_types.text, comment='URL to MINID for dataset'),
         ],
         key_defs=[Key.define(['Dataset', 'Version'])],
-
         fkey_defs=[ForeignKey.define(['Dataset'], sname, 'Dataset', ['RID'])]
     )
 
@@ -146,7 +143,7 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
 
     execution_table = schema.create_table(define_table_execution(schema_name, annotations["execution_annotation"]))
 
-    dataset_table = schema.create_table(define_table_dataset(annotations["dataset_annotation"]))
+    dataset_table = schema.create_table( define_table_dataset(schema_name, annotations["dataset_annotation"]))
     dataset_type = schema.create_table(
         Table.define_vocabulary(MLVocab.dataset_type, f'{project_name}:{{RID}}'))
     schema.create_table(
@@ -156,7 +153,8 @@ def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name:
         Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
     )
 
-    schema.create_table(define_table_dataset_version(schema_name))
+    dataset_version = schema.create_table(define_table_dataset_version(schema_name))
+    dataset_table.create_reference(('Version', True, dataset_version))
 
     # Nested datasets.
     schema.create_table(

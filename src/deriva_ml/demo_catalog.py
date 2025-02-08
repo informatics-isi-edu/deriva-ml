@@ -12,12 +12,12 @@ from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
 
-from execution_configuration import ExecutionConfiguration, Workflow
-from deriva_definitions import MLVocab, BuiltinTypes, ColumnDefinition
-from execution import Execution
-from schema_setup.create_schema import initialize_ml_schema, create_ml_schema
-from dataset import Dataset
-from deriva_ml_base import DerivaML
+from .execution_configuration import ExecutionConfiguration, Workflow
+from .deriva_definitions import MLVocab, BuiltinTypes, ColumnDefinition
+from .execution import Execution
+from .schema_setup.create_schema import initialize_ml_schema, create_ml_schema
+from .dataset import Dataset
+from .deriva_ml_base import DerivaML
 
 TEST_DATASET_SIZE = 20
 

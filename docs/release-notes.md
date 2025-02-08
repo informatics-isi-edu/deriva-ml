@@ -1,3 +1,12 @@
+Version 1.2.0
+
+- Dataset versioning with semantic versioning. Note that the current dataset version does *NOT* have the current catalog values, but rather the values at the time the dataset was created. 
+To get the current values you must increment the dataset version number.  Please consult online documentation for more information on dataset and versioning.
+- Streamlined create_execution.  Now all datasets are automatically downloaded and instance variable has databag classes. You no longer need to explictly create dataset_bdbag. 
+- Significant performance improvement on cached dataset access and initial download
+- Automatic creation of MINID for every dataset download
+- Added method to restore an existing execution from local disk.
+
 Version 1.1.4
 - Fixed error when creating DatasetBag on windows platform.
 

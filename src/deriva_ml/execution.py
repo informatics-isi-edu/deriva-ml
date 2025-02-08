@@ -10,40 +10,39 @@ from importlib.metadata import distributions
 from pathlib import Path
 import requests
 from tempfile import NamedTemporaryFile
-from typing import Iterable, Any
+from typing import Iterable, Any, Optional
 from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
-#from deriva_ml.execution import Execution
 from pydantic import validate_call, ConfigDict
 
-from deriva_definitions import MLVocab, ExecMetadataVocab
-from deriva_definitions import (
+from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
+from deriva_ml.deriva_definitions import (
     RID,
     Status,
     FileUploadState,
     UploadState,
     DerivaMLException,
 )
-from deriva_ml_base import DerivaML, FeatureRecord
-from dataset import Dataset, DatasetVersion
-from dataset_bag import DatasetBag, DatabaseModel
-from execution_configuration import ExecutionConfiguration
-from upload import execution_metadata_dir, execution_asset_dir, execution_root
-from upload import feature_root, feature_asset_dir, feature_value_path
-from upload import is_feature_dir, is_feature_asset_dir
-from upload import table_path
+from .deriva_ml_base import DerivaML, FeatureRecord
+from .dataset import Dataset, DatasetVersion
+from .dataset_bag import DatasetBag, DatabaseModel
+from .execution_configuration import ExecutionConfiguration
+from .upload import execution_metadata_dir, execution_asset_dir, execution_root
+from .upload import feature_root, feature_asset_dir, feature_value_path
+from .upload import is_feature_dir, is_feature_asset_dir
+from .upload import table_path
 
 
 class Execution:
-    """The Execution class is used to capture the context of an activity within DerivaML.  While these are primarly
+    """The Execution class is used to capture the context of an activity within DerivaML.  While these are primarily
     computational, manual processes can be represented by an execution as well.
 
     Within DerivaML, Executions are used to provide providence. Every dataset_table and data file that is generated is
     associated with an execution, which records which program and input parameters were used to generate that data.
 
-    Execution objects are created from an ExecutionConfiguration, which provides infomation about what DerivaML
+    Execution objects are created from an ExecutionConfiguration, which provides information about what DerivaML
     datasets will be used, what additional files (assets) are required, what code is being run (Workflow) and an
-    optional description of the Execution.  Side effects of creating an exeuction object are:
+    optional description of the Execution.  Side effects of creating an execution object are:
 
     1. An execution record is created in the catalog and the RID of that record is recorded,
     2. Any specified datasets are downloaded and materialized
@@ -58,7 +57,19 @@ class Execution:
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def __init__(self, configuration: ExecutionConfiguration, ml_object: "DerivaML", reload: bool = False):
+    def __init__(
+        self,
+        configuration: ExecutionConfiguration,
+        ml_object: "DerivaML",
+        reload: Optional[RID] = None,
+    ):
+        """
+
+        Args:
+            configuration:
+            ml_object:
+            reload: RID of previously initalized execution object.
+        """
         self.dataset_paths: list[Path] = []
         self.asset_paths: list[Path] = []
         self.configuration = configuration
@@ -71,7 +82,9 @@ class Execution:
 
         self.workflow_rid = self._add_workflow()
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        if not reload:
+        if reload:
+            self.execution_rid = reload
+        else:
             self.execution_rid = schema_path.Execution.insert(
                 [
                     {
@@ -122,13 +135,14 @@ class Execution:
             raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
         return workflow_rid
 
-    def _initialize_execution(self, reload: bool) -> None:
+    def _initialize_execution(self, reload: Optional[RID] = None) -> None:
         """Initialize the execution by a configuration  in the Execution_Metadata table.
         Setup working directory and download all the assets and data.
 
         :raise DerivaMLException: If there is an issue initializing the execution.
 
         Args:
+            reload: RID of previously initialized execution.
 
         Returns:
 
@@ -169,17 +183,17 @@ class Execution:
         exec_config_path = ExecMetadataVocab.execution_config.value
         cfile = self.execution_metadata_path(exec_config_path) / "configuration.json"
         with open(cfile, "w", encoding="utf-8") as config_file:
-            json.dump(self.configuration.model_dump_json(), config_file)
+            json.dump(self.configuration.model_dump(), config_file)
 
         # save runtime env
         runtime_env_path = ExecMetadataVocab.runtime_env.value
         runtime_env_dir = self.execution_metadata_path(runtime_env_path)
         with NamedTemporaryFile(
-                "w+",
-                dir=runtime_env_dir,
-                prefix="environment_snapshot_",
-                suffix=".txt",
-                delete=False,
+            "w+",
+            dir=runtime_env_dir,
+            prefix="environment_snapshot_",
+            suffix=".txt",
+            delete=False,
         ) as fp:
             for dist in distributions():
                 fp.write(f"{dist.metadata['Name']}=={dist.version}\n")
@@ -210,10 +224,10 @@ class Execution:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(
-            self,
-            bag: RID | str,
-            materialize: bool = True,
-            version: DatasetVersion = None
+        self,
+        bag: RID | str,
+        materialize: bool = True,
+        version: Optional[DatasetVersion] = None,
     ) -> tuple[Path, RID, str]:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
@@ -227,10 +241,12 @@ class Execution:
             the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
         ds = Dataset(self._ml_object.model, cache_dir=self.cache_dir)
-        return ds.download_dataset_bag(dataset_rid=bag,
-                                       materialize=materialize,
-                                       version=version or DatasetVersion(),
-                                       execution_rid=self.execution_rid)
+        return ds.download_dataset_bag(
+            dataset_rid=bag,
+            materialize=materialize,
+            version=version,
+            execution_rid=self.execution_rid,
+        )
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
@@ -364,7 +380,7 @@ class Execution:
         return results
 
     def upload_execution_outputs(
-            self, clean_folder: bool = True
+        self, clean_folder: bool = True
     ) -> dict[str, FileUploadState]:
         """Upload all the assets and metadata associated with the current execution.
 
@@ -466,7 +482,7 @@ class Execution:
             self.update_status(Status.failed, error)
 
     def _update_execution_metadata_table(
-            self, assets: dict[str, FileUploadState]
+        self, assets: dict[str, FileUploadState]
     ) -> None:
         """Upload execution metadata at working_dir/Execution_metadata.
 
@@ -494,9 +510,9 @@ class Execution:
 
             """
             return (
-                    asset.state == UploadState.success
-                    and asset.result
-                    and asset.result["RID"]
+                asset.state == UploadState.success
+                and asset.result
+                and asset.result["RID"]
             )
 
         entities = [
@@ -507,11 +523,11 @@ class Execution:
         ml_schema_path.tables[a_table].insert(entities)
 
     def _update_feature_table(
-            self,
-            target_table: str,
-            feature_name: str,
-            feature_file: str | Path,
-            uploaded_files: dict[str, FileUploadState],
+        self,
+        target_table: str,
+        feature_name: str,
+        feature_file: str | Path,
+        uploaded_files: dict[str, FileUploadState],
     ) -> None:
         """
 
@@ -583,9 +599,9 @@ class Execution:
                 RID of the asset
             """
             return (
-                    asset.state == UploadState.success
-                    and asset.result
-                    and asset.result["RID"]
+                asset.state == UploadState.success
+                and asset.result
+                and asset.result["RID"]
             )
 
         entities = [
@@ -688,7 +704,7 @@ class Execution:
         return feature_root(self.working_dir, self.execution_rid)
 
     def feature_paths(
-            self, table: Table | str, feature_name: str
+        self, table: Table | str, feature_name: str
     ) -> tuple[Path, dict[str, Path]]:
         """Return the file path of where to place feature values, and assets for the named feature and table.
 
@@ -735,8 +751,8 @@ class Execution:
             Pathlib path to the file in which to place table values.
         """
         if (
-                table
-                not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables
+            table
+            not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables
         ):
             raise DerivaMLException(
                 "Table '{}' not found in domain schema".format(table)
@@ -781,17 +797,19 @@ class Execution:
                 writer.writerow(feature.model_dump())
 
     @validate_call
-    def create_dataset(self, ds_type: str | list[str], description: str) -> RID:
+    def create_dataset(self, dataset_types: str | list[str], description: str) -> RID:
         """Create a new dataset with specified types.
 
         Args:
-            ds_type: param description:
+            dataset_types: param description:
             description: Markdown description of the dataset being created.
 
         Returns:
             RID of the newly created dataset.
         """
-        return self._ml_object.create_dataset(ds_type, description, self.execution_rid)
+        return self._ml_object.create_dataset(
+            dataset_types, description, self.execution_rid
+        )
 
     def __str__(self):
         items = [
@@ -879,7 +897,7 @@ class DerivaMLExec:
         return self.execution.execution_metadata_path(metadata_type)
 
     def feature_paths(
-            self, table: Table | str, feature_name: str
+        self, table: Table | str, feature_name: str
     ) -> tuple[Path, dict[str, Path]]:
         """Return the file path of where to place feature values, and assets for the named feature and table.
 

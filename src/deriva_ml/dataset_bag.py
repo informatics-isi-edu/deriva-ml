@@ -12,7 +12,7 @@ import pandas as pd
 from deriva.core.ermrest_model import Model
 from pydantic import validate_call, ConfigDict
 
-from deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
+from .deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
 
 
 class DatabaseModel:
@@ -40,7 +40,15 @@ class DatabaseModel:
         return cls(bag_path, dbase_dir)
 
     def __init__(self, bag_path: Path, dbase_dir: Optional[Path] = None) -> None:
+        """
+
+        Args:
+            bag_path: path to a bag
+            dbase_dir:
+        """
+
         self.bag_path = bag_path
+
         DatabaseModel._paths_loaded[self.bag_path.as_posix()] = self
 
         dir_path = dbase_dir or Path(tempfile.mkdtemp())
@@ -55,9 +63,14 @@ class DatabaseModel:
 
         self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
         # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
-        sql_dataset = self.normalize_table_name('Dataset')
+        sql_dataset = self.normalize_table_name("Dataset")
         with self.dbase:
-            self.dataset_rids = [t[0] for t in self.dbase.execute(f'SELECT "RID" FROM "{sql_dataset}"').fetchall()]
+            self.dataset_rids = [
+                t[0]
+                for t in self.dbase.execute(
+                    f'SELECT "RID" FROM "{sql_dataset}"'
+                ).fetchall()
+            ]
 
     def _load_model(self) -> None:
         # Create a sqlite database schema that contains all the tables within the catalog from which the
@@ -350,8 +363,10 @@ class DatasetBag:
         self.dataset_rid = rid
         self.dataset_table = self.database.dataset_table
         with dbase.dbase as db:
-            dataset_table = dbase.normalize_table_name('Dataset')
-            sql_cmd = f'SELECT Version from "{dataset_table}" where RID="{self.dataset_rid}"'
+            dataset_table = dbase.normalize_table_name("Dataset")
+            sql_cmd = (
+                f'SELECT Version from "{dataset_table}" where RID="{self.dataset_rid}"'
+            )
             self.version = db.execute(sql_cmd).fetchone()[0]
 
     def list_tables(self) -> list[str]:
