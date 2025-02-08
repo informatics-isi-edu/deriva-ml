@@ -1,6 +1,5 @@
 from deriva_ml.demo_catalog import create_demo_catalog, DemoML
 from deriva_ml  import Workflow, ExecutionConfiguration, MLVocab as vc
-import pandas as pd
 
 host = 'dev.eye-ai.org'
 catalog_id = "eye-ai"

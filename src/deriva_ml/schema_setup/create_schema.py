@@ -42,10 +42,11 @@ def define_table_dataset_version(sname: str, dataset_version_annotation: dict = 
             Column.define("Version", builtin_types.text, comment='Semantic version of dataset'),
             Column.define("Description", builtin_types.markdown),
             Column.define("Dataset", builtin_types.text, comment="RID of dataset"),
-            Column.define("MINID", builtin_types.text, comment='URL to MINID for dataset'),
+            Column.define("Minid", builtin_types.text, comment='URL to MINID for dataset'),
         ],
         key_defs=[Key.define(['Dataset', 'Version'])],
-        fkey_defs=[ForeignKey.define(['Dataset'], sname, ['Dataset'], ['RID'])]
+
+        fkey_defs=[ForeignKey.define(['Dataset'], sname, 'Dataset', ['RID'])]
     )
 
 

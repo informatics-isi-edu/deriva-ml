@@ -15,10 +15,8 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadAuthorizationError,
     DerivaDownloadTimeoutError,
 )
-from scipy.spatial import minkowski_distance
 
 from deriva_definitions import ML_SCHEMA, RID, DerivaMLException, MLVocab, Status
-from datetime import datetime
 from enum import Enum
 import json
 import logging
@@ -63,16 +61,24 @@ class Dataset:
         self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
         self._cache_dir = cache_dir
 
+    def _insert_dataset_version(self, dataset_rid: RID, dataset_version: DatasetVersion):
+        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
+        version_path = schema_path.tables["Dataset_Version"]
+        schema_path.tables["Dataset"].update([{'RID': dataset_rid, 'Version': str(dataset_version)}])
+        return list(version_path.insert([{'Dataset': dataset_rid, 'Version': str(dataset_version)}]))[0]
+
     def _synchronize_dataset_versions(self):
         schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
         dataset_path = schema_path.tables["Dataset"]
         dataset_version_path = schema_path.tables["DatasetVersion"]
         datasets = dataset_path.attributes(dataset_path.RID, dataset_path.RMT, dataset_path.Version).fetch()
 
-    def dataset_history(self, dataset_rid) -> list(DatasetVersion):
+    def dataset_history(self, dataset_rid) -> list[dict[str, DatasetVersion|str]]:
         version_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema].tables["Dataset_Version"]
-        return [DatasetVersion.parse(v['Version'])
-                for v in version_path.filter(version_path.Dataset == dataset_rid).entitites().fetch()]
+        return [{'version': DatasetVersion.parse(v['Version']),
+                 'minid': v['Minid'],
+                 'timestamp': v['RCT']}
+                for v in version_path.filter(version_path.Dataset == dataset_rid).entities().fetch()]
 
     def _dataset_version_snapshot(self, dataset_rid) -> str:
         dataset_version = self.dataset_version(dataset_rid)
@@ -115,7 +121,7 @@ class Dataset:
           component: VersionPart:
 
         Returns:
-          new semantic ersion of the dataset_table as a 3-tuple
+          new semantic version of the dataset_table as a 3-tuple
 
         Raises:
           DerivaMLException: if provided RID is not to a dataset_table.
@@ -123,19 +129,12 @@ class Dataset:
         version = self.dataset_version(dataset_rid)
         match component:
             case VersionPart.major:
-                version.bump_major()
+                version = version.bump_major()
             case VersionPart.minor:
-                version.bump_minor()
+                version = version.bump_minor()
             case VersionPart.patch:
-                version.bump_patch()
-        dataset_path = (
-            self._model.catalog.getPathBuilder()
-            .schemas[self.ml_schema]
-            .tables[self.dataset_table.name]
-        )
-        dataset_path.update(
-            [{"RID": dataset_rid, "Version": str(version)}]
-        )
+                version = version.bump_patch()
+        self._insert_dataset_version(dataset_rid, version)
         return version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -189,7 +188,7 @@ class Dataset:
         dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[
             self.dataset_table.name
         ]
-        dataset = dataset_table_path.insert(
+        dataset_rid = dataset_table_path.insert(
             [
                 {
                     "Description": description,
@@ -207,15 +206,16 @@ class Dataset:
         ).name
         pb.schemas[self.ml_schema].tables[atable].insert(
             [
-                {MLVocab.dataset_type: ds_type, "Dataset": dataset}
+                {MLVocab.dataset_type: ds_type, "Dataset": dataset_rid}
                 for ds_type in ds_types
             ]
         )
         if execution_rid is not None:
             pb.schemas[self.ml_schema].Dataset_Execution.insert(
-                [{"Dataset": dataset, "Execution": execution_rid}]
+                [{"Dataset": dataset_rid, "Execution": execution_rid}]
             )
-        return dataset
+        self._insert_dataset_version(dataset_rid, version)
+        return dataset_rid
 
     @validate_call
     def delete_dataset(self, dataset_rid: RID, recurse: bool = False) -> None:
@@ -819,7 +819,20 @@ class Dataset:
         return f'{self._model.catalog.catalog_id}@{snaptime}'
 
     def get_dataset_minid(self, dataset_rid: RID, version: Optional[DatasetVersion] = None, create: bool = True) -> str:
-        if ds := [v for v in self.dataset_history(dataset_rid) if v == version]:
+        """Return a MINID to the specified dataset.  If no version is specified, use the latest.
+
+        Args:
+            dataset_rid:
+            version:
+            create:
+
+        Returns:
+
+        """
+        if not any([dataset_rid == ds["RID"] for ds in self.find_datasets()]):
+            raise DerivaMLException(f"RID {dataset_rid} is not a dataset_table")
+        version = version or self.dataset_version(dataset_rid)
+        if ds := [v for v in self.dataset_history(dataset_rid) if v['version'] == str(version) and v['minid']]:
             return ds[0]['minid']
 
         with TemporaryDirectory() as tmp_dir:
@@ -828,11 +841,9 @@ class Dataset:
             else:
                 # We are given the RID to a dataset_table, so we are going to have to export as a bag and place into
                 # local file system.
-                if not any([dataset_rid == ds["RID"] for ds in self.find_datasets()]):
-                    raise DerivaMLException(f"RID {dataset_rid} is not a dataset_table")
 
-                # Generate a dowload specfication file for the current catalog schema. By default, this spec
-                # will generate a MINID and place the bag into S3 storage.
+                # Generate a download specification file for the current catalog schema. By default, this spec
+                # will generate a minid and place the bag into S3 storage.
                 spec_file = f"{tmp_dir}/download_spec.json"
                 with open(spec_file, "w", encoding="utf-8") as ds:
                     json.dump(
@@ -862,7 +873,9 @@ class Dataset:
                 ) as e:
                     raise DerivaMLException(format_exception(e))
 
-            self.update_dataset_version(dataset_rid, version, minid_page_url)
+            # Update version table with MINID.
+            version_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema].tables['Dataset_Version']
+            version_path.update([{'RID': dataset_rid, 'Minid': minid_page_url}])
             return minid_page_url
 
     def _download_dataset_bag(
