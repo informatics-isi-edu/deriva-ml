@@ -77,6 +77,10 @@ class Execution:
         self.start_time = None
         self.status = Status.pending
 
+        self.bag_minids: list[DatasetMinid] = []
+        self.dataset_rids : list[RID]= []
+        self.datasets: list[DatasetBag] = []
+
         self.working_dir = self._ml_object.working_dir
         self.cache_dir = self._ml_object.cache_dir
 
@@ -148,8 +152,6 @@ class Execution:
 
         """
         # Materialize bdbag
-        self.dataset_rids = []
-        self.datasets: list[DatasetBag] = []
         for dataset in self.configuration.datasets:
             self.update_status(Status.running, f"Materialize bag {dataset.rid}... ")
             bag_path, minid = self.download_dataset_bag(
@@ -157,6 +159,7 @@ class Execution:
                 materialize=dataset.materialize,
                 version=dataset.version,
             )
+            self.bag_minids.append(minid)
             self.datasets.append(DatasetBag(minid))
             self.dataset_rids.append(dataset.rid)
         # Update execution info

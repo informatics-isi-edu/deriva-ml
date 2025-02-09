@@ -29,7 +29,7 @@ class DatabaseModel:
     """
 
     _paths_loaded: dict[Path:"DatabaseModel"] = {}
-    _rid_map: dict[RID, dict[DatasetVersion, "DatabaseModel"]] = {}
+    _rid_map: dict[RID, tuple[DatasetVersion, "DatabaseModel"]] = {}
 
     @classmethod
     @validate_call
@@ -40,15 +40,9 @@ class DatabaseModel:
         return cls(minid, bag_path)
 
     @staticmethod
-    def rid_lookup(dataset_rid: RID, version: DatasetVersion) -> "DatabaseModel":
+    def rid_lookup(dataset_rid: RID) -> tuple[DatasetVersion, "DatabaseModel"]:
         try:
-            dset_versions = DatabaseModel._rid_map.get(dataset_rid)
-            try:
-                return dset_versions[version]
-            except KeyError:
-                raise DerivaMLException(
-                    f"Version {version} not found for dataset {dataset_rid}"
-                )
+            return DatabaseModel._rid_map[dataset_rid]
         except KeyError:
             raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
@@ -56,9 +50,7 @@ class DatabaseModel:
         self.bag_path = bag_path
         self.minid = minid
         DatabaseModel._paths_loaded[bag_path.as_posix()] = self
-        DatabaseModel._rid_map.setdefault(minid.dataset_rid, {})[
-            minid.dataset_version
-        ] = self
+        DatabaseModel._rid_map[minid.dataset_rid] = (minid.dataset_version, self)
         dir_path = bag_path.parent
         self.dbase_file = dir_path / f"{minid.version_rid}.db"
         self.dbase = sqlite3.connect(self.dbase_file)
@@ -73,16 +65,24 @@ class DatabaseModel:
         # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
         sql_dataset = self.normalize_table_name("Dataset_Version")
         with self.dbase:
-            self.dataset_rids = [
+            dataset_versions = [
                 t
                 for t in self.dbase.execute(
                     f'SELECT "Dataset", "Version" FROM "{sql_dataset}"'
                 ).fetchall()
             ]
-        for dataset_rid, dataset_version in self.dataset_rids:
-            DatabaseModel._rid_map.setdefault(dataset_rid, {})[
-                DatasetVersion.parse(dataset_version)
-            ] = self
+
+        # Get most current version of each rid
+        self.bag_rids = {}
+        for rid, version in dataset_versions:
+            self.bag_rids[rid] = max(
+                self.bag_rids.get(rid, DatasetVersion(0, 1, 0)), version
+            )
+        for dataset_rid, dataset_version in self.bag_rids.items():
+            DatabaseModel._rid_map[dataset_rid] = (
+                DatasetVersion.parse(dataset_version),
+                self,
+            )
 
     def _load_model(self) -> None:
         # Create a sqlite database schema that contains all the tables within the catalog from which the

@@ -1,12 +1,12 @@
 from collections import defaultdict
 from copy import copy
-from typing import Any, Generator, Optional
+from typing import Any, Generator
 
 import pandas as pd
 from pydantic import validate_call, ConfigDict
 
-from .deriva_definitions import RID, DerivaMLException
-from .dataset_aux_classes import DatasetVersion, DatasetMinid
+from .deriva_definitions import RID
+from .dataset_aux_classes import DatasetMinid
 from .database_model import DatabaseModel
 
 
@@ -17,25 +17,17 @@ class DatasetBag:
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def __init__(
-        self, dataset: DatasetMinid | RID, version: Optional[DatasetVersion] = None
-    ) -> None:
+    def __init__(self, dataset: DatasetMinid | RID) -> None:
         """
         Initialize a DatasetBag instance.
 
         Args:
             dataset: Version of dataset_table
-            version: Version of dataset_table
         """
-        if isinstance(dataset, DatasetMinid):
-            self.dataset_rid = dataset.dataset_rid
-            self.dataset_version = dataset.dataset_version
-        else:
-            if not version:
-                raise DerivaMLException(f"Must provide version if using dataset_rid")
-            self.dataset_rid = dataset
-            self.dataset_version = version
-        self.model = DatabaseModel.rid_lookup(self.dataset_rid, self.dataset_version)
+        self.dataset_rid = (
+            dataset.dataset_rid if isinstance(dataset, DatasetMinid) else dataset
+        )
+        self.version, self.model = DatabaseModel.rid_lookup(self.dataset_rid)
         self.database = self.model.dbase
 
         self.dataset_table = self.model.dataset_table
@@ -117,7 +109,7 @@ class DatasetBag:
         return dict(members)
 
     @validate_call
-    def list_dataset_children(self, recurse: bool = False) -> list[RID]:
+    def list_dataset_children(self, recurse: bool = False) -> list["DatasetBag"]:
         """Given a dataset_table RID, return a list of RIDs of any nested datasets.
 
         Returns:
@@ -126,7 +118,7 @@ class DatasetBag:
         """
         return self._list_dataset_children(self.dataset_rid, recurse)
 
-    def _list_dataset_children(self, dataset_rid, recurse: bool) -> list[RID]:
+    def _list_dataset_children(self, dataset_rid, recurse: bool) -> list["DatasetBag"]:
         ds_table = self.model.normalize_table_name("Dataset")
         nds_table = self.model.normalize_table_name("Dataset_Dataset")
         dv_table = self.model.normalize_table_name("Dataset_Version")
@@ -138,10 +130,7 @@ class DatasetBag:
                 f'"{nds_table}".Nested_Dataset == "{ds_table}".RID '
                 f'where "{nds_table}".Dataset == "{dataset_rid}"'
             )
-            nested = [
-                    DatasetBag(r[0], DatasetVersion.parse(r[1]))
-                    for r in db.execute(sql_cmd).fetchall()
-                ]
+            nested = [DatasetBag(r[0]) for r in db.execute(sql_cmd).fetchall()]
 
         result = copy(nested)
         if recurse:
