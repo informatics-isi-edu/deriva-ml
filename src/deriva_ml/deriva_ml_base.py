@@ -256,7 +256,7 @@ class Feature:
         featureclass_name = f"{self.target_table.name}Feature{self.feature_name}"
 
         # Create feature class. To do this, we must determine the python type for each column and also if the
-        # column is optional or not based on its nulliblity.
+        # column is optional or not based on its nullability.
         feature_columns = {
             c.name: (
                 Optional[map_type(c)] if c.nullok else map_type(c),
@@ -691,8 +691,8 @@ class DerivaML(Dataset):
     ) -> type[FeatureRecord]:
         """Create a new feature that can be associated with a table.
 
-        The feature can associate a controlled vocabulary term, an asset, or any other values with a s
-        pecific instance of an object and  execution.
+        The feature can associate a controlled vocabulary term, an asset, or any other values with a
+        specific instance of an object and  execution.
 
         Args:
             feature_name: Name of the new feature to be defined
@@ -767,7 +767,7 @@ class DerivaML(Dataset):
     def feature_record_class(
         self, table: str | Table, feature_name: str
     ) -> type[FeatureRecord]:
-        """ "Create a pydantic model for entries into the specified feature table.
+        """Create a pydantic model for entries into the specified feature table.
 
         For information on how to
         See the pydantic documentation for more details about the pydantic model.
@@ -881,7 +881,7 @@ class DerivaML(Dataset):
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_feature_values(self, table: Table | str, feature_name: str) -> ResultSet:
-        """Return a datapath resultset containing all values of a feature associated with a table.
+        """Return a datapath ResultSet containing all values of a feature associated with a table.
 
         Args:
             table: param feature_name:
@@ -951,7 +951,7 @@ class DerivaML(Dataset):
                     defaults={"ID", "URI"},
                 )[0]
             )
-        except DataPathException as e:
+        except DataPathException:
             term_id = self.lookup_term(table, term_name)
             if not exists_ok:
                 raise DerivaMLException(f"{term_name} already exists")
@@ -964,7 +964,7 @@ class DerivaML(Dataset):
          or a synonym for the term.  Generate an exception if the term is not in the vocabulary.
 
         Args:
-            table: The name of the controlled vocabulary table or a ERMrest table object..
+            table: The name of the controlled vocabulary table or a ERMRest table object.
             term_name: The name of the term to look up.
 
         Returns:
@@ -996,10 +996,10 @@ class DerivaML(Dataset):
         ]
 
     def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
-        """Return an list of terms that are in a vocabulary table.
+        """Return a list of terms that are in a vocabulary table.
 
         Args:
-            table: The name of the controlled vocabulary table or a ERMrest table object.
+            table: The name of the controlled vocabulary table or a ERMRest table object.
             table: str | Table:
 
         Returns:
@@ -1203,7 +1203,7 @@ class DerivaML(Dataset):
         with NamedTemporaryFile("w+", delete=False, suffix=".json") as dest_file:
             hs = HatracStore("https", self.host_name, self.credential)
             hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
-            return ExecutionConfiguration.load_configuration(dest_file.name)
+            return ExecutionConfiguration.load_configuration(Path(dest_file.name))
 
     def _upload_execution_configuration_file(
         self, config_file: str, description: str

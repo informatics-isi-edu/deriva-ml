@@ -1,10 +1,18 @@
 import json
 from typing import Optional, Any
 
-from pydantic import BaseModel, conlist, model_validator, ConfigDict, field_serializer
+from pydantic import (
+    BaseModel,
+    conlist,
+    model_validator,
+    ConfigDict,
+    field_serializer,
+    validate_call,
+)
+from pathlib import Path
 
-from deriva_ml.dataset import DatasetVersion
-from deriva_ml.deriva_definitions import RID
+from .dataset import DatasetVersion
+from .deriva_definitions import RID
 
 
 class Workflow(BaseModel):
@@ -72,15 +80,16 @@ class ExecutionConfiguration(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @staticmethod
-    def load_configuration(file: str) -> "ExecutionConfiguration":
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def load_configuration(path: Path) -> "ExecutionConfiguration":
         """Create a ExecutionConfiguration from a JSON configuration file.
 
         Args:
-          file: File containing JSON version of execution configuration.
+          path: File containing JSON version of execution configuration.
 
         Returns:
           An execution configuration whose values are loaded from the given file.
         """
-        with open(file) as fd:
+        with open(path) as fd:
             config = json.load(fd)
         return ExecutionConfiguration.model_validate(config)

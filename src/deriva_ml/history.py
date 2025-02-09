@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from deriva.core import DerivaServer, urlquote
 
 

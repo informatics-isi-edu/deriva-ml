@@ -25,7 +25,8 @@ from deriva_ml.deriva_definitions import (
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset import Dataset, DatasetVersion
-from .dataset_bag import DatasetBag, DatabaseModel
+from .dataset_aux_classes import DatasetMinid
+from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
 from .upload import execution_metadata_dir, execution_asset_dir, execution_root
 from .upload import feature_root, feature_asset_dir, feature_value_path
@@ -44,7 +45,7 @@ class Execution:
     datasets will be used, what additional files (assets) are required, what code is being run (Workflow) and an
     optional description of the Execution.  Side effects of creating an execution object are:
 
-    1. An execution record is created in the catalog and the RID of that record is recorded,
+    1. An execution record is created in the catalog and the RID of that record  recorded,
     2. Any specified datasets are downloaded and materialized
     3. Any additional required assets are downloaded.
 
@@ -68,9 +69,8 @@ class Execution:
         Args:
             configuration:
             ml_object:
-            reload: RID of previously initalized execution object.
+            reload: RID of previously initialized execution object.
         """
-        self.dataset_paths: list[Path] = []
         self.asset_paths: list[Path] = []
         self.configuration = configuration
         self._ml_object = ml_object
@@ -152,15 +152,13 @@ class Execution:
         self.datasets: list[DatasetBag] = []
         for dataset in self.configuration.datasets:
             self.update_status(Status.running, f"Materialize bag {dataset.rid}... ")
-            bag_path, dataset_rid, minid = self.download_dataset_bag(
+            bag_path, minid = self.download_dataset_bag(
                 dataset.rid,
                 materialize=dataset.materialize,
                 version=dataset.version,
             )
-            database = DatabaseModel.create(bag_path, self._ml_object.working_dir)
-            self.datasets.append(database.get_dataset(dataset_rid))
-            self.dataset_rids.append(dataset_rid)
-            self.dataset_paths.append(bag_path)
+            self.datasets.append(DatasetBag(minid))
+            self.dataset_rids.append(dataset.rid)
         # Update execution info
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         if self.dataset_rids and not reload:
@@ -228,7 +226,7 @@ class Execution:
         bag: RID | str,
         materialize: bool = True,
         version: Optional[DatasetVersion] = None,
-    ) -> tuple[Path, RID, str]:
+    ) -> tuple[Path, DatasetMinid]:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
 
@@ -817,7 +815,6 @@ class Execution:
             f"working_dir: {self.working_dir}",
             f"execution_rid: {self.execution_rid}",
             f"workflow_rid: {self.workflow_rid}",
-            f"dataset_paths: {self.dataset_paths}",
             f"asset_paths: {self.asset_paths}",
             f"configuration: {self.configuration}",
         ]
@@ -875,7 +872,7 @@ class DerivaMLExec:
             return False
 
     def execution_asset_path(self, asset_type: str) -> Path:
-        """Return path to wher execution assets of specifed type should be placed.
+        """Return path to where execution assets of specified type should be placed.
 
         Args:
             asset_type: str:
@@ -889,7 +886,7 @@ class DerivaMLExec:
         """Return path to where execution metadata of specified type should be placed.
 
         Args:
-            metadata_type: Term from metddata type vocabulary.
+            metadata_type: Term from metadata type vocabulary.
 
         Returns:
             Path to the directory in which to place metadata files.

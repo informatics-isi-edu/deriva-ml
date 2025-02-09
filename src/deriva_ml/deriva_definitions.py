@@ -2,7 +2,6 @@
 Shared definitions that are used in different DerivaML modules.
 """
 
-
 import warnings
 from enum import Enum
 from typing import Any, Iterable, Optional, Annotated
@@ -11,24 +10,27 @@ import deriva.core.ermrest_model as em
 from deriva.core.ermrest_model import builtin_types
 from pydantic import BaseModel, model_serializer, Field, computed_field
 
-ML_SCHEMA = 'deriva-ml'
+ML_SCHEMA = "deriva-ml"
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
-warnings.filterwarnings('ignore',
-                        message='Field name "schema"',
-                        category=Warning,
-                        module='pydantic')
+warnings.filterwarnings(
+    "ignore", message='Field name "schema"', category=Warning, module="pydantic"
+)
 
-warnings.filterwarnings('ignore',
-                        message='fields may not start with an underscore',
-                        category=Warning,
-                        module='pydantic')
+warnings.filterwarnings(
+    "ignore",
+    message="fields may not start with an underscore",
+    category=Warning,
+    module="pydantic",
+)
 
-
-rid_regex = r"^(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)$"
+rid_part = r"(?P<rid>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+))"
+snapshot_part = r"(?:@(?P<snapshot>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)))?"
+rid_regex = f"^{rid_part}{snapshot_part}$"
 RID = Annotated[str, Field(pattern=rid_regex)]
 
-DerivaSystemColumns = ['RCT', 'RMT', 'RCB', 'RMB']
+DerivaSystemColumns = ["RCT", "RMT", "RCB", "RMB"]
+
 
 # For some reason, deriva-py doesn't use the proper enum class!!
 class UploadState(Enum):
@@ -41,8 +43,10 @@ class UploadState(Enum):
     cancelled = 6
     timeout = 7
 
+
 class StrEnum(str, Enum):
     pass
+
 
 class FileUploadState(BaseModel):
     state: UploadState
@@ -52,7 +56,8 @@ class FileUploadState(BaseModel):
     @computed_field
     @property
     def rid(self) -> Optional[RID]:
-        return self.result and self.result['RID']
+        return self.result and self.result["RID"]
+
 
 class Status(StrEnum):
     """Enumeration class defining execution status.
@@ -64,10 +69,11 @@ class Status(StrEnum):
         failed: Execution has failed.
 
     """
-    running = 'Running'
-    pending = 'Pending'
-    completed = 'Completed'
-    failed = 'Failed'
+
+    running = "Running"
+    pending = "Pending"
+    completed = "Completed"
+    failed = "Failed"
 
 
 class BuiltinTypes(Enum):
@@ -97,19 +103,24 @@ class BuiltinTypes(Enum):
     serial4 = builtin_types.serial4
     serial8 = builtin_types.serial8
 
+
 class MLVocab(StrEnum):
     """Names of controlled vocabulary for various types within DerivaML."""
-    dataset_type = 'Dataset_Type'
-    workflow_type = 'Workflow_Type'
-    execution_asset_type = 'Execution_Asset_Type'
-    execution_metadata_type = 'Execution_Metadata_Type'
+
+    dataset_type = "Dataset_Type"
+    workflow_type = "Workflow_Type"
+    execution_asset_type = "Execution_Asset_Type"
+    execution_metadata_type = "Execution_Metadata_Type"
+
 
 class ExecMetadataVocab(StrEnum):
     """
-    Predefined execution metatadata types.
+    Predefined execution metadata types.
     """
-    execution_config = 'Execution_Config'
-    runtime_env = 'Runtime_Env'
+
+    execution_config = "Execution_Config"
+    runtime_env = "Runtime_Env"
+
 
 class ColumnDefinition(BaseModel):
     """Pydantic model for deriva_py Column.define"""
@@ -133,7 +144,8 @@ class ColumnDefinition(BaseModel):
             comment=self.comment,
             acls=self.acls,
             acl_bindings=self.acl_bindings,
-            annotations=self.annotations)
+            annotations=self.annotations,
+        )
 
 
 class KeyDefinition(BaseModel):
@@ -148,19 +160,20 @@ class KeyDefinition(BaseModel):
             colnames=self.colnames,
             constraint_names=self.constraint_names,
             comment=self.comment,
-            annotations=self.annotations
+            annotations=self.annotations,
         )
 
 
 class ForeignKeyDefinition(BaseModel):
     """Pydantic model for deriva_py ForeignKey.define"""
+
     colnames: Iterable[str]
     pk_sname: str
     pk_tname: str
     pk_colnames: Iterable[str]
     constraint_names: Iterable[str] = Field(default_factory=list)
-    on_update: str = 'NO ACTION'
-    on_delete: str = 'NO ACTION'
+    on_update: str = "NO ACTION"
+    on_delete: str = "NO ACTION"
     comment: str = None
     acls: dict[str, Any] = Field(default_factory=dict)
     acl_bindings: dict[str, Any] = Field(default_factory=dict)
@@ -178,7 +191,7 @@ class ForeignKeyDefinition(BaseModel):
             comment=self.comment,
             acls=self.acls,
             acl_bindings=self.acl_bindings,
-            annotations=self.annotations
+            annotations=self.annotations,
         )
 
 
@@ -202,7 +215,8 @@ class TableDefinition(BaseModel):
             comment=self.comment,
             acls=self.acls,
             acl_bindings=self.acl_bindings,
-            annotations=self.annotations)
+            annotations=self.annotations,
+        )
 
 
 class DerivaMLException(Exception):
@@ -212,6 +226,6 @@ class DerivaMLException(Exception):
         msg (str): Optional message for the exception.
     """
 
-    def __init__(self, msg=''):
+    def __init__(self, msg=""):
         super().__init__(msg)
         self._msg = msg

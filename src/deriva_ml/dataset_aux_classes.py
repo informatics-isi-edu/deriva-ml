@@ -61,21 +61,21 @@ class DatasetMinid(BaseModel):
     def dataset_snapshot(self) -> int:
         return self.version_rid.split("@")[1]
 
-    @classmethod
     @model_validator(mode="before")
+    @classmethod
     def insert_metadata(cls, data: Any) -> Any:
         if isinstance(data, dict):
             if "metadata" in data:
                 data = data | data["metadata"]
         return data
 
-    @classmethod
     @field_validator("bag_url", mode="before")
+    @classmethod
     def convert_location_to_str(cls, value: list[str]) -> str:
         return value[0]
 
-    @classmethod
     @field_validator("checksum", mode="before")
+    @classmethod
     def convert_checksum_to_value(cls, checksums: list[dict]) -> str:
         checksum_value = ""
         for checksum in checksums:

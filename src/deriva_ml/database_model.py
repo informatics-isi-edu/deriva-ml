@@ -41,7 +41,16 @@ class DatabaseModel:
 
     @staticmethod
     def rid_lookup(dataset_rid: RID, version: DatasetVersion) -> "DatabaseModel":
-        return DatabaseModel._rid_map.get(dataset_rid, {}).get(version, None)
+        try:
+            dset_versions = DatabaseModel._rid_map.get(dataset_rid)
+            try:
+                return dset_versions[version]
+            except KeyError:
+                raise DerivaMLException(
+                    f"Version {version} not found for dataset {dataset_rid}"
+                )
+        except KeyError:
+            raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
     def __init__(self, minid: DatasetMinid, bag_path: Path):
         self.bag_path = bag_path
@@ -62,17 +71,18 @@ class DatabaseModel:
 
         self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
         # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
-        sql_dataset = self.normalize_table_name("Dataset")
+        sql_dataset = self.normalize_table_name("Dataset_Version")
         with self.dbase:
             self.dataset_rids = [
-                t[0]
+                t
                 for t in self.dbase.execute(
-                    f'SELECT "RID" FROM "{sql_dataset}"'
+                    f'SELECT "Dataset", "Version" FROM "{sql_dataset}"'
                 ).fetchall()
             ]
-        # FIX ME
-        # for dataset_rid in self.dataset_rids:
-        #    DatabaseModel._rid_map[dataset_rid].update(DatasetVersion(dataset_rid))
+        for dataset_rid, dataset_version in self.dataset_rids:
+            DatabaseModel._rid_map.setdefault(dataset_rid, {})[
+                DatasetVersion.parse(dataset_version)
+            ] = self
 
     def _load_model(self) -> None:
         # Create a sqlite database schema that contains all the tables within the catalog from which the
@@ -223,9 +233,7 @@ class DatabaseModel:
 
         # Get a list of all the dataset_type values associated with this dataset_table.
         datasets = []
-        print(atable)
         ds_types = list(self.get_table_as_dict(atable))
-        print(ds_types)
         for dataset in self.get_table_as_dict("Dataset"):
             my_types = [t for t in ds_types if t["Dataset"] == dataset["RID"]]
             datasets.append(
@@ -288,7 +296,6 @@ class DatabaseModel:
           A dataframe containing the contents of the specified table.
         """
         table_name = self.normalize_table_name(table)
-        print(table_name)
         return pd.read_sql(f'SELECT * FROM "{table_name}"', con=self.dbase)
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:

@@ -1,5 +1,5 @@
 """
-This module provides functions that help stucture local directories for uploading to a DerivaML catalog, and
+This module provides functions that help structure local directories for uploading to a DerivaML catalog, and
 generating an upload specification for those directories.
 
 Here is the directory layout we support:
