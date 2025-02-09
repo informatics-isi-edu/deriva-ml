@@ -33,7 +33,7 @@ Here is the directory layout we support:
 
 from pathlib import Path
 from typing import Optional
-from deriva_definitions import RID
+from .deriva_definitions import RID
 import regex as re
 
 upload_root_regex = r"(?i)^.*/deriva-ml"

@@ -78,7 +78,7 @@ class Execution:
         self.status = Status.pending
 
         self.bag_minids: list[DatasetMinid] = []
-        self.dataset_rids : list[RID]= []
+        self.dataset_rids: list[RID] = []
         self.datasets: list[DatasetBag] = []
 
         self.working_dir = self._ml_object.working_dir
