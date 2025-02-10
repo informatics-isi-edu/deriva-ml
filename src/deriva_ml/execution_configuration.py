@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import Optional, Any
 
@@ -79,9 +81,9 @@ class ExecutionConfiguration(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @staticmethod
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def load_configuration(path: Path) -> "ExecutionConfiguration":
+   # @staticmethod
+   # @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def load_configuration(self, path: Path) -> ExecutionConfiguration:
         """Create a ExecutionConfiguration from a JSON configuration file.
 
         Args:
