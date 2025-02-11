@@ -12,12 +12,19 @@ from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
 
-from .execution_configuration import ExecutionConfiguration, Workflow
-from .deriva_definitions import MLVocab, BuiltinTypes, ColumnDefinition
+from deriva_ml import (
+    DerivaML,
+    ExecutionConfiguration,
+    Workflow,
+    MLVocab,
+    BuiltinTypes,
+    ColumnDefinition,
+)
+
+# from deriva_ml.deriva_definitions import MLVocab, BuiltinTypes, ColumnDefinition
 from .execution import Execution
 from .schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from .dataset import Dataset
-from .deriva_ml_base import DerivaML
 
 TEST_DATASET_SIZE = 20
 
@@ -69,16 +76,26 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
     deriva_ml.add_dataset_element_type("Image")
 
     # Create a new dataset_table
-    deriva_ml.add_term(MLVocab.dataset_type, "DemoSet", description="A test dataset_table")
+    deriva_ml.add_term(
+        MLVocab.dataset_type, "DemoSet", description="A test dataset_table"
+    )
     deriva_ml.add_term(
         MLVocab.dataset_type,
         "Partitioned",
         description="A partitioned dataset_table for ML training.",
     )
-    deriva_ml.add_term(MLVocab.dataset_type, "Subject", description="A test dataset_table")
-    deriva_ml.add_term(MLVocab.dataset_type, "Image", description="A test dataset_table")
-    deriva_ml.add_term(MLVocab.dataset_type, "Training", description="Training dataset_table")
-    deriva_ml.add_term(MLVocab.dataset_type, "Testing", description="Training dataset_table")
+    deriva_ml.add_term(
+        MLVocab.dataset_type, "Subject", description="A test dataset_table"
+    )
+    deriva_ml.add_term(
+        MLVocab.dataset_type, "Image", description="A test dataset_table"
+    )
+    deriva_ml.add_term(
+        MLVocab.dataset_type, "Training", description="Training dataset_table"
+    )
+    deriva_ml.add_term(
+        MLVocab.dataset_type, "Testing", description="Training dataset_table"
+    )
     deriva_ml.add_term(
         MLVocab.dataset_type, "Validation", description="Validation dataset_table"
     )
@@ -243,7 +260,6 @@ def create_demo_catalog(
         atexit.register(destroy_demo_catalog, test_catalog)
     model = test_catalog.getCatalogModel()
 
-
     try:
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
@@ -258,10 +274,14 @@ def create_demo_catalog(
         if create_datasets:
             create_demo_datasets(deriva_ml)
         dataset_table = deriva_ml.dataset_table
-        dataset_table.annotations.update(Dataset(deriva_ml.model, deriva_ml.cache_dir).generate_dataset_annotations())
+        dataset_table.annotations.update(
+            Dataset(deriva_ml.model, deriva_ml.cache_dir).generate_dataset_annotations()
+        )
         deriva_ml.model.apply()
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
-        AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
+        AclConfig(
+            hostname, test_catalog.catalog_id, policy_file, credentials=credentials
+        )
 
     except Exception:
         # on failure, delete catalog and re-raise exception

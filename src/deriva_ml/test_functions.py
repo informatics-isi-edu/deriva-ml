@@ -25,6 +25,12 @@ def setup_dev():
     return ml_instance
 
 
+def huy_test():
+    host = "dev.eye-ai.org"
+    source_dataset = "2-39FY"
+    ml_instance.download_dataset(source_dataset)
+
+
 def lac_test():
     huy_datasets = ["2-39FY", "2-277M"]
     source_dataset = "2-7K8W"

@@ -3,7 +3,14 @@ import sys
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model
-from deriva.core.ermrest_model import builtin_types, Schema, Table, Column, ForeignKey, Key
+from deriva.core.ermrest_model import (
+    builtin_types,
+    Schema,
+    Table,
+    Column,
+    ForeignKey,
+    Key,
+)
 from deriva.core.utils.core_utils import tag as chaise_tags
 
 from deriva_ml import MLVocab
@@ -27,8 +34,7 @@ def define_table_workflow(workflow_annotation: dict):
 def define_table_dataset(sname, dataset_annotation: dict = None):
     return Table.define(
         tname="Dataset",
-        column_defs=[
-            Column.define("Description", builtin_types.markdown)],
+        column_defs=[Column.define("Description", builtin_types.markdown)],
         annotations=dataset_annotation if dataset_annotation is not None else {},
     )
 
@@ -37,13 +43,20 @@ def define_table_dataset_version(sname: str, dataset_version_annotation: dict = 
     return Table.define(
         tname="Dataset_Version",
         column_defs=[
-            Column.define("Version", builtin_types.text, default="0.1.0", comment='Semantic version of dataset'),
+            Column.define(
+                "Version",
+                builtin_types.text,
+                default="0.1.0",
+                comment="Semantic version of dataset",
+            ),
             Column.define("Description", builtin_types.markdown),
             Column.define("Dataset", builtin_types.text, comment="RID of dataset"),
-            Column.define("Minid", builtin_types.text, comment='URL to MINID for dataset'),
+            Column.define(
+                "Minid", builtin_types.text, comment="URL to MINID for dataset"
+            ),
         ],
-        key_defs=[Key.define(['Dataset', 'Version'])],
-        fkey_defs=[ForeignKey.define(['Dataset'], sname, 'Dataset', ['RID'])]
+        key_defs=[Key.define(["Dataset", "Version"])],
+        fkey_defs=[ForeignKey.define(["Dataset"], sname, "Dataset", ["RID"])],
     )
 
 
@@ -86,112 +99,187 @@ def define_asset_execution_asset(sname: str, execution_asset_annotation: dict):
 
 def create_www_schema(model: Model):
     """
-    Set up a new schema and tables to hold web-page like content.  The tables include a page table, and a asset
+    Set up a new schema and tables to hold web-page like content.  The tables include a page table, and an asset
     table that can have images that are referred to by the web page.  Pages are written using markdown.
     :return:
     """
-    if model.schemas.get('www'):
-        model.schemas['www'].drop(cascade=True)
+    if model.schemas.get("www"):
+        model.schemas["www"].drop(cascade=True)
     www_schema = model.create_schema(
         Schema.define(
-            'www', comment='Schema for tables that will be displayed as web content')
+            "www", comment="Schema for tables that will be displayed as web content"
+        )
     )
     www_schema.create_table(
         Table.define(
-            'Page',
+            "Page",
             column_defs=[
-                Column.define('Title', builtin_types.text, nullok=False, comment='Unique title for the page'),
-                Column.define('Content', builtin_types.markdown, comment='Content of the page in markdown')
+                Column.define(
+                    "Title",
+                    builtin_types.text,
+                    nullok=False,
+                    comment="Unique title for the page",
+                ),
+                Column.define(
+                    "Content",
+                    builtin_types.markdown,
+                    comment="Content of the page in markdown",
+                ),
             ],
-            key_defs=[Key.define(['Title'])],
+            key_defs=[Key.define(["Title"])],
             annotations={
-                chaise_tags.table_display: {'detailed': {'hide_column_headers': True, 'collapse_toc_panel': True}
-                                            },
-                chaise_tags.visible_foreign_keys: {'detailed': {}},
-                chaise_tags.visible_columns: {'detailed': ['Content']}}
-
+                chaise_tags.table_display: {
+                    "detailed": {
+                        "hide_column_headers": True,
+                        "collapse_toc_panel": True,
+                    }
+                },
+                chaise_tags.visible_foreign_keys: {"detailed": {}},
+                chaise_tags.visible_columns: {"detailed": ["Content"]},
+            },
         )
     )
 
     return www_schema
 
 
-def create_ml_schema(model: Model, schema_name: str = 'deriva-ml', project_name: str = None):
+def create_ml_schema(
+    model: Model, schema_name: str = "deriva-ml", project_name: str = None
+):
     ml_catalog: ErmrestCatalog = model.catalog
 
     if model.schemas.get(schema_name):
         model.schemas[schema_name].drop(cascade=True)
     # get annotations
     annotations = generate_annotation(ml_catalog.catalog_id, schema_name)
-    model.annotations.update(annotations['catalog_annotation'])
+    model.annotations.update(annotations["catalog_annotation"])
     client_annotation = {
         "tag:misd.isi.edu,2015:display": {"name": "Users"},
-        "tag:isrd.isi.edu,2016:table-display": {"row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}},
-        "tag:isrd.isi.edu,2016:visible-columns": {"compact": ["Full_Name", "Display_Name", "Email", "ID"]}
+        "tag:isrd.isi.edu,2016:table-display": {
+            "row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}
+        },
+        "tag:isrd.isi.edu,2016:visible-columns": {
+            "compact": ["Full_Name", "Display_Name", "Email", "ID"]
+        },
     }
-    model.schemas['public'].tables['ERMrest_Client'].annotations.update(client_annotation)
+    model.schemas["public"].tables["ERMrest_Client"].annotations.update(
+        client_annotation
+    )
     model.apply()
 
-    schema = model.create_schema(Schema.define(schema_name, annotations=annotations['schema_annotation']))
+    schema = model.create_schema(
+        Schema.define(schema_name, annotations=annotations["schema_annotation"])
+    )
     project_name = project_name or schema_name
     # Workflow
-    schema.create_table(Table.define_vocabulary("Feature_Name", f'{project_name}:{{RID}}'))
-
-    workflow_table = schema.create_table(define_table_workflow(annotations["workflow_annotation"]))
-    workflow_table.create_reference(schema.create_table(
-        Table.define_vocabulary(MLVocab.workflow_type, f'{schema_name}:{{RID}}')))
-
-    execution_table = schema.create_table(define_table_execution(schema_name, annotations["execution_annotation"]))
-
-    dataset_table = schema.create_table( define_table_dataset(schema_name, annotations["dataset_annotation"]))
-    dataset_type = schema.create_table(
-        Table.define_vocabulary(MLVocab.dataset_type, f'{project_name}:{{RID}}'))
     schema.create_table(
-        Table.define_association(associates=[("Dataset", dataset_table), (MLVocab.dataset_type, dataset_type)])
+        Table.define_vocabulary("Feature_Name", f"{project_name}:{{RID}}")
+    )
+
+    workflow_table = schema.create_table(
+        define_table_workflow(annotations["workflow_annotation"])
+    )
+    workflow_table.create_reference(
+        schema.create_table(
+            Table.define_vocabulary(MLVocab.workflow_type, f"{schema_name}:{{RID}}")
+        )
+    )
+
+    execution_table = schema.create_table(
+        define_table_execution(schema_name, annotations["execution_annotation"])
+    )
+
+    dataset_table = schema.create_table(
+        define_table_dataset(schema_name, annotations["dataset_annotation"])
+    )
+    dataset_type = schema.create_table(
+        Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}")
     )
     schema.create_table(
-        Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
+        Table.define_association(
+            associates=[
+                ("Dataset", dataset_table),
+                (MLVocab.dataset_type, dataset_type),
+            ]
+        )
+    )
+    schema.create_table(
+        Table.define_association(
+            associates=[("Dataset", dataset_table), ("Execution", execution_table)]
+        )
     )
 
     dataset_version = schema.create_table(define_table_dataset_version(schema_name))
-    dataset_table.create_reference(('Version', True, dataset_version))
+    dataset_table.create_reference(("Version", True, dataset_version))
 
     # Nested datasets.
     schema.create_table(
-        Table.define_association(associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)])
+        Table.define_association(
+            associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)]
+        )
     )
 
     # Execution Metadata
     execution_metadata_table = schema.create_table(
-        define_asset_execution_metadata(schema.name, annotations["execution_metadata_annotation"]))
+        define_asset_execution_metadata(
+            schema.name, annotations["execution_metadata_annotation"]
+        )
+    )
     execution_metadata_table.create_reference(
         schema.create_table(
-            Table.define_vocabulary("Execution_Metadata_Type", f'{project_name}:{{RID}}')))
+            Table.define_vocabulary(
+                "Execution_Metadata_Type", f"{project_name}:{{RID}}"
+            )
+        )
+    )
     schema.create_table(
-        Table.define_association([("Execution_Metadata", execution_metadata_table), ("Execution", execution_table)]))
+        Table.define_association(
+            [
+                ("Execution_Metadata", execution_metadata_table),
+                ("Execution", execution_table),
+            ]
+        )
+    )
 
     # Execution Asset
     execution_asset_table = schema.create_table(
-        define_asset_execution_asset(schema.name, annotations["execution_asset_annotation"])
+        define_asset_execution_asset(
+            schema.name, annotations["execution_asset_annotation"]
+        )
     )
     execution_asset_table.create_reference(
         schema.create_table(
-            Table.define_vocabulary("Execution_Asset_Type", f'{project_name}:{{RID}}')))
+            Table.define_vocabulary("Execution_Asset_Type", f"{project_name}:{{RID}}")
+        )
+    )
     schema.create_table(
-        Table.define_association([("Execution_Asset", execution_asset_table), ("Execution", execution_table)]))
+        Table.define_association(
+            [("Execution_Asset", execution_asset_table), ("Execution", execution_table)]
+        )
+    )
 
     create_www_schema(model)
     initialize_ml_schema(model, schema_name)
 
 
-def initialize_ml_schema(model: Model, schema_name: str = 'deriva-ml'):
+def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     catalog = model.catalog
-    execution_metadata_type = catalog.getPathBuilder().schemas[schema_name].tables['Execution_Metadata_Type']
-    execution_metadata_type.insert([{'Name': 'Execution_Config',
-                                     'Description': "Configuration File for execution metadata"},
-                                    {'Name': "Runtime_Env",
-                                     'Description': "Information about the execution environment"}],
-                                   defaults={'ID', 'URI'})
+    execution_metadata_type = (
+        catalog.getPathBuilder().schemas[schema_name].tables["Execution_Metadata_Type"]
+    )
+    execution_metadata_type.insert(
+        [
+            {
+                "Name": "Execution_Config",
+                "Description": "Configuration File for execution metadata",
+            },
+            {
+                "Name": "Runtime_Env",
+                "Description": "Information about the execution environment",
+            },
+        ],
+        defaults={"ID", "URI"},
+    )
 
 
 def main():

@@ -1,13 +1,13 @@
 from collections import defaultdict
 from copy import copy
-from typing import Any, Generator
+from typing import Any, Generator, TYPE_CHECKING, Optional
 
 import pandas as pd
-from pydantic import validate_call, ConfigDict
+from pydantic import validate_call
+from .deriva_definitions import RID, DerivaMLException
 
-from .deriva_definitions import RID
-from .dataset_aux_classes import DatasetMinid
-from .database_model import DatabaseModel
+if TYPE_CHECKING:
+    from .database_model import DatabaseModel
 
 
 class DatasetBag:
@@ -16,21 +16,29 @@ class DatasetBag:
 
     """
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def __init__(self, dataset: DatasetMinid | RID) -> None:
+    #    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def __init__(
+        self, database_model: "DatabaseModel", dataset_rid: Optional[RID]
+    ) -> None:
         """
         Initialize a DatasetBag instance.
 
         Args:
-            dataset: Version of dataset_table
+            database_model: Database version of the bag.
         """
-        self.dataset_rid = (
-            dataset.dataset_rid if isinstance(dataset, DatasetMinid) else dataset
-        )
-        self.version, self.model = DatabaseModel.rid_lookup(self.dataset_rid)
+
+        self.model = database_model
         self.database = self.model.dbase
 
+        if dataset_rid:
+            if not dataset_rid in self.model.bag_rids:
+                raise DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
+        self.dataset_rid = dataset_rid or self.model.dataset_rid
+        self.version = self.model.dataset_version(self.dataset_rid)
         self.dataset_table = self.model.dataset_table
+
+    def __repr__(self) -> str:
+        return f"<deriva_ml.DatasetBag object {self.dataset_rid} at {hex(id(self))}>"
 
     def list_tables(self) -> list[str]:
         """List the names of the tables in the catalog
@@ -130,7 +138,9 @@ class DatasetBag:
                 f'"{nds_table}".Nested_Dataset == "{ds_table}".RID '
                 f'where "{nds_table}".Dataset == "{dataset_rid}"'
             )
-            nested = [DatasetBag(r[0]) for r in db.execute(sql_cmd).fetchall()]
+            nested = [
+                DatasetBag(self.model, r[0]) for r in db.execute(sql_cmd).fetchall()
+            ]
 
         result = copy(nested)
         if recurse:

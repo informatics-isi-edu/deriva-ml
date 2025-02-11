@@ -3,7 +3,7 @@ import sqlite3
 
 from csv import reader
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, Generator, Optional
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -12,6 +12,8 @@ from pydantic import validate_call
 
 from .deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
 from .dataset_aux_classes import DatasetVersion, DatasetMinid
+
+from .dataset_bag import DatasetBag
 
 
 class DatabaseModel:
@@ -29,7 +31,7 @@ class DatabaseModel:
     """
 
     _paths_loaded: dict[Path:"DatabaseModel"] = {}
-    _rid_map: dict[RID, tuple[DatasetVersion, "DatabaseModel"]] = {}
+    _rid_map: dict[RID, list[tuple[DatasetVersion, "DatabaseModel"]]] = {}
 
     @classmethod
     @validate_call
@@ -40,17 +42,18 @@ class DatabaseModel:
         return cls(minid, bag_path)
 
     @staticmethod
-    def rid_lookup(dataset_rid: RID) -> tuple[DatasetVersion, "DatabaseModel"]:
+    def rid_lookup(dataset_rid: RID) -> list[tuple[DatasetVersion, "DatabaseModel"]]:
         try:
             return DatabaseModel._rid_map[dataset_rid]
         except KeyError:
             raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
     def __init__(self, minid: DatasetMinid, bag_path: Path):
+        DatabaseModel._paths_loaded[bag_path.as_posix()] = self
+
         self.bag_path = bag_path
         self.minid = minid
-        DatabaseModel._paths_loaded[bag_path.as_posix()] = self
-        DatabaseModel._rid_map[minid.dataset_rid] = (minid.dataset_version, self)
+        self.dataset_rid = minid.dataset_rid
         dir_path = bag_path.parent
         self.dbase_file = dir_path / f"{minid.version_rid}.db"
         self.dbase = sqlite3.connect(self.dbase_file)
@@ -78,10 +81,15 @@ class DatabaseModel:
             self.bag_rids[rid] = max(
                 self.bag_rids.get(rid, DatasetVersion(0, 1, 0)), version
             )
+
+        #
         for dataset_rid, dataset_version in self.bag_rids.items():
-            DatabaseModel._rid_map[dataset_rid] = (
-                DatasetVersion.parse(dataset_version),
-                self,
+            version_list = DatabaseModel._rid_map.setdefault(dataset_rid, [])
+            version_list.append(
+                (
+                    DatasetVersion.parse(dataset_version),
+                    self,
+                )
             )
 
     def _load_model(self) -> None:
@@ -218,6 +226,25 @@ class DatabaseModel:
                     "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;"
                 ).fetchall()
             ]
+
+    def get_dataset(self, dataset_rid: Optional[RID] = None) -> DatasetBag:
+        """Get a dataset, or nested dataset from the bag database
+
+        Args:
+            dataset_rid: Optional.  If not provided, use the main RID for the bag.  If a value is given, it must
+            be the RID for a nested dataset.
+
+        Returns:
+            DatasetBag object for the specified dataset.
+        """
+        if dataset_rid and dataset_rid not in self.bag_rids:
+            DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
+        return DatasetBag(self, dataset_rid or self.dataset_rid)
+
+    def dataset_version(self, dataset_rid: Optional[RID] = None) -> DatasetVersion:
+        if dataset_rid and dataset_rid not in self.bag_rids:
+            DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
+        return self.bag_rids[dataset_rid]
 
     def find_datasets(self) -> list[dict[str, Any]]:
         """Returns a list of currently available datasets.

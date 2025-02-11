@@ -9,7 +9,6 @@ from pydantic import (
     model_validator,
     ConfigDict,
     field_serializer,
-    validate_call,
 )
 from pathlib import Path
 
@@ -26,7 +25,7 @@ class Workflow(BaseModel):
         url: The URI to the workflow instance.  In most cases should be a GitHub URI to the code being executed.
         workflow_type: The type of the workflow.  Must be an existing controlled vocabulary term.
         version: The version of the workflow instance.  Should follow semantic versioning.
-        description: A description of the workflow instance.  Can be in markdown format.
+        description: A description of the workflow instance.  Can be in Markdown format.
     """
 
     name: str
@@ -37,7 +36,7 @@ class Workflow(BaseModel):
 
 
 class DatasetSpec(BaseModel):
-    """Represent a dataset_table in a execution configuration dataset_table list
+    """Represent a dataset_table in an execution configuration dataset_table list
 
     Attributes:
         rid: A dataset_table RID
@@ -53,7 +52,7 @@ class DatasetSpec(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _check_bare_rid(cls, data: Any) -> dict[str, str | bool]:
-        # If you are just given a string, assume its a rid and put into dict for further validation.
+        # If you are just given a string, assume it's a rid and put into dict for further validation.
         return {"rid": data} if isinstance(data, str) else data
 
     @field_serializer("version", when_used="json")
@@ -71,7 +70,7 @@ class ExecutionConfiguration(BaseModel):
                      download_dataset_bag method can be specified, e.g.  datasets=[{'rid': RID, 'materialize': True}].
         assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
         workflow: A workflow instance.  Must have a name, URI to the workflow instance, and a type.
-        description: A description of the execution.  Can use markdown format.
+        description: A description of the execution.  Can use Markdown format.
     """
 
     datasets: conlist(DatasetSpec) = []
@@ -81,9 +80,8 @@ class ExecutionConfiguration(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-   # @staticmethod
-   # @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def load_configuration(self, path: Path) -> ExecutionConfiguration:
+    @staticmethod
+    def load_configuration(path: Path) -> ExecutionConfiguration:
         """Create a ExecutionConfiguration from a JSON configuration file.
 
         Args:

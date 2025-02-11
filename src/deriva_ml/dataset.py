@@ -29,6 +29,7 @@ import requests
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import Any, Callable, Optional, Iterable
 
+from deriva_ml import DatasetBag
 from .deriva_definitions import ML_SCHEMA, DerivaMLException, MLVocab, Status, RID
 from .history import iso_to_snap
 from .database_model import DatabaseModel
@@ -826,7 +827,7 @@ class Dataset:
         materialize: bool = True,
         version: Optional[DatasetVersion] = None,
         execution_rid: Optional[RID] = None,
-    ) -> tuple[Path, DatasetMinid]:
+    ) -> DatasetBag:
         """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
 
         Args:
@@ -851,8 +852,7 @@ class Dataset:
             if materialize
             else self.download_dataset_bag(minid)
         )
-        DatabaseModel.register(minid, bag_path)
-        return bag_path, minid
+        return DatabaseModel.register(minid, bag_path).get_dataset()
 
     def _version_snapshot(self, dataset_rid: RID, version: DatasetVersion) -> str:
         version_timestamp = [

@@ -38,8 +38,7 @@ def get_record_history(
         if len(l) > 1:
             raise ValueError("got more than one row for %r" % url)
         if len(l) == 0:
-            raise ValueError("ERROR: %s: No record found \n" % (url))
-            break
+            raise ValueError("ERROR: %s: No record found \n" % url)
         row = l[0]
         snap2rows[parts["snap"]] = row
         rows_found.append(row)

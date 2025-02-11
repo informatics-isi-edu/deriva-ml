@@ -15,8 +15,8 @@ from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
 from pydantic import validate_call, ConfigDict
 
-from deriva_ml.deriva_definitions import MLVocab, ExecMetadataVocab
-from deriva_ml.deriva_definitions import (
+from .deriva_definitions import MLVocab, ExecMetadataVocab
+from .deriva_definitions import (
     RID,
     Status,
     FileUploadState,
@@ -25,7 +25,6 @@ from deriva_ml.deriva_definitions import (
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset import Dataset, DatasetVersion
-from .dataset_aux_classes import DatasetMinid
 from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
 from .upload import execution_metadata_dir, execution_asset_dir, execution_root
@@ -77,7 +76,6 @@ class Execution:
         self.start_time = None
         self.status = Status.pending
 
-        self.bag_minids: list[DatasetMinid] = []
         self.dataset_rids: list[RID] = []
         self.datasets: list[DatasetBag] = []
 
@@ -154,13 +152,13 @@ class Execution:
         # Materialize bdbag
         for dataset in self.configuration.datasets:
             self.update_status(Status.running, f"Materialize bag {dataset.rid}... ")
-            bag_path, minid = self.download_dataset_bag(
-                dataset.rid,
-                materialize=dataset.materialize,
-                version=dataset.version,
+            self.datasets.append(
+                self.download_dataset_bag(
+                    dataset.rid,
+                    materialize=dataset.materialize,
+                    version=dataset.version,
+                )
             )
-            self.bag_minids.append(minid)
-            self.datasets.append(DatasetBag(minid))
             self.dataset_rids.append(dataset.rid)
         # Update execution info
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
@@ -229,7 +227,7 @@ class Execution:
         bag: RID | str,
         materialize: bool = True,
         version: Optional[DatasetVersion] = None,
-    ) -> tuple[Path, DatasetMinid]:
+    ) -> DatasetBag:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
 
