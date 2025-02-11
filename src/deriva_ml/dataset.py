@@ -83,6 +83,7 @@ class Dataset:
             if v["Version"] > versions.get("Dataset", DatasetVersion(0, 0, 0)):
                 versions[v["Dataset"]] = v
         dataset_path = schema_path.tables["Dataset"]
+
         dataset_path.update(
             [
                 {"RID": dataset, "Version": version["RID"]}
@@ -847,10 +848,11 @@ class Dataset:
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
         minid = self.get_dataset_minid(dataset_rid, version)
+        print(minid)
         bag_path = (
             self._materialize_dataset_bag(minid, execution_rid=execution_rid)
             if materialize
-            else self.download_dataset_bag(minid)
+            else self._download_dataset_bag(minid)
         )
         return DatabaseModel.register(minid, bag_path).get_dataset()
 
