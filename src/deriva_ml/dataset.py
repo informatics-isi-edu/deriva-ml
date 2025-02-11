@@ -1007,6 +1007,7 @@ class Dataset:
         else:
             bag_dir.mkdir(parents=True, exist_ok=True)
             with NamedTemporaryFile(
+                delete=False,
                 suffix=f"Dataset_{minid.dataset_rid}.zip"
             ) as zip_file:
                 archive_path = fetch_single_file(minid.bag_url, zip_file.name)
