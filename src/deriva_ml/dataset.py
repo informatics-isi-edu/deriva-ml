@@ -59,12 +59,21 @@ class Dataset:
         self._cache_dir = cache_dir
 
     def _insert_dataset_version(
-        self, dataset_rid: RID, dataset_version: DatasetVersion,  description: Optional[str] = ""
+        self,
+        dataset_rid: RID,
+        dataset_version: DatasetVersion,
+        description: Optional[str] = "",
     ) -> RID:
         schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
         version_path = schema_path.tables["Dataset_Version"]
         version_rid = version_path.insert(
-            [{"Dataset": dataset_rid, "Version": str(dataset_version), "Description": description}]
+            [
+                {
+                    "Dataset": dataset_rid,
+                    "Version": str(dataset_version),
+                    "Description": description,
+                }
+            ]
         )[0]["RID"]
         schema_path.tables["Dataset"].update(
             [{"RID": dataset_rid, "Version": version_rid}]
