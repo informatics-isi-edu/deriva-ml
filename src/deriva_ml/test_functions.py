@@ -78,7 +78,7 @@ def execution_test(ml_instance):
     ][0]
 
     ml_instance.add_term(
-        vc.workflow_type, "Manual Workflow", description="Inital setup of Model File"
+        vc.workflow_type, "Manual Workflow", description="Initial setup of Model File"
     )
     ml_instance.add_term(
         vc.execution_asset_type, "API_Model", description="Model for our API workflow"
@@ -105,6 +105,7 @@ def execution_test(ml_instance):
 
     # Now upload the file and retrieve the RID of the new asset from the returned results.
     uploaded_assets = manual_execution.upload_execution_outputs()
+
     training_model_rid = uploaded_assets["API_Model/modelfile.txt"].result["RID"]
     api_workflow = Workflow(
         name="ML Demo",

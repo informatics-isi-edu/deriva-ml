@@ -297,16 +297,17 @@ class Execution:
           - DerivaMLException: If there is an issue uploading the assets.
         """
         results = {}
+
+        def asset_name(p: str) -> str:
+            return Path(*Path(p).parts[-2:]).as_posix()
+
         try:
             self.update_status(Status.running, "Uploading execution assets...")
             execution_asset_files = self._ml_object.upload_assets(
                 self._execution_asset_dir
             )
             self._update_execution_asset_table(execution_asset_files)
-            prefix_path = f"{self._execution_asset_dir.as_posix()}/"
-            results |= {
-                k.replace(prefix_path, ""): v for k, v in execution_asset_files.items()
-            }
+            results |= {asset_name(k): v for k, v in execution_asset_files.items()}
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
@@ -389,7 +390,8 @@ class Execution:
             clean_folder: bool:  (Default value = True)
 
         Returns:
-            Results of the upload operation. Uploaded assets with key as assets' suborder name, values as an
+            Results of the upload operation. Asset names are all relative to the execution upload directory.
+            Uploaded assets with key as assets' suborder name, values as an
             ordered dictionary with RID and metadata in the Execution_Asset table.
         """
         try:
