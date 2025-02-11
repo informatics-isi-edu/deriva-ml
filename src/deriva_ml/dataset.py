@@ -59,17 +59,36 @@ class Dataset:
         self._cache_dir = cache_dir
 
     def _insert_dataset_version(
-        self, dataset_rid: RID, dataset_version: DatasetVersion
+        self, dataset_rid: RID, dataset_version: DatasetVersion,  description: Optional[str] = ""
     ) -> RID:
         schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
         version_path = schema_path.tables["Dataset_Version"]
         version_rid = version_path.insert(
-            [{"Dataset": dataset_rid, "Version": str(dataset_version)}]
+            [{"Dataset": dataset_rid, "Version": str(dataset_version), "Description": description}]
         )[0]["RID"]
         schema_path.tables["Dataset"].update(
             [{"RID": dataset_rid, "Version": version_rid}]
         )
         return version_rid
+
+    def _bootstrap_versions(self):
+        datasets = [ds["RID"] for ds in self.find_datasets()]
+        ds_version = [
+            {
+                "Dataset": d,
+                "Version": "0.1.0",
+                "Description": "Dataset at the time of conversion to versioned datasets",
+            }
+            for d in datasets
+        ]
+        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
+        version_path = schema_path.tables["Dataset_Version"]
+        dataset_path = schema_path.tables["Dataset"]
+        history = list(version_path.insert(ds_version))
+        dataset_versions = [
+            {"RID": h["Dataset"], "Version": h["Version"]} for h in history
+        ]
+        dataset_path.update(dataset_versions)
 
     def _synchronize_dataset_versions(self):
         datasets = [ds["RID"] for ds in self.find_datasets()]
@@ -127,7 +146,7 @@ class Dataset:
             return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
 
     def increment_dataset_version(
-        self, dataset_rid: RID, component: VersionPart
+        self, dataset_rid: RID, component: VersionPart, description: Optional[str] = ""
     ) -> DatasetVersion:
         """Increment the version of the specified dataset_table.
 
@@ -135,7 +154,8 @@ class Dataset:
           dataset_rid: RID to a dataset_table
           component: Which version of the dataset_table to increment.
           dataset_rid: RID:
-          component: VersionPart:
+          component: VersionPart: Major, Monor or Path
+          description: Description of the version update of the dataset_table.
 
         Returns:
           new semantic version of the dataset_table as a 3-tuple
@@ -151,7 +171,7 @@ class Dataset:
                 version = version.bump_minor()
             case VersionPart.patch:
                 version = version.bump_patch()
-        self._insert_dataset_version(dataset_rid, version)
+        self._insert_dataset_version(dataset_rid, version, description=description)
         return version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -435,7 +455,11 @@ class Dataset:
 
     @validate_call
     def add_dataset_members(
-        self, dataset_rid: Optional[RID], members: list[RID], validate: bool = True
+        self,
+        dataset_rid: Optional[RID],
+        members: list[RID],
+        validate: bool = True,
+        description: Optional[str] = "",
     ) -> None:
         """Add additional elements to an existing dataset_table.
 
@@ -445,10 +469,12 @@ class Dataset:
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             dataset_rid: Optional[RID]:
             members: list[RID]:
+            description: Markdown decription of the updated dataset.
             validate: bool:  (Default value = True)
         """
 
         members = set(members)
+        description = description or "Updated dataset via add_dataset_members"
 
         def check_dataset_cycle(member_rid, path=None):
             """
@@ -509,7 +535,9 @@ class Dataset:
                 schema_path.tables[association_map[table]].insert(
                     [{"Dataset": dataset_rid, fk_column: e} for e in elements]
                 )
-        self.increment_dataset_version(dataset_rid, VersionPart.minor)
+        self.increment_dataset_version(
+            dataset_rid, VersionPart.minor, description=description
+        )
 
     @validate_call
     def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
