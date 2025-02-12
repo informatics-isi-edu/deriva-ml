@@ -66,8 +66,7 @@ def get_os_info():
         try:
             values[func] = getattr(os, "get" + func)()
         except (OSError, AttributeError) as exc:
-            print(exc)
-            values[func] = exc.msg
+            pass
     values["umask"] = oct(get_umask())
     values["name"] = os.name
     values["environ"] = {e: v for e, v in os.environ.items()}
