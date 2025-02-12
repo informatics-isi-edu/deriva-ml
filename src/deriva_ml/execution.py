@@ -1,12 +1,11 @@
+from collections import defaultdict
 import csv
 import hashlib
 import json
 import logging
 import os
 import shutil
-from collections import defaultdict
 from datetime import datetime
-from importlib.metadata import distributions
 from pathlib import Path
 import requests
 from tempfile import NamedTemporaryFile
@@ -27,6 +26,7 @@ from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset import Dataset, DatasetVersion
 from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
+from .execution_environment import get_execution_environment
 from .upload import execution_metadata_dir, execution_asset_dir, execution_root
 from .upload import feature_root, feature_asset_dir, feature_value_path
 from .upload import is_feature_dir, is_feature_asset_dir
@@ -137,6 +137,19 @@ class Execution:
             raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
         return workflow_rid
 
+    def _save_runtime_environment(self):
+
+        runtime_env_path = ExecMetadataVocab.runtime_env.value
+        runtime_env_dir = self.execution_metadata_path(runtime_env_path)
+        with NamedTemporaryFile(
+            "w+",
+            dir=runtime_env_dir,
+            prefix="environment_snapshot_",
+            suffix=".txt",
+            delete=False,
+        ) as fp:
+            json.dump(get_execution_environment(), fp)
+
     def _initialize_execution(self, reload: Optional[RID] = None) -> None:
         """Initialize the execution by a configuration  in the Execution_Metadata table.
         Setup working directory and download all the assets and data.
@@ -185,17 +198,8 @@ class Execution:
             json.dump(self.configuration.model_dump(), config_file)
 
         # save runtime env
-        runtime_env_path = ExecMetadataVocab.runtime_env.value
-        runtime_env_dir = self.execution_metadata_path(runtime_env_path)
-        with NamedTemporaryFile(
-            "w+",
-            dir=runtime_env_dir,
-            prefix="environment_snapshot_",
-            suffix=".txt",
-            delete=False,
-        ) as fp:
-            for dist in distributions():
-                fp.write(f"{dist.metadata['Name']}=={dist.version}\n")
+        self._save_runtime_environment()
+
         self.start_time = datetime.now()
         self.update_status(Status.running, "Initialize status finished.")
 

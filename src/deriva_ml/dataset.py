@@ -885,7 +885,7 @@ class Dataset:
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
         minid = self.get_dataset_minid(dataset_rid, version)
-        print(minid)
+
         bag_path = (
             self._materialize_dataset_bag(minid, execution_rid=execution_rid)
             if materialize

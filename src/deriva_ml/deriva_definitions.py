@@ -104,6 +104,36 @@ class BuiltinTypes(Enum):
     serial8 = builtin_types.serial8
 
 
+class VocabularyTerm(BaseModel):
+    """An entry in a vocabulary table.
+
+    Attributes:
+       name: Name of vocabulary term
+       synonyms: List of alternative names for the term
+       id: CURI identifier for the term
+       uri: Unique URI for the term.
+       description: A description of the meaning of the term
+       rid: Resource identifier assigned to the term
+
+    Args:
+
+    Returns:
+
+    """
+
+    name: str = Field(alias="Name")
+    synonyms: Optional[list[str]] = Field(alias="Synonyms")
+    id: str = Field(alias="ID")
+    uri: str = Field(alias="URI")
+    description: str = Field(alias="Description")
+    rid: str = Field(alias="RID")
+
+    class Config:
+        """ """
+
+        extra = "ignore"
+
+
 class MLVocab(StrEnum):
     """Names of controlled vocabulary for various types within DerivaML."""
 

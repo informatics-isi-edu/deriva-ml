@@ -82,15 +82,9 @@ class DatabaseModel:
                 self.bag_rids.get(rid, DatasetVersion(0, 1, 0)), version
             )
 
-        #
         for dataset_rid, dataset_version in self.bag_rids.items():
             version_list = DatabaseModel._rid_map.setdefault(dataset_rid, [])
-            version_list.append(
-                (
-                    DatasetVersion.parse(dataset_version),
-                    self,
-                )
-            )
+            version_list.append((dataset_version, self))
 
     def _load_model(self) -> None:
         # Create a sqlite database schema that contains all the tables within the catalog from which the
