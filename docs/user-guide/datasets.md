@@ -55,7 +55,7 @@ subject_dataset = dataset_execution.create_dataset(
 
 ## Dataset element types
 
-In DerivaML, a dataet may consist of many different types of objects. In generaly, any element of a domain model may be included in a dataset. Howerver, 
+In DerivaML, a dataet may consist of many different types of objects. In generally, any element of a domain model may be included in a dataset. Howerver, 
 Its important to know how a 
 Datasets can contain elements from the domain model. or other datasets.
 
@@ -72,16 +72,13 @@ Listing members of a dataset
 
 # Dataset Versioning
 
-Every dataset is assigned a version number which will change over the lifetime of the dataset.  
-DerivaML uses semantic versioning to differentation between versions of the dataset over time. 
-A semantic version consists of three parts. Each part is an integer seperated by a dot:`major.minor.patch`. 
-The major part will change when there is a schema change to any object included in the dataset.  The minor part will change when new elements are added to a dataset, and the patch parch changes for minor alterations, such as adding or changing a comment or data cleaning.
+Every dataset is assigned a version number which will change over the lifetime of the dataset.DerivaML uses semantic versioning to differentation between versions of the dataset over time.  A semantic version consists of three parts. Each part is an integer seperated by a dot:`major.minor.patch`. 0  The major part will change when there is a schema change to any object included in the dataset.  The minor part will change when new elements are added to a dataset, and the patch parch changes for minor alterations, such as adding or changing a comment or data cleaning.
 
 DerivaML will automatically assign an intial version of `0.1.0` when a dataast is first created, and incement the
 minor part of the version number whenever new elements are addded. It is up to the DerivaML to otherwise incrment version.
 
 The version of a dataset can be incrmented by the method:
-```DerivaML.increment_version(part, description```
+```[DerivaML.increment_version(part, description)[deriva_ml.dataseet.increment_vertsion]```
 
 The current version of a dataset can be returned, as can the history of a dataset.
 
