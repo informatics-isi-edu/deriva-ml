@@ -20,7 +20,14 @@ from typing import Optional, Any
 
 
 class VersionPart(Enum):
-    """Simple enumeration for semantic versioning."""
+    """Simple enumeration for semantic versioning.
+
+    Attributes:
+        major (int): Major version number
+        minor (int): Minor version number
+        patch (int): Patch version number
+
+    """
 
     major = "major"
     minor = "minor"
@@ -28,13 +35,22 @@ class VersionPart(Enum):
 
 
 class DatasetVersion(Version):
+    """Represent the version associated with a dataset.
+
+    Attributes:
+        major (int): Major version number
+        minor (int): Minor version number
+        patch (int): Patch version number
+
+    Methods:
+        parse_version(str): Convert a version string into a DatasetVersion object.
+        to_dict(): Convert a DatasetVersion object to a dict.
+        replace(major, minor, patch): Replace the major and minor versions
+
+    """
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
 
-    @model_serializer()
-    def model_dump(self):
-        print("model_dump ")
-        return self.to_dict()
 
 
 class DatasetHistory(BaseModel):
@@ -60,6 +76,20 @@ class DatasetHistory(BaseModel):
 
 
 class DatasetMinid(BaseModel):
+    """Represent information about a MINID that refers to a dataset
+
+    Attributes:
+        dataset_version (DatasetVersion): A DatasetVersion object which captures the semantic versioning of the dataset.
+        metadata (dict): A dictionary containing metadata from the MINID landing page.
+        minid (str): The URL that represents the handle of the MINID associated with the dataset.
+        bag_url (str): The URL to the dataset bag
+        identifier (str): The identifier of the MINID in CURI form
+        landing_page (str): The URL to the landing page of the MINID
+        checksum (str): The checksum of the MINID in SHA256 form
+        dataset_rid (str): The RID of the dataset.
+        dataset_snapshot (str): The ERMRest catalog snapshot for the dataset version
+        
+    """
     dataset_version: DatasetVersion
     metadata: dict[str, str | int]
     minid: str = Field(alias="compact_uri")
@@ -71,12 +101,12 @@ class DatasetMinid(BaseModel):
 
     @computed_field
     @property
-    def dataset_rid(self) -> int:
+    def dataset_rid(self) -> str:
         return self.version_rid.split("@")[0]
 
     @computed_field
     @property
-    def dataset_snapshot(self) -> int:
+    def dataset_snapshot(self) -> str:
         return self.version_rid.split("@")[1]
 
     @model_validator(mode="before")
