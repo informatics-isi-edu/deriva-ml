@@ -6,7 +6,13 @@ source_dataset = "3R6"
 create_catalog = False
 
 from deriva_ml.demo_catalog import create_demo_catalog, DemoML
-from deriva_ml import Workflow, ExecutionConfiguration, MLVocab as vc, DerivaML
+from deriva_ml import (
+    Workflow,
+    ExecutionConfiguration,
+    MLVocab as vc,
+    DerivaML,
+    DatasetSpec,
+)
 
 
 def setup_demo_ml():
@@ -116,8 +122,14 @@ def execution_test(ml_instance):
 
     config = ExecutionConfiguration(
         datasets=[
-            nested_dataset_rid,
-            {"rid": testing_dataset_rid, "materialize": True},
+            DatasetSpec(
+                rid=nested_dataset_rid,
+                version=ml_instance.dataset_version(nested_dataset_rid),
+            ),
+            DatasetSpec(
+                rid=testing_dataset_rid,
+                version=ml_instance.dataset_version(testing_dataset_rid),
+            ),
         ],
         assets=[training_model_rid],
         description="Sample Execution",

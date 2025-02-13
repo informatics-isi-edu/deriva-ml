@@ -6,6 +6,7 @@ __all__ = [
     "Workflow",
     "DatasetBag",
     "DatasetVersion",
+    "DatasetSpec",
     "ColumnDefinition",
     "TableDefinition",
     "BuiltinTypes",
@@ -33,5 +34,10 @@ from .deriva_definitions import (
     DerivaSystemColumns,
 )
 from .deriva_ml_base import DerivaML
-from .execution_configuration import ExecutionConfiguration, Workflow, DatasetVersion
+from .execution_configuration import (
+    ExecutionConfiguration,
+    Workflow,
+    DatasetVersion,
+    DatasetSpec,
+)
 from .dataset_aux_classes import VersionPart

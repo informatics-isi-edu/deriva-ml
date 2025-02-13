@@ -1,5 +1,9 @@
 """
-THis module defines the DataSet class with is used to manipulate n
+This module defines the DataSet class with is used to manipulate datasets in DerivaML,
+The intended use of this class is as a base class in DerivaML so all the methods documented here are
+accessible via a DerivaML class instance.
+
+
 """
 
 from bdbag.fetch.fetcher import fetch_single_file
@@ -46,16 +50,16 @@ class Dataset:
     Class to manipulate a dataset.
 
     Attributes:
-        dataset_table: ERMRest table holding dataset information.
+        dataset_table (Table): ERMRest table holding dataset information.
     """
 
     def __init__(self, model: Model, cache_dir: Path):
         self._model = model
-        self.ml_schema = ML_SCHEMA
+        self._ml_schema = ML_SCHEMA
         self._domain_schema = [
             s for s in model.schemas if s not in ["deriva-ml", "www", "public"]
         ].pop()
-        self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
+        self.dataset_table = self._model.schemas[self._ml_schema].tables["Dataset"]
         self._cache_dir = cache_dir
 
     def _insert_dataset_version(
@@ -64,7 +68,7 @@ class Dataset:
         dataset_version: DatasetVersion,
         description: Optional[str] = "",
     ) -> RID:
-        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
+        schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         version_path = schema_path.tables["Dataset_Version"]
         version_rid = version_path.insert(
             [
@@ -90,7 +94,7 @@ class Dataset:
             }
             for d in datasets
         ]
-        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
+        schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         version_path = schema_path.tables["Dataset_Version"]
         dataset_path = schema_path.tables["Dataset"]
         history = list(version_path.insert(ds_version))
@@ -103,7 +107,7 @@ class Dataset:
         datasets = [ds["RID"] for ds in self.find_datasets()]
         for ds in datasets:
             self.dataset_version(ds)
-        schema_path = self._model.catalog.getPathBuilder().schemas[self.ml_schema]
+        schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         dataset_version_path = schema_path.tables["Dataset_Version"]
         # Get the maximum version number for each dataset.
         versions = {}
@@ -119,10 +123,19 @@ class Dataset:
             ]
         )
 
-    def dataset_history(self, dataset_rid) -> list[DatasetHistory]:
+    def dataset_history(self, dataset_rid: RID) -> list[DatasetHistory]:
+        """Return a list of DatasetHistory objects representing the dataset
+
+        Args:
+            dataset_rid: A RID to the dataset for which history is to be fetched.
+
+        Returns:
+            A list of DatasetHistory objects which indicate the version-number, creation time,
+            and bag instantiation of the dataset.
+        """
         version_path = (
             self._model.catalog.getPathBuilder()
-            .schemas[self.ml_schema]
+            .schemas[self._ml_schema]
             .tables["Dataset_Version"]
         )
         return [
@@ -141,9 +154,13 @@ class Dataset:
     def dataset_version(self, dataset_rid: RID) -> DatasetVersion:
         """Retrieve the current version of the specified dataset_table.
 
+        Given a rid, return the most recent version of the dataset. It is important to remember that this version
+        captures the state of the catalog at the time the version was created, not the current state of the catalog.
+        This means that its possible that the values associated with an object in the catalog may be different
+        from the values of that object in the dataset.
+
         Args:
-            dataset_rid: return: A tuple with the semantic version of the dataset_table.
-            dataset_rid: RID:
+            dataset_rid: The RID of the dataset to retrieve the version for.
 
         Returns:
             A tuple with the semantic version of the dataset_table.
@@ -162,8 +179,8 @@ class Dataset:
         Args:
           dataset_rid: RID to a dataset_table
           component: Which version of the dataset_table to increment.
-          dataset_rid: RID:
-          component: VersionPart: Major, Monor or Path
+          dataset_rid: RID of the dataset whose version is to be incremented.
+          component: Major, Minor or Patch
           description: Description of the version update of the dataset_table.
 
         Returns:
@@ -200,8 +217,7 @@ class Dataset:
             version: Version of the dataset_table.
             ds_type: str | list[str]:
             description: str:
-            execution_rid: Optional[RID]:  (Default value = None)
-            version: tuple[int: int: int]
+
 
         Returns:
             New dataset_table RID.
@@ -212,7 +228,7 @@ class Dataset:
 
         type_path = (
             self._model.catalog.getPathBuilder()
-            .schemas[self.ml_schema]
+            .schemas[self._ml_schema]
             .tables[MLVocab.dataset_type.value]
         )
         defined_types = list(type_path.entities().fetch())
@@ -245,18 +261,18 @@ class Dataset:
 
         # Get the name of the association table between dataset_table and dataset_type.
         atable = next(
-            self._model.schemas[self.ml_schema]
+            self._model.schemas[self._ml_schema]
             .tables[MLVocab.dataset_type]
             .find_associations()
         ).name
-        pb.schemas[self.ml_schema].tables[atable].insert(
+        pb.schemas[self._ml_schema].tables[atable].insert(
             [
                 {MLVocab.dataset_type: ds_type, "Dataset": dataset_rid}
                 for ds_type in ds_types
             ]
         )
         if execution_rid is not None:
-            pb.schemas[self.ml_schema].Dataset_Execution.insert(
+            pb.schemas[self._ml_schema].Dataset_Execution.insert(
                 [{"Dataset": dataset_rid, "Execution": execution_rid}]
             )
         self._insert_dataset_version(dataset_rid, version)
@@ -311,11 +327,11 @@ class Dataset:
             self.dataset_table.name
         ]
         atable = next(
-            self._model.schemas[self.ml_schema]
+            self._model.schemas[self._ml_schema]
             .tables[MLVocab.dataset_type]
             .find_associations()
         ).name
-        ml_path = pb.schemas[self.ml_schema]
+        ml_path = pb.schemas[self._ml_schema]
         atable_path = ml_path.tables[atable]
 
         # Get a list of all the dataset_type values associated with this dataset_table.
@@ -478,7 +494,7 @@ class Dataset:
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             dataset_rid: Optional[RID]:
             members: list[RID]:
-            description: Markdown decription of the updated dataset.
+            description: Markdown description of the updated dataset.
             validate: bool:  (Default value = True)
         """
 
@@ -535,7 +551,7 @@ class Dataset:
         pb = self._model.catalog.getPathBuilder()
         for table, elements in dataset_elements.items():
             schema_path = pb.schemas[
-                self.ml_schema if table == "Dataset" else self._domain_schema
+                self._ml_schema if table == "Dataset" else self._domain_schema
             ]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
 
@@ -570,7 +586,7 @@ class Dataset:
             )
         # Get association table for nested datasets
         pb = self._model.catalog.getPathBuilder()
-        atable_path = pb.schemas[self.ml_schema].Dataset_Dataset
+        atable_path = pb.schemas[self._ml_schema].Dataset_Dataset
         return [
             p["Dataset"]
             for p in atable_path.filter(atable_path.Nested_Dataset == dataset_rid)
@@ -592,7 +608,9 @@ class Dataset:
         return [d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
 
     @staticmethod
-    def download_dataset_element(spath, dpath, table: Table) -> list[dict[str, Any]]:
+    def download_dataset_element(
+        spath: str, dpath: str, table: Table
+    ) -> list[dict[str, Any]]:
         """Return the download specification for the data object indicated by a path through the data model.
 
         Args:
@@ -694,9 +712,9 @@ class Dataset:
             if node.name == "Dataset":
                 paths.append(
                     (
-                        f"{sprefix}/(RID)=({self.ml_schema}:Dataset_Version:Dataset)",
+                        f"{sprefix}/(RID)=({self._ml_schema}:Dataset_Version:Dataset)",
                         f"{dprefix}/Dataset_Version",
-                        self._model.schemas[self.ml_schema].tables["Dataset_Version"],
+                        self._model.schemas[self._ml_schema].tables["Dataset_Version"],
                     )
                 )
                 new_spath = sprefix
@@ -717,7 +735,7 @@ class Dataset:
     def _table_paths(self, graph) -> list[tuple[str, str, Table]]:
         sprefix = "deriva-ml:Dataset/RID={Dataset_RID}"
         dprefix = "Dataset"
-        dataset_dataset_table = self._model.schemas[self.ml_schema].tables[
+        dataset_dataset_table = self._model.schemas[self._ml_schema].tables[
             "Dataset_Dataset"
         ]
         table_paths = self._domain_table_paths(
@@ -757,7 +775,7 @@ class Dataset:
         # Build up the dataset_table nesting graph...
         pb = (
             self._model.catalog.getPathBuilder()
-            .schemas[self.ml_schema]
+            .schemas[self._ml_schema]
             .tables["Dataset_Dataset"]
         )
         nested_dataset = defaultdict(list)
@@ -936,7 +954,7 @@ class Dataset:
             # Update version table with MINID.
             version_path = (
                 self._model.catalog.getPathBuilder()
-                .schemas[self.ml_schema]
+                .schemas[self._ml_schema]
                 .tables["Dataset_Version"]
             )
             version_path.update(
@@ -1031,7 +1049,7 @@ class Dataset:
 
         def update_status(status: Status, msg: str) -> None:
             self._model.catalog.getPathBuilder().schemas[
-                self.ml_schema
+                self._ml_schema
             ].Execution.update(
                 [
                     {

@@ -1,3 +1,4 @@
+import configparser
 from collections import defaultdict
 import csv
 import hashlib
@@ -54,6 +55,14 @@ class Execution:
 
     Finally, the execution object can update its current state in the DerivaML catalog, allowing users to remotely
     track the progress of their execution.
+
+    Attributes:
+        dataset_rids (list[RID]): The RIDs of the datasets to be downloaded and materialized as part of the execution.
+        datasets (list[DatasetBag]): List of datasetBag objects that referred the materialized datasets specified in.
+            `dataset_rids`.
+        configuration (ExecutionConfiguration): The configuration of the execution.
+        workflow_rid (RID): The RID of the workflow associated with the execution.
+        status (Status): The status of the execution.
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -79,8 +88,8 @@ class Execution:
         self.dataset_rids: list[RID] = []
         self.datasets: list[DatasetBag] = []
 
-        self.working_dir = self._ml_object.working_dir
-        self.cache_dir = self._ml_object.cache_dir
+        self._working_dir = self._ml_object.working_dir
+        self._cache_dir = self._ml_object.cache_dir
 
         self.workflow_rid = self._add_workflow()
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
@@ -243,7 +252,7 @@ class Execution:
         Returns:
             the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
-        ds = Dataset(self._ml_object.model, cache_dir=self.cache_dir)
+        ds = Dataset(self._ml_object.model, cache_dir=self._cache_dir)
         return ds.download_dataset_bag(
             dataset_rid=bag,
             materialize=materialize,
@@ -288,7 +297,7 @@ class Execution:
         )
 
     def _upload_execution_dirs(self) -> dict[str, FileUploadState]:
-        """Upload execution assets at working_dir/Execution_asset.
+        """Upload execution assets at _working_dir/Execution_asset.
 
         This routine uploads the contents of the
         Execution_Asset directory, and then updates the execution_asset table in the ML schema to have references
@@ -418,7 +427,7 @@ class Execution:
           :return: PathLib path object to model directory.
 
         """
-        path = self.working_dir / self.execution_rid / "asset"
+        path = self._working_dir / self.execution_rid / "asset"
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -489,7 +498,7 @@ class Execution:
     def _update_execution_metadata_table(
         self, assets: dict[str, FileUploadState]
     ) -> None:
-        """Upload execution metadata at working_dir/Execution_metadata.
+        """Upload execution metadata at _working_dir/Execution_metadata.
 
         Args:
             assets: dict[str:
@@ -629,7 +638,7 @@ class Execution:
 
         """
         return execution_metadata_dir(
-            self.working_dir, exec_rid=self.execution_rid, metadata_type=""
+            self._working_dir, exec_rid=self.execution_rid, metadata_type=""
         )
 
     def execution_metadata_path(self, metadata_type: str) -> Path:
@@ -647,7 +656,7 @@ class Execution:
             MLVocab.execution_metadata_type, metadata_type
         )  # Make sure metadata type exists.
         return execution_metadata_dir(
-            self.working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type
+            self._working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type
         )
 
     @property
@@ -661,7 +670,7 @@ class Execution:
 
         """
         return execution_asset_dir(
-            self.working_dir, exec_rid=self.execution_rid, asset_type=""
+            self._working_dir, exec_rid=self.execution_rid, asset_type=""
         )
 
     def execution_asset_path(self, asset_type: str) -> Path:
@@ -681,7 +690,7 @@ class Execution:
         self._ml_object.lookup_term(MLVocab.execution_asset_type, asset_type)
 
         return execution_asset_dir(
-            self.working_dir, exec_rid=self.execution_rid, asset_type=asset_type
+            self._working_dir, exec_rid=self.execution_rid, asset_type=asset_type
         )
 
     @property
@@ -694,7 +703,7 @@ class Execution:
           :return:
 
         """
-        return execution_root(self.working_dir, self.execution_rid)
+        return execution_root(self._working_dir, self.execution_rid)
 
     @property
     def _feature_root(self) -> Path:
@@ -706,7 +715,7 @@ class Execution:
         Returns:
 
         """
-        return feature_root(self.working_dir, self.execution_rid)
+        return feature_root(self._working_dir, self.execution_rid)
 
     def feature_paths(
         self, table: Table | str, feature_name: str
@@ -727,7 +736,7 @@ class Execution:
         feature = self._ml_object.lookup_feature(table, feature_name)
 
         tpath = feature_value_path(
-            self.working_dir,
+            self._working_dir,
             schema=self._ml_object.domain_schema,
             target_table=feature.target_table.name,
             feature_name=feature_name,
@@ -735,7 +744,7 @@ class Execution:
         )
         asset_paths = {
             asset_table.name: feature_asset_dir(
-                self.working_dir,
+                self._working_dir,
                 exec_rid=self.execution_rid,
                 schema=self._ml_object.domain_schema,
                 target_table=feature.target_table.name,
@@ -764,7 +773,7 @@ class Execution:
             )
 
         return table_path(
-            self.working_dir, schema=self._ml_object.domain_schema, table=table
+            self._working_dir, schema=self._ml_object.domain_schema, table=table
         )
 
     def execute(self) -> "DerivaMLExec":
@@ -818,8 +827,8 @@ class Execution:
 
     def __str__(self):
         items = [
-            f"caching_dir: {self.cache_dir}",
-            f"working_dir: {self.working_dir}",
+            f"caching_dir: {self._cache_dir}",
+            f"_working_dir: {self._working_dir}",
             f"execution_rid: {self.execution_rid}",
             f"workflow_rid: {self.workflow_rid}",
             f"asset_paths: {self.asset_paths}",

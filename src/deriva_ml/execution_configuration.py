@@ -39,13 +39,14 @@ class DatasetSpec(BaseModel):
     """Represent a dataset_table in an execution configuration dataset_table list
 
     Attributes:
-        rid: A dataset_table RID
-        materialize: If False, do not materialize datasets, only download table data, no assets.  Defaults to True
+        rid (RID): A dataset_table RID
+        materialize (bool): If False, do not materialize datasets, only download table data, no assets.  Defaults to True
+        version (DatasetVersion): The version of the dataset.  Should follow semantic versioning.
     """
 
     rid: RID
     materialize: bool = True
-    version: Optional[DatasetVersion] = None
+    version: DatasetVersion
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -55,9 +56,9 @@ class DatasetSpec(BaseModel):
         # If you are just given a string, assume it's a rid and put into dict for further validation.
         return {"rid": data} if isinstance(data, str) else data
 
-    @field_serializer("version", when_used="json")
-    def serialize_version(self, version: DatasetVersion):
-        return str(version)
+    @field_serializer("version")
+    def serialize_version(self, version: DatasetVersion) -> dict[str, Any]:
+        return version.to_dict()
 
 
 class ExecutionConfiguration(BaseModel):

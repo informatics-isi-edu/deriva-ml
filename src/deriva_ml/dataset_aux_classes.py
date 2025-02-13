@@ -12,6 +12,7 @@ from pydantic import (
     Field,
     computed_field,
     model_validator,
+    model_serializer,
 )
 
 from semver import Version
@@ -30,8 +31,25 @@ class DatasetVersion(Version):
     def __init__(self, *vargs, **kwargs):
         super().__init__(*vargs, **kwargs)
 
+    @model_serializer()
+    def model_dump(self):
+        print("model_dump ")
+        return self.to_dict()
+
 
 class DatasetHistory(BaseModel):
+    """
+    Class representing a dataset history.
+
+    Attributes:
+        dataset_version (DatasetVersion): A DatasetVersion object which captures the semantic versioning of the dataset.
+        dataset_rid (RID): The RID of the dataset.
+        version_rid (RID): The RID of the version record for the dataset in the Dataset_Version table.
+        minid (str): The URL that represents the handle of the dataset bag.  This will be None if a MINID has not
+                     been created yet.
+        timestamp (datetime): The timestamp of when the  dataset was created.
+    """
+
     dataset_version: DatasetVersion
     dataset_rid: RID
     version_rid: RID
