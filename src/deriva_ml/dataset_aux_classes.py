@@ -12,7 +12,7 @@ from pydantic import (
     Field,
     computed_field,
     model_validator,
-    model_serializer,
+    validate_call,
 )
 
 from semver import Version
@@ -35,7 +35,7 @@ class VersionPart(Enum):
 
 
 class DatasetVersion(Version):
-    """Represent the version associated with a dataset.
+    """Represent the version associated with a dataset using semantic versioning.
 
     Attributes:
         major (int): Major version number
@@ -43,14 +43,20 @@ class DatasetVersion(Version):
         patch (int): Patch version number
 
     Methods:
-        parse_version(str): Convert a version string into a DatasetVersion object.
         to_dict(): Convert a DatasetVersion object to a dict.
+        to_tuple(): Convert a DatasetVersion object to a tuple.
         replace(major, minor, patch): Replace the major and minor versions
-
+        parse(str): Parse the string into a DatasetVersion object.
     """
-    def __init__(self, *vargs, **kwargs):
-        super().__init__(*vargs, **kwargs)
 
+    @validate_call
+    def __init__(self, major: int, minor: int, patch: int):
+        """Initialize a DatasetVersion object.
+
+        Args:
+            major (int | str)
+        """
+        super().__init__(major, minor, patch)
 
 
 class DatasetHistory(BaseModel):
@@ -88,8 +94,9 @@ class DatasetMinid(BaseModel):
         checksum (str): The checksum of the MINID in SHA256 form
         dataset_rid (str): The RID of the dataset.
         dataset_snapshot (str): The ERMRest catalog snapshot for the dataset version
-        
+
     """
+
     dataset_version: DatasetVersion
     metadata: dict[str, str | int]
     minid: str = Field(alias="compact_uri")

@@ -275,7 +275,9 @@ def create_demo_catalog(
             create_demo_datasets(deriva_ml)
         dataset_table = deriva_ml.dataset_table
         dataset_table.annotations.update(
-            Dataset(deriva_ml.model, deriva_ml.cache_dir)._generate_dataset_annotations()
+            Dataset(
+                deriva_ml.model, deriva_ml.cache_dir
+            )._generate_dataset_annotations()
         )
         deriva_ml.model.apply()
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")

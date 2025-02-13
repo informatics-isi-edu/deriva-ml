@@ -762,11 +762,12 @@ class Dataset:
         return table_paths
 
     def _dataset_nesting_depth(self):
-        """ Determine the maximim dataset nesting depth in the current catalog.
+        """Determine the maximim dataset nesting depth in the current catalog.
 
         Returns:
 
         """
+
         def children_depth(
             dataset_rid: RID, nested_datasets: dict[RID, list[RID]]
         ) -> int:
