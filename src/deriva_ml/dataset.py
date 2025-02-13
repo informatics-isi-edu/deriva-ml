@@ -21,6 +21,11 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadTimeoutError,
 )
 
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 import json
 import logging
 from pathlib import Path
@@ -189,14 +194,8 @@ class Dataset:
           DerivaMLException: if provided RID is not to a dataset_table.
         """
         version = self.dataset_version(dataset_rid)
-        match component:
-            case VersionPart.major:
-                version = version.bump_major()
-            case VersionPart.minor:
-                version = version.bump_minor()
-            case VersionPart.patch:
-                version = version.bump_patch()
-        self._insert_dataset_version(dataset_rid, version, description=description)
+        new_version = version.increment_version(component)
+        self._insert_dataset_version(dataset_rid, new_version, description=description)
         return version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -762,7 +761,7 @@ class Dataset:
         return table_paths
 
     def _dataset_nesting_depth(self):
-        """Determine the maximim dataset nesting depth in the current catalog.
+        """Determine the maximum dataset nesting depth in the current catalog.
 
         Returns:
 
@@ -982,7 +981,7 @@ class Dataset:
         Args:
             dataset_rid: RID of the dataset.
             version: Version of the dataset.
-            create: Create a new MINID if one doesn't already exist.'
+            create: Create a new MINID if one doesn't already exist.
 
         Returns:
             New or existing MINID for the dataset.

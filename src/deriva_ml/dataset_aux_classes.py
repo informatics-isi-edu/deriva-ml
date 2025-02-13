@@ -43,20 +43,50 @@ class DatasetVersion(Version):
         patch (int): Patch version number
 
     Methods:
-        to_dict(): Convert a DatasetVersion object to a dict.
-        to_tuple(): Convert a DatasetVersion object to a tuple.
         replace(major, minor, patch): Replace the major and minor versions
-        parse(str): Parse the string into a DatasetVersion object.
     """
 
-    @validate_call
-    def __init__(self, major: int, minor: int, patch: int):
+    def __init__(self, major: int, minor: int = 0, patch: int = 0):
         """Initialize a DatasetVersion object.
 
         Args:
             major (int | str)
         """
         super().__init__(major, minor, patch)
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+
+        Returns:
+            dictionary of version information
+
+        """
+        return {"major": self.major, "minor": self.minor, "patch": self.patch}
+
+    def to_tuple(self) -> tuple[int, int, int]:
+        """
+
+        Returns:
+            tuple of version information
+
+        """
+        return self.major, self.minor, self.patch
+
+    @classmethod
+    def parse(cls, version: str, optional_minor_an_path=False) -> "DatasetVersion":
+        v = Version.parse(version)
+        return DatasetVersion(v.major, v.minor, v.patch)
+
+    def increment_version(self, component: VersionPart) -> "DatasetVersion":
+        match component:
+            case VersionPart.major:
+                return self.bump_major()
+            case VersionPart.minor:
+                return self.bump_minor()
+            case VersionPart.patch:
+                return self.bump_patch()
+            case _:
+                return self
 
 
 class DatasetHistory(BaseModel):

@@ -4,7 +4,7 @@ from typing import Any, Generator, TYPE_CHECKING, Optional
 
 import pandas as pd
 from pydantic import validate_call
-from .deriva_definitions import RID, DerivaMLException
+from .deriva_definitions import RID
 
 if TYPE_CHECKING:
     from .database_model import DatabaseModel
@@ -30,10 +30,11 @@ class DatasetBag:
         self.model = database_model
         self.database = self.model.dbase
 
-        if dataset_rid:
-            if not dataset_rid in self.model.bag_rids:
-                raise DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
         self.dataset_rid = dataset_rid or self.model.dataset_rid
+        self.model.rid_lookup(
+            dataset_rid
+        )  # Check to make sure that this dataset is in the
+
         self.version = self.model.dataset_version(self.dataset_rid)
         self.dataset_table = self.model.dataset_table
 

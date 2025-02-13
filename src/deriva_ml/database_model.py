@@ -28,6 +28,14 @@ class DatabaseModel:
     found by looking in the ERMRest model.  In addition, as sqllite doesn't support schema, Ermrest schema are added
     to the table name using the convention SchemaName:TableName.  Methods in DatasetBag that have table names as the
     argument will perform the appropriate name mappings.
+
+    Attributes:
+        bag_path (Path): path to the local copy of the BDBag
+        minid (DatasetMinid): Minid for the specified bag
+        dataset_rid (RID): RID for the specified dataset
+        dbase (Connection): connection to the sqlite database holding table values
+        domain_schema (str): Name of the domain schema
+        dataset_table  (Table): the dataset table in the ERMRest model.
     """
 
     _paths_loaded: dict[Path:"DatabaseModel"] = {}

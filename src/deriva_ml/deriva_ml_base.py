@@ -1029,10 +1029,10 @@ class DerivaML(Dataset):
     def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":
         """Create an execution object
 
-        Given an execution configuration, initialize the local compute enviroment to prepare for executing a
+        Given an execution configuration, initialize the local compute environment to prepare for executing a
         ML or analytic routine.  This routine has a number of side effects.
 
-        1. The datasets specified in the configuration are downloaded and placed in the cache-dir. If a verision is
+        1. The datasets specified in the configuration are downloaded and placed in the cache-dir. If a version is
         not specified in the configuration, then a new minor version number is created for the dataset and downloaded.
 
         Args:

@@ -27,6 +27,9 @@ plugins:
           show_signature_annotations: true
           line_length: 40
           annotations_path: brief
+          inherited_members: true
+          preload_modules: [semver]
+
 - mkdocs-jupyter:
    include: ["*.ipynb"]
    include_source: True
