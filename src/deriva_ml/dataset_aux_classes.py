@@ -12,11 +12,11 @@ from pydantic import (
     Field,
     computed_field,
     model_validator,
-    validate_call,
+    field_serializer,
 )
 
 from semver import Version
-from typing import Optional, Any
+from typing import Optional, Any, SupportsInt
 
 
 class VersionPart(Enum):
@@ -46,11 +46,15 @@ class DatasetVersion(Version):
         replace(major, minor, patch): Replace the major and minor versions
     """
 
-    def __init__(self, major: int, minor: int = 0, patch: int = 0):
+    def __init__(
+        self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0
+    ):
         """Initialize a DatasetVersion object.
 
         Args:
-            major (int | str)
+            major: Major version number. Used to indicate schema changes.
+            minor: Minor version number.  Used to indicate additional members added, or change in member values.
+            patch: Patch number of the dataset.  Used to indicate minor clean-up and edits
         """
         super().__init__(major, minor, patch)
 
@@ -170,3 +174,29 @@ class DatasetMinid(BaseModel):
         return checksum_value
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class DatasetSpec(BaseModel):
+    """Represent a dataset_table in an execution configuration dataset_table list
+
+    Attributes:
+        rid (RID): A dataset_table RID
+        materialize (bool): If False, do not materialize datasets, only download table data, no assets.  Defaults to True
+        version (DatasetVersion): The version of the dataset.  Should follow semantic versioning.
+    """
+
+    rid: RID
+    materialize: bool = True
+    version: DatasetVersion
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _check_bare_rid(cls, data: Any) -> dict[str, str | bool]:
+        # If you are just given a string, assume it's a rid and put into dict for further validation.
+        return {"rid": data} if isinstance(data, str) else data
+
+    @field_serializer("version")
+    def serialize_version(self, version: DatasetVersion) -> dict[str, Any]:
+        return version.to_dict()

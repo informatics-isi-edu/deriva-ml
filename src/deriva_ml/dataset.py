@@ -47,6 +47,7 @@ from .dataset_aux_classes import (
     DatasetMinid,
     DatasetHistory,
     VersionPart,
+    DatasetSpec,
 )
 
 
@@ -887,34 +888,29 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(
         self,
-        dataset_rid: RID | str,
-        materialize: bool = True,
-        version: Optional[DatasetVersion] = None,
+        dataset: DatasetSpec,
         execution_rid: Optional[RID] = None,
     ) -> DatasetBag:
         """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
 
         Args:
-            dataset_rid: RID of the dataset.
-            materialize: Download the assets associated with this dataset.
-            version: Which version of the dataset.
-            execution_rid:
+            dataset: Specification of the dataset to be downloaded.
+            execution_rid: Execution RID for the dataset.
 
         Returns:
             Tuple consisting of the path to the dataset, the RID of the dataset that was downloaded and the MINID
             for the dataset.
         """
-        version = version or self.dataset_version(dataset_rid)
         if (
             execution_rid
             and self._model.catalog.resolve_rid(execution_rid).table.name != "Execution"
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
-        minid = self.get_dataset_minid(dataset_rid, version)
+        minid = self.get_dataset_minid(dataset.rid, dataset.version)
 
         bag_path = (
             self._materialize_dataset_bag(minid, execution_rid=execution_rid)
-            if materialize
+            if dataset.materialize
             else self._download_dataset_bag(minid)
         )
         return DatabaseModel.register(minid, bag_path).get_dataset()

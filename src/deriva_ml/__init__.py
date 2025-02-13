@@ -37,7 +37,6 @@ from .deriva_ml_base import DerivaML
 from .execution_configuration import (
     ExecutionConfiguration,
     Workflow,
-    DatasetVersion,
-    DatasetSpec,
 )
-from .dataset_aux_classes import VersionPart
+
+from .dataset_aux_classes import VersionPart, DatasetSpec, DatasetVersion

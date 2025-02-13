@@ -1,4 +1,3 @@
-import configparser
 from collections import defaultdict
 import csv
 import hashlib

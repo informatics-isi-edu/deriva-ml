@@ -72,20 +72,20 @@ Listing members of a dataset
 
 # Dataset Versioning
 
-Every dataset is assigned a version number which will change over the lifetime of the dataset.DerivaML uses semantic versioning to differentation between versions of the dataset over time.  A semantic version consists of three parts. Each part is an integer seperated by a dot:`major.minor.patch`. 0  The major part will change when there is a schema change to any object included in the dataset.  The minor part will change when new elements are added to a dataset, and the patch parch changes for minor alterations, such as adding or changing a comment or data cleaning.
+Every dataset is assigned a version number which will change over the lifetime of the dataset.DerivaML uses semantic versioning to differntiate between versions of the dataset over time. A semantic version consists of three parts. Each part is an integer seperated by a dot:`major.minor.patch`. 0  The major part will change when there is a schema change to any object included in the dataset.  The minor part will change when new elements are added to a dataset, and the patch parch changes for minor alterations, such as adding or changing a comment or data cleaning.
 
-DerivaML will automatically assign an intial version of `0.1.0` when a dataast is first created, and incement the
-minor part of the version number whenever new elements are addded. It is up to the DerivaML to otherwise incrment version.
+DerivaML will automatically assign an initial version of `0.1.0` when a dataaset is first created, and increment the
+minor part of the version number whenever new elements are added. It is up to the DerivaML user to otherwise increment the dataset version.
 
-The version of a dataset can be incrmented by the method:
-[`DerivaML.increment_version(part, description)`][deriva_ml.dataset.Dataset.increment_dataset_version]
-The current version of a dataset can be returned, as can the history of a dataset.
+The version of a dataset can be incremented by the method: [`DerivaML.increment_version()`][deriva_ml.dataset.Dataset.increment_dataset_version]
+The current version of a dataset can be returned: [`DerivaML.dataset_version()`][deriva_ml.dataset.Dataset.dataset_version], as can the version history of a dataset: [`DerivaML.dataset_history`][deriva_ml.dataset.Dataset.dataset_history].
 
-Dataset versions can be specified when a dataset is downloaded to a compute platform for processing by ML code.
-
-Dataset versions, semantic versioning
+Dataset versions must be specified when a dataset is downloaded to a compute platform for processing by ML code.
+It is important to know that the values in the dataset are the values that were in place at the time the dataset was created.  This is true for the current dataset as well.  If you want to use the current values in a catalog, you must create a new dataset as part of the execution configuration. This is easily accomplished using the `increment_version` method.
 
 # Downloading Datasets
+
+Datasets are automatically downloaded as part of creating a new execution.  
 Downloading datasets for the ML code.  Caching
 
 MINIDs
