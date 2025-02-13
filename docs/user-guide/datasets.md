@@ -78,8 +78,7 @@ DerivaML will automatically assign an intial version of `0.1.0` when a dataast i
 minor part of the version number whenever new elements are addded. It is up to the DerivaML to otherwise incrment version.
 
 The version of a dataset can be incrmented by the method:
-```[DerivaML.increment_version(part, description)[deriva_ml.dataseet.increment_vertsion]```
-
+[`DerivaML.increment_version(part, description)`][deriva_ml.dataset.Dataset.increment_dataset_version]
 The current version of a dataset can be returned, as can the history of a dataset.
 
 Dataset versions can be specified when a dataset is downloaded to a compute platform for processing by ML code.

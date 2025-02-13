@@ -921,6 +921,7 @@ class Dataset:
                     config_file=spec_file,
                     output_dir=tmp_dir,
                     defer_download=True,
+                    timeout=(10, 300),
                     envars={"Dataset_RID": dataset_rid},
                 )
                 minid_page_url = exporter.export()[0]  # Get the MINID launch page
@@ -1007,8 +1008,7 @@ class Dataset:
         else:
             bag_dir.mkdir(parents=True, exist_ok=True)
             with NamedTemporaryFile(
-                delete=False,
-                suffix=f"Dataset_{minid.dataset_rid}.zip"
+                delete=False, suffix=f"Dataset_{minid.dataset_rid}.zip"
             ) as zip_file:
                 archive_path = fetch_single_file(minid.bag_url, zip_file.name)
                 bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())

@@ -48,6 +48,7 @@ nav:
     - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
   - Library Documentation:
     - DerivaML: code-docs/deriva_ml_base.md
+    - Datasets: code-docs/dataset.md
     - DatasetBag: code-docs/dataset_bag.md
     - Execution: code-docs/execution.md
     - ExecutionConfiguration: code-docs/execution_configuration.md
