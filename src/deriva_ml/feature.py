@@ -13,8 +13,10 @@ class FeatureRecord(BaseModel):
     """Base class for feature records.  Feature records are pydantic models which are dynamically generated and
     describe all the columns of a feature.
 
-    Args:
-
+    Attributes:
+        Execution (str):
+        Feature_Name (str):
+        feature:
     Returns:
 
     """
@@ -36,7 +38,7 @@ class FeatureRecord(BaseModel):
         Args:
 
         Returns:
-          :return: set of feature column names.
+          A set of feature column names.
 
         """
         return cls.feature.feature_columns

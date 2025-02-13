@@ -928,7 +928,7 @@ class DerivaMLExec:
         return self.execution.feature_paths(table, feature_name)
 
     def table_path(self, table: Table | str) -> Path:
-        """
+        """Path in the local file system for tables to be uploaded as part of the execution.
 
         Args:
           table: Table|str:

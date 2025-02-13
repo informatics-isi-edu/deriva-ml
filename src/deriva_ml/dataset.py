@@ -130,8 +130,7 @@ class Dataset:
             dataset_rid: A RID to the dataset for which history is to be fetched.
 
         Returns:
-            A list of DatasetHistory objects which indicate the version-number, creation time,
-            and bag instantiation of the dataset.
+            A list of DatasetHistory objects which indicate the version-number, creation time, and bag instantiation of the dataset.
         """
         version_path = (
             self._model.catalog.getPathBuilder()
@@ -402,7 +401,7 @@ class Dataset:
         )
 
         # self.model = self.catalog.getCatalogModel()
-        self.dataset_table.annotations.update(self.generate_dataset_annotations())
+        self.dataset_table.annotations.update(self._generate_dataset_annotations())
         self._model.apply()
         return table
 
@@ -488,6 +487,9 @@ class Dataset:
     ) -> None:
         """Add additional elements to an existing dataset_table.
 
+        Add new elements to an existing dataset. In addition to adding new members, the minor version number of the
+        dataset is incremented and the description, if provide is applied to that new version.
+
         Args:
             dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
             members: List of RIDs of members to add to the  dataset_table.
@@ -566,7 +568,8 @@ class Dataset:
 
     @validate_call
     def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
-        """Given a dataset_table RID, return a list of RIDs of the parent datasets.
+        """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
+        nested dataset.
 
         Args:
             dataset_rid: return: RID of the parent dataset_table.
@@ -608,7 +611,7 @@ class Dataset:
         return [d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
 
     @staticmethod
-    def download_dataset_element(
+    def _download_dataset_element(
         spath: str, dpath: str, table: Table
     ) -> list[dict[str, Any]]:
         """Return the download specification for the data object indicated by a path through the data model.
@@ -759,6 +762,11 @@ class Dataset:
         return table_paths
 
     def _dataset_nesting_depth(self):
+        """ Determine the maximim dataset nesting depth in the current catalog.
+
+        Returns:
+
+        """
         def children_depth(
             dataset_rid: RID, nested_datasets: dict[RID, list[RID]]
         ) -> int:
@@ -928,7 +936,7 @@ class Dataset:
             # will generate a minid and place the bag into S3 storage.
             spec_file = f"{tmp_dir}/download_spec.json"
             with open(spec_file, "w", encoding="utf-8") as ds:
-                json.dump(self.generate_dataset_download_spec(), ds)
+                json.dump(self._generate_dataset_download_spec(), ds)
             try:
                 # Generate the bag and put into S3 storage.
                 exporter = DerivaExport(
@@ -971,12 +979,12 @@ class Dataset:
         """Return a MINID to the specified dataset.  If no version is specified, use the latest.
 
         Args:
-            dataset_rid:
-            version:
-            create:
+            dataset_rid: RID of the dataset.
+            version: Version of the dataset.
+            create: Create a new MINID if one doesn't already exist.'
 
         Returns:
-
+            New or existing MINID for the dataset.
         """
         if dataset_rid.startswith("minid"):
             minid_url = f"https://identifiers.org/{dataset_rid}"
@@ -1089,7 +1097,7 @@ class Dataset:
             validated_check.touch()
         return Path(bag_path)
 
-    def export_outputs(self) -> list[dict[str, Any]]:
+    def _export_outputs(self) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
 
         Returns:
@@ -1107,7 +1115,7 @@ class Dataset:
             Returns:
                 An export specification suitable for Chaise.
             """
-            return self.export_dataset_element(spath, dpath, table)
+            return self._export_dataset_element(spath, dpath, table)
 
         # Export specification is a specification for the datasets, plus any controlled vocabulary
         return [
@@ -1146,7 +1154,7 @@ class Dataset:
             Returns:
 
             """
-            return self.download_dataset_element(spath, dpath, table)
+            return self._download_dataset_element(spath, dpath, table)
 
         # Download spec is the spec for any controlled vocabulary and for the dataset_table.
         return [
@@ -1157,7 +1165,7 @@ class Dataset:
         ] + self._dataset_specification(writer)
 
     @staticmethod
-    def export_dataset_element(
+    def _export_dataset_element(
         spath: str, dpath: str, table: Table
     ) -> list[dict[str, Any]]:
         """Given a path in the data model, output an export specification for the path taken to get to the current table.
@@ -1195,7 +1203,7 @@ class Dataset:
             )
         return exports
 
-    def generate_dataset_download_spec(self) -> dict[str, Any]:
+    def _generate_dataset_download_spec(self) -> dict[str, Any]:
         """
 
         Returns:
@@ -1340,7 +1348,7 @@ class Dataset:
             },
         }
 
-    def dataset_visible_fkeys(self) -> dict[str, Any]:
+    def _dataset_visible_fkeys(self) -> dict[str, Any]:
         def fkey_name(fk):
             return [fk.name[0].name, fk.name[1]]
 
@@ -1359,13 +1367,13 @@ class Dataset:
         ]
         return {"detailed": source_list}
 
-    def generate_dataset_annotations(self) -> dict[str, Any]:
+    def _generate_dataset_annotations(self) -> dict[str, Any]:
         return {
             deriva_tags.export_fragment_definitions: {
-                "dataset_export_outputs": self.export_outputs()
+                "dataset_export_outputs": self._export_outputs()
             },
             deriva_tags.visible_columns: self.dataset_visible_columns(),
-            deriva_tags.visible_foreign_keys: self.dataset_visible_fkeys(),
+            deriva_tags.visible_foreign_keys: self._dataset_visible_fkeys(),
             deriva_tags.export_2019: {
                 "detailed": {
                     "templates": [
