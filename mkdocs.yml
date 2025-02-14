@@ -43,7 +43,6 @@ nav:
     - Creating a workflow: user-guide/ml_workflow_instruction.md
     - DerivaML Structure: deriva_ml_structure.md
     - Configuring an Execution: user-guide/execution-configuration.md
-    - VM Docs: VM_setup_instruction.md
   - Sample Notebooks:
     - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
     - Execution: 'Notebooks/DerivaML Execution.ipynb'
