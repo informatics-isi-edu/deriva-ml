@@ -179,7 +179,11 @@ class Dataset:
             return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
 
     def increment_dataset_version(
-        self, dataset_rid: RID, component: VersionPart, description: Optional[str] = ""
+        self,
+        dataset_rid: RID,
+        component: VersionPart,
+        description: Optional[str] = "",
+        recurse: bool = False,
     ) -> DatasetVersion:
         """Increment the version of the specified dataset_table.
 
@@ -189,6 +193,7 @@ class Dataset:
           dataset_rid: RID of the dataset whose version is to be incremented.
           component: Major, Minor or Patch
           description: Description of the version update of the dataset_table.
+          recurse: If True, increment the dataset_table recursively in a nested dataset.
 
         Returns:
           new semantic version of the dataset_table as a 3-tuple
@@ -199,6 +204,9 @@ class Dataset:
         version = self.dataset_version(dataset_rid)
         new_version = version.increment_version(component)
         self._insert_dataset_version(dataset_rid, new_version, description=description)
+        if recurse:
+            for ds in self.list_dataset_children(dataset_rid, recurse=True):
+                self.increment_dataset_version(ds, description=description)
         return version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
