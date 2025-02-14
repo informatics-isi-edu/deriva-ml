@@ -12,11 +12,11 @@ from pydantic import validate_call
 
 from .deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
 from .dataset_aux_classes import DatasetVersion, DatasetMinid
-
+from .deriva_model import DerivaModel
 from .dataset_bag import DatasetBag
 
 
-class DatabaseModel:
+class DatabaseModel(DerivaModel):
     """Read in the contents of a BDBag and create a local SQLite database.
 
         As part of its initialization, this routine will create a sqlite database that has the contents of all the tables
@@ -29,6 +29,10 @@ class DatabaseModel:
     to the table name using the convention SchemaName:TableName.  Methods in DatasetBag that have table names as the
     argument will perform the appropriate name mappings.
 
+    Because of nested datasets, it's possible that more than one dataset rid is in a bag, or that a dataset rid might
+    appear in more than one database. To help manage this, a global list of all the datasets that have been loaded
+    into DatabaseModels, is kept in the class variable `_rid_map`.
+
     Attributes:
         bag_path (Path): path to the local copy of the BDBag
         minid (DatasetMinid): Minid for the specified bag
@@ -38,12 +42,24 @@ class DatabaseModel:
         dataset_table  (Table): the dataset table in the ERMRest model.
     """
 
+    # Keep track of what databases we have loaded.
     _paths_loaded: dict[Path:"DatabaseModel"] = {}
+
+    # Maintain a global map of RIDS to versions and databases.
     _rid_map: dict[RID, list[tuple[DatasetVersion, "DatabaseModel"]]] = {}
 
     @classmethod
     @validate_call
     def register(cls, minid: DatasetMinid, bag_path: Path):
+        """Register a new minid in the list of local databases if it's new, otherwise, return an existing DatabaseModel.
+
+        Args:
+            minid: MINID to the databag that is to be loaded.
+            bag_path: Path to the bag on the local filesystem./
+
+        Returns:
+            A DatabaseModel instance to the loaded bag.
+        """
         o = cls._paths_loaded.get(bag_path.as_posix())
         if o:
             return o
@@ -51,12 +67,29 @@ class DatabaseModel:
 
     @staticmethod
     def rid_lookup(dataset_rid: RID) -> list[tuple[DatasetVersion, "DatabaseModel"]]:
+        """Return a list of DatasetVersion/DatabaseModel instances corresponding to the given RID.
+
+        Args:
+            dataset_rid: Rit to be looked up.
+
+        Returns:
+            List of DatasetVersion/DatabaseModel instances corresponding to the given RID.
+
+        Raises:
+            Raise a DerivaMLException if the given RID is not found.
+        """
         try:
             return DatabaseModel._rid_map[dataset_rid]
         except KeyError:
             raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
     def __init__(self, minid: DatasetMinid, bag_path: Path):
+        """Create a new DatabaseModel.  This should only be called via the static Register method
+
+        Args:
+            minid: Minid for the specified bag.
+            bag_path:  Path to the local copy of the BDBag.
+        """
         DatabaseModel._paths_loaded[bag_path.as_posix()] = self
 
         self.bag_path = bag_path
@@ -66,7 +99,10 @@ class DatabaseModel:
         self.dbase_file = dir_path / f"{minid.version_rid}.db"
         self.dbase = sqlite3.connect(self.dbase_file)
 
-        self._model = Model.fromfile("file-system", self.bag_path / "data/schema.json")
+        super().__init__(
+            Model.fromfile("file-system", self.bag_path / "data/schema.json")
+        )
+
         self._logger = logging.getLogger("deriva_ml")
         self.domain_schema = self._guess_domain_schema()
         self._load_model()
@@ -77,7 +113,7 @@ class DatabaseModel:
             self.dataset_rid,
             self.dbase_file,
         )
-        self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
+        self.dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
         # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
         sql_dataset = self.normalize_table_name("Dataset_Version")
         with self.dbase:
@@ -100,12 +136,11 @@ class DatabaseModel:
             version_list.append((dataset_version, self))
 
     def _load_model(self) -> None:
-        # Create a sqlite database schema that contains all the tables within the catalog from which the
-        # BDBag was created.
+        """Create a sqlite database schema that contains all the tables within the catalog from which the BDBag was created."""
         with self.dbase:
-            for t in self._model.schemas[self.domain_schema].tables.values():
+            for t in self.model.schemas[self.domain_schema].tables.values():
                 self.dbase.execute(t.sqlite3_ddl())
-            for t in self._model.schemas["deriva-ml"].tables.values():
+            for t in self.model.schemas["deriva-ml"].tables.values():
                 self.dbase.execute(t.sqlite3_ddl())
 
     def _load_sqllite(self) -> None:
@@ -123,7 +158,7 @@ class DatabaseModel:
             table = csv_file.stem
             schema = (
                 self.domain_schema
-                if table in self._model.schemas[self.domain_schema].tables
+                if table in self.model.schemas[self.domain_schema].tables
                 else self.ml_schema
             )
 
@@ -173,10 +208,14 @@ class DatabaseModel:
             logging.info(f"No downloaded assets in bag {dataset_rid}")
         return fetch_map
 
-    def _guess_domain_schema(self):
-        # Guess the domain schema name by eliminating all the "builtin" schema.
+    def _guess_domain_schema(self) -> str:
+        """Guess the domain schema name by eliminating all the "builtin" schema.
+
+        Returns:
+            String for domain schema name.
+        """
         return [
-            s for s in self._model.schemas if s not in ["deriva-ml", "public", "www"]
+            s for s in self.model.schemas if s not in ["deriva-ml", "public", "www"]
         ][0]
 
     def _is_asset(self, table_name: str) -> bool:
@@ -186,15 +225,15 @@ class DatabaseModel:
           table_name: str:
 
         Returns:
-
+            Boolean that is true if the table looks like an asset table.
         """
         asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
         sname = (
             self.domain_schema
-            if table_name in self._model.schemas[self.domain_schema].tables
+            if table_name in self.model.schemas[self.domain_schema].tables
             else self.ml_schema
         )
-        asset_table = self._model.schemas[sname].tables[table_name]
+        asset_table = self.model.schemas[sname].tables[table_name]
         return asset_columns.issubset({c.name for c in asset_table.columns})
 
     @staticmethod
@@ -260,7 +299,7 @@ class DatabaseModel:
              list of currently available datasets.
         """
         atable = next(
-            self._model.schemas[ML_SCHEMA]
+            self.model.schemas[ML_SCHEMA]
             .tables[MLVocab.dataset_type]
             .find_associations()
         ).name
@@ -291,11 +330,11 @@ class DatabaseModel:
             [sname, tname] = table.split(":")
         except ValueError:
             tname = table
-            for sname, s in self._model.schemas.items():
+            for sname, s in self.model.schemas.items():
                 if table in s.tables:
                     break
         try:
-            _ = self._model.schemas[sname].tables[tname]
+            _ = self.model.schemas[sname].tables[tname]
             return f"{sname}:{tname}"
         except KeyError:
             raise DerivaMLException(f'Table name "{table}" does not exist.')

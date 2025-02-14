@@ -9,7 +9,7 @@ accessible via a DerivaML class instance.
 from bdbag.fetch.fetcher import fetch_single_file
 from bdbag import bdbag_api as bdb
 from collections import defaultdict
-from deriva.core.ermrest_model import Model, Table
+from deriva.core.ermrest_model import Table
 from deriva.core.datapath import DataPathException
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 from deriva.transfer.download.deriva_export import DerivaExport
@@ -41,6 +41,7 @@ from typing import Any, Callable, Optional, Iterable
 from deriva_ml import DatasetBag
 from .deriva_definitions import ML_SCHEMA, DerivaMLException, MLVocab, Status, RID
 from .history import iso_to_snap
+from .deriva_model import DerivaModel
 from .database_model import DatabaseModel
 from .dataset_aux_classes import (
     DatasetVersion,
@@ -61,12 +62,9 @@ class Dataset:
 
     _Logger = logging.getLogger("deriva_ml")
 
-    def __init__(self, model: Model, cache_dir: Path):
+    def __init__(self, model: DerivaModel, cache_dir: Path):
         self._model = model
         self._ml_schema = ML_SCHEMA
-        self._domain_schema = [
-            s for s in model.schemas if s not in ["deriva-ml", "www", "public"]
-        ].pop()
         self.dataset_table = self._model.schemas[self._ml_schema].tables["Dataset"]
         self._cache_dir = cache_dir
         self._logger = logging.getLogger("deriva_ml")
@@ -360,7 +358,7 @@ class Dataset:
 
         def domain_table(table: Table) -> bool:
             return (
-                table.schema.name == self._domain_schema
+                table.schema.name == self._model.domain_schema
                 or table.name == self.dataset_table.name
             )
 
@@ -369,22 +367,6 @@ class Dataset:
             for a in self.dataset_table.find_associations()
             if domain_table(t := a.other_fkeys.pop().pk_table)
         ]
-
-    def _get_table(self, table: Table | str) -> Table:
-        # Add table to map
-        t = table
-        table_found = False
-        if not isinstance(table, Table):
-            for s in self._model.schemas.values():
-                try:
-                    t = s.tables[t]
-                    table_found = True
-                    break
-                except KeyError:
-                    pass
-        if not table_found:
-            raise DerivaMLException(f"The table {table} doesn't exist.")
-        return t
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
@@ -399,14 +381,14 @@ class Dataset:
             The table object that was added to the dataset_table.
         """
         # Add table to map
-        element_table = self._get_table(element)
-        table = self._model.schemas[self._domain_schema].create_table(
+        element_table = self._model.get_table(element)
+        table = self._model.schemas[self._model.domain_schema].create_table(
             Table.define_association([self.dataset_table, element_table])
         )
 
         # self.model = self.catalog.getCatalogModel()
         self.dataset_table.annotations.update(self._generate_dataset_annotations())
-        self._model.apply()
+        self._model.model.apply()
         return table
 
     @validate_call
@@ -447,7 +429,7 @@ class Dataset:
             member_table = assoc_table.table
 
             if (
-                target_table.schema.name != self._domain_schema
+                target_table.schema.name != self._model.domain_schema
                 and target_table != self.dataset_table
             ):
                 # Look at domain tables and nested datasets.
@@ -557,7 +539,7 @@ class Dataset:
         pb = self._model.catalog.getPathBuilder()
         for table, elements in dataset_elements.items():
             schema_path = pb.schemas[
-                self._ml_schema if table == "Dataset" else self._domain_schema
+                self._ml_schema if table == "Dataset" else self._model.domain_schema
             ]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
 
@@ -583,7 +565,7 @@ class Dataset:
             RID of the parent dataset_table.
         """
         try:
-            rid_record = self._model.catalog.resolve_rid(dataset_rid, self._model)
+            rid_record = self._model.catalog.resolve_rid(dataset_rid, self._model.model)
         except KeyError as _e:
             raise DerivaMLException(f"Invalid RID {dataset_rid}")
 
@@ -828,7 +810,7 @@ class Dataset:
             return (
                 child != node
                 and child not in visited_nodes
-                and child.schema.name == self._domain_schema
+                and child.schema.name == self._model.domain_schema
             )
 
         # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by

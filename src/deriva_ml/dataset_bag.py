@@ -14,6 +14,18 @@ class DatasetBag:
     """DatasetBag is a class that manages a materialized bag.  It is created from a locally materialized BDBag for a
     dataset_table, which is created either by DerivaML.create_execution, or directly by calling DerivaML.download_dataset.
 
+    A general a bag may contain multiple datasets, if the dataset is nested. The DatasetBag is used to represent only
+    one of the datasets in the bag.
+
+    All the metadata associated with the dataset is stored in a SQLLite database that can be queried using SQL.
+
+    Attributes
+        dataset_rid (RID): RID for the specified dataset
+        version: The version of the dataset
+        model (DatabaseModel): The Database model that has all the catalog metadata associated with this dataset.
+            database:
+        dbase (Connection): connection to the sqlite database holding table values
+        domain_schema (str): Name of the domain schema
     """
 
     #    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -33,10 +45,10 @@ class DatasetBag:
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         self.model.rid_lookup(
             dataset_rid
-        )  # Check to make sure that this dataset is in the
+        )  # Check to make sure that this dataset is in the bag.
 
         self.version = self.model.dataset_version(self.dataset_rid)
-        self.dataset_table = self.model.dataset_table
+        self._dataset_table = self.model.dataset_table
 
     def __repr__(self) -> str:
         return f"<deriva_ml.DatasetBag object {self.dataset_rid} at {hex(id(self))}>"
@@ -60,20 +72,20 @@ class DatasetBag:
 
     @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[tuple]]:
-        """Return a list of entities associated with a specific dataset_table.
+        """Return a list of entities associated with a specific _dataset_table.
 
         Args:
            recurse:  (Default value = False)
 
         Returns:
-            Dictionary of entities associated with a specific dataset_table.  Key is the table from which the elements
+            Dictionary of entities associated with a specific _dataset_table.  Key is the table from which the elements
             were taken.
         """
 
-        # Look at each of the element types that might be in the dataset_table and get the list of rid for them from
+        # Look at each of the element types that might be in the _dataset_table and get the list of rid for them from
         # the appropriate association table.
         members = defaultdict(list)
-        for assoc_table in self.dataset_table.find_associations():
+        for assoc_table in self._dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
             self_fkey = assoc_table.self_fkey
             target_table = other_fkey.pk_table
@@ -81,11 +93,11 @@ class DatasetBag:
 
             if (
                 target_table.schema.name != self.database.domain_schema
-                and target_table != self.dataset_table
+                and target_table != self._dataset_table
             ):
                 # Look at domain tables and nested datasets.
                 continue
-            if target_table == self.dataset_table:
+            if target_table == self._dataset_table:
                 # find_assoc gives us the keys in the wrong position, so swap.
                 self_fkey, other_fkey = other_fkey, self_fkey
             sql_target = self.model.normalize_table_name(target_table.name)
@@ -107,7 +119,7 @@ class DatasetBag:
 
             target_entities = []  # path.entities().fetch()
             members[target_table.name].extend(target_entities)
-            if recurse and target_table.name == self.dataset_table:
+            if recurse and target_table.name == self._dataset_table:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in target_entities]
                 for ds in nested_datasets:
@@ -119,7 +131,7 @@ class DatasetBag:
 
     @validate_call
     def list_dataset_children(self, recurse: bool = False) -> list["DatasetBag"]:
-        """Given a dataset_table RID, return a list of RIDs of any nested datasets.
+        """Given a _dataset_table RID, return a list of RIDs of any nested datasets.
 
         Returns:
           list of RIDs of nested datasets.

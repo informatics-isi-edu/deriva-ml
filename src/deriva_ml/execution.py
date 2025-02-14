@@ -432,7 +432,7 @@ class Execution:
           - DerivaMLException: If there is an issue downloading the assets.
         """
         table = self._ml_object.resolve_rid(file_rid).table
-        if not self._ml_object.is_asset(table):
+        if not self._ml_object.model.is_asset(table):
             raise DerivaMLException(f"Table {table} is not an asset table.")
 
         pb = self._ml_object.pathBuilder
