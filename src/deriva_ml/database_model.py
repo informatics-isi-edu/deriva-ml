@@ -67,11 +67,16 @@ class DatabaseModel:
         self.dbase = sqlite3.connect(self.dbase_file)
 
         self._model = Model.fromfile("file-system", self.bag_path / "data/schema.json")
+        self._logger = logging.getLogger("deriva_ml")
         self.domain_schema = self._guess_domain_schema()
         self._load_model()
         self.ml_schema = ML_SCHEMA
         self._load_sqllite()
-
+        self._logger.info(
+            "Creating new database for dataset: %s in %s",
+            self.dataset_rid,
+            self.dbase_file,
+        )
         self.dataset_table = self._model.schemas[self.ml_schema].tables["Dataset"]
         # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
         sql_dataset = self.normalize_table_name("Dataset_Version")

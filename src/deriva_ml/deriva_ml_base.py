@@ -82,7 +82,7 @@ class DerivaML(Dataset):
         working_dir: Optional[str] = None,
         model_version: str = "1",
         ml_schema: str = ML_SCHEMA,
-        logging_level=logging.WARNING,
+        logging_level=logging.INFO,
     ):
         """Create and initialize a DerivaML instance.
 
@@ -136,9 +136,16 @@ class DerivaML(Dataset):
 
         self.start_time = datetime.now()
         self.status = Status.pending.value
+        self._logger = logging.getLogger("deriva_ml")
+        self._logger.setLevel(logging_level)
+
+        formatter = logging.Formatter(
+            f"%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
 
         logging.basicConfig(
-            level=logging_level, format="%(asctime)s - %(levelname)s - %(message)s"
+            level=logging_level,
+            format="%(asctime)s - %(name)s.%(levelname)s - %(message)s",
         )
         if "dirty" in self.version:
             logging.info(

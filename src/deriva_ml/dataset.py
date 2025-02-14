@@ -59,6 +59,8 @@ class Dataset:
         dataset_table (Table): ERMRest table holding dataset information.
     """
 
+    _Logger = logging.getLogger("deriva_ml")
+
     def __init__(self, model: Model, cache_dir: Path):
         self._model = model
         self._ml_schema = ML_SCHEMA
@@ -67,6 +69,7 @@ class Dataset:
         ].pop()
         self.dataset_table = self._model.schemas[self._ml_schema].tables["Dataset"]
         self._cache_dir = cache_dir
+        self._logger = logging.getLogger("deriva_ml")
 
     def _insert_dataset_version(
         self,
@@ -156,6 +159,7 @@ class Dataset:
             .fetch()
         ]
 
+    @validate_call
     def dataset_version(self, dataset_rid: RID) -> DatasetVersion:
         """Retrieve the current version of the specified dataset_table.
 
@@ -1007,6 +1011,7 @@ class Dataset:
                     raise DerivaMLException(
                         f"Minid for dataset {dataset_rid} doesn't exist"
                     )
+                self._logger.info("Creating new MINID for dataset %s", dataset_rid)
                 minid_url = self._create_dataset_minid(dataset_rid, dataset_version)
             # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
         r = requests.get(minid_url, headers={"accept": "application/json"})
@@ -1063,19 +1068,18 @@ class Dataset:
                     }
                 ]
             )
+            self._logger.info(msg)
 
         def fetch_progress_callback(current, total):
             msg = f"Materializing bag: {current} of {total} file(s) downloaded."
             if execution_rid:
                 update_status(Status.running, msg)
-            logging.info(msg)
             return True
 
         def validation_progress_callback(current, total):
             msg = f"Validating bag: {current} of {total} file(s) validated."
             if execution_rid:
                 update_status(Status.running, msg)
-            logging.info(msg)
             return True
 
         # request metadata
