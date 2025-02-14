@@ -27,8 +27,26 @@ def setup_demo_ml():
 
 def setup_dev():
     host = "dev.eye-ai.org"
+    source_dataset = "2-277M"
     ml_instance = DerivaML(host, catalog_id="eye-ai")
-    return ml_instance
+    preds_workflow = Workflow(
+        name="LAC data template",
+        url="https://github.com/informatics-isi-edu/eye-ai-exec/blob/main/notebooks/templates/template_lac.ipynb",
+        workflow_type="Test Workflow",
+    )
+    config = ExecutionConfiguration(
+        datasets=[
+            {
+                "rid": source_dataset,
+                "materialize": False,
+                "version": ml_instance.dataset_version(source_dataset),
+            }
+        ],
+        assets=["2-C8JM"],
+        workflow=preds_workflow,
+        description="Instance of linking VGG19 predictions to patient-level data",
+    )
+    return ml_instance, config
 
 
 def huy_test():

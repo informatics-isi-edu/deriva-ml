@@ -23,7 +23,8 @@ from .deriva_definitions import (
     DerivaMLException,
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
-from .dataset import Dataset, DatasetVersion
+from .dataset_aux_classes import DatasetSpec
+from .dataset import Dataset
 from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
 from .execution_environment import get_execution_environment
@@ -31,6 +32,11 @@ from .upload import execution_metadata_dir, execution_asset_dir, execution_root
 from .upload import feature_root, feature_asset_dir, feature_value_path
 from .upload import is_feature_dir, is_feature_asset_dir
 from .upload import table_path
+
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class Execution:
@@ -173,13 +179,7 @@ class Execution:
         # Materialize bdbag
         for dataset in self.configuration.datasets:
             self.update_status(Status.running, f"Materialize bag {dataset.rid}... ")
-            self.datasets.append(
-                self.download_dataset_bag(
-                    dataset.rid,
-                    materialize=dataset.materialize,
-                    version=dataset.version,
-                )
-            )
+            self.datasets.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
         # Update execution info
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
@@ -234,30 +234,18 @@ class Execution:
         return checksum
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def download_dataset_bag(
-        self,
-        bag: RID | str,
-        materialize: bool = True,
-        version: Optional[DatasetVersion] = None,
-    ) -> DatasetBag:
+    def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
         that all the metadata is correct
 
         Args:
-            bag: The RID of a dataset_table or a minid to an existing bag.
-            materialize: Materialize the bag, rather than just downloading it.
-            version: The version of the dataset to download.
+            dataset: A dataset specification of a dataset_table or a minid to an existing bag.
 
         Returns:
             the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
         ds = Dataset(self._ml_object.model, cache_dir=self._cache_dir)
-        return ds.download_dataset_bag(
-            dataset_rid=bag,
-            materialize=materialize,
-            version=version,
-            execution_rid=self.execution_rid,
-        )
+        return ds.download_dataset_bag(dataset, execution_rid=self.execution_rid)
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
