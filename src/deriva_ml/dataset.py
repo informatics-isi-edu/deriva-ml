@@ -69,6 +69,18 @@ class Dataset:
         self._cache_dir = cache_dir
         self._logger = logging.getLogger("deriva_ml")
 
+    def _is_dataset_rid(self, dataset_rid: RID, deleted: bool = False) -> bool:
+        try:
+            rid_info = self._model.catalog.resolve_rid(dataset_rid, self._model.model)
+        except KeyError as _e:
+            raise DerivaMLException(f"Invalid RID {dataset_rid}")
+
+        # Got a dataset rid. Now check to see if its deleted or not.
+        if deleted:
+            return True
+        else:
+            return not list(rid_info.datapath.entities().fetch())[0]["Deleted"]
+
     def _insert_dataset_version(
         self,
         dataset_rid: RID,
@@ -263,7 +275,7 @@ class Dataset:
             [
                 {
                     "Description": description,
-                    MLVocab.dataset_type: ds_type,
+                    "Deleted": False,
                 }
             ]
         )[0]["RID"]
@@ -298,34 +310,24 @@ class Dataset:
         """
         # Get association table entries for this dataset_table
         # Delete association table entries
+        if not self._is_dataset_rid(dataset_rid):
+            raise DerivaMLException("Dataset_rid is not a dataset.")
+
         pb = self._model.catalog.getPathBuilder()
-        for assoc_table in self.dataset_table.find_associations(self.dataset_table):
-            other_fkey = assoc_table.other_fkeys.pop()
-            self_fkey = assoc_table.self_fkey
-            target_table = other_fkey.pk_table
-            member_table = assoc_table.table
-
-            schema_path = pb.schemas[member_table.schema.name]
-            tpath = schema_path.tables[assoc_table.name]
-            dataset_column_path = tpath.columns[self_fkey.columns[0].name]
-            dataset_entries = tpath.filter(dataset_column_path == dataset_rid)
-            if recurse and target_table == self.dataset_table:
-                # Nested table
-                for dataset in dataset_entries:
-                    self.delete_dataset(dataset["RID"], recurse)
-            try:
-                dataset_entries.delete()
-            except DataPathException:
-                pass
-
-        # Delete dataset_table.
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[
             self.dataset_table.name
         ]
-        dataset_path.filter(dataset_path.columns["RID"] == dataset_rid).delete()
 
-    def find_datasets(self) -> Iterable[dict[str, Any]]:
+        rid_list = (
+            [dataset_rid] + self.list_dataset_children(dataset_rid) if recurse else []
+        )
+        dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
+
+    def find_datasets(self, deleted: bool = False) -> Iterable[dict[str, Any]]:
         """Returns a list of currently available datasets.
+
+        Arguments:
+            deleted: If True, included the datasets that have been deleted.
 
         Returns:
              list of currently available datasets.
@@ -343,9 +345,16 @@ class Dataset:
         ml_path = pb.schemas[self._ml_schema]
         atable_path = ml_path.tables[atable]
 
+        if deleted:
+            filtered_path = dataset_path
+        else:
+            filtered_path = dataset_path.filter(
+                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)
+            )
+
         # Get a list of all the dataset_type values associated with this dataset_table.
         datasets = []
-        for dataset in dataset_path.entities().fetch():
+        for dataset in filtered_path.entities().fetch():
             ds_types = (
                 atable_path.filter(atable_path.Dataset == dataset["RID"])
                 .attributes(atable_path.Dataset_Type)
@@ -415,16 +424,8 @@ class Dataset:
             were taken.
         """
 
-        try:
-            if (
-                self._model.catalog.resolve_rid(dataset_rid).table.name
-                != self.dataset_table.name
-            ):
-                raise DerivaMLException(
-                    f"RID is not for a dataset_table: {dataset_rid}"
-                )
-        except KeyError:
-            raise DerivaMLException(f"Invalid RID: {dataset_rid}")
+        if not self._is_dataset_rid(dataset_rid):
+            raise DerivaMLException(f"RID is not for a dataset_table: {dataset_rid}")
 
         # Look at each of the element types that might be in the dataset_table and get the list of rid for them from
         # the appropriate association table.
@@ -626,12 +627,7 @@ class Dataset:
         Returns:
             RID of the parent dataset_table.
         """
-        try:
-            rid_record = self._model.catalog.resolve_rid(dataset_rid, self._model.model)
-        except KeyError as _e:
-            raise DerivaMLException(f"Invalid RID {dataset_rid}")
-
-        if rid_record.table.name != self.dataset_table.name:
+        if not self._is_dataset_rid(dataset_rid):
             raise DerivaMLException(
                 f"RID: {dataset_rid} does not belong to dataset_table {self.dataset_table.name}"
             )
