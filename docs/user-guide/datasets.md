@@ -83,7 +83,28 @@ The current version of a dataset can be returned: [`DerivaML.dataset_version()`]
 Dataset versions must be specified when a dataset is downloaded to a compute platform for processing by ML code.
 It is important to know that the values in the dataset are the values that were in place at the time the dataset was created.  This is true for the current dataset as well.  If you want to use the current values in a catalog, you must create a new dataset as part of the execution configuration. This is easily accomplished using the `increment_version` method.
 
-# Downloading Datasets
+## Assets
+
+A core function of datasets is to help orginize collections of files or *assets* that are stored in the catalog. The actual contents of all of the assets are stored in the DerivaML object store, which is call Hatrac.  As far as the object store is concerned, each asset is just a blob of bits, which are characterized by a versioned URL, a length and a checksum.
+
+Within the DerivaML catalog, assets are represented by an *asset table.*  Each different asset type is stored in a different table, and the entry includes the URL to the object, the length, checksum and other general metadata, along with any additional asset type specific metadata that might have been defined.
+
+## Downloaded Datasets and Assets
+
+While it is possible to retrieve the assets associated with a dataset directly from the catalog, if your computation requres access to many assets, its typically much more effective to download the asset along with all the other elements of the dataset into the local compute environment.  For this reason, creating a new execution using [`DerivaML.create_execution`][deriva_ml.dataset.create_execution] will automatically download all of the datasets listed in the `datasets` component of an [`ExecutionConfiguration`][deriva_ml.execution_configuration.execution_configuration].
+
+Once downloaded, the dataset is represented by a [`Dataset_Bag`][deriva_ml.dataset_bag.DatasetBag] object. 
+
+Every asset in a dataset is recorded in an asset table, which has its location on the local file system, along with other metadata.
+Asset tables can be retrieved from the dataset_bag via the get_table_as_?() method.
+
+The interface will ensure that all assets of the same type are in the same directory, and that directory will be named by the asset type.
+
+It is unwise to use the name of the asset file for anything. Rather, you should figure out what asset you want via the metadata that connects that asset to more interesting things.
+
+If you need to reorganize assets in an application-specific way, using symbolic links is probably the most efficient thing to do with respect to time and disk space. 
+
+## Downloading Datasets
 
 Datasets are automatically downloaded as part of creating a new execution.  
 Downloading datasets for the ML code.  Caching
