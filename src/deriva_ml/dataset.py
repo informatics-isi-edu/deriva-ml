@@ -206,7 +206,7 @@ class Dataset:
         self._insert_dataset_version(dataset_rid, new_version, description=description)
         if recurse:
             for ds in self.list_dataset_children(dataset_rid, recurse=True):
-                self.increment_dataset_version(ds, description=description)
+                self.increment_dataset_version(ds, component, description=description)
         return version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -474,7 +474,7 @@ class Dataset:
     @validate_call
     def add_dataset_members(
         self,
-        dataset_rid: Optional[RID],
+        dataset_rid: RID,
         members: list[RID],
         validate: bool = True,
         description: Optional[str] = "",
@@ -488,10 +488,7 @@ class Dataset:
             dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
             members: List of RIDs of members to add to the  dataset_table.
             validate: Check rid_list to make sure elements are not already in the dataset_table.
-            dataset_rid: Optional[RID]:
-            members: list[RID]:
             description: Markdown description of the updated dataset.
-            validate: bool:  (Default value = True)
         """
 
         members = set(members)
@@ -556,6 +553,63 @@ class Dataset:
                 schema_path.tables[association_map[table]].insert(
                     [{"Dataset": dataset_rid, fk_column: e} for e in elements]
                 )
+        self.increment_dataset_version(
+            dataset_rid, VersionPart.minor, description=description
+        )
+
+    @validate_call
+    def delete_dataset_members(
+        self, dataset_rid: RID, members: list[RID], description=""
+    ) -> None:
+        """Add additional elements to an existing dataset_table.
+
+        Delete elements from an existing dataset. In addition to deleting members, the minor version number of the
+        dataset is incremented and the description, if provide is applied to that new version.
+
+        Args:
+            dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
+            members: List of RIDs of members to add to the  dataset_table.
+            description: Markdown description of the updated dataset.
+        """
+
+        members = set(members)
+        description = description or "Deletes dataset members"
+
+        # Now go through every rid to be added to the data set and sort them based on what association table entries
+        # need to be made.
+        dataset_elements = {}
+        association_map = {
+            a.other_fkeys.pop().pk_table.name: a.table.name
+            for a in self.dataset_table.find_associations()
+        }
+        # Get a list of all the types of objects that can be linked to a dataset_table.
+        for m in members:
+            try:
+                rid_info = self._model.catalog.resolve_rid(m)
+            except KeyError:
+                raise DerivaMLException(f"Invalid RID: {m}")
+            if rid_info.table.name not in association_map:
+                raise DerivaMLException(
+                    f"RID table: {rid_info.table.name} not part of dataset_table"
+                )
+            dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
+        # Now make the entries into the association tables.
+        pb = self._model.catalog.getPathBuilder()
+        for table, elements in dataset_elements.items():
+            schema_path = pb.schemas[
+                self._ml_schema if table == "Dataset" else self._model.domain_schema
+            ]
+            fk_column = "Nested_Dataset" if table == "Dataset" else table
+
+            if len(elements):
+                atable_path = schema_path.tables[association_map[table]]
+                # Find out the name of the column in the association table.
+                for e in elements:
+                    entity = atable_path.filter(
+                        (atable_path.Dataset == dataset_rid)
+                        & (atable_path.columns[fk_column] == e),
+                    )
+                    entity.delete()
         self.increment_dataset_version(
             dataset_rid, VersionPart.minor, description=description
         )
