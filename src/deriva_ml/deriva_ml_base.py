@@ -9,19 +9,14 @@ relationships that follow a specific data model.
 """
 
 import getpass
-import json
 import logging
-import os
-import re
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 from deriva.core import (
     ErmrestCatalog,
     get_credential,
-    format_exception,
     urlquote,
     DEFAULT_SESSION_CONFIG,
 )
@@ -30,8 +25,6 @@ from deriva.core.datapath import _CatalogWrapper
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import FindAssociationResult, Key, Table
 from deriva.core.hatrac_store import HatracStore
-from deriva.core.utils import hash_utils, mime_utils
-from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import validate_call, ConfigDict
 
 from .execution_configuration import ExecutionConfiguration
@@ -41,9 +34,9 @@ from .deriva_model import DerivaModel
 from .upload import asset_dir
 from .upload import (
     table_path,
-    bulk_upload_configuration,
     execution_rids,
     execution_metadata_dir,
+    upload_directory,
 )
 from .deriva_definitions import ColumnDefinition
 from .deriva_definitions import ExecMetadataVocab
@@ -106,9 +99,11 @@ class DerivaML(Dataset):
             self.credential,
             session_config=self._get_session_config(),
         )
+        m = self.catalog.getCatalogModel()
         self.model = DerivaModel(
             self.catalog.getCatalogModel(), domain_schema=domain_schema
         )
+
         self.cache_dir = (
             Path(cache_dir) if cache_dir else Path.home() / "deriva-ml" / "cache"
         )
@@ -345,8 +340,21 @@ class DerivaML(Dataset):
             )
         )
 
+    def find_assets(self) -> list[Table]:
+        """ """
+        return [
+            t
+            for s in self.model.schemas.values()
+            for t in s.tables.values()
+            if self.model.is_asset(t)
+        ]
+
     def create_asset(
-        self, asset_name: str, comment: str = "", schema: str = None
+        self,
+        asset_name: str,
+        column_defs: Iterable[ColumnDefinition] = [],
+        comment: str = "",
+        schema: str = None,
     ) -> Table:
         """Create an asset table with the given asset name.
 
@@ -362,7 +370,12 @@ class DerivaML(Dataset):
         """
         schema = schema or self.domain_schema
         asset_table = self.model.schemas[schema].create_table(
-            Table.define_asset(schema, asset_name, comment=comment)
+            Table.define_asset(
+                schema,
+                asset_name,
+                column_defs=[c.model_dump() for c in column_defs],
+                comment=comment,
+            )
         )
         return asset_table
 
@@ -471,7 +484,7 @@ class DerivaML(Dataset):
         """
         return self.lookup_feature(table, feature_name).feature_record_class()
 
-    def drop_feature(self, table: Table | str, feature_name: str) -> bool:
+    def delete_feature(self, table: Table | str, feature_name: str) -> bool:
         """
 
         Args:
@@ -544,7 +557,7 @@ class DerivaML(Dataset):
             }.issubset({c.name for c in a.table.columns})
 
         return [
-            Feature(a)
+            Feature(a, self.model)
             for a in table.find_associations(min_arity=3, max_arity=3, pure=False)
             if is_feature(a)
         ]
@@ -722,72 +735,19 @@ class DerivaML(Dataset):
         return Path(dest_filename)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def upload_asset(self, file: Path | str, table: Table | str, **kwargs: Any) -> dict:
-        """Upload the specified file into Hatrac and update the associated asset table.
-
-        Args:
-            file: path to the file to upload.
-            table: Name of the asset table
-            kwargs: Keyword arguments for values of additional columns to be added to the asset table.
-
-        Returns:
-
-        """
-        table = self.model.get_table(table)
-        if not self.model.is_asset(table):
-            raise DerivaMLException(f"Table {table} is not an asset table.")
-
-        credential = self.catalog.deriva_server.credentials
-        file_path = Path(file)
-        file_name = file_path.name
-        file_size = file_path.stat().st_size
-        # Get everything up to the filename  part of the
-        hatrac_path = f"/hatrac/{table.name}/"
-        hs = HatracStore("https", self.host_name, credential)
-        md5_hashes = hash_utils.compute_file_hashes(file, ["md5"])["md5"]
-        sanitized_filename = urlquote(
-            re.sub("[^a-zA-Z0-9_.-]", "_", md5_hashes[0] + "." + file_name)
-        )
-        hatrac_path = f"{hatrac_path}{sanitized_filename}"
-
-        try:
-            # Upload the file to hatrac.
-            hatrac_uri = hs.put_obj(
-                hatrac_path,
-                file,
-                md5=md5_hashes[1],
-                content_type=mime_utils.guess_content_type(file),
-                content_disposition="filename*=UTF-8''" + file_name,
-            )
-        except Exception as e:
-            raise e
-        try:
-            # Now update the asset table.
-            ipath = self.pathBuilder.schemas[table.schema.name].tables[table.name]
-            return list(
-                ipath.insert(
-                    [
-                        {
-                            "URL": hatrac_uri,
-                            "Filename": file_name,
-                            "Length": file_size,
-                            "MD5": md5_hashes[0],
-                        }
-                        | kwargs
-                    ]
-                )
-            )[0]
-        except Exception as e:
-            raise e
-
     def upload_assets(
-        self, assets_dir: str | Path
+        self,
+        assets_dir: str | Path,
+        metadata: Optional[dict[str, dict[str, str | int | float | bool]]] = None,
     ) -> dict[Any, FileUploadState] | None:
         """Upload assets from a directory. This routine assumes that the current upload specification includes a
         configuration for the specified directory.  Every asset in the specified directory is uploaded
 
         Args:
             assets_dir: Directory containing the assets to upload.
+            metadata:  Values for additional columns to be added to the asset table.  The format of the metadata
+                argument is a dictionary  whose key is the name of the asset for which the values are being provided
+                and whose value is a dictionary of column names and values.
 
         Returns:
             Results of the upload operation.
@@ -795,32 +755,36 @@ class DerivaML(Dataset):
         Raises:
             DerivaMLException: If there is an issue uploading the assets.
         """
-        with TemporaryDirectory() as temp_dir:
-            spec_file = f"{temp_dir}/config.json"
-            with open(spec_file, "w+") as cfile:
-                json.dump(bulk_upload_configuration, cfile)
-            uploader = GenericUploader(
-                server={
-                    "host": self.host_name,
-                    "protocol": "https",
-                    "catalog_id": self.catalog_id,
-                },
-                config_file=spec_file,
-            )
-            try:
-                uploader.getUpdatedConfig()
-                uploader.scanDirectory(assets_dir)
-                results = {
-                    path: FileUploadState(
-                        state=UploadState(result["State"]),
-                        status=result["Status"],
-                        result=result["Result"],
+
+        asset_name = Path(assets_dir).name
+        asset_schema = self.model.get_table(asset_name).schema.name
+        asset_cols = {c.name for c in self.model.get_table(asset_name).columns}
+        asset_files = {f.name for f in assets_dir.iterdir()}
+
+        if not self.model.is_asset(asset_name):
+            raise DerivaMLException("Directory does not have name of an asset table.")
+
+        if metadata:
+            for f, md in metadata.items():
+                if f not in asset_files:
+                    raise DerivaMLException(
+                        f"Metadata is specified for missing asset {f}."
                     )
-                    for path, result in uploader.uploadFiles().items()
-                }
-            finally:
-                uploader.cleanup()
-        return results
+                if asset_cols >= set(metadata.keys()):
+                    raise DerivaMLException(
+                        f"Metadata values do not match asset columns."
+                    )
+
+        results = upload_directory(self.model, assets_dir)
+        result_rids = [
+            r.result["RID"]
+            for r in results
+            if r.state == UploadState.success and r.result
+        ]
+
+        # Now add metadata
+        asset_path = self.pathBuilder.schemas[asset_schema].tables[asset_name]
+        asset_path.update([{"RID": a["RID"]} | metadata[a["file"]] for a in results])
 
     def _update_status(
         self, new_status: Status, status_detail: str, execution_rid: RID
@@ -848,106 +812,6 @@ class DerivaML(Dataset):
                 }
             ]
         )
-
-    def upload_execution_configuration(self, config: ExecutionConfiguration) -> RID:
-        """Upload execution configuration to Execution_Metadata table with Execution Metadata Type = Execution_Config.
-
-        Args:
-            config: A execution configuration.
-
-        Returns:
-            RID of the newly created configuration file.
-
-        Raises:
-             DerivaMLException: If there is an issue uploading the configuration.
-        """
-        try:
-            fp = NamedTemporaryFile(
-                "w+", prefix="exec_config", suffix=".json", delete=False
-            )
-            json.dump(config.model_dump_json(), fp)
-            fp.close()
-            configuration_rid = self._upload_execution_configuration_file(
-                fp.name, description=config.description
-            )
-            os.remove(fp.name)
-        except Exception as _e:
-            raise DerivaMLException(f"Error in execution configuration upload")
-        return configuration_rid
-
-    def download_execution_configuration(
-        self, configuration_rid: RID
-    ) -> ExecutionConfiguration:
-        """Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
-        configuration in hatrac
-
-        Args:
-            configuration_rid: RID that should be to an asset table that refers to an execution configuration
-
-        Returns:
-            A ExecutionConfiguration object for configured by the parameters in the configuration file.
-        """
-        configuration = self.retrieve_rid(configuration_rid)
-        with NamedTemporaryFile("w+", delete=False, suffix=".json") as dest_file:
-            hs = HatracStore("https", self.host_name, self.credential)
-            hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
-            return ExecutionConfiguration.load_configuration(Path(dest_file.name))
-
-    def _upload_execution_configuration_file(
-        self, config_file: str, description: str
-    ) -> RID:
-        """
-
-        Args:
-            config_file: str:
-            description: str:
-
-        Returns:
-
-        """
-        file_path = Path(config_file)
-        file_name = file_path.name
-        file_size = file_path.stat().st_size
-        try:
-            hs = HatracStore("https", self.host_name, self.credential)
-            md5 = hash_utils.compute_file_hashes(config_file, ["md5"])["md5"][1]
-            sanitized_filename = urlquote(
-                re.sub("[^a-zA-Z0-9_.-]", "_", md5 + "." + file_name)
-            )
-            hatrac_path = f"/hatrac/execution_metadata/{sanitized_filename}"
-            hatrac_uri = hs.put_obj(
-                hatrac_path,
-                config_file,
-                md5=md5,
-                content_type=mime_utils.guess_content_type(config_file),
-                content_disposition="filename*=UTF-8''" + file_name,
-            )
-        except Exception as e:
-            error = format_exception(e)
-            raise DerivaMLException(
-                f"Failed to upload execution configuration file {config_file} to object store. Error: {error}"
-            )
-        try:
-            ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
-            return list(
-                ml_schema_path.tables["Execution_Metadata"].insert(
-                    [
-                        {
-                            "URL": hatrac_uri,
-                            "Filename": file_name,
-                            "Length": file_size,
-                            "MD5": md5,
-                            "Description": description,
-                            "Execution_Metadata_Type": ExecMetadataVocab.execution_config,
-                        }
-                    ]
-                )
-            )[0]["RID"]
-        except Exception as e:
-            error = format_exception(e)
-            raise DerivaMLException(
-                f"Failed to update Execution_Asset table with configuration file metadata. Error: {error}"
-            )
 
     # @validate_call
     def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":
