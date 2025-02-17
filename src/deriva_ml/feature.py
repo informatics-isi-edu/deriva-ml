@@ -8,6 +8,8 @@ from pydantic import BaseModel, create_model
 from typing import Optional, Type, ClassVar
 from types import UnionType
 
+from .deriva_model import DerivaModel
+
 
 class FeatureRecord(BaseModel):
     """Base class for feature records.  Feature records are pydantic models which are dynamically generated and
@@ -83,34 +85,11 @@ class FeatureRecord(BaseModel):
 class Feature:
     """Wrapper for results of Table.find_associations()"""
 
-    def __init__(self, atable: FindAssociationResult):
+    def __init__(self, atable: FindAssociationResult, model: DerivaModel) -> None:
         self.feature_table = atable.table
         self.target_table = atable.self_fkey.pk_table
         self.feature_name = atable.table.columns["Feature_Name"].default
-
-        def is_asset(table):
-            """
-
-            Args:
-              table:
-
-            Returns:
-
-            """
-            asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
-            return asset_columns.issubset({c.name for c in table.columns})
-
-        def is_vocabulary(table):
-            """
-
-            Args:
-              table:
-
-            Returns:
-
-            """
-            vocab_columns = {"NAME", "URI", "SYNONYMS", "DESCRIPTION", "ID"}
-            return vocab_columns.issubset({c.name.upper() for c in table.columns})
+        self._model = model
 
         skip_columns = {
             "RID",
@@ -132,13 +111,13 @@ class Feature:
         self.asset_columns = {
             fk.foreign_key_columns[0]
             for fk in self.feature_table.foreign_keys
-            if fk not in assoc_fkeys and is_asset(fk.pk_table)
+            if fk not in assoc_fkeys and self._model.is_asset(fk.pk_table)
         }
 
         self.term_columns = {
             fk.foreign_key_columns[0]
             for fk in self.feature_table.foreign_keys
-            if fk not in assoc_fkeys and is_vocabulary(fk.pk_table)
+            if fk not in assoc_fkeys and self._model.is_vocabulary(fk.pk_table)
         }
 
         self.value_columns = self.feature_columns - (
