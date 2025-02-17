@@ -4,6 +4,7 @@ import sys
 from deriva.core.utils.core_utils import tag as deriva_tags
 from ..upload import bulk_upload_configuration
 
+
 def generate_annotation(catalog_id: str, schema: str) -> dict:
     workflow_annotation = {
         deriva_tags.visible_columns: {
@@ -11,10 +12,18 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 "RID",
                 "Name",
                 "Description",
-                {"display": {"markdown_pattern": "[{{{URL}}}]({{{URL}}})"}, "markdown_name": "URL"},
+                {
+                    "display": {"markdown_pattern": "[{{{URL}}}]({{{URL}}})"},
+                    "markdown_name": "URL",
+                },
                 "Checksum",
                 "Version",
-                {"source": [{"outbound": [schema, "Workflow_Workflow_Type_fkey"]}, "RID"]}
+                {
+                    "source": [
+                        {"outbound": [schema, "Workflow_Workflow_Type_fkey"]},
+                        "RID",
+                    ]
+                },
             ]
         }
     }
@@ -29,42 +38,59 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 {"source": [{"outbound": [schema, "Execution_Workflow_fkey"]}, "RID"]},
                 "Duration",
                 "Status",
-                "Status_Detail"
+                "Status_Detail",
             ]
         },
         "tag:isrd.isi.edu,2016:visible-foreign-keys": {
             "detailed": [
                 {
-                    "source": [{"inbound": [schema, "Dataset_Execution_Execution_fkey"]},
-                               {"outbound": [schema, "Dataset_Execution_Dataset_fkey"]}, "RID"],
-                    "markdown_name": "Dataset"
+                    "source": [
+                        {"inbound": [schema, "Dataset_Execution_Execution_fkey"]},
+                        {"outbound": [schema, "Dataset_Execution_Dataset_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Dataset",
                 },
                 {
                     "source": [
-                        {"inbound": [schema, "Execution_Asset_Execution_Execution_fkey"]},
-                        {"outbound": [schema, "Execution_Asset_Execution_Execution_Asset_fkey"]}, "RID"],
-                    "markdown_name": "Execution Asset"
+                        {
+                            "inbound": [
+                                schema,
+                                "Execution_Asset_Execution_Execution_fkey",
+                            ]
+                        },
+                        {
+                            "outbound": [
+                                schema,
+                                "Execution_Asset_Execution_Execution_Asset_fkey",
+                            ]
+                        },
+                        "RID",
+                    ],
+                    "markdown_name": "Execution Asset",
                 },
                 {
-                    "source": [{"inbound": [schema, "Execution_Metadata_Execution_fkey"]}, "RID"],
-                    "markdown_name": "Execution Metadata"
-                }
+                    "source": [
+                        {"inbound": [schema, "Execution_Metadata_Execution_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Execution Metadata",
+                },
             ]
-        }
+        },
     }
 
     execution_asset_annotation = {
         deriva_tags.table_display: {
-            "row_name": {
-                "row_markdown_pattern": "{{{Filename}}}"
-            }
+            "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
         },
         deriva_tags.visible_columns: {
             "compact": [
                 "RID",
                 "URL",
                 "Description",
-                "Length", [schema, "Execution_Asset_Execution_Asset_Type_fkey"],
+                "Length",
+                [schema, "Execution_Asset_Execution_Asset_Type_fkey"],
                 # {
                 #     "display": {
                 #         "template_engine": "handlebars",
@@ -98,16 +124,14 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                 "Description",
                 "Length",
                 "MD5",
-                [schema, "Execution_Asset_Execution_Asset_Type_fkey"]
-            ]
-        }
+                [schema, "Execution_Asset_Execution_Asset_Type_fkey"],
+            ],
+        },
     }
 
     execution_metadata_annotation = {
         deriva_tags.table_display: {
-            "row_name": {
-                "row_markdown_pattern": "{{{Filename}}}"
-            }
+            "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
         }
     }
 
@@ -118,11 +142,11 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
     }
 
     schema_annotation = {
-        'name_style': {'underline_space': True},
+        "name_style": {"underline_space": True},
     }
 
     catalog_annotation = {
-        deriva_tags.display: {"name_style": { "underline_space": True}},
+        deriva_tags.display: {"name_style": {"underline_space": True}},
         deriva_tags.chaise_config: {
             "headTitle": "Catalog ML",
             "navbarBrandText": "ML Data Browser",
@@ -136,56 +160,56 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
                         "children": [
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Client",
-                                "name": "Users"
+                                "name": "Users",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Group",
-                                "name": "Groups"
+                                "name": "Groups",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_RID_Lease",
-                                "name": "ERMrest RID Lease"
-                            }
-                        ]
+                                "name": "ERMrest RID Lease",
+                            },
+                        ],
                     },
                     {
                         "name": "Deriva-ML",
                         "children": [
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow",
-                                "name": "Workflow"
+                                "name": "Workflow",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow_Type",
-                                "name": "Workflow Type"
+                                "name": "Workflow Type",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution",
-                                "name": "Execution"
+                                "name": "Execution",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Metadata",
-                                "name": "Execution Metadata"
+                                "name": "Execution Metadata",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Metadata_Type",
-                                "name": "Execution Metadata Type"
+                                "name": "Execution Metadata Type",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset",
-                                "name": "Execution Asset"
+                                "name": "Execution Asset",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset_Type",
-                                "name": "Execution Asset Type"
+                                "name": "Execution Asset Type",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset",
-                                "name": "Dataset"
-                            }
-                        ]
-                    }
-                ]
+                                "name": "Dataset",
+                            },
+                        ],
+                    },
+                ],
             },
             "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
             "deleteRecord": True,
@@ -194,23 +218,24 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
             "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
             "resolverImplicitCatalog": catalog_id,
         },
-        deriva_tags.bulk_upload: bulk_upload_configuration,
+        deriva_tags.bulk_upload: bulk_upload_configuration(schema),
     }
 
-    return {"workflow_annotation": workflow_annotation,
-            "dataset_annotation": dataset_annotation,
-            "execution_annotation": execution_annotation,
-            "execution_asset_annotation": execution_asset_annotation,
-            "execution_metadata_annotation": execution_metadata_annotation,
-            "schema_annotation": schema_annotation,
-            "catalog_annotation": catalog_annotation,
-            }
+    return {
+        "workflow_annotation": workflow_annotation,
+        "dataset_annotation": dataset_annotation,
+        "execution_annotation": execution_annotation,
+        "execution_asset_annotation": execution_asset_annotation,
+        "execution_metadata_annotation": execution_metadata_annotation,
+        "schema_annotation": schema_annotation,
+        "catalog_annotation": catalog_annotation,
+    }
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--catalog_id', type=str, required=True)
-    parser.add_argument('--schema_name', type=str, required=True)
+    parser.add_argument("--catalog_id", type=str, required=True)
+    parser.add_argument("--schema_name", type=str, required=True)
     args = parser.parse_args()
     generate_annotation(args.catalog_id, args.schema_name)
 
