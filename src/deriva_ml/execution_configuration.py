@@ -10,6 +10,7 @@ from pydantic import (
 )
 from pathlib import Path
 
+
 from .dataset_aux_classes import DatasetSpec
 from .deriva_definitions import RID
 
@@ -66,3 +67,24 @@ class ExecutionConfiguration(BaseModel):
         with open(path) as fd:
             config = json.load(fd)
         return ExecutionConfiguration.model_validate(config)
+
+    def download_execution_configuration(
+        self, configuration_rid: RID
+    ) -> ExecutionConfiguration:
+        """Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
+        configuration in hatrac
+
+        Args:
+            configuration_rid: RID that should be to an asset table that refers to an execution configuration
+
+        Returns:
+            A ExecutionConfiguration object for configured by the parameters in the configuration file.
+        """
+        AssertionError("Not Implemented")
+        return ExecutionConfiguration.load_configuration(configuration_rid)
+
+        # configuration = self.retrieve_rid(configuration_rid)
+        # with NamedTemporaryFile("w+", delete=False, suffix=".json") as dest_file:
+        #    hs = HatracStore("https", self.host_name, self.credential)
+        #    hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
+        #    return ExecutionConfiguration.load_configuration(Path(dest_file.name))
