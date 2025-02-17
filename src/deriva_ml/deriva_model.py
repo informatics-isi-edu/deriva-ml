@@ -8,12 +8,7 @@ relationships that follow a specific data model.
 
 """
 
-from typing import Iterable, Optional
-from deriva.core.ermrest_model import FindAssociationResult, Table, Model, Schema
-from deriva.core.ermrest_catalog import ErmrestCatalog
-from pydantic import validate_call, ConfigDict
-from .feature import Feature, FeatureRecord
-
+from deriva.core.ermrest_model import Table, Model
 
 from .deriva_definitions import (
     DerivaMLException,
@@ -26,7 +21,11 @@ class DerivaModel:
 
     Attributes:
         domain_schema: Schema name for domain specific tables and relationships.
-        model: ERMRest model for the catalog
+        model: ERMRest model for the catalog.
+        schemas: ERMRest model for the catalog.
+        catalog: ERMRest catalog for the model
+        hostname: ERMRest catalog for the model
+
     """
 
     def __init__(
@@ -40,23 +39,17 @@ class DerivaModel:
         Args:
         """
         self.model = model
+        self.configuration = None
+        self.catalog = self.model.catalog
+        self.hostname = self.catalog.deriva_server.server
+        self.schemas = self.model.schemas
 
         self.ml_schema = ml_schema
-        self.configuration = None
-
         builtin_schemas = ["public", self.ml_schema, "www"]
         self.domain_schema = (
             domain_schema
             or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
         )
-
-    @property
-    def schemas(self) -> dict[str, Schema]:
-        return self.model.schemas
-
-    @property
-    def catalog(self) -> Optional[ErmrestCatalog]:
-        return self.model.catalog
 
     def get_table(self, table: str | Table) -> Table:
         """Return the table object corresponding to the given table name.
@@ -127,102 +120,17 @@ class DerivaModel:
         table = self.get_table(table_name)
         return asset_columns.issubset({c.name for c in table.columns})
 
-    def find_assets(self) -> list[Table]:
-        """ """
-        return [
-            t
-            for s in self.model.schemas.values()
-            for t in s.tables.values()
-            if self.is_asset(t)
-        ]
+    def asset_metadata(self, table: str | Table) -> set[str]:
+        """Return the metadata columns for an asset table."""
 
-    def feature_record_class(
-        self, table: str | Table, feature_name: str
-    ) -> type[FeatureRecord]:
-        """Create a pydantic model for entries into the specified feature table.
-
-        For information on how to
-        See the pydantic documentation for more details about the pydantic model.
-
-        Args:
-            table: table name or object on which the feature is to be associated
-            feature_name: name of the feature to be created
-            table: str | Table:
-            feature_name: str:
-
-        Returns:
-            A Feature class that can be used to create instances of the feature.
-        """
-        return self.lookup_feature(table, feature_name).feature_record_class()
-
-    def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
-        """Lookup the named feature associated with the provided table.
-
-        Args:
-            table: param feature_name:
-            table: str | Table:
-            feature_name: str:
-
-        Returns:
-            A Feature class that represents the requested feature.
-
-        Raises:
-          DerivaMLException: If the feature cannot be found.
-        """
         table = self.get_table(table)
-        try:
-            return [
-                f for f in self.find_features(table) if f.feature_name == feature_name
-            ][0]
-        except IndexError:
-            raise DerivaMLException(
-                f"Feature {table.name}:{feature_name} doesn't exist."
-            )
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def find_features(self, table: Table | str) -> Iterable[Feature]:
-        """List the names of the features in the specified table.
-
-        Args:
-            table: The table to find features for.
-            table: Table | str:
-
-        Returns:
-            An iterable of FeatureResult instances that describe the current features in the table.
-        """
-        table = self.get_table(table)
-
-        def is_feature(a: FindAssociationResult) -> bool:
-            """
-
-            Args:
-              a: FindAssociationResult:
-
-            Returns:
-
-            """
-            # return {'Feature_Name', 'Execution'}.issubset({c.name for c in a.table.columns})
-            return {
-                "Feature_Name",
-                "Execution",
-                a.self_fkey.foreign_key_columns[0].name,
-            }.issubset({c.name for c in a.table.columns})
-
-        return [
-            Feature(a)
-            for a in table.find_associations(min_arity=3, max_arity=3, pure=False)
-            if is_feature(a)
-        ]
-
-    def find_vocabularies(self) -> Iterable[Table]:
-        """Return a list of all the controlled vocabulary tables in the domain schema."""
-        return [
-            t
-            for s in self.model.schemas.values()
-            for t in s.tables.values()
-            if self.is_vocabulary(t)
-        ]
+        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
+        if not self.is_asset(table):
+            raise DerivaMLException(f"{table.name} is not an asset table.")
+        return {c.name for c in table.columns} - asset_columns
 
     def apply(self):
         if self.catalog == "file-system":
             raise DerivaMLException("Cannot apply() to non-catalog model.")
+        else:
+            self.model.apply()
