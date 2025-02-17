@@ -34,7 +34,10 @@ def define_table_workflow(workflow_annotation: dict):
 def define_table_dataset(sname, dataset_annotation: dict = None):
     return Table.define(
         tname="Dataset",
-        column_defs=[Column.define("Description", builtin_types.markdown)],
+        column_defs=[
+            Column.define("Description", builtin_types.markdown),
+            Column.define("Deleted", builtin_types.boolean),
+        ],
         annotations=dataset_annotation if dataset_annotation is not None else {},
     )
 
@@ -152,6 +155,7 @@ def create_ml_schema(
         model.schemas[schema_name].drop(cascade=True)
     # get annotations
     annotations = generate_annotation(ml_catalog.catalog_id, schema_name)
+
     model.annotations.update(annotations["catalog_annotation"])
     client_annotation = {
         "tag:misd.isi.edu,2015:display": {"name": "Users"},
