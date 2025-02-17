@@ -28,15 +28,35 @@ Here is the directory layout we support:
                <schema>
                    <asset_table>
                      file1, file2, ....
-
+        asset
+            <schema>
+                <asset_table>
+                    file1, file2, ....
+                asset_metadata.json
 """
 
+from deriva.core import urlquote
+from deriva.core.hatrac_store import HatracStore
+from deriva.core.ermrest_model import Table
+from deriva.core.utils import hash_utils, mime_utils
+from deriva.transfer.upload.deriva_upload import GenericUploader
+from deriva_ml.deriva_definitions import (
+    RID,
+    DerivaMLException,
+    FileUploadState,
+    UploadState,
+)
+from deriva_ml.deriva_model import DerivaModel
+
+import json
+from pydantic import validate_call, ConfigDict
 from pathlib import Path
-from typing import Optional
-from .deriva_definitions import RID
 import regex as re
+from tempfile import TemporaryDirectory
+from typing import Any, Optional
 
 upload_root_regex = r"(?i)^.*/deriva-ml"
+
 exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"
 exec_asset_dir_regex = (
     exec_dir_regex + r"/execution-asset/(?P<execution_asset_type>[-\w]+)"
@@ -131,6 +151,60 @@ def upload_root(prefix: Path | str) -> Path:
     """
     path = Path(prefix) / "deriva-ml"
     path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
+def asset_root(prefix: Path | str) -> Path:
+    """
+
+    Args:
+      prefix: Path | str:
+      exec_rid:
+
+    Returns:
+
+    """
+    path = upload_root(prefix) / "asset"
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
+@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
+    """Return the path to a directory in which to place  assets of a specified type are to be uploaded.
+
+    Args:
+      prefix: Location of upload root directory
+      asset_type: Type of execution asset
+      exec_rid: RID of the execution asset
+      prefix: Path | str:
+      asset_type: str:
+
+    Returns:
+
+    """
+    path = asset_root(prefix) / asset_type
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
+    """Return the path to a directory in which to place execution assets of a specified type are to be uploaded.
+
+    Args:
+      prefix: Location of upload root directory
+      asset_type: Type of execution asset
+      exec_rid: RID of the execution asset
+      prefix: Path | str:
+      exec_rid: str:
+      asset_type: str:
+
+    Returns:
+
+    """
+    path = execution_asset_root(prefix, exec_rid) / asset_type
+    path.mkdir(parents=True, exist_ok=True)
     return path
 
 
@@ -317,22 +391,6 @@ def feature_asset_dir(
     return path
 
 
-def asset_dir(prefix: Path | str, schema: str, asset_table: str) -> Path:
-    """Return the path to a directory in which to place assets that are to be uploaded.
-
-    Args:
-        prefix: Location of upload root directory
-        schema: Domain schema
-        asset_table: Name of the asset table
-
-    Returns:
-        Path to the directory in which to place assets
-    """
-    path = upload_root(prefix) / "asset" / schema / asset_table
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     """Return the path to a CSV file in which to place table values that are to be uploaded.
 
@@ -349,109 +407,232 @@ def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     return path / f"{table}.csv"
 
 
-bulk_upload_configuration = {
-    "asset_mappings": [
-        {
-            # Upload  any files that may have been created by the program execution.  These are  in the
-            # Execution_Metadata directory
-            "column_map": {
-                "MD5": "{md5}",
-                "URL": "{URI}",
-                "Length": "{file_size}",
-                "Filename": "{file_name}",
-                "Execution_Metadata_Type": "{execution_metadata_type_name}",
+def bulk_upload_configuration(domain_schema: str) -> dict[str, Any]:
+    """Return an upload specification for deriva-ml
+    Arguments:
+        domain_schema: Name of domain schema used to configure asset upload from arbitrary directory
+    """
+    return {
+        "asset_mappings": [
+            {
+                # Upload  any files that may have been created by the program execution.  These are  in the
+                # Execution_Metadata directory
+                "column_map": {
+                    "MD5": "{md5}",
+                    "URL": "{URI}",
+                    "Length": "{file_size}",
+                    "Filename": "{file_name}",
+                    "Execution_Metadata_Type": "{execution_metadata_type_name}",
+                },
+                "file_pattern": exec_metadata_regex,
+                "target_table": ["deriva-ml", "Execution_Metadata"],
+                "checksum_types": ["sha256", "md5"],
+                "hatrac_options": {"versioned_urls": True},
+                "hatrac_templates": {
+                    "hatrac_uri": "/hatrac/execution_metadata/{md5}.{file_name}",
+                    "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+                },
+                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+                "metadata_query_templates": [
+                    "/attribute/deriva-ml:Execution_Metadata_Type/Name={execution_metadata_type}/execution_metadata_type_name:=Name"
+                ],
             },
-            "file_pattern": exec_metadata_regex,
-            "target_table": ["deriva-ml", "Execution_Metadata"],
-            "checksum_types": ["sha256", "md5"],
-            "hatrac_options": {"versioned_urls": True},
-            "hatrac_templates": {
-                "hatrac_uri": "/hatrac/execution_metadata/{md5}.{file_name}",
-                "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+            {
+                # Upload the contents of the Execution_Asset directory.
+                "column_map": {
+                    "MD5": "{md5}",
+                    "URL": "{URI}",
+                    "Length": "{file_size}",
+                    "Filename": "{file_name}",
+                    "Execution_Asset_Type": "{execution_asset_type_name}",
+                },
+                "file_pattern": exec_asset_regex,
+                "target_table": ["deriva-ml", "Execution_Asset"],
+                "checksum_types": ["sha256", "md5"],
+                "hatrac_options": {"versioned_urls": True},
+                "hatrac_templates": {
+                    "hatrac_uri": "/hatrac/execution_asset/{md5}.{file_name}",
+                    "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+                },
+                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+                "metadata_query_templates": [
+                    "/attribute/deriva-ml:Execution_Asset_Type/Name={execution_asset_type}/execution_asset_type_name:=Name"
+                ],
             },
-            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-            "metadata_query_templates": [
-                "/attribute/deriva-ml:Execution_Metadata_Type/Name={execution_metadata_type}/execution_metadata_type_name:=Name"
-            ],
-        },
-        {
-            # Upload the contents of the Execution_Asset directory.
-            "column_map": {
-                "MD5": "{md5}",
-                "URL": "{URI}",
-                "Length": "{file_size}",
-                "Filename": "{file_name}",
-                "Execution_Asset_Type": "{execution_asset_type_name}",
+            {
+                # Upload the assets for a feature table.
+                "column_map": {
+                    "MD5": "{md5}",
+                    "URL": "{URI}",
+                    "Length": "{file_size}",
+                    "Filename": "{file_name}",
+                },
+                "file_pattern": feature_asset_regex,  # Sets target_table, feature_name, asset_table
+                "target_table": ["{schema}", "{asset_table}"],
+                "checksum_types": ["sha256", "md5"],
+                "hatrac_options": {"versioned_urls": True},
+                "hatrac_templates": {
+                    "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
+                    "content-disposition": "filename*=UTF-8''{file_name}",
+                },
+                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
             },
-            "file_pattern": exec_asset_regex,
-            "target_table": ["deriva-ml", "Execution_Asset"],
-            "checksum_types": ["sha256", "md5"],
-            "hatrac_options": {"versioned_urls": True},
-            "hatrac_templates": {
-                "hatrac_uri": "/hatrac/execution_asset/{md5}.{file_name}",
-                "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+            {
+                # Upload assets into an asset table of an asset table.
+                "column_map": {
+                    "MD5": "{md5}",
+                    "URL": "{URI}",
+                    "Length": "{file_size}",
+                    "Filename": "{file_name}",
+                },
+                "target_table": [domain_schema, "{asset_table}"],
+                "file_pattern": asset_path_regex,  # Sets schema, asset_table, file_name, file_ext
+                "checksum_types": ["sha256", "md5"],
+                "hatrac_options": {"versioned_urls": True},
+                "hatrac_templates": {
+                    "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
+                    "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+                },
+                "record_query_template": "/entity/{target_table}/MD5={{md5}}&Filename={{file_name}}",
             },
-            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-            "metadata_query_templates": [
-                "/attribute/deriva-ml:Execution_Asset_Type/Name={execution_asset_type}/execution_asset_type_name:=Name"
-            ],
-        },
-        {
-            # Upload the assets for a feature table.
-            "column_map": {
-                "MD5": "{md5}",
-                "URL": "{URI}",
-                "Length": "{file_size}",
-                "Filename": "{file_name}",
-            },
-            "file_pattern": feature_asset_regex,  # Sets target_table, feature_name, asset_table
-            "target_table": ["{schema}", "{asset_table}"],
-            "checksum_types": ["sha256", "md5"],
-            "hatrac_options": {"versioned_urls": True},
-            "hatrac_templates": {
-                "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
-                "content-disposition": "filename*=UTF-8''{file_name}",
-            },
-            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-        },
-        {
-            # Upload assets into an asset table of an asset table.
-            "column_map": {
-                "MD5": "{md5}",
-                "URL": "{URI}",
-                "Length": "{file_size}",
-                "Filename": "{file_name}",
-            },
-            "file_pattern": asset_path_regex,  # Sets schema, asset_table, file_name, file_ext
-            "checksum_types": ["sha256", "md5"],
-            "hatrac_options": {"versioned_urls": True},
-            "hatrac_templates": {
-                "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
-                "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
-            },
-            "target_table": ["{schema}", "{asset_table}"],
-            "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-        },
-        # {
-        #  Upload the records into a  table
-        #   "asset_type": "skip",
-        ##   "default_columns": ["RID", "RCB", "RMB", "RCT", "RMT"],
-        #  "file_pattern": feature_value_regex,  # Sets schema, table,
-        #  "ext_pattern": "^.*[.](?P<file_ext>json|csv)$",
-        #  "target_table": ["{schema}", "{table}"],
-        # },
-        {
+            # {
             #  Upload the records into a  table
-            "asset_type": "table",
-            "default_columns": ["RID", "RCB", "RMB", "RCT", "RMT"],
-            "file_pattern": table_regex,  # Sets schema, table,
-            "ext_pattern": "^.*[.](?P<file_ext>json|csv)$",
-            "target_table": ["{schema}", "{table}"],
-        },
-    ],
-    "version_update_url": "https://github.com/informatics-isi-edu/deriva-client",
-    "version_compatibility": [[">=1.4.0", "<2.0.0"]],
-}
+            #   "asset_type": "skip",
+            ##   "default_columns": ["RID", "RCB", "RMB", "RCT", "RMT"],
+            #  "file_pattern": feature_value_regex,  # Sets schema, table,
+            #  "ext_pattern": "^.*[.](?P<file_ext>json|csv)$",
+            #  "target_table": ["{schema}", "{table}"],
+            # },
+            {
+                #  Upload the records into a  table
+                "asset_type": "table",
+                "default_columns": ["RID", "RCB", "RMB", "RCT", "RMT"],
+                "file_pattern": table_regex,  # Sets schema, table,
+                "ext_pattern": "^.*[.](?P<file_ext>json|csv)$",
+                "target_table": ["{schema}", "{table}"],
+            },
+        ],
+        "version_update_url": "https://github.com/informatics-isi-edu/deriva-client",
+        "version_compatibility": [[">=1.4.0", "<2.0.0"]],
+    }
+
+
+@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def upload_directory(
+    model: DerivaModel, directory: Path | str
+) -> dict[Any, FileUploadState] | None:
+    """Upload assets from a directory. This routine assumes that the current upload specification includes a
+    configuration for the specified directory.  Every asset in the specified directory is uploaded
+
+    Args:
+        directory: Directory containing the assets and tables to upload.
+
+    Returns:
+        Results of the upload operation.
+
+    Raises:
+        DerivaMLException: If there is an issue uploading the assets.
+    """
+    directory = Path(directory)
+    if not directory.is_dir():
+        raise DerivaMLException("Directory does not exist")
+
+    # Now upload the files by creating an upload spec and then calling the uploader.
+    with TemporaryDirectory() as temp_dir:
+        spec_file = f"{temp_dir}/config.json"
+        import pprint
+
+        pprint.pprint(bulk_upload_configuration(model.domain_schema))
+        with open(spec_file, "w+") as cfile:
+            json.dump(bulk_upload_configuration(model.domain_schema), cfile)
+        uploader = GenericUploader(
+            server={
+                "host": model.hostname,
+                "protocol": "https",
+                "catalog_id": model.catalog.catalog_id,
+            },
+            config_file=spec_file,
+        )
+        try:
+            uploader.getUpdatedConfig()
+            uploader.scanDirectory(directory)
+            results = {
+                path: FileUploadState(
+                    state=UploadState(result["State"]),
+                    status=result["Status"],
+                    result=result["Result"],
+                )
+                for path, result in uploader.uploadFiles().items()
+            }
+        finally:
+            uploader.cleanup()
+        return results
+
+
+@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def upload_asset(
+    model: DerivaModel, file: Path | str, table: Table | str, **kwargs: Any
+) -> dict:
+    """Upload the specified file into Hatrac and update the associated asset table.
+
+    Args:
+        file: path to the file to upload.
+        table: Name of the asset table
+        kwargs: Keyword arguments for values of additional columns to be added to the asset table.
+
+    Returns:
+
+    """
+    if not model.is_asset(table):
+        raise DerivaMLException(f"Table {table} is not an asset table.")
+
+    file_path = Path(file)
+    file_name = file_path.name
+    file_size = file_path.stat().st_size
+
+    hatrac_path = f"/hatrac/{table.name}/"
+    hs = HatracStore(
+        "https",
+        server=model.catalog.deriva_server.server,
+        credentials=model.catalog.deriva_server.credentials,
+    )
+    md5_hashes = hash_utils.compute_file_hashes(file, ["md5"])["md5"]
+    sanitized_filename = urlquote(
+        re.sub("[^a-zA-Z0-9_.-]", "_", md5_hashes[0] + "." + file_name)
+    )
+    hatrac_path = f"{hatrac_path}{sanitized_filename}"
+
+    try:
+        # Upload the file to hatrac.
+        hatrac_uri = hs.put_obj(
+            hatrac_path,
+            file,
+            md5=md5_hashes[1],
+            content_type=mime_utils.guess_content_type(file),
+            content_disposition="filename*=UTF-8''" + file_name,
+        )
+    except Exception as e:
+        raise e
+    try:
+        # Now update the asset table.
+        ipath = (
+            model.catalog.getPathBuilder().schemas[table.schema.name].tables[table.name]
+        )
+        return list(
+            ipath.insert(
+                [
+                    {
+                        "URL": hatrac_uri,
+                        "Filename": file_name,
+                        "Length": file_size,
+                        "MD5": md5_hashes[0],
+                    }
+                    | kwargs
+                ]
+            )
+        )[0]
+    except Exception as e:
+        raise e
 
 
 def test_upload():
