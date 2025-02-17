@@ -1,6 +1,7 @@
 import atexit
 from importlib.metadata import version
 from importlib.resources import files
+from pathlib import Path
 from random import random
 from tempfile import TemporaryDirectory
 
@@ -21,16 +22,16 @@ from deriva_ml import (
     ColumnDefinition,
 )
 
-# from deriva_ml.deriva_definitions import MLVocab, BuiltinTypes, ColumnDefinition
 from .execution import Execution
 from .schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from .dataset import Dataset
 
 TEST_DATASET_SIZE = 20
 
+import time
 
-def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
-    # Delete any vocabularies and features.
+
+def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
     model = deriva_ml.model
     for trial in range(3):
         for t in [
@@ -45,7 +46,6 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
 
     # Empty out remaining tables.
     pb = deriva_ml.pathBuilder
-    domain_schema = pb.schemas[sname]
     retry = True
     while retry:
         retry = False
@@ -59,16 +59,24 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
 
     initialize_ml_schema(model, "deriva-ml")
 
+
+def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
+    # Delete any vocabularies and features.
+    reset_demo_catalog(deriva_ml, sname)
+    domain_schema = pb.schemas[sname]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
     with TemporaryDirectory() as tmpdir:
+        image_dir = Path(tmpdir) / "Image"
+        image_dir.mkdir()
         for s in ss:
-            image_file = f"{tmpdir}/test_{s['RID']}.txt"
+            image_file = image_dir / f"test_{s['RID']}.txt"
             with open(image_file, "w+") as f:
                 f.write(f"Hello there {random()}\n")
-            deriva_ml.upload_asset(
-                image_file, "Image", Subject=s["RID"], Description="A test image"
-            )
+        deriva_ml.upload_asset(
+            image_file, "Image", Subject=s["RID"], Description="A test image"
+        )
+        deriva_ml.upload_assets(image_dir)
 
 
 def create_demo_datasets(deriva_ml: DerivaML) -> None:
@@ -252,15 +260,19 @@ def create_demo_catalog(
     create_datasets=False,
     on_exit_delete=True,
 ) -> ErmrestCatalog:
+    st = time.time()
     credentials = get_credential(hostname)
     server = DerivaServer("https", hostname, credentials=credentials)
     test_catalog = server.create_ermrest_catalog()
-
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)
+    print(f"setup server time {time.time() - st} seconds")
+    st = time.time()
     model = test_catalog.getCatalogModel()
+    print(f"get model time {time.time() - st} seconds")
 
     try:
+        st = time.time()
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
         deriva_ml = DerivaML(
@@ -268,6 +280,8 @@ def create_demo_catalog(
             catalog_id=test_catalog.catalog_id,
             project_name=project_name,
         )
+        print(f"setup schema time {time.time() - st} seconds")
+        st = time.time()
         populate_demo_catalog(deriva_ml, domain_schema)
         if create_features:
             create_demo_features(deriva_ml)
@@ -279,6 +293,7 @@ def create_demo_catalog(
                 deriva_ml.model, deriva_ml.cache_dir
             )._generate_dataset_annotations()
         )
+        print(f"populate server time {time.time() - st} seconds")
         deriva_ml.model.apply()
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
         AclConfig(
