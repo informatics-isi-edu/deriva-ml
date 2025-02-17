@@ -26,8 +26,6 @@ from .deriva_definitions import (
     UploadState,
     FileUploadState,
     RID,
-)
-from .deriva_definitions import (
     DerivaMLException,
     MLVocab,
     ExecMetadataVocab,
