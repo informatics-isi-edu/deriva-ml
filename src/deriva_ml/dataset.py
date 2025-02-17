@@ -10,7 +10,6 @@ from bdbag.fetch.fetcher import fetch_single_file
 from bdbag import bdbag_api as bdb
 from collections import defaultdict
 from deriva.core.ermrest_model import Table
-from deriva.core.datapath import DataPathException
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 from deriva.transfer.download.deriva_export import DerivaExport
 from deriva.transfer.download.deriva_download import (
@@ -692,19 +691,6 @@ class Dataset:
             )
         return exports
 
-    @staticmethod
-    def _is_vocabulary(t: Table) -> bool:
-        """
-
-        Args:
-          t: Table:
-
-        Returns:
-            True if the table has a vocabulary, False otherwise.
-        """
-        vocab_columns = {"Name", "URI", "Synonyms", "Description", "ID"}
-        return vocab_columns.issubset({c.name for c in t.columns}) and t
-
     def _vocabulary_specification(
         self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
     ) -> list[dict[str, Any]]:
@@ -720,7 +706,7 @@ class Dataset:
             table
             for s in self._model.schemas.values()
             for table in s.tables.values()
-            if self._is_vocabulary(table)
+            if self._model.is_vocabulary(table)
         ]
         return [
             o
@@ -877,7 +863,7 @@ class Dataset:
         for t in nodes:
             new_visited_nodes = visited_nodes.copy()
             new_visited_nodes.add(t)
-            if self._is_vocabulary(t):
+            if self._model.is_vocabulary(t):
                 # If the end of the path is a vocabulary table, we are at a terminal node in the ERD, so stop
                 continue
             # Get all the paths that extend the current path
