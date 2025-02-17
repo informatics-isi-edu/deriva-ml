@@ -578,7 +578,6 @@ class Execution:
         the catalog. This routine takes a list of uploaded assets and makes that association.
 
         Args:
-            assets: return:
             assets: dict[str:
             FileUploadState]:
         """
@@ -591,14 +590,7 @@ class Execution:
         # Now got through the list of recently added assets, and add an entry for this asset if it
         # doesn't already exist.
         def asset_rid(asset) -> str:
-            """
-
-            Args:
-                asset:
-
-            Returns:
-                RID of the asset
-            """
+            """RID of the asset"""
             return (
                 asset.state == UploadState.success
                 and asset.result
