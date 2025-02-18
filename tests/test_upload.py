@@ -51,8 +51,11 @@ class TestUpload(unittest.TestCase):
     def setUp(self):
         print(f"Calling setup {test_catalog.catalog_id}")
         self.ml_instance = DerivaML(
-            hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1"
+            hostname=hostname,
+            catalog_id=test_catalog.catalog_id,
+            domain_schema=SNAME_DOMAIN,
         )
+
         self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
         self.model = self.ml_instance.model
 
@@ -61,21 +64,19 @@ class TestUpload(unittest.TestCase):
 
     def test_upload_directory(self):
         reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
+        self.ml_instance.create_asset("FooBar")
         domain_schema = self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN]
-        subject = domain_schema.tables["Subject"]
-        ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(2)])
         with TemporaryDirectory() as tmpdir:
-            image_dir = Path(tmpdir) / "Image"
-            image_dir.mkdir()
-            for s in ss:
-                image_file = image_dir / f"test_{s['RID']}.txt"
+            asset_dir = self.ml_instance.asset_path("FooBar")
+            for s in range(2):
+                image_file = asset_dir / f"test_{s}.txt"
                 with open(image_file, "w+") as f:
                     f.write(f"Hello there {random()}\n")
-            self.ml_instance.upload_assets(image_dir)
+            self.ml_instance.upload_assets(asset_dir)
         assets = list(
             self.ml_instance.catalog.getPathBuilder()
             .schemas[SNAME_DOMAIN]
-            .tables["Image"]
+            .tables["FooBar"]
             .entities()
             .fetch()
         )
@@ -92,6 +93,7 @@ class TestUpload(unittest.TestCase):
             image_dir = Path(tmpdir) / "Image"
             image_dir.mkdir()
             for s in ss:
+                asset_file(assettype, {"Execution": s["RID"]})
                 image_file = Path("Image") / f"test_{s['RID']}.txt"
                 with open(Path(tmpdir) / image_file, "w+") as f:
                     f.write(f"Hello there {random()}\n")
