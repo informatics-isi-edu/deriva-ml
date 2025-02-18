@@ -421,7 +421,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
         + asset_tables_with_metadata
         + [
             {
-                # Upload assets into an asset table of an asset table.
+                # Upload assets into an asset table of an asset table without any metadata
                 "column_map": {
                     "MD5": "{md5}",
                     "URL": "{URI}",
@@ -430,7 +430,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                 },
                 "target_table": [model.domain_schema, "{asset_table}"],
                 "file_pattern": asset_path_regex
-                + asset_file_regex
+                + "/"
                 + asset_file_regex,  # Sets schema, asset_table, file_name, file_ext
                 "checksum_types": ["sha256", "md5"],
                 "hatrac_options": {"versioned_urls": True},
