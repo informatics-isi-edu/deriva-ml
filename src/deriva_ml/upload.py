@@ -31,15 +31,25 @@ Here is the directory layout we support:
         asset
             <schema>
                 <asset_table>
-                    file1, file2, ....
-                asset_metadata.json
+                    <metadata1>
+                        <metadata2>
+                            file1, file2, ....
+
 """
 
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, Optional
+
+import regex as re
 from deriva.core import urlquote
-from deriva.core.hatrac_store import HatracStore
 from deriva.core.ermrest_model import Table
+from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
+from pydantic import validate_call, ConfigDict
+
 from deriva_ml.deriva_definitions import (
     RID,
     DerivaMLException,
@@ -47,13 +57,6 @@ from deriva_ml.deriva_definitions import (
     UploadState,
 )
 from deriva_ml.deriva_model import DerivaModel
-
-import json
-from pydantic import validate_call, ConfigDict
-from pathlib import Path
-import regex as re
-from tempfile import TemporaryDirectory
-from typing import Any, Optional
 
 upload_root_regex = r"(?i)^.*/deriva-ml"
 
@@ -84,9 +87,11 @@ feature_asset_regex = (
     + r"/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$"
 )
 asset_path_regex = (
-    upload_root_regex
-    + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
+    upload_root_regex + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)"
 )
+
+asset_file_regex = r"(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
+
 table_regex = (
     exec_dir_regex
     + r"/table/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
@@ -94,193 +99,112 @@ table_regex = (
 
 
 def is_execution_metadata_dir(path: Path) -> Optional[re.Match]:
-    """
-
-    Args:
-      path: Path:
-
-    Returns:
-        Regex match object from metadata_dir_regex.
-    """
+    """Path matches the patten for execution metadata directory."""
     return re.match(exec_metadata_dir_regex + "$", path.as_posix())
 
 
 def is_execution_asset_dir(path: Path) -> Optional[re.Match]:
-    """
-    Args:
-      path: Path:
-
-    Returns:
-
-    """
+    """Path maths the pattern for execution asset directory"""
     return re.match(exec_asset_dir_regex + "$", path.as_posix())
 
 
 def is_feature_dir(path: Path) -> Optional[re.Match]:
-    """
-
-    Args:
-      path: Path:
-
-    Returns:
-
-    """
+    """Path matches the pattern for where the table for a feature would go."""
     return re.match(feature_table_dir_regex + "$", path.as_posix())
 
 
 def is_feature_asset_dir(path: Path) -> Optional[re.Match]:
-    """
-
-    Args:
-      path: Path:
-
-    Returns:
-
-    """
+    """Path matches the pattern for feature, asset, returns the feature components."""
     return re.match(feature_asset_dir_regex + "$", path.as_posix())
 
 
 def upload_root(prefix: Path | str) -> Path:
-    """
-
-    Args:
-      prefix: Path | str:
-
-    Returns:
-
-    """
+    """Return the top level directory of where to put files to be upload."""
     path = Path(prefix) / "deriva-ml"
     path.mkdir(exist_ok=True, parents=True)
     return path
 
 
 def asset_root(prefix: Path | str) -> Path:
-    """
-
-    Args:
-      prefix: Path | str:
-      exec_rid:
-
-    Returns:
-
-    """
+    """Return the top level directory of where to put asset directories to be uploaded."""
     path = upload_root(prefix) / "asset"
     path.mkdir(exist_ok=True, parents=True)
     return path
 
 
+def asset_table_dir(prefix: Path, asset_schema, asset_table) -> Path:
+    """Return the top level directory of where to asset table will be uploaded."""
+    path = asset_root(prefix) / asset_schema / asset_table
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
+
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-def asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
+def asset_dir(
+    prefix: Path | str,
+    model: DerivaModel,
+    asset_schema: str,
+    asset_type: str,
+    metadata=None,
+) -> Path:
     """Return the path to a directory in which to place  assets of a specified type are to be uploaded.
 
     Args:
       prefix: Location of upload root directory
+        asset_schema: Type of execution asset
       asset_type: Type of execution asset
-      exec_rid: RID of the execution asset
-      prefix: Path | str:
-      asset_type: str:
+      model: Deriva model in which the asset is defined
 
     Returns:
-
+        Path to directory in which to place assets of type asset_type.
     """
-    path = asset_root(prefix) / asset_type
+    metadata = metadata or {}
+    asset_metadata = model.asset_metadata(asset_type)
+    print(f"Asset metadata: {asset_metadata} {set(metadata.keys())}")
+    if not (asset_metadata >= set(metadata.keys())):
+        raise DerivaMLException(
+            f"Metadata {metadata} does not match asset metadata {asset_metadata}"
+        )
+
+    path = asset_table_dir(prefix, asset_schema=asset_schema, asset_table=asset_type)
+    for m in model.asset_metadata(asset_type):
+        path = path / metadata.get(m, "None")
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
-    """Return the path to a directory in which to place execution assets of a specified type are to be uploaded.
-
-    Args:
-      prefix: Location of upload root directory
-      asset_type: Type of execution asset
-      exec_rid: RID of the execution asset
-      prefix: Path | str:
-      exec_rid: str:
-      asset_type: str:
-
-    Returns:
-
-    """
-    path = execution_asset_root(prefix, exec_rid) / asset_type
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+def execution_rids(prefix: Path | str) -> list[RID]:
+    """Return a list of all of the execution RIDS that have files waiting to be uploaded."""
+    path = upload_root(prefix) / "execution"
+    return [d.name for d in path.iterdir()]
 
 
 def execution_root(prefix: Path | str, exec_rid) -> Path:
-    """
-
-    Args:
-      prefix: Path | str:
-      exec_rid:
-
-    Returns:
-
-    """
+    """Path to directory to place execution specific upload files."""
     path = upload_root(prefix) / "execution" / exec_rid
     path.mkdir(exist_ok=True, parents=True)
     return path
 
 
-def execution_rids(prefix: Path | str) -> list[RID]:
-    """
-
-    Args:
-        prefix: Path to upload directory
-
-    Returns:
-        List of execution RIDS that are currently being uploaded
-    """
-    path = upload_root(prefix) / "execution"
-    return [d.name for d in path.iterdir()]
-
-
 def execution_asset_root(prefix: Path | str, exec_rid: str) -> Path:
-    """
+    """Path to directory into which execution assets should be located"""
 
-    Args:
-      prefix: Path | str:
-      exec_rid: str:
-
-    Returns:
-
-    """
     path = execution_root(prefix, exec_rid) / "execution-asset"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def execution_metadata_root(prefix: Path | str, exec_rid: str) -> Path:
-    """
-
-    Args:
-      prefix: Path | str:
-      exec_rid: str:
-
-    Returns:
-
-    """
-    path = execution_root(prefix, exec_rid) / "execution-metadata"
+@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
+    """Return the path to a directory in which to place execution assets of a specified type are to be uploaded."""
+    path = execution_asset_root(prefix, exec_rid) / asset_type
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> Path:
-    """Return the path to a directory in which to place execution assets of a specified type are to be uploaded.
-
-    Args:
-      prefix: Location of upload root directory
-      asset_type: Type of execution asset
-      exec_rid: RID of the execution asset
-      prefix: Path | str:
-      exec_rid: str:
-      asset_type: str:
-
-    Returns:
-
-    """
-    path = execution_asset_root(prefix, exec_rid) / asset_type
+def execution_metadata_root(prefix: Path | str, exec_rid: str) -> Path:
+    """Path to directory into which execution metadata should be located."""
+    path = execution_root(prefix, exec_rid) / "execution-metadata"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -288,31 +212,15 @@ def execution_asset_dir(prefix: Path | str, exec_rid: str, asset_type: str) -> P
 def execution_metadata_dir(
     prefix: Path | str, exec_rid: str, metadata_type: str
 ) -> Path:
-    """Return the path to a directory in which to place execution metadata of a specified type are to be uploaded.
+    """Return the path to a directory in which to place execution metadata of a specified type are to be uploaded."""
 
-    Args:
-        prefix: Location in which to locate this directory
-        exec_rid: Execution rid to be associated with this metadata
-        metadata_type: Controlled vocabulary term from vocabulary Metadata_Type
-
-    Returns:
-        Path to the metadata directory
-    """
     path = execution_metadata_root(prefix, exec_rid) / metadata_type
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def feature_root(prefix: Path | str, exec_rid: str) -> Path:
-    """
-
-    Args:
-      prefix: Path | str:
-      exec_rid: str:
-
-    Returns:
-
-    """
+    """Return the path to the directory in which features for the specified execution should be placed."""
     path = execution_root(prefix, exec_rid) / "feature"
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -321,18 +229,7 @@ def feature_root(prefix: Path | str, exec_rid: str) -> Path:
 def feature_dir(
     prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
 ) -> Path:
-    """
-
-    Args:
-        prefix: Path | str:
-        exec_rid: str:
-        schema: str:
-        target_table: str:
-        feature_name: str:
-
-    Returns:
-
-    """
+    """Return the path to eht directory in which a named feature for an execution should be placed."""
     path = feature_root(prefix, exec_rid) / schema / target_table / feature_name
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -341,8 +238,7 @@ def feature_dir(
 def feature_value_path(
     prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
 ) -> Path:
-    """Return the path to a CSV file in which to place feature values that are to be uploaded.  Values will either be
-    scalar, references to controlled vocabulary (Terms) or references to assets.
+    """Return the path to a CSV file in which to place feature values that are to be uploaded.
 
     Args:
         prefix: Location of upload root directory
@@ -407,11 +303,53 @@ def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     return path / f"{table}.csv"
 
 
-def bulk_upload_configuration(domain_schema: str) -> dict[str, Any]:
+def asset_table_upload_spec(model, asset_table):
+    """Generate a pattern to an asset table that may include additional metadata columns.
+
+    Args:
+        model:
+        asset_table:
+
+    Returns:
+
+    """
+    metadata_columns = model.asset_metadata(asset_table)
+    asset_table = model.get_table(asset_table)
+    schema = model.get_table(asset_table).schema.name
+    metadata_path = "/".join([rf"/(?P<{c}>[-\w]+)" for c in metadata_columns])
+    asset_path = f"{upload_root_regex}/{schema}/{asset_table.name}{metadata_path}/{asset_file_regex}"
+    asset_table = model.get_table(asset_table)
+    schema = model.get_table(asset_table).schema.name
+    return {
+        # Upload assets into an asset table of an asset table.
+        "column_map": {
+            "MD5": "{md5}",
+            "URL": "{URI}",
+            "Length": "{file_size}",
+            "Filename": "{file_name}",
+        }
+        | {c: f'"{{{c}}}"' for c in metadata_columns},
+        "file_pattern": asset_path,  # Sets schema, asset_table, file_name, file_ext
+        "checksum_types": ["sha256", "md5"],
+        "hatrac_options": {"versioned_urls": True},
+        "hatrac_templates": {
+            "hatrac_uri": f"/hatrac/{asset_table.name}/{{md5}}.{{file_name}}",
+            "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+        },
+        "record_query_template": f"/entity/{schema}:{asset_table.name}/MD5={{md5}}&Filename={{file_name}}",
+    }
+
+
+def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
     """Return an upload specification for deriva-ml
     Arguments:
-        domain_schema: Name of domain schema used to configure asset upload from arbitrary directory
+        model: Model from which to generate the upload configuration
     """
+    asset_tables_with_metadata = [
+        asset_table_upload_spec(model=model, asset_table=t)
+        for t in model.find_assets()
+        if model.asset_metadata(t)
+    ]
     return {
         "asset_mappings": [
             {
@@ -423,6 +361,7 @@ def bulk_upload_configuration(domain_schema: str) -> dict[str, Any]:
                     "Length": "{file_size}",
                     "Filename": "{file_name}",
                     "Execution_Metadata_Type": "{execution_metadata_type_name}",
+                    "Execution": "{execution_rid}",
                 },
                 "file_pattern": exec_metadata_regex,
                 "target_table": ["deriva-ml", "Execution_Metadata"],
@@ -445,6 +384,7 @@ def bulk_upload_configuration(domain_schema: str) -> dict[str, Any]:
                     "Length": "{file_size}",
                     "Filename": "{file_name}",
                     "Execution_Asset_Type": "{execution_asset_type_name}",
+                    "Execution": "{execution_rid}",
                 },
                 "file_pattern": exec_asset_regex,
                 "target_table": ["deriva-ml", "Execution_Asset"],
@@ -477,6 +417,9 @@ def bulk_upload_configuration(domain_schema: str) -> dict[str, Any]:
                 },
                 "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
             },
+        ]
+        + asset_tables_with_metadata
+        + [
             {
                 # Upload assets into an asset table of an asset table.
                 "column_map": {
@@ -485,8 +428,10 @@ def bulk_upload_configuration(domain_schema: str) -> dict[str, Any]:
                     "Length": "{file_size}",
                     "Filename": "{file_name}",
                 },
-                "target_table": [domain_schema, "{asset_table}"],
-                "file_pattern": asset_path_regex,  # Sets schema, asset_table, file_name, file_ext
+                "target_table": [model.domain_schema, "{asset_table}"],
+                "file_pattern": asset_path_regex
+                + asset_file_regex
+                + asset_file_regex,  # Sets schema, asset_table, file_name, file_ext
                 "checksum_types": ["sha256", "md5"],
                 "hatrac_options": {"versioned_urls": True},
                 "hatrac_templates": {
@@ -540,11 +485,9 @@ def upload_directory(
     # Now upload the files by creating an upload spec and then calling the uploader.
     with TemporaryDirectory() as temp_dir:
         spec_file = f"{temp_dir}/config.json"
-        import pprint
 
-        pprint.pprint(bulk_upload_configuration(model.domain_schema))
         with open(spec_file, "w+") as cfile:
-            json.dump(bulk_upload_configuration(model.domain_schema), cfile)
+            json.dump(bulk_upload_configuration(model), cfile)
         uploader = GenericUploader(
             server={
                 "host": model.hostname,

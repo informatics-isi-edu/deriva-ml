@@ -22,9 +22,9 @@ from deriva_ml import (
     ColumnDefinition,
 )
 
-from .execution import Execution
-from .schema_setup.create_schema import initialize_ml_schema, create_ml_schema
-from .dataset import Dataset
+from deriva_ml.execution import Execution
+from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
+from deriva_ml.dataset import Dataset
 
 TEST_DATASET_SIZE = 20
 
@@ -256,6 +256,7 @@ def create_demo_catalog(
     hostname,
     domain_schema="test-schema",
     project_name="ml-test",
+    populate=True,
     create_features=False,
     create_datasets=False,
     on_exit_delete=True,
@@ -282,7 +283,8 @@ def create_demo_catalog(
         )
         print(f"setup schema time {time.time() - st} seconds")
         st = time.time()
-        populate_demo_catalog(deriva_ml, domain_schema)
+        if populate:
+            populate_demo_catalog(deriva_ml, domain_schema)
         if create_features:
             create_demo_features(deriva_ml)
         if create_datasets:

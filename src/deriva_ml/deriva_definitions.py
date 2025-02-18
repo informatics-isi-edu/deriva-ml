@@ -29,7 +29,7 @@ snapshot_part = r"(?:@(?P<snapshot>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)
 rid_regex = f"^{rid_part}{snapshot_part}$"
 RID = Annotated[str, Field(pattern=rid_regex)]
 
-DerivaSystemColumns = ["RCT", "RMT", "RCB", "RMB"]
+DerivaSystemColumns = ["RID", "RCT", "RMT", "RCB", "RMB"]
 
 
 # For some reason, deriva-py doesn't use the proper enum class!!

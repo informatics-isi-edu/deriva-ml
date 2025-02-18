@@ -304,9 +304,10 @@ class Execution:
         try:
             self.update_status(Status.running, "Uploading execution assets...")
             execution_asset_files = self._ml_object.upload_assets(
-                self._execution_asset_dir
+                #       self._execution_asset_dir
+                self._execution_root
             )
-            self._update_execution_asset_table(execution_asset_files)
+            # self._update_execution_asset_table(execution_asset_files)
             results |= {asset_name(k): v for k, v in execution_asset_files.items()}
         except Exception as e:
             error = format_exception(e)
@@ -317,7 +318,7 @@ class Execution:
             execution_metadata_files = self._ml_object.upload_assets(
                 self._execution_metadata_dir
             )
-            self._update_execution_metadata_table(execution_metadata_files)
+            # self._update_execution_metadata_table(execution_metadata_files)
             prefix_path = f"{self._execution_metadata_dir.as_posix()}/"
             results |= {
                 k.replace(prefix_path, ""): v
@@ -482,46 +483,46 @@ class Execution:
             error = format_exception(e)
             self.update_status(Status.failed, error)
 
-    def _update_execution_metadata_table(
-        self, assets: dict[str, FileUploadState]
-    ) -> None:
-        """Upload execution metadata at _working_dir/Execution_metadata.
-
-        Args:
-            assets: dict[str:
-            FileUploadState]:
-
-        Raises:
-          - DerivaMLException: If there is an issue uploading the metadata.
-        """
-        ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        a_table = list(
-            self._ml_object.model.schemas[self._ml_object.ml_schema]
-            .tables["Execution_Metadata"]
-            .find_associations()
-        )[0].name
-
-        def asset_rid(asset) -> str:
-            """
-
-            Args:
-              asset:
-
-            Returns:
-
-            """
-            return (
-                asset.state == UploadState.success
-                and asset.result
-                and asset.result["RID"]
-            )
-
-        entities = [
-            {"Execution_Metadata": rid, "Execution": self.execution_rid}
-            for asset in assets.values()
-            if (rid := asset_rid(asset))
-        ]
-        ml_schema_path.tables[a_table].insert(entities)
+    # def _update_execution_metadata_table(
+    #     self, assets: dict[str, FileUploadState]
+    # ) -> None:
+    #     """Upload execution metadata at _working_dir/Execution_metadata.
+    #
+    #     Args:
+    #         assets: dict[str:
+    #         FileUploadState]:
+    #
+    #     Raises:
+    #       - DerivaMLException: If there is an issue uploading the metadata.
+    #     """
+    #     ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+    #     a_table = list(
+    #         self._ml_object.model.schemas[self._ml_object.ml_schema]
+    #         .tables["Execution_Metadata"]
+    #         .find_associations()
+    #     )[0].name
+    #
+    #     def asset_rid(asset) -> str:
+    #         """
+    #
+    #         Args:
+    #           asset:
+    #
+    #         Returns:
+    #
+    #         """
+    #         return (
+    #             asset.state == UploadState.success
+    #             and asset.result
+    #             and asset.result["RID"]
+    #         )
+    #
+    #     entities = [
+    #         {"Execution_Metadata": rid, "Execution": self.execution_rid}
+    #         for asset in assets.values()
+    #         if (rid := asset_rid(asset))
+    #     ]
+    #     ml_schema_path.tables[a_table].insert(entities)
 
     def _update_feature_table(
         self,
@@ -573,36 +574,36 @@ class Execution:
             entities = [map_path(e) for e in csv.DictReader(feature_values)]
         self._ml_object.domain_path.tables[feature_table].insert(entities)
 
-    def _update_execution_asset_table(self, assets: dict[str, FileUploadState]) -> None:
-        """Assets associated with an execution must be linked to an execution entity after they are uploaded into
-        the catalog. This routine takes a list of uploaded assets and makes that association.
-
-        Args:
-            assets: dict[str:
-            FileUploadState]:
-        """
-        ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        asset_exec_entities = ml_schema_path.Execution_Asset_Execution.filter(
-            ml_schema_path.Execution_Asset_Execution.Execution == self.execution_rid
-        ).entities()
-        existing_assets = {e["Execution_Asset"] for e in asset_exec_entities}
-
-        # Now got through the list of recently added assets, and add an entry for this asset if it
-        # doesn't already exist.
-        def asset_rid(asset) -> str:
-            """RID of the asset"""
-            return (
-                asset.state == UploadState.success
-                and asset.result
-                and asset.result["RID"]
-            )
-
-        entities = [
-            {"Execution_Asset": rid, "Execution": self.execution_rid}
-            for asset in assets.values()
-            if (rid := asset_rid(asset)) not in existing_assets
-        ]
-        ml_schema_path.Execution_Asset_Execution.insert(entities)
+    # def _update_execution_asset_table(self, assets: dict[str, FileUploadState]) -> None:
+    #     """Assets associated with an execution must be linked to an execution entity after they are uploaded into
+    #     the catalog. This routine takes a list of uploaded assets and makes that association.
+    #
+    #     Args:
+    #         assets: dict[str:
+    #         FileUploadState]:
+    #     """
+    #     ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+    #     asset_exec_entities = ml_schema_path.Execution_Asset_Execution.filter(
+    #         ml_schema_path.Execution_Asset_Execution.Execution == self.execution_rid
+    #     ).entities()
+    #     existing_assets = {e["Execution_Asset"] for e in asset_exec_entities}
+    #
+    #     # Now got through the list of recently added assets, and add an entry for this asset if it
+    #     # doesn't already exist.
+    #     def asset_rid(asset) -> str:
+    #         """RID of the asset"""
+    #         return (
+    #             asset.state == UploadState.success
+    #             and asset.result
+    #             and asset.result["RID"]
+    #         )
+    #
+    #     entities = [
+    #         {"Execution_Asset": rid, "Execution": self.execution_rid}
+    #         for asset in assets.values()
+    #         if (rid := asset_rid(asset)) not in existing_assets
+    #     ]
+    #     ml_schema_path.Execution_Asset_Execution.insert(entities)
 
     @property
     def _execution_metadata_dir(self) -> Path:

@@ -99,15 +99,10 @@ class DerivaML(Dataset):
             self.credential,
             session_config=self._get_session_config(),
         )
-        m = self.catalog.getCatalogModel()
         self.model = DerivaModel(
             self.catalog.getCatalogModel(), domain_schema=domain_schema
         )
 
-        self.cache_dir = (
-            Path(cache_dir) if cache_dir else Path.home() / "deriva-ml" / "cache"
-        )
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
         default_workdir = self.__class__.__name__ + "_working"
         self.working_dir = (
             Path(working_dir) / getpass.getuser()
@@ -115,6 +110,10 @@ class DerivaML(Dataset):
             else Path.home() / "deriva-ml"
         ) / default_workdir
         self.working_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_dir = (
+            Path(cache_dir) if cache_dir else Path.home() / "deriva-ml" / "cache"
+        )
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize dataset class.
         super().__init__(self.model, self.cache_dir)
@@ -186,7 +185,7 @@ class DerivaML(Dataset):
             table=self.model.get_table(table).name,
         )
 
-    def asset_directory(self, table: str | Table, prefix: str | Path = None) -> Path:
+    def asset_path(self, table: str | Table, prefix: str | Path = None) -> Path:
         """Return a local file path in which to place a files for an asset table.  T
 
         Args:
@@ -200,8 +199,13 @@ class DerivaML(Dataset):
         if not self.model.is_asset(table):
             raise DerivaMLException(f"The table {table} is not an asset table.")
 
-        prefix = Path(prefix) or self.working_dir
-        return asset_dir(prefix, table.schema.name, table.name)
+        prefix = Path(prefix) if prefix else self.working_dir
+        return asset_dir(
+            prefix,
+            asset_schema=table.schema.name,
+            asset_type=table.name,
+            model=self.model,
+        )
 
     def download_dir(self, cached: bool = False) -> Path:
         """Location where downloaded files are placed.
@@ -340,19 +344,10 @@ class DerivaML(Dataset):
             )
         )
 
-    def find_assets(self) -> list[Table]:
-        """ """
-        return [
-            t
-            for s in self.model.schemas.values()
-            for t in s.tables.values()
-            if self.model.is_asset(t)
-        ]
-
     def create_asset(
         self,
         asset_name: str,
-        column_defs: Iterable[ColumnDefinition] = [],
+        column_defs: Iterable[ColumnDefinition] = None,
         comment: str = "",
         schema: str = None,
     ) -> Table:
@@ -360,6 +355,7 @@ class DerivaML(Dataset):
 
         Args:
             asset_name: Name of the asset table.
+            column_defs: Iterable of ColumnDefinition objects to provide additional metadata for asset.
             comment: Description of the asset table. (Default value = '')
             schema: Schema in which to create the asset table.  Defaults to domain_schema.
             asset_name: str:
@@ -368,6 +364,7 @@ class DerivaML(Dataset):
         Returns:
             Table object for the asset table.
         """
+        column_defs = column_defs or []
         schema = schema or self.domain_schema
         asset_table = self.model.schemas[schema].create_table(
             Table.define_asset(
@@ -686,15 +683,6 @@ class DerivaML(Dataset):
             ):
                 return VocabularyTerm.model_validate(term)
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
-
-    def find_vocabularies(self) -> Iterable[Table]:
-        """Return a list of all the controlled vocabulary tables in the domain schema."""
-        return [
-            t
-            for s in self.model.schemas.values()
-            for t in s.tables.values()
-            if self.model.is_vocabulary(t)
-        ]
 
     def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
         """Return a list of terms that are in a vocabulary table.

@@ -9,11 +9,9 @@ relationships that follow a specific data model.
 """
 
 from deriva.core.ermrest_model import Table, Model
+from deriva.core.ermrest_catalog import ErmrestCatalog
 
-from .deriva_definitions import (
-    DerivaMLException,
-    ML_SCHEMA,
-)
+from .deriva_definitions import DerivaMLException, ML_SCHEMA, DerivaSystemColumns
 
 
 class DerivaModel:
@@ -40,16 +38,22 @@ class DerivaModel:
         """
         self.model = model
         self.configuration = None
-        self.catalog = self.model.catalog
+        self.catalog: ErmrestCatalog = self.model.catalog
         self.hostname = self.catalog.deriva_server.server
         self.schemas = self.model.schemas
 
         self.ml_schema = ml_schema
         builtin_schemas = ["public", self.ml_schema, "www"]
-        self.domain_schema = (
-            domain_schema
-            or [s for s in self.model.schemas.keys() if s not in builtin_schemas].pop()
-        )
+        try:
+            self.domain_schema = (
+                domain_schema
+                or [
+                    s for s in self.model.schemas.keys() if s not in builtin_schemas
+                ].pop()
+            )
+        except IndexError:
+            # No domain schema defined.
+            self.domain_schema = domain_schema
 
     def get_table(self, table: str | Table) -> Table:
         """Return the table object corresponding to the given table name.
@@ -120,11 +124,36 @@ class DerivaModel:
         table = self.get_table(table_name)
         return asset_columns.issubset({c.name for c in table.columns})
 
+    def find_assets(self, with_metadata: bool = False) -> list[Table]:
+        """Return the list of asset tables in the current model"""
+        return [
+            t
+            for s in self.model.schemas.values()
+            for t in s.tables.values()
+            if self.is_asset(t)
+        ]
+
+    def find_vocabularies(self) -> list[Table]:
+        """Return a list of all the controlled vocabulary tables in the domain schema."""
+        return [
+            t
+            for s in self.model.schemas.values()
+            for t in s.tables.values()
+            if self.is_vocabulary(t)
+        ]
+
     def asset_metadata(self, table: str | Table) -> set[str]:
         """Return the metadata columns for an asset table."""
 
         table = self.get_table(table)
-        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
+        asset_columns = {
+            "Filename",
+            "URL",
+            "Length",
+            "MD5",
+            "Description",
+        }.union(set(DerivaSystemColumns))
+
         if not self.is_asset(table):
             raise DerivaMLException(f"{table.name} is not an asset table.")
         return {c.name for c in table.columns} - asset_columns

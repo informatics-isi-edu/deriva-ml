@@ -15,6 +15,7 @@ from deriva.core.utils.core_utils import tag as chaise_tags
 
 from deriva_ml import MLVocab
 from deriva_ml.schema_setup.annotations import generate_annotation
+from deriva_ml.deriva_model import DerivaModel
 
 
 def define_table_workflow(workflow_annotation: dict):
@@ -154,7 +155,8 @@ def create_ml_schema(
     if model.schemas.get(schema_name):
         model.schemas[schema_name].drop(cascade=True)
     # get annotations
-    annotations = generate_annotation(ml_catalog.catalog_id, schema_name)
+    deriva_model = DerivaModel(model)
+    annotations = generate_annotation(deriva_model)
 
     model.annotations.update(annotations["catalog_annotation"])
     client_annotation = {

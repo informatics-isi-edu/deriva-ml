@@ -2,10 +2,13 @@ import argparse
 import sys
 
 from deriva.core.utils.core_utils import tag as deriva_tags
+from ..deriva_model import DerivaModel
 from ..upload import bulk_upload_configuration
 
 
-def generate_annotation(catalog_id: str, schema: str) -> dict:
+def generate_annotation(model: DerivaModel) -> dict:
+    catalog_id = model.catalog.catalog_id
+    schema = model.ml_schema
     workflow_annotation = {
         deriva_tags.visible_columns: {
             "*": [
@@ -138,7 +141,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
     dataset_annotation = {
         # Setup Facet on types
         # Make types in visible columns
-        # Have all connected values be visabile FK.
+        # Have all connected values be visible FK.
     }
 
     schema_annotation = {
@@ -218,7 +221,7 @@ def generate_annotation(catalog_id: str, schema: str) -> dict:
             "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
             "resolverImplicitCatalog": catalog_id,
         },
-        deriva_tags.bulk_upload: bulk_upload_configuration(schema),
+        deriva_tags.bulk_upload: bulk_upload_configuration(model=DerivaModel(model)),
     }
 
     return {
