@@ -119,7 +119,7 @@ def is_feature_asset_dir(path: Path) -> Optional[re.Match]:
 
 
 def upload_root(prefix: Path | str) -> Path:
-    """Return the top level directory of where to put files to be upload."""
+    """Return the top level directory of where to put files to be uploaded."""
     path = Path(prefix) / "deriva-ml"
     path.mkdir(exist_ok=True, parents=True)
     return path
@@ -138,8 +138,9 @@ def asset_table_dir(prefix: Path, asset_schema, asset_table) -> Path:
     path.mkdir(exist_ok=True, parents=True)
     return path
 
+
 def execution_rids(prefix: Path | str) -> list[RID]:
-    """Return a list of all of the execution RIDS that have files waiting to be uploaded."""
+    """Return a list of all the execution RIDS that have files waiting to be uploaded."""
     path = upload_root(prefix) / "execution"
     return [d.name for d in path.iterdir()]
 
@@ -281,8 +282,8 @@ def asset_table_upload_spec(model, asset_table):
     metadata_columns = model.asset_metadata(asset_table)
     asset_table = model.get_table(asset_table)
     schema = model.get_table(asset_table).schema.name
-    metadata_path = "/".join([rf"/(?P<{c}>[-\w]+)" for c in metadata_columns])
-    asset_path = f"{upload_root_regex}/{schema}/{asset_table.name}{metadata_path}/{asset_file_regex}"
+    metadata_path = "/".join([rf"(?P<{c}>[-\w]+)" for c in metadata_columns])
+    asset_path = f"{upload_root_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
     asset_table = model.get_table(asset_table)
     schema = model.get_table(asset_table).schema.name
     return {
@@ -293,15 +294,16 @@ def asset_table_upload_spec(model, asset_table):
             "Length": "{file_size}",
             "Filename": "{file_name}",
         }
-        | {c: f'"{{{c}}}"' for c in metadata_columns},
+        | {c: f"{{{c}}}" for c in metadata_columns},
         "file_pattern": asset_path,  # Sets schema, asset_table, file_name, file_ext
+        "target_table": [schema, asset_table.name],
         "checksum_types": ["sha256", "md5"],
         "hatrac_options": {"versioned_urls": True},
         "hatrac_templates": {
             "hatrac_uri": f"/hatrac/{asset_table.name}/{{md5}}.{{file_name}}",
             "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
         },
-        "record_query_template": f"/entity/{schema}:{asset_table.name}/MD5={{md5}}&Filename={{file_name}}",
+        "record_query_template": "/entity/{target_table}/MD5={{md5}}&Filename={{file_name}}",
     }
 
 
@@ -435,6 +437,7 @@ def upload_directory(
     configuration for the specified directory.  Every asset in the specified directory is uploaded
 
     Args:
+        model: Model to upload assets to.
         directory: Directory containing the assets and tables to upload.
 
     Returns:
@@ -486,6 +489,7 @@ def upload_asset(
     Args:
         file: path to the file to upload.
         table: Name of the asset table
+        model: Model to upload assets to.
         kwargs: Keyword arguments for values of additional columns to be added to the asset table.
 
     Returns:
@@ -542,10 +546,13 @@ def upload_asset(
     except Exception as e:
         raise e
 
+
 class UploadAssetDirectory:
     def __init__(self, model: DerivaModel, schema: str, table: str, prefix: Path):
         self.prefix = prefix
-        self.path = asset_table_dir(prefix=prefix, asset_schema=schema, asset_table=table)
+        self.path = asset_table_dir(
+            prefix=prefix, asset_schema=schema, asset_table=table
+        )
         self.table = table
         self.schema = schema
         self.model = model
@@ -582,7 +589,7 @@ def test_upload():
         "foo", "my-rid", "my-schema", "my-target", "my-feature", "my-asset"
     )
     _tp = table_path("foo", "my-schema", "my-table")
- #   _ad = create_asset_dir("foo", "my-schema", "my-asset")
+    #   _ad = create_asset_dir("foo", "my-schema", "my-asset")
     _is_md = is_execution_metadata_dir(emd)
     _is_ea = is_execution_asset_dir(ead)
     _is_fa = is_feature_asset_dir(fa)
