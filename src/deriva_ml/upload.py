@@ -351,7 +351,6 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                     "Length": "{file_size}",
                     "Filename": "{file_name}",
                     "Execution_Asset_Type": "{execution_asset_type_name}",
-                    "Execution": "{execution_rid}",
                 },
                 "file_pattern": exec_asset_regex,
                 "target_table": ["deriva-ml", "Execution_Asset"],

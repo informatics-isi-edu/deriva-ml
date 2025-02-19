@@ -28,10 +28,18 @@ from .dataset import Dataset
 from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
 from .execution_environment import get_execution_environment
-from .upload import execution_metadata_dir, execution_asset_dir, execution_root
-from .upload import feature_root, feature_asset_dir, feature_value_path
-from .upload import is_feature_dir, is_feature_asset_dir
-from .upload import table_path
+from .upload import (
+    execution_metadata_dir,
+    execution_asset_dir,
+    execution_root,
+    feature_root,
+    feature_asset_dir,
+    feature_value_path,
+    is_feature_dir,
+    is_feature_asset_dir,
+    table_path,
+    upload_directory,
+)
 
 try:
     from icecream import ic
@@ -291,47 +299,33 @@ class Execution:
         to these newly uploaded files.
 
         Returns:
-          - dict: Results of the upload operation.
+          dict: Results of the upload operation.
 
         Raises:
-          - DerivaMLException: If there is an issue uploading the assets.
+          DerivaMLException: If there is an issue uploading the assets.
         """
-        results = {}
 
         def asset_name(p: str) -> str:
             return Path(*Path(p).parts[-2:]).as_posix()
 
         try:
-            self.update_status(Status.running, "Uploading execution assets...")
-            execution_asset_files = self._ml_object.upload_assets(
-                #       self._execution_asset_dir
-                self._execution_root
-            )
-            # self._update_execution_asset_table(execution_asset_files)
-            results |= {asset_name(k): v for k, v in execution_asset_files.items()}
+            self.update_status(Status.running, "Uploading execution files...")
+            results = upload_directory(self._ml_object.model, self._execution_root)
+            results = {asset_name(k): v for k, v in results.items()}
+            print(results)
+            execution_assets = [
+                r.result["RID"]
+                for r in results.values()
+                if r.state == UploadState.success and "Execution_Asset_Type" in r.result
+            ]
+            self._update_execution_asset_table(execution_assets)
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
-        try:
-            self.update_status(Status.running, "Uploading execution metadata...")
-            execution_metadata_files = self._ml_object.upload_assets(
-                self._execution_metadata_dir
-            )
-            # self._update_execution_metadata_table(execution_metadata_files)
-            prefix_path = f"{self._execution_metadata_dir.as_posix()}/"
-            results |= {
-                k.replace(prefix_path, ""): v
-                for k, v in execution_metadata_files.items()
-            }
-        except Exception as e:
-            error = format_exception(e)
-            self.update_status(Status.failed, error)
-            raise DerivaMLException(
-                f"Fail to upload execution metadata. Error: {error}"
-            )
 
         self.update_status(Status.running, f"Updating features...")
+
         feature_assets = defaultdict(dict)
 
         def traverse_bottom_up(directory: Path):
@@ -574,36 +568,28 @@ class Execution:
             entities = [map_path(e) for e in csv.DictReader(feature_values)]
         self._ml_object.domain_path.tables[feature_table].insert(entities)
 
-    # def _update_execution_asset_table(self, assets: dict[str, FileUploadState]) -> None:
-    #     """Assets associated with an execution must be linked to an execution entity after they are uploaded into
-    #     the catalog. This routine takes a list of uploaded assets and makes that association.
-    #
-    #     Args:
-    #         assets: dict[str:
-    #         FileUploadState]:
-    #     """
-    #     ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-    #     asset_exec_entities = ml_schema_path.Execution_Asset_Execution.filter(
-    #         ml_schema_path.Execution_Asset_Execution.Execution == self.execution_rid
-    #     ).entities()
-    #     existing_assets = {e["Execution_Asset"] for e in asset_exec_entities}
-    #
-    #     # Now got through the list of recently added assets, and add an entry for this asset if it
-    #     # doesn't already exist.
-    #     def asset_rid(asset) -> str:
-    #         """RID of the asset"""
-    #         return (
-    #             asset.state == UploadState.success
-    #             and asset.result
-    #             and asset.result["RID"]
-    #         )
-    #
-    #     entities = [
-    #         {"Execution_Asset": rid, "Execution": self.execution_rid}
-    #         for asset in assets.values()
-    #         if (rid := asset_rid(asset)) not in existing_assets
-    #     ]
-    #     ml_schema_path.Execution_Asset_Execution.insert(entities)
+    def _update_execution_asset_table(self, assets: list[RID]) -> None:
+        """Assets associated with an execution must be linked to an execution entity after they are uploaded into
+        the catalog. This routine takes a list of uploaded assets and makes that association.
+
+        Args:
+            assets: list of RIDS for execution assets.:
+            FileUploadState]:
+        """
+        ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+        asset_exec_entities = ml_schema_path.Execution_Asset_Execution.filter(
+            ml_schema_path.Execution_Asset_Execution.Execution == self.execution_rid
+        ).entities()
+        existing_assets = {e["Execution_Asset"] for e in asset_exec_entities}
+
+        # Now got through the list of recently added assets, and add an entry for this asset if it
+        # doesn't already exist.
+        entities = [
+            {"Execution_Asset": asset_rid, "Execution": self.execution_rid}
+            for asset_rid in assets
+            if asset_rid not in existing_assets
+        ]
+        ml_schema_path.Execution_Asset_Execution.insert(entities)
 
     @property
     def _execution_metadata_dir(self) -> Path:
