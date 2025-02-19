@@ -16,7 +16,7 @@ dependencies = [
     "deriva~=1.7.6",
     "pandas",
     "regex~=2024.7.24",
-    "pydantic~=2.10.1",
+    "pydantic>=2.10.6",
     "semver>3.0.0"
 ]
 

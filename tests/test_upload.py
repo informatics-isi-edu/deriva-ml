@@ -1,4 +1,6 @@
 import unittest
+from os import write
+
 from deriva_ml import DerivaML
 from deriva.core import DerivaServer, get_credential
 import os
@@ -65,12 +67,11 @@ class TestUpload(unittest.TestCase):
     def test_upload_directory(self):
         reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
         self.ml_instance.create_asset("FooBar")
-        domain_schema = self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN]
         with TemporaryDirectory() as tmpdir:
-            asset_dir = self.ml_instance.asset_path("FooBar")
+            asset_dir = self.ml_instance.asset_dir("FooBar", prefix=tmpdir)
             for s in range(2):
-                image_file = asset_dir / f"test_{s}.txt"
-                with open(image_file, "w+") as f:
+                asset_file = asset_dir.create_file(f"test_{s}.txt", metadata={})
+                with open(asset_file, "w+") as f:
                     f.write(f"Hello there {random()}\n")
             self.ml_instance.upload_assets(asset_dir)
         assets = list(
@@ -90,15 +91,12 @@ class TestUpload(unittest.TestCase):
         ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(2)])
         metadata = {}
         with TemporaryDirectory() as tmpdir:
-            image_dir = Path(tmpdir) / "Image"
-            image_dir.mkdir()
+            image_dir = self.ml_instance.asset_dir("Image", prefix=tmpdir)
             for s in ss:
-                asset_file(assettype, {"Execution": s["RID"]})
-                image_file = Path("Image") / f"test_{s['RID']}.txt"
-                with open(Path(tmpdir) / image_file, "w+") as f:
+                image_file = image_dir.create_file(f"test_{s['RID']}.txt", {"Subject": s["RID"]})
+                with open(image_file, "w+") as f:
                     f.write(f"Hello there {random()}\n")
-                metadata[image_file.as_posix()] = s
-            self.ml_instance.upload_assets(image_dir, metadata)
+            self.ml_instance.upload_assets(image_dir)
         assets = list(
             self.ml_instance.catalog.getPathBuilder()
             .schemas[SNAME_DOMAIN]
@@ -107,29 +105,18 @@ class TestUpload(unittest.TestCase):
             .fetch()
         )
         print(assets)
-        self.assertEqual(assets[0]["Subject"], "Subject1")
+        self.assertEqual(assets[0]["Subject"], "Subject")
         self.assertEqual(len(assets), 2)
-
-    def test_upload_file(self):
-        reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
-        domain_schema = self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN]
-        subject = domain_schema.tables["Subject"]
-        s = subject.insert([{"Name": f"Thing{1}"}])
-        with TemporaryDirectory() as tmpdir:
-            image_dir = Path(tmpdir) / "Image"
-            image_dir.mkdir()
-            image_file = image_dir / f"test_{s['RID']}.txt"
-            with open(image_file, "w+") as f:
-                f.write(f"Hello there {random()}\n")
-            self.ml_instance.upload_asset(
-                image_file, "Image", Subject=s["RID"], Description="A test image"
-            )
 
     def test_upload_execution_metatable(self):
         pass
 
     def test_upload_execution_assets(self):
-        pass
+        metadata_file = execution_metadata_dir(MetataType.foo)
+        with open(metadata_dir) as f:
+            write()
+
+        self,ml_instance.upload_execution_outputs(metadata_file)
 
     def test_upload_execution_outputs(self):
         pass
