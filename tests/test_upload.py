@@ -81,19 +81,24 @@ class TestUpload(unittest.TestCase):
             .entities()
             .fetch()
         )
-        print(assets)
         self.assertEqual(len(assets), 2)
 
     def test_upload_directory_metadata(self):
         reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
-        domain_schema = self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN]
-        subject = domain_schema.tables["Subject"]
-        ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(2)])
-        metadata = {}
+        subject_path = (
+            self.ml_instance.catalog.getPathBuilder()
+            .schemas[SNAME_DOMAIN]
+            .tables["Subject"]
+        )
+        ss = list(subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(2)]))
+        print(list(subject_path.entities().fetch()))
+        print(ss)
         with TemporaryDirectory() as tmpdir:
             image_dir = self.ml_instance.asset_dir("Image", prefix=tmpdir)
             for s in ss:
-                image_file = image_dir.create_file(f"test_{s['RID']}.txt", {"Subject": s["RID"]})
+                image_file = image_dir.create_file(
+                    f"test_{s['RID']}.txt", {"Subject": s["RID"]}
+                )
                 with open(image_file, "w+") as f:
                     f.write(f"Hello there {random()}\n")
             self.ml_instance.upload_assets(image_dir)
@@ -105,7 +110,7 @@ class TestUpload(unittest.TestCase):
             .fetch()
         )
         print(assets)
-        self.assertEqual(assets[0]["Subject"], "Subject")
+        self.assertIn(assets[0]["Subject"], [s["RID"] for s in ss])
         self.assertEqual(len(assets), 2)
 
     def test_upload_execution_metatable(self):
@@ -116,7 +121,7 @@ class TestUpload(unittest.TestCase):
         with open(metadata_dir) as f:
             write()
 
-        self,ml_instance.upload_execution_outputs(metadata_file)
+        self, ml_instance.upload_execution_outputs(metadata_file)
 
     def test_upload_execution_outputs(self):
         pass

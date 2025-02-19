@@ -76,15 +76,15 @@ class TestDataset(unittest.TestCase):
 
     def test_add_dataset_members(self):
         reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
-        dataset_rid = self.test_create_dataset()
-        subject_rids = [
-            i["RID"]
-            for i in self.ml_instance.catalog.getPathBuilder()
+        subject_path = (
+            self.ml_instance.catalog.getPathBuilder()
             .schemas[SNAME_DOMAIN]
             .tables["Subject"]
-            .entities()
-            .fetch()
-        ]
+        )
+
+        dataset_rid = self.test_create_dataset()
+        subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
+        subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
         self.ml_instance.add_dataset_members(
             dataset_rid=dataset_rid, members=subject_rids
         )
@@ -92,3 +92,28 @@ class TestDataset(unittest.TestCase):
             len(self.ml_instance.list_dataset_members(dataset_rid)["Subject"]),
             len(subject_rids),
         )
+        self.assertEqual(len(self.ml_instance.dataset_history(dataset_rid)), 2)
+        self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "0.2.0")
+
+    def test_remove_dataset_members(self):
+        reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
+        subject_path = (
+            self.ml_instance.catalog.getPathBuilder()
+            .schemas[SNAME_DOMAIN]
+            .tables["Subject"]
+        )
+
+        dataset_rid = self.test_create_dataset()
+        subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
+        subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
+        self.ml_instance.add_dataset_members(
+            dataset_rid=dataset_rid, members=subject_rids
+        )
+
+        subject_rids = self.ml_instance.list_dataset_members(dataset_rid)["Subject"]
+        self.assertEqual(len(subject_rids), 5)
+        self.ml_instance.delete_dataset_members(subject_rids[0:1])
+        subject_rids = self.ml_instance.list_dataset_members(dataset_rid)["Subject"]
+        self.assertEqual(len(subject_rids), 3)
+        self.assertEqual(len(self.ml_instance.dataset_history(dataset_rid)), 3)
+        self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "0.3.0")
