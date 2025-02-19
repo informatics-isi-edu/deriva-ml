@@ -50,6 +50,13 @@ class DerivaMLTest(unittest.TestCase):
 
 
 # Example assertion
+import unittest
+from test_basic_tables import TestVocabulary
+
+suite = unittest.TestSuite()
+
+suite.addTest(unittest.makeSuite(TestVocabulary))
+suite.addTest(unittest.makeSuite(TestMultiplicationAndDivision))
 
 # Discover and run all test cases in the "tests" directory
 test_loader = unittest.TestLoader()
