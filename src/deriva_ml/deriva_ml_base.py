@@ -36,13 +36,12 @@ from .upload import (
     execution_rids,
     execution_metadata_dir,
     upload_directory,
-    UploadAssetDirectory
+    UploadAssetDirectory,
 )
 from .deriva_definitions import ColumnDefinition
 from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import (
     RID,
-    UploadState,
     Status,
     FileUploadState,
     DerivaMLException,
@@ -185,7 +184,9 @@ class DerivaML(Dataset):
             table=self.model.get_table(table).name,
         )
 
-    def asset_dir(self, table: str | Table, prefix: str | Path = None) -> UploadAssetDirectory:
+    def asset_dir(
+        self, table: str | Table, prefix: str | Path = None
+    ) -> UploadAssetDirectory:
         """Return a local file path in which to place a files for an asset table.  T
 
         Args:
@@ -739,9 +740,12 @@ class DerivaML(Dataset):
         Raises:
             DerivaMLException: If there is an issue uploading the assets.
         """
+
         def path_to_asset(path: str) -> str:
             components = path.split("/")
-            return components[components.index('asset')+2]  # Look for asset in the path to find the name
+            return components[
+                components.index("asset") + 2
+            ]  # Look for asset in the path to find the name
 
         if isinstance(assets_dir, UploadAssetDirectory):
             assets_dir = assets_dir.path
