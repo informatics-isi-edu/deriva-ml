@@ -312,7 +312,7 @@ class Execution:
             self.update_status(Status.running, "Uploading execution files...")
             results = upload_directory(self._ml_object.model, self._execution_root)
             results = {asset_name(k): v for k, v in results.items()}
-            print(results)
+
             execution_assets = [
                 r.result["RID"]
                 for r in results.values()
@@ -574,7 +574,6 @@ class Execution:
 
         Args:
             assets: list of RIDS for execution assets.:
-            FileUploadState]:
         """
         ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         asset_exec_entities = ml_schema_path.Execution_Asset_Execution.filter(

@@ -266,10 +266,8 @@ def create_demo_catalog(
     test_catalog = server.create_ermrest_catalog()
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)
-    print(f"setup server time {time.time() - st} seconds")
     st = time.time()
     model = test_catalog.getCatalogModel()
-    print(f"get model time {time.time() - st} seconds")
 
     try:
         st = time.time()
@@ -280,8 +278,6 @@ def create_demo_catalog(
             catalog_id=test_catalog.catalog_id,
             project_name=project_name,
         )
-        print(f"setup schema time {time.time() - st} seconds")
-        st = time.time()
         if populate:
             populate_demo_catalog(deriva_ml, domain_schema)
         if create_features:
@@ -294,7 +290,6 @@ def create_demo_catalog(
                 deriva_ml.model, deriva_ml.cache_dir
             )._generate_dataset_annotations()
         )
-        print(f"populate server time {time.time() - st} seconds")
         deriva_ml.model.apply()
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
         AclConfig(
