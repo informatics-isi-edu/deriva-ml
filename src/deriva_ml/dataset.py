@@ -313,15 +313,17 @@ class Dataset:
             raise DerivaMLException("Dataset_rid is not a dataset.")
 
         if parents := self.list_dataset_parents(dataset_rid):
-            raise DerivaMLException(f'Dataset_rid "{dataset_rid}" is in a nested dataset: {parents}.')
+            raise DerivaMLException(
+                f'Dataset_rid "{dataset_rid}" is in a nested dataset: {parents}.'
+            )
 
         pb = self._model.catalog.getPathBuilder()
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[
             self.dataset_table.name
         ]
 
-        rid_list = (
-            [dataset_rid] + self.list_dataset_children(dataset_rid) if recurse else []
+        rid_list = [dataset_rid] + (
+            self.list_dataset_children(dataset_rid) if recurse else []
         )
         dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
 
@@ -564,7 +566,7 @@ class Dataset:
     def delete_dataset_members(
         self, dataset_rid: RID, members: list[RID], description=""
     ) -> None:
-        """Add additional elements to an existing dataset_table.
+        """Remove elements to an existing dataset_table.
 
         Delete elements from an existing dataset. In addition to deleting members, the minor version number of the
         dataset is incremented and the description, if provide is applied to that new version.
