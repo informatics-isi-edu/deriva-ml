@@ -37,11 +37,6 @@ class VersionPart(Enum):
 class DatasetVersion(Version):
     """Represent the version associated with a dataset using semantic versioning.
 
-    Attributes:
-        major (int): Major version number
-        minor (int): Minor version number
-        patch (int): Patch version number
-
     Methods:
         replace(major, minor, patch): Replace the major and minor versions
     """
@@ -125,9 +120,8 @@ class DatasetMinid(BaseModel):
         bag_url (str): The URL to the dataset bag
         identifier (str): The identifier of the MINID in CURI form
         landing_page (str): The URL to the landing page of the MINID
+        version_rid (str): RID of the dataset version.
         checksum (str): The checksum of the MINID in SHA256 form
-        dataset_rid (str): The RID of the dataset.
-        dataset_snapshot (str): The ERMRest catalog snapshot for the dataset version
 
     """
 
