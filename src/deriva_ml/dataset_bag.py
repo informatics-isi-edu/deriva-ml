@@ -3,8 +3,7 @@ from copy import copy
 from typing import Any, Generator, TYPE_CHECKING, Optional
 
 import pandas as pd
-from nltk.stem.snowball import DanishStemmer
-from pydantic import validate_call, ConfigDict
+from pydantic import validate_call
 from .deriva_definitions import RID
 
 if TYPE_CHECKING:
@@ -162,11 +161,10 @@ class DatasetBag:
                 result.extend(self._list_dataset_children(child, recurse))
         return result
 
+
 # Add annotations after definition to deal with forward reference issues in pydantic
 
 DatasetBag.list_dataset_children = validate_call(
     config=dict(arbitrary_types_allowed=True),
     validate_return=True,
 )(DatasetBag.list_dataset_children)
-
-
