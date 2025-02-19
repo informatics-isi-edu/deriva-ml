@@ -63,19 +63,18 @@ def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
 def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
     # Delete any vocabularies and features.
     reset_demo_catalog(deriva_ml, sname)
-    domain_schema = pb.schemas[sname]
+    domain_schema = deriva_ml.catalog.getPathBuilder().schemas[sname]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
+
     with TemporaryDirectory() as tmpdir:
-        image_dir = Path(tmpdir) / "Image"
-        image_dir.mkdir()
+        image_dir = deriva_ml.asset_dir("Image", prefix=tmpdir)
         for s in ss:
-            image_file = image_dir / f"test_{s['RID']}.txt"
+            image_file = image_dir.create_file(
+                f"test_{s['RID']}.txt", {"Subject": s["RID"]}
+            )
             with open(image_file, "w+") as f:
                 f.write(f"Hello there {random()}\n")
-        deriva_ml.upload_asset(
-            image_file, "Image", Subject=s["RID"], Description="A test image"
-        )
         deriva_ml.upload_assets(image_dir)
 
 
