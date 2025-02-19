@@ -312,6 +312,9 @@ class Dataset:
         if not self._is_dataset_rid(dataset_rid):
             raise DerivaMLException("Dataset_rid is not a dataset.")
 
+        if parents := self.list_dataset_parents(dataset_rid):
+            raise DerivaMLException(f'Dataset_rid "{dataset_rid}" is in a nested dataset: {parents}.')
+
         pb = self._model.catalog.getPathBuilder()
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[
             self.dataset_table.name
