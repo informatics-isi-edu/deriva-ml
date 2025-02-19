@@ -1,6 +1,6 @@
 import unittest
 
-from deriva_ml import DerivaML, RID
+from deriva_ml import DerivaML, RID, DerivaMLException
 from deriva.core import DerivaServer, get_credential
 import os
 from deriva_ml.demo_catalog import (
@@ -21,7 +21,6 @@ if os.getenv("DERIVA_PY_TEST_VERBOSE"):
 
 
 def setUpModule():
-    print("Calling setupModule")
     global test_catalog
     logger.debug("setUpModule begin")
     credential = os.getenv("DERIVA_PY_TEST_CREDENTIAL") or get_credential(hostname)
@@ -81,7 +80,6 @@ class TestDataset(unittest.TestCase):
             .schemas[SNAME_DOMAIN]
             .tables["Subject"]
         )
-
         dataset_rid = self.test_create_dataset()
         subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
         subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
@@ -95,14 +93,13 @@ class TestDataset(unittest.TestCase):
         self.assertEqual(len(self.ml_instance.dataset_history(dataset_rid)), 2)
         self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "0.2.0")
 
-    def test_remove_dataset_members(self):
+    def test_delete_dataset_members(self):
         reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
         subject_path = (
             self.ml_instance.catalog.getPathBuilder()
             .schemas[SNAME_DOMAIN]
             .tables["Subject"]
         )
-
         dataset_rid = self.test_create_dataset()
         subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
         subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
@@ -110,10 +107,43 @@ class TestDataset(unittest.TestCase):
             dataset_rid=dataset_rid, members=subject_rids
         )
 
-        subject_rids = self.ml_instance.list_dataset_members(dataset_rid)["Subject"]
+        subject_rids = [
+            s["RID"]
+            for s in self.ml_instance.list_dataset_members(dataset_rid)["Subject"]
+        ]
         self.assertEqual(len(subject_rids), 5)
-        self.ml_instance.delete_dataset_members(subject_rids[0:1])
+        self.ml_instance.delete_dataset_members(dataset_rid, subject_rids[0:2])
         subject_rids = self.ml_instance.list_dataset_members(dataset_rid)["Subject"]
         self.assertEqual(len(subject_rids), 3)
         self.assertEqual(len(self.ml_instance.dataset_history(dataset_rid)), 3)
         self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "0.3.0")
+
+    def test_delete_dataset(self):
+        subject_path = (
+            self.ml_instance.catalog.getPathBuilder()
+            .schemas[SNAME_DOMAIN]
+            .tables["Subject"]
+        )
+        reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
+        reset_demo_catalog(self.ml_instance, SNAME_DOMAIN)
+        self.ml_instance.add_dataset_element_type("Subject")
+        type_rid = self.ml_instance.add_term(
+            "Dataset_Type", "TestSet", description="A test"
+        )
+        dataset_rids = [
+            self.ml_instance.create_dataset(type_rid.name, description="A Dataset")
+            for i in range(5)
+        ]
+        subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
+        subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
+        self.ml_instance.add_dataset_members(
+            dataset_rid=dataset_rids[0], members=subject_rids
+        )
+        self.assertEqual(5, len(self.ml_instance.find_datasets()))
+        self.ml_instance.delete_dataset(dataset_rids[0])
+        self.assertEqual(4, len(self.ml_instance.find_datasets()))
+        self.assertEqual(5, len(self.ml_instance.find_datasets(deleted=True)))
+        self.ml_instance.delete_dataset(dataset_rids[1])
+        self.assertRaises(
+            DerivaMLException, self.ml_instance.list_dataset_members, dataset_rids[0]
+        )
