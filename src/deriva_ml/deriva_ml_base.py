@@ -31,12 +31,12 @@ from .execution_configuration import ExecutionConfiguration
 from .feature import Feature, FeatureRecord
 from .dataset import Dataset
 from .deriva_model import DerivaModel
-from .upload import asset_dir
 from .upload import (
     table_path,
     execution_rids,
     execution_metadata_dir,
     upload_directory,
+    UploadAssetDirectory
 )
 from .deriva_definitions import ColumnDefinition
 from .deriva_definitions import ExecMetadataVocab
@@ -185,7 +185,7 @@ class DerivaML(Dataset):
             table=self.model.get_table(table).name,
         )
 
-    def asset_path(self, table: str | Table, prefix: str | Path = None) -> Path:
+    def asset_dir(self, table: str | Table, prefix: str | Path = None) -> UploadAssetDirectory:
         """Return a local file path in which to place a files for an asset table.  T
 
         Args:
@@ -200,11 +200,11 @@ class DerivaML(Dataset):
             raise DerivaMLException(f"The table {table} is not an asset table.")
 
         prefix = Path(prefix) if prefix else self.working_dir
-        return asset_dir(
-            prefix,
-            asset_schema=table.schema.name,
-            asset_type=table.name,
+        return UploadAssetDirectory(
             model=self.model,
+            prefix=prefix,
+            schema=table.schema.name,
+            table=table.name,
         )
 
     def download_dir(self, cached: bool = False) -> Path:
@@ -725,17 +725,13 @@ class DerivaML(Dataset):
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def upload_assets(
         self,
-        assets_dir: str | Path,
-        metadata: Optional[dict[str, dict[str, str | int | float | bool]]] = None,
+        assets_dir: str | Path | UploadAssetDirectory,
     ) -> dict[Any, FileUploadState] | None:
         """Upload assets from a directory. This routine assumes that the current upload specification includes a
         configuration for the specified directory.  Every asset in the specified directory is uploaded
 
         Args:
             assets_dir: Directory containing the assets to upload.
-            metadata:  Values for additional columns to be added to the asset table.  The format of the metadata
-                argument is a dictionary  whose key is the name of the asset for which the values are being provided
-                and whose value is a dictionary of column names and values.
 
         Returns:
             Results of the upload operation.
@@ -743,36 +739,17 @@ class DerivaML(Dataset):
         Raises:
             DerivaMLException: If there is an issue uploading the assets.
         """
+        def path_to_asset(path: str) -> str:
+            components = path.split("/")
+            return components[components.index('asset')+2]  # Look for asset in the path to find the name
 
-        asset_name = Path(assets_dir).name
-        asset_schema = self.model.get_table(asset_name).schema.name
-        asset_cols = {c.name for c in self.model.get_table(asset_name).columns}
-        asset_files = {f.name for f in assets_dir.iterdir()}
+        if isinstance(assets_dir, UploadAssetDirectory):
+            assets_dir = assets_dir.path
 
-        if not self.model.is_asset(asset_name):
+        if not self.model.is_asset(Path(assets_dir).name):
             raise DerivaMLException("Directory does not have name of an asset table.")
-
-        if metadata:
-            for f, md in metadata.items():
-                if f not in asset_files:
-                    raise DerivaMLException(
-                        f"Metadata is specified for missing asset {f}."
-                    )
-                if asset_cols >= set(metadata.keys()):
-                    raise DerivaMLException(
-                        f"Metadata values do not match asset columns."
-                    )
-
         results = upload_directory(self.model, assets_dir)
-        result_rids = [
-            r.result["RID"]
-            for r in results
-            if r.state == UploadState.success and r.result
-        ]
-
-        # Now add metadata
-        asset_path = self.pathBuilder.schemas[asset_schema].tables[asset_name]
-        asset_path.update([{"RID": a["RID"]} | metadata[a["file"]] for a in results])
+        return {path_to_asset(p): r for p, r in results.items()}
 
     def _update_status(
         self, new_status: Status, status_detail: str, execution_rid: RID

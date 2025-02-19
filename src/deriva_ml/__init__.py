@@ -18,6 +18,7 @@ __all__ = [
     "VersionPart",
 ]
 
+from .dataset_aux_classes import VersionPart, DatasetSpec, DatasetVersion
 from .dataset_bag import DatasetBag
 from .deriva_definitions import (
     ColumnDefinition,
@@ -37,4 +38,3 @@ from .execution_configuration import (
     Workflow,
 )
 
-from .dataset_aux_classes import VersionPart, DatasetSpec, DatasetVersion

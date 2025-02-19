@@ -3,7 +3,8 @@ from copy import copy
 from typing import Any, Generator, TYPE_CHECKING, Optional
 
 import pandas as pd
-from pydantic import validate_call
+from nltk.stem.snowball import DanishStemmer
+from pydantic import validate_call, ConfigDict
 from .deriva_definitions import RID
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ class DatasetBag:
         domain_schema (str): Name of the domain schema
     """
 
-    #    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    # Validate call
     def __init__(
         self, database_model: "DatabaseModel", dataset_rid: Optional[RID]
     ) -> None:
@@ -129,7 +130,7 @@ class DatasetBag:
                         members[k].extend(v)
         return dict(members)
 
-    @validate_call
+    # @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_children(self, recurse: bool = False) -> list["DatasetBag"]:
         """Given a _dataset_table RID, return a list of RIDs of any nested datasets.
 
@@ -160,3 +161,12 @@ class DatasetBag:
             for child in nested:
                 result.extend(self._list_dataset_children(child, recurse))
         return result
+
+# Add annotations after definition to deal with forward reference issues in pydantic
+
+DatasetBag.list_dataset_children = validate_call(
+    config=dict(arbitrary_types_allowed=True),
+    validate_return=True,
+)(DatasetBag.list_dataset_children)
+
+

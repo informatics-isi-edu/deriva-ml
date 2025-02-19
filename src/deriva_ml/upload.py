@@ -138,41 +138,6 @@ def asset_table_dir(prefix: Path, asset_schema, asset_table) -> Path:
     path.mkdir(exist_ok=True, parents=True)
     return path
 
-
-@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-def asset_dir(
-    prefix: Path | str,
-    model: DerivaModel,
-    asset_schema: str,
-    asset_type: str,
-    metadata=None,
-) -> Path:
-    """Return the path to a directory in which to place  assets of a specified type are to be uploaded.
-
-    Args:
-      prefix: Location of upload root directory
-        asset_schema: Type of execution asset
-      asset_type: Type of execution asset
-      model: Deriva model in which the asset is defined
-
-    Returns:
-        Path to directory in which to place assets of type asset_type.
-    """
-    metadata = metadata or {}
-    asset_metadata = model.asset_metadata(asset_type)
-    print(f"Asset metadata: {asset_metadata} {set(metadata.keys())}")
-    if not (asset_metadata >= set(metadata.keys())):
-        raise DerivaMLException(
-            f"Metadata {metadata} does not match asset metadata {asset_metadata}"
-        )
-
-    path = asset_table_dir(prefix, asset_schema=asset_schema, asset_table=asset_type)
-    for m in model.asset_metadata(asset_type):
-        path = path / metadata.get(m, "None")
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def execution_rids(prefix: Path | str) -> list[RID]:
     """Return a list of all of the execution RIDS that have files waiting to be uploaded."""
     path = upload_root(prefix) / "execution"
@@ -577,6 +542,36 @@ def upload_asset(
     except Exception as e:
         raise e
 
+class UploadAssetDirectory:
+    def __init__(self, model: DerivaModel, schema: str, table: str, prefix: Path):
+        self.prefix = prefix
+        self.path = asset_table_dir(prefix=prefix, asset_schema=schema, asset_table=table)
+        self.table = table
+        self.schema = schema
+        self.model = model
+
+    def create_file(self, file_name: str, metadata: dict[str, Any]) -> Path:
+        """Return the file in which to place  assets of a specified type are to be uploaded.
+
+        Args:
+            file_name: Name of file to which the contents of the asset will be placed
+            metadata: Any additional metadata to add to the asset
+        Returns:
+            Path to directory in which to place assets of type asset_type.
+        """
+        metadata = metadata or {}
+        asset_metadata = self.model.asset_metadata(self.table)
+        if not (asset_metadata >= set(metadata.keys())):
+            raise DerivaMLException(
+                f"Metadata {metadata} does not match asset metadata {asset_metadata}"
+            )
+
+        path = self.path
+        for m in self.model.asset_metadata(self.table):
+            path = path / metadata.get(m, "None")
+        path.mkdir(parents=True, exist_ok=True)
+        return path / file_name
+
 
 def test_upload():
     """ """
@@ -587,7 +582,7 @@ def test_upload():
         "foo", "my-rid", "my-schema", "my-target", "my-feature", "my-asset"
     )
     _tp = table_path("foo", "my-schema", "my-table")
-    _ad = asset_dir("foo", "my-schema", "my-asset")
+ #   _ad = create_asset_dir("foo", "my-schema", "my-asset")
     _is_md = is_execution_metadata_dir(emd)
     _is_ea = is_execution_asset_dir(ead)
     _is_fa = is_feature_asset_dir(fa)
