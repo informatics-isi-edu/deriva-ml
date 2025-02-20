@@ -1,6 +1,7 @@
 import atexit
 from importlib.metadata import version
 from importlib.resources import files
+import logging
 from random import random
 from tempfile import TemporaryDirectory
 
@@ -25,7 +26,7 @@ from deriva_ml.execution import Execution
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from deriva_ml.dataset import Dataset
 
-TEST_DATASET_SIZE = 20
+TEST_DATASET_SIZE = 4
 
 
 def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
@@ -70,7 +71,7 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
             image_file = image_dir.create_file(
                 f"test_{s['RID']}.txt", {"Subject": s["RID"]}
             )
-            with open(image_file, "w+") as f:
+            with open(image_file, "w") as f:
                 f.write(f"Hello there {random()}\n")
         deriva_ml.upload_assets(image_dir)
 
@@ -281,6 +282,7 @@ def create_demo_catalog(
             hostname=hostname,
             catalog_id=test_catalog.catalog_id,
             project_name=project_name,
+            logging_level=logging.WARN,
         )
         if populate:
             populate_demo_catalog(deriva_ml, domain_schema)
