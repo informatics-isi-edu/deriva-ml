@@ -196,8 +196,8 @@ class DatabaseModel(DerivaModel):
         """
         fetch_map = {}
         try:
-            with open(self.bag_path / "fetch.txt", newline="\n") as fetchfile:
-                for row in fetchfile:
+            with open(self.bag_path / "fetch.txt", newline="\n") as fetch_file:
+                for row in fetch_file:
                     # Rows in fetch.text are tab seperated with URL filename.
                     fields = row.split("\t")
                     local_file = fields[2].replace("\n", "")
