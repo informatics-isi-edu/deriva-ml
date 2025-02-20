@@ -105,12 +105,18 @@ class TestDataset(TestDerivaML):
     def test_nested_datasets(self):
         reset_demo_catalog(self.ml_instance, self.domain_schema)
         create_demo_datasets(self.ml_instance)
-        [nested_dataset, double_nested_dataset] = self.ml_instance.find_datasets()
+        datasets = self.ml_instance.find_datasets()
+
+        [nested_dataset, double_nested_dataset] = [
+            d["RID"] for d in datasets if "Partitioned" in d["Dataset_Type"]
+        ]
+
         if self.ml_instance._dataset_depth(nested_dataset) == 2:
             nested_dataset, double_nested_dataset = (
                 double_nested_dataset,
                 nested_dataset,
             )
+
         self.assertEqual(2, len(nested_dataset.dataset_children()))
         self.assertEqual(double_nested_dataset, nested_dataset.dataset_parents()[0])
         print(double_nested_dataset.dataset_children(recurse=True))
