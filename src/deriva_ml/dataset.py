@@ -223,7 +223,7 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
         self,
-        ds_type: str | list[str],
+        type: str | list[str],
         description: str,
         execution_rid: Optional[RID] = None,
         version: Optional[DatasetVersion] = None,
@@ -231,11 +231,11 @@ class Dataset:
         """Create a new dataset_table from the specified list of RIDs.
 
         Args:
-            ds_type: One or more dataset_table types.  Must be a term from the DatasetType controlled vocabulary.
+            type: One or more dataset_table types.  Must be a term from the DatasetType controlled vocabulary.
             description: Description of the dataset_table.
             execution_rid: Execution under which the dataset_table will be created.
             version: Version of the dataset_table.
-            ds_type: str | list[str]:
+            type: str | list[str]:
             description: str:
 
 
@@ -262,7 +262,7 @@ class Dataset:
             return False
 
         # Create the entry for the new dataset_table and get its RID.
-        ds_types = [ds_type] if isinstance(ds_type, str) else ds_type
+        ds_types = [type] if isinstance(type, str) else type
         pb = self._model.catalog.getPathBuilder()
         for ds_type in ds_types:
             if not check_dataset_type(ds_type):
@@ -353,7 +353,7 @@ class Dataset:
             filtered_path = dataset_path
         else:
             filtered_path = dataset_path.filter(
-                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)
+                (dataset_path.Deleted == False) | (dataset_path.Deleted is None)
             )
 
         # Get a list of all the dataset_type values associated with this dataset_table.
