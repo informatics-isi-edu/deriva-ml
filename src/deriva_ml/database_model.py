@@ -24,7 +24,7 @@ class DatabaseModel(DerivaModel):
     copy of the file. In addition, a local version of the ERMRest model that as used to generate the dataset_table is
     available.
 
-       The sqllite database will not have any foreign key constraints applied, however, foreign-key relationships can be
+       The sqlite database will not have any foreign key constraints applied, however, foreign-key relationships can be
     found by looking in the ERMRest model.  In addition, as sqllite doesn't support schema, Ermrest schema are added
     to the table name using the convention SchemaName:TableName.  Methods in DatasetBag that have table names as the
     argument will perform the appropriate name mappings.
@@ -107,7 +107,7 @@ class DatabaseModel(DerivaModel):
         self.domain_schema = self._guess_domain_schema()
         self._load_model()
         self.ml_schema = ML_SCHEMA
-        self._load_sqllite()
+        self._load_sqlite()
         self._logger.info(
             "Creating new database for dataset: %s in %s",
             self.dataset_rid,
@@ -143,7 +143,7 @@ class DatabaseModel(DerivaModel):
             for t in self.model.schemas["deriva-ml"].tables.values():
                 self.dbase.execute(t.sqlite3_ddl())
 
-    def _load_sqllite(self) -> None:
+    def _load_sqlite(self) -> None:
         """Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.
 
         If the file is for an asset table, update the FileName column of the table to have the local file path for

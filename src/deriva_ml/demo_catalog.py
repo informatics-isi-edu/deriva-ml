@@ -1,7 +1,6 @@
 import atexit
 from importlib.metadata import version
 from importlib.resources import files
-from pathlib import Path
 from random import random
 from tempfile import TemporaryDirectory
 
@@ -27,8 +26,6 @@ from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml
 from deriva_ml.dataset import Dataset
 
 TEST_DATASET_SIZE = 20
-
-import time
 
 
 def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
@@ -270,17 +267,14 @@ def create_demo_catalog(
     create_datasets=False,
     on_exit_delete=True,
 ) -> ErmrestCatalog:
-    st = time.time()
     credentials = get_credential(hostname)
     server = DerivaServer("https", hostname, credentials=credentials)
     test_catalog = server.create_ermrest_catalog()
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)
-    st = time.time()
     model = test_catalog.getCatalogModel()
 
     try:
-        st = time.time()
         create_ml_schema(model, project_name=project_name)
         create_domain_schema(model, domain_schema)
         deriva_ml = DerivaML(
