@@ -1,18 +1,11 @@
 from derivaml_test import TestDerivaML
 
 from deriva_ml import MLVocab, Workflow, ExecutionConfiguration
-import os
 from tempfile import TemporaryDirectory
 from random import random
 from deriva_ml.demo_catalog import (
     reset_demo_catalog,
 )
-import logging
-
-logger = logging.getLogger(__name__)
-if os.getenv("DERIVA_PY_TEST_VERBOSE"):
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(logging.StreamHandler())
 
 
 class TestUpload(TestDerivaML):

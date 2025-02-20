@@ -1,6 +1,6 @@
 from derivaml_test import TestDerivaML
 
-from deriva_ml import  RID, DerivaMLException
+from deriva_ml import RID, DerivaMLException
 from deriva_ml.demo_catalog import (
     reset_demo_catalog,
 )
