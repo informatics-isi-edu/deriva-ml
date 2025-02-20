@@ -136,6 +136,10 @@ class DerivaML(Dataset):
             format="%(asctime)s - %(name)s.%(levelname)s - %(message)s",
         )
 
+        # Set logging level for dervia library
+        deriva_logger = logging.getLogger("deriva")
+        deriva_logger.setLevel(logging_level)
+
         if "dirty" in self.version:
             logging.info(
                 f"Loading dirty model.  Consider commiting and tagging: {self.version}"
