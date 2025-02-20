@@ -2,7 +2,7 @@ import unittest
 import os
 
 # List of test modules to include
-test_modules = ["test_basic_tables", "test_upload", "test_dataset"]
+test_modules = ["test_basic_tables", "test_upload", "test_dataset", "test_download"]
 
 os.environ["DERIVA_PY_TEST_HOSTNAME"] = "dev.eye-ai.org"
 
