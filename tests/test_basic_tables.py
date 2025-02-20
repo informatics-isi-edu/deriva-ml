@@ -1,10 +1,6 @@
 from derivaml_test import TestDerivaML
 
 from deriva_ml import DerivaMLException, ColumnDefinition, BuiltinTypes
-import logging
-
-
-logger = logging.getLogger(__name__)
 
 
 class TestVocabulary(TestDerivaML):

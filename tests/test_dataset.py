@@ -1,5 +1,13 @@
 from derivaml_test import TestDerivaML
-from deriva_ml import RID, DerivaMLException
+from deriva_ml import (
+    RID,
+    DerivaMLException,
+    TableDefinition,
+    ColumnDefinition,
+    BuiltinTypes,
+    VersionPart,
+    DatasetVersion,
+)
 from deriva_ml.demo_catalog import (
     reset_demo_catalog,
     create_demo_datasets,
@@ -10,115 +18,120 @@ class TestDataset(TestDerivaML):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def test_add_element_type(self):
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
-        self.ml_instance.add_dataset_element_type("Subject")
-        self.assertEqual(len(list(self.ml_instance.list_dataset_element_types())), 2)
+    def test_dataset_1(self):
+        self.ml_instance.model.create_table(
+            TableDefinition(
+                name="TestTable",
+                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+            )
+        )
+        self.ml_instance.add_dataset_element_type("TestTable")
+        self.assertIn(
+            "TestTable",
+            [t.name for t in self.ml_instance.list_dataset_element_types()],
+        )
 
-    def test_create_dataset(self) -> RID:
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
-        self.ml_instance.add_dataset_element_type("Subject")
+    def test_dataset_2(self):
         type_rid = self.ml_instance.add_term(
             "Dataset_Type", "TestSet", description="A test"
         )
-        dataset_rid = self.ml_instance.create_dataset(
+        self.dataset_rid = self.ml_instance.create_dataset(
             type_rid.name, description="A Dataset"
         )
-        self.assertEqual(len(list(self.ml_instance.find_datasets())), 1)
-        return dataset_rid
+        datasets = list(self.ml_instance.find_datasets())
+        self.assertIn(self.dataset_rid, [d["RID"] for d in datasets])
+        ds_type = [d["Dataset_Type"] for d in datasets if d["RID"] == self.dataset_rid][
+            0
+        ]
+        self.assertIn("TestSet", ds_type)
 
-    def test_add_dataset_members(self):
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
-        subject_path = (
+    def test_dataset_3(self):
+        type_rid = self.ml_instance.lookup_term("Dataset_Type", "TestSet")
+        dataset_rid = self.ml_instance.create_dataset(
+            type_rid.name,
+            description="A New Dataset",
+            version=DatasetVersion(1, 0, 0),
+        )
+        v0 = self.ml_instance.dataset_version(dataset_rid)
+        self.assertEqual("1.0.0", str(v0))
+        v1 = self.ml_instance.increment_dataset_version(
+            dataset_rid=dataset_rid, component=VersionPart.minor
+        )
+        self.assertEqual("1.1.0", str(v1))
+
+    def test_dataset_4(self):
+        type_rid = self.ml_instance.lookup_term("Dataset_Type", "TestSet")
+        dataset_rid = self.ml_instance.create_dataset(
+            type_rid.name,
+            description="A New Dataset",
+            version=DatasetVersion(1, 0, 0),
+        )
+        table_path = (
             self.ml_instance.catalog.getPathBuilder()
             .schemas[self.domain_schema]
-            .tables["Subject"]
+            .tables["TestTable"]
         )
-        dataset_rid = self.test_create_dataset()
-        subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
-        subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
-        self.ml_instance.add_dataset_members(
-            dataset_rid=dataset_rid, members=subject_rids
-        )
+        table_path.insert([{"Col1": f"Thing{t + 1}"} for t in range(4)])
+        test_rids = [i["RID"] for i in table_path.entities().fetch()]
+        member_cnt = len(test_rids)
+        self.ml_instance.add_dataset_members(dataset_rid=dataset_rid, members=test_rids)
         self.assertEqual(
-            len(self.ml_instance.list_dataset_members(dataset_rid)["Subject"]),
-            len(subject_rids),
+            len(self.ml_instance.list_dataset_members(dataset_rid)["TestTable"]),
+            len(test_rids),
         )
         self.assertEqual(len(self.ml_instance.dataset_history(dataset_rid)), 2)
-        self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "0.2.0")
+        self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "1.1.0")
 
-    def test_delete_dataset_members(self):
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
-        subject_path = (
-            self.ml_instance.catalog.getPathBuilder()
-            .schemas[self.domain_schema]
-            .tables["Subject"]
-        )
-        dataset_rid = self.test_create_dataset()
-        subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
-        subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
-        self.ml_instance.add_dataset_members(
-            dataset_rid=dataset_rid, members=subject_rids
-        )
-
-        subject_rids = [
-            s["RID"]
-            for s in self.ml_instance.list_dataset_members(dataset_rid)["Subject"]
-        ]
-        self.assertEqual(len(subject_rids), 5)
-        self.ml_instance.delete_dataset_members(dataset_rid, subject_rids[0:2])
-        subject_rids = self.ml_instance.list_dataset_members(dataset_rid)["Subject"]
-        self.assertEqual(len(subject_rids), 3)
+        self.ml_instance.delete_dataset_members(dataset_rid, test_rids[0:2])
+        test_rids = self.ml_instance.list_dataset_members(dataset_rid)["TestTable"]
+        self.assertEqual(member_cnt - 2, len(test_rids))
         self.assertEqual(len(self.ml_instance.dataset_history(dataset_rid)), 3)
-        self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "0.3.0")
+        self.assertEqual(str(self.ml_instance.dataset_version(dataset_rid)), "1.2.0")
 
-    def test_delete_dataset(self):
-        subject_path = (
-            self.ml_instance.catalog.getPathBuilder()
-            .schemas[self.domain_schema]
-            .tables["Subject"]
-        )
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
-        self.ml_instance.add_dataset_element_type("Subject")
-        type_rid = self.ml_instance.add_term(
-            "Dataset_Type", "TestSet", description="A test"
-        )
-        dataset_rids = [
-            self.ml_instance.create_dataset(type_rid.name, description="A Dataset")
-            for i in range(5)
-        ]
-        subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(5)])
-        subject_rids = [i["RID"] for i in subject_path.entities().fetch()]
-        self.ml_instance.add_dataset_members(
-            dataset_rid=dataset_rids[0], members=subject_rids
-        )
-        self.assertEqual(5, len(self.ml_instance.find_datasets()))
+    def test_dataset_5(self):
+        dataset_rids = [d["RID"] for d in self.ml_instance.find_datasets()]
+        dataset_cnt = len(dataset_rids)
         self.ml_instance.delete_dataset(dataset_rids[0])
-        self.assertEqual(4, len(self.ml_instance.find_datasets()))
-        self.assertEqual(5, len(self.ml_instance.find_datasets(deleted=True)))
-        self.ml_instance.delete_dataset(dataset_rids[1])
+        self.assertEqual(dataset_cnt - 1, len(self.ml_instance.find_datasets()))
+        self.assertEqual(dataset_cnt, len(self.ml_instance.find_datasets(deleted=True)))
         self.assertRaises(
             DerivaMLException, self.ml_instance.list_dataset_members, dataset_rids[0]
         )
 
     def test_nested_datasets(self):
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
-        create_demo_datasets(self.ml_instance)
-        datasets = self.ml_instance.find_datasets()
-
-        [nested_dataset, double_nested_dataset] = [
-            d["RID"] for d in datasets if "Partitioned" in d["Dataset_Type"]
-        ]
-
-        if self.ml_instance._dataset_depth(nested_dataset) == 2:
-            nested_dataset, double_nested_dataset = (
-                double_nested_dataset,
-                nested_dataset,
+        type_rid = self.ml_instance.lookup_term("Dataset_Type", "TestSet")
+        table_path = (
+            self.ml_instance.catalog.getPathBuilder()
+            .schemas[self.domain_schema]
+            .tables["TestTable"]
+        )
+        test_rids = [i["RID"] for i in table_path.entities().fetch()]
+        dataset_rids = []
+        for r in test_rids[0:4]:
+            d = self.ml_instance.create_dataset(
+                type_rid.name,
+                description=f"Dataset {r}",
+                version=DatasetVersion(1, 0, 0),
             )
+            self.ml_instance.add_dataset_members(d, r)
+            dataset_rids.append(d)
+        nested_datasets = []
+        for i in range(0, 4, 2):
+            nested_dataset = self.ml_instance.create_dataset(
+                type_rid.name,
+                description=f"Nested Dataset {i}",
+                version=DatasetVersion(1, 0, 0),
+            )
+            self.ml_instance.add_dataset_members(
+                nested_dataset, dataset_rids[i : i + 1]
+            )
+            nested_datasets.append(nested_dataset)
+        double_nested_dataset = self.ml_instance.create_dataset()
+        double_nested_dataset.add_dataset_members(nested_datasets)
 
-        self.assertEqual(2, len(nested_dataset.dataset_children()))
-        self.assertEqual(double_nested_dataset, nested_dataset.dataset_parents()[0])
+        self.assertEqual(2, double_nested_dataset._dataset_nesting_depth())
+        self.assertEqual(2, len(nested_datasets[0].dataset_children()))
+        self.assertEqual(double_nested_dataset, nested_datasets[0].dataset_parents()[0])
         print(double_nested_dataset.dataset_children(recurse=True))
 
     def test_dataset_version(self):
