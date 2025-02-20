@@ -39,7 +39,11 @@ class DerivaModel:
         self.model = model
         self.configuration = None
         self.catalog: ErmrestCatalog = self.model.catalog
-        self.hostname = self.catalog.deriva_server.server
+        self.hostname = (
+            self.catalog.deriva_server.server
+            if isinstance(self.catalog, ErmrestCatalog)
+            else "localhost"
+        )
         self.schemas = self.model.schemas
 
         self.ml_schema = ml_schema
