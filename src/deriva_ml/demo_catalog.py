@@ -153,6 +153,11 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
         description="A nested dataset_table for machine learning",
         execution_rid=dataset_execution.execution_rid,
     )
+    double_nested_dataset = deriva_ml.create_dataset(
+        ["Partitioned", 'Image'],
+        description="A double nested dataset_table for machine learning",
+        execution_rid=dataset_execution.execution_rid,
+    )
     training_dataset = deriva_ml.create_dataset(
         "Training",
         description="An image dataset_table for training",
@@ -170,7 +175,12 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
     )
     deriva_ml.add_dataset_members(
         dataset_rid=nested_dataset,
-        members=[training_dataset, testing_dataset, validation_dataset],
+        members=[training_dataset, testing_dataset],
+    )
+
+    deriva_ml.add_dataset_members(
+        dataset_rid = double_nested_dataset,
+        members=[nested_dataset, validation_dataset],
     )
     deriva_ml.add_dataset_members(dataset_rid=training_dataset, members=training_rids)
     deriva_ml.add_dataset_members(dataset_rid=testing_dataset, members=testing_rids)
