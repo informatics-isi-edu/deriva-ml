@@ -56,7 +56,6 @@ class TestVocabulary(TestDerivaML):
         )
 
     def test_is_assoc(self):
-        print("Calling test_is_assoc begin")
         self.assertTrue(self.ml_instance.model.is_association("Dataset_Dataset"))
         self.assertFalse(self.ml_instance.model.is_association("Dataset"))
 

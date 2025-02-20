@@ -2,7 +2,7 @@ import os
 import unittest
 from deriva_ml import DerivaML
 from demo_catalog import create_demo_catalog
-
+import logging
 
 hostname = os.getenv("DERIVA_PY_TEST_HOSTNAME")
 SNAME = os.getenv("DERIVA_PY_TEST_SNAME")
@@ -16,7 +16,9 @@ TestCatalog = create_demo_catalog(
     populate=False,
 )
 
-ML_INSTANCE = DerivaML(hostname, TestCatalog.catalog_id, SNAME_DOMAIN)
+ML_INSTANCE = DerivaML(
+    hostname, TestCatalog.catalog_id, SNAME_DOMAIN, logging_level=logging.WARN
+)
 
 
 class TestDerivaML(unittest.TestCase):

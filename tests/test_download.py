@@ -1,5 +1,4 @@
 from derivaml_test import TestDerivaML
-from deriva_ml import MLVocab as vc, Workflow, ExecutionConfiguration, DatasetSpec
 from deriva_ml.demo_catalog import (
     reset_demo_catalog,
     populate_demo_catalog,
@@ -19,4 +18,4 @@ class TestDownload(TestDerivaML):
             for ds in self.ml_instance.find_datasets()
             if "Partitioned" in ds["Dataset_Type"]
         ][0]
-        self.ml_instance.download_dataset(nested_dataset_rid)
+        bag = self.ml_instance.download_dataset_bag(nested_dataset_rid)
