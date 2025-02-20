@@ -1,40 +1,39 @@
-class TestExecution(unittest.TestCase):
-    def setUp(self):
-        self.ml_instance = DerivaML(
-            hostname, test_catalog.catalog_id, SNAME_DOMAIN, None, None, "1"
-        )
-        self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
-        self.model = self.ml_instance.model
-        self.files = os.path.dirname(__file__) + "/files"
+from derivaml_test import TestDerivaML
+from deriva_ml import MLVocab as vc, Workflow, ExecutionConfiguration
+from deriva_ml.demo_catalog import (
+    reset_demo_catalog,
+)
 
-    def test_upload_configuration(self):
-        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
-        config_file = self.files + "/test-workflow-1.json"
-        config = ExecutionConfiguration.load_configuration(config_file)
-        rid = self.ml_instance.upload_execution_configuration(config)
-        self.assertEqual(rid, self.ml_instance.retrieve_rid(rid)["RID"])
 
+class TestExecution(TestDerivaML):
     def test_execution_1(self):
-        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
-        exec_config = ExecutionConfiguration.load_configuration(
-            self.files + "/test-workflow-1.json"
+        reset_demo_catalog(self.ml_instance, self.domain_schema)
+        self.ml_instance.add_term(
+            vc.workflow_type,
+            "Manual Workflow",
+            description="Initial setup of Model File",
         )
-        configuration_record = self.ml_instance.initialize_execution(
-            configuration=exec_config
+        self.ml_instance.add_term(
+            vc.execution_asset_type,
+            "API_Model",
+            description="Model for our API workflow",
         )
-        with self.ml_instance.execution(configuration=configuration_record) as exec:
-            output_dir = self.ml_instance.execution_assets_path / "testoutput"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            with open(output_dir / "test.txt", "w+") as f:
-                f.write("Hello there\n")
-        upload_status = self.ml_instance.upload_execution(
-            configuration=configuration_record
+        self.ml_instance.add_term(
+            vc.workflow_type,
+            "ML Demo",
+            description="A ML Workflow that uses Deriva ML API",
         )
-        e = (
-            list(
-                self.ml_instance.catalog.getPathBuilder()
-                .deriva_ml.Execution.entities()
-                .fetch()
+
+        api_workflow = Workflow(
+            name="Manual Workflow",
+            url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_execution.py",
+            workflow_type="Manual Workflow",
+            description="A manual operation",
+        )
+
+        manual_execution = self.ml_instance.create_execution(
+            ExecutionConfiguration(
+                description="Sample Execution", workflow=api_workflow
             )
-        )[0]
-        self.assertEqual(e["Status"], "Completed")
+        )
+        manual_execution.upload_execution_outputs()
