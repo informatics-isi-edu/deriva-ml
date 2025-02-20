@@ -1,3 +1,6 @@
+"""
+The module implements the sqllite interface to a set of directories representing a dataset bag.
+"""
 from collections import defaultdict
 from copy import copy
 from typing import Any, Generator, TYPE_CHECKING, Optional
@@ -62,12 +65,15 @@ class DatasetBag:
         return self.model.list_tables()
 
     def get_table(self, table: str) -> Generator[tuple, None, None]:
+        """Get the contents of the specified table as a set of tuples"""
         return self.model.get_table(table)
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
+        """Get the contents of the specified table as a dataframe"""
         return self.model.get_table_as_dataframe(table)
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+        """Get the contents of the specified table as a dictionary"""
         return self.model.get_table_as_dict(table)
 
     @validate_call

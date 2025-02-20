@@ -135,6 +135,7 @@ class DerivaML(Dataset):
             level=logging_level,
             format="%(asctime)s - %(name)s.%(levelname)s - %(message)s",
         )
+
         if "dirty" in self.version:
             logging.info(
                 f"Loading dirty model.  Consider commiting and tagging: {self.version}"

@@ -78,7 +78,7 @@ def lac_test():
 def create_demo_ml():
     host = "dev.eye-ai.org"
     test_catalog = create_demo_catalog(
-        host, "test-schema", create_features=True, create_datasets=True
+        host, "test-schema", create_features=False, create_datasets=False
     )
     return DemoML(host, test_catalog.catalog_id)
 

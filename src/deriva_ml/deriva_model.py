@@ -11,7 +11,14 @@ relationships that follow a specific data model.
 from deriva.core.ermrest_model import Table, Model
 from deriva.core.ermrest_catalog import ErmrestCatalog
 
-from .deriva_definitions import DerivaMLException, ML_SCHEMA, DerivaSystemColumns
+from .deriva_definitions import (
+    DerivaMLException,
+    ML_SCHEMA,
+    DerivaSystemColumns,
+    TableDefinition,
+)
+
+from pydantic import validate_call, ConfigDict
 
 
 class DerivaModel:
@@ -163,7 +170,15 @@ class DerivaModel:
         return {c.name for c in table.columns} - asset_columns
 
     def apply(self):
+        """Call Ermrestmodel.apply"""
         if self.catalog == "file-system":
             raise DerivaMLException("Cannot apply() to non-catalog model.")
         else:
             self.model.apply()
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def create_table(self, table_def: TableDefinition) -> Table:
+        """Create a new table from TableDefinition."""
+        return self.model.schemas[self.domain_schema].create_table(
+            table_def.model_dump()
+        )
