@@ -9,6 +9,7 @@ accessible via a DerivaML class instance.
 from bdbag.fetch.fetcher import fetch_single_file
 from bdbag import bdbag_api as bdb
 from collections import defaultdict
+from copy import copy
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 from deriva.transfer.download.deriva_export import DerivaExport
@@ -218,7 +219,7 @@ class Dataset:
         if recurse:
             for ds in self.list_dataset_children(dataset_rid, recurse=True):
                 self.increment_dataset_version(ds, component, description=description)
-        return version
+        return new_version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
@@ -646,17 +647,25 @@ class Dataset:
         ]
 
     @validate_call
-    def list_dataset_children(self, dataset_rid: RID) -> list[RID]:
+    def list_dataset_children(self, dataset_rid: RID, recurse=False) -> list[RID]:
         """Given a dataset_table RID, return a list of RIDs of any nested datasets.
 
         Args:
             dataset_rid: A dataset_table RID.
+            recurse: If True, return a list of RIDs of any nested datasets.
 
         Returns:
           list of RIDs of nested datasets.
 
         """
-        return [d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
+        children = []
+        for child in [
+            d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]
+        ]:
+            children.append(child)
+            if recurse:
+                children.extend(self.list_dataset_children(child, recurse=recurse))
+        return children
 
     @staticmethod
     def _download_dataset_element(
