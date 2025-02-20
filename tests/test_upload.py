@@ -84,7 +84,7 @@ class TestUpload(TestDerivaML):
             )
         )
 
-        # Now lets create model configuration for our program.
+        # Now let us create model configuration for our program.
         model_file = (
             manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
         )
