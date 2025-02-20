@@ -1,8 +1,9 @@
-from demo_catalog import populate_demo_catalog, create_demo_datasets
 from derivaml_test import TestDerivaML
 from deriva_ml import MLVocab as vc, Workflow, ExecutionConfiguration, DatasetSpec
 from deriva_ml.demo_catalog import (
     reset_demo_catalog,
+    populate_demo_catalog,
+    create_demo_datasets,
 )
 
 

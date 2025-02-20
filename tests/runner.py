@@ -3,7 +3,13 @@ import os
 
 # List of test modules to include
 
-test_modules = ["test_basic_tables", "test_upload", "test_dataset", "test_download", "test_execution"]
+test_modules = [
+    "test_basic_tables",
+    "test_dataset",
+    "test_download",
+    "test_execution",
+    "test_upload",
+]
 
 
 os.environ["DERIVA_PY_TEST_HOSTNAME"] = "dev.eye-ai.org"
