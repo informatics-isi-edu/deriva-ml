@@ -32,7 +32,7 @@ class TestDerivaML(unittest.TestCase):
         self.ml_instance = ML_INSTANCE
         self.model = self.ml_instance.model
 
-    def create_nested_dataset(self) -> tuple[RID, set[RID], set[RID]]:
+    def create_nested_dataset(self) -> tuple[RID, list[RID], list[RID]]:
         populate_demo_catalog(self.ml_instance, self.domain_schema)
         self.ml_instance.add_dataset_element_type("Subject")
         type_rid = self.ml_instance.add_term(
@@ -68,7 +68,6 @@ class TestDerivaML(unittest.TestCase):
             type_rid.name,
             description=f"Double nested dataset",
             version=DatasetVersion(1, 0, 0),
-
         )
         self.ml_instance.add_dataset_members(double_nested_dataset, nested_datasets)
-        return double_nested_dataset, set(nested_datasets), set(dataset_rids)
+        return double_nested_dataset, nested_datasets, dataset_rids
