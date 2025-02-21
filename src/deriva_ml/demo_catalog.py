@@ -20,6 +20,8 @@ from deriva_ml import (
     MLVocab,
     BuiltinTypes,
     ColumnDefinition,
+    DatasetVersion,
+    RID,
 )
 
 from deriva_ml.execution import Execution
@@ -76,118 +78,45 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
         deriva_ml.upload_assets(image_dir)
 
 
-def create_demo_datasets(deriva_ml: DerivaML) -> None:
-    deriva_ml.add_dataset_element_type("Subject")
-    deriva_ml.add_dataset_element_type("Image")
+def create_nested_dataset(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
+    ml_instance.add_dataset_element_type("Subject")
+    type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
+    table_path = (
+        ml_instance.catalog.getPathBuilder()
+        .schemas[ml_instance.domain_schema]
+        .tables["Subject"]
+    )
+    subject_rids = [i["RID"] for i in table_path.entities().fetch()]
 
-    # Create a new dataset_table
-    deriva_ml.add_term(
-        MLVocab.dataset_type, "DemoSet", description="A test dataset_table"
-    )
-    deriva_ml.add_term(
-        MLVocab.dataset_type,
-        "Partitioned",
-        description="A partitioned dataset_table for ML training.",
-    )
-    deriva_ml.add_term(
-        MLVocab.dataset_type, "Subject", description="A test dataset_table"
-    )
-    deriva_ml.add_term(
-        MLVocab.dataset_type, "Image", description="A test dataset_table"
-    )
-    deriva_ml.add_term(
-        MLVocab.dataset_type, "Training", description="Training dataset_table"
-    )
-    deriva_ml.add_term(
-        MLVocab.dataset_type, "Testing", description="Training dataset_table"
-    )
-    deriva_ml.add_term(
-        MLVocab.dataset_type, "Validation", description="Validation dataset_table"
-    )
+    dataset_rids = []
+    for r in subject_rids[0:4]:
+        d = ml_instance.create_dataset(
+            type_rid.name,
+            description=f"Dataset {r}",
+            version=DatasetVersion(1, 0, 0),
+        )
+        ml_instance.add_dataset_members(d, [r])
+        dataset_rids.append(d)
 
-    deriva_ml.add_term(
-        MLVocab.workflow_type,
-        "Create Dataset Notebook",
-        description="A Workflow that creates a new dataset_table",
+    nested_datasets = []
+    for i in range(0, 4, 2):
+        nested_dataset = ml_instance.create_dataset(
+            type_rid.name,
+            description=f"Nested Dataset {i}",
+            version=DatasetVersion(1, 0, 0),
+        )
+        ml_instance.add_dataset_members(nested_dataset, dataset_rids[i : i + 2])
+        nested_datasets.append(nested_dataset)
+    double_nested_dataset = ml_instance.create_dataset(
+        type_rid.name,
+        description=f"Double nested dataset",
+        version=DatasetVersion(1, 0, 0),
     )
-
-    # Now let's create model configuration for our program.
-    api_workflow = Workflow(
-        name="API Workflow",
-        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/src/deriva_ml/demo_catalog.py",
-        workflow_type="Create Dataset Notebook",
-    )
-
-    dataset_execution = Execution(
-        ExecutionConfiguration(
-            workflow=api_workflow, description="Create demo dataset_table"
-        ),
-        deriva_ml,
-    )
-
-    pb = deriva_ml.pathBuilder.schemas[deriva_ml.domain_schema]
-    subject_path = pb.Subject
-    image_path = pb.Image
-
-    # Get images and subjects.  Join images with subjects.
-    images = {
-        i["Subject"]: i["RID"]
-        for i in image_path.attributes(image_path.RID, image_path.Subject).fetch()
-    }
-    subjects = [
-        s | {"Image": images[s["RID"]]}
-        for s in subject_path.attributes(subject_path.RID, subject_path.Name).fetch()
-    ]
-
-    def thing_number(name: str) -> int:
-        return int(name.replace("Thing", ""))
-
-    training_rids = [s["Image"] for s in subjects if thing_number(s["Name"]) % 3 == 0]
-    testing_rids = [s["Image"] for s in subjects if thing_number(s["Name"]) % 3 == 1]
-    validation_rids = [s["Image"] for s in subjects if thing_number(s["Name"]) % 3 == 2]
-
-    nested_dataset = deriva_ml.create_dataset(
-        ["Partitioned", "Image"],
-        description="A nested dataset_table for machine learning",
-        execution_rid=dataset_execution.execution_rid,
-    )
-    double_nested_dataset = deriva_ml.create_dataset(
-        ["Partitioned", "Image"],
-        description="A double nested dataset_table for machine learning",
-        execution_rid=dataset_execution.execution_rid,
-    )
-    training_dataset = deriva_ml.create_dataset(
-        "Training",
-        description="An image dataset_table for training",
-        execution_rid=dataset_execution.execution_rid,
-    )
-    testing_dataset = deriva_ml.create_dataset(
-        "Testing",
-        description="A image dataset_table for testing",
-        execution_rid=dataset_execution.execution_rid,
-    )
-    validation_dataset = deriva_ml.create_dataset(
-        "Validation",
-        description="A image dataset_table for validation",
-        execution_rid=dataset_execution.execution_rid,
-    )
-    deriva_ml.add_dataset_members(
-        dataset_rid=nested_dataset,
-        members=[training_dataset, testing_dataset],
-    )
-
-    deriva_ml.add_dataset_members(
-        dataset_rid=double_nested_dataset,
-        members=[nested_dataset, validation_dataset],
-    )
-    deriva_ml.add_dataset_members(dataset_rid=training_dataset, members=training_rids)
-    deriva_ml.add_dataset_members(dataset_rid=testing_dataset, members=testing_rids)
-    deriva_ml.add_dataset_members(
-        dataset_rid=validation_dataset, members=validation_rids
-    )
+    ml_instance.add_dataset_members(double_nested_dataset, nested_datasets)
+    return double_nested_dataset, nested_datasets, dataset_rids
 
 
-def create_demo_features(deriva_ml: DerivaML) -> None:
+def create_features(deriva_ml: DerivaML) -> None:
     deriva_ml.create_vocabulary("SubjectHealth", "A vocab")
     deriva_ml.add_term(
         "SubjectHealth",
