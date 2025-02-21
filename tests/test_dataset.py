@@ -100,12 +100,6 @@ class TestDataset(TestDerivaML):
 
     def test_nested_datasets(self):
         double_nested_dataset, nested_datasets, datasets = self.create_nested_dataset()
-        print(double_nested_dataset)
-        print(nested_datasets)
-        print(datasets)
-        print(self.ml_instance.list_dataset_members(double_nested_dataset).keys())
-        print(len(self.ml_instance.list_dataset_members(nested_datasets)['Dataset']))
-        print(len(self.ml_instance.list_dataset_members(datasets)['Dataset']))
 
         self.assertEqual(2, self.ml_instance._dataset_nesting_depth())
         self.assertEqual(
@@ -113,22 +107,23 @@ class TestDataset(TestDerivaML):
             set(self.ml_instance.list_dataset_children(double_nested_dataset)),
         )
 
+        self.assertEqual(
+            set(nested_datasets + datasets),
+            set(
+                self.ml_instance.list_dataset_children(
+                    double_nested_dataset, recurse=True
+                )
+            ),
+        )
+
         # Check parents and children.
+        self.assertEqual(
+            2, len(self.ml_instance.list_dataset_children(nested_datasets[0]))
+        )
+
         self.assertEqual(
             double_nested_dataset,
             self.ml_instance.list_dataset_parents(nested_datasets[0])[0],
-        )
-        self.assertEqual(1,
-                         len(self.ml_instance.list_dataset_children(nested_datasets[0])))
-        self.assertEqual(double_nested_dataset, self.ml_instance.dataset_parents(nested_datasets[0]))
-
-        self.assertEqual(
-            nested_datasets,
-            self.ml_instance.list_dataset_members(double_nested_dataset),
-        )
-        self.assertEqual(
-            set(nested_datasets) and set(datasets),
-            self.ml_instance.list_dataset_members(double_nested_dataset, recurse=True),
         )
 
         # check inrementing datasest version

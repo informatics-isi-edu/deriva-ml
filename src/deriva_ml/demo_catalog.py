@@ -61,7 +61,6 @@ def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
 def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
     # Delete any vocabularies and features.
     reset_demo_catalog(deriva_ml, sname)
-    print("Catalog reset")
     domain_schema = deriva_ml.catalog.getPathBuilder().schemas[sname]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
@@ -153,7 +152,7 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
         execution_rid=dataset_execution.execution_rid,
     )
     double_nested_dataset = deriva_ml.create_dataset(
-        ["Partitioned", 'Image'],
+        ["Partitioned", "Image"],
         description="A double nested dataset_table for machine learning",
         execution_rid=dataset_execution.execution_rid,
     )
@@ -178,7 +177,7 @@ def create_demo_datasets(deriva_ml: DerivaML) -> None:
     )
 
     deriva_ml.add_dataset_members(
-        dataset_rid = double_nested_dataset,
+        dataset_rid=double_nested_dataset,
         members=[nested_dataset, validation_dataset],
     )
     deriva_ml.add_dataset_members(dataset_rid=training_dataset, members=training_rids)

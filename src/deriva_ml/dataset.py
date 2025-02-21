@@ -466,7 +466,7 @@ class Dataset:
                     == target_path.columns[member_link[1]]
                 ),
             )
-            target_entities = path.entities().fetch()
+            target_entities = list(path.entities().fetch())
             members[target_table.name].extend(target_entities)
             if recurse and target_table == self.dataset_table:
                 # Get the members for all the nested datasets and add to the member list.
@@ -495,7 +495,6 @@ class Dataset:
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             description: Markdown description of the updated dataset.
         """
-        print(f'Adding members {members} to {dataset_rid}')
         members = set(members)
         description = description or "Updated dataset via add_dataset_members"
 
@@ -552,7 +551,6 @@ class Dataset:
                 self._ml_schema if table == "Dataset" else self._model.domain_schema
             ]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
-            print(f'adding elements {table} {elements}')
             if len(elements):
                 # Find out the name of the column in the association table.
                 schema_path.tables[association_map[table]].insert(
@@ -657,7 +655,7 @@ class Dataset:
           list of RIDs of nested datasets.
 
         """
-        children = [d['RID'] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
+        children = [d["RID"] for d in self.list_dataset_members(dataset_rid)["Dataset"]]
         if recurse:
             for child in children.copy():
                 children.extend(self.list_dataset_children(child, recurse=recurse))

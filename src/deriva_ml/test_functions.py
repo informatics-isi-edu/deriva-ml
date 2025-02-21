@@ -12,8 +12,8 @@ from deriva_ml import (
     MLVocab as vc,
     DerivaML,
     DatasetSpec,
-DatasetVersion,
-RID
+    DatasetVersion,
+    RID,
 )
 
 
@@ -157,12 +157,11 @@ def execution_test(ml_instance):
     )
     return config
 
+
 def create_nested_dataset(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
     populate_demo_catalog(ml_instance, ml_instance.domain_schema)
     ml_instance.add_dataset_element_type("Subject")
-    type_rid = ml_instance.add_term(
-        "Dataset_Type", "TestSet", description="A test"
-    )
+    type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
     table_path = (
         ml_instance.catalog.getPathBuilder()
         .schemas[ml_instance.domain_schema]
@@ -185,16 +184,14 @@ def create_nested_dataset(ml_instance: DerivaML) -> tuple[RID, list[RID], list[R
             description=f"Nested Dataset {i}",
             version=DatasetVersion(1, 0, 0),
         )
-        ml_instance.add_dataset_members(
-            nested_dataset, dataset_rids[i : i + 1]
-        )
+        ml_instance.add_dataset_members(nested_dataset, dataset_rids[i : i + 1])
         nested_datasets.append(nested_dataset)
     double_nested_dataset = ml_instance.create_dataset(
         type_rid.name,
         description=f"Double nested dataset",
         version=DatasetVersion(1, 0, 0),
     )
-    print(f'adding members for nested_datasets {double_nested_dataset}')
+    print(f"adding members for nested_datasets {double_nested_dataset}")
     ml_instance.add_dataset_members(double_nested_dataset, nested_datasets)
-    print(ml_instance.list_dataset_members(double_nested_dataset))
+    print(len(ml_instance.list_dataset_members(double_nested_dataset)))
     return double_nested_dataset, nested_datasets, dataset_rids

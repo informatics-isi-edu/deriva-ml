@@ -4,6 +4,8 @@ from deriva_ml.demo_catalog import (
     populate_demo_catalog,
     create_demo_datasets,
 )
+from deriva_ml import DatasetSpec
+from pathlib import Path
 
 
 class TestDownload(TestDerivaML):
@@ -11,11 +13,19 @@ class TestDownload(TestDerivaML):
         super().__init__(*args, **kwargs)
 
     def test_download(self):
-        populate_demo_catalog(self.ml_instance, self.domain_schema)
-        create_demo_datasets(self.ml_instance)
-        nested_dataset_rid = [
-            ds["RID"]
-            for ds in self.ml_instance.find_datasets()
-            if "Partitioned" in ds["Dataset_Type"]
-        ][0]
-        bag = self.ml_instance.download_dataset_bag(nested_dataset_rid)
+        double_nested_dataset, nested_datasets, datasets = self.create_nested_dataset()
+        bag = self.ml_instance.download_dataset_bag(
+            DatasetSpec(
+                rid=double_nested_dataset,
+                version=self.ml_instance.dataset_version(double_nested_dataset),
+            )
+        )
+
+        self.assertEqual(
+            set(nested_datasets), {ds.dataset_rid for ds in bag.list_dataset_children()}
+        )
+
+        print(bag.list_dataset_children(recurse=True))
+        files = [Path(r["Filename"]) for r in bag.get_table_as_dict("Image")]
+        for f in files:
+            self.assertTrue(f.exists())

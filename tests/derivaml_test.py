@@ -16,10 +16,6 @@ TestCatalog = create_demo_catalog(
     populate=False,
 )
 
-ML_INSTANCE = DerivaML(
-    hostname, TestCatalog.catalog_id, SNAME_DOMAIN, logging_level=logging.WARN
-)
-
 
 class TestDerivaML(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -29,7 +25,9 @@ class TestDerivaML(unittest.TestCase):
         self.domain_schema = SNAME_DOMAIN
 
     def setUp(self):
-        self.ml_instance = ML_INSTANCE
+        self.ml_instance = DerivaML(
+            hostname, TestCatalog.catalog_id, SNAME_DOMAIN, logging_level=logging.WARN
+        )
         self.model = self.ml_instance.model
 
     def create_nested_dataset(self) -> tuple[RID, list[RID], list[RID]]:
@@ -44,6 +42,7 @@ class TestDerivaML(unittest.TestCase):
             .tables["Subject"]
         )
         subject_rids = [i["RID"] for i in table_path.entities().fetch()]
+
         dataset_rids = []
         for r in subject_rids[0:4]:
             d = self.ml_instance.create_dataset(
@@ -53,6 +52,7 @@ class TestDerivaML(unittest.TestCase):
             )
             self.ml_instance.add_dataset_members(d, [r])
             dataset_rids.append(d)
+
         nested_datasets = []
         for i in range(0, 4, 2):
             nested_dataset = self.ml_instance.create_dataset(
@@ -61,7 +61,7 @@ class TestDerivaML(unittest.TestCase):
                 version=DatasetVersion(1, 0, 0),
             )
             self.ml_instance.add_dataset_members(
-                nested_dataset, dataset_rids[i : i + 1]
+                nested_dataset, dataset_rids[i : i + 2]
             )
             nested_datasets.append(nested_dataset)
         double_nested_dataset = self.ml_instance.create_dataset(
