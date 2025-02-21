@@ -144,9 +144,6 @@ class DatasetBag:
           list of RIDs of nested datasets.
 
         """
-        return self._list_dataset_children(self.dataset_rid, recurse)
-
-    def _list_dataset_children(self, dataset_rid, recurse: bool) -> list["DatasetBag"]:
         ds_table = self.model.normalize_table_name("Dataset")
         nds_table = self.model.normalize_table_name("Dataset_Dataset")
         dv_table = self.model.normalize_table_name("Dataset_Version")
@@ -156,7 +153,7 @@ class DatasetBag:
                 f'FROM "{nds_table}" JOIN "{dv_table}" JOIN "{ds_table}" on '
                 f'"{ds_table}".Version == "{dv_table}".RID AND '
                 f'"{nds_table}".Nested_Dataset == "{ds_table}".RID '
-                f'where "{nds_table}".Dataset == "{dataset_rid}"'
+                f'where "{nds_table}".Dataset == "{self.dataset_rid}"'
             )
             nested = [
                 DatasetBag(self.model, r[0]) for r in db.execute(sql_cmd).fetchall()
@@ -165,7 +162,7 @@ class DatasetBag:
         result = copy(nested)
         if recurse:
             for child in nested:
-                result.extend(self._list_dataset_children(child, recurse))
+                result.extend(child.list_dataset_children(recurse))
         return result
 
 
