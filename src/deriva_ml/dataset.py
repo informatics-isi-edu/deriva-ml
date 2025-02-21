@@ -19,6 +19,7 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadAuthorizationError,
     DerivaDownloadTimeoutError,
 )
+from tests.deriva.core.mmo.base import catalog
 
 try:
     from icecream import ic
@@ -162,6 +163,7 @@ class Dataset:
                 timestamp=v["RCT"],
                 dataset_rid=dataset_rid,
                 version_rid=v["RID"],
+                description=v["Description"],
             )
             for v in version_path.filter(version_path.Dataset == dataset_rid)
             .entities()
@@ -194,7 +196,6 @@ class Dataset:
         dataset_rid: RID,
         component: VersionPart,
         description: Optional[str] = "",
-        recurse: bool = False,
     ) -> DatasetVersion:
         """Increment the version of the specified dataset_table.
 
@@ -212,12 +213,15 @@ class Dataset:
         Raises:
           DerivaMLException: if provided RID is not to a dataset_table.
         """
+        for ds in self.list_dataset_children(dataset_rid):
+            self.increment_dataset_version(
+                ds,
+                component,
+                description=f"Increment version of nested dataset: {description}",
+            )
         version = self.dataset_version(dataset_rid)
         new_version = version.increment_version(component)
         self._insert_dataset_version(dataset_rid, new_version, description=description)
-        if recurse:
-            for ds in self.list_dataset_children(dataset_rid, recurse=True):
-                self.increment_dataset_version(ds, component, description=description)
         return new_version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -970,14 +974,17 @@ class Dataset:
             # will generate a minid and place the bag into S3 storage.
             spec_file = f"{tmp_dir}/download_spec.json"
             with open(spec_file, "w", encoding="utf-8") as ds:
-                json.dump(self._generate_dataset_download_spec(), ds)
+                json.dump(
+                    self._generate_dataset_download_spec(dataset_rid, dataset_version),
+                    ds,
+                )
             try:
+                self._logger.info(
+                    f"Downloading dataset minid for catalog: {dataset_rid}@{str(dataset_version.dataset_version)}"
+                )
                 # Generate the bag and put into S3 storage.
                 exporter = DerivaExport(
                     host=self._model.catalog.deriva_server.server,
-                    catalog_id=self._version_snapshot(
-                        dataset_rid, dataset_version.dataset_version
-                    ),
                     config_file=spec_file,
                     output_dir=tmp_dir,
                     defer_download=True,
@@ -1237,13 +1244,21 @@ class Dataset:
             )
         return exports
 
-    def _generate_dataset_download_spec(self) -> dict[str, Any]:
+    def _generate_dataset_download_spec(
+        self, dataset_rid: RID = None, dataset_version: DatasetHistory = None
+    ) -> dict[str, Any]:
         """
 
         Returns:
         """
         s3_target = "s3://eye-ai-shared"
         minid_test = False
+
+        if dataset_rid is None:
+            catalog_id = self._model.catalog.catalog_id
+        else:
+            version = self.dataset_version(dataset_rid) if dataset_version else dataset_version.dataset_version
+            catalog_id = self._version_snapshot(dataset_rid, version)
 
         return {
             "env": {"Dataset_RID": "{Dataset_RID}"},
@@ -1275,7 +1290,7 @@ class Dataset:
             ],
             "catalog": {
                 "host": f"{self._model.catalog.deriva_server.scheme}://{self._model.catalog.deriva_server.server}",
-                "catalog_id": f"{self._model.catalog.catalog_id}",
+                "catalog_id": catalog_id,
                 "query_processors": [
                     {
                         "processor": "env",
