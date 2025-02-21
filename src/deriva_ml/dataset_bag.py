@@ -1,6 +1,7 @@
 """
 The module implements the sqllite interface to a set of directories representing a dataset bag.
 """
+
 from collections import defaultdict
 from copy import copy
 from typing import Any, Generator, TYPE_CHECKING, Optional
@@ -98,7 +99,7 @@ class DatasetBag:
             member_table = assoc_table.table
 
             if (
-                target_table.schema.name != self.database.domain_schema
+                target_table.schema.name != self.model.domain_schema
                 and target_table != self._dataset_table
             ):
                 # Look at domain tables and nested datasets.
