@@ -48,6 +48,7 @@ from deriva.core.ermrest_model import Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
+import logging
 from pydantic import validate_call, ConfigDict
 
 from deriva_ml.deriva_definitions import (

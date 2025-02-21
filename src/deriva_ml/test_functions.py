@@ -5,13 +5,15 @@ catalog_id = "eye-ai"
 source_dataset = "3R6"
 create_catalog = False
 
-from deriva_ml.demo_catalog import create_demo_catalog, DemoML
+from deriva_ml.demo_catalog import create_demo_catalog, DemoML, populate_demo_catalog
 from deriva_ml import (
     Workflow,
     ExecutionConfiguration,
     MLVocab as vc,
     DerivaML,
     DatasetSpec,
+DatasetVersion,
+RID
 )
 
 
@@ -154,3 +156,45 @@ def execution_test(ml_instance):
         workflow=api_workflow,
     )
     return config
+
+def create_nested_dataset(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
+    populate_demo_catalog(ml_instance, ml_instance.domain_schema)
+    ml_instance.add_dataset_element_type("Subject")
+    type_rid = ml_instance.add_term(
+        "Dataset_Type", "TestSet", description="A test"
+    )
+    table_path = (
+        ml_instance.catalog.getPathBuilder()
+        .schemas[ml_instance.domain_schema]
+        .tables["Subject"]
+    )
+    subject_rids = [i["RID"] for i in table_path.entities().fetch()]
+    dataset_rids = []
+    for r in subject_rids[0:4]:
+        d = ml_instance.create_dataset(
+            type_rid.name,
+            description=f"Dataset {r}",
+            version=DatasetVersion(1, 0, 0),
+        )
+        ml_instance.add_dataset_members(d, [r])
+        dataset_rids.append(d)
+    nested_datasets = []
+    for i in range(0, 4, 2):
+        nested_dataset = ml_instance.create_dataset(
+            type_rid.name,
+            description=f"Nested Dataset {i}",
+            version=DatasetVersion(1, 0, 0),
+        )
+        ml_instance.add_dataset_members(
+            nested_dataset, dataset_rids[i : i + 1]
+        )
+        nested_datasets.append(nested_dataset)
+    double_nested_dataset = ml_instance.create_dataset(
+        type_rid.name,
+        description=f"Double nested dataset",
+        version=DatasetVersion(1, 0, 0),
+    )
+    print(f'adding members for nested_datasets {double_nested_dataset}')
+    ml_instance.add_dataset_members(double_nested_dataset, nested_datasets)
+    print(ml_instance.list_dataset_members(double_nested_dataset))
+    return double_nested_dataset, nested_datasets, dataset_rids

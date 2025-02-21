@@ -61,6 +61,7 @@ def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
 def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
     # Delete any vocabularies and features.
     reset_demo_catalog(deriva_ml, sname)
+    print("Catalog reset")
     domain_schema = deriva_ml.catalog.getPathBuilder().schemas[sname]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
