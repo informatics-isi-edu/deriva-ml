@@ -84,9 +84,7 @@ def define_asset_execution_metadata(sname: str, execution_metadata_annotation: d
     return Table.define_asset(
         sname=sname,
         tname="Execution_Metadata",
-        column_defs=[Column.define("Execution", builtin_types.markdown)],
         hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
-        fkey_defs=[ForeignKey.define(["Execution"], sname, "Execution", ["RID"])],
         annotations=execution_metadata_annotation,
     )
 
