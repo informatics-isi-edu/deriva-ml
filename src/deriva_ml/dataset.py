@@ -19,7 +19,6 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadAuthorizationError,
     DerivaDownloadTimeoutError,
 )
-from tests.deriva.core.mmo.base import catalog
 
 try:
     from icecream import ic
@@ -1257,9 +1256,13 @@ class Dataset:
         if dataset_rid is None:
             catalog_id = self._model.catalog.catalog_id
         else:
-            version = self.dataset_version(dataset_rid) if dataset_version else dataset_version.dataset_version
+            version = (
+                self.dataset_version(dataset_rid)
+                if dataset_version
+                else dataset_version.dataset_version
+            )
             catalog_id = self._version_snapshot(dataset_rid, version)
-
+        print(f"Catalog ID: {catalog_id}")
         return {
             "env": {"Dataset_RID": "{Dataset_RID}"},
             "bag": {
