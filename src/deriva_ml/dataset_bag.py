@@ -2,6 +2,9 @@
 The module implements the sqllite interface to a set of directories representing a dataset bag.
 """
 
+from deriva.core.ermrest_model import Table
+import deriva.core.datapath as datapath
+
 from collections import defaultdict
 from copy import copy
 from typing import Any, Generator, TYPE_CHECKING, Optional
@@ -135,6 +138,26 @@ class DatasetBag:
                     ).items():
                         members[k].extend(v)
         return dict(members)
+
+    # noinspection PyProtectedMember
+    def list_feature_values(
+        self, table: Table | str, feature_name: str
+    ) -> datapath._ResultSet:
+        """Return a datapath ResultSet containing all values of a feature associated with a table.
+
+        Args:
+            table: param feature_name:
+            table: Table | str:
+            feature_name: str:
+
+        Returns:
+
+        """
+        feature = self.model.lookup_feature(table, feature_name)
+        feature_table = self.model.normalize_table_name(feature.feature_table.name)
+        with self.database as db:
+            sql_cmd = f'SELECT * FROM "{feature_table}"'
+            return db.execute(sql_cmd).fetchall()
 
     # @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_children(self, recurse: bool = False) -> list["DatasetBag"]:
