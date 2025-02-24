@@ -5,10 +5,11 @@ This module provides the implementation of the Feature capability in deriva-ml
 from deriva.core.ermrest_model import FindAssociationResult, Column
 from pathlib import Path
 from pydantic import BaseModel, create_model
-from typing import Optional, Type, ClassVar
+from typing import Optional, Type, ClassVar, TYPE_CHECKING
 from types import UnionType
 
-from .deriva_model import DerivaModel
+if TYPE_CHECKING:
+    from .deriva_model import DerivaModel
 
 
 class FeatureRecord(BaseModel):
@@ -85,7 +86,7 @@ class FeatureRecord(BaseModel):
 class Feature:
     """Wrapper for results of Table.find_associations()"""
 
-    def __init__(self, atable: FindAssociationResult, model: DerivaModel) -> None:
+    def __init__(self, atable: FindAssociationResult, model: "DerivaModel") -> None:
         self.feature_table = atable.table
         self.target_table = atable.self_fkey.pk_table
         self.feature_name = atable.table.columns["Feature_Name"].default
