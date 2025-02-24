@@ -78,7 +78,7 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
         deriva_ml.upload_assets(image_dir)
 
 
-def create_nested_dataset(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
+def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
     ml_instance.add_dataset_element_type("Subject")
     type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
     table_path = (
@@ -107,6 +107,7 @@ def create_nested_dataset(ml_instance: DerivaML) -> tuple[RID, list[RID], list[R
         )
         ml_instance.add_dataset_members(nested_dataset, dataset_rids[i : i + 2])
         nested_datasets.append(nested_dataset)
+
     double_nested_dataset = ml_instance.create_dataset(
         type_rid.name,
         description=f"Double nested dataset",
@@ -116,7 +117,7 @@ def create_nested_dataset(ml_instance: DerivaML) -> tuple[RID, list[RID], list[R
     return double_nested_dataset, nested_datasets, dataset_rids
 
 
-def create_features(deriva_ml: DerivaML) -> None:
+def create_demo_features(deriva_ml: DerivaML) -> None:
     deriva_ml.create_vocabulary("SubjectHealth", "A vocab")
     deriva_ml.add_term(
         "SubjectHealth",
@@ -213,12 +214,6 @@ def create_demo_catalog(
             project_name=project_name,
             logging_level=logging.WARN,
         )
-        if populate:
-            populate_demo_catalog(deriva_ml, domain_schema)
-        if create_features:
-            create_demo_features(deriva_ml)
-        if create_datasets:
-            create_demo_datasets(deriva_ml)
         dataset_table = deriva_ml.dataset_table
         dataset_table.annotations.update(
             Dataset(
@@ -230,6 +225,12 @@ def create_demo_catalog(
         AclConfig(
             hostname, test_catalog.catalog_id, policy_file, credentials=credentials
         )
+        if populate or create_features or create_datasets:
+            populate_demo_catalog(deriva_ml, domain_schema)
+            if create_features:
+                create_demo_features(deriva_ml)
+            if create_datasets:
+                create_demo_datasets(deriva_ml)
 
     except Exception:
         # on failure, delete catalog and re-raise exception
