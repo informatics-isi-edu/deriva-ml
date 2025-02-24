@@ -1,29 +1,32 @@
-@unittest.skipUnless(hostname, "Test host not specified")
-class TestFeatures(unittest.TestCase):
-    def setUp(self):
-        self.ml_instance = DerivaML(
-            hostname, test_catalog.catalog_id, SNAME_DOMAIN, "", "", "1"
-        )
-        self.domain_schema = self.ml_instance.model.schemas[SNAME_DOMAIN]
-        self.model = self.ml_instance.model
+from derivaml_test import TestDerivaML
+from deriva_ml import ColumnDefinition, BuiltinTypes, DatasetSpec
+
+
+class TestFeatures(TestDerivaML):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def test_create_feature(self):
-        populate_test_catalog(self.ml_instance, SNAME_DOMAIN)
+        self.populate_catalog()
         self.ml_instance.create_vocabulary("FeatureValue", "A vocab")
-        self.ml_instance.add_term("FeatureValue", "V1", description="A Feature Vale")
+        self.ml_instance.add_term("FeatureValue", "V1", description="A Feature Value")
 
         a = self.ml_instance.create_asset("TestAsset", comment="A asset")
 
         self.ml_instance.create_feature(
-            "Feature1",
-            "Image",
+            feature_name="Feature1",
+            target_table="Image",
             terms=["FeatureValue"],
             assets=[a],
             metadata=[ColumnDefinition(name="TestCol", type=BuiltinTypes.int2)],
         )
         self.assertIn(
+            "Feature1",
+            [f.feature_name for f in self.ml_instance.find_features("Image")],
+        )
+        self.assertIn(
             "Execution_Image_Feature1",
-            [f.name for f in self.ml_instance.find_features("Image")],
+            [f.feature_table.name for f in self.ml_instance.find_features("Image")],
         )
 
     def test_add_feature(self):
@@ -31,7 +34,9 @@ class TestFeatures(unittest.TestCase):
         TestFeature = self.ml_instance.feature_record_class("Image", "Feature1")
         # Create the name for this feature and then create the feature.
         # Get some images to attach the feature value to.
-        domain_path = self.ml_instance.catalog.getPathBuilder().schemas[SNAME_DOMAIN]
+        domain_path = self.ml_instance.catalog.getPathBuilder().schemas[
+            self.domain_schema
+        ]
         image_rids = [i["RID"] for i in domain_path.tables["Image"].entities().fetch()]
         asset_rid = domain_path.tables["TestAsset"].insert(
             [{"Name": "foo", "URL": "foo/bar", "Length": 2, "MD5": 4}]
@@ -61,3 +66,32 @@ class TestFeatures(unittest.TestCase):
         self.ml_instance.add_features(feature_list)
         features = self.ml_instance.list_feature_values("Image", "Feature1")
         self.assertEqual(len(features), len(image_rids))
+
+    def test_download_feature(self):
+        self.create_features()
+        double_nested_dataset, y, z = self.create_nested_dataset()
+        bag = self.ml_instance.download_dataset_bag(
+            DatasetSpec(
+                rid=double_nested_dataset,
+                version=self.ml_instance.dataset_version(double_nested_dataset),
+            )
+        )
+        s_features = (
+            [
+                f"{f.target_table.name}:{f.feature_name}"
+                for f in self.ml_instance.find_features("Subject")
+            ],
+        )
+        s_features_bag = (
+            [
+                f"{f.target_table.name}:{f.feature_name}"
+                for f in bag.find_features("Subject")
+            ],
+        )
+        f2 = [
+            f"{f.target_table.name}:{f.feature_name}"
+            for f in self.ml_instance.find_features("Image")
+        ]
+        print(s_features)
+        print(s_features_bag)
+        bag.list_feature_values()

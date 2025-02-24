@@ -1,7 +1,12 @@
 import os
 import unittest
-from deriva_ml import DerivaML, DatasetVersion, RID
-from demo_catalog import create_demo_catalog, populate_demo_catalog
+from deriva_ml import DerivaML, RID
+from demo_catalog import (
+    create_demo_catalog,
+    populate_demo_catalog,
+    create_demo_datasets,
+    create_demo_features,
+)
 import logging
 
 hostname = os.getenv("DERIVA_PY_TEST_HOSTNAME")
@@ -16,6 +21,8 @@ TestCatalog = create_demo_catalog(
     populate=False,
 )
 
+logging.basicConfig(level=logging.WARNING)
+
 
 class TestDerivaML(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -23,51 +30,28 @@ class TestDerivaML(unittest.TestCase):
         self.ml_catalog = TestCatalog
         self.hostname = hostname
         self.domain_schema = SNAME_DOMAIN
+        self.catalog_populated = False
 
     def setUp(self):
         self.ml_instance = DerivaML(
-            hostname, TestCatalog.catalog_id, SNAME_DOMAIN, logging_level=logging.WARN
+            hostname,
+            TestCatalog.catalog_id,
+            SNAME_DOMAIN,
+            logging_level=logging.WARNING,
         )
         self.model = self.ml_instance.model
 
+    def populate_catalog(self):
+        if not self.catalog_populated:
+            logging.info("Populating catalog")
+            populate_demo_catalog(self.ml_instance, self.domain_schema)
+            self.catalog_populated = True
+
     def create_nested_dataset(self) -> tuple[RID, list[RID], list[RID]]:
-        populate_demo_catalog(self.ml_instance, self.domain_schema)
-        self.ml_instance.add_dataset_element_type("Subject")
-        type_rid = self.ml_instance.add_term(
-            "Dataset_Type", "TestSet", description="A test"
-        )
-        table_path = (
-            self.ml_instance.catalog.getPathBuilder()
-            .schemas[self.domain_schema]
-            .tables["Subject"]
-        )
-        subject_rids = [i["RID"] for i in table_path.entities().fetch()]
+        self.populate_catalog()
+        logging.info("Creating nested dataset")
+        return create_demo_datasets(self.ml_instance)
 
-        dataset_rids = []
-        for r in subject_rids[0:4]:
-            d = self.ml_instance.create_dataset(
-                type_rid.name,
-                description=f"Dataset {r}",
-                version=DatasetVersion(1, 0, 0),
-            )
-            self.ml_instance.add_dataset_members(d, [r])
-            dataset_rids.append(d)
-
-        nested_datasets = []
-        for i in range(0, 4, 2):
-            nested_dataset = self.ml_instance.create_dataset(
-                type_rid.name,
-                description=f"Nested Dataset {i}",
-                version=DatasetVersion(1, 0, 0),
-            )
-            self.ml_instance.add_dataset_members(
-                nested_dataset, dataset_rids[i : i + 2]
-            )
-            nested_datasets.append(nested_dataset)
-        double_nested_dataset = self.ml_instance.create_dataset(
-            type_rid.name,
-            description=f"Double nested dataset",
-            version=DatasetVersion(1, 0, 0),
-        )
-        self.ml_instance.add_dataset_members(double_nested_dataset, nested_datasets)
-        return double_nested_dataset, nested_datasets, dataset_rids
+    def create_features(self):
+        self.populate_catalog()
+        create_demo_features(self.ml_instance)

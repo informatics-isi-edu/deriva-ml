@@ -9,6 +9,7 @@ test_modules = [
     "test_download",
     "test_execution",
     "test_upload",
+    "test_features",
 ]
 
 

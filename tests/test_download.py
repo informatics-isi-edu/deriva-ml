@@ -1,9 +1,4 @@
 from derivaml_test import TestDerivaML
-from deriva_ml.demo_catalog import (
-    reset_demo_catalog,
-    populate_demo_catalog,
-    create_demo_datasets,
-)
 from deriva_ml import DatasetSpec
 from pathlib import Path
 
@@ -14,11 +9,19 @@ class TestDownload(TestDerivaML):
 
     def test_download(self):
         double_nested_dataset, nested_datasets, datasets = self.create_nested_dataset()
+        current_version = self.ml_instance.dataset_version(double_nested_dataset)
+        subject_rid = self.ml_instance.list_dataset_members(datasets[0])["Subject"][0][
+            "RID"
+        ]
+        print("subject_rid", subject_rid)
+        self.ml_instance.add_dataset_members(double_nested_dataset, [subject_rid])
+        new_version = self.ml_instance.dataset_version(double_nested_dataset)
+        print(f"New version: {new_version} Current version: {current_version}")
         bag = self.ml_instance.download_dataset_bag(
-            DatasetSpec(
-                rid=double_nested_dataset,
-                version=self.ml_instance.dataset_version(double_nested_dataset),
-            )
+            DatasetSpec(rid=double_nested_dataset, version=current_version)
+        )
+        new_bag = self.ml_instance.download_dataset_bag(
+            DatasetSpec(rid=double_nested_dataset, version=new_version)
         )
 
         # The datasets in the bag should be all the datasets we started with.
@@ -28,12 +31,12 @@ class TestDownload(TestDerivaML):
         )
 
         # Children of top level bag should be in datasets variable
-        self.assertEqual(
-            set(nested_datasets), {ds.dataset_rid for ds in bag.list_dataset_children()}
+        self.assertCountEqual(
+            nested_datasets, {ds.dataset_rid for ds in bag.list_dataset_children()}
         )
 
-        self.assertEqual(
-            set(nested_datasets + datasets),
+        self.assertCountEqual(
+            nested_datasets + datasets,
             {ds.dataset_rid for ds in bag.list_dataset_children(recurse=True)},
         )
 
@@ -41,3 +44,8 @@ class TestDownload(TestDerivaML):
         files = [Path(r["Filename"]) for r in bag.get_table_as_dict("Image")]
         for f in files:
             self.assertTrue(f.exists())
+
+        print(bag.list_dataset_members()["Subject"])
+        print(new_bag.list_dataset_members()["Subject"])
+        self.assertEqual(1, len(new_bag.list_dataset_members()["Subject"]))
+        self.assertEqual(0, len(bag.list_dataset_members()["Subject"]))

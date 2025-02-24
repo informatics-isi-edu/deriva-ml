@@ -95,4 +95,6 @@ class TestUpload(TestDerivaML):
         uploaded_assets = manual_execution.upload_execution_outputs()
         path = self.ml_instance.catalog.getPathBuilder().schemas["deriva-ml"]
         self.assertEqual(1, len(list(path.Execution_Asset.entities().fetch())))
-        self.assertEqual(2, len(list(path.Execution_Metadata.entities().fetch())))
+        execution_metadata = list(path.Execution_Metadata.entities().fetch())
+        print([m["Filename"] for m in execution_metadata])
+        self.assertEqual(2, len(execution_metadata))
