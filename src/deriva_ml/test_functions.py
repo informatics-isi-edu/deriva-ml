@@ -4,7 +4,7 @@ catalog_id = "eye-ai"
 # source_dataset = '2-7K8W'
 source_dataset = "3R6"
 create_catalog = False
-
+import logging
 from deriva_ml.demo_catalog import create_demo_catalog, DemoML, populate_demo_catalog
 from deriva_ml import (
     Workflow,
@@ -80,7 +80,11 @@ def lac_test():
 def create_demo_ml():
     host = "dev.eye-ai.org"
     test_catalog = create_demo_catalog(
-        host, "test-schema", create_features=False, create_datasets=False
+        host,
+        "test-schema",
+        create_features=False,
+        create_datasets=True,
+        logging_level=logging.INFO,
     )
     return DemoML(host, test_catalog.catalog_id)
 
