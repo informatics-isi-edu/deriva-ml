@@ -20,6 +20,8 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadTimeoutError,
 )
 
+from history import get_record_history
+
 try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
@@ -957,13 +959,23 @@ class Dataset:
         return DatabaseModel.register(minid, bag_path).get_dataset()
 
     def _version_snapshot(self, dataset_rid: RID, version: DatasetVersion) -> str:
-        version_timestamp = [
-            h.timestamp
-            for h in self.dataset_history(dataset_rid)
+        version_record = [
+            h
+            for h in self.dataset_history(dataset_rid=dataset_rid)
             if h.dataset_version == version
         ][0]
-        snaptime = iso_to_snap(version_timestamp.isoformat())
-        return f"{self._model.catalog.catalog_id}@{snaptime}"
+        snapshots = get_record_history(
+            self._model.catalog.deriva_server,
+            self._model.catalog.catalog_id,
+            self._ml_schema,
+            "Dataset_Version",
+            [version_record.version_rid],
+        )
+        snapshot = list(
+            {k: v for k, v in snapshots.items() if v["Version"] == str(version)}
+        )[0]
+        return self._model.catalog.catalog_id
+        # return f"{self._model.catalog.catalog_id}@{snapshot}"
 
     def _create_dataset_minid(
         self, dataset_rid: RID, dataset_version: DatasetHistory
@@ -1262,7 +1274,6 @@ class Dataset:
                 else dataset_version.dataset_version
             )
             catalog_id = self._version_snapshot(dataset_rid, version)
-        print(f"Catalog ID: {catalog_id}")
         return {
             "env": {"Dataset_RID": "{Dataset_RID}"},
             "bag": {
