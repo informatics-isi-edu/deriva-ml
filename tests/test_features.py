@@ -76,22 +76,19 @@ class TestFeatures(TestDerivaML):
                 version=self.ml_instance.dataset_version(double_nested_dataset),
             )
         )
-        s_features = (
-            [
-                f"{f.target_table.name}:{f.feature_name}"
-                for f in self.ml_instance.find_features("Subject")
-            ],
-        )
-        s_features_bag = (
-            [
-                f"{f.target_table.name}:{f.feature_name}"
-                for f in bag.find_features("Subject")
-            ],
-        )
-        f2 = [
+        s_features = [
             f"{f.target_table.name}:{f.feature_name}"
-            for f in self.ml_instance.find_features("Image")
+            for f in self.ml_instance.find_features("Subject")
+        ]
+        s_features_bag = [
+            f"{f.target_table.name}:{f.feature_name}"
+            for f in bag.find_features("Subject")
         ]
         print(s_features)
         print(s_features_bag)
-        bag.list_feature_values()
+        for f in self.ml_instance.find_features("Subject"):
+            print(self.ml_instance.list_feature_values(f.feature_table, f.feature_name))
+            print(bag.list_feature_values(f.feature_table, f.feature_name))
+        for f in self.ml_instance.find_features("Image"):
+            print(self.ml_instance.list_feature_values(f.feature_table, f.feature_name))
+            print(bag.list_feature_values(f.feature_table, f.feature_name))

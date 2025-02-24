@@ -184,7 +184,6 @@ class DerivaModel:
                 a.self_fkey.foreign_key_columns[0].name,
             }.issubset({c.name for c in a.table.columns})
 
-        print(f"got table {table}")
         return [
             Feature(a, self)
             for a in table.find_associations(min_arity=3, max_arity=3, pure=False)
