@@ -1,14 +1,10 @@
-#!/usr/bin/python
-
 import sys
-from datetime import datetime
-from deriva.core import DerivaServer, urlquote
+from datetime import datetime, timezone
+from deriva.core import urlquote
 
 
 # -- ==============================================================================================
-def get_record_history(
-    server: DerivaServer, cid, sname, tname, kvals, kcols=["RID"], snap=None
-):
+def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=None):
     parts = {
         "cid": urlquote(cid),
         "sname": urlquote(sname),
@@ -33,12 +29,13 @@ def get_record_history(
     snap2rows = {}
     while True:
         url = path % parts
-        sys.stderr.write("%s\n" % url)
+        # sys.stderr.write("%s\n" % url)
         l = server.get(url).json()
         if len(l) > 1:
             raise ValueError("got more than one row for %r" % url)
         if len(l) == 0:
-            raise ValueError("ERROR: %s: No record found \n" % url)
+            #  sys.stderr.write("ERROR: %s: No record found \n" % (url))
+            break
         row = l[0]
         snap2rows[parts["snap"]] = row
         rows_found.append(row)
@@ -58,7 +55,7 @@ def datetime_epoch_us(dt):
 # -- --------------------------------------------------------------------------------------
 # Take the iso format string (same as RMT) and return the version number
 #
-def iso_to_snap(iso_datetime: str):
+def iso_to_snap(iso_datetime):
     rmt = datetime.fromisoformat(iso_datetime)
     return urlb32_encode(datetime_epoch_us(rmt))
 
