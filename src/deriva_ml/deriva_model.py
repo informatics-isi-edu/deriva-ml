@@ -8,8 +8,9 @@ relationships that follow a specific data model.
 
 """
 
-from deriva.core.ermrest_model import Table, Model
+from deriva.core.ermrest_model import Table, Model, FindAssociationResult
 from deriva.core.ermrest_catalog import ErmrestCatalog
+from .feature import Feature
 
 from .deriva_definitions import (
     DerivaMLException,
@@ -19,6 +20,7 @@ from .deriva_definitions import (
 )
 
 from pydantic import validate_call, ConfigDict
+from typing import Iterable
 
 
 class DerivaModel:
@@ -152,6 +154,65 @@ class DerivaModel:
             for t in s.tables.values()
             if self.is_vocabulary(t)
         ]
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def find_features(self, table: Table | str) -> Iterable[Feature]:
+        """List the names of the features in the specified table.
+
+        Args:
+            table: The table to find features for.
+            table: Table | str:
+
+        Returns:
+            An iterable of FeatureResult instances that describe the current features in the table.
+        """
+        table = self.get_table(table)
+
+        def is_feature(a: FindAssociationResult) -> bool:
+            """
+
+            Args:
+              a: FindAssociationResult:
+
+            Returns:
+
+            """
+            # return {'Feature_Name', 'Execution'}.issubset({c.name for c in a.table.columns})
+            return {
+                "Feature_Name",
+                "Execution",
+                a.self_fkey.foreign_key_columns[0].name,
+            }.issubset({c.name for c in a.table.columns})
+
+        return [
+            Feature(a, self)
+            for a in table.find_associations(min_arity=3, max_arity=3, pure=False)
+            if is_feature(a)
+        ]
+
+    def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
+        """Lookup the named feature associated with the provided table.
+
+        Args:
+            table: param feature_name:
+            table: str | Table:
+            feature_name: str:
+
+        Returns:
+            A Feature class that represents the requested feature.
+
+        Raises:
+          DerivaMLException: If the feature cannot be found.
+        """
+        table = self.get_table(table)
+        try:
+            return [
+                f for f in self.find_features(table) if f.feature_name == feature_name
+            ][0]
+        except IndexError:
+            raise DerivaMLException(
+                f"Feature {table.name}:{feature_name} doesn't exist."
+            )
 
     def asset_metadata(self, table: str | Table) -> set[str]:
         """Return the metadata columns for an asset table."""

@@ -20,10 +20,10 @@ from deriva.core import (
     urlquote,
     DEFAULT_SESSION_CONFIG,
 )
-from deriva.core.datapath import DataPathException, _ResultSet as ResultSet
-from deriva.core.datapath import _CatalogWrapper
+import deriva.core.datapath as datapath
+from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_catalog import ResolveRidResult
-from deriva.core.ermrest_model import FindAssociationResult, Key, Table
+from deriva.core.ermrest_model import Key, Table
 from deriva.core.hatrac_store import HatracStore
 from pydantic import validate_call, ConfigDict
 
@@ -136,7 +136,7 @@ class DerivaML(Dataset):
             format="%(asctime)s - %(name)s.%(levelname)s - %(message)s",
         )
 
-        # Set logging level for dervia library
+        # Set logging level for Deriva library
         deriva_logger = logging.getLogger("deriva")
         deriva_logger.setLevel(logging_level)
 
@@ -162,8 +162,9 @@ class DerivaML(Dataset):
         )
         return session_config
 
+    # noinspection PyProtectedMember
     @property
-    def pathBuilder(self) -> _CatalogWrapper:
+    def pathBuilder(self) -> datapath._CatalogWrapper:
         """Get a new instance of a pathBuilder object."""
         return self.catalog.getPathBuilder()
 
@@ -520,15 +521,7 @@ class DerivaML(Dataset):
         Raises:
           DerivaMLException: If the feature cannot be found.
         """
-        table = self.model.get_table(table)
-        try:
-            return [
-                f for f in self.find_features(table) if f.feature_name == feature_name
-            ][0]
-        except IndexError:
-            raise DerivaMLException(
-                f"Feature {table.name}:{feature_name} doesn't exist."
-            )
+        return self.model.lookup_feature(table, feature_name)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def find_features(self, table: Table | str) -> Iterable[Feature]:
@@ -541,29 +534,7 @@ class DerivaML(Dataset):
         Returns:
             An iterable of FeatureResult instances that describe the current features in the table.
         """
-        table = self.model.get_table(table)
-
-        def is_feature(a: FindAssociationResult) -> bool:
-            """
-
-            Args:
-              a: FindAssociationResult:
-
-            Returns:
-
-            """
-            # return {'Feature_Name', 'Execution'}.issubset({c.name for c in a.table.columns})
-            return {
-                "Feature_Name",
-                "Execution",
-                a.self_fkey.foreign_key_columns[0].name,
-            }.issubset({c.name for c in a.table.columns})
-
-        return [
-            Feature(a, self.model)
-            for a in table.find_associations(min_arity=3, max_arity=3, pure=False)
-            if is_feature(a)
-        ]
+        return self.model.find_features(table)
 
     @validate_call
     def add_features(self, features: Iterable[FeatureRecord]) -> int:
@@ -583,8 +554,11 @@ class DerivaML(Dataset):
         entries = feature_path.insert(f.model_dump() for f in features)
         return len(entries)
 
+    # noinspection PyProtectedMember
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_feature_values(self, table: Table | str, feature_name: str) -> ResultSet:
+    def list_feature_values(
+        self, table: Table | str, feature_name: str
+    ) -> datapath._ResultSet:
         """Return a datapath ResultSet containing all values of a feature associated with a table.
 
         Args:
