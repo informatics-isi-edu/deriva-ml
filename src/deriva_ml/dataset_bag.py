@@ -7,11 +7,12 @@ import deriva.core.datapath as datapath
 
 from collections import defaultdict
 from copy import copy
-from typing import Any, Generator, TYPE_CHECKING, Optional
+from typing import Any, Generator, TYPE_CHECKING, Optional, Iterable
 
 import pandas as pd
 from pydantic import validate_call
 from .deriva_definitions import RID
+from .feature import Feature
 
 if TYPE_CHECKING:
     from .database_model import DatabaseModel
@@ -138,6 +139,9 @@ class DatasetBag:
                     ).items():
                         members[k].extend(v)
         return dict(members)
+
+    def find_features(self, table: str | Table) -> Iterable[Feature]:
+        return self.model.find_features(table)
 
     # noinspection PyProtectedMember
     def list_feature_values(

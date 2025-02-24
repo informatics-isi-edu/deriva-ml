@@ -68,7 +68,7 @@ class DerivaModel:
             # No domain schema defined.
             self.domain_schema = domain_schema
 
-    def get_table(self, table: str | Table) -> Table:
+    def name_to_table(self, table: str | Table) -> Table:
         """Return the table object corresponding to the given table name.
 
         If the table name appears in more than one schema, return the first one you find.
@@ -102,7 +102,7 @@ class DerivaModel:
 
         """
         vocab_columns = {"NAME", "URI", "SYNONYMS", "DESCRIPTION", "ID"}
-        table = self.get_table(table_name)
+        table = self.name_to_table(table_name)
         return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
     def is_association(
@@ -120,7 +120,7 @@ class DerivaModel:
 
 
         """
-        table = self.get_table(table_name)
+        table = self.name_to_table(table_name)
         return table.is_association(unqualified=unqualified, pure=pure)
 
     def is_asset(self, table_name: str | Table) -> bool:
@@ -134,7 +134,7 @@ class DerivaModel:
 
         """
         asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
-        table = self.get_table(table_name)
+        table = self.name_to_table(table_name)
         return asset_columns.issubset({c.name for c in table.columns})
 
     def find_assets(self, with_metadata: bool = False) -> list[Table]:
@@ -166,7 +166,7 @@ class DerivaModel:
         Returns:
             An iterable of FeatureResult instances that describe the current features in the table.
         """
-        table = self.get_table(table)
+        table = self.name_to_table(table)
 
         def is_feature(a: FindAssociationResult) -> bool:
             """
@@ -184,6 +184,7 @@ class DerivaModel:
                 a.self_fkey.foreign_key_columns[0].name,
             }.issubset({c.name for c in a.table.columns})
 
+        print(f"got table {table}")
         return [
             Feature(a, self)
             for a in table.find_associations(min_arity=3, max_arity=3, pure=False)
@@ -204,7 +205,7 @@ class DerivaModel:
         Raises:
           DerivaMLException: If the feature cannot be found.
         """
-        table = self.get_table(table)
+        table = self.name_to_table(table)
         try:
             return [
                 f for f in self.find_features(table) if f.feature_name == feature_name
@@ -217,7 +218,7 @@ class DerivaModel:
     def asset_metadata(self, table: str | Table) -> set[str]:
         """Return the metadata columns for an asset table."""
 
-        table = self.get_table(table)
+        table = self.name_to_table(table)
         asset_columns = {
             "Filename",
             "URL",

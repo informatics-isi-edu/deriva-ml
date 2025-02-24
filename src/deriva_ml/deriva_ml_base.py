@@ -187,7 +187,7 @@ class DerivaML(Dataset):
         return table_path(
             self.working_dir,
             schema=self.domain_schema,
-            table=self.model.get_table(table).name,
+            table=self.model.namne_to_table(table).name,
         )
 
     def asset_dir(
@@ -202,7 +202,7 @@ class DerivaML(Dataset):
         Returns:
             Path to the directory in which asset files should be placed.
         """
-        table = self.model.get_table(table)
+        table = self.model.name_to_table(table)
         if not self.model.is_asset(table):
             raise DerivaMLException(f"The table {table} is not an asset table.")
 
@@ -236,7 +236,7 @@ class DerivaML(Dataset):
             URL to the table in Chaise format.
         """
         try:
-            table = self.model.get_table(table)
+            table = self.model.name_to_table(table)
             uri = self.catalog.get_server_uri().replace(
                 "ermrest/catalog/", "chaise/recordset/#"
             )
@@ -430,7 +430,7 @@ class DerivaML(Dataset):
 
             """
             if isinstance(m, str):
-                return self.model.get_table(m)
+                return self.model.name_to_table(m)
             elif isinstance(m, ColumnDefinition):
                 return m.model_dump()
             else:
@@ -444,7 +444,7 @@ class DerivaML(Dataset):
 
         # Get references to the necessary tables and make sure that the
         # provided feature name exists.
-        target_table = self.model.get_table(target_table)
+        target_table = self.model.name_to_table(target_table)
         execution = self.model.schemas[self.ml_schema].tables["Execution"]
         feature_name_table = self.model.schemas[self.ml_schema].tables["Feature_Name"]
         feature_name_term = self.add_term(
@@ -497,7 +497,7 @@ class DerivaML(Dataset):
 
         Returns:
         """
-        table = self.model.get_table(table)
+        table = self.model.name_to_table(table)
         try:
             feature = next(
                 f for f in self.find_features(table) if f.feature_name == feature_name
@@ -569,7 +569,7 @@ class DerivaML(Dataset):
         Returns:
 
         """
-        table = self.model.get_table(table)
+        table = self.model.name_to_table(table)
         feature = self.lookup_feature(table, feature_name)
         pb = self.catalog.getPathBuilder()
         return (
@@ -607,7 +607,7 @@ class DerivaML(Dataset):
           DerivaException: If the control vocabulary name already exists and exist_ok is False.
         """
         synonyms = synonyms or []
-        table = self.model.get_table(table)
+        table = self.model.name_to_table(table)
         pb = self.catalog.getPathBuilder()
         if not (self.model.is_vocabulary(table)):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
@@ -652,7 +652,7 @@ class DerivaML(Dataset):
           DerivaException: If the schema or vocabulary table doesn't exist, or if the term is not
             found in the vocabulary.
         """
-        vocab_table = self.model.get_table(table)
+        vocab_table = self.model.name_to_table(table)
         if not self.model.is_vocabulary(vocab_table):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
@@ -679,7 +679,7 @@ class DerivaML(Dataset):
                 a controlled vocabulary.
         """
         pb = self.catalog.getPathBuilder()
-        table = self.model.get_table(table)
+        table = self.model.name_to_table(table)
         if not (self.model.is_vocabulary(table)):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 

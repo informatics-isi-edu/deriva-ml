@@ -407,7 +407,7 @@ class Dataset:
             The table object that was added to the dataset_table.
         """
         # Add table to map
-        element_table = self._model.get_table(element)
+        element_table = self._model.name_to_table(element)
         table = self._model.schemas[self._model.domain_schema].create_table(
             Table.define_association([self.dataset_table, element_table])
         )

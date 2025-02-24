@@ -84,7 +84,6 @@ def create_demo_ml():
         "test-schema",
         create_features=False,
         create_datasets=True,
-        logging_level=logging.INFO,
     )
     return DemoML(host, test_catalog.catalog_id)
 

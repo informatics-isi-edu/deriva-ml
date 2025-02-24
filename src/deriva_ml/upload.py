@@ -281,12 +281,12 @@ def asset_table_upload_spec(model, asset_table):
 
     """
     metadata_columns = model.asset_metadata(asset_table)
-    asset_table = model.get_table(asset_table)
-    schema = model.get_table(asset_table).schema.name
+    asset_table = model.name_to_table(asset_table)
+    schema = model.name_to_table(asset_table).schema.name
     metadata_path = "/".join([rf"(?P<{c}>[-\w]+)" for c in metadata_columns])
     asset_path = f"{upload_root_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
-    asset_table = model.get_table(asset_table)
-    schema = model.get_table(asset_table).schema.name
+    asset_table = model.name_to_table(asset_table)
+    schema = model.name_to_table(asset_table).schema.name
     return {
         # Upload assets into an asset table of an asset table.
         "column_map": {
