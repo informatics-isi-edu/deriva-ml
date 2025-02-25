@@ -39,7 +39,7 @@ from typing import Any, Callable, Optional, Iterable
 
 from deriva_ml import DatasetBag
 from .deriva_definitions import ML_SCHEMA, DerivaMLException, MLVocab, Status, RID
-from .history import get_record_history
+from .history import iso_to_snap
 from .deriva_model import DerivaModel
 from .database_model import DatabaseModel
 from .dataset_aux_classes import (
@@ -204,7 +204,6 @@ class Dataset:
           dataset_rid: RID of the dataset whose version is to be incremented.
           component: Major, Minor or Patch
           description: Description of the version update of the dataset_table.
-          recurse: If True, increment the dataset_table recursively in a nested dataset.
 
         Returns:
           new semantic version of the dataset_table as a 3-tuple
@@ -947,7 +946,7 @@ class Dataset:
             and self._model.catalog.resolve_rid(execution_rid).table.name != "Execution"
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
-        minid = self.get_dataset_minid(dataset.rid, dataset.version)
+        minid = self.get_dataset_minid(dataset)
 
         bag_path = (
             self._materialize_dataset_bag(minid, execution_rid=execution_rid)
@@ -956,39 +955,24 @@ class Dataset:
         )
         return DatabaseModel.register(minid, bag_path).get_dataset()
 
-    def _version_snapshot(self, dataset_rid: RID, version: DatasetVersion) -> str:
+    def _version_snapshot(self, dataset: DatasetSpec) -> str:
         version_record = [
             h
-            for h in self.dataset_history(dataset_rid=dataset_rid)
-            if h.dataset_version == version
+            for h in self.dataset_history(dataset_rid=dataset.rid)
+            if h.dataset_version == dataset.version
         ][0]
-        snapshots = get_record_history(
-            self._model.catalog.deriva_server,
-            self._model.catalog.catalog_id,
-            self._ml_schema,
-            "Dataset_Version",
-            [version_record.version_rid],
-        )
-        snapshot = list(
-            {k: v for k, v in snapshots.items() if v["Version"] == str(version)}
-        )[0]
-        return f"{self._model.catalog.catalog_id}@{snapshot}"
+        return f"{self._model.catalog.catalog_id}@{iso_to_snap(version_record.timestamp.isoformat())}"
 
-    def _create_dataset_minid(
-        self, dataset_rid: RID, dataset_version: DatasetHistory
-    ) -> str:
+    def _create_dataset_minid(self, dataset: DatasetSpec) -> str:
         with TemporaryDirectory() as tmp_dir:
             # Generate a download specification file for the current catalog schema. By default, this spec
             # will generate a minid and place the bag into S3 storage.
             spec_file = f"{tmp_dir}/download_spec.json"
             with open(spec_file, "w", encoding="utf-8") as ds:
-                json.dump(
-                    self._generate_dataset_download_spec(dataset_rid, dataset_version),
-                    ds,
-                )
+                json.dump(self._generate_dataset_download_spec(dataset), ds)
             try:
                 self._logger.info(
-                    f"Downloading dataset minid for catalog: {dataset_rid}@{str(dataset_version.dataset_version)}"
+                    f"Downloading dataset minid for catalog: {dataset.rid}@{str(dataset.version)}"
                 )
                 # Generate the bag and put into S3 storage.
                 exporter = DerivaExport(
@@ -997,7 +981,7 @@ class Dataset:
                     output_dir=tmp_dir,
                     defer_download=True,
                     timeout=(10, 300),
-                    envars={"Dataset_RID": dataset_rid},
+                    envars={"Dataset_RID": dataset.rid},
                 )
                 minid_page_url = exporter.export()[0]  # Get the MINID launch page
             except (
@@ -1014,57 +998,56 @@ class Dataset:
                 .schemas[self._ml_schema]
                 .tables["Dataset_Version"]
             )
-            version_path.update(
-                [{"RID": dataset_version.version_rid, "Minid": minid_page_url}]
-            )
+            version_rid = [
+                h
+                for h in self.dataset_history(dataset_rid=dataset.rid)
+                if h.dataset_version == dataset.version
+            ][0].version_rid
+            version_path.update([{"RID": version_rid, "Minid": minid_page_url}])
         return minid_page_url
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def get_dataset_minid(
-        self,
-        dataset_rid: RID,
-        version: Optional[DatasetVersion] = None,
-        create: bool = True,
+        self, dataset: DatasetSpec, create: bool = True
     ) -> DatasetMinid:
         """Return a MINID to the specified dataset.  If no version is specified, use the latest.
 
         Args:
-            dataset_rid: RID of the dataset.
-            version: Version of the dataset.
+            dataset: Specification of the dataset.
             create: Create a new MINID if one doesn't already exist.
 
         Returns:
             New or existing MINID for the dataset.
         """
-        if dataset_rid.startswith("minid"):
-            minid_url = f"https://identifiers.org/{dataset_rid}"
-        elif dataset_rid.startswith("http"):
-            minid_url = dataset_rid
+        if dataset.rid.startswith("minid"):
+            minid_url = f"https://identifiers.org/{dataset.rid}"
+        elif dataset.rid.startswith("http"):
+            minid_url = dataset.rid
         else:
-            if not any([dataset_rid == ds["RID"] for ds in self.find_datasets()]):
-                raise DerivaMLException(f"RID {dataset_rid} is not a dataset_table")
+            if not any([dataset.rid == ds["RID"] for ds in self.find_datasets()]):
+                raise DerivaMLException(f"RID {dataset.rid} is not a dataset_table")
 
             # Get the history record for the version we are looking for.
-            version = version or self.dataset_version(dataset_rid)
-            dataset_version = [
+            dataset_version_record = [
                 v
-                for v in self.dataset_history(dataset_rid)
-                if v.dataset_version == str(version)
+                for v in self.dataset_history(dataset.rid)
+                if v.dataset_version == str(dataset.version)
             ][0]
-            if not dataset_version:
+            if not dataset_version_record:
                 raise DerivaMLException(
-                    f"Version {str(version)} does not exist for RID {dataset_rid}"
+                    f"Version {str(dataset.version)} does not exist for RID {dataset.rid}"
                 )
-            minid_url = dataset_version.minid
+            minid_url = dataset_version_record.minid
             if not minid_url:
                 if not create:
                     raise DerivaMLException(
-                        f"Minid for dataset {dataset_rid} doesn't exist"
+                        f"Minid for dataset {dataset.rid} doesn't exist"
                     )
-                self._logger.info("Creating new MINID for dataset %s", dataset_rid)
-                minid_url = self._create_dataset_minid(dataset_rid, dataset_version)
+                self._logger.info("Creating new MINID for dataset %s", dataset.rid)
+                minid_url = self._create_dataset_minid(dataset)
             # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
         r = requests.get(minid_url, headers={"accept": "application/json"})
-        return DatasetMinid(dataset_version=version, **r.json())
+        return DatasetMinid(dataset_version=dataset.version, **r.json())
 
     def _download_dataset_bag(self, minid: DatasetMinid) -> Path:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
@@ -1252,9 +1235,7 @@ class Dataset:
             )
         return exports
 
-    def _generate_dataset_download_spec(
-        self, dataset_rid: RID = None, dataset_version: DatasetHistory = None
-    ) -> dict[str, Any]:
+    def _generate_dataset_download_spec(self, dataset: DatasetSpec) -> dict[str, Any]:
         """
 
         Returns:
@@ -1262,16 +1243,7 @@ class Dataset:
         s3_target = "s3://eye-ai-shared"
         minid_test = False
 
-        if dataset_rid is None:
-            catalog_id = self._model.catalog.catalog_id
-        else:
-            version = (
-                self.dataset_version(dataset_rid)
-                if dataset_version
-                else dataset_version.dataset_version
-            )
-            catalog_id = self._version_snapshot(dataset_rid, version)
-            print("snapshot catalog_id", catalog_id)
+        catalog_id = self._version_snapshot(dataset)
         return {
             "env": {"Dataset_RID": "{Dataset_RID}"},
             "bag": {

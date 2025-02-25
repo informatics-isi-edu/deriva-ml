@@ -45,7 +45,5 @@ class TestDownload(TestDerivaML):
         for f in files:
             self.assertTrue(f.exists())
 
-        print(bag.list_dataset_members()["Subject"])
-        print(new_bag.list_dataset_members()["Subject"])
         self.assertEqual(1, len(new_bag.list_dataset_members()["Subject"]))
         self.assertEqual(0, len(bag.list_dataset_members()["Subject"]))
