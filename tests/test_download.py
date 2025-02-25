@@ -13,10 +13,8 @@ class TestDownload(TestDerivaML):
         subject_rid = self.ml_instance.list_dataset_members(datasets[0])["Subject"][0][
             "RID"
         ]
-        print("subject_rid", subject_rid)
         self.ml_instance.add_dataset_members(double_nested_dataset, [subject_rid])
         new_version = self.ml_instance.dataset_version(double_nested_dataset)
-        print(f"New version: {new_version} Current version: {current_version}")
         bag = self.ml_instance.download_dataset_bag(
             DatasetSpec(rid=double_nested_dataset, version=current_version)
         )

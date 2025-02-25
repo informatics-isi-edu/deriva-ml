@@ -9,7 +9,6 @@ from deriva_ml.demo_catalog import (
 
 class TestExecution(TestDerivaML):
     def test_execution_no_download(self):
-        reset_demo_catalog(self.ml_instance, self.domain_schema)
         self.ml_instance.add_term(
             vc.workflow_type,
             "Manual Workflow",
