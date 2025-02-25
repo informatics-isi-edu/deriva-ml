@@ -13,7 +13,7 @@ description = "Utilities to simplify use of Dervia and Pandas to create reproduc
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "deriva~=1.7.7",
+    "deriva~=1.7.6",
     "pandas",
     "regex~=2024.7.24",
     "pydantic>=2.10.6",
