@@ -20,8 +20,6 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadTimeoutError,
 )
 
-from history import get_record_history
-
 try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
@@ -41,7 +39,7 @@ from typing import Any, Callable, Optional, Iterable
 
 from deriva_ml import DatasetBag
 from .deriva_definitions import ML_SCHEMA, DerivaMLException, MLVocab, Status, RID
-from .history import iso_to_snap
+from .history import get_record_history
 from .deriva_model import DerivaModel
 from .database_model import DatabaseModel
 from .dataset_aux_classes import (
@@ -974,8 +972,7 @@ class Dataset:
         snapshot = list(
             {k: v for k, v in snapshots.items() if v["Version"] == str(version)}
         )[0]
-        return self._model.catalog.catalog_id
-        # return f"{self._model.catalog.catalog_id}@{snapshot}"
+        return f"{self._model.catalog.catalog_id}@{snapshot}"
 
     def _create_dataset_minid(
         self, dataset_rid: RID, dataset_version: DatasetHistory
@@ -1274,6 +1271,7 @@ class Dataset:
                 else dataset_version.dataset_version
             )
             catalog_id = self._version_snapshot(dataset_rid, version)
+            print("snapshot catalog_id", catalog_id)
         return {
             "env": {"Dataset_RID": "{Dataset_RID}"},
             "bag": {
