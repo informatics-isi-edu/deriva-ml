@@ -71,13 +71,14 @@ class TestUpload(TestDerivaML):
             description="Model for our API workflow",
         )
 
-        api_workflow = Workflow(
-            name="Manual Workflow",
-            url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_upload.py",
-            workflow_type="Manual Workflow",
-            description="A manual operation",
+        api_workflow = self.ml_instance.add_workflow(
+            Workflow(
+                name="Manual Workflow",
+                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_upload.py",
+                workflow_type="Manual Workflow",
+                description="A manual operation",
+            )
         )
-
         manual_execution = self.ml_instance.create_execution(
             ExecutionConfiguration(
                 description="Sample Execution", workflow=api_workflow
@@ -95,6 +96,7 @@ class TestUpload(TestDerivaML):
         uploaded_assets = manual_execution.upload_execution_outputs()
         path = self.ml_instance.catalog.getPathBuilder().schemas["deriva-ml"]
         self.assertEqual(1, len(list(path.Execution_Asset.entities().fetch())))
+
         execution_metadata = list(path.Execution_Metadata.entities().fetch())
-        print([m["Filename"] for m in execution_metadata])
+        print([m for m in execution_metadata])
         self.assertEqual(2, len(execution_metadata))

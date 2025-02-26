@@ -1,9 +1,12 @@
+from idlelib.run import manage_socket
+
 from derivaml_test import TestDerivaML
-from deriva_ml import MLVocab as vc, Workflow, ExecutionConfiguration, DatasetSpec
-from deriva_ml.demo_catalog import (
-    reset_demo_catalog,
-    populate_demo_catalog,
-    create_demo_datasets,
+from deriva_ml import (
+    MLVocab as vc,
+    Workflow,
+    ExecutionConfiguration,
+    DatasetSpec,
+    DerivaML,
 )
 
 
@@ -25,11 +28,13 @@ class TestExecution(TestDerivaML):
             description="A ML Workflow that uses Deriva ML API",
         )
 
-        api_workflow = Workflow(
-            name="Manual Workflow",
-            url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_execution.py",
-            workflow_type="Manual Workflow",
-            description="A manual operation",
+        api_workflow = self.ml_instance.add_workflow(
+            Workflow(
+                name="Manual Workflow",
+                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_execution.py",
+                workflow_type="Manual Workflow",
+                description="A manual operation",
+            )
         )
 
         manual_execution = self.ml_instance.create_execution(
@@ -37,82 +42,107 @@ class TestExecution(TestDerivaML):
                 description="Sample Execution", workflow=api_workflow
             )
         )
+        with manual_execution as e:
+            pass
         manual_execution.upload_execution_outputs()
 
     def test_execution_download(self):
-        populate_demo_catalog(self.ml_instance, self.domain_schema)
-        create_demo_datasets(self.ml_instance)
-        exec_config = execution_test(self.ml_instance)
-        exec = self.ml_instance.create_execution(exec_config)
+        self.populate_catalog()
+        double_nested, nested, datasets = self.create_nested_dataset()
 
+        self.ml_instance.add_term(
+            vc.execution_asset_type,
+            "API_Model",
+            description="Model for our API workflow",
+        )
+        self.ml_instance.add_term(
+            vc.workflow_type,
+            "ML Demo",
+            description="A ML Workflow that uses Deriva ML API",
+        )
+        api_workflow = self.ml_instance.add_workflow(
+            Workflow(
+                name="ML Demo",
+                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/pyproject.toml",
+                workflow_type="ML Demo",
+                description="A workflow that uses Deriva ML",
+            )
+        )
+        execution_model = self.create_execution_asset(api_workflow)
 
-def execution_test(ml_instance):
-    training_dataset_rid = [
-        ds["RID"]
-        for ds in ml_instance.find_datasets()
-        if "Training" in ds["Dataset_Type"]
-    ][0]
-    testing_dataset_rid = [
-        ds["RID"]
-        for ds in ml_instance.find_datasets()
-        if "Testing" in ds["Dataset_Type"]
-    ][0]
+        config = ExecutionConfiguration(
+            datasets=[
+                DatasetSpec(
+                    rid=nested[0],
+                    version=self.ml_instance.dataset_version(nested[0]),
+                ),
+                DatasetSpec(
+                    rid=nested[1],
+                    version=self.ml_instance.dataset_version(nested[1]),
+                ),
+            ],
+            assets=[execution_model],
+            description="Sample Execution",
+            workflow=api_workflow,
+        )
+        exec = self.ml_instance.create_execution(config)
+        with exec as e:
+            print(e.asset_paths)
+            print(e.datasets)
+            self.assertEqual(1, len(e.asset_paths))
+            self.assertEqual(2, len(e.datasets))
+        exec.upload_execution_outputs()
+        pb = self.ml_instance.pathBuilder.schemas[self.ml_instance.ml_schema]
+        execution_asset_execution = pb.Execution_Asset_Execution
+        execution_metadata_execution = pb.Execution_Metadata_Execution
+        execution_asset = pb.Execution_Asset
+        execution_metadata = pb.Execution_Metadata
 
-    nested_dataset_rid = [
-        ds["RID"]
-        for ds in ml_instance.find_datasets()
-        if "Partitioned" in ds["Dataset_Type"]
-    ][0]
+        assets_execution = [
+            {
+                "RID": a["RID"],
+                "Execution_Asset": a["Execution_Asset"],
+                "Execution": a["Execution"],
+            }
+            for a in execution_asset_execution.entities().fetch()
+            if a["Execution"] == exec.execution_rid
+        ]
+        metadata_execution = [
+            {
+                "RID": a["RID"],
+                "Execution": a["Execution"],
+                "Execution_Metadata": a["Execution_Metadata"],
+            }
+            for a in execution_metadata_execution.entities().fetch()
+            if a["Execution"] == exec.execution_rid
+        ]
+        execution_assets = [
+            {"RID": a["RID"], "Filename": a["Filename"]}
+            for a in execution_asset.entities().fetch()
+        ]
+        execution_metadata = [
+            {"RID": a["RID"], "Filename": a["Filename"]}
+            for a in execution_metadata.entities().fetch()
+        ]
+        print(assets_execution)
+        print(metadata_execution)
+        print(execution_assets)
+        print(execution_metadata)
+        self.assertEqual(1, len(assets_execution))
+        self.assertEqual(2, len(metadata_execution))
 
-    ml_instance.add_term(
-        vc.workflow_type, "Manual Workflow", description="Initial setup of Model File"
-    )
-    ml_instance.add_term(
-        vc.execution_asset_type, "API_Model", description="Model for our API workflow"
-    )
-    ml_instance.add_term(
-        vc.workflow_type, "ML Demo", description="A ML Workflow that uses Deriva ML API"
-    )
-    api_workflow = Workflow(
-        name="Manual Workflow",
-        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/Notebooks/DerivaML%20Execution.ipynb",
-        workflow_type="Manual Workflow",
-        description="A manual operation",
-    )
-
-    manual_execution = ml_instance.create_execution(
-        ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)
-    )
-
-    # Now lets create model configuration for our program.
-    model_file = manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
-    with open(model_file, "w") as fp:
-        fp.write(f"My model")
-
-    # Now upload the file and retrieve the RID of the new asset from the returned results.
-    uploaded_assets = manual_execution.upload_execution_outputs()
-
-    training_model_rid = uploaded_assets["API_Model/modelfile.txt"].result["RID"]
-    api_workflow = Workflow(
-        name="ML Demo",
-        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/pyproject.toml",
-        workflow_type="ML Demo",
-        description="A workflow that uses Deriva ML",
-    )
-
-    config = ExecutionConfiguration(
-        datasets=[
-            DatasetSpec(
-                rid=nested_dataset_rid,
-                version=ml_instance.dataset_version(nested_dataset_rid),
-            ),
-            DatasetSpec(
-                rid=testing_dataset_rid,
-                version=ml_instance.dataset_version(testing_dataset_rid),
-            ),
-        ],
-        assets=[training_model_rid],
-        description="Sample Execution",
-        workflow=api_workflow,
-    )
-    return config
+    def create_execution_asset(self, api_workflow):
+        manual_execution = self.ml_instance.create_execution(
+            ExecutionConfiguration(
+                description="Sample Execution", workflow=api_workflow
+            )
+        )
+        model_file = (
+            manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
+        )
+        with open(model_file, "w") as fp:
+            fp.write(f"My model")
+        # Now upload the file and retrieve the RID of the new asset from the returned results.
+        uploaded_assets = manual_execution.upload_execution_outputs()
+        self.ml_instance._execution = None
+        return uploaded_assets["API_Model/modelfile.txt"].result["RID"]
