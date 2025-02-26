@@ -2,8 +2,10 @@ import atexit
 from importlib.metadata import version
 from importlib.resources import files
 import logging
-from random import random
+from random import random, randint
+import tempfile
 from tempfile import TemporaryDirectory
+import itertools
 
 from deriva.config.acl_config import AclConfig
 from deriva.core import DerivaServer
@@ -117,30 +119,30 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     return double_nested_dataset, nested_datasets, dataset_rids
 
 
-def create_demo_features(deriva_ml: DerivaML) -> None:
-    deriva_ml.create_vocabulary("SubjectHealth", "A vocab")
-    deriva_ml.add_term(
+def create_demo_features(ml_instance):
+    ml_instance.create_vocabulary("SubjectHealth", "A vocab")
+    ml_instance.add_term(
         "SubjectHealth",
         "Sick",
         description="The subject self reports that they are sick",
     )
-    deriva_ml.add_term(
+    ml_instance.add_term(
         "SubjectHealth",
         "Well",
         description="The subject self reports that they feel well",
     )
 
-    deriva_ml.create_vocabulary(
+    ml_instance.create_vocabulary(
         "ImageQuality", "Controlled vocabulary for image quality"
     )
-    deriva_ml.add_term("ImageQuality", "Good", description="The image is good")
-    deriva_ml.add_term("ImageQuality", "Bad", description="The image is bad")
+    ml_instance.add_term("ImageQuality", "Good", description="The image is good")
+    ml_instance.add_term("ImageQuality", "Bad", description="The image is bad")
 
-    box_asset = deriva_ml.create_asset(
+    box_asset = ml_instance.create_asset(
         "BoundingBox", comment="A file that contains a cropped version of a image"
     )
 
-    deriva_ml.create_feature(
+    ml_instance.create_feature(
         "Subject",
         "Health",
         terms=["SubjectHealth"],
@@ -148,8 +150,85 @@ def create_demo_features(deriva_ml: DerivaML) -> None:
         optional=["Scale"],
     )
 
-    deriva_ml.create_feature("Image", "BoundingBox", assets=[box_asset])
-    deriva_ml.create_feature("Image", "Quality", terms=["ImageQuality"])
+    ml_instance.create_feature("Image", "BoundingBox", assets=[box_asset])
+    ml_instance.create_feature("Image", "Quality", terms=["ImageQuality"])
+
+    ImageQualityFeature = ml_instance.feature_record_class("Image", "Quality")
+    ImageBoundingboxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
+    SubjectWellnessFeature = ml_instance.feature_record_class("Subject", "Health")
+
+    ml_instance.add_term(
+        MLVocab.workflow_type,
+        "API Workflow",
+        description="A Workflow that uses Deriva ML API",
+    )
+    ml_instance.add_term(
+        MLVocab.execution_asset_type,
+        "API_Model",
+        description="Model for our API workflow",
+    )
+
+    api_workflow = ml_instance.add_workflow(
+        Workflow(
+            name="API Workflow",
+            url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/pyproject.toml",
+            workflow_type="API Workflow",
+        )
+    )
+
+    api_execution = ml_instance.create_execution(
+        ExecutionConfiguration(
+            workflow=api_workflow, description="Our Sample Workflow instance"
+        )
+    )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        assetdir = ml_instance.asset_dir("BoundingBox", prefix=temp_dir)
+        for i in range(10):
+            with open(assetdir.path / f"box{i}.txt", "w") as fp:
+                fp.write(f"Hi there {i}")
+        bounding_box_assets = ml_instance.upload_assets(assetdir)
+    bounding_box_rids = [a.result["RID"] for a in bounding_box_assets.values()]
+
+    # Get the IDs of al of the things that we are going to want to attach features to.
+    subject_rids = [
+        i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()
+    ]
+    image_rids = [
+        i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()
+    ]
+
+    subject_feature_list = [
+        SubjectWellnessFeature(
+            Subject=subject_rid,
+            Execution=api_execution.execution_rid,
+            SubjectHealth=["Well", "Sick"][randint(0, 1)],
+            Scale=randint(1, 10),
+        )
+        for subject_rid in subject_rids
+    ]
+
+    image_quality_feature_list = [
+        ImageQualityFeature(
+            Image=image_rid,
+            Execution=api_execution.execution_rid,
+            ImageQuality=["Good", "Bad"][randint(0, 1)],
+        )
+        for image_rid in image_rids
+    ]
+
+    image_bounding_box_feature_list = [
+        ImageBoundingboxFeature(
+            Image=image_rid,
+            Execution=api_execution.execution_rid,
+            BoundingBox=asset_rid,
+        )
+        for image_rid, asset_rid in zip(image_rids, itertools.cycle(bounding_box_rids))
+    ]
+
+    ml_instance.add_features(subject_feature_list)
+    ml_instance.add_features(image_quality_feature_list)
+    ml_instance.add_features(image_bounding_box_feature_list)
 
 
 def create_domain_schema(model: Model, sname: str) -> None:

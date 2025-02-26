@@ -253,7 +253,7 @@ class Execution:
         minutes, seconds = divmod(remainder, 60)
         duration = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
 
-        self.update_status(Status.running, "Algorithm execution ended.")
+        self.update_status(Status.completed, "Algorithm execution ended.")
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
             [{"RID": self.execution_rid, "Duration": duration}]
         )

@@ -86,9 +86,11 @@ class TestFeatures(TestDerivaML):
         ]
         print(s_features)
         print(s_features_bag)
+
         for f in self.ml_instance.find_features("Subject"):
-            print(self.ml_instance.list_feature_values(f.feature_table, f.feature_name))
-            print(bag.list_feature_values(f.feature_table, f.feature_name))
+            print(f"Looking for {f.feature_table} {f.feature_name}")
+            print(list(self.ml_instance.list_feature_values("Subject", f.feature_name)))
+            print(bag.list_feature_values("Subject", f.feature_name))
         for f in self.ml_instance.find_features("Image"):
-            print(self.ml_instance.list_feature_values(f.feature_table, f.feature_name))
-            print(bag.list_feature_values(f.feature_table, f.feature_name))
+            print(list(self.ml_instance.list_feature_values("Image", f.feature_name)))
+            print(bag.list_feature_values("Image", f.feature_name))

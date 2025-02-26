@@ -152,7 +152,10 @@ class DerivaML(Dataset):
 
     def __del__(self):
         if self._execution and self._execution.status != Status.completed:
-            self._execution.update_status(Status.aborted, f"Execution Aborted")
+            try:
+                self._execution.update_status(Status.aborted, f"Execution Aborted")
+            except requests.HTTPError as e:
+                pass
 
     @staticmethod
     def _get_session_config():
@@ -726,8 +729,10 @@ class DerivaML(Dataset):
         self,
         assets_dir: str | Path | UploadAssetDirectory,
     ) -> dict[Any, FileUploadState] | None:
-        """Upload assets from a directory. This routine assumes that the current upload specification includes a
-        configuration for the specified directory.  Every asset in the specified directory is uploaded
+        """Upload assets from a directory.
+
+        This routine assumes that the current upload specification includes a configuration for the specified directory.
+        Every asset in the specified directory is uploaded
 
         Args:
             assets_dir: Directory containing the assets to upload.
