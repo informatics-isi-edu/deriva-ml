@@ -70,8 +70,11 @@ class Status(StrEnum):
 
     """
 
-    running = "Running"
+    initializing = "Initializing"
+    created = "Created"
     pending = "Pending"
+    running = "Running"
+    aborted = "Aborted"
     completed = "Completed"
     failed = "Failed"
 

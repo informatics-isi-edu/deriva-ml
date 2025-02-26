@@ -11,14 +11,17 @@ relationships that follow a specific data model.
 import getpass
 import logging
 from datetime import datetime
+import hashlib
 from itertools import chain
 from pathlib import Path
+import requests
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 from deriva.core import (
     ErmrestCatalog,
     get_credential,
     urlquote,
     DEFAULT_SESSION_CONFIG,
+    format_exception,
 )
 import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException
@@ -27,7 +30,7 @@ from deriva.core.ermrest_model import Key, Table
 from deriva.core.hatrac_store import HatracStore
 from pydantic import validate_call, ConfigDict
 
-from .execution_configuration import ExecutionConfiguration
+from .execution_configuration import ExecutionConfiguration, Workflow
 from .feature import Feature, FeatureRecord
 from .dataset import Dataset
 from .deriva_model import DerivaModel
@@ -47,6 +50,7 @@ from .deriva_definitions import (
     DerivaMLException,
     ML_SCHEMA,
     VocabularyTerm,
+    MLVocab,
 )
 
 if TYPE_CHECKING:
@@ -122,6 +126,7 @@ class DerivaML(Dataset):
         self.ml_schema = ml_schema
         self.version = model_version
         self.configuration = None
+        self._execution: Optional[Execution] = None
 
         self.domain_schema = self.model.domain_schema
         self.project_name = project_name or self.domain_schema
@@ -144,6 +149,10 @@ class DerivaML(Dataset):
             logging.info(
                 f"Loading dirty model.  Consider commiting and tagging: {self.version}"
             )
+
+    def __del__(self):
+        if self._execution and self._execution.status != Status.completed:
+            self._execution.update_status(Status.aborted, f"Execution Aborted")
 
     @staticmethod
     def _get_session_config():
@@ -187,7 +196,7 @@ class DerivaML(Dataset):
         return table_path(
             self.working_dir,
             schema=self.domain_schema,
-            table=self.model.namne_to_table(table).name,
+            table=self.model.name_to_table(table).name,
         )
 
     def asset_dir(
@@ -688,19 +697,29 @@ class DerivaML(Dataset):
             for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()
         ]
 
-    def download_asset(self, asset_url: str, dest_filename: str) -> Path:
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def download_asset(self, asset_rid: RID, dest_dir: Path) -> Path:
         """Download an asset from a URL and place it in a local directory.
 
         Args:
-            asset_url: URL of the asset.
-            dest_filename: Destination filename.
+            asset_rid: URL of the asset.
+            dest_dir: Destination directory for the asset.
 
         Returns:
             A  Path object to the downloaded asset.
         """
+        table = self.resolve_rid(asset_rid).table
+        if not self.model.is_asset(table):
+            raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
+
+        tpath = self.pathBuilder.schemas[table.schema.name].tables[table.name]
+        asset_metadata = list(tpath.filter(tpath.RID == asset_rid).entities())[0]
+        asset_url = asset_metadata["URL"]
+        asset_filename = dest_dir / asset_metadata["Filename"]
+
         hs = HatracStore("https", self.host_name, self.credential)
-        hs.get_obj(path=asset_url, destfilename=dest_filename)
-        return Path(dest_filename)
+        hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
+        return Path(asset_filename)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def upload_assets(
@@ -761,6 +780,72 @@ class DerivaML(Dataset):
             ]
         )
 
+    def list_workflows(self) -> list[Workflow]:
+        workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
+        return [
+            Workflow(
+                name=w["Name"],
+                url=w["URL"],
+                workflow_type=w["Workflow_Type"],
+                version=w["Version"],
+                description=w["Description"],
+            )
+            for w in workflow_path.entities().fetch()
+        ]
+
+    def add_workflow(self, workflow: Workflow) -> RID:
+        """Add a workflow to the Workflow table.
+
+        Args:
+          - url(str): URL of the workflow.
+          - workflow_type(str): Type of the workflow.
+          - version(str): Version of the workflow.
+          - description(str): Description of the workflow.
+
+        Returns:
+          - str: Resource Identifier (RID) of the added workflow.
+
+        """
+
+        # Check to make sure that the workflow is not already in the table. If it's not, add it.
+        def get_checksum(url) -> str:
+            """Get the checksum of a file from a URL."""
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+            except Exception:
+                raise DerivaMLException(f"Invalid URL: {url}")
+            else:
+                sha256_hash = hashlib.sha256()
+                sha256_hash.update(response.content)
+                checksum = "SHA-256: " + sha256_hash.hexdigest()
+            return checksum
+
+        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
+        try:
+            url_column = ml_schema_path.Workflow.URL
+            workflow_record = list(
+                ml_schema_path.Workflow.filter(url_column == workflow.url).entities()
+            )[0]
+            workflow_rid = workflow_record["RID"]
+        except IndexError:
+            # Record doesn't exist already
+            workflow_record = {
+                "URL": workflow.url,
+                "Name": workflow.name,
+                "Description": workflow.description,
+                "Checksum": get_checksum(workflow.url),
+                "Version": workflow.version,
+                MLVocab.workflow_type: self.lookup_term(
+                    MLVocab.workflow_type, workflow.workflow_type
+                ).name,
+            }
+            workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]["RID"]
+        except Exception as e:
+            error = format_exception(e)
+            raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
+        return workflow_rid
+
     # @validate_call
     def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":
         """Create an execution object
@@ -779,7 +864,13 @@ class DerivaML(Dataset):
         """
         from .execution import Execution
 
-        return Execution(configuration, self)
+        if self._execution:
+            DerivaMLException(
+                f"Only one execution can be created for a Deriva ML instance."
+            )
+        else:
+            self._execution = Execution(configuration, self)
+        return self._execution
 
     # @validate_call
     def restore_execution(self, execution_rid: Optional[RID] = None) -> "Execution":
