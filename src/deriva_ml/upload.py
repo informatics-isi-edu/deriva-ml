@@ -270,7 +270,7 @@ def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     return path / f"{table}.csv"
 
 
-def asset_table_upload_spec(model, asset_table):
+def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
     """Generate a pattern to an asset table that may include additional metadata columns.
 
     Args:

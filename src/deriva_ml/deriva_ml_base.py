@@ -802,10 +802,7 @@ class DerivaML(Dataset):
         """Add a workflow to the Workflow table.
 
         Args:
-          - url(str): URL of the workflow.
-          - workflow_type(str): Type of the workflow.
-          - version(str): Version of the workflow.
-          - description(str): Description of the workflow.
+            workflow: An instance of a Workflow object.
 
         Returns:
           - str: Resource Identifier (RID) of the added workflow.
