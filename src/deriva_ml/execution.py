@@ -674,7 +674,7 @@ class Execution:
             dataset_types, description, self.execution_rid
         )
 
-    def dataset_add_members(
+    def add_dataset_members(
         self,
         dataset_rid: RID,
         members: list[RID],
@@ -690,15 +690,14 @@ class Execution:
         )
 
     def increment_dataset_version(
-            self,
-            dataset_rid: RID,
-            component: VersionPart,
-            description: str = "") -> DatasetVersion:
+        self, dataset_rid: RID, component: VersionPart, description: str = ""
+    ) -> DatasetVersion:
         return self._ml_object.increment_dataset_version(
             dataset_rid=dataset_rid,
             component=component,
             description=description,
-            execution_rid=self.execution_rid)
+            execution_rid=self.execution_rid,
+        )
 
     def __str__(self):
         items = [

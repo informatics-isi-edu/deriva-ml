@@ -10,7 +10,6 @@ from bdbag.fetch.fetcher import fetch_single_file
 from bdbag import bdbag_api as bdb
 from collections import defaultdict
 
-from conda.cli.main_env_vars import execute_unset
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 from deriva.transfer.download.deriva_export import DerivaExport
@@ -167,7 +166,7 @@ class Dataset:
                 dataset_rid=dataset_rid,
                 version_rid=v["RID"],
                 description=v["Description"],
-                execution_rid=v['Execution'],
+                execution_rid=v["Execution"],
             )
             for v in version_path.filter(version_path.Dataset == dataset_rid)
             .entities()

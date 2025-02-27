@@ -7,6 +7,9 @@ from deriva_ml import (
     BuiltinTypes,
     VersionPart,
     DatasetVersion,
+    ExecutionConfiguration,
+    MLVocab,
+    Workflow,
 )
 
 
@@ -128,3 +131,49 @@ class TestDataset(TestDerivaML):
 
         # check inrementing datasest version
         # check incrmenting nested version with recurse.
+
+    def test_dataset_execution(self):
+        self.ml_instance.model.create_table(
+            TableDefinition(
+                name="TestTableExecution",
+                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+            )
+        )
+        self.ml_instance.add_dataset_element_type("TestTableExecution")
+        table_path = (
+            self.ml_instance.catalog.getPathBuilder()
+            .schemas[self.domain_schema]
+            .tables["TestTableExecution"]
+        )
+        table_path.insert([{"Col1": f"Thing{t + 1}"} for t in range(4)])
+        test_rids = [i["RID"] for i in table_path.entities().fetch()]
+
+        self.ml_instance.add_term(
+            MLVocab.workflow_type,
+            "Manual Workflow",
+            description="Initial setup of Model File",
+        )
+        type_rid = self.ml_instance.add_term(
+            "Dataset_Type", "TestSet", description="A test"
+        )
+
+        api_workflow = self.ml_instance.add_workflow(
+            Workflow(
+                name="Manual Workflow",
+                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_upload.py",
+                workflow_type="Manual Workflow",
+                description="A manual operation",
+            )
+        )
+        manual_execution = self.ml_instance.create_execution(
+            ExecutionConfiguration(
+                description="Sample Execution", workflow=api_workflow
+            )
+        )
+
+        dataset_rid = manual_execution.create_dataset(
+            dataset_types=["TestSet"], description="A dataset"
+        )
+        manual_execution.add_dataset_members(dataset_rid, test_rids)
+        history = self.ml_instance.dataset_history(dataset_rid=dataset_rid)
+        self.assertEqual(manual_execution.execution_rid, history[0].execution_rid)
