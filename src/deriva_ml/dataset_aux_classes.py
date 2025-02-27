@@ -104,6 +104,7 @@ class DatasetHistory(BaseModel):
     dataset_version: DatasetVersion
     dataset_rid: RID
     version_rid: RID
+    execution_rid: Optional[RID] = None
     description: str = ""
     minid: Optional[str] = None
     timestamp: Optional[datetime] = None

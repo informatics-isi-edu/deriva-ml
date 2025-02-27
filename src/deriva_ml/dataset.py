@@ -9,6 +9,8 @@ accessible via a DerivaML class instance.
 from bdbag.fetch.fetcher import fetch_single_file
 from bdbag import bdbag_api as bdb
 from collections import defaultdict
+
+from conda.cli.main_env_vars import execute_unset
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 from deriva.transfer.download.deriva_export import DerivaExport
@@ -85,6 +87,7 @@ class Dataset:
         dataset_rid: RID,
         dataset_version: DatasetVersion,
         description: Optional[str] = "",
+        execution_rid: Optional[RID] = None,
     ) -> RID:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         version_path = schema_path.tables["Dataset_Version"]
@@ -94,6 +97,7 @@ class Dataset:
                     "Dataset": dataset_rid,
                     "Version": str(dataset_version),
                     "Description": description,
+                    "Execution": execution_rid,
                 }
             ]
         )[0]["RID"]
@@ -163,6 +167,7 @@ class Dataset:
                 dataset_rid=dataset_rid,
                 version_rid=v["RID"],
                 description=v["Description"],
+                execution_rid=v['Execution'],
             )
             for v in version_path.filter(version_path.Dataset == dataset_rid)
             .entities()
@@ -190,11 +195,13 @@ class Dataset:
         else:
             return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def increment_dataset_version(
         self,
         dataset_rid: RID,
         component: VersionPart,
         description: Optional[str] = "",
+        execution_rid: Optional[RID] = None,
     ) -> DatasetVersion:
         """Increment the version of the specified dataset_table.
 
@@ -204,6 +211,7 @@ class Dataset:
           dataset_rid: RID of the dataset whose version is to be incremented.
           component: Major, Minor or Patch
           description: Description of the version update of the dataset_table.
+          execution_rid: Which execution is performing increment.
 
         Returns:
           new semantic version of the dataset_table as a 3-tuple
@@ -216,10 +224,16 @@ class Dataset:
                 ds,
                 component,
                 description=f"Increment version of nested dataset: {description}",
+                execution_rid=execution_rid,
             )
         version = self.dataset_version(dataset_rid)
         new_version = version.increment_version(component)
-        self._insert_dataset_version(dataset_rid, new_version, description=description)
+        self._insert_dataset_version(
+            dataset_rid,
+            new_version,
+            description=description,
+            execution_rid=execution_rid,
+        )
         return new_version
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -297,7 +311,12 @@ class Dataset:
             pb.schemas[self._ml_schema].Dataset_Execution.insert(
                 [{"Dataset": dataset_rid, "Execution": execution_rid}]
             )
-        self._insert_dataset_version(dataset_rid, version)
+        self._insert_dataset_version(
+            dataset_rid,
+            dataset_version=version,
+            execution_rid=execution_rid,
+            description="Initial dataset creation.",
+        )
         return dataset_rid
 
     @validate_call
@@ -485,6 +504,7 @@ class Dataset:
         members: list[RID],
         validate: bool = True,
         description: Optional[str] = "",
+        execution_rid: Optional[RID] = None,
     ) -> None:
         """Add additional elements to an existing dataset_table.
 
@@ -496,6 +516,7 @@ class Dataset:
             members: List of RIDs of members to add to the  dataset_table.
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             description: Markdown description of the updated dataset.
+            execution_rid: Optional RID of execution associated with this dataset.
         """
         members = set(members)
         description = description or "Updated dataset via add_dataset_members"
@@ -559,12 +580,19 @@ class Dataset:
                     [{"Dataset": dataset_rid, fk_column: e} for e in elements]
                 )
         self.increment_dataset_version(
-            dataset_rid, VersionPart.minor, description=description
+            dataset_rid,
+            VersionPart.minor,
+            description=description,
+            execution_rid=execution_rid,
         )
 
     @validate_call
     def delete_dataset_members(
-        self, dataset_rid: RID, members: list[RID], description=""
+        self,
+        dataset_rid: RID,
+        members: list[RID],
+        description="",
+        execution_rid: Optional[RID] = None,
     ) -> None:
         """Remove elements to an existing dataset_table.
 
@@ -616,7 +644,10 @@ class Dataset:
                     )
                     entity.delete()
         self.increment_dataset_version(
-            dataset_rid, VersionPart.minor, description=description
+            dataset_rid,
+            VersionPart.minor,
+            description=description,
+            execution_rid=execution_rid,
         )
 
     @validate_call

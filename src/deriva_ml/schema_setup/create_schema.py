@@ -55,6 +55,7 @@ def define_table_dataset_version(sname: str, dataset_version_annotation: dict = 
             ),
             Column.define("Description", builtin_types.markdown),
             Column.define("Dataset", builtin_types.text, comment="RID of dataset"),
+            Column.define("Execution", builtin_types.text, comment="RID of execution"),
             Column.define(
                 "Minid", builtin_types.text, comment="URL to MINID for dataset"
             ),

@@ -23,7 +23,7 @@ from .deriva_definitions import (
     DerivaMLException,
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
-from .dataset_aux_classes import DatasetSpec
+from .dataset_aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from .dataset import Dataset
 from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
@@ -673,6 +673,32 @@ class Execution:
         return self._ml_object.create_dataset(
             dataset_types, description, self.execution_rid
         )
+
+    def dataset_add_members(
+        self,
+        dataset_rid: RID,
+        members: list[RID],
+        validate: bool = True,
+        description: str = "",
+    ) -> None:
+        return self._ml_object.add_dataset_members(
+            dataset_rid=dataset_rid,
+            members=members,
+            validate=validate,
+            description=description,
+            execution_rid=self.execution_rid,
+        )
+
+    def increment_dataset_version(
+            self,
+            dataset_rid: RID,
+            component: VersionPart,
+            description: str = "") -> DatasetVersion:
+        return self._ml_object.increment_dataset_version(
+            dataset_rid=dataset_rid,
+            component=component,
+            description=description,
+            execution_rid=self.execution_rid)
 
     def __str__(self):
         items = [
