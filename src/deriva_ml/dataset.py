@@ -26,6 +26,7 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
+from graphlib import TopologicalSorter
 import json
 import logging
 from pathlib import Path
@@ -194,6 +195,24 @@ class Dataset:
         else:
             return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
 
+    def _build_dataset_graph(
+        self, dataset_rid: RID, ts=TopologicalSorter(), visited=None
+    ) -> Iterable[RID]:
+        """Use topological sort to return bottom up list of nested datasets"""
+
+        visited = visited or set()
+        if dataset_rid not in visited:
+            visited.add(dataset_rid)
+            children = self.list_dataset_children(dataset_rid=dataset_rid)
+            parents = self.list_dataset_parents(dataset_rid=dataset_rid)
+            for parent in parents:
+                ts.add(parent, dataset_rid)
+                self._build_dataset_graph(ts, parent, visited)
+            for child in children:
+                ts.add(dataset_rid, child)
+                self._build_dataset_graph(ts, child, visited)
+        return ts.static_order()
+
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def increment_dataset_version(
         self,
@@ -218,22 +237,16 @@ class Dataset:
         Raises:
           DerivaMLException: if provided RID is not to a dataset_table.
         """
-        for ds in self.list_dataset_children(dataset_rid):
-            self.increment_dataset_version(
-                ds,
-                component,
-                description=f"Increment version of nested dataset: {description}",
+        for dataset in self._build_dataset_graph(dataset_rid=dataset_rid):
+            version = self.dataset_version(dataset)
+            new_version = version.increment_version(component)
+            self._insert_dataset_version(
+                dataset,
+                new_version,
+                description=description,
                 execution_rid=execution_rid,
             )
-        version = self.dataset_version(dataset_rid)
-        new_version = version.increment_version(component)
-        self._insert_dataset_version(
-            dataset_rid,
-            new_version,
-            description=description,
-            execution_rid=execution_rid,
-        )
-        return new_version
+        return self.dataset_version(dataset_rid)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
@@ -590,7 +603,7 @@ class Dataset:
         self,
         dataset_rid: RID,
         members: list[RID],
-        description="",
+        description: str = "",
         execution_rid: Optional[RID] = None,
     ) -> None:
         """Remove elements to an existing dataset_table.
@@ -602,6 +615,7 @@ class Dataset:
             dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
             members: List of RIDs of members to add to the  dataset_table.
             description: Markdown description of the updated dataset.
+            execution_rid: Optional RID of execution associated with this operation.
         """
 
         members = set(members)
