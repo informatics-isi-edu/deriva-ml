@@ -53,6 +53,9 @@ nav:
     - Datasets: code-docs/dataset.md
     - DatasetBag Auxiliary Classes: code-docs/dataset_aux_classes.md
     - DatasetBag: code-docs/dataset_bag.md
+    - DerivaModel: code-docs/deriva_model.md
     - Execution: code-docs/execution.md
     - ExecutionConfiguration: code-docs/execution_configuration.md
+    - Feature: code-docs/feature.md
+    - Upload: code-docs/upload.md
   - Release Notes: release-notes.md
