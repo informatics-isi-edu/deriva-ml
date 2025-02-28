@@ -6,6 +6,7 @@ from demo_catalog import (
     populate_demo_catalog,
     create_demo_datasets,
     create_demo_features,
+    reset_demo_catalog,
 )
 import logging
 
@@ -31,25 +32,36 @@ class TestDerivaML(unittest.TestCase):
         self.hostname = hostname
         self.domain_schema = SNAME_DOMAIN
         self.catalog_populated = False
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        self.model = None
 
     def setUp(self):
         self.ml_instance = DerivaML(
             hostname,
             TestCatalog.catalog_id,
             SNAME_DOMAIN,
-            logging_level=logging.WARNING,
+            logging_level=logging.INFO,
         )
+        self.reset_catalog()
         self.model = self.ml_instance.model
+
+    def tearDown(self):
+        self.ml_instance = None
+
+    def reset_catalog(self):
+        reset_demo_catalog(self.ml_instance, self.domain_schema)
+        self.catalog_populated = False
 
     def populate_catalog(self):
         if not self.catalog_populated:
-            logging.info("Populating catalog")
+            self.logger.info("Populating catalog")
             populate_demo_catalog(self.ml_instance, self.domain_schema)
             self.catalog_populated = True
 
     def create_nested_dataset(self) -> tuple[RID, list[RID], list[RID]]:
         self.populate_catalog()
-        logging.info("Creating nested dataset")
+        self.logger.info("Creating nested dataset")
         return create_demo_datasets(self.ml_instance)
 
     def create_features(self):

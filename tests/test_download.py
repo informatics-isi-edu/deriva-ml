@@ -1,6 +1,7 @@
 from derivaml_test import TestDerivaML
 from deriva_ml import DatasetSpec
 from pathlib import Path
+from pprint import pprint
 
 
 class TestDownload(TestDerivaML):
@@ -45,3 +46,11 @@ class TestDownload(TestDerivaML):
 
         self.assertEqual(1, len(new_bag.list_dataset_members()["Subject"]))
         self.assertEqual(0, len(bag.list_dataset_members()["Subject"]))
+
+        children = new_bag.list_dataset_children()
+        print(children)
+        for c in children:
+            print(c)
+            pprint(c.list_dataset_members())
+            pprint(list(c.get_table_as_dict("Image")))
+            c.get_table_as_dict("Subject")
