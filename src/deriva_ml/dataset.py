@@ -195,23 +195,22 @@ class Dataset:
         else:
             return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
 
-    def _build_dataset_graph(
-        self, dataset_rid: RID, ts=TopologicalSorter(), visited=None
-    ) -> Iterable[RID]:
-        """Use topological sort to return bottom up list of nested datasets"""
+    def _build_dataset_graph(self, dataset_rid: RID) -> Iterable[RID]:
+        ts = TopologicalSorter()
+        self._build_dataset_graph_1(dataset_rid, ts, set())
+        return ts.static_order()
 
-        visited = visited or set()
+    def _build_dataset_graph_1(self, dataset_rid: RID, ts, visited) -> None:
+        """Use topological sort to return bottom up list of nested datasets"""
+        ts.add(dataset_rid)
         if dataset_rid not in visited:
             visited.add(dataset_rid)
             children = self.list_dataset_children(dataset_rid=dataset_rid)
             parents = self.list_dataset_parents(dataset_rid=dataset_rid)
             for parent in parents:
-                ts.add(parent, dataset_rid)
-                self._build_dataset_graph(ts, parent, visited)
+                self._build_dataset_graph_1(parent, ts, visited)
             for child in children:
-                ts.add(dataset_rid, child)
-                self._build_dataset_graph(ts, child, visited)
-        return ts.static_order()
+                self._build_dataset_graph_1(child, ts, visited)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def increment_dataset_version(
@@ -880,50 +879,6 @@ class Dataset:
             else 0
         )
 
-    def _schema_graph(
-        self, node: Table, visited_nodes: Optional[set] = None
-    ) -> dict[Table, list[dict[Table, list]]]:
-        """Generate an undirected, acyclic graph of domain schema. We do this by traversing the schema foreign key
-        relationships.  We stop when we hit the deriva-ml schema or when we reach a node that we have already seen.
-
-        Nested datasets need to be unfolded
-
-        Args:
-          node: Current (starting) node in the graph.
-          visited_nodes: param nested_dataset: Are we in a nested dataset_table, (i.e. have we seen the DataSet table)?
-
-        Returns:
-            Graph of the schema, starting from node.
-        """
-
-        visited_nodes = visited_nodes or set()
-        graph = {node: []}
-
-        def include_node(child: Table) -> bool:
-            """Indicate if the table should be included in the graph.
-
-            Include node in the graph if it's not a loopback from fk<-> referred_by, you have not already been to the
-            node.
-            """
-            return (
-                child != node
-                and child not in visited_nodes
-                and child.schema.name == self._model.domain_schema
-            )
-
-        # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
-        nodes = {fk.pk_table for fk in node.foreign_keys if include_node(fk.pk_table)}
-        nodes |= {fk.table for fk in node.referenced_by if include_node(fk.table)}
-        for t in nodes:
-            new_visited_nodes = visited_nodes.copy()
-            new_visited_nodes.add(t)
-            if self._model.is_vocabulary(t):
-                # If the end of the path is a vocabulary table, we are at a terminal node in the ERD, so stop
-                continue
-            # Get all the paths that extend the current path
-            graph[node].append(self._schema_graph(t, new_visited_nodes))
-        return graph
-
     def _dataset_specification(
         self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
     ) -> list[dict[str, Any]]:
@@ -965,7 +920,7 @@ class Dataset:
             A dataset_table specification.
         """
         element_spec = []
-        for path in self._table_paths(self._schema_graph(self.dataset_table)):
+        for path in self._table_paths(self._model.schema_graph(self.dataset_table)):
             element_spec.extend(writer(*path))
         return self._vocabulary_specification(writer) + element_spec
 
