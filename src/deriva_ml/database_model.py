@@ -342,60 +342,6 @@ class DatabaseModel(DerivaModel):
         except KeyError:
             raise DerivaMLException(f'Table name "{table}" does not exist.')
 
-    def get_table(self, table: str) -> Generator[tuple, None, None]:
-        """Retrieve the contents of the specified table. If schema is not provided as part of the table name,
-        the method will attempt to locate the schema for the table.
-
-        Args:
-            table: return: A generator that yields tuples of column values.
-
-        Returns:
-          A generator that yields tuples of column values.
-
-        """
-        table_name = self.normalize_table_name(table)
-        result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
-        while row := result.fetchone():
-            yield row
-
-    def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
-        """Retrieve the contents of the specified table as a dataframe.
-
-
-        If schema is not provided as part of the table name,
-        the method will attempt to locate the schema for the table.
-
-        Args:
-            table: Table to retrieve data from.
-
-        Returns:
-          A dataframe containing the contents of the specified table.
-        """
-        table_name = self.normalize_table_name(table)
-        return pd.read_sql(f'SELECT * FROM "{table_name}"', con=self.dbase)
-
-    def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
-        """Retrieve the contents of the specified table as a dictionary.
-
-        Args:
-            table: Table to retrieve data from. f schema is not provided as part of the table name,
-                the method will attempt to locate the schema for the table.
-
-        Returns:
-          A generator producing dictionaries containing the contents of the specified table as name/value pairs.
-        """
-        table_name = self.normalize_table_name(table)
-        with self.dbase:
-            col_names = [
-                c[1]
-                for c in self.dbase.execute(
-                    f'PRAGMA table_info("{table_name}")'
-                ).fetchall()
-            ]
-            result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
-            while row := result.fetchone():
-                yield dict(zip(col_names, row))
-
     def delete_database(self):
         """
 

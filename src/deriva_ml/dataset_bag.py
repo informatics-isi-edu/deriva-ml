@@ -11,7 +11,7 @@ from typing import Any, Generator, TYPE_CHECKING, Optional, Iterable
 
 import pandas as pd
 from pydantic import validate_call
-from .deriva_definitions import RID
+from .deriva_definitions import RID, DerivaMLException
 from .feature import Feature
 
 if TYPE_CHECKING:
@@ -69,17 +69,147 @@ class DatasetBag:
         """
         return self.model.list_tables()
 
+    def _find_link(self, path: list[Table]) -> list[tuple[str, str]]:
+        """Given a path through the model, return the FKs that linke the tables"""
+        linkage = []
+        for table1, table2 in zip(path, path[1:]):
+            table1_name = self.model.normalize_table_name(table1.name)
+            table2_name = self.model.normalize_table_name(table2.name)
+            out_links = [
+                (
+                    f'"{table1_name}".{fk.foreign_key_columns[0].name}',
+                    f'"{table2_name}".{fk.referenced_columns[0].name}',
+                )
+                for fk in table1.foreign_keys
+                if fk.pk_table == table2
+            ]
+            in_links = [
+                (
+                    f'"{table1_name}".{fk.referenced_columns[0].name}',
+                    f'"{table2_name}".{fk.foreign_key_columns[0].name}',
+                )
+                for fk in table1.referenced_by
+                if fk.table == table2
+            ]
+            if len(in_links) + len(out_links) != 1:
+                raise DerivaMLException(
+                    f"Ambiguous linkage between {table1.name} and {table2.name}"
+                )
+            linkage.append(in_links[0] if in_links else out_links[0])
+        return linkage
+
+    def _domain_table_paths(
+        self,
+        graph: dict[Table, list[dict[Table, Any]]],
+        join_tables: list,
+    ) -> list[list[Table]]:
+        """Recursively walk over the domain schema graph and extend the current path.
+
+        Args:
+            graph: An undirected, acyclic graph of schema.  Represented as a dictionary whose name is the table name.
+                and whose values are the child nodes of the table.
+            spath: Source path so far
+            sprefix: Initial path to be included.  Allows for nested datasets
+            nested: If true, skip initial data segment.
+
+        Returns:
+          A list of all the paths through the graph.  Each path is a list of tables.
+
+        """
+        paths = []
+        for node, children in graph.items():
+            new_join_tables = join_tables + [node]
+            paths.append(new_join_tables)
+            for child in children:
+                paths.extend(self._domain_table_paths(child, new_join_tables))
+        return paths
+
+    def _dataset_table_view(self, table: str) -> str:
+        table_name = self.model.normalize_table_name(table)
+        with self.database as dbase:
+            select_args = ",".join(
+                [
+                    f'"{table_name}".{c[1]}'
+                    for c in dbase.execute(
+                        f'PRAGMA table_info("{table_name}")'
+                    ).fetchall()
+                ]
+            )
+        datasets = ",".join(
+            [f'"{self.dataset_rid}"']
+            + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
+        )
+        graph = self.model.schema_graph(self._dataset_table)
+        paths = [
+            (
+                [f'"{self.model.normalize_table_name(t.name)}"' for t in p],
+                self._find_link(p),
+            )
+            for p in self._domain_table_paths(graph=graph, join_tables=[])
+            if p[-1].name == table
+        ]
+        sql = []
+        dataset_table_name = (
+            f'"{self.model.normalize_table_name(self._dataset_table.name)}"'
+        )
+        for ts, on in paths:
+            tables = " JOIN ".join(ts)
+            on_expression = " and ".join([f"{l}={r}" for l, r in on])
+            sql.append(
+                f"SELECT {select_args} FROM {tables} ON {on_expression} WHERE {dataset_table_name}.RID IN ({datasets})"
+            )
+        sql = " UNION ".join(sql) if len(sql) > 1 else sql[0]
+        return sql
+
     def get_table(self, table: str) -> Generator[tuple, None, None]:
-        """Get the contents of the specified table as a set of tuples"""
-        return self.model.get_table(table)
+        """Retrieve the contents of the specified table. If schema is not provided as part of the table name,
+        the method will attempt to locate the schema for the table.
+
+        Args:
+            table: return: A generator that yields tuples of column values.
+
+        Returns:
+          A generator that yields tuples of column values.
+
+        """
+        result = self.database.execute(self._dataset_table_view(table))
+        while row := result.fetchone():
+            yield row
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
-        """Get the contents of the specified table as a dataframe"""
-        return self.model.get_table_as_dataframe(table)
+        """Retrieve the contents of the specified table as a dataframe.
+
+
+        If schema is not provided as part of the table name,
+        the method will attempt to locate the schema for the table.
+
+        Args:
+            table: Table to retrieve data from.
+
+        Returns:
+          A dataframe containing the contents of the specified table.
+        """
+        return pd.read_sql(self._dataset_table_view(table))
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
-        """Get the contents of the specified table as a dictionary"""
-        return self.model.get_table_as_dict(table)
+        """Retrieve the contents of the specified table as a dictionary.
+
+        Args:
+            table: Table to retrieve data from. f schema is not provided as part of the table name,
+                the method will attempt to locate the schema for the table.
+
+        Returns:
+          A generator producing dictionaries containing the contents of the specified table as name/value pairs.
+        """
+        table_name = self.model.normalize_table_name(table)
+        with self.database as dbase:
+            col_names = [
+                c[1]
+                for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()
+            ]
+            result = self.database.execute(self._dataset_table_view(table))
+            while row := result.fetchone():
+                yield dict(zip(col_names, row))
 
     @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[tuple]]:

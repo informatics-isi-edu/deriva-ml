@@ -20,7 +20,7 @@ from .deriva_definitions import (
 )
 
 from pydantic import validate_call, ConfigDict
-from typing import Iterable
+from typing import Iterable, Optional
 
 
 class DerivaModel:
@@ -231,11 +231,55 @@ class DerivaModel:
         return {c.name for c in table.columns} - asset_columns
 
     def apply(self):
-        """Call Ermrestmodel.apply"""
+        """Call ERMRestModel.apply"""
         if self.catalog == "file-system":
             raise DerivaMLException("Cannot apply() to non-catalog model.")
         else:
             self.model.apply()
+
+    def schema_graph(
+        self, node: Table, visited_nodes: Optional[set] = None
+    ) -> dict[Table, list[dict[Table, list]]]:
+        """Generate an undirected, acyclic graph of domain schema. We do this by traversing the schema foreign key
+        relationships.  We stop when we hit the deriva-ml schema or when we reach a node that we have already seen.
+
+        Nested datasets need to be unfolded
+
+        Args:
+          node: Current (starting) node in the graph.
+          visited_nodes: param nested_dataset: Are we in a nested dataset_table, (i.e. have we seen the DataSet table)?
+
+        Returns:
+            Graph of the schema, starting from node.
+        """
+
+        visited_nodes = visited_nodes or set()
+        graph = {node: []}
+
+        def include_node(child: Table) -> bool:
+            """Indicate if the table should be included in the graph.
+
+            Include node in the graph if it's not a loopback from fk<-> referred_by, you have not already been to the
+            node.
+            """
+            return (
+                child != node
+                and child not in visited_nodes
+                and child.schema.name == self.domain_schema
+            )
+
+        # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
+        nodes = {fk.pk_table for fk in node.foreign_keys if include_node(fk.pk_table)}
+        nodes |= {fk.table for fk in node.referenced_by if include_node(fk.table)}
+        for t in nodes:
+            new_visited_nodes = visited_nodes.copy()
+            new_visited_nodes.add(t)
+            if self.is_vocabulary(t):
+                # If the end of the path is a vocabulary table, we are at a terminal node in the ERD, so stop
+                continue
+            # Get all the paths that extend the current path
+            graph[node].append(self.schema_graph(t, new_visited_nodes))
+        return graph
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_table(self, table_def: TableDefinition) -> Table:

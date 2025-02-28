@@ -50,22 +50,6 @@ def setup_dev():
     )
     return ml_instance, config
 
-
-def huy_test():
-    host = "www.eye-ai.org"
-    source_dataset = "2-39FY"
-    ml_instance.download_dataset(source_dataset)
-
-
-def lac_test():
-    huy_datasets = ["2-39FY", "2-277M"]
-    source_dataset = "2-7K8W"
-    test_workflow = Workflow(
-        name="LAC data template",
-        url="https://github.com/informatics-isi-edu/eye-ai-exec/blob/main/notebooks/templates/template_lac.ipynb",
-        workflow_type="Test Workflow",
-    )
-
     # Configuration instance.
     config = ExecutionConfiguration(
         datasets=huy_datasets,
@@ -83,7 +67,7 @@ def create_demo_ml():
         host,
         "test-schema",
         create_features=False,
-        create_datasets=True,
+        create_datasets=False,
     )
     return DemoML(host, test_catalog.catalog_id)
 
