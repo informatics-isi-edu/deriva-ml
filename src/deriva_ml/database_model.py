@@ -1,3 +1,6 @@
+"""Ths module constains the definition of the DatabaseModel class.  The role of this class is to provide an nterface between the BDBag representation
+of a dataset and a sqllite database in which the contents of the bag are stored.
+"""
 import logging
 import sqlite3
 
