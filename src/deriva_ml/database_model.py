@@ -35,6 +35,9 @@ class DatabaseModel(DerivaModel):
     Because of nested datasets, it's possible that more than one dataset rid is in a bag, or that a dataset rid might
     appear in more than one database. To help manage this, a global list of all the datasets that have been loaded
     into DatabaseModels, is kept in the class variable `_rid_map`.
+    
+    Because you can load diffent versions of a dataset simultaniously, the dataset RID and version number are tracked, and a new
+    sqllite instance is created for every new dataset version present.
 
     Attributes:
         bag_path (Path): path to the local copy of the BDBag
