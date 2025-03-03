@@ -237,6 +237,35 @@ class DerivaModel:
         else:
             self.model.apply()
 
+    def _find_link(self, path: list[Table]) -> list[tuple[str, str]]:
+        """Given a path through the model, return the FKs that linke the tables"""
+        linkage = []
+        for table1, table2 in zip(path, path[1:]):
+            table1_name = self.model.normalize_table_name(table1.name)
+            table2_name = self.model.normalize_table_name(table2.name)
+            out_links = [
+                (
+                    f'"{table1_name}".{fk.foreign_key_columns[0].name}',
+                    f'"{table2_name}".{fk.referenced_columns[0].name}',
+                )
+                for fk in table1.foreign_keys
+                if fk.pk_table == table2
+            ]
+            in_links = [
+                (
+                    f'"{table1_name}".{fk.referenced_columns[0].name}',
+                    f'"{table2_name}".{fk.foreign_key_columns[0].name}',
+                )
+                for fk in table1.referenced_by
+                if fk.table == table2
+            ]
+            if len(in_links) + len(out_links) != 1:
+                raise DerivaMLException(
+                    f"Ambiguous linkage between {table1.name} and {table2.name}"
+                )
+            linkage.append(in_links[0] if in_links else out_links[0])
+        return linkage
+
     def schema_graph(
         self, node: Table, visited_nodes: Optional[set] = None
     ) -> dict[Table, list[dict[Table, list]]]:
@@ -297,6 +326,32 @@ class DerivaModel:
           A list of all the paths through the graph.  Each path is a list of tables.
 
         """
+
+        def find_arcs(node) -> list[Table]:
+            """Given a path through the model, return the FKs that linke the tables"""
+            linkage = []
+                out_links = [
+                (
+                    f'"{table1_name}".{fk.foreign_key_columns[0].name}',
+                    f'"{table2_name}".{fk.referenced_columns[0].name}',
+                )
+                for fk in table1.foreign_keys
+                if fk.pk_table.schema != table2
+            ]
+                in_links = [
+                    (
+                        f'"{table1_name}".{fk.referenced_columns[0].name}',
+                        f'"{table2_name}".{fk.foreign_key_columns[0].name}',
+                    )
+                    for fk in table1.referenced_by
+                    if fk.table == table2
+                ]
+                if len(in_links) + len(out_links) != 1:
+                    raise DerivaMLException(
+                        f"Ambiguous linkage between {table1.name} and {table2.name}"
+                    )
+                linkage.append(in_links[0] if in_links else out_links[0])
+            return linkage
 
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
             if self.is_association(n2) == 2:
