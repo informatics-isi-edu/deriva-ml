@@ -98,32 +98,6 @@ class DatasetBag:
             linkage.append(in_links[0] if in_links else out_links[0])
         return linkage
 
-    def _domain_table_paths(
-        self,
-        graph: dict[Table, list[dict[Table, Any]]],
-        join_tables: list,
-    ) -> list[list[Table]]:
-        """Recursively walk over the domain schema graph and extend the current path.
-
-        Args:
-            graph: An undirected, acyclic graph of schema.  Represented as a dictionary whose name is the table name.
-                and whose values are the child nodes of the table.
-            spath: Source path so far
-            sprefix: Initial path to be included.  Allows for nested datasets
-            nested: If true, skip initial data segment.
-
-        Returns:
-          A list of all the paths through the graph.  Each path is a list of tables.
-
-        """
-        paths = []
-        for node, children in graph.items():
-            new_join_tables = join_tables + [node]
-            paths.append(new_join_tables)
-            for child in children:
-                paths.extend(self._domain_table_paths(child, new_join_tables))
-        return paths
-
     def _dataset_table_view(self, table: str) -> str:
         table_name = self.model.normalize_table_name(table)
         with self.database as dbase:
@@ -145,7 +119,7 @@ class DatasetBag:
                 [f'"{self.model.normalize_table_name(t.name)}"' for t in p],
                 self._find_link(p),
             )
-            for p in self._domain_table_paths(graph=graph, join_tables=[])
+            for p in self.model.schema_graph_to_paths(graph=graph, path=[])
             if p[-1].name == table
         ]
         sql = []

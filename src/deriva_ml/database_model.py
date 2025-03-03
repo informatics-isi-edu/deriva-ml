@@ -3,12 +3,10 @@ import sqlite3
 
 from csv import reader
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 
-import pandas as pd
 from deriva.core.ermrest_model import Model
-from pydantic import validate_call
 
 from .deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
 from .dataset_aux_classes import DatasetVersion, DatasetMinid
@@ -16,7 +14,21 @@ from .deriva_model import DerivaModel
 from .dataset_bag import DatasetBag
 
 
-class DatabaseModel(DerivaModel):
+class DatabaseModelMeta(type):
+    """Use metaclass to ensure that there is onl one instance per path"""
+
+    _paths_loaded: dict[Path:"DatabaseModel"] = {}
+
+    def __call__(cls, *args, **kwargs):
+        logger = logging.getLogger("deriva_ml")
+        bag_path: Path = args[1]
+        if bag_path.as_posix() not in cls._paths_loaded:
+            logger.info(f"Loading {bag_path}")
+            cls._paths_loaded[bag_path] = super().__call__(*args, **kwargs)
+        return cls._paths_loaded[bag_path]
+
+
+class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     """Read in the contents of a BDBag and create a local SQLite database.
 
         As part of its initialization, this routine will create a sqlite database that has the contents of all the tables
@@ -42,28 +54,8 @@ class DatabaseModel(DerivaModel):
         dataset_table  (Table): the dataset table in the ERMRest model.
     """
 
-    # Keep track of what databases we have loaded.
-    _paths_loaded: dict[Path:"DatabaseModel"] = {}
-
     # Maintain a global map of RIDS to versions and databases.
     _rid_map: dict[RID, list[tuple[DatasetVersion, "DatabaseModel"]]] = {}
-
-    @classmethod
-    @validate_call
-    def register(cls, minid: DatasetMinid, bag_path: Path):
-        """Register a new minid in the list of local databases if it's new, otherwise, return an existing DatabaseModel.
-
-        Args:
-            minid: MINID to the databag that is to be loaded.
-            bag_path: Path to the bag on the local filesystem./
-
-        Returns:
-            A DatabaseModel instance to the loaded bag.
-        """
-        o = cls._paths_loaded.get(bag_path.as_posix())
-        if o:
-            return o
-        return cls(minid, bag_path)
 
     @staticmethod
     def rid_lookup(dataset_rid: RID) -> list[tuple[DatasetVersion, "DatabaseModel"]]:
@@ -84,13 +76,12 @@ class DatabaseModel(DerivaModel):
             raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
     def __init__(self, minid: DatasetMinid, bag_path: Path):
-        """Create a new DatabaseModel.  This should only be called via the static Register method
+        """Create a new DatabaseModel.
 
         Args:
             minid: Minid for the specified bag.
             bag_path:  Path to the local copy of the BDBag.
         """
-        DatabaseModel._paths_loaded[bag_path.as_posix()] = self
 
         self.bag_path = bag_path
         self.minid = minid

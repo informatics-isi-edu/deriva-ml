@@ -952,7 +952,7 @@ class Dataset:
             if dataset.materialize
             else self._download_dataset_bag(minid)
         )
-        return DatabaseModel.register(minid, bag_path).get_dataset()
+        return DatabaseModel(minid, bag_path).get_dataset()
 
     def _version_snapshot(self, dataset: DatasetSpec) -> str:
         version_record = [
