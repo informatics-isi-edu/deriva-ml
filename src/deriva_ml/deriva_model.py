@@ -20,7 +20,7 @@ from .deriva_definitions import (
 )
 
 from pydantic import validate_call, ConfigDict
-from typing import Iterable, Optional, Any
+from typing import Iterable, Optional
 
 
 class DerivaModel:
@@ -238,7 +238,7 @@ class DerivaModel:
             self.model.apply()
 
     def _find_link(self, path: list[Table]) -> list[tuple[str, str]]:
-        """Given a path through the model, return the FKs that linke the tables"""
+        """Given a path through the model, return the FKs that link the tables"""
         linkage = []
         for table1, table2 in zip(path, path[1:]):
             table1_name = self.model.normalize_table_name(table1.name)
@@ -310,64 +310,53 @@ class DerivaModel:
             graph[node].append(self.schema_graph(t, new_visited_nodes))
         return graph
 
-    def schema_graph_to_paths(
-        self, graph: dict[Table, list[dict[Table, Any]]], path: list[Table] = None
+    def schema_to_paths(
+        self, root: Table = None, path: list[Table] = None
     ) -> list[list[Table]]:
         """Recursively walk over the domain schema graph and extend the current path.
 
         Walk a schema graph and return a list all  the paths through the graph.
 
         Args:
-            graph: An undirected, acyclic graph of schema.  Represented as a dictionary whose name is the table name.
-                and whose values are the child nodes of the table.
             path: Source path so far
 
         Returns:
           A list of all the paths through the graph.  Each path is a list of tables.
 
         """
+        root = root or self.model.schemas[self.ml_schema].table['Dataset']
+        path = path.copy() if path else []
+        path.append(root)
+        paths = [path]
 
-        def find_arcs(node) -> list[Table]:
-            """Given a path through the model, return the FKs that linke the tables"""
-            linkage = []
-                out_links = [
-                (
-                    f'"{table1_name}".{fk.foreign_key_columns[0].name}',
-                    f'"{table2_name}".{fk.referenced_columns[0].name}',
-                )
-                for fk in table1.foreign_keys
-                if fk.pk_table.schema != table2
-            ]
-                in_links = [
-                    (
-                        f'"{table1_name}".{fk.referenced_columns[0].name}',
-                        f'"{table2_name}".{fk.foreign_key_columns[0].name}',
-                    )
-                    for fk in table1.referenced_by
-                    if fk.table == table2
-                ]
-                if len(in_links) + len(out_links) != 1:
-                    raise DerivaMLException(
-                        f"Ambiguous linkage between {table1.name} and {table2.name}"
-                    )
-                linkage.append(in_links[0] if in_links else out_links[0])
-            return linkage
+        def find_arcs(table: Table) -> set[Table]:
+            """Given a path through the model, return the FKs that link the tables"""
+            arc_list = [fk.pk_table for fk in table.foreign_keys] + [fk.table for fk in table.referenced_by]
+            arc_list = [t for t in arc_list if t.schema.name in {self.domain_schema, self.domain_schema}]
+            arcs = set(arc_list)
+            if len(arcs) == len(arc_list):
+                raise DerivaMLException(f'Ambiguous relationship in {table.name} ')
+            return arcs
 
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
-            if self.is_association(n2) == 2:
+            # If we have node_name <- node_name_dataset-> Dataset then we are looping
+            # back around to a new dataset element
+            if n1.name != 'Dataset' and self.is_association(n2) == 2 and n2.name == f'{n1.name}_Dataset':
                 print(list(n1.find_associations()))
+                return True
+            else:
                 return False
 
-        paths = []
-        path = path.copy() if path else []
+        # Don't follow vocabulary terms back to their use.
+        if self.is_vocabulary(root):
+            return paths
 
-        for node, children in graph.items():
-            path.append(node)
-            paths.append(path)
-            for child in children:
-                if is_nested_dataset_loopback(node, child):
-                    continue
-                paths.extend(self.schema_graph_to_paths(child, path))
+        for child in find_arcs(root):
+            if child in path:
+                raise DerivaMLException(f'Cycle in path at {child.name}')
+            if is_nested_dataset_loopback(root, child):
+                continue
+            paths.extend(self.schema_to_paths(child, path))
         return paths
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
