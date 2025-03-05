@@ -145,7 +145,7 @@ class DatasetBag:
         Returns:
           A dataframe containing the contents of the specified table.
         """
-        return pd.read_sql(self._dataset_table_view(table))
+        return pd.read_sql(self._dataset_table_view(table), self.database)
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
