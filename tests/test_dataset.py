@@ -126,7 +126,10 @@ class TestDataset(TestDerivaML):
                 "Dataset"
             ]
         )
-        print(self.ml_instance.list_dataset_children(dataset_rid=double_nested_dataset))
+        print(
+            "double nested children",
+            self.ml_instance.list_dataset_children(dataset_rid=double_nested_dataset),
+        )
         self.assertEqual(2, self.ml_instance._dataset_nesting_depth())
         self.assertEqual(
             set(nested_datasets),
