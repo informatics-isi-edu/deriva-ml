@@ -772,6 +772,7 @@ class Dataset:
         def children_depth(
             dataset_rid: RID, nested_datasets: dict[RID, list[RID]]
         ) -> int:
+            """Return the number of nested datasets in the current catalog"""
             try:
                 children = nested_datasets[dataset_rid]
                 return (
@@ -1006,6 +1007,7 @@ class Dataset:
         """
 
         def update_status(status: Status, msg: str) -> None:
+            """Update the current status for this execution in the catalog"""
             self._model.catalog.getPathBuilder().schemas[
                 self._ml_schema
             ].Execution.update(

@@ -1,3 +1,7 @@
+"""
+This module defined the Execution class which is used to interact with the state of an active execution.
+"""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -240,7 +244,7 @@ class Execution:
         )
 
     def execution_start(self) -> None:
-        """ """
+        """Start an execution, uploading status to catalog"""
 
         self.start_time = datetime.now()
         self.uploaded_assets = None
@@ -681,6 +685,17 @@ class Execution:
         validate: bool = True,
         description: str = "",
     ) -> None:
+        """Add additional elements to an existing dataset_table.
+
+        Add new elements to an existing dataset. In addition to adding new members, the minor version number of the
+        dataset is incremented and the description, if provide is applied to that new version.
+
+        Args:
+            dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
+            members: List of RIDs of members to add to the  dataset_table.
+            validate: Check rid_list to make sure elements are not already in the dataset_table.
+            description: Markdown description of the updated dataset.
+        """
         return self._ml_object.add_dataset_members(
             dataset_rid=dataset_rid,
             members=members,
@@ -692,6 +707,21 @@ class Execution:
     def increment_dataset_version(
         self, dataset_rid: RID, component: VersionPart, description: str = ""
     ) -> DatasetVersion:
+        """Increment the version of the specified dataset_table.
+
+        Args:
+          dataset_rid: RID to a dataset_table
+          component: Which version of the dataset_table to increment.
+          dataset_rid: RID of the dataset whose version is to be incremented.
+          component: Major, Minor or Patch
+          description: Description of the version update of the dataset_table.
+
+        Returns:
+          new semantic version of the dataset_table as a 3-tuple
+
+        Raises:
+          DerivaMLException: if provided RID is not to a dataset_table.
+        """
         return self._ml_object.increment_dataset_version(
             dataset_rid=dataset_rid,
             component=component,

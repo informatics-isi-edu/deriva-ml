@@ -30,15 +30,12 @@ class FeatureRecord(BaseModel):
     feature: ClassVar[Optional["Feature"]] = None
 
     class Config:
-        """ """
 
         arbitrary_types_allowed = True
 
     @classmethod
     def feature_columns(cls) -> set[Column]:
         """
-
-        Args:
 
         Returns:
           A set of feature column names.

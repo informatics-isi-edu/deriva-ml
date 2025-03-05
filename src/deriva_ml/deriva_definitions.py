@@ -34,6 +34,8 @@ DerivaSystemColumns = ["RID", "RCT", "RMT", "RCB", "RMB"]
 
 # For some reason, deriva-py doesn't use the proper enum class!!
 class UploadState(Enum):
+    """State of file upload"""
+
     success = 0
     failed = 1
     pending = 2
@@ -132,8 +134,6 @@ class VocabularyTerm(BaseModel):
     rid: str = Field(alias="RID")
 
     class Config:
-        """ """
-
         extra = "ignore"
 
 
@@ -177,7 +177,6 @@ class ColumnDefinition(BaseModel):
 
     @model_serializer()
     def serialize_column_definition(self):
-        print("serialize_column_definition")
         return em.Column.define(
             self.name,
             builtin_types[self.type.value],

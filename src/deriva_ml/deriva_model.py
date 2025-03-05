@@ -17,12 +17,11 @@ from .deriva_definitions import (
     ML_SCHEMA,
     DerivaSystemColumns,
     TableDefinition,
-    ColumnDefinition,
 )
 
 from collections import Counter
 from pydantic import validate_call, ConfigDict
-from typing import Iterable, Optional
+from typing import Iterable
 
 
 class DerivaModel:
@@ -34,6 +33,8 @@ class DerivaModel:
         schemas: ERMRest model for the catalog.
         catalog: ERMRest catalog for the model
         hostname: ERMRest catalog for the model
+        ml_schema: The ML schema for the catalog.
+        domain_schema: The domain schema for the catalog.
 
     """
 
@@ -239,79 +240,6 @@ class DerivaModel:
         else:
             self.model.apply()
 
-    def _find_link(self, path: list[Table]) -> list[tuple[str, str]]:
-        """Given a path through the model, return the FKs that link the tables"""
-        linkage = []
-        for table1, table2 in zip(path, path[1:]):
-            table1_name = self.model.normalize_table_name(table1.name)
-            table2_name = self.model.normalize_table_name(table2.name)
-            out_links = [
-                (
-                    f'"{table1_name}".{fk.foreign_key_columns[0].name}',
-                    f'"{table2_name}".{fk.referenced_columns[0].name}',
-                )
-                for fk in table1.foreign_keys
-                if fk.pk_table == table2
-            ]
-            in_links = [
-                (
-                    f'"{table1_name}".{fk.referenced_columns[0].name}',
-                    f'"{table2_name}".{fk.foreign_key_columns[0].name}',
-                )
-                for fk in table1.referenced_by
-                if fk.table == table2
-            ]
-            if len(in_links) + len(out_links) != 1:
-                raise DerivaMLException(
-                    f"Ambiguous linkage between {table1.name} and {table2.name}"
-                )
-            linkage.append(in_links[0] if in_links else out_links[0])
-        return linkage
-
-    def schema_graph(
-        self, node: Table, visited_nodes: Optional[set] = None
-    ) -> dict[Table, list[dict[Table, list]]]:
-        """Generate an undirected, acyclic graph of domain schema. We do this by traversing the schema foreign key
-        relationships.  We stop when we hit the deriva-ml schema or when we reach a node that we have already seen.
-
-        Nested datasets need to be unfolded
-
-        Args:
-          node: Current (starting) node in the graph.
-          visited_nodes: param nested_dataset: Are we in a nested dataset_table, (i.e. have we seen the DataSet table)?
-
-        Returns:
-            Graph of the schema, starting from node.
-        """
-
-        visited_nodes = visited_nodes or set()
-        graph = {node: []}
-
-        def include_node(child: Table) -> bool:
-            """Indicate if the table should be included in the graph.
-
-            Include node in the graph if it's not a loopback from fk<-> referred_by, you have not already been to the
-            node.
-            """
-            return (
-                child != node
-                and child not in visited_nodes
-                and child.schema.name == self.domain_schema
-            )
-
-        # Get all the tables reachable from the end of the path avoiding loops from T1<->T2 via referenced_by
-        nodes = {fk.pk_table for fk in node.foreign_keys if include_node(fk.pk_table)}
-        nodes |= {fk.table for fk in node.referenced_by if include_node(fk.table)}
-        for t in nodes:
-            new_visited_nodes = visited_nodes.copy()
-            new_visited_nodes.add(t)
-            if self.is_vocabulary(t):
-                # If the end of the path is a vocabulary table, we are at a terminal node in the ERD, so stop
-                continue
-            # Get all the paths that extend the current path
-            graph[node].append(self.schema_graph(t, new_visited_nodes))
-        return graph
-
     def _table_relationship(
         self, table1: Table | str, table2: Table | str
     ) -> tuple[Column, Column]:
@@ -376,6 +304,7 @@ class DerivaModel:
             return set(arc_list)
 
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
+            """Test to see if node is an association table used to link elements to datasets."""
             # If we have node_name <- node_name_dataset-> Dataset then we are looping
             # back around to a new dataset element
             dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
@@ -397,7 +326,6 @@ class DerivaModel:
             if is_nested_dataset_loopback(root, child):
                 continue
             if child in path:
-                continue
                 raise DerivaMLException(
                     f"Cycle in schema path: {child.name} path:{[p.name for p in path]}"
                 )

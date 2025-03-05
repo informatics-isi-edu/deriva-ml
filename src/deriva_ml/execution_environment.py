@@ -1,3 +1,5 @@
+""" Module that captures details of execution environment for use as execution metadata"""
+
 import locale
 import os
 import platform

@@ -785,7 +785,36 @@ class DerivaML(Dataset):
             ]
         )
 
+    def list_files(self) -> list[dict[str, Any]]:
+        """Return the contents of the file table.  Denormalized file types into the file record."""
+        atable = next(
+            self._model.schemas[self._ml_schema]
+            .tables[MLVocab.dataset_type]
+            .find_associations()
+        ).name
+        ml_path = self.pathBuilder.schemas[self._ml_schema]
+        atable_path = ml_path.tables[atable]
+        file_path = ml_path.File
+        # Get a list of all the dataset_type values associated with this dataset_table.
+        files = []
+        for file in file_path.entities().fetch():
+            file_types = (
+                atable_path.filter(file_path.Dataset == file["RID"])
+                .attributes(atable_path.Dataset_Type)
+                .fetch()
+            )
+            files.append(
+                file
+                | {
+                    MLVocab.dataset_type: [
+                        ds[MLVocab.dataset_type] for ft in file_types
+                    ]
+                }
+            )
+        return files
+
     def list_workflows(self) -> list[Workflow]:
+        """Return a list of all of the workflows in the catalog."""
         workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
         return [
             Workflow(

@@ -11,7 +11,7 @@ from typing import Any, Generator, TYPE_CHECKING, Optional, Iterable
 
 import pandas as pd
 from pydantic import validate_call
-from .deriva_definitions import RID, DerivaMLException
+from .deriva_definitions import RID
 from .feature import Feature
 
 if TYPE_CHECKING:
@@ -227,6 +227,14 @@ class DatasetBag:
         return dict(members)
 
     def find_features(self, table: str | Table) -> Iterable[Feature]:
+        """
+        Args:
+            table: The table to find features for.
+            table: Table | str:
+
+        Returns:
+            An iterable of FeatureResult instances that describe the current features in the table.
+        """
         return self.model.find_features(table)
 
     # noinspection PyProtectedMember
