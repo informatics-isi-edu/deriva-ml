@@ -31,7 +31,8 @@ class Workflow(BaseModel):
     url: str
     workflow_type: str
     version: Optional[str] = None
-    description: str = None
+    description: Optional[str] = ""
+    rid: Optional[RID] = None
 
 
 class ExecutionConfiguration(BaseModel):

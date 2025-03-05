@@ -2,7 +2,7 @@
 The module implements the sqllite interface to a set of directories representing a dataset bag.
 """
 
-from deriva.core.ermrest_model import Table
+from deriva.core.ermrest_model import Table, Column
 import deriva.core.datapath as datapath
 
 from collections import defaultdict
@@ -16,6 +16,11 @@ from .feature import Feature
 
 if TYPE_CHECKING:
     from .database_model import DatabaseModel
+
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class DatasetBag:
@@ -69,35 +74,6 @@ class DatasetBag:
         """
         return self.model.list_tables()
 
-    def _find_link(self, path: list[Table]) -> list[tuple[str, str]]:
-        """Given a path through the model, return the FKs that linke the tables"""
-        linkage = []
-        for table1, table2 in zip(path, path[1:]):
-            table1_name = self.model.normalize_table_name(table1.name)
-            table2_name = self.model.normalize_table_name(table2.name)
-            out_links = [
-                (
-                    f'"{table1_name}".{fk.foreign_key_columns[0].name}',
-                    f'"{table2_name}".{fk.referenced_columns[0].name}',
-                )
-                for fk in table1.foreign_keys
-                if fk.pk_table == table2
-            ]
-            in_links = [
-                (
-                    f'"{table1_name}".{fk.referenced_columns[0].name}',
-                    f'"{table2_name}".{fk.foreign_key_columns[0].name}',
-                )
-                for fk in table1.referenced_by
-                if fk.table == table2
-            ]
-            if len(in_links) + len(out_links) != 1:
-                raise DerivaMLException(
-                    f"Ambiguous linkage between {table1.name} and {table2.name}"
-                )
-            linkage.append(in_links[0] if in_links else out_links[0])
-        return linkage
-
     def _dataset_table_view(self, table: str) -> str:
         table_name = self.model.normalize_table_name(table)
         with self.database as dbase:
@@ -113,22 +89,28 @@ class DatasetBag:
             [f'"{self.dataset_rid}"']
             + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
         )
-        graph = self.model.schema_graph(self._dataset_table)
         paths = [
             (
                 [f'"{self.model.normalize_table_name(t.name)}"' for t in p],
-                self._find_link(p),
+                [self.model._table_relationship(t1, t2) for t1, t2 in zip(p, p[1:])],
             )
-            for p in self.model.schema_graph_to_paths(graph=graph, path=[])
+            for p in self.model._schema_to_paths()
             if p[-1].name == table
         ]
+
         sql = []
         dataset_table_name = (
             f'"{self.model.normalize_table_name(self._dataset_table.name)}"'
         )
+
+        def column_name(col: Column) -> str:
+            return f'"{self.model.normalize_table_name(col.table.name)}".{col.name}'
+
         for ts, on in paths:
             tables = " JOIN ".join(ts)
-            on_expression = " and ".join([f"{l}={r}" for l, r in on])
+            on_expression = " and ".join(
+                [f"{column_name(l)}={column_name(r)}" for l, r in on]
+            )
             sql.append(
                 f"SELECT {select_args} FROM {tables} ON {on_expression} WHERE {dataset_table_name}.RID IN ({datasets})"
             )

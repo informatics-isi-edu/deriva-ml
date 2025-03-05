@@ -8,7 +8,7 @@ from typing import Any, Iterable, Optional, Annotated
 
 import deriva.core.ermrest_model as em
 from deriva.core.ermrest_model import builtin_types
-from pydantic import BaseModel, model_serializer, Field, computed_field
+from pydantic import BaseModel, model_serializer, Field, computed_field, field_validator
 
 ML_SCHEMA = "deriva-ml"
 
@@ -80,31 +80,31 @@ class Status(StrEnum):
 
 
 class BuiltinTypes(Enum):
-    text = builtin_types.text
-    int2 = builtin_types.int2
-    jsonb = builtin_types.json
-    float8 = builtin_types.float8
-    timestamp = builtin_types.timestamp
-    int8 = builtin_types.int8
-    boolean = builtin_types.boolean
-    json = builtin_types.json
-    float4 = builtin_types.float4
-    int4 = builtin_types.int4
-    timestamptz = builtin_types.timestamptz
-    date = builtin_types.date
-    ermrest_rid = builtin_types.ermrest_rid
-    ermrest_rcb = builtin_types.ermrest_rcb
-    ermrest_rmb = builtin_types.ermrest_rmb
-    ermrest_rct = builtin_types.ermrest_rct
-    ermrest_rmt = builtin_types.ermrest_rmt
-    markdown = builtin_types.markdown
-    longtext = builtin_types.longtext
-    ermrest_curie = builtin_types.ermrest_curie
-    ermrest_uri = builtin_types.ermrest_uri
-    color_rgb_hex = builtin_types.color_rgb_hex
-    serial2 = builtin_types.serial2
-    serial4 = builtin_types.serial4
-    serial8 = builtin_types.serial8
+    text = builtin_types.text.typename
+    int2 = builtin_types.int2.typename
+    jsonb = builtin_types.json.typename
+    float8 = builtin_types.float8.typename
+    timestamp = builtin_types.timestamp.typename
+    int8 = builtin_types.int8.typename
+    boolean = builtin_types.boolean.typename
+    json = builtin_types.json.typename
+    float4 = builtin_types.float4.typename
+    int4 = builtin_types.int4.typename
+    timestamptz = builtin_types.timestamptz.typename
+    date = builtin_types.date.typename
+    ermrest_rid = builtin_types.ermrest_rid.typename
+    ermrest_rcb = builtin_types.ermrest_rcb.typename
+    ermrest_rmb = builtin_types.ermrest_rmb.typename
+    ermrest_rct = builtin_types.ermrest_rct.typename
+    ermrest_rmt = builtin_types.ermrest_rmt.typename
+    markdown = builtin_types.markdown.typename
+    longtext = builtin_types.longtext.typename
+    ermrest_curie = builtin_types.ermrest_curie.typename
+    ermrest_uri = builtin_types.ermrest_uri.typename
+    color_rgb_hex = builtin_types.color_rgb_hex.typename
+    serial2 = builtin_types.serial2.typename
+    serial4 = builtin_types.serial4.typename
+    serial8 = builtin_types.serial8.typename
 
 
 class VocabularyTerm(BaseModel):
@@ -162,16 +162,24 @@ class ColumnDefinition(BaseModel):
     type: BuiltinTypes
     nullok: bool = True
     default: Any = None
-    comment: str = None
+    comment: Optional[str] = None
     acls: dict = Field(default_factory=dict)
     acl_bindings: dict = Field(default_factory=dict)
     annotations: dict = Field(default_factory=dict)
 
+    @field_validator("type", mode="before")
+    @classmethod
+    def extract_type_name(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return BuiltinTypes(value["typename"])
+        else:
+            return value
+
     @model_serializer()
     def serialize_column_definition(self):
         return em.Column.define(
-            cname=self.name,
-            ctype=self.type.value,
+            self.name,
+            self.type.value,
             nullok=self.nullok,
             default=self.default,
             comment=self.comment,

@@ -37,7 +37,7 @@ from pydantic import (
 import requests
 
 from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import Any, Callable, Optional, Iterable
+from typing import Any, Callable, Optional, Iterable, Iterator
 
 from deriva_ml import DatasetBag
 from .deriva_definitions import ML_SCHEMA, DerivaMLException, MLVocab, Status, RID
@@ -706,44 +706,6 @@ class Dataset:
                 children.extend(self.list_dataset_children(child, recurse=recurse))
         return children
 
-    @staticmethod
-    def _download_dataset_element(
-        spath: str, dpath: str, table: Table
-    ) -> list[dict[str, Any]]:
-        """Return the download specification for the data object indicated by a path through the data model.
-
-        Args:
-          spath: Source path
-          dpath: Destination path
-          table: Table referenced to by the path
-
-        Returns:
-          The download specification that will retrieve that data from the catalog and place it into a BDBag.
-        """
-        exports = [
-            {
-                "processor": "csv",
-                "processor_params": {
-                    "query_path": f"/entity/{spath}?limit=none",
-                    "output_path": dpath,
-                },
-            }
-        ]
-
-        # If this table is an asset table, then we need to output the files associated with the asset.
-        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
-        if asset_columns.issubset({c.name for c in table.columns}):
-            exports.append(
-                {
-                    "processor": "fetch",
-                    "processor_params": {
-                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none",
-                        "output_path": f"asset/{table.name}",
-                    },
-                }
-            )
-        return exports
-
     def _vocabulary_specification(
         self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
     ) -> list[dict[str, Any]]:
@@ -767,82 +729,38 @@ class Dataset:
             for o in writer(f"{table.schema.name}:{table.name}", table.name, table)
         ]
 
-    def _domain_table_paths(
-        self,
-        graph: dict[Table, list[dict[Table, Any]]],
-        spath: str = None,
-        dpath: str = None,
-        sprefix: str = "deriva-ml:Dataset/RID={Dataset_RID}",
-        dprefix: str = "Dataset",
-        nested: bool = False,
-    ) -> list[tuple[str, str, Table]]:
-        """Recursively walk over the domain schema graph and extend the current path.
+    def _table_paths(self) -> Iterator[tuple[list[str], list[str], list[Table]]]:
 
-        Args:
-            graph: An undirected, acyclic graph of schema.  Represented as a dictionary whose name is the table name.
-                and whose values are the child nodes of the table.
-            spath: Source path so far
-            dpath: Destination path so far
-            sprefix: Initial path to be included.  Allows for nested datasets
-            dprefix: Initial path to be included.  Allows for nested datasets
-            nested: If true, skip initial data segment.
+        dataset_dataset = self._model.schemas[self._ml_schema].tables["Dataset_Dataset"]
+        paths = self._model._schema_to_paths()
+        nested_paths = paths
 
-        Returns:
-          A list of all the paths through the graph.  Each path is a list of tables.
-
-        """
-        source_path = spath or sprefix
-        dest_path = dpath or dprefix
-        paths = []
-        for node, children in graph.items():
-            if node.name == "Dataset":
-                paths.append(
-                    (
-                        f"{sprefix}/(RID)=({self._ml_schema}:Dataset_Version:Dataset)",
-                        f"{dprefix}/Dataset_Version",
-                        self._model.schemas[self._ml_schema].tables["Dataset_Version"],
-                    )
-                )
-                new_spath = sprefix
-                new_dpath = dprefix
-
-                if not nested:
-                    paths.append((new_spath, new_dpath, node))
-            else:
-                new_spath = source_path + f"/{node.schema.name}:{node.name}"
-                new_dpath = dest_path + f"/{node.name}"
-                paths.append((new_spath, new_dpath, node))
-            for child in children:
-                paths.extend(
-                    self._domain_table_paths(child, new_spath, new_dpath, nested=nested)
-                )
-        return paths
-
-    def _table_paths(self, graph) -> list[tuple[str, str, Table]]:
-        sprefix = "deriva-ml:Dataset/RID={Dataset_RID}"
-        dprefix = "Dataset"
-        dataset_dataset_table = self._model.schemas[self._ml_schema].tables[
-            "Dataset_Dataset"
-        ]
-        table_paths = self._domain_table_paths(
-            graph=graph, sprefix=sprefix, dprefix=dprefix
-        )
-        nested_sprefix = sprefix
-        nested_dprefix = dprefix
         for i in range(self._dataset_nesting_depth()):
-            nested_sprefix += f"/(RID)=(deriva-ml:Dataset_Dataset:Dataset)"
-            nested_dprefix += f"/Dataset_Dataset"
-            table_paths.append((nested_sprefix, nested_dprefix, dataset_dataset_table))
-            nested_sprefix += f"/(Nested_Dataset)=(deriva-ml:Dataset:RID)"
-            nested_dprefix += f"/Dataset"
-            table_paths.append((nested_sprefix, nested_dprefix, self.dataset_table))
-            # Get CSV for nested datasets.
-            table_paths.extend(
-                self._domain_table_paths(
-                    graph, sprefix=nested_sprefix, dprefix=nested_dprefix, nested=True
-                )
-            )
-        return table_paths
+            if i == 0:
+                paths.extend([[self.dataset_table, dataset_dataset]])
+            nested_paths = [
+                [self.dataset_table, dataset_dataset] + p for p in nested_paths
+            ]
+            paths.extend(nested_paths)
+
+        def source_path(path):
+            p = [f"{self._model.ml_schema}:Dataset/RID={{Dataset_RID}}"]
+            for table in path[1:]:
+                if table == dataset_dataset:
+                    p.append(f"(RID)=(deriva-ml:Dataset_Dataset:Dataset)")
+                elif table == self.dataset_table:
+                    p.append(f"(Nested_Dataset)=(deriva-ml:Dataset:RID)")
+                elif table.name == "Dataset_Version":
+                    p.append(f"(RID)=({self._model.ml_schema}:Dataset_Version:Dataset)")
+                else:
+                    p.append(f"{table.schema.name}:{table.name}")
+            return p
+
+        src_paths = ["/".join(source_path(p)) for p in paths]
+        dest_paths = ["/".join([t.name for t in p]) for p in paths]
+        target_tables = [p[-1] for p in paths]
+
+        return zip(src_paths, dest_paths, target_tables)
 
     def _dataset_nesting_depth(self):
         """Determine the maximum dataset nesting depth in the current catalog.
@@ -920,7 +838,7 @@ class Dataset:
             A dataset_table specification.
         """
         element_spec = []
-        for path in self._table_paths(self._model.schema_graph(self.dataset_table)):
+        for path in self._table_paths():
             element_spec.extend(writer(*path))
         return self._vocabulary_specification(writer) + element_spec
 
@@ -1194,6 +1112,44 @@ class Dataset:
                 "processor_params": {"query_path": f"/schema", "output_path": "schema"},
             }
         ] + self._dataset_specification(writer)
+
+    @staticmethod
+    def _download_dataset_element(
+        spath: str, dpath: str, table: Table
+    ) -> list[dict[str, Any]]:
+        """Return the download specification for the data object indicated by a path through the data model.
+
+        Args:
+          spath: Source path
+          dpath: Destination path
+          table: Table referenced to by the path
+
+        Returns:
+          The download specification that will retrieve that data from the catalog and place it into a BDBag.
+        """
+        exports = [
+            {
+                "processor": "csv",
+                "processor_params": {
+                    "query_path": f"/entity/{spath}?limit=none",
+                    "output_path": dpath,
+                },
+            }
+        ]
+
+        # If this table is an asset table, then we need to output the files associated with the asset.
+        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
+        if asset_columns.issubset({c.name for c in table.columns}):
+            exports.append(
+                {
+                    "processor": "fetch",
+                    "processor_params": {
+                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none",
+                        "output_path": f"asset/{table.name}",
+                    },
+                }
+            )
+        return exports
 
     @staticmethod
     def _export_dataset_element(

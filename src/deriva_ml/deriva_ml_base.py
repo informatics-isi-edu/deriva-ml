@@ -794,6 +794,7 @@ class DerivaML(Dataset):
                 workflow_type=w["Workflow_Type"],
                 version=w["Version"],
                 description=w["Description"],
+                rid=w["RID"],
             )
             for w in workflow_path.entities().fetch()
         ]
