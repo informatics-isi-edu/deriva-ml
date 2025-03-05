@@ -87,6 +87,8 @@ class TestFeatures(TestDerivaML):
         print(s_features)
         print(s_features_bag)
 
+        self.assertEqual(len(self.ml_instance.list_feature_values("Subject", "health"),
+                        len(bag.lis_feature_values(subject, s_features_bag))
         for f in self.ml_instance.find_features("Subject"):
             print(f"Looking for {f.feature_table} {f.feature_name}")
             print(list(self.ml_instance.list_feature_values("Subject", f.feature_name)))
