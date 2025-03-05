@@ -177,9 +177,10 @@ class ColumnDefinition(BaseModel):
 
     @model_serializer()
     def serialize_column_definition(self):
+        print("serialize_column_definition")
         return em.Column.define(
             self.name,
-            self.type.value,
+            builtin_types[self.type.value],
             nullok=self.nullok,
             default=self.default,
             comment=self.comment,

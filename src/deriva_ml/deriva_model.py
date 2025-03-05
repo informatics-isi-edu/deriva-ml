@@ -378,18 +378,18 @@ class DerivaModel:
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
             # If we have node_name <- node_name_dataset-> Dataset then we are looping
             # back around to a new dataset element
-            return (
-                n1.name != "Dataset"
-                and self.is_association(n2) == 2
-                and n2.name == f"Dataset_{n1.name}"
-            )
+            dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
+            assoc_table = [
+                a for a in dataset_table.find_associations() if a.table == n2
+            ]
+            return len(assoc_table) == 1 and n1 != dataset_table
 
         # Don't follow vocabulary terms back to their use.
         if self.is_vocabulary(root):
             return paths
 
         for child in find_arcs(root):
-            if child.name in {"Dataset_Execution", "Dataset_Dataset"}:
+            if child.name in {"Dataset_Execution", "Dataset_Dataset", "Execution"}:
                 continue
             if child == parent:
                 # Don't loop back via referred_by
@@ -397,7 +397,10 @@ class DerivaModel:
             if is_nested_dataset_loopback(root, child):
                 continue
             if child in path:
-                raise DerivaMLException(f"Cycle in schema path: {child} path:{path}")
+                continue
+                raise DerivaMLException(
+                    f"Cycle in schema path: {child.name} path:{[p.name for p in path]}"
+                )
 
             paths.extend(self._schema_to_paths(child, path))
         return paths
