@@ -75,9 +75,10 @@ class Dataset:
             rid_info = self._model.catalog.resolve_rid(dataset_rid, self._model.model)
         except KeyError as _e:
             raise DerivaMLException(f"Invalid RID {dataset_rid}")
-
-        # Got a dataset rid. Now check to see if its deleted or not.
-        if deleted:
+        if rid_info.table != self.dataset_table:
+            return False
+        elif deleted:
+            # Got a dataset rid. Now check to see if its deleted or not.
             return True
         else:
             return not list(rid_info.datapath.entities().fetch())[0]["Deleted"]
@@ -444,7 +445,7 @@ class Dataset:
         self._model.model.apply()
         return table
 
-    @validate_call
+    # @validate_call
     def list_dataset_members(
         self, dataset_rid: RID, recurse: bool = False
     ) -> dict[str, list[dict[str, Any]]]:
@@ -469,34 +470,28 @@ class Dataset:
         pb = self._model.catalog.getPathBuilder()
         for assoc_table in self.dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
-            self_fkey = assoc_table.self_fkey
             target_table = other_fkey.pk_table
             member_table = assoc_table.table
 
+            # Look at domain tables and nested datasets.
             if (
                 target_table.schema.name != self._model.domain_schema
                 and target_table != self.dataset_table
             ):
-                # Look at domain tables and nested datasets.
                 continue
-            if target_table == self.dataset_table:
-                # find_assoc gives us the keys in the wrong position, so swap.
-                self_fkey, other_fkey = other_fkey, self_fkey
+
+            member_column = (
+                other_fkey.foreign_key_columns[0].name
+                if target_table == self.dataset_table
+                else "Nested_Dataset"
+            )
 
             target_path = pb.schemas[target_table.schema.name].tables[target_table.name]
             member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
-            # Get the names of the columns that we are going to need for linking
-            member_link = tuple(
-                c.name for c in next(iter(other_fkey.column_map.items()))
-            )
-            path = pb.schemas[member_table.schema.name].tables[member_table.name].path
-            path.filter(member_path.Dataset == dataset_rid)
-            path.link(
+
+            path = member_path.filter(member_path.Dataset == dataset_rid).link(
                 target_path,
-                on=(
-                    member_path.columns[member_link[0]]
-                    == target_path.columns[member_link[1]]
-                ),
+                on=(member_path.columns[member_column] == target_path.columns["RID"]),
             )
             target_entities = list(path.entities().fetch())
             members[target_table.name].extend(target_entities)
