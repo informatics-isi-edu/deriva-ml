@@ -36,7 +36,7 @@ class TestVocabulary(TestDerivaML):
         self.assertEqual(term.name, self.ml_instance.lookup_term("CV2", "T1").name)
 
         # Check for redundant terms.
-        with self.assertRaises(DerivaMLException) as context:
+        with self.assertRaises(DerivaMLException):
             self.ml_instance.add_term(
                 "CV2", "T1", description="A vocab", exists_ok=False
             )

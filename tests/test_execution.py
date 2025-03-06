@@ -1,12 +1,9 @@
-from idlelib.run import manage_socket
-
 from derivaml_test import TestDerivaML
 from deriva_ml import (
     MLVocab as vc,
     Workflow,
     ExecutionConfiguration,
     DatasetSpec,
-    DerivaML,
 )
 
 
@@ -42,7 +39,7 @@ class TestExecution(TestDerivaML):
                 description="Sample Execution", workflow=api_workflow
             )
         )
-        with manual_execution as e:
+        with manual_execution:
             pass
         manual_execution.upload_execution_outputs()
 
@@ -141,7 +138,7 @@ class TestExecution(TestDerivaML):
             manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
         )
         with open(model_file, "w") as fp:
-            fp.write(f"My model")
+            fp.write("My model")
         # Now upload the file and retrieve the RID of the new asset from the returned results.
         uploaded_assets = manual_execution.upload_execution_outputs()
         self.ml_instance._execution = None

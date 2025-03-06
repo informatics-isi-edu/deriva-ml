@@ -90,10 +90,10 @@ class TestUpload(TestDerivaML):
             manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
         )
         with open(model_file, "w") as fp:
-            fp.write(f"My model")
+            fp.write("My model")
 
         # Now upload the file and retrieve the RID of the new asset from the returned results.
-        uploaded_assets = manual_execution.upload_execution_outputs()
+        manual_execution.upload_execution_outputs()
         path = self.ml_instance.catalog.getPathBuilder().schemas["deriva-ml"]
         self.assertEqual(1, len(list(path.Execution_Asset.entities().fetch())))
 

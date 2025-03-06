@@ -194,9 +194,7 @@ class TestDataset(TestDerivaML):
             "Manual Workflow",
             description="Initial setup of Model File",
         )
-        type_rid = self.ml_instance.add_term(
-            "Dataset_Type", "TestSet", description="A test"
-        )
+        self.ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
 
         api_workflow = self.ml_instance.add_workflow(
             Workflow(
