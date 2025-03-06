@@ -79,7 +79,7 @@ class DatasetBag:
         with self.database as dbase:
             select_args = ",".join(
                 [
-                    f'"{table_name}".{c[1]}'
+                    f'"{table_name}"."{c[1]}"'
                     for c in dbase.execute(
                         f'PRAGMA table_info("{table_name}")'
                     ).fetchall()

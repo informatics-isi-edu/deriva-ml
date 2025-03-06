@@ -9,7 +9,14 @@ from typing import Any, Iterable, Optional, Annotated
 import deriva.core.ermrest_model as em
 from urllib.parse import urlparse
 from deriva.core.ermrest_model import builtin_types
-from pydantic import BaseModel, model_serializer, Field, computed_field, field_validator, ValidationError
+from pydantic import (
+    BaseModel,
+    model_serializer,
+    Field,
+    computed_field,
+    field_validator,
+    ValidationError,
+)
 
 ML_SCHEMA = "deriva-ml"
 

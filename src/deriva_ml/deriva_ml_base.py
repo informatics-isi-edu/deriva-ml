@@ -7,6 +7,7 @@ DerivaML and its associated classes all depend on a catalog that implements a `d
 relationships that follow a specific data model.
 
 """
+
 import ftplib
 import getpass
 import logging
@@ -51,7 +52,7 @@ from .deriva_definitions import (
     ML_SCHEMA,
     VocabularyTerm,
     MLVocab,
-    FileSpec
+    FileSpec,
 )
 
 if TYPE_CHECKING:
@@ -823,7 +824,9 @@ class DerivaML(Dataset):
             if not check_file_type(file_type):
                 raise DerivaMLException("File type must be a vocabulary term.")
         file_table_path = pb.schemas[self.ml_schema].tables["File"]
-        file_rids = [e['RID'] for e in file_table_path.insert([ f.model_dump() for f in files])]
+        file_rids = [
+            e["RID"] for e in file_table_path.insert([f.model_dump() for f in files])
+        ]
 
         # Get the name of the association table between file_table and file_type.
         atable = next(
@@ -832,9 +835,12 @@ class DerivaML(Dataset):
             .find_associations()
         ).name
         pb.schemas[self._ml_schema].tables[atable].insert(
-            [{MLVocab.dataset_type: file_type, "File": file_rid}
+            [
+                {MLVocab.dataset_type: file_type, "File": file_rid}
                 for file_type in file_types
-            for file_rid in file_rids for file_type in file_types]
+                for file_rid in file_rids
+                for file_type in file_types
+            ]
         )
         return file_rids
 
