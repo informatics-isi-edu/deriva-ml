@@ -104,7 +104,7 @@ class DatasetBag:
         )
 
         def column_name(col: Column) -> str:
-            return f'"{self.model.normalize_table_name(col.table.name)}".{col.name}'
+            return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
 
         for ts, on in paths:
             tables = " JOIN ".join(ts)
