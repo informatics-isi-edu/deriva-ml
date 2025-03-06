@@ -293,7 +293,7 @@ class Dataset:
         pb = self._model.catalog.getPathBuilder()
         for ds_type in ds_types:
             if not check_dataset_type(ds_type):
-                raise DerivaMLException(f"Dataset type must be a vocabulary term.")
+                raise DerivaMLException("Dataset type must be a vocabulary term.")
         dataset_table_path = pb.schemas[self.dataset_table.schema.name].tables[
             self.dataset_table.name
         ]
@@ -747,9 +747,9 @@ class Dataset:
             p = [f"{self._model.ml_schema}:Dataset/RID={{Dataset_RID}}"]
             for table in path[1:]:
                 if table == dataset_dataset:
-                    p.append(f"(RID)=(deriva-ml:Dataset_Dataset:Dataset)")
+                    p.append("(RID)=(deriva-ml:Dataset_Dataset:Dataset)")
                 elif table == self.dataset_table:
-                    p.append(f"(Nested_Dataset)=(deriva-ml:Dataset:RID)")
+                    p.append("(Nested_Dataset)=(deriva-ml:Dataset:RID)")
                 elif table.name == "Dataset_Version":
                     p.append(f"(RID)=({self._model.ml_schema}:Dataset_Version:Dataset)")
                 else:
@@ -1111,7 +1111,7 @@ class Dataset:
         return [
             {
                 "processor": "json",
-                "processor_params": {"query_path": f"/schema", "output_path": "schema"},
+                "processor_params": {"query_path": "/schema", "output_path": "schema"},
             }
         ] + self._dataset_specification(writer)
 

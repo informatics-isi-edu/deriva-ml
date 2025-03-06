@@ -113,13 +113,13 @@ class Execution:
 
         if self._ml_object.resolve_rid(configuration.workflow).table.name != "Workflow":
             raise DerivaMLException(
-                f"Workflow specified in execution configuration is not a Workflow"
+                "Workflow specified in execution configuration is not a Workflow"
             )
 
         for d in self.configuration.datasets:
             if self._ml_object.resolve_rid(d.rid).table.name != "Dataset":
                 raise DerivaMLException(
-                    f"Dataset specified in execution configuration is not a dataset"
+                    "Dataset specified in execution configuration is not a dataset"
                 )
 
         for a in self.configuration.assets:
@@ -127,7 +127,7 @@ class Execution:
                 self._ml_object.resolve_rid(a).table.name
             ):
                 raise DerivaMLException(
-                    f"Asset specified in execution configuration is not a asset table"
+                    "Asset specified in execution configuration is not a asset table"
                 )
 
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
@@ -248,7 +248,7 @@ class Execution:
 
         self.start_time = datetime.now()
         self.uploaded_assets = None
-        self.update_status(Status.initializing, f"Start ML algorithm ...")
+        self.update_status(Status.initializing, "Start ML algorithm ...")
 
     def execution_stop(self) -> None:
         """Finish the execution and update the duration and status of execution."""
@@ -303,7 +303,7 @@ class Execution:
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
 
-        self.update_status(Status.running, f"Updating features...")
+        self.update_status(Status.running, "Updating features...")
 
         feature_assets = defaultdict(dict)
 
@@ -350,7 +350,7 @@ class Execution:
                         ],
                     )
 
-        self.update_status(Status.running, f"Upload assets complete")
+        self.update_status(Status.running, "Upload assets complete")
         return results
 
     def upload_execution_outputs(

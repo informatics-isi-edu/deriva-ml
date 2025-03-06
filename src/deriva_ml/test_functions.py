@@ -4,16 +4,13 @@ catalog_id = "eye-ai"
 # source_dataset = '2-7K8W'
 source_dataset = "3R6"
 create_catalog = False
-import logging
-from deriva_ml.demo_catalog import create_demo_catalog, DemoML, populate_demo_catalog
+from deriva_ml.demo_catalog import create_demo_catalog, DemoML
 from deriva_ml import (
     Workflow,
     ExecutionConfiguration,
     MLVocab as vc,
     DerivaML,
     DatasetSpec,
-    DatasetVersion,
-    RID,
 )
 
 
@@ -114,7 +111,7 @@ def execution_test(ml_instance):
     # Now lets create model configuration for our program.
     model_file = manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
     with open(model_file, "w") as fp:
-        fp.write(f"My model")
+        fp.write("My model")
 
     # Now upload the file and retrieve the RID of the new asset from the returned results.
     uploaded_assets = manual_execution.upload_execution_outputs()

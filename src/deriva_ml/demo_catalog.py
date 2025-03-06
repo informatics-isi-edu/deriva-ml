@@ -26,7 +26,6 @@ from deriva_ml import (
     RID,
 )
 
-from deriva_ml.execution import Execution
 from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
 from deriva_ml.dataset import Dataset
 
@@ -114,7 +113,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
 
     double_nested_dataset = ml_instance.create_dataset(
         type_rid.name,
-        description=f"Double nested dataset",
+        description="Double nested dataset",
         version=DatasetVersion(1, 0, 0),
     )
     ml_instance.add_dataset_members(double_nested_dataset, nested_datasets)

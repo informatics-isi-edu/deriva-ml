@@ -151,11 +151,11 @@ class DerivaML(Dataset):
             )
 
     def __del__(self):
-        if self._execution and self._execution.status != Status.completed:
-            try:
-                self._execution.update_status(Status.aborted, f"Execution Aborted")
-            except requests.HTTPError as e:
-                pass
+        try:
+            if self._execution and self._execution.status != Status.completed:
+                self._execution.update_status(Status.aborted, "Execution Aborted")
+        except (AttributeError, requests.HTTPError):
+            pass
 
     @staticmethod
     def _get_session_config():
@@ -450,9 +450,9 @@ class DerivaML(Dataset):
 
         # Make sure that the provided assets or terms are actually assets or terms.
         if not all(map(self.model.is_asset, assets)):
-            raise DerivaMLException(f"Invalid create_feature asset table.")
+            raise DerivaMLException("Invalid create_feature asset table.")
         if not all(map(self.model.is_vocabulary, terms)):
-            raise DerivaMLException(f"Invalid create_feature asset table.")
+            raise DerivaMLException("Invalid create_feature asset table.")
 
         # Get references to the necessary tables and make sure that the
         # provided feature name exists.
@@ -898,7 +898,7 @@ class DerivaML(Dataset):
 
         if self._execution:
             DerivaMLException(
-                f"Only one execution can be created for a Deriva ML instance."
+                "Only one execution can be created for a Deriva ML instance."
             )
         else:
             self._execution = Execution(configuration, self)

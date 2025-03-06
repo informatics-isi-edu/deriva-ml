@@ -47,7 +47,7 @@ def get_platform_info():
     for attr in attributes:
         try:
             platform_info[attr] = getattr(platform, attr)()
-        except Exception as exc:
+        except Exception:
             # Not all attributes are available on all platforms.
             continue
     return platform_info
@@ -67,7 +67,7 @@ def get_os_info():
     ]:
         try:
             values[func] = getattr(os, "get" + func)()
-        except (OSError, AttributeError) as exc:
+        except (OSError, AttributeError):
             pass
     values["umask"] = oct(get_umask())
     values["name"] = os.name
