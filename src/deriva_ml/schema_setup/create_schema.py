@@ -100,6 +100,27 @@ def define_asset_execution_asset(sname: str, execution_asset_annotation: dict):
     return table_def
 
 
+def define_files():
+    """Define files table structure"""
+    table_def = Table.define(
+        'File',
+        column_defs=[
+            Column.define('url', builtin_types.text),
+            Column.define('description', builtin_types.markdown),
+        ]
+    )
+    return table_def
+
+
+def define_data_source_vocab():
+    """Define data_source vocabulary table structure"""
+    table_def = Table.define_vocabulary(
+        tname='data_source',
+        curie_template='deriva-ml:{RID}'
+    )
+    return table_def
+
+
 def create_www_schema(model: Model):
     """
     Set up a new schema and tables to hold web-page like content.  The tables include a page table, and an asset
@@ -263,6 +284,19 @@ def create_ml_schema(
         )
     )
 
+    # File table
+    file_table = schema.create_table(define_files())
+    file_type = schema.create_table(
+        Table.define_vocabulary(MLVocab.file_type, f"{project_name}:{{RID}}")
+    )
+    schema.create_table(
+        Table.define_association(
+            associates=[
+                ("File", dataset_table),
+                (MLVocab.file_type, file_type),
+            ]
+        )
+    )
     create_www_schema(model)
     initialize_ml_schema(model, schema_name)
 

@@ -795,6 +795,7 @@ class DerivaML(Dataset):
         ml_path = self.pathBuilder.schemas[self._ml_schema]
         atable_path = ml_path.tables[atable]
         file_path = ml_path.File
+
         # Get a list of all the dataset_type values associated with this dataset_table.
         files = []
         for file in file_path.entities().fetch():
@@ -807,7 +808,7 @@ class DerivaML(Dataset):
                 file
                 | {
                     MLVocab.dataset_type: [
-                        ds[MLVocab.dataset_type] for ft in file_types
+                        ft[MLVocab.dataset_type] for ft in file_types
                     ]
                 }
             )
