@@ -7,7 +7,7 @@ DerivaML and its associated classes all depend on a catalog that implements a `d
 relationships that follow a specific data model.
 
 """
-
+import ftplib
 import getpass
 import logging
 from datetime import datetime
@@ -51,6 +51,7 @@ from .deriva_definitions import (
     ML_SCHEMA,
     VocabularyTerm,
     MLVocab,
+    FileSpec
 )
 
 if TYPE_CHECKING:
@@ -785,6 +786,58 @@ class DerivaML(Dataset):
             ]
         )
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def add_files(
+        self,
+        files: list[FileSpec],
+        type: str | list[str],
+    ) -> RID:
+        """Add a new file to the File table in the catalog.
+
+        Args:
+            type: One or more file types.  Must be a term from the File_Type controlled vocabulary.
+            description: Description of the dataset_table.
+            type: str | list[str]:
+            description: str:
+
+
+        Returns:
+            New dataset_table RID.
+
+        """
+
+        defined_types = self.list_vocabulary_terms(type)
+
+        def check_file_type(dtype: str) -> bool:
+            for term in defined_types:
+                if dtype == term["Name"] or (
+                    term["Synonyms"] and file_type in term["Synonyms"]
+                ):
+                    return True
+            return False
+
+        # Create the entry for the new dataset_table and get its RID.
+        file_types = [type] if isinstance(type, str) else type
+        pb = self._model.catalog.getPathBuilder()
+        for file_type in file_types:
+            if not check_file_type(file_type):
+                raise DerivaMLException("File type must be a vocabulary term.")
+        file_table_path = pb.schemas[self.ml_schema].tables["File"]
+        file_rids = [e['RID'] for e in file_table_path.insert([ f.model_dump() for f in files])]
+
+        # Get the name of the association table between file_table and file_type.
+        atable = next(
+            self._model.schemas[self._ml_schema]
+            .tables[MLVocab.file_type]
+            .find_associations()
+        ).name
+        pb.schemas[self._ml_schema].tables[atable].insert(
+            [{MLVocab.dataset_type: file_type, "File": file_rid}
+                for file_type in file_types
+            for file_rid in file_rids for file_type in file_types]
+        )
+        return file_rids
+
     def list_files(self) -> list[dict[str, Any]]:
         """Return the contents of the file table.  Denormalized file types into the file record."""
         atable = next(
@@ -815,7 +868,7 @@ class DerivaML(Dataset):
         return files
 
     def list_workflows(self) -> list[Workflow]:
-        """Return a list of all of the workflows in the catalog."""
+        """Return a list of all the workflows in the catalog."""
         workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
         return [
             Workflow(

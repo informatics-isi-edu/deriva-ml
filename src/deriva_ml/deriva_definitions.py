@@ -7,8 +7,9 @@ from enum import Enum
 from typing import Any, Iterable, Optional, Annotated
 
 import deriva.core.ermrest_model as em
+from urllib.parse import urlparse
 from deriva.core.ermrest_model import builtin_types
-from pydantic import BaseModel, model_serializer, Field, computed_field, field_validator
+from pydantic import BaseModel, model_serializer, Field, computed_field, field_validator, ValidationError
 
 ML_SCHEMA = "deriva-ml"
 
@@ -107,6 +108,25 @@ class BuiltinTypes(Enum):
     serial2 = builtin_types.serial2.typename
     serial4 = builtin_types.serial4.typename
     serial8 = builtin_types.serial8.typename
+
+
+class FileSpec(BaseModel):
+    """A entry into the File table
+
+    Attributes:
+        url: The File url to the url.
+        description: The description of the file.
+    """
+
+    url: str
+    description: Optional[str] = ""
+
+    @field_validator("url")
+    def validate_file_url(cls, v):
+        url_parts = urlparse(v)
+        if url_parts.scheme != "file":
+            raise ValidationError("url is not a file URL")
+        return v
 
 
 class VocabularyTerm(BaseModel):
