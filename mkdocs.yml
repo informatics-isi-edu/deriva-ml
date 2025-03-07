@@ -29,6 +29,9 @@ plugins:
           annotations_path: brief
           inherited_members: true
           preload_modules: [semver]
+          filters:
+            - "!^_"
+            - "^__"
 
 - mkdocs-jupyter:
    include: ["*.ipynb"]
