@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva.core import DerivaServer, get_credential
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import (
     builtin_types,
@@ -32,7 +32,7 @@ def define_table_workflow(workflow_annotation: dict):
     )
 
 
-def define_table_dataset(sname, dataset_annotation: dict = None):
+def define_table_dataset(dataset_annotation: dict = None):
     return Table.define(
         tname="Dataset",
         column_defs=[
@@ -43,7 +43,7 @@ def define_table_dataset(sname, dataset_annotation: dict = None):
     )
 
 
-def define_table_dataset_version(sname: str, dataset_version_annotation: dict = None):
+def define_table_dataset_version(sname: str):
     return Table.define(
         tname="Dataset_Version",
         column_defs=[
@@ -100,16 +100,12 @@ def define_asset_execution_asset(sname: str, execution_asset_annotation: dict):
     return table_def
 
 
-def define_files():
+def define_table_file(sname):
     """Define files table structure"""
-    table_def = Table.define(
-        "File",
-        column_defs=[
-            Column.define("URL", builtin_types.text),
-            Column.define("Description", builtin_types.markdown),
-        ],
+    return Table.define_asset(
+        sname=sname,
+        tname="File",
     )
-    return table_def
 
 
 def create_www_schema(model: Model):
@@ -154,15 +150,12 @@ def create_www_schema(model: Model):
             },
         )
     )
-
     return www_schema
 
 
 def create_ml_schema(
     model: Model, schema_name: str = "deriva-ml", project_name: str = None
 ):
-    ml_catalog: ErmrestCatalog = model.catalog
-
     if model.schemas.get(schema_name):
         model.schemas[schema_name].drop(cascade=True)
     # get annotations
@@ -207,7 +200,7 @@ def create_ml_schema(
     )
 
     dataset_table = schema.create_table(
-        define_table_dataset(schema_name, annotations["dataset_annotation"])
+        define_table_dataset(annotations["dataset_annotation"])
     )
     dataset_type = schema.create_table(
         Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}")
@@ -276,15 +269,23 @@ def create_ml_schema(
     )
 
     # File table
-    file_table = schema.create_table(define_files())
+    file_table = schema.create_table(define_table_file(schema_name))
     file_type = schema.create_table(
         Table.define_vocabulary(MLVocab.file_type, f"{project_name}:{{RID}}")
     )
     schema.create_table(
         Table.define_association(
             associates=[
-                ("File", dataset_table),
+                ("File", file_table),
                 (MLVocab.file_type, file_type),
+            ]
+        )
+    )
+    schema.create_table(
+        Table.define_association(
+            [
+                ("File", file_table),
+                ("Execution", execution_table),
             ]
         )
     )

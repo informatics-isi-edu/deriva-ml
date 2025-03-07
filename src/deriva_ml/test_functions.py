@@ -20,8 +20,7 @@ def setup_demo_ml():
         host, "test-schema", create_features=True, create_datasets=True
     )
     ml_instance = DemoML(host, test_catalog.catalog_id)
-    config = execution_test(ml_instance)
-    return ml_instance, config
+    return ml_instance
 
 
 def setup_dev():

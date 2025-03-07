@@ -3,11 +3,12 @@ Shared definitions that are used in different DerivaML modules.
 """
 
 import warnings
+from datetime import date
 from enum import Enum
 from typing import Any, Iterable, Optional, Annotated
 
 import deriva.core.ermrest_model as em
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from deriva.core.ermrest_model import builtin_types
 from pydantic import (
     BaseModel,
@@ -17,6 +18,7 @@ from pydantic import (
     field_validator,
     ValidationError,
 )
+from socket import gethostname
 
 ML_SCHEMA = "deriva-ml"
 
@@ -118,7 +120,7 @@ class BuiltinTypes(Enum):
 
 
 class FileSpec(BaseModel):
-    """A entry into the File table
+    """An entry into the File table
 
     Attributes:
         url: The File url to the url.
@@ -127,13 +129,24 @@ class FileSpec(BaseModel):
 
     url: str
     description: Optional[str] = ""
+    md5: str
+    length: int
 
     @field_validator("url")
+    @classmethod
     def validate_file_url(cls, v):
         url_parts = urlparse(v)
-        if url_parts.scheme != "file":
+        if url_parts.scheme == "tag":
+            return v
+        elif not url_parts.scheme:
+            print(v)
+            return f'tag://{gethostname()},{date.today()}:file://{v}'
+        else:
             raise ValidationError("url is not a file URL")
-        return v
+
+    @model_serializer()
+    def serialize_filespec(self):
+        return {'URL': self.url, 'Description': self.description, 'MD5': self.md5, 'Length': self.length}
 
 
 class VocabularyTerm(BaseModel):

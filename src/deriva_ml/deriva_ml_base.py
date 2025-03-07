@@ -8,7 +8,8 @@ relationships that follow a specific data model.
 
 """
 
-import ftplib
+from __future__ import annotations
+
 import getpass
 import logging
 from datetime import datetime
@@ -790,35 +791,32 @@ class DerivaML(Dataset):
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_files(
         self,
-        files: list[FileSpec],
-        type: str | list[str],
-    ) -> RID:
+        files: Iterable[FileSpec],
+        file_types: str | list[str],
+        execution_rid: Optional[RID] = None,
+    ) -> Iterable[RID]:
         """Add a new file to the File table in the catalog.
 
         Args:
-            type: One or more file types.  Must be a term from the File_Type controlled vocabulary.
-            description: Description of the dataset_table.
-            type: str | list[str]:
-            description: str:
-
+            file_types: One or more file types.  Must be a term from the File_Type controlled vocabulary.
+            files: A sequence of file specifications that describe the files to add.
+            execution_rid: Resource Identifier (RID) of the execution to associate with the file.
 
         Returns:
-            New dataset_table RID.
-
+            Iterable of the RIDs of the files that were added.
         """
-
-        defined_types = self.list_vocabulary_terms(type)
+        defined_types = self.list_vocabulary_terms(MLVocab.file_type)
+        if execution_rid and self.resolve_rid(execution_rid).table.name != 'Execution':
+            raise DerivaMLException(f'RID {execution_rid} is not for an execution table.')
 
         def check_file_type(dtype: str) -> bool:
             for term in defined_types:
-                if dtype == term["Name"] or (
-                    term["Synonyms"] and file_type in term["Synonyms"]
-                ):
+                if dtype == term.name or (term.synonyms and file_type in term.synonyms):
                     return True
             return False
 
         # Create the entry for the new dataset_table and get its RID.
-        file_types = [type] if isinstance(type, str) else type
+        file_types = [file_types] if isinstance(file_types, str) else file_types
         pb = self._model.catalog.getPathBuilder()
         for file_type in file_types:
             if not check_file_type(file_type):
@@ -836,15 +834,31 @@ class DerivaML(Dataset):
         ).name
         pb.schemas[self._ml_schema].tables[atable].insert(
             [
-                {MLVocab.dataset_type: file_type, "File": file_rid}
-                for file_type in file_types
+                {"File_Type": file_type, "File": file_rid}
                 for file_rid in file_rids
                 for file_type in file_types
             ]
         )
+
+        if execution_rid:
+            # Get the name of the association table between file_table and execution.
+            exec_table = next(
+                self._model.schemas[self._ml_schema]
+                .tables["Execution"]
+                .find_associations()
+            ).name
+            pb.schemas[self._ml_schema].tables[exec_table].insert(
+                [
+                    {"File": file_rid, "Execution": execution_rid}
+                    for file_rid in file_rids
+                ]
+            )
+
         return file_rids
 
-    def list_files(self) -> list[dict[str, Any]]:
+    def list_files(
+        self, file_types: Optional[list[str]] = None
+    ) -> list[dict[str, Any]]:
         """Return the contents of the file table.  Denormalized file types into the file record."""
         atable = next(
             self._model.schemas[self._ml_schema]
@@ -854,24 +868,25 @@ class DerivaML(Dataset):
         ml_path = self.pathBuilder.schemas[self._ml_schema]
         atable_path = ml_path.tables[atable]
         file_path = ml_path.File
+        type_path = ml_path.File_File_Type
 
         # Get a list of all the dataset_type values associated with this dataset_table.
         files = []
-        for file in file_path.entities().fetch():
-            file_types = (
-                atable_path.filter(file_path.Dataset == file["RID"])
-                .attributes(atable_path.Dataset_Type)
-                .fetch()
-            )
-            files.append(
-                file
-                | {
-                    MLVocab.dataset_type: [
-                        ft[MLVocab.dataset_type] for ft in file_types
-                    ]
-                }
-            )
-        return files
+        path = file_path.link(type_path)
+        path = path.attributes(
+            path.File.RID,
+            path.File.URL,
+            path.File.MD5,
+            path.File.Length,
+            path.File.Description,
+            path.File_File_Type.File_Type,
+        )
+        file_map = {}
+        for f in path.fetch():
+            file_map.setdefault(f['RID'], f | {'File_Types': []})['File_Types'].append(f['File_Type'])
+
+        # Now get rid of the File_Type key and return the result
+        return [ (f, f.pop('File_Type'))[0] for f in file_map.values()]
 
     def list_workflows(self) -> list[Workflow]:
         """Return a list of all the workflows in the catalog."""

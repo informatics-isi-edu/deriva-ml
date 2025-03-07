@@ -479,11 +479,10 @@ class Dataset:
                 and target_table != self.dataset_table
             ):
                 continue
-
             member_column = (
-                other_fkey.foreign_key_columns[0].name
+                "Nested_Dataset"
                 if target_table == self.dataset_table
-                else "Nested_Dataset"
+                else other_fkey.foreign_key_columns[0].name
             )
 
             target_path = pb.schemas[target_table.schema.name].tables[target_table.name]
