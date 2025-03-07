@@ -6,6 +6,7 @@ from demo_catalog import (
     populate_demo_catalog,
     create_demo_datasets,
     create_demo_features,
+    reset_demo_catalog,
 )
 import logging
 
@@ -37,20 +38,19 @@ class TestDerivaML(unittest.TestCase):
 
     def setUp(self):
         self.ml_instance = DerivaML(
-            hostname,
+            self.hostname,
             TestCatalog.catalog_id,
-            SNAME_DOMAIN,
+            self.domain_schema,
             logging_level=logging.INFO,
         )
         self.reset_catalog()
-        self.model = self.ml_instance.model
-        self.catalog_populated = False
 
     def tearDown(self):
         self.ml_instance = None
 
     def reset_catalog(self):
-        self.setUp()
+        reset_demo_catalog(self.ml_instance, self.domain_schema)
+        self.catalog_populated = False
 
     def populate_catalog(self):
         if not self.catalog_populated:

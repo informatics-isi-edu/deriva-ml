@@ -121,11 +121,24 @@ class TestDataset(TestDerivaML):
         print(f"datasets {datasets}")
         import pprint
 
+        print("double_nested_dataset")
         pprint.pprint(
-            self.ml_instance.list_dataset_members(dataset_rid=double_nested_dataset)[
-                "Dataset"
+            self.ml_instance.list_dataset_members(dataset_rid=double_nested_dataset)
+        )
+
+        print("nested_dataset")
+        pprint.pprint(
+            [
+                self.ml_instance.list_dataset_members(dataset_rid=ds)
+                for ds in nested_datasets
             ]
         )
+
+        print("dataset")
+        pprint.pprint(
+            [self.ml_instance.list_dataset_members(dataset_rid=ds) for ds in datasets]
+        )
+
         print(
             "double nested children",
             self.ml_instance.list_dataset_children(dataset_rid=double_nested_dataset),
