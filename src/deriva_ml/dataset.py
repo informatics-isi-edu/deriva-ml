@@ -892,7 +892,7 @@ class Dataset:
                     config_file=spec_file,
                     output_dir=tmp_dir,
                     defer_download=True,
-                    timeout=(10, 300),
+                    timeout=(10, 610),
                     envars={"Dataset_RID": dataset.rid},
                 )
                 minid_page_url = exporter.export()[0]  # Get the MINID launch page
