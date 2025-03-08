@@ -96,12 +96,12 @@ def execution_test(ml_instance):
         vc.workflow_type, "ML Demo", description="A ML Workflow that uses Deriva ML API"
     )
 
-    api_workflow = Workflow(
+    api_workflow = ml_instance.add_workflow(Workflow(
         name="Manual Workflow",
         url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/Notebooks/DerivaML%20Execution.ipynb",
         workflow_type="Manual Workflow",
         description="A manual operation",
-    )
+    ))
 
     manual_execution = ml_instance.create_execution(
         ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)

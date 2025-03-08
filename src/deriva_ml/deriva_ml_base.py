@@ -115,10 +115,12 @@ class DerivaML(Dataset):
             if working_dir
             else Path.home() / "deriva-ml"
         ) / default_workdir
+
         self.working_dir.mkdir(parents=True, exist_ok=True)
         self.cache_dir = (
             Path(cache_dir) if cache_dir else Path.home() / "deriva-ml" / "cache"
         )
+
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize dataset class.

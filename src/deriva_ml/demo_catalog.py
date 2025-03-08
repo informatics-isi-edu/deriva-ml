@@ -294,6 +294,7 @@ def create_demo_catalog(
             project_name=project_name,
             logging_level=logging.WARN,
         )
+        working_dir = deriva_ml.working_dir
         dataset_table = deriva_ml.dataset_table
         dataset_table.annotations.update(
             Dataset(
