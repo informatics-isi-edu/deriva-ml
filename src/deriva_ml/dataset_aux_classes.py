@@ -187,6 +187,14 @@ class DatasetSpec(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    @field_validator("version", mode="before")
+    @classmethod
+    def version_field_validator(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            return DatasetVersion(**v)
+        else:
+            return v
+
     @model_validator(mode="before")
     @classmethod
     def _check_bare_rid(cls, data: Any) -> dict[str, str | bool]:
