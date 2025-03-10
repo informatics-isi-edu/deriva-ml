@@ -265,7 +265,9 @@ class DerivaModel:
         return relationships[0]
 
     def _schema_to_paths(
-        self, root: Table = None, path: list[Table] = None
+        self,
+        root: Table = None,
+        path: list[Table] = None,
     ) -> list[list[Table]]:
         """Recursively walk over the domain schema graph and extend the current path.
 
@@ -278,6 +280,7 @@ class DerivaModel:
           A list of all the paths through the graph.  Each path is a list of tables.
 
         """
+
         root = root or self.model.schemas[self.ml_schema].tables["Dataset"]
         path = path.copy() if path else []
         parent = path[-1] if path else None  # Table that we are coming from.

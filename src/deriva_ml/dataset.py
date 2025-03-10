@@ -447,7 +447,7 @@ class Dataset:
 
     # @validate_call
     def list_dataset_members(
-        self, dataset_rid: RID, recurse: bool = False
+        self, dataset_rid: RID, recurse: bool = False, limit: Optional[int] = None
     ) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset_table.
 
@@ -455,6 +455,7 @@ class Dataset:
             dataset_rid: param recurse: If this is a nested dataset_table, list the members of the contained datasets
             dataset_rid: RID:
             recurse:  (Default value = False)
+            limit: If provided, the maxiumum number of members to return for each element type.
 
         Returns:
             Dictionary of entities associated with a specific dataset_table.  Key is the table from which the elements
@@ -492,7 +493,9 @@ class Dataset:
                 target_path,
                 on=(member_path.columns[member_column] == target_path.columns["RID"]),
             )
-            target_entities = list(path.entities().fetch())
+            target_entities = list(
+                path.entities().fetch(limit=limit) if limit else path.entities().fetch()
+            )
             members[target_table.name].extend(target_entities)
             if recurse and target_table == self.dataset_table:
                 # Get the members for all the nested datasets and add to the member list.
@@ -723,21 +726,16 @@ class Dataset:
             for o in writer(f"{table.schema.name}:{table.name}", table.name, table)
         ]
 
-    def _table_paths(self) -> Iterator[tuple[list[str], list[str], list[Table]]]:
+    def _table_paths(
+        self, dataset: DatasetSpec = None
+    ) -> Iterator[tuple[list[str], list[str], list[Table]]]:
 
         dataset_dataset = self._model.schemas[self._ml_schema].tables["Dataset_Dataset"]
-        paths = self._model._schema_to_paths()
-        nested_paths = paths
 
-        for i in range(self._dataset_nesting_depth()):
-            if i == 0:
-                paths.extend([[self.dataset_table, dataset_dataset]])
-            nested_paths = [
-                [self.dataset_table, dataset_dataset] + p for p in nested_paths
-            ]
-            paths.extend(nested_paths)
+        paths = self._collect_paths(dataset and dataset.rid)
 
-        def source_path(path):
+        def source_path(path: tuple[Table, ...]):
+            path = list(path)
             p = [f"{self._model.ml_schema}:Dataset/RID={{Dataset_RID}}"]
             for table in path[1:]:
                 if table == dataset_dataset:
@@ -756,7 +754,65 @@ class Dataset:
 
         return zip(src_paths, dest_paths, target_tables)
 
-    def _dataset_nesting_depth(self):
+    def _collect_paths(
+        self,
+        dataset_rid: Optional[RID] = None,
+        dataset_nesting_depth: Optional[int] = None,
+    ) -> set[tuple[Table, ...]]:
+
+        dataset_nesting_depth = (
+            self._dataset_nesting_depth()
+            if dataset_nesting_depth is None
+            else dataset_nesting_depth
+        )
+        dataset_dataset = self._model.schemas[self._ml_schema].tables["Dataset_Dataset"]
+
+        # Figure out which paths we don't need to query for this dataset.  If no dataset is provided, use them all.
+        dataset_elements = (
+            [
+                self._model.name_to_table(e)
+                for e, m in self.list_dataset_members(
+                    dataset_rid=dataset_rid, limit=1
+                ).items()
+                if m
+            ]
+            if dataset_rid
+            else self.list_dataset_element_types()
+        )
+
+        dataset_associations = [a.table for a in self.dataset_table.find_associations()]
+        included_associations = [
+            a.table
+            for a in self.dataset_table.find_associations()
+            if a.other_fkeys.pop().pk_table in dataset_elements
+        ]
+        # Get the paths through the schema and filter out all of dataset paths not used by this dataset.
+        paths = {
+            tuple(p)
+            for p in self._model._schema_to_paths()
+            if (len(p) == 1)
+            or (p[1] not in dataset_associations)
+            or (p[1] in included_associations)
+        }
+        # Now get paths for nested datasets
+        nested_paths = set()
+        if dataset_rid:
+            for c in self.list_dataset_children(dataset_rid=dataset_rid):
+                nested_paths |= self._collect_paths(c)
+        else:
+            if dataset_nesting_depth:
+                nested_paths = self._collect_paths(
+                    dataset_nesting_depth=dataset_nesting_depth - 1
+                )
+        if nested_paths:
+            paths |= {
+                tuple([self.dataset_table]),
+                (self.dataset_table, dataset_dataset),
+            }
+        paths |= {(self.dataset_table, dataset_dataset) + p for p in nested_paths}
+        return paths
+
+    def _dataset_nesting_depth(self, dataset_rid: Optional[RID] = None) -> int:
         """Determine the maximum dataset nesting depth in the current catalog.
 
         Returns:
@@ -766,7 +822,7 @@ class Dataset:
         def children_depth(
             dataset_rid: RID, nested_datasets: dict[RID, list[RID]]
         ) -> int:
-            """Return the number of nested datasets in the current catalog"""
+            """Return the number of nested datasets for the dataset_rid if provided, otherwise in the current catalog"""
             try:
                 children = nested_datasets[dataset_rid]
                 return (
@@ -783,8 +839,19 @@ class Dataset:
             .schemas[self._ml_schema]
             .tables["Dataset_Dataset"]
         )
+        dataset_children = (
+            [
+                {
+                    "Dataset": dataset_rid,
+                    "Nested_Dataset": c,
+                }  # Make uniform with return from datapath
+                for c in self.list_dataset_children(dataset_rid)
+            ]
+            if dataset_rid
+            else pb.entities().fetch()
+        )
         nested_dataset = defaultdict(list)
-        for ds in pb.entities().fetch():
+        for ds in dataset_children:
             nested_dataset[ds["Dataset"]].append(ds["Nested_Dataset"])
         return (
             max(map(lambda d: children_depth(d, dict(nested_dataset)), nested_dataset))
@@ -793,7 +860,9 @@ class Dataset:
         )
 
     def _dataset_specification(
-        self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
+        self,
+        writer: Callable[[str, str, Table], list[dict[str, Any]]],
+        dataset: DatasetSpec,
     ) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset_table.  Each element of the dataset_table will be placed in its own dir
         The top level data directory of the resulting BDBag will have one subdirectory for element type. the subdirectory
@@ -833,7 +902,7 @@ class Dataset:
             A dataset_table specification.
         """
         element_spec = []
-        for path in self._table_paths():
+        for path in self._table_paths(dataset=dataset):
             element_spec.extend(writer(*path))
         return self._vocabulary_specification(writer) + element_spec
 
@@ -1042,7 +1111,9 @@ class Dataset:
             validated_check.touch()
         return Path(bag_path)
 
-    def _export_outputs(self) -> list[dict[str, Any]]:
+    def _export_outputs(
+        self, dataset: Optional[DatasetSpec] = None
+    ) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
 
         Returns:
@@ -1079,9 +1150,9 @@ class Dataset:
                 "source": {"api": "schema", "skip_root_path": True},
                 "destination": {"type": "json", "name": "schema"},
             },
-        ] + self._dataset_specification(writer)
+        ] + self._dataset_specification(writer, dataset)
 
-    def _processor_params(self) -> list[dict[str, Any]]:
+    def _processor_params(self, dataset: DatasetSpec) -> list[dict[str, Any]]:
         """
         Returns:
           a download specification for the datasets in the provided model.
@@ -1107,7 +1178,7 @@ class Dataset:
                 "processor": "json",
                 "processor_params": {"query_path": "/schema", "output_path": "schema"},
             }
-        ] + self._dataset_specification(writer)
+        ] + self._dataset_specification(writer, dataset)
 
     @staticmethod
     def _download_dataset_element(
@@ -1244,7 +1315,7 @@ class Dataset:
                         },
                     },
                 ]
-                + self._processor_params(),
+                + self._processor_params(dataset),
             },
         }
 
