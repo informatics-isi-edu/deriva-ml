@@ -87,29 +87,32 @@ class Dataset:
         else:
             return not list(rid_info.datapath.entities().fetch())[0]["Deleted"]
 
-    def _insert_dataset_version(
+    def _insert_dataset_versions(
         self,
-        dataset_rid: RID,
-        dataset_version: DatasetVersion,
+        dataset_list: list[DatasetSpec],
         description: Optional[str] = "",
         execution_rid: Optional[RID] = None,
     ) -> RID:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
-        version_path = schema_path.tables["Dataset_Version"]
-        version_rid = version_path.insert(
-            [
-                {
-                    "Dataset": dataset_rid,
-                    "Version": str(dataset_version),
-                    "Description": description,
-                    "Execution": execution_rid,
-                }
-            ]
-        )[0]["RID"]
-        schema_path.tables["Dataset"].update(
-            [{"RID": dataset_rid, "Version": version_rid}]
-        )
-        return version_rid
+
+        # Construct version records for insert
+        version_records = [
+            {
+                "Dataset": dataset.rid,
+                "Version": str(dataset.version),
+                "Description": description,
+                "Execution": execution_rid,
+            }
+            for dataset in dataset_list
+        ]
+
+        # Insert version records and construct entities for updating the dataset version column.
+        version_rids = [
+            {"Version": v["RID"], "RID": v["Dataset"]}
+            for v in schema_path.tables["Dataset_Version"].insert(version_records)
+        ]
+        schema_path.tables["Dataset"].update(version_rids)
+        return version_rids
 
     def _bootstrap_versions(self):
         datasets = [ds["RID"] for ds in self.find_datasets()]
@@ -241,16 +244,20 @@ class Dataset:
         Raises:
           DerivaMLException: if provided RID is not to a dataset_table.
         """
-        for dataset in self._build_dataset_graph(dataset_rid=dataset_rid):
-            version = self.dataset_version(dataset)
-            new_version = version.increment_version(component)
-            self._insert_dataset_version(
-                dataset,
-                new_version,
-                description=description,
-                execution_rid=execution_rid,
+
+        # Find all of the datasets that are reachable from this dataset and determine their new version numbers.
+        related_datasets = list(self._build_dataset_graph(dataset_rid=dataset_rid))
+        version_update_list = [
+            DatasetSpec(
+                rid=ds_rid,
+                version=self.dataset_version(ds_rid).increment_version(component),
             )
-        return self.dataset_version(dataset_rid)
+            for ds_rid in related_datasets
+        ]
+        updated_versions = self._insert_dataset_versions(
+            version_update_list, description=description, execution_rid=execution_rid
+        )
+        return [d.version for d in version_update_list if d.rid == dataset_rid][0]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
@@ -327,9 +334,8 @@ class Dataset:
             pb.schemas[self._ml_schema].Dataset_Execution.insert(
                 [{"Dataset": dataset_rid, "Execution": execution_rid}]
             )
-        self._insert_dataset_version(
-            dataset_rid,
-            dataset_version=version,
+        self._insert_dataset_versions(
+            [DatasetSpec(rid=dataset_rid, version=version)],
             execution_rid=execution_rid,
             description="Initial dataset creation.",
         )
