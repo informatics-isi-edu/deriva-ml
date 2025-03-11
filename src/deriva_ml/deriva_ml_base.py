@@ -35,6 +35,8 @@ from pydantic import validate_call, ConfigDict
 from .execution_configuration import ExecutionConfiguration, Workflow
 from .feature import Feature, FeatureRecord
 from .dataset import Dataset
+from .dataset_aux_classes import DatasetSpec
+from .dataset_bag import DatasetBag
 from .deriva_model import DerivaModel
 from .upload import (
     table_path,
@@ -706,6 +708,28 @@ class DerivaML(Dataset):
         ]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def download_dataset_bag(
+        self,
+        dataset: DatasetSpec,
+        execution_rid: Optional[RID] = None,
+    ) -> DatasetBag:
+        """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
+
+        Args:
+            dataset: Specification of the dataset to be downloaded.
+            execution_rid: Execution RID for the dataset.
+
+        Returns:
+            Tuple consisting of the path to the dataset, the RID of the dataset that was downloaded and the MINID
+            for the dataset.
+        """
+        return self._download_dataset_bag(
+            dataset=dataset,
+            execution_rid=execution_rid,
+            snapshot_catalog=DerivaML(self.host_name, self._version_snapshot(dataset)),
+        )
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_asset(self, asset_rid: RID, dest_dir: Path) -> Path:
         """Download an asset from a URL and place it in a local directory.
 
@@ -808,8 +832,10 @@ class DerivaML(Dataset):
             Iterable of the RIDs of the files that were added.
         """
         defined_types = self.list_vocabulary_terms(MLVocab.file_type)
-        if execution_rid and self.resolve_rid(execution_rid).table.name != 'Execution':
-            raise DerivaMLException(f'RID {execution_rid} is not for an execution table.')
+        if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
+            raise DerivaMLException(
+                f"RID {execution_rid} is not for an execution table."
+            )
 
         def check_file_type(dtype: str) -> bool:
             for term in defined_types:
@@ -862,18 +888,11 @@ class DerivaML(Dataset):
         self, file_types: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         """Return the contents of the file table.  Denormalized file types into the file record."""
-        atable = next(
-            self._model.schemas[self._ml_schema]
-            .tables[MLVocab.dataset_type]
-            .find_associations()
-        ).name
         ml_path = self.pathBuilder.schemas[self._ml_schema]
-        atable_path = ml_path.tables[atable]
         file_path = ml_path.File
         type_path = ml_path.File_File_Type
 
         # Get a list of all the dataset_type values associated with this dataset_table.
-        files = []
         path = file_path.link(type_path)
         path = path.attributes(
             path.File.RID,
@@ -885,10 +904,12 @@ class DerivaML(Dataset):
         )
         file_map = {}
         for f in path.fetch():
-            file_map.setdefault(f['RID'], f | {'File_Types': []})['File_Types'].append(f['File_Type'])
+            file_map.setdefault(f["RID"], f | {"File_Types": []})["File_Types"].append(
+                f["File_Type"]
+            )
 
         # Now get rid of the File_Type key and return the result
-        return [ (f, f.pop('File_Type'))[0] for f in file_map.values()]
+        return [(f, f.pop("File_Type"))[0] for f in file_map.values()]
 
     def list_workflows(self) -> list[Workflow]:
         """Return a list of all the workflows in the catalog."""

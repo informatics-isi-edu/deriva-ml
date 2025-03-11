@@ -221,8 +221,9 @@ class Execution:
         Returns:
             the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
-        ds = Dataset(self._ml_object.model, cache_dir=self._cache_dir)
-        return ds.download_dataset_bag(dataset, execution_rid=self.execution_rid)
+        return self._ml_object.download_dataset_bag(
+            dataset, execution_rid=self.execution_rid
+        )
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
