@@ -1039,7 +1039,9 @@ class DerivaML(Dataset):
         else:
             stack = inspect.stack()
             if len(stack) > 1:
-                filename = Path(stack[1].filename)  # Get the caller's filename
+                filename = Path(
+                    stack[2].filename
+                )  # Get the caller's filename, which is two up the stack from here.
             else:
                 raise DerivaMLException(
                     f"Looking for caller failed"
