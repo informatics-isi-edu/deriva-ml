@@ -33,18 +33,18 @@ class Workflow(BaseModel):
     version: Optional[str] = None
     description: Optional[str] = ""
     rid: Optional[RID] = None
+    checksum: Optional[str]
+
 
 
 class ExecutionConfiguration(BaseModel):
     """Define the parameters that are used to configure a specific execution.
 
     Attributes:
-        datasets: List of dataset_table RIDS, MINIDS for datasets to be downloaded prior to execution.  By default,
-                     all  the datasets are materialized. However, if the assets associated with a dataset_table are not
-                     needed, a dictionary that defines the rid and the materialization parameter for the
-                     download_dataset_bag method can be specified, e.g.  datasets=[{'rid': RID, 'materialize': True}].
+        datasets: List of dataset specifications which specify the dataset RID, version and if the dataset
+            should be materialized.
         assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
-        workflow: A workflow instance.  Must have a name, URI to the workflow instance, and a type.
+        workflow: A RID for a workflow instance.  Must have a name, URI to the workflow instance, and a type.
         description: A description of the execution.  Can use Markdown format.
     """
 

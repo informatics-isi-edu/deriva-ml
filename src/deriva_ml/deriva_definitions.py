@@ -139,7 +139,6 @@ class FileSpec(BaseModel):
         if url_parts.scheme == "tag":
             return v
         elif not url_parts.scheme:
-            print(v)
             return f'tag://{gethostname()},{date.today()}:file://{v}'
         else:
             raise ValidationError("url is not a file URL")

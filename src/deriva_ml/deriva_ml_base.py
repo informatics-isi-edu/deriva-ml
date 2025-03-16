@@ -15,8 +15,11 @@ import logging
 from datetime import datetime
 import hashlib
 from itertools import chain
+import inspect
 from pathlib import Path
 import requests
+from setuptools_git_versioning import get_latest_file_commit
+import subprocess
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 from deriva.core import (
     ErmrestCatalog,
@@ -57,6 +60,18 @@ from .deriva_definitions import (
     MLVocab,
     FileSpec,
 )
+
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
+try:
+    from IPython import get_ipython
+except ImportError:  # Graceful fallback if IPython isn't installed.
+    get_ipython = lambda: None
+
 
 if TYPE_CHECKING:
     from .execution import Execution
@@ -922,6 +937,7 @@ class DerivaML(Dataset):
                 version=w["Version"],
                 description=w["Description"],
                 rid=w["RID"],
+                checksum=w["Checksum"],
             )
             for w in workflow_path.entities().fetch()
         ]
@@ -938,33 +954,18 @@ class DerivaML(Dataset):
         """
 
         # Check to make sure that the workflow is not already in the table. If it's not, add it.
-        def get_checksum(url) -> str:
-            """Get the checksum of a file from a URL."""
-            try:
-                response = requests.get(url)
-                response.raise_for_status()
-            except Exception:
-                raise DerivaMLException(f"Invalid URL: {url}")
-            else:
-                sha256_hash = hashlib.sha256()
-                sha256_hash.update(response.content)
-                checksum = "SHA-256: " + sha256_hash.hexdigest()
-            return checksum
+
+        if workflow_rid := self.lookup_workflow(workflow.url):
+            return workflow_rid
 
         ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         try:
-            url_column = ml_schema_path.Workflow.URL
-            workflow_record = list(
-                ml_schema_path.Workflow.filter(url_column == workflow.url).entities()
-            )[0]
-            workflow_rid = workflow_record["RID"]
-        except IndexError:
             # Record doesn't exist already
             workflow_record = {
                 "URL": workflow.url,
                 "Name": workflow.name,
                 "Description": workflow.description,
-                "Checksum": get_checksum(workflow.url),
+                "Checksum": workflow.checksum,
                 "Version": workflow.version,
                 MLVocab.workflow_type: self.lookup_term(
                     MLVocab.workflow_type, workflow.workflow_type
@@ -975,6 +976,109 @@ class DerivaML(Dataset):
             error = format_exception(e)
             raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
         return workflow_rid
+
+    def lookup_workflow(self, url: str) -> Optional[RID]:
+        workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
+        try:
+            url_column = workflow_path.URL
+            return list(workflow_path.filter(url_column == url).entities())[0]["RID"]
+        except IndexError:
+            return None
+
+    def create_workflow(
+        self, name: str, workflow_type: str, description: str = "", create: bool = True
+    ) -> RID:
+        """Identify current executing program and return a workflow RID for it
+
+        Determane the notebook of script that is currently being executed. Assume that  this is
+        being executed from a cloned GitHub repository.  Determine the remote repository name for
+        this object.  Then either retrieve an existing workflow for this executable of create
+        a new one.
+
+        Args:
+            name: The name of the workflow.
+            workflow_type: The type of the workflow.
+            description: The description of the workflow.
+            create: Whether or not to create a new workflow.
+        """
+        # Make sure type is coorect.
+        self.lookup_term(MLVocab.workflow_type, workflow_type)
+        filename, github_url, is_dirty = self._github_url()
+
+        with open(filename, "rb") as f:
+            sha256_hash = hashlib.sha256()
+            sha256_hash.update(f.read())
+            checksum = "SHA-256:" + sha256_hash.hexdigest()
+
+        workflow = Workflow(
+            name=name,
+            url=github_url,
+            checksum=checksum,
+            description=description,
+            workflow_type=workflow_type,
+        )
+        return self.add_workflow(workflow) if create else None
+
+    @staticmethod
+    def _github_url() -> tuple[str, str, bool]:
+        """Return a GitHUB URL for the latest commit of the script from which this routine is called.
+
+        This routine is used to be called from a script or notebook (e.g. python -m file). It assumes that
+        the file is in a gitHUB repository and commited.  It returns a URL to the last commited version of this
+        file in GitHUB.
+
+        Returns: A tuple with the filename, gethub_url and a boolaen to indicated if uncommited changes
+            have been made to the file.
+
+        """
+
+        # Get the name of the script that is calling this function.
+        if ipython := get_ipython():
+            # Try to get the __session__ variable from the user namespace.
+            filename = Path("").absolute().parent / ipython.user_ns.get("__session__")
+        else:
+            stack = inspect.stack()
+            if len(stack) > 1:
+                filename = Path(stack[1].filename)  # Get the caller's filename
+            else:
+                raise DerivaMLException(
+                    f"Looking for caller failed"
+                )  # Stack is too shallow
+
+        # Get repo URL from local github repo.
+        try:
+            result = subprocess.run(
+                ["git", "remote", "get-url", "origin"], capture_output=True, text=True
+            )
+            github_url = result.stdout.strip().removesuffix(".git")
+        except subprocess.CalledProcessError:
+            raise DerivaMLException(f"No GIT remote found")
+
+        # Find the root directory for the repository
+        repo_root = filename
+        while repo_root != repo_root.root:
+            if (repo_root / ".git").exists():
+                break
+            else:
+                repo_root = repo_root.parent
+
+        # Now check to see if file has been modified since the last commit.
+        try:
+            result = subprocess.run(
+                ["git", "status", "--porcelain", filename],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            is_dirty = bool(
+                result.stdout.strip()
+            )  # Returns True if output is non-empty (file is modified)
+        except subprocess.CalledProcessError:
+            is_dirty = False  # If Git command fails, assume no changes
+
+        sha = get_latest_file_commit(filename)
+        url = f"{github_url}/blob/{sha}/{filename.relative_to(repo_root)}"
+        return filename, url, is_dirty
 
     # @validate_call
     def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":

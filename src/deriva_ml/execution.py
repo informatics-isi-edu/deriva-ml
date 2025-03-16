@@ -28,7 +28,6 @@ from .deriva_definitions import (
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset_aux_classes import DatasetSpec, DatasetVersion, VersionPart
-from .dataset import Dataset
 from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration
 from .execution_environment import get_execution_environment
