@@ -12,6 +12,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
+import requests
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Any, Optional
 from deriva.core import format_exception
@@ -48,6 +49,12 @@ try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
+try:
+    from jupyter_server.serverapp import list_running_servers
+except ImportError:
+    list_running_servers = lambda: []
 
 
 class Execution:
@@ -99,6 +106,7 @@ class Execution:
         self.configuration = configuration
         self._ml_object = ml_object
         self.start_time = None
+        self.stop_time = None
         self.status = Status.created
         self.uploaded_assets: list[Path] = []
 
@@ -243,6 +251,29 @@ class Execution:
             ]
         )
 
+    def _create_notebook_checkpoint(self):
+        """Trigger a checkpoint creation using Jupyter's API."""
+        notebook_name = self._ml_object._notebook
+        servers = list_running_servers()
+        # Look for the server running this notebook.
+        root = Path("").absolute().parent.as_posix()
+        server = [s for s in list_running_servers() if s["root_dir"] == root][0]
+        notebook_url = f"{server['url']}api/contents/{notebook_name}"
+
+        # Get notebook content
+        response = requests.get(
+            notebook_url, headers={"Authorization": f"Token {server['token']}"}
+        )
+        if response.status_code == 200:
+            notebook_content = response.json()["content"]
+            # Execution metadata cannot be in a directory, so map path into filename.
+            checkpoint_path = (
+                self.execution_metadata_path(ExecMetadataVocab.runtime_env.value)
+                / f"{notebook_name.as_posix().replace('/','_')}.checkpoint"
+            )
+            with open(checkpoint_path, "w", encoding="utf-8") as f:
+                json.dump(notebook_content, f)
+
     def execution_start(self) -> None:
         """Start an execution, uploading status to catalog"""
 
@@ -252,10 +283,14 @@ class Execution:
 
     def execution_stop(self) -> None:
         """Finish the execution and update the duration and status of execution."""
-        duration = datetime.now() - self.start_time
+        self.stop_time = datetime.now()
+        duration = self.stop_time - self.start_time
         hours, remainder = divmod(duration.total_seconds(), 3600)
         minutes, seconds = divmod(remainder, 60)
         duration = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
+
+        if self._ml_object._notebook:
+            self._create_notebook_checkpoint()
 
         self.update_status(Status.completed, "Algorithm execution ended.")
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(

@@ -70,8 +70,11 @@ exec_asset_regex = (
 exec_metadata_dir_regex = (
     exec_dir_regex + r"/execution-metadata/(?P<execution_metadata_type>[-\w]+)"
 )
+
+# May have more than one suffix
 exec_metadata_regex = (
-    exec_metadata_dir_regex + r"/(?P<filename>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
+    exec_metadata_dir_regex
+    + r"/(?P<filename>[-\w]+([.][\w]+)*)[.](?P<file_ext>[a-z0-9]*)$"
 )
 feature_dir_regex = exec_dir_regex + r"/feature"
 feature_table_dir_regex = (

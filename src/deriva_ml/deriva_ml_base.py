@@ -149,6 +149,10 @@ class DerivaML(Dataset):
         self.version = model_version
         self.configuration = None
         self._execution: Optional[Execution] = None
+        if ipython := get_ipython():
+            self._notebook = Path(ipython.user_ns.get("__session__"))
+        else:
+            self._notebook = None
 
         self.domain_schema = self.model.domain_schema
         self.project_name = project_name or self.domain_schema
@@ -1001,14 +1005,29 @@ class DerivaML(Dataset):
             description: The description of the workflow.
             create: Whether or not to create a new workflow.
         """
-        # Make sure type is coorect.
+        # Make sure type is correct.
         self.lookup_term(MLVocab.workflow_type, workflow_type)
         filename, github_url, is_dirty = self._github_url()
 
-        with open(filename, "rb") as f:
-            sha256_hash = hashlib.sha256()
-            sha256_hash.update(f.read())
-            checksum = "SHA-256:" + sha256_hash.hexdigest()
+        if is_dirty:
+            self._logger.warning(
+                f"File {filename} has been modified since last commit. Consider commiting before executing"
+            )
+
+        sha256_hash = hashlib.sha256()
+        if self._notebook:
+            # If you are in a notebook, strip out the outputs before computing the checksum.
+            result = subprocess.run(
+                ["nbstripout", "-t", filename],
+                capture_output=True,
+                text=False,
+                check=True,
+            )
+            sha256_hash.update(result.stdout)
+        else:
+            with open(filename, "rb") as f:
+                sha256_hash.update(f.read())
+        checksum = "SHA-256:" + sha256_hash.hexdigest()
 
         workflow = Workflow(
             name=name,
@@ -1019,8 +1038,7 @@ class DerivaML(Dataset):
         )
         return self.add_workflow(workflow) if create else None
 
-    @staticmethod
-    def _github_url() -> tuple[str, str, bool]:
+    def _github_url(self) -> tuple[str, str, bool]:
         """Return a GitHUB URL for the latest commit of the script from which this routine is called.
 
         This routine is used to be called from a script or notebook (e.g. python -m file). It assumes that
@@ -1033,9 +1051,9 @@ class DerivaML(Dataset):
         """
 
         # Get the name of the script that is calling this function.
-        if ipython := get_ipython():
+        if self._notebook:
             # Try to get the __session__ variable from the user namespace.
-            filename = Path("").absolute().parent / ipython.user_ns.get("__session__")
+            filename = Path("").absolute().parent / self._notebook
         else:
             stack = inspect.stack()
             if len(stack) > 1:
@@ -1067,14 +1085,14 @@ class DerivaML(Dataset):
         # Now check to see if file has been modified since the last commit.
         try:
             result = subprocess.run(
-                ["git", "status", "--porcelain", filename],
+                ["git", "status", "--porcelain"],
                 capture_output=True,
                 text=True,
                 check=True,
             )
             is_dirty = bool(
-                result.stdout.strip()
-            )  # Returns True if output is non-empty (file is modified)
+                " M " in result.stdout.strip()
+            )  # Returns True if output indicates a modified file
         except subprocess.CalledProcessError:
             is_dirty = False  # If Git command fails, assume no changes
 

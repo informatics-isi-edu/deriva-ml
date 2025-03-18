@@ -8,7 +8,7 @@ def execute(host, catalog, script):
 
     )
     ml_instance = DerivaML()
-    ml_instance.create_execution(configuratio)
+    ml_instance.create_execution(configuration)
     script
 
 
