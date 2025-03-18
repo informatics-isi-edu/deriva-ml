@@ -18,7 +18,8 @@ dependencies = [
     "regex~=2024.7.24",
     "pydantic>=2.10.6",
     "semver>3.0.0",
-     "setuptools-git-versioning>=2.0,<3"
+     "setuptools-git-versioning>=2.0,<3",
+    "nbstripout",
 ]
 
 [tool.setuptools.package-data]
