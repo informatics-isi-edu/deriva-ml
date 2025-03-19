@@ -4,6 +4,7 @@ __all__ = [
     "FileUploadState",
     "FileSpec",
     "ExecutionConfiguration",
+    "Execution",
     "Workflow",
     "DatasetBag",
     "DatasetVersion",
@@ -39,4 +40,4 @@ from .execution_configuration import (
     ExecutionConfiguration,
     Workflow,
 )
-
+from .execution import Execution

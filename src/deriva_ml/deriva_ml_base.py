@@ -157,7 +157,19 @@ class DerivaML(Dataset):
             # Check if running in Jupyter's ZMQ kernel (used by notebooks)
             if ipython is not None and "IPKernelApp" in ipython.config:
                 self._notebook = Path(ipython.user_ns.get("__session__"))
-            # Check if running in Jupyter's ZMQ kernel (used by notebooks)
+                # Check if running in Jupyter's ZMQ kernel (used by notebooks)
+                try:
+                    if subprocess.run(
+                        ["nbstripout", "--is-installed"],
+                        check=True,
+                        capture_output=True,
+                    ).returncode:
+                        self._logger.warn(
+                            "nbstripout is not installed in repository. Please run nbstripout --install"
+                        )
+                except subprocess.CalledProcessError:
+                    self._logger.error("nbstripout is not found.")
+
         except (ImportError, AttributeError):
             pass
 
@@ -1001,9 +1013,9 @@ class DerivaML(Dataset):
     ) -> RID:
         """Identify current executing program and return a workflow RID for it
 
-        Determane the notebook of script that is currently being executed. Assume that  this is
+        Determine the notebook or script that is currently being executed. Assume that  this is
         being executed from a cloned GitHub repository.  Determine the remote repository name for
-        this object.  Then either retrieve an existing workflow for this executable of create
+        this object.  Then either retrieve an existing workflow for this executable or create
         a new one.
 
         Args:
@@ -1045,14 +1057,14 @@ class DerivaML(Dataset):
         )
         return self.add_workflow(workflow) if create else None
 
-    def _github_url(self) -> tuple[str, str, bool]:
+    def _github_url(self) -> tuple[Path, str, bool]:
         """Return a GitHUB URL for the latest commit of the script from which this routine is called.
 
         This routine is used to be called from a script or notebook (e.g. python -m file). It assumes that
         the file is in a gitHUB repository and commited.  It returns a URL to the last commited version of this
         file in GitHUB.
 
-        Returns: A tuple with the filename, gethub_url and a boolaen to indicated if uncommited changes
+        Returns: A tuple with the filename, gethub_url and a boolean to indicated if uncommited changes
             have been made to the file.
 
         """
@@ -1098,7 +1110,7 @@ class DerivaML(Dataset):
                 check=True,
             )
             is_dirty = bool(
-                " M " in result.stdout.strip()
+                "M " in result.stdout.strip()
             )  # Returns True if output indicates a modified file
         except subprocess.CalledProcessError:
             is_dirty = False  # If Git command fails, assume no changes

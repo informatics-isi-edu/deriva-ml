@@ -254,7 +254,7 @@ class Execution:
     def _create_notebook_checkpoint(self):
         """Trigger a checkpoint creation using Jupyter's API."""
         notebook_name = self._ml_object._notebook
-        servers = list_running_servers()
+
         # Look for the server running this notebook.
         root = Path("").absolute().parent.as_posix()
         servers = list(list_running_servers())
