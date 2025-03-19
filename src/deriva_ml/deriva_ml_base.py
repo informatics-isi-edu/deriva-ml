@@ -149,10 +149,17 @@ class DerivaML(Dataset):
         self.version = model_version
         self.configuration = None
         self._execution: Optional[Execution] = None
-        if ipython := get_ipython():
-            self._notebook = Path(ipython.user_ns.get("__session__"))
-        else:
-            self._notebook = None
+        self._notebook = None
+        try:
+            from IPython import get_ipython
+
+            ipython = get_ipython()
+            # Check if running in Jupyter's ZMQ kernel (used by notebooks)
+            if ipython is not None and "IPKernelApp" in ipython.config:
+                self._notebook = Path(ipython.user_ns.get("__session__"))
+            # Check if running in Jupyter's ZMQ kernel (used by notebooks)
+        except (ImportError, AttributeError):
+            pass
 
         self.domain_schema = self.model.domain_schema
         self.project_name = project_name or self.domain_schema
