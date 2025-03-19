@@ -20,6 +20,7 @@ from pathlib import Path
 import requests
 from setuptools_git_versioning import get_latest_file_commit
 import subprocess
+import shutil
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 from deriva.core import (
     ErmrestCatalog,
@@ -160,8 +161,8 @@ class DerivaML(Dataset):
                 # Check if running in Jupyter's ZMQ kernel (used by notebooks)
                 try:
                     if subprocess.run(
-                        ["nbstripout", "--is-installed"],
-                        check=True,
+                        [shutil.which("nbstripout"), "--is-installed"],
+                        check=False,
                         capture_output=True,
                     ).returncode:
                         self._logger.warn(
@@ -1022,7 +1023,7 @@ class DerivaML(Dataset):
             name: The name of the workflow.
             workflow_type: The type of the workflow.
             description: The description of the workflow.
-            create: Whether or not to create a new workflow.
+            create: Whether to create a new workflow.
         """
         # Make sure type is correct.
         self.lookup_term(MLVocab.workflow_type, workflow_type)
