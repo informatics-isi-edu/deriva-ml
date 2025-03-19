@@ -257,7 +257,9 @@ class Execution:
         servers = list_running_servers()
         # Look for the server running this notebook.
         root = Path("").absolute().parent.as_posix()
-        server = [s for s in list_running_servers() if s["root_dir"] == root][0]
+        servers = list(list_running_servers())
+        # Jupyterhub seems to handle root_dir differently then server case.
+        server = (servers if len(servers) == 1 else [s for s in servers if s["root_dir"] == root])[0]
         notebook_url = f"{server['url']}api/contents/{notebook_name}"
 
         # Get notebook content
