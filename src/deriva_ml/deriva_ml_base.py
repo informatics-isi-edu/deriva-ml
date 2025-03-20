@@ -31,6 +31,7 @@ from deriva.core import (
 )
 import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException
+from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.hatrac_store import HatracStore
@@ -116,13 +117,11 @@ class DerivaML(Dataset):
             model_version: A string that indicates the version model.  Typically passed in via
         """
         self.credential = get_credential(hostname)
-        self.catalog = ErmrestCatalog(
-            "https",
-            hostname,
-            catalog_id,
-            self.credential,
-            session_config=self._get_session_config(),
-        )
+        server = DerivaServer("https",
+                              hostname,
+                              credentials=self.credential,
+                              session_config=self._get_session_config())
+        self.catalog = server.connect_ermrest(catalog_id)
         self.model = DerivaModel(
             self.catalog.getCatalogModel(), domain_schema=domain_schema
         )
