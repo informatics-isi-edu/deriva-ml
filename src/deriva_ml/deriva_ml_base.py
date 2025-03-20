@@ -13,17 +13,14 @@ from __future__ import annotations
 import getpass
 import logging
 from datetime import datetime
-import hashlib
 from itertools import chain
 import inspect
 from pathlib import Path
 import requests
-from setuptools_git_versioning import get_latest_file_commit
 import subprocess
 import shutil
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 from deriva.core import (
-    ErmrestCatalog,
     get_credential,
     urlquote,
     DEFAULT_SESSION_CONFIG,
@@ -1035,20 +1032,18 @@ class DerivaML(Dataset):
                 f"File {filename} has been modified since last commit. Consider commiting before executing"
             )
 
-        sha256_hash = hashlib.sha256()
-        if self._notebook:
-            # If you are in a notebook, strip out the outputs before computing the checksum.
-            result = subprocess.run(
-                ["nbstripout", "-t", filename],
-                capture_output=True,
-                text=False,
-                check=True,
-            )
-            sha256_hash.update(result.stdout)
-        else:
-            with open(filename, "rb") as f:
-                sha256_hash.update(f.read())
-        checksum = "SHA-256:" + sha256_hash.hexdigest()
+        # If you are in a notebook, strip out the outputs before computing the checksum.
+        cmd = (
+            f"nbstripout {filename} | git hash-object --stdin"
+            if self._notebook
+            else f"git hash-object {filename}"
+        )
+        checksum = subprocess.run(
+            ["nbstripout", "-t", filename],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
 
         workflow = Workflow(
             name=name,
@@ -1117,7 +1112,14 @@ class DerivaML(Dataset):
         except subprocess.CalledProcessError:
             is_dirty = False  # If Git command fails, assume no changes
 
-        sha = get_latest_file_commit(filename)
+        """Get SHA-1 hash of latest commit of the file in the repository"""
+        result = subprocess.run(
+            ["git", "log", "-n", "1", "--pretty=format:%H" "--", filename],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        sha = result.stdout.strip()
         url = f"{github_url}/blob/{sha}/{filename.relative_to(repo_root)}"
         return filename, url, is_dirty
 

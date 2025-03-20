@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "deriva-ml"
 dynamic = ["version"]
 authors = [
-    {name = "ISRD", email = "isrd-dev@isi.edu"},
+    { name = "ISRD", email = "isrd-dev@isi.edu" },
 ]
 description = "Utilities to simplify use of Dervia and Pandas to create reproducable ML pipelines"
 readme = "README.md"
@@ -18,7 +18,7 @@ dependencies = [
     "regex~=2024.7.24",
     "pydantic>=2.10.6",
     "semver>3.0.0",
-     "setuptools-git-versioning>=2.0,<3",
+    "setuptools-git-versioning>=2.0,<3",
     "nbstripout",
 ]
 
@@ -26,7 +26,7 @@ dependencies = [
 deriva_ml = ["schema_setup/*.json"]
 
 [tool.setuptools.dynamic]
-version = {attr = "deriva_ml.VERSION.__version__"}  # any module attribute compatible with ast.literal_eval
+version = { attr = "deriva_ml.VERSION.__version__" }  # any module attribute compatible with ast.literal_eval
 
 [project.scripts]
 deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:main"
