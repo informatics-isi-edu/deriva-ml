@@ -117,10 +117,12 @@ class DerivaML(Dataset):
             model_version: A string that indicates the version model.  Typically passed in via
         """
         self.credential = get_credential(hostname)
-        server = DerivaServer("https",
-                              hostname,
-                              credentials=self.credential,
-                              session_config=self._get_session_config())
+        server = DerivaServer(
+            "https",
+            hostname,
+            credentials=self.credential,
+            session_config=self._get_session_config(),
+        )
         self.catalog = server.connect_ermrest(catalog_id)
         self.model = DerivaModel(
             self.catalog.getCatalogModel(), domain_schema=domain_schema
