@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "wheel", "setuptools-scm>=8"]
+requires = ["setuptools>=64", "wheel", "setuptools-scm<=6"]
 build-backend = "setuptools.build_meta"
 
 
@@ -18,7 +18,8 @@ dependencies = [
     "regex~=2024.7.24",
     "pydantic>=2.10.6",
     "semver>3.0.0",
-    "setuptools-git-versioning>=2.0,<3",
+     "setuptools>=64",
+    "setuptools-scm<=6",
     "nbstripout",
 ]
 
