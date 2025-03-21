@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
-set -e  # Exit if any command fails
+#!/usr/bin/env bash -v
+set -e  # Exit immediately if any command fails
 
-# Ensure GitHub CLI is available.
+# Check for GitHub CLI (gh)
 if ! command -v gh &> /dev/null; then
     echo "Error: GitHub CLI (gh) is not installed. Please install it and log in."
     exit 1
@@ -11,20 +11,20 @@ fi
 VERSION_TYPE=${1:-patch}
 echo "Bumping version: $VERSION_TYPE"
 
-# Bump the version using bump2version.
-# This updates version files, commits, and creates a Git tag.
-bump2version "$VERSION_TYPE"
+# Bump the version using bump-my-version.
+# This command should update version files, commit the changes, and create a Git tag.
+bump-my-version bump "$VERSION_TYPE"
 
 # Build the package.
-# setuptools_scm will derive the version from Git tags during the build.
+# During the build, setuptools_scm will derive the version from Git tags.
 echo "Building the package..."
 python -m build
 
 # Push commits and tags to the remote repository.
-echo "Pushing changes to remote..."
+echo "Pushing changes to remote repository..."
 git push --follow-tags
 
-# Retrieve the new version tag (the latest tag)
+# Retrieve the new version tag (latest tag)
 NEW_TAG=$(git describe --tags --abbrev=0)
 echo "New version tag: $NEW_TAG"
 

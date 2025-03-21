@@ -24,13 +24,11 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
-
 deriva_ml = ["schema_setup/*.json"]
 
 [tool.setuptools_scm]
 
 [tool.bumpversion]
-current_version = "0.1.0"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 search = "{current_version}"
