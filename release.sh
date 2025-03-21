@@ -15,21 +15,22 @@ echo "Bumping version: $VERSION_TYPE"
 # This command should update version files, commit the changes, and create a Git tag.
 bump-my-version bump $VERSION_TYPE --verbose
 
+# Push commits and tags to the remote repository.
+echo "Pushing changes to remote repository..."
+git push --follow-tags
+
+# Create a GitHub release with auto-generated release notes.
+echo "Creating GitHub release for $NEW_TAG..."
+gh release create "$NEW_TAG" --title "$NEW_TAG Release" --generate-notes
+
 # Build the package.
 # During the build, setuptools_scm will derive the version from Git tags.
 echo "Building the package..."
 python -m build
 
-# Push commits and tags to the remote repository.
-echo "Pushing changes to remote repository..."
-git push --follow-tags
-
 # Retrieve the new version tag (latest tag)
 NEW_TAG=$(git describe --tags --abbrev=0)
 echo "New version tag: $NEW_TAG"
 
-# Create a GitHub release with auto-generated release notes.
-echo "Creating GitHub release for $NEW_TAG..."
-gh release create "$NEW_TAG" --title "$NEW_TAG Release" --generate-notes
 
 echo "Release process complete!"
