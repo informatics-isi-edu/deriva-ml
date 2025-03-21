@@ -24,6 +24,7 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
+
 deriva_ml = ["schema_setup/*.json"]
 
 [tool.setuptools_scm]

@@ -1,24 +1,25 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e  # Exit immediately if a command exits with a non-zero status
 
-set -e  # Exit on error
+# Check for an argument: patch, minor, or major (default: patch)
+VERSION_TYPE=${1:-patch}
+echo "Bumping version: $VERSION_TYPE"
 
-# Ask for the version number
-read -p "Enter version (e.g., 1.2.3): " VERSION
+# Bump the version using bump2version.
+# This command will update version files, commit, and tag if configured.
+bump2version "$VERSION_TYPE"
 
-TAG="v$VERSION"
-
-# Confirm action
-read -p "Release version $TAG? [y/N] " CONFIRM
-[[ $CONFIRM != "y" && $CONFIRM != "Y" ]] && echo "Aborted." && exit 1
-
-# Create Git tag
-git tag -a "$TAG" -m "Release $TAG"
-git push origin "$TAG"
-
-# Build the Python package
+# Build the package.
+# This uses setuptools_scm during the build (make sure you have a pyproject.toml or setup.cfg configured).
+echo "Building the package..."
 python -m build
 
-# Create GitHub release
-gh release create "$TAG" --generate-notes
+# Optionally, you could run your test suite here.
+# echo "Running tests..."
+# pytest
 
-echo "Release $TAG complete!"
+# Push commits and tags to the remote repository.
+echo "Pushing changes to remote repository..."
+git push --follow-tags
+
+echo "Release complete!"
