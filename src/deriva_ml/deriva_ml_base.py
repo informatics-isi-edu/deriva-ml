@@ -15,6 +15,7 @@ import logging
 from datetime import datetime
 from itertools import chain
 import inspect
+import setuptools_scm
 from pathlib import Path
 import requests
 import subprocess
@@ -141,6 +142,8 @@ class DerivaML(Dataset):
 
         # Initialize dataset class.
         super().__init__(self.model, self.cache_dir)
+        self._logger = logging.getLogger("deriva_ml")
+        self._logger.setLevel(logging_level)
 
         self.host_name = hostname
         self.catalog_id = catalog_id
@@ -148,37 +151,12 @@ class DerivaML(Dataset):
         self.version = model_version
         self.configuration = None
         self._execution: Optional[Execution] = None
-        self._notebook = None
-        try:
-            from IPython import get_ipython
-
-            ipython = get_ipython()
-            # Check if running in Jupyter's ZMQ kernel (used by notebooks)
-            if ipython is not None and "IPKernelApp" in ipython.config:
-                self._notebook = Path(ipython.user_ns.get("__session__"))
-                # Check if running in Jupyter's ZMQ kernel (used by notebooks)
-                try:
-                    if subprocess.run(
-                        [shutil.which("nbstripout"), "--is-installed"],
-                        check=False,
-                        capture_output=True,
-                    ).returncode:
-                        self._logger.warn(
-                            "nbstripout is not installed in repository. Please run nbstripout --install"
-                        )
-                except subprocess.CalledProcessError:
-                    self._logger.error("nbstripout is not found.")
-
-        except (ImportError, AttributeError):
-            pass
-
+        self._script_path, self._is_notebook = self._get_python_script()
+        self._notebook = self._get_python_notebook()
         self.domain_schema = self.model.domain_schema
         self.project_name = project_name or self.domain_schema
-
         self.start_time = datetime.now()
         self.status = Status.pending.value
-        self._logger = logging.getLogger("deriva_ml")
-        self._logger.setLevel(logging_level)
 
         logging.basicConfig(
             level=logging_level,
@@ -200,6 +178,65 @@ class DerivaML(Dataset):
                 self._execution.update_status(Status.aborted, "Execution Aborted")
         except (AttributeError, requests.HTTPError):
             pass
+
+    def _get_python_notebook(self) -> Path | None:
+        """Figure out if you are running in a Jupyter notebook
+
+        Returns:
+            A Path to the notebook file that is currently being executed.
+        """
+        notebook = None
+        try:
+            ipython = get_ipython()
+            # Check if running in Jupyter's ZMQ kernel (used by notebooks)
+            if ipython is not None and "IPKernelApp" in ipython.config:
+                notebook = Path(ipython.user_ns.get("__session__"))
+                # Check if running in Jupyter's ZMQ kernel (used by notebooks)
+                try:
+                    if subprocess.run(
+                        [shutil.which("nbstripout"), "--is-installed"],
+                        check=False,
+                        capture_output=True,
+                    ).returncode:
+                        self._logger.warning(
+                            "nbstripout is not installed in repository. Please run nbstripout --install"
+                        )
+                except subprocess.CalledProcessError:
+                    self._logger.error("nbstripout is not found.")
+        except (ImportError, AttributeError):
+            pass
+        return notebook
+
+    def _get_python_script(self) -> tuple[Path, bool]:
+        """Return the path to the currently executing script"""
+        is_notebook = False
+        if filename := self._get_python_notebook():
+            is_notebook = True
+        else:
+            stack = inspect.stack()
+            if len(stack) > 1:
+                filename = Path(
+                    stack[2].filename
+                )  # Get the caller's filename, which is two up the stack from here.
+            else:
+                raise DerivaMLException(
+                    f"Looking for caller failed"
+                )  # Stack is too shallow
+        return filename, is_notebook
+
+    def _get_git_root(self):
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=self._script_path.parent,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                check=True
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError:
+            return None  # Not in a git repository
 
     @staticmethod
     def _get_session_config():
@@ -223,6 +260,9 @@ class DerivaML(Dataset):
     def pathBuilder(self) -> datapath._CatalogWrapper:
         """Get a new instance of a pathBuilder object."""
         return self.catalog.getPathBuilder()
+
+    def get_version(self) -> str:
+        return setuptools_scm.get_version(root=self._get_git_root())
 
     @property
     def domain_path(self):
@@ -1025,21 +1065,21 @@ class DerivaML(Dataset):
         """
         # Make sure type is correct.
         self.lookup_term(MLVocab.workflow_type, workflow_type)
-        filename, github_url, is_dirty = self._github_url()
+        github_url, is_dirty = self._github_url()
 
         if is_dirty:
             self._logger.warning(
-                f"File {filename} has been modified since last commit. Consider commiting before executing"
+                f"File {self._script_path} has been modified since last commit. Consider commiting before executing"
             )
 
         # If you are in a notebook, strip out the outputs before computing the checksum.
         cmd = (
-            f"nbstripout {filename} | git hash-object --stdin"
-            if self._notebook
-            else f"git hash-object {filename}"
+            f"nbstripout {self._script_path} | git hash-object --stdin"
+            if self._is_notebook
+            else f"git hash-object {self._script_path}"
         )
         checksum = subprocess.run(
-            ["nbstripout", "-t", filename],
+            cmd,
             capture_output=True,
             text=True,
             check=True,
@@ -1054,54 +1094,36 @@ class DerivaML(Dataset):
         )
         return self.add_workflow(workflow) if create else None
 
-    def _github_url(self) -> tuple[Path, str, bool]:
+    def _github_url(self) -> tuple[str, bool]:
         """Return a GitHUB URL for the latest commit of the script from which this routine is called.
 
         This routine is used to be called from a script or notebook (e.g. python -m file). It assumes that
         the file is in a gitHUB repository and commited.  It returns a URL to the last commited version of this
         file in GitHUB.
 
-        Returns: A tuple with the filename, gethub_url and a boolean to indicated if uncommited changes
+        Returns: A tuple with the gethub_url and a boolean to indicated if uncommited changes
             have been made to the file.
 
         """
 
-        # Get the name of the script that is calling this function.
-        if self._notebook:
-            # Try to get the __session__ variable from the user namespace.
-            filename = Path("").absolute().parent / self._notebook
-        else:
-            stack = inspect.stack()
-            if len(stack) > 1:
-                filename = Path(
-                    stack[2].filename
-                )  # Get the caller's filename, which is two up the stack from here.
-            else:
-                raise DerivaMLException(
-                    f"Looking for caller failed"
-                )  # Stack is too shallow
-
         # Get repo URL from local github repo.
         try:
             result = subprocess.run(
-                ["git", "remote", "get-url", "origin"], capture_output=True, text=True
+                ["git", "remote", "get-url", "origin"], capture_output=True, text=True,
+                cwd=self._script_path.parent,
             )
             github_url = result.stdout.strip().removesuffix(".git")
         except subprocess.CalledProcessError:
             raise DerivaMLException(f"No GIT remote found")
 
         # Find the root directory for the repository
-        repo_root = filename
-        while repo_root != repo_root.root:
-            if (repo_root / ".git").exists():
-                break
-            else:
-                repo_root = repo_root.parent
+        repo_root = self._get_git_root()
 
         # Now check to see if file has been modified since the last commit.
         try:
             result = subprocess.run(
                 ["git", "status", "--porcelain"],
+                cwd=self._script_path.parent,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -1114,14 +1136,15 @@ class DerivaML(Dataset):
 
         """Get SHA-1 hash of latest commit of the file in the repository"""
         result = subprocess.run(
-            ["git", "log", "-n", "1", "--pretty=format:%H" "--", filename],
+            ["git", "log", "-n", "1", "--pretty=format:%H" "--", self._script_path],
+            cwd=self._script_path.parent,
             capture_output=True,
             text=True,
             check=True,
         )
         sha = result.stdout.strip()
-        url = f"{github_url}/blob/{sha}/{filename.relative_to(repo_root)}"
-        return filename, url, is_dirty
+        url = f"{github_url}/blob/{sha}/{self._script_path.relative_to(repo_root)}"
+        return url, is_dirty
 
     # @validate_call
     def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":
