@@ -1,4 +1,4 @@
-#!/usr/bin/env bash -v
+#!/usr/bin/env bash
 set -e  # Exit immediately if any command fails
 
 # Check for GitHub CLI (gh)
