@@ -1,25 +1,35 @@
 #!/usr/bin/env bash
-set -e  # Exit immediately if a command exits with a non-zero status
+set -e  # Exit if any command fails
 
-# Check for an argument: patch, minor, or major (default: patch)
+# Ensure GitHub CLI is available.
+if ! command -v gh &> /dev/null; then
+    echo "Error: GitHub CLI (gh) is not installed. Please install it and log in."
+    exit 1
+fi
+
+# Default version bump is patch unless specified (patch, minor, or major)
 VERSION_TYPE=${1:-patch}
 echo "Bumping version: $VERSION_TYPE"
 
 # Bump the version using bump2version.
-# This command will update version files, commit, and tag if configured.
+# This updates version files, commits, and creates a Git tag.
 bump2version "$VERSION_TYPE"
 
 # Build the package.
-# This uses setuptools_scm during the build (make sure you have a pyproject.toml or setup.cfg configured).
+# setuptools_scm will derive the version from Git tags during the build.
 echo "Building the package..."
 python -m build
 
-# Optionally, you could run your test suite here.
-# echo "Running tests..."
-# pytest
-
 # Push commits and tags to the remote repository.
-echo "Pushing changes to remote repository..."
+echo "Pushing changes to remote..."
 git push --follow-tags
 
-echo "Release complete!"
+# Retrieve the new version tag (the latest tag)
+NEW_TAG=$(git describe --tags --abbrev=0)
+echo "New version tag: $NEW_TAG"
+
+# Create a GitHub release with auto-generated release notes.
+echo "Creating GitHub release for $NEW_TAG..."
+gh release create "$NEW_TAG" --title "$NEW_TAG Release" --generate-notes
+
+echo "Release process complete!"
