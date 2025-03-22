@@ -13,7 +13,7 @@ echo "Bumping version: $VERSION_TYPE"
 
 # Bump the version using bump-my-version.
 # This command should update version files, commit the changes, and create a Git tag.
-bump-my-version bump $VERSION_TYPE --verbose
+bump-my-version bump "$VERSION_TYPE" --verbose
 
 # Push commits and tags to the remote repository.
 echo "Pushing changes to remote repository..."
@@ -32,6 +32,6 @@ python -m build
 NEW_TAG=$(git describe --tags --abbrev=0)
 echo "New version tag: $NEW_TAG"
 
-twine upload dist/*${NEW_TAG}
+twine upload "dist/*${NEW_TAG/v/}"
 
 echo "Release process complete!"
