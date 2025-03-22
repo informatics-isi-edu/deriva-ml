@@ -19,7 +19,6 @@ import setuptools_scm
 from pathlib import Path
 import requests
 import subprocess
-import shutil
 from typing import Optional, Any, Iterable, TYPE_CHECKING
 from deriva.core import (
     get_credential,
@@ -34,6 +33,7 @@ from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.hatrac_store import HatracStore
 from pydantic import validate_call, ConfigDict
+from requests import RequestException
 
 from .execution_configuration import ExecutionConfiguration, Workflow
 from .feature import Feature, FeatureRecord
@@ -72,6 +72,15 @@ try:
 except ImportError:  # Graceful fallback if IPython isn't installed.
     get_ipython = lambda: None
 
+try:
+    from jupyter_server.serverapp import list_running_servers
+except ImportError:
+    list_running_servers = lambda: []
+
+try:
+    from ipykernel import get_connection_file
+except ImportError:
+    get_connection_file = lambda: ""
 
 if TYPE_CHECKING:
     from .execution import Execution
@@ -151,8 +160,7 @@ class DerivaML(Dataset):
         self.version = model_version
         self.configuration = None
         self._execution: Optional[Execution] = None
-        self._script_path, self._is_notebook = self._get_python_script()
-        self._notebook = self._get_python_notebook()
+        self.executable_path, self._is_notebook = self._get_python_script()
         self.domain_schema = self.model.domain_schema
         self.project_name = project_name or self.domain_schema
         self.start_time = datetime.now()
@@ -179,38 +187,77 @@ class DerivaML(Dataset):
         except (AttributeError, requests.HTTPError):
             pass
 
-    def _get_python_notebook(self) -> Path | None:
+    def _check_nbstrip_status(self) -> None:
         """Figure out if you are running in a Jupyter notebook
 
         Returns:
             A Path to the notebook file that is currently being executed.
         """
-        notebook = None
         try:
-            ipython = get_ipython()
-            # Check if running in Jupyter's ZMQ kernel (used by notebooks)
-            if ipython is not None and "IPKernelApp" in ipython.config:
-                notebook = Path(ipython.user_ns.get("__session__"))
-                # Check if running in Jupyter's ZMQ kernel (used by notebooks)
+            if subprocess.run(
+                ["nbstripout", "--is-installed"],
+                check=False,
+                capture_output=True,
+            ).returncode:
+                self._logger.warning(
+                    "nbstripout is not installed in repository. Please run nbstripout --install"
+                )
+        except subprocess.CalledProcessError:
+            self._logger.error("nbstripout is not found.")
+
+    def _get_notebook_session(
+        self,
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        """Return the absolute path of the current notebook."""
+        # Get the kernel's connection file and extract the kernel ID
+        try:
+            if not (connection_file := Path(get_connection_file()).name):
+                return None, None
+        except RuntimeError:
+            return None, None
+
+        kernel_id = connection_file.split("-", 1)[1].split(".")[0]
+
+        # Look through the running server sessions to find the matching kernel ID
+        for server in list_running_servers():
+            try:
+                # If a token is required for authentication, include it in headers
+                token = server.get("token", "")
+                headers = {}
+                if token:
+                    headers["Authorization"] = f"token {token}"
+
                 try:
-                    if subprocess.run(
-                        [shutil.which("nbstripout"), "--is-installed"],
-                        check=False,
-                        capture_output=True,
-                    ).returncode:
-                        self._logger.warning(
-                            "nbstripout is not installed in repository. Please run nbstripout --install"
-                        )
-                except subprocess.CalledProcessError:
-                    self._logger.error("nbstripout is not found.")
-        except (ImportError, AttributeError):
-            pass
-        return notebook
+                    sessions_url = server["url"] + "api/sessions"
+                    response = requests.get(sessions_url, headers=headers)
+                    response.raise_for_status()
+                    sessions = response.json()
+                except RequestException as e:
+                    raise e
+                for sess in sessions:
+                    if sess["kernel"]["id"] == kernel_id:
+                        return server, sess
+            except Exception as _e:
+                # Ignore servers we can't connect to.
+                pass
+        return None, None
+
+    def _get_notebook_path(self) -> Path | None:
+        """Return the absolute path of the current notebook."""
+
+        server, session = self._get_notebook_session()
+        if server and session:
+            self._check_nbstrip_status()
+            relative_path = session["notebook"]["path"]
+            # Join the notebook directory with the relative path
+            return Path(server["root_dir"]) / relative_path
+        else:
+            return None
 
     def _get_python_script(self) -> tuple[Path, bool]:
         """Return the path to the currently executing script"""
         is_notebook = False
-        if filename := self._get_python_notebook():
+        if filename := self._get_notebook_path():
             is_notebook = True
         else:
             stack = inspect.stack()
@@ -228,11 +275,11 @@ class DerivaML(Dataset):
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--show-toplevel"],
-                cwd=self._script_path.parent,
+                cwd=self.executable_path.parent,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 text=True,
-                check=True
+                check=True,
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError:
@@ -262,6 +309,7 @@ class DerivaML(Dataset):
         return self.catalog.getPathBuilder()
 
     def get_version(self) -> str:
+        """Return the version number of the executable"""
         return setuptools_scm.get_version(root=self._get_git_root())
 
     @property
@@ -1040,6 +1088,7 @@ class DerivaML(Dataset):
         return workflow_rid
 
     def lookup_workflow(self, url: str) -> Optional[RID]:
+        """Given a URL, look in the workflow table to find a matching workflow."""
         workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
         try:
             url_column = workflow_path.URL
@@ -1069,20 +1118,21 @@ class DerivaML(Dataset):
 
         if is_dirty:
             self._logger.warning(
-                f"File {self._script_path} has been modified since last commit. Consider commiting before executing"
+                f"File {self.executable_path} has been modified since last commit. Consider commiting before executing"
             )
 
         # If you are in a notebook, strip out the outputs before computing the checksum.
         cmd = (
-            f"nbstripout {self._script_path} | git hash-object --stdin"
+            f"nbstripout {self.executable_path} | git hash-object --stdin"
             if self._is_notebook
-            else f"git hash-object {self._script_path}"
+            else f"git hash-object {self.executable_path}"
         )
         checksum = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             check=True,
+            shell=True,
         ).stdout.strip()
 
         workflow = Workflow(
@@ -1109,8 +1159,10 @@ class DerivaML(Dataset):
         # Get repo URL from local github repo.
         try:
             result = subprocess.run(
-                ["git", "remote", "get-url", "origin"], capture_output=True, text=True,
-                cwd=self._script_path.parent,
+                ["git", "remote", "get-url", "origin"],
+                capture_output=True,
+                text=True,
+                cwd=self.executable_path.parent,
             )
             github_url = result.stdout.strip().removesuffix(".git")
         except subprocess.CalledProcessError:
@@ -1123,7 +1175,7 @@ class DerivaML(Dataset):
         try:
             result = subprocess.run(
                 ["git", "status", "--porcelain"],
-                cwd=self._script_path.parent,
+                cwd=self.executable_path.parent,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -1136,14 +1188,14 @@ class DerivaML(Dataset):
 
         """Get SHA-1 hash of latest commit of the file in the repository"""
         result = subprocess.run(
-            ["git", "log", "-n", "1", "--pretty=format:%H" "--", self._script_path],
-            cwd=self._script_path.parent,
+            ["git", "log", "-n", "1", "--pretty=format:%H" "--", self.executable_path],
+            cwd=self.executable_path.parent,
             capture_output=True,
             text=True,
             check=True,
         )
         sha = result.stdout.strip()
-        url = f"{github_url}/blob/{sha}/{self._script_path.relative_to(repo_root)}"
+        url = f"{github_url}/blob/{sha}/{self.executable_path.relative_to(repo_root)}"
         return url, is_dirty
 
     # @validate_call
@@ -1174,6 +1226,7 @@ class DerivaML(Dataset):
 
     # @validate_call
     def restore_execution(self, execution_rid: Optional[RID] = None) -> "Execution":
+        """Return an Execution object for a previously started execution with the specified RID."""
         from .execution import Execution
 
         # Find path to execution

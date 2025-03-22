@@ -253,17 +253,9 @@ class Execution:
 
     def _create_notebook_checkpoint(self):
         """Trigger a checkpoint creation using Jupyter's API."""
-        notebook_name = self._ml_object._notebook
 
-        # Look for the server running this notebook.
-        root = Path("").absolute().parent.as_posix()
-        servers = list(list_running_servers())
-        # Jupyterhub seems to handle root_dir differently then server case.
-        server = (
-            servers
-            if len(servers) == 1
-            else [s for s in servers if s["root_dir"] == root]
-        )[0]
+        server, session = self._ml_object._get_notebook_session()
+        notebook_name = session["notebook"]["path"]
         notebook_url = f"{server['url']}api/contents/{notebook_name}"
 
         # Get notebook content
@@ -275,7 +267,7 @@ class Execution:
             # Execution metadata cannot be in a directory, so map path into filename.
             checkpoint_path = (
                 self.execution_metadata_path(ExecMetadataVocab.runtime_env.value)
-                / f"{notebook_name.as_posix().replace('/','_')}.checkpoint"
+                / f"{notebook_name.replace('/','_')}.checkpoint"
             )
             with open(checkpoint_path, "w", encoding="utf-8") as f:
                 json.dump(notebook_content, f)
@@ -295,7 +287,7 @@ class Execution:
         minutes, seconds = divmod(remainder, 60)
         duration = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
 
-        if self._ml_object._notebook:
+        if self._ml_object._is_notebook:
             self._create_notebook_checkpoint()
 
         self.update_status(Status.completed, "Algorithm execution ended.")
