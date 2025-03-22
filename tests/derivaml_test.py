@@ -13,6 +13,7 @@ import logging
 hostname = os.getenv("DERIVA_PY_TEST_HOSTNAME")
 SNAME = os.getenv("DERIVA_PY_TEST_SNAME")
 SNAME_DOMAIN = "deriva-test"
+hostname = "dev.eye-ai.org"
 
 TestCatalog = create_demo_catalog(
     hostname=hostname,

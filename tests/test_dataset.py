@@ -8,7 +8,6 @@ from deriva_ml import (
     DatasetVersion,
     ExecutionConfiguration,
     MLVocab,
-    Workflow,
 )
 
 
@@ -116,33 +115,6 @@ class TestDataset(TestDerivaML):
         self.reset_catalog()
         double_nested_dataset, nested_datasets, datasets = self.create_nested_dataset()
 
-        print(f"double_dataset {double_nested_dataset}")
-        print(f"nested_datasets {nested_datasets}")
-        print(f"datasets {datasets}")
-        import pprint
-
-        print("double_nested_dataset")
-        pprint.pprint(
-            self.ml_instance.list_dataset_members(dataset_rid=double_nested_dataset)
-        )
-
-        print("nested_dataset")
-        pprint.pprint(
-            [
-                self.ml_instance.list_dataset_members(dataset_rid=ds)
-                for ds in nested_datasets
-            ]
-        )
-
-        print("dataset")
-        pprint.pprint(
-            [self.ml_instance.list_dataset_members(dataset_rid=ds) for ds in datasets]
-        )
-
-        print(
-            "double nested children",
-            self.ml_instance.list_dataset_children(dataset_rid=double_nested_dataset),
-        )
         self.assertEqual(2, self.ml_instance._dataset_nesting_depth())
         self.assertEqual(
             set(nested_datasets),
@@ -169,7 +141,7 @@ class TestDataset(TestDerivaML):
         )
 
         self.logger.info("Checking versions.")
-        print("Checking versions.")
+
         versions = {
             "d0": self.ml_instance.dataset_version(double_nested_dataset),
             "d1": [self.ml_instance.dataset_version(v) for v in nested_datasets],
@@ -183,8 +155,9 @@ class TestDataset(TestDerivaML):
             "d1": [self.ml_instance.dataset_version(v) for v in nested_datasets],
             "d2": [self.ml_instance.dataset_version(v) for v in datasets],
         }
-        print(versions)
-        print(new_versions)
+
+        self.assertEqual(new_versions["d0"].major, 2)
+        self.assertEqual(new_versions["d2"][0].major, 2)
 
     def test_dataset_execution(self):
         self.ml_instance.model.create_table(
@@ -209,13 +182,10 @@ class TestDataset(TestDerivaML):
         )
         self.ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
 
-        api_workflow = self.ml_instance.add_workflow(
-            Workflow(
-                name="Manual Workflow",
-                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_upload.py",
-                workflow_type="Manual Workflow",
-                description="A manual operation",
-            )
+        api_workflow = self.ml_instance.create_workflow(
+            name="Manual Workflow",
+            workflow_type="Manual Workflow",
+            description="A manual operation",
         )
         manual_execution = self.ml_instance.create_execution(
             ExecutionConfiguration(

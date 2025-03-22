@@ -1,7 +1,6 @@
 from derivaml_test import TestDerivaML
 from deriva_ml import (
     MLVocab as vc,
-    Workflow,
     ExecutionConfiguration,
     DatasetSpec,
 )
@@ -25,13 +24,10 @@ class TestExecution(TestDerivaML):
             description="A ML Workflow that uses Deriva ML API",
         )
 
-        api_workflow = self.ml_instance.add_workflow(
-            Workflow(
-                name="Manual Workflow",
-                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_execution.py",
-                workflow_type="Manual Workflow",
-                description="A manual operation",
-            )
+        api_workflow = self.ml_instance.create_workflow(
+            name="Manual Workflow",
+            workflow_type="Manual Workflow",
+            description="A manual operation",
         )
 
         manual_execution = self.ml_instance.create_execution(
@@ -57,14 +53,12 @@ class TestExecution(TestDerivaML):
             "ML Demo",
             description="A ML Workflow that uses Deriva ML API",
         )
-        api_workflow = self.ml_instance.add_workflow(
-            Workflow(
-                name="ML Demo",
-                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/pyproject.toml",
-                workflow_type="ML Demo",
-                description="A workflow that uses Deriva ML",
-            )
+        api_workflow = self.ml_instance.create_workflow(
+            name="ML Demo",
+            workflow_type="ML Demo",
+            description="A workflow that uses Deriva ML",
         )
+
         execution_model = self.create_execution_asset(api_workflow)
 
         config = ExecutionConfiguration(

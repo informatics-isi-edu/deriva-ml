@@ -71,14 +71,12 @@ class TestUpload(TestDerivaML):
             description="Model for our API workflow",
         )
 
-        api_workflow = self.ml_instance.add_workflow(
-            Workflow(
-                name="Manual Workflow",
-                url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/tests/test_upload.py",
-                workflow_type="Manual Workflow",
-                description="A manual operation",
-            )
+        api_workflow = self.ml_instance.create_workflow(
+            name="Manual Workflow",
+            workflow_type="Manual Workflow",
+            description="A manual operation",
         )
+
         manual_execution = self.ml_instance.create_execution(
             ExecutionConfiguration(
                 description="Sample Execution", workflow=api_workflow
