@@ -32,5 +32,6 @@ python -m build
 NEW_TAG=$(git describe --tags --abbrev=0)
 echo "New version tag: $NEW_TAG"
 
+twine upload dist/*${NEW_TAG}
 
 echo "Release process complete!"
