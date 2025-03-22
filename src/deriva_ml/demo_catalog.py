@@ -18,7 +18,6 @@ from requests import HTTPError
 from deriva_ml import (
     DerivaML,
     ExecutionConfiguration,
-    Workflow,
     MLVocab,
     BuiltinTypes,
     ColumnDefinition,
@@ -169,12 +168,9 @@ def create_demo_features(ml_instance):
         description="Model for our API workflow",
     )
 
-    api_workflow = ml_instance.add_workflow(
-        Workflow(
-            name="API Workflow",
-            url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/pyproject.toml",
-            workflow_type="API Workflow",
-        )
+    api_workflow = ml_instance.create_workflow(
+        name="API Workflow",
+        workflow_type="API Workflow",
     )
 
     api_execution = ml_instance.create_execution(
