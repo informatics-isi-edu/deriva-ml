@@ -240,7 +240,7 @@ def main():
     parser.add_argument("--catalog_id", type=str, required=True)
     parser.add_argument("--schema_name", type=str, required=True)
     args = parser.parse_args()
-    generate_annotation(args.catalog_id, args.schema_name)
+    generate_annotation(args.catalog_id)
 
 
 if __name__ == "__main__":

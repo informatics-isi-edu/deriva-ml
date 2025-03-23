@@ -21,7 +21,7 @@ from .deriva_definitions import (
 
 from collections import Counter
 from pydantic import validate_call, ConfigDict
-from typing import Iterable
+from typing import Iterable, Optional
 
 
 class DerivaModel:
@@ -267,7 +267,7 @@ class DerivaModel:
     def _schema_to_paths(
         self,
         root: Table = None,
-        path: list[Table] = None,
+        path: Optional[list[Table]] = None,
     ) -> list[list[Table]]:
         """Recursively walk over the domain schema graph and extend the current path.
 

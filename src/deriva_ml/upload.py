@@ -483,7 +483,7 @@ def upload_directory(
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
 def upload_asset(
-    model: DerivaModel, file: Path | str, table: Table | str, **kwargs: Any
+    model: DerivaModel, file: Path | str, table: Table, **kwargs: Any
 ) -> dict:
     """Upload the specified file into Hatrac and update the associated asset table.
 

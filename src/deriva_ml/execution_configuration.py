@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-from typing import Optional, Any
+from typing import Optional
 
 from pydantic import (
     BaseModel,
     conlist,
-    ConfigDict, field_validator,
+    ConfigDict,
 )
 from pathlib import Path
 
@@ -34,7 +34,6 @@ class Workflow(BaseModel):
     description: Optional[str] = ""
     rid: Optional[RID] = None
     checksum: Optional[str]
-
 
 
 class ExecutionConfiguration(BaseModel):
@@ -69,23 +68,21 @@ class ExecutionConfiguration(BaseModel):
             config = json.load(fd)
         return ExecutionConfiguration.model_validate(config)
 
-    def download_execution_configuration(
-        self, configuration_rid: RID
-    ) -> ExecutionConfiguration:
-        """Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
-        configuration in hatrac
-
-        Args:
-            configuration_rid: RID that should be to an asset table that refers to an execution configuration
-
-        Returns:
-            A ExecutionConfiguration object for configured by the parameters in the configuration file.
-        """
-        AssertionError("Not Implemented")
-        return ExecutionConfiguration.load_configuration(configuration_rid)
-
-        # configuration = self.retrieve_rid(configuration_rid)
-        # with NamedTemporaryFile("w+", delete=False, suffix=".json") as dest_file:
-        #    hs = HatracStore("https", self.host_name, self.credential)
-        #    hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
-        #    return ExecutionConfiguration.load_configuration(Path(dest_file.name))
+    # def download_execution_configuration(
+    #     self, configuration_rid: RID
+    # ) -> ExecutionConfiguration:
+    #     """Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
+    #     configuration in hatrac
+    #
+    #     Args:
+    #         configuration_rid: RID that should be to an asset table that refers to an execution configuration
+    #
+    #     Returns:
+    #         A ExecutionConfiguration object for configured by the parameters in the configuration file.
+    #     """
+    #     AssertionError("Not Implemented")
+    #     configuration = self.retrieve_rid(configuration_rid)
+    #     with NamedTemporaryFile("w+", delete=False, suffix=".json") as dest_file:
+    #         hs = HatracStore("https", self.host_name, self.credential)
+    #         hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
+    #         return ExecutionConfiguration.load_configuration(Path(dest_file.name))

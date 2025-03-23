@@ -54,7 +54,9 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 try:
     from jupyter_server.serverapp import list_running_servers
 except ImportError:
-    list_running_servers = lambda: []
+
+    def list_running_servers():
+        return []
 
 
 class Execution:
@@ -155,7 +157,6 @@ class Execution:
         self._initialize_execution(reload)
 
     def _save_runtime_environment(self):
-
         runtime_env_path = ExecMetadataVocab.runtime_env.value
         runtime_env_dir = self.execution_metadata_path(runtime_env_path)
         with NamedTemporaryFile(
@@ -267,7 +268,7 @@ class Execution:
             # Execution metadata cannot be in a directory, so map path into filename.
             checkpoint_path = (
                 self.execution_metadata_path(ExecMetadataVocab.runtime_env.value)
-                / f"{notebook_name.replace('/','_')}.checkpoint"
+                / f"{notebook_name.replace('/', '_')}.checkpoint"
             )
             with open(checkpoint_path, "w", encoding="utf-8") as f:
                 json.dump(notebook_content, f)
@@ -359,7 +360,7 @@ class Execution:
             if m := is_feature_asset_dir(p):
                 try:
                     self.update_status(
-                        Status.running, f'Uploading feature {m["feature_name"]}...'
+                        Status.running, f"Uploading feature {m['feature_name']}..."
                     )
                     feature_assets[m["target_table"], m["feature_name"]] = (
                         self._ml_object.upload_assets(p)

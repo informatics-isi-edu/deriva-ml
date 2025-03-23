@@ -5,6 +5,7 @@ import logging
 from random import random, randint
 import tempfile
 from tempfile import TemporaryDirectory
+from typing import Optional
 import itertools
 
 from deriva.config.acl_config import AclConfig
@@ -318,7 +319,11 @@ def create_demo_catalog(
 
 class DemoML(DerivaML):
     def __init__(
-        self, hostname, catalog_id, cache_dir: str = None, working_dir: str = None
+        self,
+        hostname,
+        catalog_id,
+        cache_dir: Optional[str] = None,
+        working_dir: Optional[str] = None,
     ):
         super().__init__(
             hostname=hostname,

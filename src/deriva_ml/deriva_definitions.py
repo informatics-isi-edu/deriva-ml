@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any, Iterable, Optional, Annotated
 
 import deriva.core.ermrest_model as em
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
 from deriva.core.ermrest_model import builtin_types
 from pydantic import (
     BaseModel,
@@ -139,13 +139,18 @@ class FileSpec(BaseModel):
         if url_parts.scheme == "tag":
             return v
         elif not url_parts.scheme:
-            return f'tag://{gethostname()},{date.today()}:file://{v}'
+            return f"tag://{gethostname()},{date.today()}:file://{v}"
         else:
             raise ValidationError("url is not a file URL")
 
     @model_serializer()
     def serialize_filespec(self):
-        return {'URL': self.url, 'Description': self.description, 'MD5': self.md5, 'Length': self.length}
+        return {
+            "URL": self.url,
+            "Description": self.description,
+            "MD5": self.md5,
+            "Length": self.length,
+        }
 
 
 class VocabularyTerm(BaseModel):

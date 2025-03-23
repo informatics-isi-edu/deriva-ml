@@ -92,7 +92,7 @@ class Dataset:
         dataset_list: list[DatasetSpec],
         description: Optional[str] = "",
         execution_rid: Optional[RID] = None,
-    ) -> RID:
+    ) -> list[dict[str, Any]]:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
 
         # Construct version records for insert
@@ -245,7 +245,7 @@ class Dataset:
           DerivaMLException: if provided RID is not to a dataset_table.
         """
 
-        # Find all of the datasets that are reachable from this dataset and determine their new version numbers.
+        # Find all the datasets that are reachable from this dataset and determine their new version numbers.
         related_datasets = list(self._build_dataset_graph(dataset_rid=dataset_rid))
         version_update_list = [
             DatasetSpec(
@@ -254,7 +254,7 @@ class Dataset:
             )
             for ds_rid in related_datasets
         ]
-        updated_versions = self._insert_dataset_versions(
+        self._insert_dataset_versions(
             version_update_list, description=description, execution_rid=execution_rid
         )
         return [d.version for d in version_update_list if d.rid == dataset_rid][0]
@@ -751,9 +751,10 @@ class Dataset:
         ]
 
     def _table_paths(
-        self, dataset: DatasetSpec = None, snapshot_catalog: Optional[DerivaML] = None
+        self,
+        dataset: Optional[DatasetSpec] = None,
+        snapshot_catalog: Optional[DerivaML] = None,
     ) -> Iterator[tuple[str, str, Table]]:
-
         paths = self._collect_paths(dataset and dataset.rid, snapshot_catalog)
 
         def source_path(path: tuple[Table, ...]):
@@ -779,17 +780,20 @@ class Dataset:
     def _collect_paths(
         self,
         dataset_rid: Optional[RID] = None,
-        snapshot_catalog: Optional[DerivaML] = None,
+        snapshot: Optional[Dataset] = None,
         dataset_nesting_depth: Optional[int] = None,
     ) -> set[tuple[Table, ...]]:
 
-        snapshot_catalog = snapshot_catalog or self
+        snapshot_catalog = snapshot if snapshot else self
+
         dataset_table = snapshot_catalog._model.schemas[self._ml_schema].tables[
             "Dataset"
         ]
         dataset_dataset = snapshot_catalog._model.schemas[self._ml_schema].tables[
             "Dataset_Dataset"
         ]
+
+        # Figure out what types of elements the dataset contains.
         dataset_associations = [
             a
             for a in self.dataset_table.find_associations()
@@ -812,7 +816,8 @@ class Dataset:
             ]
         else:
             included_associations = dataset_associations
-        # Get the paths through the schema and filter out all of dataset paths not used by this dataset.
+
+        # Get the paths through the schema and filter out all the dataset paths not used by this dataset.
         paths = {
             tuple(p)
             for p in snapshot_catalog._model._schema_to_paths()
@@ -827,7 +832,7 @@ class Dataset:
         if dataset_rid:
             for c in snapshot_catalog.list_dataset_children(dataset_rid=dataset_rid):
                 nested_paths |= self._collect_paths(
-                    c, snapshot_catalog=snapshot_catalog
+                    c, snapshot=snapshot_catalog
                 )
         else:
             # Initialize nesting depth if not already provided.

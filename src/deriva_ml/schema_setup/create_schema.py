@@ -1,5 +1,6 @@
 import argparse
 import sys
+from typing import Optional
 
 from deriva.core import DerivaServer, get_credential
 from deriva.core.ermrest_model import Model
@@ -32,7 +33,7 @@ def define_table_workflow(workflow_annotation: dict):
     )
 
 
-def define_table_dataset(dataset_annotation: dict = None):
+def define_table_dataset(dataset_annotation: Optional[dict] = None):
     return Table.define(
         tname="Dataset",
         column_defs=[
@@ -154,7 +155,7 @@ def create_www_schema(model: Model):
 
 
 def create_ml_schema(
-    model: Model, schema_name: str = "deriva-ml", project_name: str = None
+    model: Model, schema_name: str = "deriva-ml", project_name: Optional[str] = None
 ):
     if model.schemas.get(schema_name):
         model.schemas[schema_name].drop(cascade=True)

@@ -70,17 +70,26 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 try:
     from IPython import get_ipython
 except ImportError:  # Graceful fallback if IPython isn't installed.
-    get_ipython = lambda: None
+
+    def get_ipython():
+        return None
+
 
 try:
     from jupyter_server.serverapp import list_running_servers
 except ImportError:
-    list_running_servers = lambda: []
+
+    def list_running_servers():
+        return []
+
 
 try:
     from ipykernel import get_connection_file
 except ImportError:
-    get_connection_file = lambda: ""
+
+    def get_connection_file():
+        return ""
+
 
 if TYPE_CHECKING:
     from .execution import Execution
@@ -102,8 +111,8 @@ class DerivaML(Dataset):
         self,
         hostname: str,
         catalog_id: str | int,
-        domain_schema: str = None,
-        project_name: str = None,
+        domain_schema: Optional[str] = None,
+        project_name: Optional[str] = None,
         cache_dir: Optional[str] = None,
         working_dir: Optional[str] = None,
         model_version: str = "1",
@@ -267,7 +276,7 @@ class DerivaML(Dataset):
                 )  # Get the caller's filename, which is two up the stack from here.
             else:
                 raise DerivaMLException(
-                    f"Looking for caller failed"
+                    "Looking for caller failed"
                 )  # Stack is too shallow
         return filename, is_notebook
 
@@ -335,7 +344,7 @@ class DerivaML(Dataset):
         )
 
     def asset_dir(
-        self, table: str | Table, prefix: str | Path = None
+        self, table: str | Table, prefix: Optional[str | Path] = None
     ) -> UploadAssetDirectory:
         """Return a local file path in which to place a files for an asset table.  T
 
@@ -379,15 +388,15 @@ class DerivaML(Dataset):
         Returns:
             URL to the table in Chaise format.
         """
+        table_obj = self.model.name_to_table(table)
         try:
-            table = self.model.name_to_table(table)
             uri = self.catalog.get_server_uri().replace(
                 "ermrest/catalog/", "chaise/recordset/#"
             )
         except DerivaMLException:
             # Perhaps we have a RID....
             uri = self.cite(table)
-        return f"{uri}/{urlquote(table.schema.name)}:{urlquote(table.name)}"
+        return f"{uri}/{urlquote(table_obj.schema.name)}:{urlquote(table_obj.name)}"
 
     def cite(self, entity: dict | str) -> str:
         """Return a citation URL for the provided entity.
@@ -401,7 +410,9 @@ class DerivaML(Dataset):
         Raises:
             DerivaMLException: if provided RID does not exist.
         """
-        if entity.startswith(f"https://{self.host_name}/id/{self.catalog_id}/"):
+        if isinstance(entity, str) and entity.startswith(
+            f"https://{self.host_name}/id/{self.catalog_id}/"
+        ):
             # Already got a citation...
             return entity
         try:
@@ -498,9 +509,9 @@ class DerivaML(Dataset):
     def create_asset(
         self,
         asset_name: str,
-        column_defs: Iterable[ColumnDefinition] = None,
+        column_defs: Optional[Iterable[ColumnDefinition]] = None,
         comment: str = "",
-        schema: str = None,
+        schema: Optional[str] = None,
     ) -> Table:
         """Create an asset table with the given asset name.
 
@@ -532,9 +543,9 @@ class DerivaML(Dataset):
         self,
         target_table: Table | str,
         feature_name: str,
-        terms: list[Table | str] = None,
-        assets: list[Table | str] = None,
-        metadata: Iterable[ColumnDefinition | Table | Key | str] = None,
+        terms: Optional[list[Table | str]] = None,
+        assets: Optional[list[Table | str]] = None,
+        metadata: Optional[Iterable[ColumnDefinition | Table | Key | str]] = None,
         optional: Optional[list[str]] = None,
         comment: str = "",
     ) -> type[FeatureRecord]:
@@ -1098,7 +1109,7 @@ class DerivaML(Dataset):
 
     def create_workflow(
         self, name: str, workflow_type: str, description: str = "", create: bool = True
-    ) -> RID:
+    ) -> RID | None:
         """Identify current executing program and return a workflow RID for it
 
         Determine the notebook or script that is currently being executed. Assume that  this is
@@ -1166,7 +1177,7 @@ class DerivaML(Dataset):
             )
             github_url = result.stdout.strip().removesuffix(".git")
         except subprocess.CalledProcessError:
-            raise DerivaMLException(f"No GIT remote found")
+            raise DerivaMLException("No GIT remote found")
 
         # Find the root directory for the repository
         repo_root = self._get_git_root()
@@ -1188,7 +1199,7 @@ class DerivaML(Dataset):
 
         """Get SHA-1 hash of latest commit of the file in the repository"""
         result = subprocess.run(
-            ["git", "log", "-n", "1", "--pretty=format:%H" "--", self.executable_path],
+            ["git", "log", "-n", "1", "--pretty=format:%H--", self.executable_path],
             cwd=self.executable_path.parent,
             capture_output=True,
             text=True,

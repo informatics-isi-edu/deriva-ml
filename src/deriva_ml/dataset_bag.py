@@ -109,7 +109,7 @@ class DatasetBag:
         for ts, on in paths:
             tables = " JOIN ".join(ts)
             on_expression = " and ".join(
-                [f"{column_name(l)}={column_name(r)}" for l, r in on]
+                [f"{column_name(left)}={column_name(right)}" for left, right in on]
             )
             sql.append(
                 f"SELECT {select_args} FROM {tables} ON {on_expression} WHERE {dataset_table_name}.RID IN ({datasets})"
