@@ -9,6 +9,7 @@ fi
 
 # Default version bump is patch unless specified (patch, minor, or major)
 VERSION_TYPE=${1:-patch}
+
 echo "Bumping version: $VERSION_TYPE"
 
 # Bump the version using bump-my-version.
@@ -32,6 +33,6 @@ python -m build
 NEW_TAG=$(git describe --tags --abbrev=0)
 echo "New version tag: $NEW_TAG"
 
-twine upload "dist/*${NEW_TAG/v/}"
+twine upload dist/*${NEW_TAG/v/}
 
 echo "Release process complete!"
