@@ -32,6 +32,7 @@ from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.hatrac_store import HatracStore
+from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 from pydantic import validate_call, ConfigDict
 from requests import RequestException
 
@@ -72,6 +73,7 @@ try:
 except ImportError:  # Graceful fallback if IPython isn't installed.
 
     def get_ipython():
+        """Dummy routine in case you are not running in IPython."""
         return None
 
 
@@ -80,6 +82,7 @@ try:
 except ImportError:
 
     def list_running_servers():
+        """Dummy routine in case you are not running in Jupyter."""
         return []
 
 
@@ -88,6 +91,7 @@ try:
 except ImportError:
 
     def get_connection_file():
+        """Dummy routine in case you are not running in Jupyter."""
         return ""
 
 
@@ -214,9 +218,8 @@ class DerivaML(Dataset):
         except subprocess.CalledProcessError:
             self._logger.error("nbstripout is not found.")
 
-    def _get_notebook_session(
-        self,
-    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    @staticmethod
+    def _get_notebook_session() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         """Return the absolute path of the current notebook."""
         # Get the kernel's connection file and extract the kernel ID
         try:
@@ -377,6 +380,29 @@ class DerivaML(Dataset):
 
         """
         return self.cache_dir if cached else self.working_dir
+
+    @staticmethod
+    def globus_login(host: str) -> None:
+        """Log  into the specified host using Globus.
+
+        Args:
+            host:
+
+        Returns:
+
+        """
+        gnl = GlobusNativeLogin(host=host)
+        if gnl.is_logged_in([host]):
+            print("You are already logged in.")
+        else:
+            gnl.login(
+                [host],
+                no_local_server=True,
+                no_browser=True,
+                refresh_tokens=True,
+                update_bdbag_keychain=True,
+            )
+            print("Login Successful")
 
     def chaise_url(self, table: RID | Table) -> str:
         """Return a Chaise URL to the specified table.
@@ -910,6 +936,7 @@ class DerivaML(Dataset):
         """
 
         def path_to_asset(path: str) -> str:
+            """Pull the asset name out of a path to that asset in the filesystem"""
             components = path.split("/")
             return components[
                 components.index("asset") + 2
@@ -974,6 +1001,7 @@ class DerivaML(Dataset):
             )
 
         def check_file_type(dtype: str) -> bool:
+            """Make sure that the specified string is either the name or synonym for a file type term."""
             for term in defined_types:
                 if dtype == term.name or (term.synonyms and file_type in term.synonyms):
                     return True
