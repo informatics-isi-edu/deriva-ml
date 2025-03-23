@@ -9,7 +9,7 @@ import sqlite3
 
 from csv import reader
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Generator
 from urllib.parse import urlparse
 
 from deriva.core.ermrest_model import Model
@@ -317,6 +317,26 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                 | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in my_types]}
             )
         return datasets
+
+    def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+        """Retrieve the contents of the specified table as a dictionary.
+
+        Args:
+            table: Table to retrieve data from. f schema is not provided as part of the table name,
+                the method will attempt to locate the schema for the table.
+
+        Returns:
+          A generator producing dictionaries containing the contents of the specified table as name/value pairs.
+        """
+        table_name = self.normalize_table_name(table)
+        with self.dbase as dbase:
+            col_names = [
+                c[1]
+                for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()
+            ]
+            result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
+            while row := result.fetchone():
+                yield dict(zip(col_names, row))
 
     def normalize_table_name(self, table: str) -> str:
         """Attempt to insert the schema into a table name if it's not provided.
