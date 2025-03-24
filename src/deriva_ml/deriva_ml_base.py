@@ -1153,6 +1153,13 @@ class DerivaML(Dataset):
         """
         # Make sure type is correct.
         self.lookup_term(MLVocab.workflow_type, workflow_type)
+
+        try:
+            subprocess.run('git rev-parse --is-inside-work-tree',
+                       capture_output=True, text=True, shell=True, check=True)
+        except subprocess.CalledProcessError:
+            raise DerivaMLException("Not executing in a Git repository.")
+
         github_url, is_dirty = self._github_url()
 
         if is_dirty:
