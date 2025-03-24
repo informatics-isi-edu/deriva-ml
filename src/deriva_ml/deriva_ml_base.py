@@ -257,7 +257,7 @@ class DerivaML(Dataset):
     def _get_notebook_path(self) -> Path | None:
         """Return the absolute path of the current notebook."""
 
-        server, session = self._get_notebook_session()
+        server, session = DerivaML._get_notebook_session()
         if server and session:
             self._check_nbstrip_status()
             relative_path = session["notebook"]["path"]
