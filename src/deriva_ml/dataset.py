@@ -67,11 +67,12 @@ class Dataset:
 
     _Logger = logging.getLogger("deriva_ml")
 
-    def __init__(self, model: DerivaModel, cache_dir: Path):
+    def __init__(self, model: DerivaModel, cache_dir: Path, working_dir: Path):
         self._model = model
         self._ml_schema = ML_SCHEMA
         self.dataset_table = self._model.schemas[self._ml_schema].tables["Dataset"]
         self._cache_dir = cache_dir
+        self._working_dir = working_dir
         self._logger = logging.getLogger("deriva_ml")
 
     def _is_dataset_rid(self, dataset_rid: RID, deleted: bool = False) -> bool:
@@ -783,7 +784,6 @@ class Dataset:
         snapshot: Optional[Dataset] = None,
         dataset_nesting_depth: Optional[int] = None,
     ) -> set[tuple[Table, ...]]:
-
         snapshot_catalog = snapshot if snapshot else self
 
         dataset_table = snapshot_catalog._model.schemas[self._ml_schema].tables[
@@ -831,9 +831,7 @@ class Dataset:
         nested_paths = set()
         if dataset_rid:
             for c in snapshot_catalog.list_dataset_children(dataset_rid=dataset_rid):
-                nested_paths |= self._collect_paths(
-                    c, snapshot=snapshot_catalog
-                )
+                nested_paths |= self._collect_paths(c, snapshot=snapshot_catalog)
         else:
             # Initialize nesting depth if not already provided.
             dataset_nesting_depth = (
@@ -979,7 +977,7 @@ class Dataset:
             if dataset.materialize
             else self._download_dataset_minid(minid)
         )
-        return DatabaseModel(minid, bag_path).get_dataset()
+        return DatabaseModel(minid, bag_path, self._working_dir).get_dataset()
 
     def _version_snapshot(self, dataset: DatasetSpec) -> str:
         """Return a catalog with snapshot for the specified dataset version"""

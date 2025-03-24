@@ -84,7 +84,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         except KeyError:
             raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
-    def __init__(self, minid: DatasetMinid, bag_path: Path):
+    def __init__(self, minid: DatasetMinid, bag_path: Path, dbase_path: Path):
         """Create a new DatabaseModel.
 
         Args:
@@ -95,8 +95,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         self.bag_path = bag_path
         self.minid = minid
         self.dataset_rid = minid.dataset_rid
-        dir_path = bag_path.parent
-        self.dbase_file = dir_path / f"{minid.version_rid}.db"
+        self.dbase_file = dbase_path / f"{minid.version_rid}.db"
         self.dbase = sqlite3.connect(self.dbase_file)
 
         super().__init__(

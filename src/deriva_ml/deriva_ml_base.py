@@ -163,7 +163,7 @@ class DerivaML(Dataset):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize dataset class.
-        super().__init__(self.model, self.cache_dir)
+        super().__init__(self.model, self.cache_dir, self.working_dir)
         self._logger = logging.getLogger("deriva_ml")
         self._logger.setLevel(logging_level)
 
