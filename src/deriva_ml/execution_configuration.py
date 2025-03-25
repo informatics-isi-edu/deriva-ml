@@ -49,7 +49,7 @@ class ExecutionConfiguration(BaseModel):
 
     datasets: conlist(DatasetSpec) = []
     assets: list[RID | str] = []  # List of RIDs to model files.
-    workflow: RID
+    workflow: RID | Workflow
     description: str = ""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

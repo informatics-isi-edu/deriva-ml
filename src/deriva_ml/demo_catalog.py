@@ -295,7 +295,9 @@ def create_demo_catalog(
         dataset_table = deriva_ml.dataset_table
         dataset_table.annotations.update(
             Dataset(
-                deriva_ml.model, deriva_ml.cache_dir
+                deriva_ml.model,
+                cache_dir=deriva_ml.cache_dir,
+                working_dir=deriva_ml.working_dir,
             )._generate_dataset_annotations()
         )
         deriva_ml.model.apply()

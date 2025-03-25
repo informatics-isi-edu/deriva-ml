@@ -1136,8 +1136,8 @@ class DerivaML(Dataset):
             return None
 
     def create_workflow(
-        self, name: str, workflow_type: str, description: str = "", create: bool = True
-    ) -> RID | None:
+        self, name: str, workflow_type: str, description: str = ""
+    ) -> Workflow:
         """Identify current executing program and return a workflow RID for it
 
         Determine the notebook or script that is currently being executed. Assume that  this is
@@ -1149,14 +1149,18 @@ class DerivaML(Dataset):
             name: The name of the workflow.
             workflow_type: The type of the workflow.
             description: The description of the workflow.
-            create: Whether to create a new workflow.
         """
         # Make sure type is correct.
         self.lookup_term(MLVocab.workflow_type, workflow_type)
 
         try:
-            subprocess.run('git rev-parse --is-inside-work-tree',
-                       capture_output=True, text=True, shell=True, check=True)
+            subprocess.run(
+                "git rev-parse --is-inside-work-tree",
+                capture_output=True,
+                text=True,
+                shell=True,
+                check=True,
+            )
         except subprocess.CalledProcessError:
             raise DerivaMLException("Not executing in a Git repository.")
 
@@ -1181,14 +1185,13 @@ class DerivaML(Dataset):
             shell=True,
         ).stdout.strip()
 
-        workflow = Workflow(
+        return Workflow(
             name=name,
             url=github_url,
             checksum=checksum,
             description=description,
             workflow_type=workflow_type,
         )
-        return self.add_workflow(workflow) if create else None
 
     def _github_url(self) -> tuple[str, bool]:
         """Return a GitHUB URL for the latest commit of the script from which this routine is called.
@@ -1245,7 +1248,9 @@ class DerivaML(Dataset):
         return url, is_dirty
 
     # @validate_call
-    def create_execution(self, configuration: ExecutionConfiguration) -> "Execution":
+    def create_execution(
+        self, configuration: ExecutionConfiguration, dryrun: bool = False
+    ) -> "Execution":
         """Create an execution object
 
         Given an execution configuration, initialize the local compute environment to prepare for executing an
@@ -1256,6 +1261,7 @@ class DerivaML(Dataset):
 
         Args:
             configuration: ExecutionConfiguration:
+            dryrun: Do not create an execution record or upload results.
 
         Returns:
             An execution object.
@@ -1267,7 +1273,7 @@ class DerivaML(Dataset):
                 "Only one execution can be created for a Deriva ML instance."
             )
         else:
-            self._execution = Execution(configuration, self)
+            self._execution = Execution(configuration, self, dryrun=dryrun)
         return self._execution
 
     # @validate_call

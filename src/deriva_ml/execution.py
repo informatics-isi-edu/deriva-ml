@@ -30,7 +30,7 @@ from .deriva_definitions import (
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset_aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from .dataset_bag import DatasetBag
-from .execution_configuration import ExecutionConfiguration
+from .execution_configuration import ExecutionConfiguration, Workflow
 from .execution_environment import get_execution_environment
 from .upload import (
     execution_metadata_dir,
@@ -96,6 +96,7 @@ class Execution:
         configuration: ExecutionConfiguration,
         ml_object: "DerivaML",
         reload: Optional[RID] = None,
+        dry_run: bool = False,
     ):
         """
 
@@ -107,6 +108,7 @@ class Execution:
         self.asset_paths: list[Path] = []
         self.configuration = configuration
         self._ml_object = ml_object
+        self._logger = ml_object._logger
         self.start_time = None
         self.stop_time = None
         self.status = Status.created
@@ -117,13 +119,23 @@ class Execution:
 
         self._working_dir = self._ml_object.working_dir
         self._cache_dir = self._ml_object.cache_dir
+        self._dry_run = dry_run
 
-        self.workflow_rid = self.configuration.workflow
-
-        if self._ml_object.resolve_rid(configuration.workflow).table.name != "Workflow":
-            raise DerivaMLException(
-                "Workflow specified in execution configuration is not a Workflow"
+        if isinstance(self.configuration.workflow, Workflow):
+            self.workflow_rid = (
+                self._ml_object.add_workflow(self.configuration.workflow)
+                if not self._dry_run
+                else "0000"
             )
+        else:
+            self.workflow_rid = self.configuration.workflow
+            if (
+                self._ml_object.resolve_rid(configuration.workflow).table.name
+                != "Workflow"
+            ):
+                raise DerivaMLException(
+                    "Workflow specified in execution configuration is not a Workflow"
+                )
 
         for d in self.configuration.datasets:
             if self._ml_object.resolve_rid(d.rid).table.name != "Dataset":
@@ -142,6 +154,10 @@ class Execution:
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         if reload:
             self.execution_rid = reload
+            if self.execution_rid == "0000":
+                self._dry_run = True
+        elif self._dry_run:
+            self.execution_rid = "0000"
         else:
             self.execution_rid = schema_path.Execution.insert(
                 [
@@ -189,7 +205,7 @@ class Execution:
             self.dataset_rids.append(dataset.rid)
         # Update execution info
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        if self.dataset_rids and not reload:
+        if self.dataset_rids and not (reload or self._dry_run):
             schema_path.Dataset_Execution.insert(
                 [
                     {"Dataset": d, "Execution": self.execution_rid}
@@ -203,7 +219,7 @@ class Execution:
             self._ml_object.download_asset(asset_rid=a, dest_dir=self._asset_dir())
             for a in self.configuration.assets
         ]
-        if self.asset_paths and not reload:
+        if self.asset_paths and not (reload or self._dry_run):
             self._update_execution_asset_table(self.configuration.assets)
 
         # Save configuration details for later upload
@@ -242,6 +258,11 @@ class Execution:
             msg: Additional information about the status
         """
         self.status = status
+        self._logger.info(msg)
+
+        if self._dry_run:
+            return
+
         self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
             [
                 {
@@ -278,7 +299,7 @@ class Execution:
 
         self.start_time = datetime.now()
         self.uploaded_assets = None
-        self.update_status(Status.initializing, "Start ML algorithm ...")
+        self.update_status(Status.initializing, "Start execution  ...")
 
     def execution_stop(self) -> None:
         """Finish the execution and update the duration and status of execution."""
@@ -288,13 +309,11 @@ class Execution:
         minutes, seconds = divmod(remainder, 60)
         duration = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
 
-        if self._ml_object._is_notebook:
-            self._create_notebook_checkpoint()
-
         self.update_status(Status.completed, "Algorithm execution ended.")
-        self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
-            [{"RID": self.execution_rid, "Duration": duration}]
-        )
+        if not self._dry_run:
+            self._ml_object.pathBuilder.schemas[
+                self._ml_object.ml_schema
+            ].Execution.update([{"RID": self.execution_rid, "Duration": duration}])
 
     def _upload_execution_dirs(self) -> dict[str, FileUploadState]:
         """Upload execution assets at _working_dir/Execution_asset.
@@ -402,6 +421,8 @@ class Execution:
             Uploaded assets with key as assets' suborder name, values as an
             ordered dictionary with RID and metadata in the Execution_Asset table.
         """
+        if self._dry_run:
+            return {}
         try:
             uploaded_assets = self._upload_execution_dirs()
             self.update_status(Status.completed, "Successfully end the execution.")
