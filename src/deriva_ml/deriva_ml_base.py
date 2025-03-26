@@ -1249,7 +1249,7 @@ class DerivaML(Dataset):
 
     # @validate_call
     def create_execution(
-        self, configuration: ExecutionConfiguration, dryrun: bool = False
+        self, configuration: ExecutionConfiguration, dry_run: bool = False
     ) -> "Execution":
         """Create an execution object
 
@@ -1268,12 +1268,7 @@ class DerivaML(Dataset):
         """
         from .execution import Execution
 
-        if self._execution:
-            DerivaMLException(
-                "Only one execution can be created for a Deriva ML instance."
-            )
-        else:
-            self._execution = Execution(configuration, self, dryrun=dryrun)
+        self._execution = Execution(configuration, self, dry_run=dry_run)
         return self._execution
 
     # @validate_call

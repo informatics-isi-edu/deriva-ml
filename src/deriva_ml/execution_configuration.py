@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import Optional, Any
 
-from pydantic import (
-    BaseModel,
-    conlist,
-    ConfigDict,
-)
+from pydantic import BaseModel, conlist, ConfigDict, field_validator, Field
 from pathlib import Path
+import sys
 
 
 from .dataset_aux_classes import DatasetSpec
@@ -43,6 +40,7 @@ class ExecutionConfiguration(BaseModel):
         datasets: List of dataset specifications which specify the dataset RID, version and if the dataset
             should be materialized.
         assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
+        parameters: Either a dictionary or a path to a JSON file that contains configuration parameters for the execution.
         workflow: A RID for a workflow instance.  Must have a name, URI to the workflow instance, and a type.
         description: A description of the execution.  Can use Markdown format.
     """
@@ -50,9 +48,21 @@ class ExecutionConfiguration(BaseModel):
     datasets: conlist(DatasetSpec) = []
     assets: list[RID | str] = []  # List of RIDs to model files.
     workflow: RID | Workflow
+    parameters: dict[str, Any] = {}
     description: str = ""
+    argv: conlist(str) = Field(default_factory=lambda: sys.argv)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("parameters", mode="before")
+    @classmethod
+    def validate_parameters(cls, value: Any) -> Any:
+        """If parameter is a file, assume that it has JSON contents for configuration parameters"""
+        if isinstance(value, str) or isinstance(value, Path):
+            with open(value, "r") as f:
+                return json.load(f)
+        else:
+            return value
 
     @staticmethod
     def load_configuration(path: Path) -> ExecutionConfiguration:

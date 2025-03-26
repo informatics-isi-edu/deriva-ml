@@ -18,6 +18,7 @@ from typing import Iterable, Any, Optional
 from deriva.core import format_exception
 from deriva.core.ermrest_model import Table
 from pydantic import validate_call, ConfigDict
+import sys
 
 from .deriva_definitions import MLVocab, ExecMetadataVocab
 from .deriva_definitions import (
@@ -113,9 +114,11 @@ class Execution:
         self.stop_time = None
         self.status = Status.created
         self.uploaded_assets: list[Path] = []
+        self.configuration.argv = sys.argv
 
         self.dataset_rids: list[RID] = []
         self.datasets: list[DatasetBag] = []
+        self.parameters = self.configuration.parameters
 
         self._working_dir = self._ml_object.working_dir
         self._cache_dir = self._ml_object.cache_dir
