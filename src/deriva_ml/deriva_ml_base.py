@@ -717,24 +717,6 @@ class DerivaML(Dataset):
         """
         return self.model.find_features(table)
 
-    @validate_call
-    def add_features(self, features: Iterable[FeatureRecord]) -> int:
-        """Add a set of new feature values to the catalog.
-
-        Args:
-          features: Iterable[FeatureRecord]:
-
-        Returns:
-            Number of attributes added
-        """
-        features = list(features)
-        feature_table = features[0].feature.feature_table
-        feature_path = self.pathBuilder.schemas[feature_table.schema.name].tables[
-            feature_table.name
-        ]
-        entries = feature_path.insert(f.model_dump() for f in features)
-        return len(entries)
-
     # noinspection PyProtectedMember
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_feature_values(
@@ -943,7 +925,7 @@ class DerivaML(Dataset):
             ]  # Look for asset in the path to find the name
 
         if isinstance(assets_dir, UploadAssetDirectory):
-            assets_dir = assets_dir.path
+            assets_dir = assets_dir
 
         if not self.model.is_asset(Path(assets_dir).name):
             raise DerivaMLException("Directory does not have name of an asset table.")

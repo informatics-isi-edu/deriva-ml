@@ -221,7 +221,7 @@ def feature_value_path(
     """
     return (
         feature_dir(prefix, exec_rid, schema, target_table, feature_name)
-        / f"{feature_name}.csv"
+        / f"{feature_name}.json"
     )
 
 
@@ -548,15 +548,39 @@ def upload_asset(
         raise e
 
 
-class UploadAssetDirectory:
-    def __init__(self, model: DerivaModel, schema: str, table: str, prefix: Path):
-        self.prefix = prefix
-        self.path = asset_table_dir(
-            prefix=prefix, asset_schema=schema, asset_table=table
-        )
+PathBaseType = type(Path())
+
+
+class UploadAssetDirectory(PathBaseType):
+    """A extended version of pathlib.Path that will place file in directory stucture to define additional metadata"""
+
+    # Extend __slots__ to allow an additional attribute.
+    __slots__ = ("table", "schema", "model")
+
+    def __new__(
+        cls,
+        model: DerivaModel,
+        schema: str,
+        table: str,
+        prefix: Path,
+        *args,
+        **kwargs,
+    ):
+        """Create a new Path object.
+        We have to use __new__ to do this as the pathlib.Path is immutable.
+
+        Args:
+            model: Model to upload assets to.
+            schema: Name of the schema to use.
+            table: Name of the asset table.
+        """
+        # Create the immutable Path instance using the superclass __new__
+        path = asset_table_dir(prefix=prefix, asset_schema=schema, asset_table=table)
+        self = super().__new__(cls, path, **kwargs)
         self.table = table
         self.schema = schema
         self.model = model
+        return self
 
     def create_file(self, file_name: str, metadata: dict[str, Any]) -> Path:
         """Return the file in which to place  assets of a specified type are to be uploaded.
@@ -567,6 +591,7 @@ class UploadAssetDirectory:
         Returns:
             Path to directory in which to place assets of type asset_type.
         """
+
         metadata = metadata or {}
         asset_metadata = self.model.asset_metadata(self.table)
         if not (asset_metadata >= set(metadata.keys())):
@@ -574,7 +599,7 @@ class UploadAssetDirectory:
                 f"Metadata {metadata} does not match asset metadata {asset_metadata}"
             )
 
-        path = self.path
+        path = Path(self)
         for m in self.model.asset_metadata(self.table):
             path = path / metadata.get(m, "None")
         path.mkdir(parents=True, exist_ok=True)

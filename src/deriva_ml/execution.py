@@ -5,7 +5,6 @@ This module defined the Execution class which is used to interact with the state
 from __future__ import annotations
 
 from collections import defaultdict
-import csv
 import json
 import logging
 import os
@@ -482,7 +481,7 @@ class Execution:
             feature_file: str | Path:
             uploaded_files: dict[str: FileUploadState]:
         """
-
+        print(f"Updating feature {target_table} {feature_name} from {feature_file}...")
         asset_columns = [
             c.name
             for c in self._ml_object.feature_record_class(
@@ -493,29 +492,29 @@ class Execution:
             target_table, feature_name
         ).feature.feature_table.name
 
-        def map_path(e):
-            """
-
-            Args:
-              e:
-
-            Returns:
-
-            """
-            # Go through the asset columns and replace the file name with the RID for the uploaded file.
-            for c in asset_columns:
-                e[c] = asset_map[e[c]]
-            return e
-
         # Create a map between a file name that appeared in the file to the RID of the uploaded file.
         asset_map = {
             file: asset.result["RID"]
             for file, asset in uploaded_files.items()
             if asset.state == UploadState.success and asset.result
         }
+
+        def map_path(e):
+            print(f"e {e}")
+            print(f"asset coluomn {asset_columns}")
+            print(f"asset_map {asset_map}")
+            """Go through the asset columns and replace the file name with the RID for the uploaded file."""
+            for c in asset_columns:
+                e[c] = asset_map[e[c]]
+            return e
+
         with open(feature_file, "r") as feature_values:
-            entities = [map_path(e) for e in csv.DictReader(feature_values)]
-        self._ml_object.domain_path.tables[feature_table].insert(entities)
+            entities = json.load(feature_values)
+        print(f"entities: {entities}")
+        print(f"mapped entities: {[map_path(e) for e in entities]}")
+        self._ml_object.domain_path.tables[feature_table].insert(
+            [map_path(e) for e in entities]
+        )
 
     def _update_execution_metadata_table(self, assets: list[RID]) -> None:
         """Upload execution metadata at _working_dir/Execution_metadata."""
@@ -632,9 +631,7 @@ class Execution:
         """
         return feature_root(self._working_dir, self.execution_rid)
 
-    def feature_paths(
-        self, table: Table | str, feature_name: str
-    ) -> tuple[Path, dict[str, Path]]:
+    def feature_paths(self, table: Table | str, feature_name: str) -> dict[str, Path]:
         """Return the file path of where to place feature values, and assets for the named feature and table.
 
         A side effect of calling this routine is that the directories in which to place the feature values and assets
@@ -645,18 +642,10 @@ class Execution:
             feature_name: Name of the feature
 
         Returns:
-            A tuple whose first element is the path for the feature values and whose second element is a dictionary
-            of associated asset table names and corresponding paths.
+            A  dictionary of associated asset table names and corresponding paths.
         """
         feature = self._ml_object.lookup_feature(table, feature_name)
 
-        tpath = feature_value_path(
-            self._working_dir,
-            schema=self._ml_object.domain_schema,
-            target_table=feature.target_table.name,
-            feature_name=feature_name,
-            exec_rid=self.execution_rid,
-        )
         asset_paths = {
             asset_table.name: feature_asset_dir(
                 self._working_dir,
@@ -668,7 +657,7 @@ class Execution:
             )
             for asset_table in feature.asset_columns
         }
-        return tpath, asset_paths
+        return asset_paths
 
     def table_path(self, table: str) -> Path:
         """Return a local file path to a CSV to add values to a table on upload.
@@ -696,7 +685,7 @@ class Execution:
         return self
 
     @validate_call
-    def write_feature_file(self, features: Iterable[FeatureRecord]) -> None:
+    def add_features(self, features: Iterable[FeatureRecord]) -> None:
         """Given a collection of Feature records, write out a CSV file in the appropriate assets directory so that this
         feature gets uploaded when the execution is complete.
 
@@ -704,22 +693,116 @@ class Execution:
             features: Iterable of Feature records to write.
         """
 
-        feature_iter = iter(features)
-        first_row = next(feature_iter)
-        feature = first_row.feature
-        csv_path, _ = self.feature_paths(
-            feature.target_table.name, feature.feature_name
+        # Make sure feature list is homogeneous:
+        sorted_features = defaultdict(list)
+        for f in features:
+            sorted_features[type(f)].append(f)
+        for fs in sorted_features.values():
+            self._add_features(fs)
+
+    @staticmethod
+    def _append_features_to_json_array_file(
+        file_path: Path, features: Iterable[FeatureRecord]
+    ) -> None:
+        """
+        Append new objects to a JSON file that contains an array of objects,
+        by modifying only the tail end of the file.
+
+        Parameters:
+            file_path (str): Path to the JSON file.
+            features (list): List of dictionaries representing the new objects.
+        """
+
+        # If file doesn't exist, create a new one with the new_objects as an array.
+        features = list(features)
+        if not file_path.exists():
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump([feature.model_dump(mode="json") for feature in features], f)
+            return
+
+        # Convert new objects into JSON text, without wrapping them in an array.
+        # They will be inserted as:  ,<new_obj1>,<new_obj2>,...  (if needed)
+        new_entries = ",".join(
+            json.dumps(feature.model_dump(mode="json")) for feature in features
         )
+        new_entries_bytes = new_entries.encode("utf-8")
 
-        fieldnames = {"Execution", "Feature_Name", feature.target_table.name}
-        fieldnames |= {f.name for f in feature.feature_columns}
+        with open(file_path, "rb+") as f:
+            # First, ensure the file starts with '['
+            f.seek(0)
+            first = f.read(1)
+            if first != b"[":
+                raise ValueError("The JSON file does not start with '['.")
 
-        with open(csv_path, "w") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow(first_row.model_dump())
-            for feature in feature_iter:
-                writer.writerow(feature.model_dump())
+            # Determine whether the array is empty.
+            # Read forward until we hit a non-whitespace character after '['.
+            while True:
+                ch = f.read(1)
+                if not ch:
+                    raise ValueError(
+                        "Unexpected end of file while checking array content."
+                    )
+                if not ch.isspace():
+                    break
+            # If the first non-whitespace character is the closing bracket, the array is empty.
+            is_empty = ch == b"]"
+
+            # Now, move to the end of the file and back up to find the closing bracket.
+            f.seek(0, 2)  # move to end
+            file_end = f.tell()
+            pos = file_end - 1
+
+            # Move backwards over any trailing whitespace.
+            while pos > 0:
+                f.seek(pos)
+                char = f.read(1)
+                if not char.isspace():
+                    break
+                pos -= 1
+
+            if char != b"]":
+                raise ValueError("The file does not end with a closing bracket (']').")
+
+            # For non-empty arrays, we need to insert a comma before the new entries.
+            if not is_empty:
+                # Check the character immediately before the ']' to decide if we need a comma.
+                pos_before = pos - 1
+                while pos_before > 0:
+                    f.seek(pos_before)
+                    prev_char = f.read(1)
+                    if not prev_char.isspace():
+                        break
+                    pos_before -= 1
+                # If the previous non-whitespace character is '[', then the array is actually empty.
+                need_comma = prev_char != b"["
+
+                # Position the file pointer at the closing bracket.
+                f.seek(pos)
+                if need_comma:
+                    insertion = ("," + new_entries + "]").encode("utf-8")
+                else:
+                    insertion = (new_entries + "]").encode("utf-8")
+                f.write(insertion)
+                f.truncate()
+            else:
+                # The array is empty. Place new entries between '[' and ']'.
+                # Go to the position of the closing bracket (after skipping trailing whitespace).
+                f.seek(pos)
+                f.write(new_entries_bytes)
+                f.write(b"]")
+                f.truncate()
+
+    def _add_features(self, features: list[FeatureRecord]) -> None:
+        first_row = features[0]
+        feature = first_row.feature
+        json_path = feature_value_path(
+            self._working_dir,
+            schema=self._ml_object.domain_schema,
+            target_table=feature.target_table.name,
+            feature_name=feature.feature_name,
+            exec_rid=self.execution_rid,
+        )
+        self._append_features_to_json_array_file(json_path, features)
 
     @validate_call
     def create_dataset(self, dataset_types: str | list[str], description: str) -> RID:
