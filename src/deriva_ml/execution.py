@@ -352,24 +352,19 @@ class Execution:
             ]
             self._update_execution_asset_table(execution_assets)
             self._update_execution_metadata_table(execution_metadata)
-
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
 
         self.update_status(Status.running, "Updating features...")
-
         feature_assets = {
             path: status
             for path, status in execution_assets
             if is_feature_asset_dir(path)
         }
-        features = [f for f in feature_assets.values() if is_feature_dir(p)]
-        print(f"feature_assets: {feature_assets}")
-        self._execution_root.rglob(f"{self._feature_root}/*/*")
-
-        for p in traverse_bottom_up(self._feature_root):
+        print(f'feature_assets: {feature_assets}')
+        for p, dirs, files in self._feature_root.walk():
             if m := is_feature_dir(p):
                 files = [f for f in p.iterdir() if f.is_file()]
                 if files:
