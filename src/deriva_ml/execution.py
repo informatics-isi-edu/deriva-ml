@@ -332,7 +332,7 @@ class Execution:
         """
 
         def asset_name(p: str) -> str:
-            return Path(*Path(p).parts[-2:]).as_posix()
+            return p.replace(self._execution_root.as_posix(), "")
 
         try:
             self.update_status(Status.running, "Uploading execution files...")
@@ -360,40 +360,17 @@ class Execution:
 
         self.update_status(Status.running, "Updating features...")
 
-        feature_assets = defaultdict(dict)
-
-        def traverse_bottom_up(directory: Path):
-            """Traverses the directory tree in a bottom-up order.
-
-            Args:
-              directory: Path:
-
-            Returns:
-
-            """
-            entries = list(directory.iterdir())
-            for entry in entries:
-                if entry.is_dir():
-                    yield from traverse_bottom_up(entry)
-            yield directory
+        feature_assets = {
+            path: status
+            for path, status in execution_assets
+            if is_feature_asset_dir(path)
+        }
+        features = [f for f in feature_assets.values() if is_feature_dir(p)]
+        print(f"feature_assets: {feature_assets}")
+        self._execution_root.rglob(f"{self._feature_root}/*/*")
 
         for p in traverse_bottom_up(self._feature_root):
-            if m := is_feature_asset_dir(p):
-                try:
-                    self.update_status(
-                        Status.running, f"Uploading feature {m['feature_name']}..."
-                    )
-                    feature_assets[m["target_table"], m["feature_name"]] = (
-                        self._ml_object.upload_assets(p)
-                    )
-                    results |= feature_assets[m["target_table"], m["feature_name"]]
-                except Exception as e:
-                    error = format_exception(e)
-                    self.update_status(Status.failed, error)
-                    raise DerivaMLException(
-                        f"Fail to upload execution metadata. Error: {error}"
-                    )
-            elif m := is_feature_dir(p):
+            if m := is_feature_dir(p):
                 files = [f for f in p.iterdir() if f.is_file()]
                 if files:
                     self._update_feature_table(
@@ -498,6 +475,7 @@ class Execution:
             for file, asset in uploaded_files.items()
             if asset.state == UploadState.success and asset.result
         }
+        print(f"uploaded files {uploaded_files}")
 
         def map_path(e):
             print(f"e {e}")
@@ -505,7 +483,8 @@ class Execution:
             print(f"asset_map {asset_map}")
             """Go through the asset columns and replace the file name with the RID for the uploaded file."""
             for c in asset_columns:
-                e[c] = asset_map[e[c]]
+                asset_name = Path(*Path(e[c]).parts[-2:]).as_posix()
+                e[c] = asset_map[asset_name]
             return e
 
         with open(feature_file, "r") as feature_values:

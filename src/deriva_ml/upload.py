@@ -19,15 +19,17 @@ Here is the directory layout we support:
                                    asset
                                        <asset_table>
                                            file1, file2, ...
-                           <feature_name>.csv    <- needs to have asset_name column remapped before uploading
+                           <feature_name>.json    <- needs to have asset_name column remapped before uploading
             table
                <schema>
                    <record_table>
                       record_table.csv
             asset
-               <schema>
-                   <asset_table>
-                     file1, file2, ....
+                <schema>
+                    <asset_table>
+                        <metadata1>
+                            <metadata2>
+                                file1, file2, ....
         asset
             <schema>
                 <asset_table>
