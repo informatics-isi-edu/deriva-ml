@@ -562,6 +562,18 @@ class DerivaML(Dataset):
                 comment=comment,
             )
         )
+        # Create a table to track execution that creates the asset
+        asset_table.create_table(
+            Table.define_association(
+                [
+                    (asset_name, asset_table),
+                    (
+                        "Execution",
+                        self.model.schemas[self.ml_schema].tables["Execution"],
+                    ),
+                ]
+            )
+        )
         return asset_table
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))

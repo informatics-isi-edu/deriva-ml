@@ -35,6 +35,7 @@ from .execution_environment import get_execution_environment
 from .upload import (
     execution_metadata_dir,
     execution_asset_dir,
+    asset_dir,
     execution_root,
     feature_root,
     feature_asset_dir,
@@ -359,9 +360,9 @@ class Execution:
             for path, status in results.items()
             if status.state == UploadState.success and path.startswith("/feature")
         }
-
-        self._update_execution_asset_table(execution_assets)
-        self._update_execution_metadata_table(execution_metadata)
+        self._update_asset_execution_table(results)
+        # self._update_execution_asset_table(execution_assets)
+        # self._update_execution_metadata_table(execution_metadata)
 
         self.update_status(Status.running, "Updating features...")
 
@@ -476,6 +477,33 @@ class Execution:
             [map_path(e) for e in entities]
         )
 
+    def _update_asset_execution_table(
+        self, uploaded_assets: dict[str, FileUploadState]
+    ):
+        """Add entry to association table connecting an asset to an execution RID"""
+        ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+        sorted_assets = defaultdict(list)
+        for asset_name, rid in uploaded_assets.items():
+            sorted_assets[asset_name.split("/")[0]].append(rid)
+        assoc_name = None
+        for asset_table_name, rid_list in sorted_assets.items():
+            # Find the name of the association table
+            for assoc in self._ml_object.model.name_to_table(
+                asset_table_name
+            ).find_associations():
+                if assoc.other_fkeys.pop().pk_table.name == "Execution":
+                    assoc_name = assoc.name
+                    break
+            if not assoc_name:
+                DerivaMLException(
+                    f"Execution table for {asset_table_name} does not exist.",
+                )
+            entities = [
+                {asset_table_name: rid, "Execution": self.execution_rid}
+                for rid in rid_list
+            ]
+            ml_schema_path.Execution_Metadata_Execution.insert(entities)
+
     def _update_execution_metadata_table(self, assets: list[RID]) -> None:
         """Upload execution metadata at _working_dir/Execution_metadata."""
         ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
@@ -545,6 +573,27 @@ class Execution:
         """
         return execution_asset_dir(
             self._working_dir, exec_rid=self.execution_rid, asset_type=""
+        )
+
+    def asset_path(self, asset_name: str) -> Path:
+        """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
+
+        These files are uploaded as part of the upload_execution method in DerivaML class.
+
+        Args:
+            asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
+
+        Returns:
+            Path in which to place asset files.
+
+        Raises:
+            DerivaException: If the asset type is not defined.
+        """
+        if not self._ml_object.model.is_asset(asset_name):
+            DerivaMLException(f"Table {asset_name} is not an asset")
+
+        return asset_dir(
+            self._working_dir, exec_rid=self.execution_rid, asset_type=asset_name
         )
 
     def execution_asset_path(self, asset_type: str) -> Path:

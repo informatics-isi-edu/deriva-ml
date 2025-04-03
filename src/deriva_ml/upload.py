@@ -20,23 +20,16 @@ Here is the directory layout we support:
                                        <asset_table>
                                            file1, file2, ...
                            <feature_name>.json    <- needs to have asset_name column remapped before uploading
-            table
-               <schema>
-                   <record_table>
-                      record_table.csv
-            asset
-                <schema>
-                    <asset_table>
-                        <metadata1>
-                            <metadata2>
-                                file1, file2, ....
-        asset
-            <schema>
-                <asset_table>
-                    <metadata1>
-                        <metadata2>
-                            file1, file2, ....
-
+                table
+                   <schema>
+                       <record_table>
+                          record_table.csv
+                asset
+                    <schema>
+                        <asset_table>
+                            <metadata1>
+                                <metadata2>
+                                    file1, file2, ....
 """
 
 import json
@@ -63,15 +56,6 @@ from deriva_ml.deriva_model import DerivaModel
 upload_root_regex = r"(?i)^.*/deriva-ml"
 
 exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"
-exec_asset_dir_regex = (
-    exec_dir_regex + r"/execution-asset/(?P<execution_asset_type>[-\w]+)"
-)
-exec_asset_regex = (
-    exec_asset_dir_regex + r"/(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]+)$"
-)
-exec_metadata_dir_regex = (
-    exec_dir_regex + r"/execution-metadata/(?P<execution_metadata_type>[-\w]+)"
-)
 
 # May have more than one suffix
 exec_metadata_regex = (
@@ -91,9 +75,8 @@ feature_asset_regex = (
     feature_asset_dir_regex
     + r"/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$"
 )
-asset_path_regex = (
-    upload_root_regex + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)"
-)
+
+asset_path_regex = exec_dir_regex + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)"
 
 asset_file_regex = r"(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
 
@@ -130,9 +113,9 @@ def upload_root(prefix: Path | str) -> Path:
     return path
 
 
-def asset_root(prefix: Path | str) -> Path:
+def asset_root(prefix: Path | str, exec_rid: RID) -> Path:
     """Return the top level directory of where to put asset directories to be uploaded."""
-    path = upload_root(prefix) / "asset"
+    path = execution_root(prefix, exec_rid) / "asset"
     path.mkdir(exist_ok=True, parents=True)
     return path
 
@@ -161,6 +144,13 @@ def execution_asset_root(prefix: Path | str, exec_rid: str) -> Path:
     """Path to directory into which execution assets should be located"""
 
     path = execution_root(prefix, exec_rid) / "execution-asset"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def asset_dir(prefix: Path | str, exec_rid: str, asset_name: str) -> Path:
+    path = asset_root(prefix, exec_rid) / asset_name
     path.mkdir(parents=True, exist_ok=True)
     return path
 
