@@ -40,7 +40,6 @@ from .upload import (
     feature_asset_dir,
     feature_value_path,
     is_feature_dir,
-    is_feature_asset_dir,
     table_path,
     upload_directory,
 )
@@ -337,45 +336,43 @@ class Execution:
         try:
             self.update_status(Status.running, "Uploading execution files...")
             results = upload_directory(self._ml_object.model, self._execution_root)
-            results = {asset_name(k): v for k, v in results.items()}
-
-            execution_assets = [
-                r.result["RID"]
-                for r in results.values()
-                if r.state == UploadState.success and "Execution_Asset_Type" in r.result
-            ]
-            execution_metadata = [
-                r.result["RID"]
-                for r in results.values()
-                if r.state == UploadState.success
-                and "Execution_Metadata_Type" in r.result
-            ]
-            self._update_execution_asset_table(execution_assets)
-            self._update_execution_metadata_table(execution_metadata)
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
 
-        self.update_status(Status.running, "Updating features...")
+        results = {asset_name(k): v for k, v in results.items()}
+        execution_assets = [
+            r.result["RID"]
+            for r in results.values()
+            if r.state == UploadState.success and "Execution_Asset_Type" in r.result
+        ]
+        execution_metadata = [
+            r.result["RID"]
+            for r in results.values()
+            if r.state == UploadState.success and "Execution_Metadata_Type" in r.result
+        ]
+
+        # Pick out all  the assets that are associated with a feature.
         feature_assets = {
-            path: status
-            for path, status in execution_assets
-            if is_feature_asset_dir(path)
+            path: status.result["RID"]
+            for path, status in results.items()
+            if status.state == UploadState.success and path.startswith("/feature")
         }
-        print(f'feature_assets: {feature_assets}')
-        for p, dirs, files in self._feature_root.walk():
-            if m := is_feature_dir(p):
-                files = [f for f in p.iterdir() if f.is_file()]
-                if files:
-                    self._update_feature_table(
-                        target_table=m["target_table"],
-                        feature_name=m["feature_name"],
-                        feature_file=files[0],
-                        uploaded_files=feature_assets[
-                            m["target_table"], m["feature_name"]
-                        ],
-                    )
+
+        self._update_execution_asset_table(execution_assets)
+        self._update_execution_metadata_table(execution_metadata)
+
+        self.update_status(Status.running, "Updating features...")
+
+        for p in self._feature_root.glob("**/*.json"):
+            m = is_feature_dir(p.parent)
+            self._update_feature_table(
+                target_table=m["target_table"],
+                feature_name=m["feature_name"],
+                feature_file=p,
+                uploaded_files=feature_assets,
+            )
 
         self.update_status(Status.running, "Upload assets complete")
         return results
@@ -453,7 +450,6 @@ class Execution:
             feature_file: str | Path:
             uploaded_files: dict[str: FileUploadState]:
         """
-        print(f"Updating feature {target_table} {feature_name} from {feature_file}...")
         asset_columns = [
             c.name
             for c in self._ml_object.feature_record_class(
@@ -464,28 +460,18 @@ class Execution:
             target_table, feature_name
         ).feature.feature_table.name
 
-        # Create a map between a file name that appeared in the file to the RID of the uploaded file.
-        asset_map = {
-            file: asset.result["RID"]
-            for file, asset in uploaded_files.items()
-            if asset.state == UploadState.success and asset.result
-        }
-        print(f"uploaded files {uploaded_files}")
+        def asset_name(p: str) -> str:
+            return p.replace(self._execution_root.as_posix(), "")
 
         def map_path(e):
-            print(f"e {e}")
-            print(f"asset coluomn {asset_columns}")
-            print(f"asset_map {asset_map}")
             """Go through the asset columns and replace the file name with the RID for the uploaded file."""
             for c in asset_columns:
-                asset_name = Path(*Path(e[c]).parts[-2:]).as_posix()
-                e[c] = asset_map[asset_name]
+                e[c] = uploaded_files[asset_name(e[c])]
             return e
 
         with open(feature_file, "r") as feature_values:
             entities = json.load(feature_values)
-        print(f"entities: {entities}")
-        print(f"mapped entities: {[map_path(e) for e in entities]}")
+
         self._ml_object.domain_path.tables[feature_table].insert(
             [map_path(e) for e in entities]
         )
