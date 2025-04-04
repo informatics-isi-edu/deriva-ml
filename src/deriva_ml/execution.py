@@ -11,20 +11,16 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-import requests
-from tempfile import NamedTemporaryFile
 from typing import Iterable, Any, Optional
 from deriva.core import format_exception
-from deriva.core.ermrest_model import Table
 from pydantic import validate_call, ConfigDict
 import sys
 
-from .deriva_definitions import MLVocab, ExecMetadataVocab
+from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import (
     RID,
     Status,
     FileUploadState,
-    UploadState,
     DerivaMLException,
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
@@ -33,16 +29,14 @@ from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration, Workflow
 from .execution_environment import get_execution_environment
 from .upload import (
-    execution_metadata_dir,
-    execution_asset_dir,
-    asset_dir,
+    asset_file_path,
     execution_root,
     feature_root,
-    feature_asset_dir,
     feature_value_path,
     is_feature_dir,
     table_path,
     upload_directory,
+    normalize_asset_dir,
 )
 
 try:
@@ -175,15 +169,12 @@ class Execution:
         self._initialize_execution(reload)
 
     def _save_runtime_environment(self):
-        runtime_env_path = ExecMetadataVocab.runtime_env.value
-        runtime_env_dir = self.execution_metadata_path(runtime_env_path)
-        with NamedTemporaryFile(
-            "w+",
-            dir=runtime_env_dir,
-            prefix="environment_snapshot_",
-            suffix=".txt",
-            delete=False,
-        ) as fp:
+        runtime_env_path = self.asset_file_path(
+            asset_name="Execution_Metadata",
+            file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            Execution_Metadata_Type=ExecMetadataVocab.runtime_env.value,
+        )
+        with open(runtime_env_path, "w") as fp:
             json.dump(get_execution_environment(), fp)
 
     def _initialize_execution(self, reload: Optional[RID] = None) -> None:
@@ -222,11 +213,14 @@ class Execution:
             for a in self.configuration.assets
         ]
         if self.asset_paths and not (reload or self._dry_run):
-            self._update_execution_asset_table(self.configuration.assets)
+            self._update_asset_execution_table(self.configuration.assets)
 
         # Save configuration details for later upload
-        exec_config_path = ExecMetadataVocab.execution_config.value
-        cfile = self.execution_metadata_path(exec_config_path) / "configuration.json"
+        cfile = self.asset_file_path(
+            "Execution_Metadata",
+            file_name="configuration.json",
+            Execution_Metadata_Type=ExecMetadataVocab.execution_config.value,
+        )
         with open(cfile, "w", encoding="utf-8") as config_file:
             json.dump(self.configuration.model_dump(), config_file)
 
@@ -275,27 +269,6 @@ class Execution:
             ]
         )
 
-    def _create_notebook_checkpoint(self):
-        """Trigger a checkpoint creation using Jupyter's API."""
-
-        server, session = self._ml_object._get_notebook_session()
-        notebook_name = session["notebook"]["path"]
-        notebook_url = f"{server['url']}api/contents/{notebook_name}"
-
-        # Get notebook content
-        response = requests.get(
-            notebook_url, headers={"Authorization": f"Token {server['token']}"}
-        )
-        if response.status_code == 200:
-            notebook_content = response.json()["content"]
-            # Execution metadata cannot be in a directory, so map path into filename.
-            checkpoint_path = (
-                self.execution_metadata_path(ExecMetadataVocab.runtime_env.value)
-                / f"{notebook_name.replace('/', '_')}.checkpoint"
-            )
-            with open(checkpoint_path, "w", encoding="utf-8") as f:
-                json.dump(notebook_content, f)
-
     def execution_start(self) -> None:
         """Start an execution, uploading status to catalog"""
 
@@ -317,7 +290,7 @@ class Execution:
                 self._ml_object.ml_schema
             ].Execution.update([{"RID": self.execution_rid, "Duration": duration}])
 
-    def _upload_execution_dirs(self) -> dict[str, FileUploadState]:
+    def _upload_execution_dirs(self) -> dict[str, RID]:
         """Upload execution assets at _working_dir/Execution_asset.
 
         This routine uploads the contents of the
@@ -331,9 +304,6 @@ class Execution:
           DerivaMLException: If there is an issue uploading the assets.
         """
 
-        def asset_name(p: str) -> str:
-            return p.replace(self._execution_root.as_posix(), "")
-
         try:
             self.update_status(Status.running, "Uploading execution files...")
             results = upload_directory(self._ml_object.model, self._execution_root)
@@ -342,28 +312,13 @@ class Execution:
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
 
-        results = {asset_name(k): v for k, v in results.items()}
-        execution_assets = [
-            r.result["RID"]
-            for r in results.values()
-            if r.state == UploadState.success and "Execution_Asset_Type" in r.result
-        ]
-        execution_metadata = [
-            r.result["RID"]
-            for r in results.values()
-            if r.state == UploadState.success and "Execution_Metadata_Type" in r.result
-        ]
+        sorted_results = defaultdict(list)
+        for path, status in results.items():
+            asset_table, file_name = normalize_asset_dir(path)
+            sorted_results[asset_table].append((path, status))
+            normalize_asset_dir(path)[0]: status.result["RID"]
 
-        # Pick out all  the assets that are associated with a feature.
-        feature_assets = {
-            path: status.result["RID"]
-            for path, status in results.items()
-            if status.state == UploadState.success and path.startswith("/feature")
-        }
-        self._update_asset_execution_table(results)
-        # self._update_execution_asset_table(execution_assets)
-        # self._update_execution_metadata_table(execution_metadata)
-
+        self._update_asset_execution_table(sorted_results)
         self.update_status(Status.running, "Updating features...")
 
         for p in self._feature_root.glob("**/*.json"):
@@ -372,7 +327,7 @@ class Execution:
                 target_table=m["target_table"],
                 feature_name=m["feature_name"],
                 feature_file=p,
-                uploaded_files=feature_assets,
+                uploaded_files=results,
             )
 
         self.update_status(Status.running, "Upload assets complete")
@@ -451,42 +406,42 @@ class Execution:
             feature_file: str | Path:
             uploaded_files: dict[str: FileUploadState]:
         """
+
+        # Get the column names of all the Feature columns that should be the RID of an asset
         asset_columns = [
             c.name
             for c in self._ml_object.feature_record_class(
                 target_table, feature_name
             ).feature.asset_columns
         ]
+
         feature_table = self._ml_object.feature_record_class(
             target_table, feature_name
         ).feature.feature_table.name
 
-        def asset_name(p: str) -> str:
-            return p.replace(self._execution_root.as_posix(), "")
-
         def map_path(e):
             """Go through the asset columns and replace the file name with the RID for the uploaded file."""
             for c in asset_columns:
-                e[c] = uploaded_files[asset_name(e[c])]
+                e[c] = uploaded_files[normalize_asset_dir(e[c])[0]]
             return e
 
+        # Load the JSON file that has the set of records that contain the feature values.
         with open(feature_file, "r") as feature_values:
             entities = json.load(feature_values)
 
+        # Update the asset columns in the feature and add to the catalog.
         self._ml_object.domain_path.tables[feature_table].insert(
             [map_path(e) for e in entities]
         )
 
     def _update_asset_execution_table(
-        self, uploaded_assets: dict[str, FileUploadState]
+        self, uploaded_assets: dict[str, list[tuple[str, RID]]]
     ):
         """Add entry to association table connecting an asset to an execution RID"""
+
         ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        sorted_assets = defaultdict(list)
-        for asset_name, rid in uploaded_assets.items():
-            sorted_assets[asset_name.split("/")[0]].append(rid)
         assoc_name = None
-        for asset_table_name, rid_list in sorted_assets.items():
+        for asset_table_name, rid_list in uploaded_assets.items():
             # Find the name of the association table
             for assoc in self._ml_object.model.name_to_table(
                 asset_table_name
@@ -502,86 +457,17 @@ class Execution:
                 {asset_table_name: rid, "Execution": self.execution_rid}
                 for rid in rid_list
             ]
-            ml_schema_path.Execution_Metadata_Execution.insert(entities)
+            ml_schema_path.tables[assoc_name].insert(entities)
 
-    def _update_execution_metadata_table(self, assets: list[RID]) -> None:
-        """Upload execution metadata at _working_dir/Execution_metadata."""
-        ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        entities = [
-            {"Execution_Metadata": metadata_rid, "Execution": self.execution_rid}
-            for metadata_rid in assets
-        ]
-        ml_schema_path.Execution_Metadata_Execution.insert(entities)
-
-    def _update_execution_asset_table(self, assets: list[RID]) -> None:
-        """Assets associated with an execution must be linked to an execution entity after they are uploaded into
-        the catalog. This routine takes a list of uploaded assets and makes that association.
-
-        Args:
-            assets: list of RIDS for execution assets.:
-        """
-        ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        entities = [
-            {"Execution_Asset": asset_rid, "Execution": self.execution_rid}
-            for asset_rid in assets
-        ]
-        ml_schema_path.Execution_Asset_Execution.insert(entities)
-
-    @property
-    def _execution_metadata_dir(self) -> Path:
-        """
-
-        Args:
-
-        Returns:
-          to the catalog by the execution_upload method in an execution object.
-
-          :return:
-
-        """
-        return execution_metadata_dir(
-            self._working_dir, exec_rid=self.execution_rid, metadata_type=""
-        )
-
-    def execution_metadata_path(self, metadata_type: str) -> Path:
-        """Return a pathlib Path to the directory in which to place files of type metadata_type.
-
-        These files are uploaded to the catalog as part of the execution of the upload_execution method in DerivaML.
-
-        Args:
-            metadata_type: Type of metadata to be uploaded.  Must be a term in Metadata_Type controlled vocabulary.
-
-        Returns:
-            Path to the directory in which to place files of type metadata_type.
-        """
-        self._ml_object.lookup_term(
-            MLVocab.execution_metadata_type, metadata_type
-        )  # Make sure metadata type exists.
-        return execution_metadata_dir(
-            self._working_dir, exec_rid=self.execution_rid, metadata_type=metadata_type
-        )
-
-    @property
-    def _execution_asset_dir(self) -> Path:
-        """
-
-        Args:
-
-        Returns:
-          :return:
-
-        """
-        return execution_asset_dir(
-            self._working_dir, exec_rid=self.execution_rid, asset_type=""
-        )
-
-    def asset_path(self, asset_name: str) -> Path:
+    def asset_file_path(self, asset_name: str, file_name: str, **kwargs) -> Path:
         """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
 
         These files are uploaded as part of the upload_execution method in DerivaML class.
 
         Args:
             asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
+            file_name: Name of file to be uploaded.
+            **kwargs: Any additional metadata values that may be part of the asset table.
 
         Returns:
             Path in which to place asset files.
@@ -591,29 +477,13 @@ class Execution:
         """
         if not self._ml_object.model.is_asset(asset_name):
             DerivaMLException(f"Table {asset_name} is not an asset")
-
-        return asset_dir(
-            self._working_dir, exec_rid=self.execution_rid, asset_type=asset_name
-        )
-
-    def execution_asset_path(self, asset_type: str) -> Path:
-        """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
-
-        These files are uploaded as part of the upload_execution method in DerivaML class.
-
-        Args:
-            asset_type: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
-
-        Returns:
-            Path in which to place asset files.
-
-        Raises:
-            DerivaException: If the asset type is not defined.
-        """
-        self._ml_object.lookup_term(MLVocab.execution_asset_type, asset_type)
-
-        return execution_asset_dir(
-            self._working_dir, exec_rid=self.execution_rid, asset_type=asset_type
+        asset_table = self._ml_object.model.name_to_table(asset_name)
+        return asset_file_path(
+            self._working_dir,
+            exec_rid=self.execution_rid,
+            asset_table=asset_table,
+            file_name=file_name,
+            metadata=kwargs,
         )
 
     @property
@@ -639,34 +509,6 @@ class Execution:
 
         """
         return feature_root(self._working_dir, self.execution_rid)
-
-    def feature_paths(self, table: Table | str, feature_name: str) -> dict[str, Path]:
-        """Return the file path of where to place feature values, and assets for the named feature and table.
-
-        A side effect of calling this routine is that the directories in which to place the feature values and assets
-        will be created
-
-        Args:
-            table: The table with which the feature is associated.
-            feature_name: Name of the feature
-
-        Returns:
-            A  dictionary of associated asset table names and corresponding paths.
-        """
-        feature = self._ml_object.lookup_feature(table, feature_name)
-
-        asset_paths = {
-            asset_table.name: feature_asset_dir(
-                self._working_dir,
-                exec_rid=self.execution_rid,
-                schema=self._ml_object.domain_schema,
-                target_table=feature.target_table.name,
-                feature_name=feature_name,
-                asset_table=asset_table.name,
-            )
-            for asset_table in feature.asset_columns
-        }
-        return asset_paths
 
     def table_path(self, table: str) -> Path:
         """Return a local file path to a CSV to add values to a table on upload.

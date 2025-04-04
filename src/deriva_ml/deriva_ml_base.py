@@ -42,13 +42,7 @@ from .dataset import Dataset
 from .dataset_aux_classes import DatasetSpec
 from .dataset_bag import DatasetBag
 from .deriva_model import DerivaModel
-from .upload import (
-    table_path,
-    execution_rids,
-    execution_metadata_dir,
-    upload_directory,
-    UploadAssetDirectory,
-)
+from .upload import table_path, execution_rids, upload_directory, asset_file_path
 from .deriva_definitions import ColumnDefinition
 from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import (
@@ -346,30 +340,6 @@ class DerivaML(Dataset):
             table=self.model.name_to_table(table).name,
         )
 
-    def asset_dir(
-        self, table: str | Table, prefix: Optional[str | Path] = None
-    ) -> UploadAssetDirectory:
-        """Return a local file path in which to place a files for an asset table.  T
-
-        Args:
-            table: Location of where to place files.  Defaults to execution_assets_path.
-            prefix: Root path to asset directory.
-
-        Returns:
-            Path to the directory in which asset files should be placed.
-        """
-        table = self.model.name_to_table(table)
-        if not self.model.is_asset(table):
-            raise DerivaMLException(f"The table {table} is not an asset table.")
-
-        prefix = Path(prefix) if prefix else self.working_dir
-        return UploadAssetDirectory(
-            model=self.model,
-            prefix=prefix,
-            schema=table.schema.name,
-            table=table.name,
-        )
-
     def download_dir(self, cached: bool = False) -> Path:
         """Location where downloaded files are placed.
 
@@ -552,7 +522,7 @@ class DerivaML(Dataset):
         Returns:
             Table object for the asset table.
         """
-        column_defs = column_defs or []
+        column_defs = [ColumnDefinition(name='Asset_Type', type=)] + column_defs or []
         schema = schema or self.domain_schema
         asset_table = self.model.schemas[schema].create_table(
             Table.define_asset(
@@ -563,7 +533,7 @@ class DerivaML(Dataset):
             )
         )
         # Create a table to track execution that creates the asset
-        asset_table.create_table(
+        self.model.schemas[self.domain_schema].create_table(
             Table.define_association(
                 [
                     (asset_name, asset_table),
@@ -886,7 +856,7 @@ class DerivaML(Dataset):
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def download_asset(self, asset_rid: RID, dest_dir: Path) -> Path:
+    def download_asset(self, asset_rid: RID, dest_dir: Path) -> tuple[str, Path]:
         """Download an asset from a URL and place it in a local directory.
 
         Args:
@@ -894,7 +864,7 @@ class DerivaML(Dataset):
             dest_dir: Destination directory for the asset.
 
         Returns:
-            A  Path object to the downloaded asset.
+            A tuple with the name of the asset table and a Path object to the downloaded asset.
         """
         table = self.resolve_rid(asset_rid).table
         if not self.model.is_asset(table):
@@ -907,12 +877,12 @@ class DerivaML(Dataset):
 
         hs = HatracStore("https", self.host_name, self.credential)
         hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
-        return Path(asset_filename)
+        return table.name, Path(asset_filename)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def upload_assets(
         self,
-        assets_dir: str | Path | UploadAssetDirectory,
+        assets_dir: str | Path,
     ) -> dict[Any, FileUploadState] | None:
         """Upload assets from a directory.
 
@@ -935,9 +905,6 @@ class DerivaML(Dataset):
             return components[
                 components.index("asset") + 2
             ]  # Look for asset in the path to find the name
-
-        if isinstance(assets_dir, UploadAssetDirectory):
-            assets_dir = assets_dir
 
         if not self.model.is_asset(Path(assets_dir).name):
             raise DerivaMLException("Directory does not have name of an asset table.")
@@ -1199,7 +1166,7 @@ class DerivaML(Dataset):
 
         """
 
-        # Get repo URL from local github repo.
+        # Get repo URL from local gitHub repo.
         try:
             result = subprocess.run(
                 ["git", "remote", "get-url", "origin"],
@@ -1255,7 +1222,7 @@ class DerivaML(Dataset):
 
         Args:
             configuration: ExecutionConfiguration:
-            dryrun: Do not create an execution record or upload results.
+            dry_run: Do not create an execution record or upload results.
 
         Returns:
             An execution object.
@@ -1277,13 +1244,14 @@ class DerivaML(Dataset):
                 raise DerivaMLException(f"Multiple execution RIDs were found {e_rids}.")
 
             execution_rid = e_rids[0]
-        cfile = (
-            execution_metadata_dir(
-                self.working_dir,
-                exec_rid=execution_rid,
-                metadata_type=ExecMetadataVocab.execution_config.value,
-            )
-            / "configuration.json"
+        cfile = asset_file_path(
+            prefix=self.working_dir,
+            exec_rid=execution_rid,
+            file_name="configuration.json",
+            asset_table=self.model.name_to_table("Execution_Metadata"),
+            metadata={
+                "Execution_Metadata_Type": ExecMetadataVocab.execution_config.value
+            },
         )
         configuration = ExecutionConfiguration.load_configuration(cfile)
         return Execution(configuration, self, reload=execution_rid)

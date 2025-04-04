@@ -4,7 +4,6 @@ from importlib.resources import files
 import logging
 from random import random, randint
 import tempfile
-from tempfile import TemporaryDirectory
 from typing import Optional
 import itertools
 
@@ -67,16 +66,26 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
     domain_schema = deriva_ml.catalog.getPathBuilder().schemas[sname]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
-
-    with TemporaryDirectory() as tmpdir:
-        image_dir = deriva_ml.asset_dir("Image", prefix=tmpdir)
+    deriva_ml.add_term(
+        MLVocab.workflow_type,
+        "Demo Catalog Creation",
+        description="A workflow demonstrating how to create a demo catalog.",
+    )
+    execution = deriva_ml.create_execution(
+        ExecutionConfiguration(
+            workflow=deriva_ml.create_workflow(
+                name="Demo Catalog", workflow_type="Demo Catalog Creation"
+            )
+        )
+    )
+    with execution.execute() as e:
         for s in ss:
-            image_file = image_dir.create_file(
-                f"test_{s['RID']}.txt", {"Subject": s["RID"]}
+            image_file = e.asset_file_path(
+                "Image", f"test_{s['RID']}.txt", Subject=s["RID"]
             )
             with open(image_file, "w") as f:
                 f.write(f"Hello there {random()}\n")
-        deriva_ml.upload_assets(image_dir)
+        execution.upload_execution_outputs()
 
 
 def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
