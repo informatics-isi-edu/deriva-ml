@@ -54,6 +54,13 @@ from deriva_ml.deriva_definitions import (
 )
 from deriva_ml.deriva_model import DerivaModel
 
+
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
 upload_root_regex = r"(?i)^.*/deriva-ml"
 
 exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"
@@ -86,11 +93,13 @@ def is_feature_dir(path: Path) -> Optional[re.Match]:
     """Path matches the pattern for where the table for a feature would go."""
     return re.match(feature_table_dir_regex + "$", path.as_posix())
 
-def normalize_asset_dir(path: Path) -> Optional[tuple[str, str]]:
+
+def normalize_asset_dir(path: str) -> Optional[tuple[str, str]]:
     """Parse a path to an asset file and return the asset table name and file name"""
-    if not (m := re.match(asset_path_regex, path.as_posix())):
+    if not (m := re.match(asset_path_regex, path)):
         return None
-    return m['asset_table'], path.name
+    return m["asset_table"], path
+
 
 def upload_root(prefix: Path | str) -> Path:
     """Return the top level directory of where to put files to be uploaded."""
@@ -115,6 +124,13 @@ def execution_root(prefix: Path | str, exec_rid) -> Path:
 def feature_root(prefix: Path | str, exec_rid: str) -> Path:
     """Return the path to the directory in which features for the specified execution should be placed."""
     path = execution_root(prefix, exec_rid) / "feature"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def asset_root(prefix: Path | str, exec_rid: str) -> Path:
+    """Return the path to the directory in which features for the specified execution should be placed."""
+    path = execution_root(prefix, exec_rid) / "asset"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -429,7 +445,6 @@ def asset_file_path(
     asset_name = asset_table.name
 
     path = execution_root(prefix, exec_rid) / "asset" / schema / asset_name
-    path.mkdir(exist_ok=True, parents=True)
     metadata = metadata or {}
     asset_columns = {
         "Filename",
@@ -439,7 +454,6 @@ def asset_file_path(
         "Description",
     }.union(set(DerivaSystemColumns))
     asset_metadata = {c.name for c in asset_table.columns} - asset_columns
-
     if not (asset_metadata >= set(metadata.keys())):
         raise DerivaMLException(
             f"Metadata {metadata} does not match asset metadata {asset_metadata}"

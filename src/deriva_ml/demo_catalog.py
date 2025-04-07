@@ -2,8 +2,7 @@ import atexit
 from importlib.metadata import version
 from importlib.resources import files
 import logging
-from random import random, randint
-import tempfile
+from random import randint, random
 from typing import Optional
 import itertools
 
@@ -11,7 +10,6 @@ from deriva.config.acl_config import AclConfig
 from deriva.core import DerivaServer
 from deriva.core import ErmrestCatalog, get_credential
 from deriva.core.datapath import DataPathException
-from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
 
@@ -34,35 +32,28 @@ TEST_DATASET_SIZE = 4
 def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
     model = deriva_ml.model
     for trial in range(3):
-        for t in [
-            v
-            for v in model.schemas[sname].tables.values()
-            if v.name not in {"Subject", "Image"}
-        ]:
+        for t in [v for v in model.schemas[sname].tables.values()]:
             try:
                 t.drop()
             except HTTPError:
                 pass
-
+    model.schemas[sname].drop()
     # Empty out remaining tables.
     pb = deriva_ml.pathBuilder
     retry = True
     while retry:
-        retry = False
-        for s in [sname, "deriva-ml"]:
-            for t in pb.schemas[s].tables.values():
-                for e in t.entities().fetch():
-                    try:
-                        t.filter(t.RID == e["RID"]).delete()
-                    except DataPathException:  # FK constraint.
-                        retry = True
-
+        for t in pb.schemas["deriva-ml"].tables.values():
+            for e in t.entities().fetch():
+                try:
+                    t.filter(t.RID == e["RID"]).delete()
+                except DataPathException:  # FK constraint.
+                    retry = True
     initialize_ml_schema(model, "deriva-ml")
+    create_domain_schema(deriva_ml, sname)
 
 
 def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
     # Delete any vocabularies and features.
-    reset_demo_catalog(deriva_ml, sname)
     domain_schema = deriva_ml.catalog.getPathBuilder().schemas[sname]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
@@ -141,13 +132,11 @@ def create_demo_features(ml_instance):
         "Well",
         description="The subject self reports that they feel well",
     )
-
     ml_instance.create_vocabulary(
         "ImageQuality", "Controlled vocabulary for image quality"
     )
     ml_instance.add_term("ImageQuality", "Good", description="The image is good")
     ml_instance.add_term("ImageQuality", "Bad", description="The image is bad")
-
     box_asset = ml_instance.create_asset(
         "BoundingBox", comment="A file that contains a cropped version of a image"
     )
@@ -159,7 +148,6 @@ def create_demo_features(ml_instance):
         metadata=[ColumnDefinition(name="Scale", type=BuiltinTypes.int2, nullok=True)],
         optional=["Scale"],
     )
-
     ml_instance.create_feature("Image", "BoundingBox", assets=[box_asset])
     ml_instance.create_feature("Image", "Quality", terms=["ImageQuality"])
 
@@ -167,78 +155,91 @@ def create_demo_features(ml_instance):
     ImageBoundingboxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
     SubjectWellnessFeature = ml_instance.feature_record_class("Subject", "Health")
 
+    # Get the workflow for this notebook
+
     ml_instance.add_term(
         MLVocab.workflow_type,
-        "API Workflow",
+        "Feature Notebook Workflow",
         description="A Workflow that uses Deriva ML API",
     )
     ml_instance.add_term(
-        MLVocab.execution_asset_type,
-        "API_Model",
-        description="Model for our API workflow",
+        MLVocab.asset_type, "API_Model", description="Model for our Notebook workflow"
+    )
+    notebook_workflow = ml_instance.create_workflow(
+        name="API Workflow", workflow_type="Feature Notebook Workflow"
     )
 
-    api_workflow = ml_instance.create_workflow(
-        name="API Workflow",
-        workflow_type="API Workflow",
-    )
-
-    api_execution = ml_instance.create_execution(
+    feature_execution = ml_instance.create_execution(
         ExecutionConfiguration(
-            workflow=api_workflow, description="Our Sample Workflow instance"
+            workflow=notebook_workflow, description="Our Sample Workflow instance"
         )
     )
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        assetdir = ml_instance.asset_dir("BoundingBox", prefix=temp_dir)
-        for i in range(10):
-            with open(assetdir.path / f"box{i}.txt", "w") as fp:
-                fp.write(f"Hi there {i}")
-        bounding_box_assets = ml_instance.upload_assets(assetdir)
-    bounding_box_rids = [a.result["RID"] for a in bounding_box_assets.values()]
-
-    # Get the IDs of al of the things that we are going to want to attach features to.
     subject_rids = [
         i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()
     ]
     image_rids = [
         i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()
     ]
-
     subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
-            Execution=api_execution.execution_rid,
+            Execution=feature_execution.execution_rid,
             SubjectHealth=["Well", "Sick"][randint(0, 1)],
             Scale=randint(1, 10),
         )
         for subject_rid in subject_rids
     ]
 
+    # Create a new set of images.  For fun, lets wrap this in an execution so we get status updates
+    bounding_box_files = []
+    for i in range(10):
+        bounding_box_file = feature_execution.asset_file_path(
+            "BoundingBox", f"box{i}.txt"
+        )
+        with open(bounding_box_file, "w") as fp:
+            fp.write(f"Hi there {i}")
+        bounding_box_files.append(bounding_box_file)
+
+    image_bounding_box_feature_list = [
+        ImageBoundingboxFeature(
+            Image=image_rid,
+            Execution=feature_execution.execution_rid,
+            BoundingBox=asset_name,
+        )
+        for image_rid, asset_name in zip(
+            image_rids, itertools.cycle(bounding_box_files)
+        )
+    ]
+
     image_quality_feature_list = [
         ImageQualityFeature(
             Image=image_rid,
-            Execution=api_execution.execution_rid,
+            Execution=feature_execution.execution_rid,
             ImageQuality=["Good", "Bad"][randint(0, 1)],
         )
         for image_rid in image_rids
     ]
 
-    image_bounding_box_feature_list = [
-        ImageBoundingboxFeature(
-            Image=image_rid,
-            Execution=api_execution.execution_rid,
-            BoundingBox=asset_rid,
+    subject_feature_list = [
+        SubjectWellnessFeature(
+            Subject=subject_rid,
+            Execution=feature_execution.execution_rid,
+            SubjectHealth=["Well", "Sick"][randint(0, 1)],
+            Scale=randint(1, 10),
         )
-        for image_rid, asset_rid in zip(image_rids, itertools.cycle(bounding_box_rids))
+        for subject_rid in subject_rids
     ]
 
-    ml_instance.add_features(subject_feature_list)
-    ml_instance.add_features(image_quality_feature_list)
-    ml_instance.add_features(image_bounding_box_feature_list)
+    with feature_execution.execute() as execution:
+        feature_execution.add_features(image_bounding_box_feature_list)
+        feature_execution.add_features(image_quality_feature_list)
+        feature_execution.add_features(subject_feature_list)
+
+    feature_execution.upload_execution_outputs()
 
 
-def create_domain_schema(model: Model, sname: str) -> None:
+def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
     """
     Create a domain schema.  Assumes that the ml-schema has already been created.
     :param model:
@@ -247,28 +248,19 @@ def create_domain_schema(model: Model, sname: str) -> None:
     """
 
     # Make sure that we have a ml schema
-    _ = model.schemas["deriva-ml"]
+    _ = ml_instance.model.schemas["deriva-ml"]
 
-    if model.schemas.get(sname):
+    if ml_instance.model.schemas.get(sname):
         # Clean out any old junk....
-        model.schemas[sname].drop()
+        ml_instance.model.schemas[sname].drop()
 
-    domain_schema = model.create_schema(
+    domain_schema = ml_instance.model.model.create_schema(
         Schema.define(sname, annotations={"name_style": {"underline_space": True}})
     )
     subject_table = domain_schema.create_table(
         Table.define("Subject", column_defs=[Column.define("Name", builtin_types.text)])
     )
-
-    image_table = domain_schema.create_table(
-        Table.define_asset(
-            sname=sname,
-            tname="Image",
-            hatrac_template="/hatrac/image_asset/{{MD5}}.{{Filename}}",
-            column_defs=[Column.define("Name", builtin_types.text)],
-        )
-    )
-    image_table.create_reference(subject_table)
+    ml_instance.create_asset("Image", referenced_tables=[subject_table])
 
 
 def destroy_demo_catalog(catalog):
@@ -293,13 +285,14 @@ def create_demo_catalog(
 
     try:
         create_ml_schema(model, project_name=project_name)
-        create_domain_schema(model, domain_schema)
         deriva_ml = DerivaML(
             hostname=hostname,
             catalog_id=test_catalog.catalog_id,
             project_name=project_name,
+            domain_schema=domain_schema,
             logging_level=logging.WARN,
         )
+        create_domain_schema(deriva_ml, domain_schema)
         working_dir = deriva_ml.working_dir
         dataset_table = deriva_ml.dataset_table
         dataset_table.annotations.update(

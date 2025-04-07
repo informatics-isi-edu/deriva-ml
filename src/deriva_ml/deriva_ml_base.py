@@ -34,6 +34,7 @@ from deriva.core.ermrest_model import Key, Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 from pydantic import validate_call, ConfigDict
+from pydantic.v1 import schema_json_of
 from requests import RequestException
 
 from .execution_configuration import ExecutionConfiguration, Workflow
@@ -54,6 +55,7 @@ from .deriva_definitions import (
     VocabularyTerm,
     MLVocab,
     FileSpec,
+    TableDefinition,
 )
 
 try:
@@ -502,10 +504,17 @@ class DerivaML(Dataset):
             )
         )
 
+    def create_table(self, table: TableDefinition) -> Table:
+        """Create a table from a table definition."""
+        return self.model.schemas[self.domain_schema].create_table(table.model_dump())
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_asset(
         self,
         asset_name: str,
         column_defs: Optional[Iterable[ColumnDefinition]] = None,
+        fkey_defs: Optional[Iterable[ColumnDefinition]] = None,
+        referenced_tables: Optional[Iterable[Table]] = None,
         comment: str = "",
         schema: Optional[str] = None,
     ) -> Table:
@@ -514,6 +523,8 @@ class DerivaML(Dataset):
         Args:
             asset_name: Name of the asset table.
             column_defs: Iterable of ColumnDefinition objects to provide additional metadata for asset.
+            fkey_defs: Iterable of ForeignKeyDefinition objects to provide additional metadata for asset.
+            referenced_tables: Iterable of Table objects to which asset should provide foreign-key references to.
             comment: Description of the asset table. (Default value = '')
             schema: Schema in which to create the asset table.  Defaults to domain_schema.
             asset_name: str:
@@ -522,18 +533,30 @@ class DerivaML(Dataset):
         Returns:
             Table object for the asset table.
         """
-        column_defs = [ColumnDefinition(name='Asset_Type', type=)] + column_defs or []
+        column_defs = column_defs or []
+        fkey_defs = fkey_defs or []
+        referenced_tables = referenced_tables or []
         schema = schema or self.domain_schema
+
+        self.add_term(
+            MLVocab.asset_type, asset_name, description=f"A {asset_name} asset"
+        )
         asset_table = self.model.schemas[schema].create_table(
             Table.define_asset(
                 schema,
                 asset_name,
                 column_defs=[c.model_dump() for c in column_defs],
+                fkey_defs=[fk.model_dump() for fk in fkey_defs],
                 comment=comment,
             )
         )
+        asset_table.create_reference(
+            self.model.schemas[self.ml_schema].tables["Asset_Type"]
+        )
+        for t in referenced_tables:
+            asset_table.create_reference(self.model.name_to_table(t))
         # Create a table to track execution that creates the asset
-        self.model.schemas[self.domain_schema].create_table(
+        atable = self.model.schemas[self.domain_schema].create_table(
             Table.define_association(
                 [
                     (asset_name, asset_table),
@@ -541,6 +564,14 @@ class DerivaML(Dataset):
                         "Execution",
                         self.model.schemas[self.ml_schema].tables["Execution"],
                     ),
+                ]
+            )
+        )
+        self.model.schemas[self.domain_schema].create_table(
+            Table.define_association(
+                [
+                    ("Asset_Execution", atable),
+                    ("Asset_Role", self.model.schemas[self.ml_schema].tables["Asset_Role"])
                 ]
             )
         )
@@ -802,7 +833,8 @@ class DerivaML(Dataset):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
         schema_path = self.catalog.getPathBuilder().schemas[schema_name]
-        for term in schema_path.tables[table_name].entities():
+
+        for term in schema_path.tables[table_name].entities().fetch():
             if term_name == term["Name"] or (
                 term["Synonyms"] and term_name in term["Synonyms"]
             ):

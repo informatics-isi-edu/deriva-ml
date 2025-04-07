@@ -1,6 +1,6 @@
 import argparse
 import sys
-from typing import Optional
+from typing import Optional, Any
 
 from deriva.core import DerivaServer, get_credential
 from deriva.core.ermrest_model import Model
@@ -19,28 +19,48 @@ from deriva_ml.schema_setup.annotations import generate_annotation
 from deriva_ml.deriva_model import DerivaModel
 
 
-def define_table_workflow(workflow_annotation: dict):
-    return Table.define(
-        "Workflow",
-        column_defs=[
-            Column.define("Name", builtin_types.text),
-            Column.define("Description", builtin_types.markdown),
-            Column.define("URL", builtin_types.ermrest_uri),
-            Column.define("Checksum", builtin_types.text),
-            Column.define("Version", builtin_types.text),
-        ],
-        annotations=workflow_annotation,
+def create_dataset_table(
+    schema: Schema,
+    execution_table: Table,
+    project_name: str,
+    dataset_annotation: Optional[dict] = None,
+):
+    dataset_table = schema.create_table(
+        Table.define(
+            tname="Dataset",
+            column_defs=[
+                Column.define("Description", builtin_types.markdown),
+                Column.define("Deleted", builtin_types.boolean),
+            ],
+            annotations=dataset_annotation if dataset_annotation is not None else {},
+        )
     )
 
+    dataset_type = schema.create_table(
+        Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}")
+    )
+    schema.create_table(
+        Table.define_association(
+            associates=[
+                ("Dataset", dataset_table),
+                (MLVocab.dataset_type, dataset_type),
+            ]
+        )
+    )
 
-def define_table_dataset(dataset_annotation: Optional[dict] = None):
-    return Table.define(
-        tname="Dataset",
-        column_defs=[
-            Column.define("Description", builtin_types.markdown),
-            Column.define("Deleted", builtin_types.boolean),
-        ],
-        annotations=dataset_annotation if dataset_annotation is not None else {},
+    dataset_version = schema.create_table(define_table_dataset_version(schema.name))
+    dataset_table.create_reference(("Version", True, dataset_version))
+
+    # Nested datasets.
+    schema.create_table(
+        Table.define_association(
+            associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)]
+        )
+    )
+    schema.create_table(
+        Table.define_association(
+            associates=[("Dataset", dataset_table), ("Execution", execution_table)]
+        )
     )
 
 
@@ -66,47 +86,193 @@ def define_table_dataset_version(sname: str):
     )
 
 
-def define_table_execution(sname: str, execution_annotation: dict):
-    table_def = Table.define(
-        "Execution",
-        column_defs=[
-            Column.define("Workflow", builtin_types.text),
-            Column.define("Description", builtin_types.markdown),
-            Column.define("Duration", builtin_types.text),
-            Column.define("Status", builtin_types.text),
-            Column.define("Status_Detail", builtin_types.text),
-        ],
-        fkey_defs=[ForeignKey.define(["Workflow"], sname, "Workflow", ["RID"])],
-        annotations=execution_annotation,
+def create_execution_table(schema, annotation: Optional[dict] = None):
+    annotation = annotation if annotation is not None else {}
+    execution = schema.create_table(
+        Table.define(
+            "Execution",
+            column_defs=[
+                Column.define("Workflow", builtin_types.text),
+                Column.define("Description", builtin_types.markdown),
+                Column.define("Duration", builtin_types.text),
+                Column.define("Status", builtin_types.text),
+                Column.define("Status_Detail", builtin_types.text),
+            ],
+            fkey_defs=[
+                ForeignKey.define(["Workflow"], schema.name, "Workflow", ["RID"])
+            ],
+            annotations=annotation,
+        )
     )
-    return table_def
+    return execution
 
 
-def define_asset_execution_metadata(sname: str, execution_metadata_annotation: dict):
-    return Table.define_asset(
-        sname=sname,
-        tname="Execution_Metadata",
-        hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
-        annotations=execution_metadata_annotation,
+def create_asset_table(
+    schema,
+    asset_name: str,
+    execution_table,
+    asset_role_table,
+    annotation: Optional[dict] = None,
+):
+    annotation = annotation if annotation is not None else {}
+    asset_table = schema.create_table(
+        Table.define_asset(
+            sname=schema.name,
+            tname=asset_name,
+            hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
+            annotations=annotation,
+            column_defs=[Column.define("Asset_Type", builtin_types.text)],
+            fkey_defs=[
+                ForeignKey.define(["Asset_Type"], schema.name, "Asset_Type", ["Name"])
+            ],
+        )
+    )
+    atable = schema.create_table(
+        Table.define_association(
+            [
+                (asset_name, asset_table),
+                ("Execution", execution_table),
+            ],
+        )
     )
 
-
-def define_asset_execution_asset(sname: str, execution_asset_annotation: dict):
-    table_def = Table.define_asset(
-        sname=sname,
-        tname="Execution_Asset",
-        hatrac_template="/hatrac/execution_asset/{{MD5}}.{{Filename}}",
-        annotations=execution_asset_annotation,
+    schema.create_table(
+        Table.define_association(
+            [
+                ("Asset_Execution", atable),
+                ("Asset_Role", asset_role_table),
+            ]
+        )
     )
-    return table_def
+    return asset_table
 
 
-def define_table_file(sname):
+def create_file_table(
+    schema: Schema,
+    execution_table: Table,
+    project_name: str,
+    annotation: Optional[dict] = None,
+):
     """Define files table structure"""
-    return Table.define_asset(
-        sname=sname,
-        tname="File",
+    annotation = annotation or {}
+    file_table = schema.create_table(
+        Table.define_asset(sname=schema.name, tname="File")
     )
+
+    file_type = schema.create_table(
+        Table.define_vocabulary(MLVocab.file_type, f"{project_name}:{{RID}}")
+    )
+
+    schema.create_table(
+        Table.define_association(
+            associates=[
+                ("File", file_table),
+                (MLVocab.file_type, file_type),
+            ]
+        )
+    )
+    schema.create_table(
+        Table.define_association(
+            [
+                ("File", file_table),
+                ("Execution", execution_table),
+            ]
+        )
+    )
+
+
+def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] = None):
+    annotations = annotations or {}
+    workflow_table = schema.create_table(
+        Table.define(
+            "Workflow",
+            column_defs=[
+                Column.define("Name", builtin_types.text),
+                Column.define("Description", builtin_types.markdown),
+                Column.define("URL", builtin_types.ermrest_uri),
+                Column.define("Checksum", builtin_types.text),
+                Column.define("Version", builtin_types.text),
+            ],
+            annotations=annotations,
+        )
+    )
+    workflow_table.create_reference(
+        schema.create_table(
+            Table.define_vocabulary(MLVocab.workflow_type, f"{schema.name}:{{RID}}")
+        )
+    )
+    return workflow_table
+
+
+def create_ml_schema(
+    model: Model, schema_name: str = "deriva-ml", project_name: Optional[str] = None
+):
+    if model.schemas.get(schema_name):
+        model.schemas[schema_name].drop(cascade=True)
+    # get annotations
+    deriva_model = DerivaModel(model)
+    annotations = generate_annotation(deriva_model)
+
+    model.annotations.update(annotations["catalog_annotation"])
+    client_annotation = {
+        "tag:misd.isi.edu,2015:display": {"name": "Users"},
+        "tag:isrd.isi.edu,2016:table-display": {
+            "row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}
+        },
+        "tag:isrd.isi.edu,2016:visible-columns": {
+            "compact": ["Full_Name", "Display_Name", "Email", "ID"]
+        },
+    }
+    model.schemas["public"].tables["ERMrest_Client"].annotations.update(
+        client_annotation
+    )
+    model.apply()
+
+    schema = model.create_schema(
+        Schema.define(schema_name, annotations=annotations["schema_annotation"])
+    )
+    project_name = project_name or schema_name
+
+    # Create workflow and execution table.
+
+    schema.create_table(
+        Table.define_vocabulary("Feature_Name", f"{project_name}:{{RID}}")
+    )
+    schema.create_table(
+        Table.define_vocabulary("Asset_Type", f"{project_name}:{{RID}}")
+    )
+    asset_role_table = schema.create_table(
+        Table.define_vocabulary("Asset_Role", f"{project_name}:{{RID}}")
+    )
+
+    create_workflow_table(schema, annotations["workflow_annotation"])
+    execution_table = create_execution_table(
+        schema, annotations["execution_annotation"]
+    )
+    create_dataset_table(
+        schema, execution_table, project_name, annotations["dataset_annotation"]
+    )
+
+    create_asset_table(
+        schema,
+        "Execution_Metadata",
+        execution_table,
+        asset_role_table,
+        annotations["execution_metadata_annotation"],
+    )
+    create_asset_table(
+        schema,
+        "Execution_Asset",
+        execution_table,
+        asset_role_table,
+        annotations["execution_asset_annotation"],
+    )
+
+    # File table
+    create_file_table(schema, execution_table, project_name)
+
+    create_www_schema(model)
+    initialize_ml_schema(model, schema_name)
 
 
 def create_www_schema(model: Model):
@@ -154,152 +320,10 @@ def create_www_schema(model: Model):
     return www_schema
 
 
-def create_ml_schema(
-    model: Model, schema_name: str = "deriva-ml", project_name: Optional[str] = None
-):
-    if model.schemas.get(schema_name):
-        model.schemas[schema_name].drop(cascade=True)
-    # get annotations
-    deriva_model = DerivaModel(model)
-    annotations = generate_annotation(deriva_model)
-
-    model.annotations.update(annotations["catalog_annotation"])
-    client_annotation = {
-        "tag:misd.isi.edu,2015:display": {"name": "Users"},
-        "tag:isrd.isi.edu,2016:table-display": {
-            "row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}
-        },
-        "tag:isrd.isi.edu,2016:visible-columns": {
-            "compact": ["Full_Name", "Display_Name", "Email", "ID"]
-        },
-    }
-    model.schemas["public"].tables["ERMrest_Client"].annotations.update(
-        client_annotation
-    )
-    model.apply()
-
-    schema = model.create_schema(
-        Schema.define(schema_name, annotations=annotations["schema_annotation"])
-    )
-    project_name = project_name or schema_name
-    # Workflow
-    schema.create_table(
-        Table.define_vocabulary("Feature_Name", f"{project_name}:{{RID}}")
-    )
-
-    workflow_table = schema.create_table(
-        define_table_workflow(annotations["workflow_annotation"])
-    )
-    workflow_table.create_reference(
-        schema.create_table(
-            Table.define_vocabulary(MLVocab.workflow_type, f"{schema_name}:{{RID}}")
-        )
-    )
-
-    execution_table = schema.create_table(
-        define_table_execution(schema_name, annotations["execution_annotation"])
-    )
-
-    dataset_table = schema.create_table(
-        define_table_dataset(annotations["dataset_annotation"])
-    )
-    dataset_type = schema.create_table(
-        Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}")
-    )
-    schema.create_table(
-        Table.define_association(
-            associates=[
-                ("Dataset", dataset_table),
-                (MLVocab.dataset_type, dataset_type),
-            ]
-        )
-    )
-    schema.create_table(
-        Table.define_association(
-            associates=[("Dataset", dataset_table), ("Execution", execution_table)]
-        )
-    )
-
-    dataset_version = schema.create_table(define_table_dataset_version(schema_name))
-    dataset_table.create_reference(("Version", True, dataset_version))
-
-    # Nested datasets.
-    schema.create_table(
-        Table.define_association(
-            associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)]
-        )
-    )
-
-    # Execution Metadata
-    execution_metadata_table = schema.create_table(
-        define_asset_execution_metadata(
-            schema.name, annotations["execution_metadata_annotation"]
-        )
-    )
-    execution_metadata_table.create_reference(
-        schema.create_table(
-            Table.define_vocabulary(
-                "Execution_Metadata_Type", f"{project_name}:{{RID}}"
-            )
-        )
-    )
-    schema.create_table(
-        Table.define_association(
-            [
-                ("Execution_Metadata", execution_metadata_table),
-                ("Execution", execution_table),
-            ]
-        )
-    )
-
-    # Execution Asset
-    execution_asset_table = schema.create_table(
-        define_asset_execution_asset(
-            schema.name, annotations["execution_asset_annotation"]
-        )
-    )
-    execution_asset_table.create_reference(
-        schema.create_table(
-            Table.define_vocabulary("Execution_Asset_Type", f"{project_name}:{{RID}}")
-        )
-    )
-    schema.create_table(
-        Table.define_association(
-            [("Execution_Asset", execution_asset_table), ("Execution", execution_table)]
-        )
-    )
-
-    # File table
-    file_table = schema.create_table(define_table_file(schema_name))
-    file_type = schema.create_table(
-        Table.define_vocabulary(MLVocab.file_type, f"{project_name}:{{RID}}")
-    )
-    schema.create_table(
-        Table.define_association(
-            associates=[
-                ("File", file_table),
-                (MLVocab.file_type, file_type),
-            ]
-        )
-    )
-    schema.create_table(
-        Table.define_association(
-            [
-                ("File", file_table),
-                ("Execution", execution_table),
-            ]
-        )
-    )
-    create_www_schema(model)
-    initialize_ml_schema(model, schema_name)
-
-
 def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     catalog = model.catalog
-    execution_metadata_type = (
-        catalog.getPathBuilder().schemas[schema_name].tables["Execution_Metadata_Type"]
-    )
-    execution_metadata_type.insert(
+    asset_type = catalog.getPathBuilder().schemas[schema_name].tables["Asset_Type"]
+    asset_type.insert(
         [
             {
                 "Name": "Execution_Config",
@@ -309,6 +333,22 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
                 "Name": "Runtime_Env",
                 "Description": "Information about the execution environment",
             },
+            {
+                "Name": "Execution_Metadata",
+                "Description": "Information about the execution environment",
+            },
+            {
+                "Name": "Execution_Asset",
+                "Description": "A file generated by an execution",
+            },
+        ],
+        defaults={"ID", "URI"},
+    )
+    asset_role = catalog.getPathBuilder().schemas[schema_name].tables["Asset_Role"]
+    asset_role.insert(
+        [
+            {"Name": "Input", "Description": "Asset used for input of an execution."},
+            {"Name": "Output", "Description": "Asset used for output of an execution."},
         ],
         defaults={"ID", "URI"},
     )

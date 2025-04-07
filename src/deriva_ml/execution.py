@@ -17,12 +17,7 @@ from pydantic import validate_call, ConfigDict
 import sys
 
 from .deriva_definitions import ExecMetadataVocab
-from .deriva_definitions import (
-    RID,
-    Status,
-    FileUploadState,
-    DerivaMLException,
-)
+from .deriva_definitions import RID, Status, FileUploadState, DerivaMLException, MLVocab
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset_aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from .dataset_bag import DatasetBag
@@ -32,6 +27,7 @@ from .upload import (
     asset_file_path,
     execution_root,
     feature_root,
+    asset_root,
     feature_value_path,
     is_feature_dir,
     table_path,
@@ -172,7 +168,7 @@ class Execution:
         runtime_env_path = self.asset_file_path(
             asset_name="Execution_Metadata",
             file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            Execution_Metadata_Type=ExecMetadataVocab.runtime_env.value,
+            asset_type=ExecMetadataVocab.runtime_env.value,
         )
         with open(runtime_env_path, "w") as fp:
             json.dump(get_execution_environment(), fp)
@@ -208,18 +204,25 @@ class Execution:
 
         # Download assets....
         self.update_status(Status.running, "Downloading assets ...")
-        self.asset_paths = [
-            self._ml_object.download_asset(asset_rid=a, dest_dir=self._asset_dir())
-            for a in self.configuration.assets
-        ]
+        self.asset_paths = []
+        for asset_rid in self.configuration.assets:
+            asset_table = self._ml_object.resolve_rid(asset_rid).table.name
+            dest_dir = self._ml_object.working_dir / "downloaded-assets" / asset_table
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            self.asset_paths.append(
+                self._ml_object.download_asset(asset_rid=asset_rid, dest_dir=dest_dir)
+            )
+
         if self.asset_paths and not (reload or self._dry_run):
-            self._update_asset_execution_table(self.configuration.assets)
+            self._update_asset_execution_table(
+                {"Execution_Assets": self.configuration.assets}, asset_role="Input"
+            )
 
         # Save configuration details for later upload
         cfile = self.asset_file_path(
             "Execution_Metadata",
             file_name="configuration.json",
-            Execution_Metadata_Type=ExecMetadataVocab.execution_config.value,
+            asset_type=ExecMetadataVocab.execution_config.value,
         )
         with open(cfile, "w", encoding="utf-8") as config_file:
             json.dump(self.configuration.model_dump(), config_file)
@@ -229,6 +232,42 @@ class Execution:
 
         self.start_time = datetime.now()
         self.update_status(Status.pending, "Initialize status finished.")
+
+    @property
+    def _execution_root(self) -> Path:
+        """
+
+        Args:
+
+        Returns:
+          :return:
+
+        """
+        return execution_root(self._working_dir, self.execution_rid)
+
+    @property
+    def _feature_root(self) -> Path:
+        """The root path to all execution specific files.
+        :return:
+
+        Args:
+
+        Returns:
+
+        """
+        return feature_root(self._working_dir, self.execution_rid)
+
+    @property
+    def _asset_root(self) -> Path:
+        """The root path to all execution specific files.
+        :return:
+
+        Args:
+
+        Returns:
+
+        """
+        return asset_root(self._working_dir, self.execution_rid)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
@@ -306,19 +345,20 @@ class Execution:
 
         try:
             self.update_status(Status.running, "Uploading execution files...")
-            results = upload_directory(self._ml_object.model, self._execution_root)
+            results = upload_directory(self._ml_object.model, self._asset_root)
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
 
-        sorted_results = defaultdict(list)
+        asset_rids = defaultdict(list)
+        asset_rid_map = defaultdict(list)
         for path, status in results.items():
             asset_table, file_name = normalize_asset_dir(path)
-            sorted_results[asset_table].append((path, status))
-            normalize_asset_dir(path)[0]: status.result["RID"]
+            asset_rids[asset_table].append(status.result["RID"])
+            asset_rid_map[(asset_table, file_name)] = status.result["RID"]
 
-        self._update_asset_execution_table(sorted_results)
+        self._update_asset_execution_table(asset_rids)
         self.update_status(Status.running, "Updating features...")
 
         for p in self._feature_root.glob("**/*.json"):
@@ -327,7 +367,7 @@ class Execution:
                 target_table=m["target_table"],
                 feature_name=m["feature_name"],
                 feature_file=p,
-                uploaded_files=results,
+                uploaded_files=asset_rid_map,
             )
 
         self.update_status(Status.running, "Upload assets complete")
@@ -361,19 +401,6 @@ class Execution:
             self.update_status(Status.failed, error)
             raise e
 
-    def _asset_dir(self) -> Path:
-        """
-
-        Args:
-
-        Returns:
-          :return: PathLib path object to model directory.
-
-        """
-        path = self._working_dir / self.execution_rid / "asset"
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
     def _clean_folder_contents(self, folder_path: Path):
         """
 
@@ -396,7 +423,7 @@ class Execution:
         target_table: str,
         feature_name: str,
         feature_file: str | Path,
-        uploaded_files: dict[str, FileUploadState],
+        uploaded_files: dict[tuple[str, str], RID],
     ) -> None:
         """
 
@@ -404,7 +431,7 @@ class Execution:
             target_table: str:
             feature_name: str:
             feature_file: str | Path:
-            uploaded_files: dict[str: FileUploadState]:
+            uploaded_files: Dictionary whose key ia an asset name, file-name pair, and whose value is RID of that asset.
         """
 
         # Get the column names of all the Feature columns that should be the RID of an asset
@@ -414,7 +441,6 @@ class Execution:
                 target_table, feature_name
             ).feature.asset_columns
         ]
-
         feature_table = self._ml_object.feature_record_class(
             target_table, feature_name
         ).feature.feature_table.name
@@ -422,7 +448,7 @@ class Execution:
         def map_path(e):
             """Go through the asset columns and replace the file name with the RID for the uploaded file."""
             for c in asset_columns:
-                e[c] = uploaded_files[normalize_asset_dir(e[c])[0]]
+                e[c] = uploaded_files[normalize_asset_dir(e[c])]
             return e
 
         # Load the JSON file that has the set of records that contain the feature values.
@@ -435,37 +461,69 @@ class Execution:
         )
 
     def _update_asset_execution_table(
-        self, uploaded_assets: dict[str, list[tuple[str, RID]]]
+        self,
+        uploaded_assets: dict[str, list[RID]],
+        asset_roles: str | list[str] = "Output",
     ):
-        """Add entry to association table connecting an asset to an execution RID"""
+        """Add entry to association table connecting an asset to an execution RID
 
-        ml_schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
-        assoc_name = None
+        Args:
+            uploaded_assets: Dictionary whose key is the name of an asset table, and whose value is a list of RIDs for
+                newly added assets to that table.
+             asset_role: A term or list of terms from the Asset_Role vocabulary.
+        """
+
+        # Make sure all of the asset roles are in the controlled vocabulary table.
+        asset_roles = [asset_roles] if isinstance(asset_roles, str) else asset_roles
+        pb = self._ml_object.pathBuilder
+        for asset_role in asset_roles:
+            self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
+
+        assoc_name, assoc_schema = None, None
         for asset_table_name, rid_list in uploaded_assets.items():
-            # Find the name of the association table
-            for assoc in self._ml_object.model.name_to_table(
-                asset_table_name
-            ).find_associations():
-                if assoc.other_fkeys.pop().pk_table.name == "Execution":
-                    assoc_name = assoc.name
-                    break
-            if not assoc_name:
-                DerivaMLException(
-                    f"Execution table for {asset_table_name} does not exist.",
-                )
+            asset_exe = self._ml_object.model.find_association(
+                asset_table_name, "Execution"
+            )
+            asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
             entities = [
-                {asset_table_name: rid, "Execution": self.execution_rid}
+                {
+                    asset_table_name: rid,
+                    "Execution": self.execution_rid,
+                }
                 for rid in rid_list
             ]
-            ml_schema_path.tables[assoc_name].insert(entities)
+            asset_exe_rids = [e["RID"] for e in asset_exe_path.insert(entities)]
 
-    def asset_file_path(self, asset_name: str, file_name: str, **kwargs) -> Path:
+            # Now add in links to the roles.
+            exe_asset_role = self._ml_object.model.find_association(
+                "Asset_Role", asset_exe
+            )
+            exe_asset_role_path = pb.schemas[exe_asset_role.schema.name].tables[
+                exe_asset_role.name
+            ]
+            exe_asset_role_path.insert(
+                [
+                    {"Asset_Execution": r, "Asset_Role": role}
+                    for r in asset_exe_rids
+                    for role in asset_roles
+                ]
+            )
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def asset_file_path(
+        self,
+        asset_name: str,
+        file_name: str,
+        asset_type: Optional[str] = None,
+        **kwargs,
+    ) -> Path:
         """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
 
         These files are uploaded as part of the upload_execution method in DerivaML class.
 
         Args:
             asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
+            asset_type: Type of asset to be uploaded.  Defaults to name of the asset.
             file_name: Name of file to be uploaded.
             **kwargs: Any additional metadata values that may be part of the asset table.
 
@@ -477,38 +535,17 @@ class Execution:
         """
         if not self._ml_object.model.is_asset(asset_name):
             DerivaMLException(f"Table {asset_name} is not an asset")
+
+        asset_type = asset_type or kwargs.get("Asset_Type", None) or asset_name
+        self._ml_object.lookup_term(MLVocab.asset_type, asset_type)
         asset_table = self._ml_object.model.name_to_table(asset_name)
         return asset_file_path(
             self._working_dir,
             exec_rid=self.execution_rid,
             asset_table=asset_table,
             file_name=file_name,
-            metadata=kwargs,
+            metadata=kwargs | {"Asset_Type": asset_type},
         )
-
-    @property
-    def _execution_root(self) -> Path:
-        """
-
-        Args:
-
-        Returns:
-          :return:
-
-        """
-        return execution_root(self._working_dir, self.execution_rid)
-
-    @property
-    def _feature_root(self) -> Path:
-        """The root path to all execution specific files.
-        :return:
-
-        Args:
-
-        Returns:
-
-        """
-        return feature_root(self._working_dir, self.execution_rid)
 
     def table_path(self, table: str) -> Path:
         """Return a local file path to a CSV to add values to a table on upload.

@@ -126,6 +126,31 @@ class DerivaModel:
         table = self.name_to_table(table_name)
         return table.is_association(unqualified=unqualified, pure=pure)
 
+    def find_association(self, table1: Table | str, table2: Table | str) -> Table:
+        """Given two tables, return an association table that connects the two.
+
+        Raises"
+            DerivaML exception if there is either not an association table or more than one association table.
+        """
+        table1 = self.name_to_table(table1)
+        table2 = self.name_to_table(table2)
+
+        tables = [
+            a.table
+            for a in table1.find_associations()
+            if (t := a.other_fkeys.pop().pk_table) == table2
+        ]
+        if len(tables) == 1:
+            return tables[0]
+        elif len(tables) == 0:
+            raise DerivaMLException(
+                f"No association tables found between {table1.name} and {table2.name}."
+            )
+        else:
+            raise DerivaMLException(
+                f"There are {len(tables)} association tables between {table1.name} and {table2.name}."
+            )
+
     def is_asset(self, table_name: str | Table) -> bool:
         """True if the specified table is an asset table.
 
