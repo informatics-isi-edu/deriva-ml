@@ -111,6 +111,7 @@ def create_asset_table(
     schema,
     asset_name: str,
     execution_table,
+    asset_type_table,
     asset_role_table,
     annotation: Optional[dict] = None,
 ):
@@ -131,19 +132,20 @@ def create_asset_table(
         Table.define_association(
             [
                 (asset_name, asset_table),
-                ("Execution", execution_table),
+                ("Asset_Type", asset_type_table),
             ],
         )
     )
 
-    schema.create_table(
+    atable = schema.create_table(
         Table.define_association(
             [
-                ("Asset_Execution", atable),
-                ("Asset_Role", asset_role_table),
-            ]
+                (asset_name, asset_table),
+                ("Execution", execution_table),
+            ],
         )
     )
+    atable.create_reference(asset_role_table)
     return asset_table
 
 
@@ -238,7 +240,7 @@ def create_ml_schema(
     schema.create_table(
         Table.define_vocabulary("Feature_Name", f"{project_name}:{{RID}}")
     )
-    schema.create_table(
+    asset_type_table = schema.create_table(
         Table.define_vocabulary("Asset_Type", f"{project_name}:{{RID}}")
     )
     asset_role_table = schema.create_table(
@@ -257,6 +259,7 @@ def create_ml_schema(
         schema,
         "Execution_Metadata",
         execution_table,
+        asset_type_table,
         asset_role_table,
         annotations["execution_metadata_annotation"],
     )
@@ -264,6 +267,7 @@ def create_ml_schema(
         schema,
         "Execution_Asset",
         execution_table,
+        asset_type_table,
         asset_role_table,
         annotations["execution_asset_annotation"],
     )

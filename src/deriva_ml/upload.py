@@ -19,7 +19,7 @@ Here is the directory layout we support:
                                    asset
                                        <asset_table>
                                            file1, file2, ...
-                           <feature_name>.json    <- needs to have asset_name column remapped before uploading
+                           <feature_name>.jsonl    <- needs to have asset_name column remapped before uploading
                 table
                    <schema>
                        <record_table>
@@ -30,6 +30,9 @@ Here is the directory layout we support:
                             <metadata1>
                                 <metadata2>
                                     file1, file2, ....
+                asset-type
+                    <schema>
+                        file1.jsonl, file2.jsonl
 """
 
 import json
@@ -271,6 +274,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                     "Length": "{file_size}",
                     "Filename": "{file_name}",
                 },
+                "asset_type": "fetch",
                 "target_table": [model.domain_schema, "{asset_table}"],
                 "file_pattern": asset_path_regex
                 + "/"
@@ -463,3 +467,32 @@ def asset_file_path(
         path = path / metadata.get(m, "None")
     path.mkdir(parents=True, exist_ok=True)
     return path / file_name
+
+def asset_type_path(prefix: Path | str,
+                    exec_rid: RID, schema: str, asset_table: str) -> Path:
+    """Return the path to a JSON line file in which to place asset_type information.
+
+    Args:
+        prefix: Location of upload root directory
+        schema: Domain schema
+        table: Name of the table to be uploaded.
+
+    Returns:
+        Path to the file in which to place table values that are to be uploaded.
+    """
+    path = execution_root(prefix, exec_rid=exec_rid) / "asset-type" / schema
+    path.mkdir(parents=True, exist_ok=True)
+    return path / f"{asset_table}.jsonl"
+
+
+class AssetFilePath(type(Path())):
+    def __new__(cls, *args, asset_types: Optional[str: list[str]] = None, **kwargs):
+        obj = super().__new__(cls, *args)
+        if not asset_types:
+            asset_types = []
+        elif isinstance(asset_types, str):
+            asset_types = [asset_types]
+        obj.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
+        with open(asset_type_path(), 'a', encoding="utf-8") as f:
+            f.writelines([json.dumps({} ) "\n".join(asset_types))
+        return obj

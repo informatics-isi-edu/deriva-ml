@@ -4,6 +4,7 @@ This module defined the Execution class which is used to interact with the state
 
 from __future__ import annotations
 
+import csv
 from collections import defaultdict
 import json
 import logging
@@ -12,6 +13,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Any, Optional
+
 from deriva.core import format_exception
 from pydantic import validate_call, ConfigDict
 import sys
@@ -33,6 +35,8 @@ from .upload import (
     table_path,
     upload_directory,
     normalize_asset_dir,
+    AssetFilePath,
+    asset_type_path
 )
 
 try:
@@ -168,7 +172,7 @@ class Execution:
         runtime_env_path = self.asset_file_path(
             asset_name="Execution_Metadata",
             file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            asset_type=ExecMetadataVocab.runtime_env.value,
+            asset_types=ExecMetadataVocab.runtime_env.value,
         )
         with open(runtime_env_path, "w") as fp:
             json.dump(get_execution_environment(), fp)
@@ -355,13 +359,13 @@ class Execution:
         asset_rid_map = defaultdict(list)
         for path, status in results.items():
             asset_table, file_name = normalize_asset_dir(path)
-            asset_rids[asset_table].append(status.result["RID"])
+            asset_rids[asset_table].append((file_name, status.result["RID"]))
             asset_rid_map[(asset_table, file_name)] = status.result["RID"]
 
         self._update_asset_execution_table(asset_rids)
         self.update_status(Status.running, "Updating features...")
 
-        for p in self._feature_root.glob("**/*.json"):
+        for p in self._feature_root.glob("**/*.jsonl"):
             m = is_feature_dir(p.parent)
             self._update_feature_table(
                 target_table=m["target_table"],
@@ -423,7 +427,7 @@ class Execution:
         target_table: str,
         feature_name: str,
         feature_file: str | Path,
-        uploaded_files: dict[tuple[str, str], RID],
+        uploaded_files: dict[tuple[str, str], tuple[str, RID]],
     ) -> None:
         """
 
@@ -431,7 +435,7 @@ class Execution:
             target_table: str:
             feature_name: str:
             feature_file: str | Path:
-            uploaded_files: Dictionary whose key ia an asset name, file-name pair, and whose value is RID of that asset.
+            uploaded_files: Dictionary whose key ia an asset name, file-name pair, and whose value is a filenam, RID of that asset.
         """
 
         # Get the column names of all the Feature columns that should be the RID of an asset
@@ -448,12 +452,13 @@ class Execution:
         def map_path(e):
             """Go through the asset columns and replace the file name with the RID for the uploaded file."""
             for c in asset_columns:
+                asset_table, asset_file = normalize_asset_dir(e[c])
                 e[c] = uploaded_files[normalize_asset_dir(e[c])]
             return e
 
         # Load the JSON file that has the set of records that contain the feature values.
         with open(feature_file, "r") as feature_values:
-            entities = json.load(feature_values)
+            entities = [json.loads(l) for l in feature_values.readline()]
 
         # Update the asset columns in the feature and add to the catalog.
         self._ml_object.domain_path.tables[feature_table].insert(
@@ -463,7 +468,7 @@ class Execution:
     def _update_asset_execution_table(
         self,
         uploaded_assets: dict[str, list[RID]],
-        asset_roles: str | list[str] = "Output",
+        asset_role: str = "Output",
     ):
         """Add entry to association table connecting an asset to an execution RID
 
@@ -473,57 +478,53 @@ class Execution:
              asset_role: A term or list of terms from the Asset_Role vocabulary.
         """
 
-        # Make sure all of the asset roles are in the controlled vocabulary table.
-        asset_roles = [asset_roles] if isinstance(asset_roles, str) else asset_roles
+        # Make sure  the asset role is in the controlled vocabulary table.
+        self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
+        # Now we need to attach the asset types
+        asset_type_map = {}
+        with open(asset_type_path(prefix, schema, asset_type), "r") as f:
+            asset_type_map.update(json.loads(f.readline()))
+
+
         pb = self._ml_object.pathBuilder
-        for asset_role in asset_roles:
-            self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
-
-        assoc_name, assoc_schema = None, None
         for asset_table_name, rid_list in uploaded_assets.items():
-            asset_exe = self._ml_object.model.find_association(
-                asset_table_name, "Execution"
-            )
+            asset_exe = self._ml_object.model.find_association(asset_table_name, "Execution")
+            asset_asset_type = self._ml_object.model.find_association(asset_table_name, "Execution")
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
-            entities = [
-                {
-                    asset_table_name: rid,
-                    "Execution": self.execution_rid,
-                }
-                for rid in rid_list
-            ]
-            asset_exe_rids = [e["RID"] for e in asset_exe_path.insert(entities)]
-
-            # Now add in links to the roles.
-            exe_asset_role = self._ml_object.model.find_association(
-                "Asset_Role", asset_exe
-            )
-            exe_asset_role_path = pb.schemas[exe_asset_role.schema.name].tables[
-                exe_asset_role.name
-            ]
-            exe_asset_role_path.insert(
+            asset_exe_path.insert(
                 [
-                    {"Asset_Execution": r, "Asset_Role": role}
-                    for r in asset_exe_rids
-                    for role in asset_roles
+                    {
+                        asset_table_name: rid,
+                        "Execution": self.execution_rid,
+                        "Asset_Role": asset_role,
+                    }
+                    for rid in rid_list
                 ]
             )
+
+            asset_type_path = pb.schemas[asset_type.schema.name].tables[asset_type.name]
+            asset_type_path.insert([{asset_table_name: rid, 'Asset_Type': t} for t in asset_types[] for rid in rid_list]
+                                   )
+
+
+
+
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def asset_file_path(
         self,
         asset_name: str,
         file_name: str,
-        asset_type: Optional[str] = None,
+        asset_types: Optional[list[str] | str] = None,
         **kwargs,
-    ) -> Path:
+    ) -> AssetFilePath:
         """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
 
         These files are uploaded as part of the upload_execution method in DerivaML class.
 
         Args:
             asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
-            asset_type: Type of asset to be uploaded.  Defaults to name of the asset.
+            asset_types: Type of asset to be uploaded.  Defaults to name of the asset.
             file_name: Name of file to be uploaded.
             **kwargs: Any additional metadata values that may be part of the asset table.
 
@@ -536,15 +537,26 @@ class Execution:
         if not self._ml_object.model.is_asset(asset_name):
             DerivaMLException(f"Table {asset_name} is not an asset")
 
-        asset_type = asset_type or kwargs.get("Asset_Type", None) or asset_name
-        self._ml_object.lookup_term(MLVocab.asset_type, asset_type)
-        asset_table = self._ml_object.model.name_to_table(asset_name)
-        return asset_file_path(
-            self._working_dir,
-            exec_rid=self.execution_rid,
-            asset_table=asset_table,
-            file_name=file_name,
-            metadata=kwargs | {"Asset_Type": asset_type},
+        asset_types = asset_types or kwargs.get("Asset_Type", None) or asset_name
+        asset_type = [asset_types] if isinstance(asset_types, str) else asset_types
+        for t in asset_type:
+            self._ml_object.lookup_term(MLVocab.asset_type, t)
+
+        with open(asset_type_path(self._working_dir, asset_name), "a") as f:
+            csvwriter = csv.writer(f)
+            for t in asset_types:
+                csvwriter.writerow([asset_name, file_name, t])
+            csvwriter.writerow([])
+        )
+        return AssetFilePath(
+            asset_file_path(
+                self._working_dir,
+                exec_rid=self.execution_rid,
+                asset_table=self._ml_object.model.name_to_table(asset_name),
+                file_name=file_name,
+                metadata=kwargs,
+            ),
+            asset_types=asset_types,
         )
 
     def table_path(self, table: str) -> Path:
@@ -588,99 +600,8 @@ class Execution:
         for fs in sorted_features.values():
             self._add_features(fs)
 
-    @staticmethod
-    def _append_features_to_json_array_file(
-        file_path: Path, features: Iterable[FeatureRecord]
-    ) -> None:
-        """
-        Append new objects to a JSON file that contains an array of objects,
-        by modifying only the tail end of the file.
-
-        Parameters:
-            file_path (str): Path to the JSON file.
-            features (list): List of dictionaries representing the new objects.
-        """
-
-        # If file doesn't exist, create a new one with the new_objects as an array.
-        features = list(features)
-        if not file_path.exists():
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump([feature.model_dump(mode="json") for feature in features], f)
-            return
-
-        # Convert new objects into JSON text, without wrapping them in an array.
-        # They will be inserted as:  ,<new_obj1>,<new_obj2>,...  (if needed)
-        new_entries = ",".join(
-            json.dumps(feature.model_dump(mode="json")) for feature in features
-        )
-        new_entries_bytes = new_entries.encode("utf-8")
-
-        with open(file_path, "rb+") as f:
-            # First, ensure the file starts with '['
-            f.seek(0)
-            first = f.read(1)
-            if first != b"[":
-                raise ValueError("The JSON file does not start with '['.")
-
-            # Determine whether the array is empty.
-            # Read forward until we hit a non-whitespace character after '['.
-            while True:
-                ch = f.read(1)
-                if not ch:
-                    raise ValueError(
-                        "Unexpected end of file while checking array content."
-                    )
-                if not ch.isspace():
-                    break
-            # If the first non-whitespace character is the closing bracket, the array is empty.
-            is_empty = ch == b"]"
-
-            # Now, move to the end of the file and back up to find the closing bracket.
-            f.seek(0, 2)  # move to end
-            file_end = f.tell()
-            pos = file_end - 1
-
-            # Move backwards over any trailing whitespace.
-            while pos > 0:
-                f.seek(pos)
-                char = f.read(1)
-                if not char.isspace():
-                    break
-                pos -= 1
-
-            if char != b"]":
-                raise ValueError("The file does not end with a closing bracket (']').")
-
-            # For non-empty arrays, we need to insert a comma before the new entries.
-            if not is_empty:
-                # Check the character immediately before the ']' to decide if we need a comma.
-                pos_before = pos - 1
-                while pos_before > 0:
-                    f.seek(pos_before)
-                    prev_char = f.read(1)
-                    if not prev_char.isspace():
-                        break
-                    pos_before -= 1
-                # If the previous non-whitespace character is '[', then the array is actually empty.
-                need_comma = prev_char != b"["
-
-                # Position the file pointer at the closing bracket.
-                f.seek(pos)
-                if need_comma:
-                    insertion = ("," + new_entries + "]").encode("utf-8")
-                else:
-                    insertion = (new_entries + "]").encode("utf-8")
-                f.write(insertion)
-                f.truncate()
-            else:
-                # The array is empty. Place new entries between '[' and ']'.
-                # Go to the position of the closing bracket (after skipping trailing whitespace).
-                f.seek(pos)
-                f.write(new_entries_bytes)
-                f.write(b"]")
-                f.truncate()
-
     def _add_features(self, features: list[FeatureRecord]) -> None:
+        # Update feature records to include current execution_rid
         first_row = features[0]
         feature = first_row.feature
         json_path = feature_value_path(
@@ -690,7 +611,12 @@ class Execution:
             feature_name=feature.feature_name,
             exec_rid=self.execution_rid,
         )
-        self._append_features_to_json_array_file(json_path, features)
+
+        with open(json_path, "a", encoding="utf-8") as file:
+            for feature in features:
+                feature.Execution = self.execution_rid
+                file.write(json.dumps(feature.model_dump(mode='json')) + "\n")
+
 
     @validate_call
     def create_dataset(self, dataset_types: str | list[str], description: str) -> RID:

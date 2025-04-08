@@ -550,8 +550,14 @@ class DerivaML(Dataset):
                 comment=comment,
             )
         )
-        asset_table.create_reference(
-            self.model.schemas[self.ml_schema].tables["Asset_Type"]
+
+        self.model.schemas[self.domain_schema].create_table(
+            Table.define_association(
+                [
+                    ("Asset", asset_table),
+                    ("Asset_Type", self.model.name_to_table("Asset_Type"))
+                ]
+            )
         )
         for t in referenced_tables:
             asset_table.create_reference(self.model.name_to_table(t))
@@ -567,14 +573,7 @@ class DerivaML(Dataset):
                 ]
             )
         )
-        self.model.schemas[self.domain_schema].create_table(
-            Table.define_association(
-                [
-                    ("Asset_Execution", atable),
-                    ("Asset_Role", self.model.schemas[self.ml_schema].tables["Asset_Role"])
-                ]
-            )
-        )
+        atable.create_reference(self.model.name_to_table("Asset_Role"))
         return asset_table
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
