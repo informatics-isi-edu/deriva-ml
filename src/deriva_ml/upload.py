@@ -99,9 +99,10 @@ def is_feature_dir(path: Path) -> Optional[re.Match]:
 
 def normalize_asset_dir(path: str) -> Optional[tuple[str, str]]:
     """Parse a path to an asset file and return the asset table name and file name"""
+
     if not (m := re.match(asset_path_regex, path)):
         return None
-    return m["asset_table"], path
+    return f"{m['schema']}/{m['asset_table']}", Path(path).name
 
 
 def upload_root(prefix: Path | str) -> Path:
@@ -164,39 +165,8 @@ def feature_value_path(
     """
     return (
         feature_dir(prefix, exec_rid, schema, target_table, feature_name)
-        / f"{feature_name}.json"
+        / f"{feature_name}.jsonl"
     )
-
-
-def feature_asset_dir(
-    prefix: Path | str,
-    exec_rid: str,
-    schema: str,
-    target_table: str,
-    feature_name: str,
-    asset_table: str,
-) -> Path:
-    """Return the path to a directory in which to place feature assets for a named feature are to be uploaded.
-
-    Args:
-        prefix: Location of upload root directory
-        exec_rid: RID of the execution for the feature asset
-        schema: Domain schema
-        target_table: Name of the target table for the feature.
-        feature_name: Name of the feature
-        asset_table: Name of the asset table for the feature.
-
-    Returns:
-        Path to directory in which feature asset files are placed.
-    """
-    path = (
-        feature_dir(prefix, exec_rid, schema, target_table, feature_name)
-        / "asset"
-        / asset_table
-    )
-
-    path.mkdir(parents=True, exist_ok=True)
-    return path
 
 
 def table_path(prefix: Path | str, schema: str, table: str) -> Path:
@@ -275,7 +245,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                     "Filename": "{file_name}",
                 },
                 "asset_type": "fetch",
-                "target_table": [model.domain_schema, "{asset_table}"],
+                "target_table": ["{schema}", "{asset_table}"],
                 "file_pattern": asset_path_regex
                 + "/"
                 + asset_file_regex,  # Sets schema, asset_table, file_name, file_ext
@@ -468,31 +438,52 @@ def asset_file_path(
     path.mkdir(parents=True, exist_ok=True)
     return path / file_name
 
-def asset_type_path(prefix: Path | str,
-                    exec_rid: RID, schema: str, asset_table: str) -> Path:
+
+def asset_type_path(prefix: Path | str, exec_rid: RID, asset_table: Table) -> Path:
     """Return the path to a JSON line file in which to place asset_type information.
 
     Args:
         prefix: Location of upload root directory
-        schema: Domain schema
-        table: Name of the table to be uploaded.
+        exec_rid: Execution RID
+        asset_table: Table in which to place assets.
 
     Returns:
-        Path to the file in which to place table values that are to be uploaded.
+        Path to the file in which to place asset_type values for the named asset..
     """
-    path = execution_root(prefix, exec_rid=exec_rid) / "asset-type" / schema
+    path = (
+        execution_root(prefix, exec_rid=exec_rid)
+        / "asset-type"
+        / asset_table.schema.name
+    )
     path.mkdir(parents=True, exist_ok=True)
-    return path / f"{asset_table}.jsonl"
+    return path / f"{asset_table.name}.jsonl"
 
 
 class AssetFilePath(type(Path())):
-    def __new__(cls, *args, asset_types: Optional[str: list[str]] = None, **kwargs):
-        obj = super().__new__(cls, *args)
-        if not asset_types:
-            asset_types = []
-        elif isinstance(asset_types, str):
-            asset_types = [asset_types]
-        obj.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
-        with open(asset_type_path(), 'a', encoding="utf-8") as f:
-            f.writelines([json.dumps({} ) "\n".join(asset_types))
+    """Derived class of Path that also includes information about the asset type."""
+
+    def __new__(
+        cls,
+        prefix,
+        execution_rid: RID,
+        asset_table: Table,
+        file_name: str,
+        asset_types: list[str] | str,
+        **kwargs,
+    ):
+        obj = super().__new__(
+            cls,
+            asset_file_path(
+                prefix, execution_rid, asset_table, file_name, metadata=kwargs
+            ),
+        )
+        obj.asset_types = (
+            asset_types if isinstance(asset_types, list) else [asset_types]
+        )
+
+        # Persist the asset types into a file
+        with open(
+            asset_type_path(prefix, execution_rid, asset_table), "a", encoding="utf-8"
+        ) as f:
+            f.write(json.dumps({file_name: obj.asset_types}) + "\n")
         return obj

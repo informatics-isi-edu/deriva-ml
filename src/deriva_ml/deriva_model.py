@@ -137,7 +137,7 @@ class DerivaModel:
 
         tables = [
             a.table
-            for a in table1.find_associations()
+            for a in table1.find_associations(pure=False)
             if (t := a.other_fkeys.pop().pk_table) == table2
         ]
         if len(tables) == 1:

@@ -122,10 +122,6 @@ def create_asset_table(
             tname=asset_name,
             hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
             annotations=annotation,
-            column_defs=[Column.define("Asset_Type", builtin_types.text)],
-            fkey_defs=[
-                ForeignKey.define(["Asset_Type"], schema.name, "Asset_Type", ["Name"])
-            ],
         )
     )
     atable = schema.create_table(

@@ -34,7 +34,6 @@ from deriva.core.ermrest_model import Key, Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 from pydantic import validate_call, ConfigDict
-from pydantic.v1 import schema_json_of
 from requests import RequestException
 
 from .execution_configuration import ExecutionConfiguration, Workflow
@@ -554,8 +553,8 @@ class DerivaML(Dataset):
         self.model.schemas[self.domain_schema].create_table(
             Table.define_association(
                 [
-                    ("Asset", asset_table),
-                    ("Asset_Type", self.model.name_to_table("Asset_Type"))
+                    (asset_table.name, asset_table),
+                    ("Asset_Type", self.model.name_to_table("Asset_Type")),
                 ]
             )
         )

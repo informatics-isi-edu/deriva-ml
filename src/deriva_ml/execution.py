@@ -4,7 +4,6 @@ This module defined the Execution class which is used to interact with the state
 
 from __future__ import annotations
 
-import csv
 from collections import defaultdict
 import json
 import logging
@@ -26,7 +25,6 @@ from .dataset_bag import DatasetBag
 from .execution_configuration import ExecutionConfiguration, Workflow
 from .execution_environment import get_execution_environment
 from .upload import (
-    asset_file_path,
     execution_root,
     feature_root,
     asset_root,
@@ -36,7 +34,7 @@ from .upload import (
     upload_directory,
     normalize_asset_dir,
     AssetFilePath,
-    asset_type_path
+    asset_type_path,
 )
 
 try:
@@ -226,7 +224,7 @@ class Execution:
         cfile = self.asset_file_path(
             "Execution_Metadata",
             file_name="configuration.json",
-            asset_type=ExecMetadataVocab.execution_config.value,
+            asset_types=ExecMetadataVocab.execution_config.value,
         )
         with open(cfile, "w", encoding="utf-8") as config_file:
             json.dump(self.configuration.model_dump(), config_file)
@@ -355,14 +353,12 @@ class Execution:
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
 
-        asset_rids = defaultdict(list)
-        asset_rid_map = defaultdict(list)
+        asset_map = defaultdict(list)
         for path, status in results.items():
             asset_table, file_name = normalize_asset_dir(path)
-            asset_rids[asset_table].append((file_name, status.result["RID"]))
-            asset_rid_map[(asset_table, file_name)] = status.result["RID"]
+            asset_map[asset_table].append((file_name, status.result["RID"]))
 
-        self._update_asset_execution_table(asset_rids)
+        self._update_asset_execution_table(asset_map)
         self.update_status(Status.running, "Updating features...")
 
         for p in self._feature_root.glob("**/*.jsonl"):
@@ -371,7 +367,7 @@ class Execution:
                 target_table=m["target_table"],
                 feature_name=m["feature_name"],
                 feature_file=p,
-                uploaded_files=asset_rid_map,
+                uploaded_files=asset_map,
             )
 
         self.update_status(Status.running, "Upload assets complete")
@@ -427,7 +423,7 @@ class Execution:
         target_table: str,
         feature_name: str,
         feature_file: str | Path,
-        uploaded_files: dict[tuple[str, str], tuple[str, RID]],
+        uploaded_files: dict[str, tuple[str, RID]],
     ) -> None:
         """
 
@@ -435,7 +431,7 @@ class Execution:
             target_table: str:
             feature_name: str:
             feature_file: str | Path:
-            uploaded_files: Dictionary whose key ia an asset name, file-name pair, and whose value is a filenam, RID of that asset.
+            uploaded_files: Dictionary whose key ia an asset name, file-name pair, and whose value is a filename, RID of that asset.
         """
 
         # Get the column names of all the Feature columns that should be the RID of an asset
@@ -445,21 +441,32 @@ class Execution:
                 target_table, feature_name
             ).feature.asset_columns
         ]
+
+        asset_columns = [
+            c.name
+            for c in self._ml_object.feature_record_class(
+                target_table, feature_name
+            ).feature.asset_columns
+        ]
+
         feature_table = self._ml_object.feature_record_class(
             target_table, feature_name
         ).feature.feature_table.name
+        asset_map = {
+            (asset_table, asset[0]): asset[1]
+            for asset_table, assets in uploaded_files.items()
+            for asset in assets
+        }
 
         def map_path(e):
             """Go through the asset columns and replace the file name with the RID for the uploaded file."""
             for c in asset_columns:
-                asset_table, asset_file = normalize_asset_dir(e[c])
-                e[c] = uploaded_files[normalize_asset_dir(e[c])]
+                e[c] = asset_map[normalize_asset_dir(e[c])]
             return e
 
         # Load the JSON file that has the set of records that contain the feature values.
         with open(feature_file, "r") as feature_values:
-            entities = [json.loads(l) for l in feature_values.readline()]
-
+            entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
         self._ml_object.domain_path.tables[feature_table].insert(
             [map_path(e) for e in entities]
@@ -467,7 +474,7 @@ class Execution:
 
     def _update_asset_execution_table(
         self,
-        uploaded_assets: dict[str, list[RID]],
+        uploaded_assets: dict[str, list[str, RID]],
         asset_role: str = "Output",
     ):
         """Add entry to association table connecting an asset to an execution RID
@@ -480,16 +487,18 @@ class Execution:
 
         # Make sure  the asset role is in the controlled vocabulary table.
         self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
-        # Now we need to attach the asset types
-        asset_type_map = {}
-        with open(asset_type_path(prefix, schema, asset_type), "r") as f:
-            asset_type_map.update(json.loads(f.readline()))
-
 
         pb = self._ml_object.pathBuilder
-        for asset_table_name, rid_list in uploaded_assets.items():
-            asset_exe = self._ml_object.model.find_association(asset_table_name, "Execution")
-            asset_asset_type = self._ml_object.model.find_association(asset_table_name, "Execution")
+        for asset_table, asset_list in uploaded_assets.items():
+            asset_table_name = asset_table.split("/")[
+                1
+            ]  # Peel off the schema from the asset table
+            asset_exe = self._ml_object.model.find_association(
+                asset_table_name, "Execution"
+            )
+            asset_asset_type = self._ml_object.model.find_association(
+                asset_table_name, "Asset_Type"
+            )
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
             asset_exe_path.insert(
                 [
@@ -498,17 +507,34 @@ class Execution:
                         "Execution": self.execution_rid,
                         "Asset_Role": asset_role,
                     }
-                    for rid in rid_list
+                    for _, rid in asset_list
                 ]
             )
 
-            asset_type_path = pb.schemas[asset_type.schema.name].tables[asset_type.name]
-            asset_type_path.insert([{asset_table_name: rid, 'Asset_Type': t} for t in asset_types[] for rid in rid_list]
-                                   )
+            # Now add in the type names via the asset_asset_type association table.
+            # Get the list of types for each file in the asset.
+            asset_type_map = {}
+            with open(
+                asset_type_path(
+                    self._working_dir,
+                    self.execution_rid,
+                    self._ml_object.model.name_to_table(asset_table_name),
+                ),
+                "r",
+            ) as f:
+                for line in f:
+                    asset_type_map.update(json.loads(line.strip()))
 
-
-
-
+            type_path = pb.schemas[asset_asset_type.schema.name].tables[
+                asset_asset_type.name
+            ]
+            type_path.insert(
+                [
+                    {asset_table_name: rid, "Asset_Type": t}
+                    for file_name, rid in asset_list
+                    for t in asset_type_map[file_name]
+                ]
+            )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def asset_file_path(
@@ -542,21 +568,13 @@ class Execution:
         for t in asset_type:
             self._ml_object.lookup_term(MLVocab.asset_type, t)
 
-        with open(asset_type_path(self._working_dir, asset_name), "a") as f:
-            csvwriter = csv.writer(f)
-            for t in asset_types:
-                csvwriter.writerow([asset_name, file_name, t])
-            csvwriter.writerow([])
-        )
         return AssetFilePath(
-            asset_file_path(
-                self._working_dir,
-                exec_rid=self.execution_rid,
-                asset_table=self._ml_object.model.name_to_table(asset_name),
-                file_name=file_name,
-                metadata=kwargs,
-            ),
-            asset_types=asset_types,
+            self._working_dir,
+            self.execution_rid,
+            self._ml_object.model.name_to_table(asset_name),
+            file_name,
+            asset_types,
+            **kwargs,
         )
 
     def table_path(self, table: str) -> Path:
@@ -611,12 +629,10 @@ class Execution:
             feature_name=feature.feature_name,
             exec_rid=self.execution_rid,
         )
-
         with open(json_path, "a", encoding="utf-8") as file:
             for feature in features:
                 feature.Execution = self.execution_rid
-                file.write(json.dumps(feature.model_dump(mode='json')) + "\n")
-
+                file.write(json.dumps(feature.model_dump(mode="json")) + "\n")
 
     @validate_call
     def create_dataset(self, dataset_types: str | list[str], description: str) -> RID:

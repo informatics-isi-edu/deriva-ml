@@ -25,12 +25,11 @@ class FeatureRecord(BaseModel):
     """
 
     # model_dump of this feature should be compatible with feature table columns.
-    Execution: str
+    Execution: Optional[str] = None
     Feature_Name: str
     feature: ClassVar[Optional["Feature"]] = None
 
     class Config:
-
         arbitrary_types_allowed = True
 
     @classmethod

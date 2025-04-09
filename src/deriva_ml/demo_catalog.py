@@ -204,7 +204,6 @@ def create_demo_features(ml_instance):
     image_bounding_box_feature_list = [
         ImageBoundingboxFeature(
             Image=image_rid,
-            Execution=feature_execution.execution_rid,
             BoundingBox=asset_name,
         )
         for image_rid, asset_name in zip(
@@ -215,7 +214,6 @@ def create_demo_features(ml_instance):
     image_quality_feature_list = [
         ImageQualityFeature(
             Image=image_rid,
-            Execution=feature_execution.execution_rid,
             ImageQuality=["Good", "Bad"][randint(0, 1)],
         )
         for image_rid in image_rids
@@ -224,7 +222,6 @@ def create_demo_features(ml_instance):
     subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
-            Execution=feature_execution.execution_rid,
             SubjectHealth=["Well", "Sick"][randint(0, 1)],
             Scale=randint(1, 10),
         )
