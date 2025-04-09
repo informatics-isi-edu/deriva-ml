@@ -31,7 +31,6 @@ from deriva.core.datapath import DataPathException
 from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
-from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 from pydantic import validate_call, ConfigDict
 from requests import RequestException
@@ -42,13 +41,12 @@ from .dataset import Dataset
 from .dataset_aux_classes import DatasetSpec
 from .dataset_bag import DatasetBag
 from .deriva_model import DerivaModel
-from .upload import table_path, execution_rids, upload_directory, asset_file_path
+from .upload import table_path, execution_rids, asset_file_path
 from .deriva_definitions import ColumnDefinition
 from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import (
     RID,
     Status,
-    FileUploadState,
     DerivaMLException,
     ML_SCHEMA,
     VocabularyTerm,
@@ -452,6 +450,7 @@ class DerivaML(Dataset):
         try:
             return self.catalog.resolve_rid(rid, self.model.model)
         except KeyError as _e:
+            ic(_e)
             raise DerivaMLException(f"Invalid RID {rid}")
 
     def retrieve_rid(self, rid: RID) -> dict[str, Any]:
@@ -574,6 +573,40 @@ class DerivaML(Dataset):
         )
         atable.create_reference(self.model.name_to_table("Asset_Role"))
         return asset_table
+
+    # @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def list_assets(self, asset_table: Table | str):
+        """Return the contents of an asset table"""
+
+        if not self.model.is_asset(asset_table):
+            raise DerivaMLException(f"Table {asset_table.name} is not an asset")
+        asset_table = self.model.name_to_table(asset_table)
+        pb = self._model.catalog.getPathBuilder()
+        asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
+
+        asset_type_table = self._model.find_association(asset_table, MLVocab.asset_type)
+        type_path = pb.schemas[asset_type_table.schema.name].tables[
+            asset_type_table.name
+        ]
+
+        # Get a list of all the asset_type values associated with this dataset_table.
+        assets = []
+        for asset in asset_path.entities().fetch():
+            asset_types = (
+                type_path.filter(type_path.columns[asset_table.name] == asset["RID"])
+                .attributes(type_path.Asset_Type)
+                .fetch()
+            )
+            assets.append(
+                asset
+                | {
+                    MLVocab.asset_type.value: [
+                        asset_type[MLVocab.asset_type.value]
+                        for asset_type in asset_types
+                    ]
+                }
+            )
+        return assets
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_feature(
@@ -884,62 +917,6 @@ class DerivaML(Dataset):
             execution_rid=execution_rid,
             snapshot_catalog=DerivaML(self.host_name, self._version_snapshot(dataset)),
         )
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def download_asset(self, asset_rid: RID, dest_dir: Path) -> tuple[str, Path]:
-        """Download an asset from a URL and place it in a local directory.
-
-        Args:
-            asset_rid: URL of the asset.
-            dest_dir: Destination directory for the asset.
-
-        Returns:
-            A tuple with the name of the asset table and a Path object to the downloaded asset.
-        """
-        table = self.resolve_rid(asset_rid).table
-        if not self.model.is_asset(table):
-            raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
-
-        tpath = self.pathBuilder.schemas[table.schema.name].tables[table.name]
-        asset_metadata = list(tpath.filter(tpath.RID == asset_rid).entities())[0]
-        asset_url = asset_metadata["URL"]
-        asset_filename = dest_dir / asset_metadata["Filename"]
-
-        hs = HatracStore("https", self.host_name, self.credential)
-        hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
-        return table.name, Path(asset_filename)
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def upload_assets(
-        self,
-        assets_dir: str | Path,
-    ) -> dict[Any, FileUploadState] | None:
-        """Upload assets from a directory.
-
-        This routine assumes that the current upload specification includes a configuration for the specified directory.
-        Every asset in the specified directory is uploaded
-
-        Args:
-            assets_dir: Directory containing the assets to upload.
-
-        Returns:
-            Results of the upload operation.
-
-        Raises:
-            DerivaMLException: If there is an issue uploading the assets.
-        """
-
-        def path_to_asset(path: str) -> str:
-            """Pull the asset name out of a path to that asset in the filesystem"""
-            components = path.split("/")
-            return components[
-                components.index("asset") + 2
-            ]  # Look for asset in the path to find the name
-
-        if not self.model.is_asset(Path(assets_dir).name):
-            raise DerivaMLException("Directory does not have name of an asset table.")
-        results = upload_directory(self.model, assets_dir)
-        return {path_to_asset(p): r for p, r in results.items()}
 
     def _update_status(
         self, new_status: Status, status_detail: str, execution_rid: RID

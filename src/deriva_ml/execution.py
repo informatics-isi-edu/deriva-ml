@@ -16,6 +16,7 @@ from typing import Iterable, Any, Optional
 from deriva.core import format_exception
 from pydantic import validate_call, ConfigDict
 import sys
+from deriva.core.hatrac_store import HatracStore
 
 from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import RID, Status, FileUploadState, DerivaMLException, MLVocab
@@ -33,7 +34,7 @@ from .upload import (
     table_path,
     upload_directory,
     normalize_asset_dir,
-    AssetFilePath,
+    asset_file_path,
     asset_type_path,
 )
 
@@ -49,6 +50,29 @@ except ImportError:
 
     def list_running_servers():
         return []
+
+
+class AssetFilePath(type(Path())):
+    """Derived class of Path that also includes information about a downloaded."""
+
+    def __new__(
+        cls,
+        asset_path,
+        asset_name: str,
+        file_name: str,
+        asset_metadata: dict[str, Any],
+        asset_types: list[str] | str,
+        asset_rid: Optional[RID] = None,
+    ):
+        obj = super().__new__(cls, asset_path)
+        obj.asset_types = (
+            asset_types if isinstance(asset_types, list) else [asset_types]
+        )
+        obj.asset_metadata = asset_metadata
+        obj.asset_name = asset_name
+        obj.file_name = file_name
+        obj.asset_rid = asset_rid
+        return obj
 
 
 class Execution:
@@ -100,6 +124,7 @@ class Execution:
         self.asset_paths: list[Path] = []
         self.configuration = configuration
         self._ml_object = ml_object
+        self._model = ml_object.model
         self._logger = ml_object._logger
         self.start_time = None
         self.stop_time = None
@@ -132,15 +157,14 @@ class Execution:
                 )
 
         for d in self.configuration.datasets:
+            ic(d.rid)
             if self._ml_object.resolve_rid(d.rid).table.name != "Dataset":
                 raise DerivaMLException(
                     "Dataset specified in execution configuration is not a dataset"
                 )
 
         for a in self.configuration.assets:
-            if not self._ml_object.model.is_asset(
-                self._ml_object.resolve_rid(a).table.name
-            ):
+            if not self._model.is_asset(self._ml_object.resolve_rid(a).table.name):
                 raise DerivaMLException(
                     "Asset specified in execution configuration is not a asset table"
                 )
@@ -206,23 +230,26 @@ class Execution:
 
         # Download assets....
         self.update_status(Status.running, "Downloading assets ...")
-        self.asset_paths = []
+        self.asset_paths = {}
         for asset_rid in self.configuration.assets:
             asset_table = self._ml_object.resolve_rid(asset_rid).table.name
-            dest_dir = self._ml_object.working_dir / "downloaded-assets" / asset_table
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            self.asset_paths.append(
-                self._ml_object.download_asset(asset_rid=asset_rid, dest_dir=dest_dir)
+            dest_dir = (
+                execution_root(self._ml_object.working_dir, self.execution_rid)
+                / "downloaded-assets"
+                / asset_table
             )
-
-        if self.asset_paths and not (reload or self._dry_run):
-            self._update_asset_execution_table(
-                {"Execution_Assets": self.configuration.assets}, asset_role="Input"
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            self.asset_paths.setdefault(asset_table, []).append(
+                self.download_asset(
+                    asset_rid=asset_rid,
+                    dest_dir=dest_dir,
+                    update_catalog=not (reload or self._dry_run),
+                )
             )
 
         # Save configuration details for later upload
         cfile = self.asset_file_path(
-            "Execution_Metadata",
+            asset_name="Execution_Metadata",
             file_name="configuration.json",
             asset_types=ExecMetadataVocab.execution_config.value,
         )
@@ -331,7 +358,7 @@ class Execution:
                 self._ml_object.ml_schema
             ].Execution.update([{"RID": self.execution_rid, "Duration": duration}])
 
-    def _upload_execution_dirs(self) -> dict[str, RID]:
+    def _upload_execution_dirs(self) -> dict[str, list[AssetFilePath]]:
         """Upload execution assets at _working_dir/Execution_asset.
 
         This routine uploads the contents of the
@@ -347,16 +374,30 @@ class Execution:
 
         try:
             self.update_status(Status.running, "Uploading execution files...")
-            results = upload_directory(self._ml_object.model, self._asset_root)
+            results = upload_directory(self._model, self._asset_root)
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
 
-        asset_map = defaultdict(list)
+        asset_map = {}
         for path, status in results.items():
             asset_table, file_name = normalize_asset_dir(path)
-            asset_map[asset_table].append((file_name, status.result["RID"]))
+
+            asset_map.setdefault(asset_table, []).append(
+                AssetFilePath(
+                    asset_path=path,
+                    asset_name=asset_table,
+                    file_name=file_name,
+                    asset_metadata={
+                        k: v
+                        for k, v in status.result.items()
+                        if k in self._model.asset_metadata(asset_table.split("/")[1])
+                    },
+                    asset_types=[],
+                    asset_rid=status.result["RID"],
+                )
+            )
 
         self._update_asset_execution_table(asset_map)
         self.update_status(Status.running, "Updating features...")
@@ -371,11 +412,102 @@ class Execution:
             )
 
         self.update_status(Status.running, "Upload assets complete")
-        return results
+        return asset_map
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def download_asset(
+        self, asset_rid: RID, dest_dir: Path, update_catalog=True
+    ) -> AssetFilePath:
+        """Download an asset from a URL and place it in a local directory.
+
+        Args:
+            asset_rid: URL of the asset.
+            dest_dir: Destination directory for the asset.
+            update_catalog: Whether to update the catalog execution information after downloading.
+
+        Returns:
+            A tuple with the name of the asset table and a Path object to the downloaded asset.
+        """
+
+        asset_table = self._ml_object.resolve_rid(asset_rid).table
+        if not self._model.is_asset(asset_table):
+            raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
+
+        asset_record = self._ml_object.retrieve_rid(asset_rid)
+        asset_metadata = {
+            k: v
+            for k, v in asset_record.items()
+            if k in self._model.asset_metadata(asset_table)
+        }
+        asset_url = asset_record["URL"]
+        asset_filename = dest_dir / asset_record["Filename"]
+        hs = HatracStore("https", self._ml_object.host_name, self._ml_object.credential)
+        hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
+
+        asset_type_table = self._model.find_association(asset_table, MLVocab.asset_type)
+        type_path = self._ml_object.pathBuilder.schemas[
+            asset_type_table.schema.name
+        ].tables[asset_type_table.name]
+        asset_types = [
+            asset_type[MLVocab.asset_type.value]
+            for asset_type in type_path.filter(
+                type_path.columns[asset_table.name] == asset_rid
+            )
+            .attributes(type_path.Asset_Type)
+            .fetch()
+        ]
+
+        asset_path = AssetFilePath(
+            file_name=asset_filename,
+            asset_rid=asset_rid,
+            asset_path=asset_filename,
+            asset_metadata=asset_metadata,
+            asset_name=asset_table.name,
+            asset_types=asset_types,
+        )
+
+        if update_catalog:
+            self._update_asset_execution_table(
+                {f"{asset_table.schema.name}/{asset_table.name}": [asset_path]},
+                asset_role="Input",
+            )
+        return asset_path
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def upload_assets(
+        self,
+        assets_dir: str | Path,
+    ) -> dict[Any, FileUploadState] | None:
+        """Upload assets from a directory.
+
+        This routine assumes that the current upload specification includes a configuration for the specified directory.
+        Every asset in the specified directory is uploaded
+
+        Args:
+            assets_dir: Directory containing the assets to upload.
+
+        Returns:
+            Results of the upload operation.
+
+        Raises:
+            DerivaMLException: If there is an issue uploading the assets.
+        """
+
+        def path_to_asset(path: str) -> str:
+            """Pull the asset name out of a path to that asset in the filesystem"""
+            components = path.split("/")
+            return components[
+                components.index("asset") + 2
+            ]  # Look for asset in the path to find the name
+
+        if not self._model.is_asset(Path(assets_dir).name):
+            raise DerivaMLException("Directory does not have name of an asset table.")
+        results = upload_directory(self._model, assets_dir)
+        return {path_to_asset(p): r for p, r in results.items()}
 
     def upload_execution_outputs(
         self, clean_folder: bool = True
-    ) -> dict[str, FileUploadState]:
+    ) -> dict[str, AssetFilePath]:
         """Upload all the assets and metadata associated with the current execution.
 
         This will include any new assets, features, or table values.
@@ -423,7 +555,7 @@ class Execution:
         target_table: str,
         feature_name: str,
         feature_file: str | Path,
-        uploaded_files: dict[str, tuple[str, RID]],
+        uploaded_files: dict[str, list[AssetFilePath]],
     ) -> None:
         """
 
@@ -442,6 +574,7 @@ class Execution:
             ).feature.asset_columns
         ]
 
+        # Get the names of the columns in the feature that are assets.
         asset_columns = [
             c.name
             for c in self._ml_object.feature_record_class(
@@ -453,7 +586,7 @@ class Execution:
             target_table, feature_name
         ).feature.feature_table.name
         asset_map = {
-            (asset_table, asset[0]): asset[1]
+            (asset_table, asset.file_name): asset.asset_rid
             for asset_table, assets in uploaded_files.items()
             for asset in assets
         }
@@ -474,7 +607,7 @@ class Execution:
 
     def _update_asset_execution_table(
         self,
-        uploaded_assets: dict[str, list[str, RID]],
+        uploaded_assets: dict[str, list[AssetFilePath]],
         asset_role: str = "Output",
     ):
         """Add entry to association table connecting an asset to an execution RID
@@ -484,7 +617,6 @@ class Execution:
                 newly added assets to that table.
              asset_role: A term or list of terms from the Asset_Role vocabulary.
         """
-
         # Make sure  the asset role is in the controlled vocabulary table.
         self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
 
@@ -493,46 +625,48 @@ class Execution:
             asset_table_name = asset_table.split("/")[
                 1
             ]  # Peel off the schema from the asset table
-            asset_exe = self._ml_object.model.find_association(
-                asset_table_name, "Execution"
-            )
-            asset_asset_type = self._ml_object.model.find_association(
-                asset_table_name, "Asset_Type"
-            )
+            asset_exe = self._model.find_association(asset_table_name, "Execution")
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
             asset_exe_path.insert(
                 [
                     {
-                        asset_table_name: rid,
+                        asset_table_name: asset_path.asset_rid,
                         "Execution": self.execution_rid,
                         "Asset_Role": asset_role,
                     }
-                    for _, rid in asset_list
+                    for asset_path in asset_list
                 ]
             )
 
             # Now add in the type names via the asset_asset_type association table.
             # Get the list of types for each file in the asset.
+            if asset_role == "Input":
+                return
             asset_type_map = {}
             with open(
                 asset_type_path(
                     self._working_dir,
                     self.execution_rid,
-                    self._ml_object.model.name_to_table(asset_table_name),
+                    self._model.name_to_table(asset_table_name),
                 ),
                 "r",
             ) as f:
                 for line in f:
                     asset_type_map.update(json.loads(line.strip()))
+            for asset_path in asset_list:
+                asset_path.asset_types = asset_type_map[asset_path.file_name]
 
+            asset_asset_type = self._model.find_association(
+                asset_table_name, "Asset_Type"
+            )
             type_path = pb.schemas[asset_asset_type.schema.name].tables[
                 asset_asset_type.name
             ]
             type_path.insert(
                 [
-                    {asset_table_name: rid, "Asset_Type": t}
-                    for file_name, rid in asset_list
-                    for t in asset_type_map[file_name]
+                    {asset_table_name: asset.asset_rid, "Asset_Type": t}
+                    for asset in asset_list
+                    for t in asset_type_map[asset.file_name]
                 ]
             )
 
@@ -560,21 +694,38 @@ class Execution:
         Raises:
             DerivaException: If the asset type is not defined.
         """
-        if not self._ml_object.model.is_asset(asset_name):
+        if not self._model.is_asset(asset_name):
             DerivaMLException(f"Table {asset_name} is not an asset")
 
+        asset_table = self._model.name_to_table(asset_name)
+
         asset_types = asset_types or kwargs.get("Asset_Type", None) or asset_name
-        asset_type = [asset_types] if isinstance(asset_types, str) else asset_types
-        for t in asset_type:
+        asset_types = [asset_types] if isinstance(asset_types, str) else asset_types
+        for t in asset_types:
             self._ml_object.lookup_term(MLVocab.asset_type, t)
 
-        return AssetFilePath(
+        asset_path = asset_file_path(
             self._working_dir,
             self.execution_rid,
-            self._ml_object.model.name_to_table(asset_name),
+            self._model.name_to_table(asset_name),
             file_name,
-            asset_types,
-            **kwargs,
+            metadata=kwargs,
+        )
+
+        # Persist the asset types into a file
+        with open(
+            asset_type_path(self._working_dir, self.execution_rid, asset_table),
+            "a",
+            encoding="utf-8",
+        ) as f:
+            f.write(json.dumps({file_name: asset_types}) + "\n")
+
+        return AssetFilePath(
+            asset_path=asset_path,
+            asset_name=asset_name,
+            file_name=file_name,
+            asset_metadata=kwargs,
+            asset_types=asset_types,
         )
 
     def table_path(self, table: str) -> Path:
@@ -586,10 +737,7 @@ class Execution:
         Returns:
             Pathlib path to the file in which to place table values.
         """
-        if (
-            table
-            not in self._ml_object.model.schemas[self._ml_object.domain_schema].tables
-        ):
+        if table not in self._model.schemas[self._ml_object.domain_schema].tables:
             raise DerivaMLException(
                 "Table '{}' not found in domain schema".format(table)
             )

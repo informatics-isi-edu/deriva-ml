@@ -84,6 +84,13 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     ml_instance.add_dataset_element_type("Image")
 
     type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
+    training_rid = ml_instance.add_term(
+        "Dataset_Type", "Training", description="A traing set"
+    )
+    testing_rid = ml_instance.add_term(
+        "Dataset_Type", "Testing", description="A testing set"
+    )
+
     table_path = (
         ml_instance.catalog.getPathBuilder()
         .schemas[ml_instance.domain_schema]
@@ -94,7 +101,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     dataset_rids = []
     for r in subject_rids[0:4]:
         d = ml_instance.create_dataset(
-            type_rid.name,
+            type=[type_rid.name, "Testing"],
             description=f"Dataset {r}",
             version=DatasetVersion(1, 0, 0),
         )
@@ -104,7 +111,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     nested_datasets = []
     for i in range(0, 4, 2):
         nested_dataset = ml_instance.create_dataset(
-            type_rid.name,
+            type=[type_rid.name, "Training"],
             description=f"Nested Dataset {i}",
             version=DatasetVersion(1, 0, 0),
         )

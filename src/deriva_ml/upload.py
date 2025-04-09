@@ -457,33 +457,3 @@ def asset_type_path(prefix: Path | str, exec_rid: RID, asset_table: Table) -> Pa
     )
     path.mkdir(parents=True, exist_ok=True)
     return path / f"{asset_table.name}.jsonl"
-
-
-class AssetFilePath(type(Path())):
-    """Derived class of Path that also includes information about the asset type."""
-
-    def __new__(
-        cls,
-        prefix,
-        execution_rid: RID,
-        asset_table: Table,
-        file_name: str,
-        asset_types: list[str] | str,
-        **kwargs,
-    ):
-        obj = super().__new__(
-            cls,
-            asset_file_path(
-                prefix, execution_rid, asset_table, file_name, metadata=kwargs
-            ),
-        )
-        obj.asset_types = (
-            asset_types if isinstance(asset_types, list) else [asset_types]
-        )
-
-        # Persist the asset types into a file
-        with open(
-            asset_type_path(prefix, execution_rid, asset_table), "a", encoding="utf-8"
-        ) as f:
-            f.write(json.dumps({file_name: obj.asset_types}) + "\n")
-        return obj
