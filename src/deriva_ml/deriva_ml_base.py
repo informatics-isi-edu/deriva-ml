@@ -43,7 +43,6 @@ from .dataset_bag import DatasetBag
 from .deriva_model import DerivaModel
 from .upload import table_path, execution_rids, asset_file_path
 from .deriva_definitions import ColumnDefinition
-from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import (
     RID,
     Status,
@@ -450,7 +449,6 @@ class DerivaML(Dataset):
         try:
             return self.catalog.resolve_rid(rid, self.model.model)
         except KeyError as _e:
-            ic(_e)
             raise DerivaMLException(f"Invalid RID {rid}")
 
     def retrieve_rid(self, rid: RID) -> dict[str, Any]:
@@ -1256,9 +1254,6 @@ class DerivaML(Dataset):
             exec_rid=execution_rid,
             file_name="configuration.json",
             asset_table=self.model.name_to_table("Execution_Metadata"),
-            metadata={
-                "Execution_Metadata_Type": ExecMetadataVocab.execution_config.value
-            },
         )
         configuration = ExecutionConfiguration.load_configuration(cfile)
         return Execution(configuration, self, reload=execution_rid)

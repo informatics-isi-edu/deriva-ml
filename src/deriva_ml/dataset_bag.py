@@ -168,7 +168,7 @@ class DatasetBag:
                 yield dict(zip(col_names, row))
 
     @validate_call
-    def list_dataset_members(self, recurse: bool = False) -> dict[str, list[tuple]]:
+    def list_dataset_members(self, recurse: bool = False) -> dict[str, dict[str, Any]]:
         """Return a list of entities associated with a specific _dataset_table.
 
         Args:
@@ -206,12 +206,19 @@ class DatasetBag:
             )
 
             with self.database as db:
+                col_names = [
+                    c[1]
+                    for c in db.execute(f'PRAGMA table_info("{sql_target}")').fetchall()
+                ]
+                select_cols = ",".join([f'"{sql_target}".{c}' for c in col_names])
                 sql_cmd = (
-                    f'SELECT * FROM "{sql_member}" '
+                    f'SELECT {select_cols} FROM "{sql_member}" '
                     f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
                     f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
                 )
-                target_entities = db.execute(sql_cmd).fetchall()
+                target_entities = [
+                    dict(zip(col_names, e)) for e in db.execute(sql_cmd).fetchall()
+                ]
                 members[target_table.name].extend(target_entities)
 
             target_entities = []  # path.entities().fetch()

@@ -53,7 +53,19 @@ except ImportError:
 
 
 class AssetFilePath(type(Path())):
-    """Derived class of Path that also includes information about a downloaded."""
+    """Derived class of Path that also includes information about a downloaded.
+
+    An AssetFilePath has all  the methods associated with a pathlib.Path object. In addition, it defines additional
+    attributes associated with a DerviaML asset.
+
+    Attributes:
+        asset_types: A list of the types associated with this asset.  From the Asset_Type controlled vocabulary.
+        asset_metadata: A dictionary of names and values of any additional columns  associated with this asset.
+        asset_name: The name of the asset table
+        file_name: The name of the file in the local file system that has the asset contents
+        asset_rid: The RID of the asset if it has been uploaded into an asset table
+    """
+
 
     def __new__(
         cls,
@@ -117,8 +129,8 @@ class Execution:
         """
 
         Args:
-            configuration:
-            ml_object:
+            configuration: Execution configuration object that describes the execution.
+            ml_object: The DerivaML instance that created the execution.
             reload: RID of previously initialized execution object.
         """
         self.asset_paths: list[Path] = []
@@ -157,7 +169,6 @@ class Execution:
                 )
 
         for d in self.configuration.datasets:
-            ic(d.rid)
             if self._ml_object.resolve_rid(d.rid).table.name != "Dataset":
                 raise DerivaMLException(
                     "Dataset specified in execution configuration is not a dataset"
@@ -218,6 +229,7 @@ class Execution:
             )
             self.datasets.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
+
         # Update execution info
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         if self.dataset_rids and not (reload or self._dry_run):
@@ -809,9 +821,13 @@ class Execution:
         Add new elements to an existing dataset. In addition to adding new members, the minor version number of the
         dataset is incremented and the description, if provide is applied to that new version.
 
+        The RIDs in the list to not have to be all from the same table, but they must be from a table that has
+        been configured to be a dataset element type.
+
         Args:
             dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
-            members: List of RIDs of members to add to the  dataset_table.
+            members: List of RIDs of members to add to the  dataset_table. RID must be to a table type that is a
+                dataset element type (see DerivaML.add_dataset_element_type).
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             description: Markdown description of the updated dataset.
         """
