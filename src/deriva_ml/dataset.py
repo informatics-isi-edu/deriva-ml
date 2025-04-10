@@ -805,7 +805,7 @@ class Dataset:
             dataset_elements = [
                 snapshot_catalog._model.name_to_table(e)
                 for e, m in snapshot_catalog.list_dataset_members(
-                    dataset_rid=dataset_rid, limit=1
+                    dataset_rid=dataset_rid,  #  limit=1  Limit seems to make things run slow.
                 ).items()
                 if m
             ]
