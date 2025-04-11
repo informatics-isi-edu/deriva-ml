@@ -17,7 +17,6 @@ Dataset types are assigned from a controlled vocabulary called `MLVocab.dataset_
 as you need:
 ```
 from deriva_ml import MLVocab
-...
 ml_instance.add_term(MLVocab.dataset_type, "DemoSet", description="A test dataset_table")
 ```
 When you create a dataset, you can provide as many dataset types as required to streamline orginizing and discovering
@@ -30,7 +29,6 @@ Its important to know how a dataset was created, so the most common way to creat
 # Now lets create model configuration for our program.
 api_workflow = Workflow(
     name="API Workflow",
-    url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/Notebooks/DerivaML%20Dataset.ipynb",
     workflow_type="Create Dataset Notebook"
 )
 
