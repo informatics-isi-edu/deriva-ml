@@ -66,7 +66,6 @@ class AssetFilePath(type(Path())):
         asset_rid: The RID of the asset if it has been uploaded into an asset table
     """
 
-
     def __new__(
         cls,
         asset_path,
@@ -696,8 +695,8 @@ class Execution:
 
         Args:
             asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
-            asset_types: Type of asset to be uploaded.  Defaults to name of the asset.
             file_name: Name of file to be uploaded.
+            asset_types: Type of asset to be uploaded.  Defaults to name of the asset.
             **kwargs: Any additional metadata values that may be part of the asset table.
 
         Returns:

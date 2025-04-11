@@ -27,6 +27,8 @@ from typing import Iterable, Optional
 class DerivaModel:
     """Augmented interface to deriva model class.
 
+    This class provides a number of DerivaML specific methods that augment the interface in the deriva model class.
+
     Attributes:
         domain_schema: Schema name for domain specific tables and relationships.
         model: ERMRest model for the catalog.
@@ -70,6 +72,10 @@ class DerivaModel:
         except IndexError:
             # No domain schema defined.
             self.domain_schema = domain_schema
+
+    def __getattr__(self, name):
+        # Called only if `name` is not found in Manager.  Delegate attributes to model class.
+        return getattr(self.model, name)
 
     def name_to_table(self, table: str | Table) -> Table:
         """Return the table object corresponding to the given table name.
@@ -129,7 +135,7 @@ class DerivaModel:
     def find_association(self, table1: Table | str, table2: Table | str) -> Table:
         """Given two tables, return an association table that connects the two.
 
-        Raises"
+        Raises:
             DerivaML exception if there is either not an association table or more than one association table.
         """
         table1 = self.name_to_table(table1)
@@ -138,7 +144,7 @@ class DerivaModel:
         tables = [
             a.table
             for a in table1.find_associations(pure=False)
-            if (t := a.other_fkeys.pop().pk_table) == table2
+            if a.other_fkeys.pop().pk_table == table2
         ]
         if len(tables) == 1:
             return tables[0]

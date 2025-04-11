@@ -232,12 +232,10 @@ class Dataset:
         """Increment the version of the specified dataset_table.
 
         Args:
-          dataset_rid: RID to a dataset_table
-          component: Which version of the dataset_table to increment.
-          dataset_rid: RID of the dataset whose version is to be incremented.
-          component: Major, Minor or Patch
-          description: Description of the version update of the dataset_table.
-          execution_rid: Which execution is performing increment.
+            dataset_rid: RID of the dataset whose version is to be incremented.
+            component: Which version of the dataset_table to increment. Major, Minor or Patch
+            description: Description of the version update of the dataset_table.
+            execution_rid: Which execution is performing increment.
 
         Returns:
           new semantic version of the dataset_table as a 3-tuple
@@ -275,9 +273,6 @@ class Dataset:
             description: Description of the dataset_table.
             execution_rid: Execution under which the dataset_table will be created.
             version: Version of the dataset_table.
-            type: str | list[str]:
-            description: str:
-
 
         Returns:
             New dataset_table RID.
@@ -349,7 +344,6 @@ class Dataset:
         Args:
             dataset_rid: RID of the dataset_table to delete.
             recurse: If True, delete the dataset_table along with any nested datasets. (Default value = False)
-            dataset_rid: RID:
         """
         # Get association table entries for this dataset_table
         # Delete association table entries
@@ -439,8 +433,7 @@ class Dataset:
         routine makes it possible to add objects from the specified table to a dataset_table.
 
         Args:
-            element: Name or the table or table object that is to be added to the dataset_table.
-            element: str | Table:
+            element: Name of the table or table object that is to be added to the dataset_table.
 
         Returns:
             The table object that was added to the dataset_table.
@@ -464,7 +457,6 @@ class Dataset:
 
         Args:
             dataset_rid: param recurse: If this is a nested dataset_table, list the members of the contained datasets
-            dataset_rid: RID:
             recurse:  (Default value = False)
             limit: If provided, the maximum number of members to return for each element type.
 
@@ -677,7 +669,6 @@ class Dataset:
 
         Args:
             dataset_rid: return: RID of the parent dataset_table.
-            dataset_rid: RID:
 
         Returns:
             RID of the parent dataset_table.

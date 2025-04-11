@@ -326,7 +326,6 @@ class DerivaML(Dataset):
         """Return a local file path in which to place a CSV to add values to a table on upload.
 
         Args:
-          table: return:
           table: str | Table:
 
         Returns:
@@ -1240,6 +1239,7 @@ class DerivaML(Dataset):
     # @validate_call
     def restore_execution(self, execution_rid: Optional[RID] = None) -> "Execution":
         """Return an Execution object for a previously started execution with the specified RID."""
+
         from .execution import Execution
 
         # Find path to execution
