@@ -448,7 +448,7 @@ def asset_type_path(prefix: Path | str, exec_rid: RID, asset_table: Table) -> Pa
         asset_table: Table in which to place assets.
 
     Returns:
-        Path to the file in which to place asset_type values for the named asset..
+        Path to the file in which to place asset_type values for the named asset.
     """
     path = (
         execution_root(prefix, exec_rid=exec_rid)

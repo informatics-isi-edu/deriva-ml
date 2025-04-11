@@ -75,6 +75,17 @@ class AssetFilePath(type(Path())):
         asset_types: list[str] | str,
         asset_rid: Optional[RID] = None,
     ):
+        """
+        Create a new Path object that has additional information related to the use of this path as an asset.
+
+        Args:
+            asset_path: Local path to the location of the asset.
+            asset_name:  The name of the asset in the catalog (e.g. the asset table name).
+            file_name:  Name of the local file that contains the contents of the asset.
+            asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
+            asset_types:  A list of terms from the Asset_Type controlled vocabulary.
+            asset_rid:  The RID of the asset if it has been uploaded into an asset table
+        """
         obj = super().__new__(cls, asset_path)
         obj.asset_types = (
             asset_types if isinstance(asset_types, list) else [asset_types]
@@ -132,7 +143,7 @@ class Execution:
             ml_object: The DerivaML instance that created the execution.
             reload: RID of previously initialized execution object.
         """
-        self.asset_paths: list[Path] = []
+        self.asset_paths: list[AssetFilePath] = []
         self.configuration = configuration
         self._ml_object = ml_object
         self._model = ml_object.model
@@ -140,7 +151,7 @@ class Execution:
         self.start_time = None
         self.stop_time = None
         self.status = Status.created
-        self.uploaded_assets: list[Path] = []
+        self.uploaded_assets: Optional[dict[str, list[AssetFilePath]]] = None
         self.configuration.argv = sys.argv
 
         self.dataset_rids: list[RID] = []
@@ -151,6 +162,7 @@ class Execution:
         self._cache_dir = self._ml_object.cache_dir
         self._dry_run = dry_run
 
+        # Make sure we have a good workflow.
         if isinstance(self.configuration.workflow, Workflow):
             self.workflow_rid = (
                 self._ml_object.add_workflow(self.configuration.workflow)
@@ -167,6 +179,7 @@ class Execution:
                     "Workflow specified in execution configuration is not a Workflow"
                 )
 
+        # Validate the datasets and assets to be valid.
         for d in self.configuration.datasets:
             if self._ml_object.resolve_rid(d.rid).table.name != "Dataset":
                 raise DerivaMLException(
@@ -386,7 +399,8 @@ class Execution:
         try:
             self.update_status(Status.running, "Uploading execution files...")
             results = upload_directory(self._model, self._asset_root)
-        except Exception as e:
+            print(results)
+        except RuntimeError as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
@@ -518,7 +532,7 @@ class Execution:
 
     def upload_execution_outputs(
         self, clean_folder: bool = True
-    ) -> dict[str, AssetFilePath]:
+    ) -> dict[str, list[AssetFilePath]]:
         """Upload all the assets and metadata associated with the current execution.
 
         This will include any new assets, features, or table values.
@@ -534,11 +548,11 @@ class Execution:
         if self._dry_run:
             return {}
         try:
-            uploaded_assets = self._upload_execution_dirs()
+            self.uploaded_assets = self._upload_execution_dirs()
             self.update_status(Status.completed, "Successfully end the execution.")
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)
-            return uploaded_assets
+            return self.uploaded_assets
         except Exception as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)

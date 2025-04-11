@@ -391,7 +391,7 @@ class Dataset:
             filtered_path = dataset_path
         else:
             filtered_path = dataset_path.filter(
-                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)
+                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)  # noqa: E712
             )
 
         # Get a list of all the dataset_type values associated with this dataset_table.

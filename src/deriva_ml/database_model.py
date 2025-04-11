@@ -1,4 +1,4 @@
-"""Ths module contains the definition of the DatabaseModel class.  The role of this class is to provide an nterface between the BDBag representation
+"""Ths module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface between the BDBag representation
 of a dataset and a sqllite database in which the contents of the bag are stored.
 """
 
@@ -51,7 +51,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     appear in more than one database. To help manage this, a global list of all the datasets that have been loaded
     into DatabaseModels, is kept in the class variable `_rid_map`.
 
-    Because you can load diffent versions of a dataset simultaniously, the dataset RID and version number are tracked, and a new
+    Because you can load different versions of a dataset simultaneously, the dataset RID and version number are tracked, and a new
     sqllite instance is created for every new dataset version present.
 
     Attributes:
@@ -290,6 +290,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         return DatasetBag(self, dataset_rid or self.dataset_rid)
 
     def dataset_version(self, dataset_rid: Optional[RID] = None) -> DatasetVersion:
+        """Return the version of the specified dataset."""
         if dataset_rid and dataset_rid not in self.bag_rids:
             DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
         return self.bag_rids[dataset_rid]
