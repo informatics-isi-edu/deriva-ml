@@ -9,3 +9,4 @@ The script release.sh will create a new release tag in GitHub.  This script requ
 GitHUB CLI be installed. 
 
 See [https://cli.github.com](https://cli.github.com) for instructions on how to install and configure the CLI.
+

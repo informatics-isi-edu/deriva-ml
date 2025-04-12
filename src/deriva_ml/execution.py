@@ -277,7 +277,7 @@ class Execution:
             file_name="configuration.json",
             asset_types=ExecMetadataVocab.execution_config.value,
         )
-        with open(cfile, "w", encoding="utf-8") as config_file:
+        with open(cfile.as_posix(), "w", encoding="utf-8") as config_file:
             json.dump(self.configuration.model_dump(), config_file)
 
         # save runtime env
@@ -738,14 +738,15 @@ class Execution:
         for t in asset_types:
             self._ml_object.lookup_term(MLVocab.asset_type, t)
 
+        file_name = Path(file_name)
         asset_path = asset_file_path(
             self._working_dir,
             self.execution_rid,
             self._model.name_to_table(asset_name),
-            file_name,
+            file_name.name,
             metadata=kwargs,
         )
-        file_name = Path(file_name)
+
         if file_name.exists():
             if copy_file:
                 asset_path.write_bytes(file_name.read_bytes())
@@ -758,12 +759,12 @@ class Execution:
             "a",
             encoding="utf-8",
         ) as f:
-            f.write(json.dumps({file_name: asset_types}) + "\n")
+            f.write(json.dumps({file_name.name: asset_types}) + "\n")
 
         return AssetFilePath(
             asset_path=asset_path,
             asset_name=asset_name,
-            file_name=file_name,
+            file_name=file_name.name,
             asset_metadata=kwargs,
             asset_types=asset_types,
         )
