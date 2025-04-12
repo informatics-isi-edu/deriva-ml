@@ -700,11 +700,21 @@ class Execution:
         asset_name: str,
         file_name: str,
         asset_types: Optional[list[str] | str] = None,
+        copy_file=False,
         **kwargs,
     ) -> AssetFilePath:
         """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
 
-        These files are uploaded as part of the upload_execution method in DerivaML class.
+        Given the name of an asset table, and a file name, register the file for upload, and return a path to that
+        file in the upload directory.  In addition to the filename, additioal asset metadata and file asset types may
+        be specified.
+
+        This routine has three modes, depending on if file_name refers to an existing file.  If it doesn't, a path
+        to a new file with the specified name is returned.  The caller can then open that file for writing.
+
+        If the provided filename refers to an existing file and the copy_file argument is False (the default), then the
+        returned path contains a symbolic link to that file.  If the copy_file argument is True then the contents of
+        file_name are copied into the target directory.
 
         Args:
             asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
@@ -735,6 +745,12 @@ class Execution:
             file_name,
             metadata=kwargs,
         )
+        file_name = Path(file_name)
+        if file_name.exists():
+            if copy_file:
+                asset_path.write_bytes(file_name.read_bytes())
+            else:
+                asset_path.symlink_to(file_name)
 
         # Persist the asset types into a file
         with open(
@@ -772,6 +788,7 @@ class Execution:
 
     def execute(self) -> Execution:
         """Initiate an execution with provided configuration. Can be used in a context manager."""
+        self.execution_start()
         return self
 
     @validate_call
