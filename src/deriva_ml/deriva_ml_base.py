@@ -265,10 +265,13 @@ class DerivaML(Dataset):
             is_notebook = True
         else:
             stack = inspect.stack()
+            # Get the caller's filename, which is two up the stack from here.
             if len(stack) > 1:
-                filename = Path(
-                    stack[2].filename
-                )  # Get the caller's filename, which is two up the stack from here.
+                filename = Path(stack[2].filename)
+                if not filename.exists():
+                    # Begin called from command line interpreter.
+                    filename = "REPL"
+                # Get the caller's filename, which is two up the stack from here.
             else:
                 raise DerivaMLException(
                     "Looking for caller failed"
@@ -1142,13 +1145,17 @@ class DerivaML(Dataset):
             if self._is_notebook
             else f"git hash-object {self.executable_path}"
         )
-        checksum = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            shell=True,
-        ).stdout.strip()
+        checksum = (
+            subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                shell=True,
+            ).stdout.strip()
+            if self.executable_path != "REPL"
+            else "1"
+        )
 
         return Workflow(
             name=name,
@@ -1171,6 +1178,8 @@ class DerivaML(Dataset):
         """
 
         # Get repo URL from local gitHub repo.
+        if self.executable_path == "REPL":
+            return "REPL", True
         try:
             result = subprocess.run(
                 ["git", "remote", "get-url", "origin"],
