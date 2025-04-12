@@ -244,7 +244,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                     "Length": "{file_size}",
                     "Filename": "{file_name}",
                 },
-                "asset_type": "fetch",
+                "asset_type": "file",
                 "target_table": ["{schema}", "{asset_table}"],
                 "file_pattern": asset_path_regex
                 + "/"
