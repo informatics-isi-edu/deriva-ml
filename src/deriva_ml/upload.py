@@ -212,6 +212,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
         }
         | {c: f"{{{c}}}" for c in metadata_columns},
         "file_pattern": asset_path,  # Sets schema, asset_table, file_name, file_ext
+        "asset_type": "file",
         "target_table": [schema, asset_table.name],
         "checksum_types": ["sha256", "md5"],
         "hatrac_options": {"versioned_urls": True},
