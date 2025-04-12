@@ -193,11 +193,7 @@ class DerivaML(Dataset):
             pass
 
     def _check_nbstrip_status(self) -> None:
-        """Figure out if you are running in a Jupyter notebook
-
-        Returns:
-            A Path to the notebook file that is currently being executed.
-        """
+        """Check to see if nbstrip is installed"""
         try:
             if subprocess.run(
                 ["nbstripout", "--is-installed"],

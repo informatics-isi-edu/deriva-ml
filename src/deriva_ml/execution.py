@@ -651,6 +651,7 @@ class Execution:
             ]  # Peel off the schema from the asset table
             asset_exe = self._model.find_association(asset_table_name, "Execution")
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
+
             asset_exe_path.insert(
                 [
                     {
@@ -706,7 +707,7 @@ class Execution:
         """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
 
         Given the name of an asset table, and a file name, register the file for upload, and return a path to that
-        file in the upload directory.  In addition to the filename, additioal asset metadata and file asset types may
+        file in the upload directory.  In addition to the filename, additional asset metadata and file asset types may
         be specified.
 
         This routine has three modes, depending on if file_name refers to an existing file.  If it doesn't, a path
