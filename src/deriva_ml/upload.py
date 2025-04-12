@@ -216,10 +216,10 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
         "checksum_types": ["sha256", "md5"],
         "hatrac_options": {"versioned_urls": True},
         "hatrac_templates": {
-            "hatrac_uri": f"/hatrac/{asset_table.name}/{{md5}}.{{file_name}}",
+            "hatrac_uri": f"/hatrac/{asset_table.name}/{{md5}}.{{file_name}}.{{file_ext}}",
             "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
         },
-        "record_query_template": "/entity/{target_table}/MD5={{md5}}&Filename={{file_name}}",
+        "record_query_template": "/entity/{target_table}/MD5={{md5}}&Filename={file_name}.{file_ext}",
     }
 
 
@@ -252,10 +252,10 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                 "checksum_types": ["sha256", "md5"],
                 "hatrac_options": {"versioned_urls": True},
                 "hatrac_templates": {
-                    "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
+                    "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}.{file_ext}",
                     "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
                 },
-                "record_query_template": "/entity/{target_table}/MD5={{md5}}&Filename={{file_name}}",
+                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}.{file_ext}",
             },
             # {
             #  Upload the records into a  table

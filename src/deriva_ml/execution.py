@@ -399,7 +399,6 @@ class Execution:
         try:
             self.update_status(Status.running, "Uploading execution files...")
             results = upload_directory(self._model, self._asset_root)
-            print(results)
         except RuntimeError as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
