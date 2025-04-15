@@ -10,6 +10,7 @@ import json
 import logging
 import os
 from pathlib import Path
+
 from pydantic import validate_call, ConfigDict
 import regex as re
 import sys
@@ -20,7 +21,14 @@ from deriva.core import format_exception
 from deriva.core.datapath import DataPathException
 from deriva.core.hatrac_store import HatracStore
 from .deriva_definitions import ExecMetadataVocab
-from .deriva_definitions import RID, Status, FileUploadState, DerivaMLException, MLVocab
+from .deriva_definitions import (
+    RID,
+    Status,
+    FileUploadState,
+    DerivaMLException,
+    MLVocab,
+    DRY_RUN_RID,
+)
 from .deriva_ml_base import DerivaML, FeatureRecord
 from .dataset_aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from .dataset_bag import DatasetBag
@@ -168,7 +176,7 @@ class Execution:
             self.workflow_rid = (
                 self._ml_object.add_workflow(self.configuration.workflow)
                 if not self._dry_run
-                else "0000"
+                else DRY_RUN_RID
             )
         else:
             self.workflow_rid = self.configuration.workflow
@@ -196,10 +204,10 @@ class Execution:
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         if reload:
             self.execution_rid = reload
-            if self.execution_rid == "0000":
+            if self.execution_rid == DRY_RUN_RID:
                 self._dry_run = True
         elif self._dry_run:
-            self.execution_rid = "0000"
+            self.execution_rid = DRY_RUN_RID
         else:
             self.execution_rid = schema_path.Execution.insert(
                 [

@@ -41,7 +41,14 @@ from tempfile import TemporaryDirectory, NamedTemporaryFile
 from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
 
 from deriva_ml import DatasetBag
-from .deriva_definitions import ML_SCHEMA, DerivaMLException, MLVocab, Status, RID
+from .deriva_definitions import (
+    ML_SCHEMA,
+    DerivaMLException,
+    MLVocab,
+    Status,
+    RID,
+    DRY_RUN_RID,
+)
 from .history import iso_to_snap
 from .deriva_model import DerivaModel
 from .database_model import DatabaseModel
@@ -957,7 +964,7 @@ class Dataset:
             for the dataset.
         """
         if (
-            execution_rid
+            execution_rid != DRY_RUN_RID
             and self._model.catalog.resolve_rid(execution_rid).table.name != "Execution"
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")

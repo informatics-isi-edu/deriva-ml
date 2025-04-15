@@ -21,6 +21,7 @@ from pydantic import (
 from socket import gethostname
 
 ML_SCHEMA = "deriva-ml"
+DRY_RUN_RID = "0000"
 
 # We are going to use schema as a field name and this collides with method in pydantic base class
 warnings.filterwarnings(
