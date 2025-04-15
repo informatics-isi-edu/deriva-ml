@@ -74,17 +74,16 @@ feature_table_dir_regex = (
     + r"/(?P<schema>[-\w]+)/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)"
 )
 feature_value_regex = (
-    feature_table_dir_regex + r"/(?P=feature_name)[.](?P<file_ext>[(csv|json)]*)$"
+    feature_table_dir_regex + r"/(?P=feature_name)[.](?P<ext>[(csv|json)]*)$"
 )
 feature_asset_dir_regex = feature_table_dir_regex + r"/asset/(?P<asset_table>[-\w]+)"
 feature_asset_regex = (
-    feature_asset_dir_regex
-    + r"/(?P<file_name>[A-Za-z0-9_-]+)[.](?P<file_ext>[a-z0-9]*)$"
+    feature_asset_dir_regex + r"/(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
 )
 
 asset_path_regex = exec_dir_regex + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)"
 
-asset_file_regex = r"(?P<file_name>[-\w]+)[.](?P<file_ext>[a-z0-9]*)$"
+asset_file_regex = r"(?P<file>[-\w]+)[.](?P<ext>[a-z0-9]*)$"
 
 table_regex = (
     exec_dir_regex
@@ -211,16 +210,16 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
             "Filename": "{file_name}",
         }
         | {c: f"{{{c}}}" for c in metadata_columns},
-        "file_pattern": asset_path,  # Sets schema, asset_table, file_name, file_ext
+        "file_pattern": asset_path,  # Sets schema, asset_table, file
         "asset_type": "file",
         "target_table": [schema, asset_table.name],
         "checksum_types": ["sha256", "md5"],
         "hatrac_options": {"versioned_urls": True},
         "hatrac_templates": {
-            "hatrac_uri": f"/hatrac/{asset_table.name}/{{md5}}.{{file_name}}.{{file_ext}}",
-            "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+            "hatrac_uri": f"/hatrac/{asset_table.name}/{{md5}}.{{file_name}}",
+            "content-disposition": "filename*=UTF-8''{file_name}",
         },
-        "record_query_template": "/entity/{target_table}/MD5={{md5}}&Filename={file_name}.{file_ext}",
+        "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
     }
 
 
@@ -249,14 +248,14 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                 "target_table": ["{schema}", "{asset_table}"],
                 "file_pattern": asset_path_regex
                 + "/"
-                + asset_file_regex,  # Sets schema, asset_table, file_name, file_ext
+                + asset_file_regex,  # Sets schema, asset_table, name, ext
                 "checksum_types": ["sha256", "md5"],
                 "hatrac_options": {"versioned_urls": True},
                 "hatrac_templates": {
-                    "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}.{file_ext}",
-                    "content-disposition": "filename*=UTF-8''{file_name}.{file_ext}",
+                    "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
+                    "content-disposition": "filename*=UTF-8''{file_name}",
                 },
-                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}.{file_ext}",
+                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
             },
             # {
             #  Upload the records into a  table
