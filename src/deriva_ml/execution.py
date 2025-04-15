@@ -5,19 +5,20 @@ This module defined the Execution class which is used to interact with the state
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime
 import json
 import logging
 import os
-import shutil
-from datetime import datetime
 from pathlib import Path
+from pydantic import validate_call, ConfigDict
+import regex as re
+import sys
+import shutil
 from typing import Iterable, Any, Optional
 
 from deriva.core import format_exception
-from pydantic import validate_call, ConfigDict
-import sys
+from deriva.core.datapath import DataPathException
 from deriva.core.hatrac_store import HatracStore
-
 from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import RID, Status, FileUploadState, DerivaMLException, MLVocab
 from .deriva_ml_base import DerivaML, FeatureRecord
@@ -625,9 +626,20 @@ class Execution:
         with open(feature_file, "r") as feature_values:
             entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
-        self._ml_object.domain_path.tables[feature_table].insert(
-            [map_path(e) for e in entities]
-        )
+        try:
+            self._ml_object.domain_path.tables[feature_table].insert(
+                [map_path(e) for e in entities]
+            )
+        except DataPathException as e:
+            if re.match(
+                rf'DETAIL: +Key +\("Execution", +"{target_table}", +"Feature_Name"\)=\(.*\) already exists',
+                e.message,
+            ):
+                self._logger.info(
+                    f"Skipping reload of feature values for {feature_table}"
+                )
+            else:
+                raise e
 
     def _update_asset_execution_table(
         self,
@@ -652,16 +664,27 @@ class Execution:
             asset_exe = self._model.find_association(asset_table_name, "Execution")
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
 
-            asset_exe_path.insert(
-                [
-                    {
-                        asset_table_name: asset_path.asset_rid,
-                        "Execution": self.execution_rid,
-                        "Asset_Role": asset_role,
-                    }
-                    for asset_path in asset_list
-                ]
-            )
+            try:
+                asset_exe_path.insert(
+                    [
+                        {
+                            asset_table_name: asset_path.asset_rid,
+                            "Execution": self.execution_rid,
+                            "Asset_Role": asset_role,
+                        }
+                        for asset_path in asset_list
+                    ]
+                )
+            except DataPathException as e:
+                if re.match(
+                    rf'DETAIL: +Key +\("{asset_table_name}", +"Execution"\)=\(.*\) already exists',
+                    e.message,
+                ):
+                    self._logger.info(
+                        f"Skipping reload of execution assocations for {asset_table_name}"
+                    )
+                else:
+                    raise e
 
             # Now add in the type names via the asset_asset_type association table.
             # Get the list of types for each file in the asset.
@@ -687,13 +710,24 @@ class Execution:
             type_path = pb.schemas[asset_asset_type.schema.name].tables[
                 asset_asset_type.name
             ]
-            type_path.insert(
-                [
-                    {asset_table_name: asset.asset_rid, "Asset_Type": t}
-                    for asset in asset_list
-                    for t in asset_type_map[asset.file_name]
-                ]
-            )
+            try:
+                type_path.insert(
+                    [
+                        {asset_table_name: asset.asset_rid, "Asset_Type": t}
+                        for asset in asset_list
+                        for t in asset_type_map[asset.file_name]
+                    ]
+                )
+            except DataPathException as e:
+                if re.match(
+                    rf'DETAIL: +Key +\("{asset_table_name}", +"Asset_Type"\)=\(.*\) already exists',
+                    e.message,
+                ):
+                    self._logger.info(
+                        f"Skipping reload of execution asset types for {asset_table_name}"
+                    )
+                else:
+                    raise e
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def asset_file_path(
