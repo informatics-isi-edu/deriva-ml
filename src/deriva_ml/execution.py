@@ -27,6 +27,7 @@ from .deriva_definitions import (
     FileUploadState,
     DerivaMLException,
     MLVocab,
+    MLAsset,
     DRY_RUN_RID,
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
@@ -54,11 +55,11 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 try:
-    from jupyter_server.serverapp import list_running_servers
+    from IPython.display import display
 except ImportError:
 
-    def list_running_servers():
-        return []
+    def display(s):
+        print(s)
 
 
 class AssetFilePath(type(Path())):
@@ -218,6 +219,10 @@ class Execution:
                 ]
             )[0]["RID"]
 
+        if self.configuration.workflow.is_notebook:
+            # Put execution_rid into cell output so we can find it later.
+            display("Execution RID: %s", self._ml_object.cite(self.execution_rid))
+
         # Create a directory for execution rid so we can recover state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)
         self._initialize_execution(reload)
@@ -282,12 +287,15 @@ class Execution:
 
         # Save configuration details for later upload
         cfile = self.asset_file_path(
-            asset_name="Execution_Metadata",
+            asset_name=MLAsset.execution_metadata,
             file_name="configuration.json",
             asset_types=ExecMetadataVocab.execution_config.value,
         )
         with open(cfile.as_posix(), "w", encoding="utf-8") as config_file:
             json.dump(self.configuration.model_dump(), config_file)
+
+        for parameter_file in self.configuration.parameters:
+            self.asset_file_path(MLAsset.execution_assets, parameter_file)
 
         # save runtime env
         self._save_runtime_environment()
@@ -741,7 +749,7 @@ class Execution:
     def asset_file_path(
         self,
         asset_name: str,
-        file_name: str,
+        file_name: str | Path,
         asset_types: Optional[list[str] | str] = None,
         copy_file=False,
         **kwargs,

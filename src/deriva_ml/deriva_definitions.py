@@ -191,6 +191,9 @@ class MLVocab(StrEnum):
     asset_type = "Asset_Type"
     asset_role = "Asset_Role"
 
+class MLAsset(StrEnum):
+    execution_metadata = "Execution_Metadata"
+    execution_assets = "Execution_Assets"
 
 class ExecMetadataVocab(StrEnum):
     """
