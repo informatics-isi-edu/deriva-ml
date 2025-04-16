@@ -22,6 +22,7 @@ dependencies = [
      "setuptools>=64",
     "setuptools-scm<=6.0",
     "nbstripout",
+    "papermill"
 ]
 
 [tool.setuptools.package-data]
@@ -54,6 +55,8 @@ post_commit_hooks = []
 deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:main"
 deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
 deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
+deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
+
 
 [metadata]
 license = "Apache 2.0"
