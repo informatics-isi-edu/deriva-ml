@@ -8,12 +8,20 @@ import inspect
 import json
 import logging
 import os
+
 from requests import RequestException
 import requests
 import subprocess
 from typing import Optional, Any
 
-from pydantic import BaseModel, conlist, ConfigDict, field_validator, Field
+from pydantic import (
+    BaseModel,
+    conlist,
+    ConfigDict,
+    field_validator,
+    Field,
+    PrivateAttr,
+)
 from pathlib import Path
 import sys
 
@@ -48,7 +56,7 @@ except ImportError:
         return ""
 
 
-class Workflow:
+class Workflow(BaseModel):
     """A specification of a workflow.  Must have a name, URI to the workflow instance, and a type.  The workflow type
     needs to be an existing-controlled vocabulary term.
 
@@ -61,24 +69,17 @@ class Workflow:
         is_notebook: A boolean indicating whether this workflow instance is a notebook or not.
     """
 
-    def __init__(
-        self,
-        name: str,
-        url: str,
-        workflow_type: str,
-        version: Optional[str] = None,
-        description: str = None,
-        rid: Optional[RID] = None,
-        checksum: Optional[str] = None,
-    ):
-        self.name = name
-        self.url = url
-        self.workflow_type = workflow_type
-        self.version = version
-        self.description = description or ""
-        self.rid = rid
-        self.checksum = checksum
-        self.is_notebook = ".ipynb" in self.url,
+    name: str
+    url: str
+    workflow_type: str
+    version: Optional[str] = None
+    description: str = None
+    rid: Optional[RID] = None
+    checksum: Optional[str] = None
+
+    _logger: Any = PrivateAttr()
+
+    def __post_init__(self):
         self._logger = logging.getLogger("deriva_ml")
 
     @staticmethod
@@ -150,9 +151,10 @@ class Workflow:
                 pass
         return None, None
 
-    def _get_python_script(self) -> Path:
+    @staticmethod
+    def _get_python_script() -> Path:
         """Return the path to the currently executing script"""
-        if not (filename := self._get_notebook_path()):
+        if not (filename := Workflow._get_notebook_path()):
             stack = inspect.stack()
             # Get the caller's filename, which is two up the stack from here.
             if len(stack) > 1:
@@ -263,7 +265,9 @@ class Workflow:
             github_url = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
             checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
         else:
-            github_url, checksum = Workflow.get_url_and_checksum(Workflow._get_python_script())
+            github_url, checksum = Workflow.get_url_and_checksum(
+                Workflow._get_python_script()
+            )
 
         return Workflow(
             name=name,

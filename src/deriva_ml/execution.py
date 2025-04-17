@@ -219,9 +219,9 @@ class Execution:
                 ]
             )[0]["RID"]
 
-        if self.configuration.workflow.is_notebook:
+        if self.configuration.workflow.is_notebook():
             # Put execution_rid into cell output so we can find it later.
-            display("Execution RID: %s", self._ml_object.cite(self.execution_rid))
+            display(f"Execution RID: {self._ml_object.cite(self.execution_rid)}")
 
         # Create a directory for execution rid so we can recover state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)
