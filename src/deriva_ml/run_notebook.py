@@ -4,6 +4,7 @@ import json
 import os
 import papermill as pm
 from pathlib import Path
+import regex as re
 
 from deriva_ml import (
     MLVocab,
@@ -59,12 +60,14 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         os.environ["PAPERMILL_WORKFLOW_URL"] = url
         os.environ["PAPERMILL_WORKFLOW_CHECKSUM"] = checksum
 
-        with NamedTemporaryFile() as notebook_output:
-            pm.execute_notebook(input_path=notebook_file,
+        notebook_output = "foo.ipynb"
+        pm.execute_notebook(input_path=notebook_file,
                                 output_path=notebook_output,
                                 parameters=parameters)
         # look for execution rid in output.
-            execution_rid = re.search("Execution RID: []", notebook_output)
+        xecution_rid = re.search("Execution RID: ", notebook_output)
+            'asset/Execution_Assets/filename'
+            asset_type = ['Notebook_asset']
             upload.asset_file_path()
             upload_path.write_text(notebook_output.name)
             uplost_directory. upload_assets()

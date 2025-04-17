@@ -78,31 +78,36 @@ class Workflow:
         self.description = description or ""
         self.rid = rid
         self.checksum = checksum
-        self.is_notebook = False
+        self.is_notebook = ".ipynb" in self.url,
         self._logger = logging.getLogger("deriva_ml")
 
-        # self.executable_path, self._is_notebook = self._get_python_script()
-
-    def _check_nbstrip_status(self) -> None:
+    @staticmethod
+    def _check_nbstrip_status() -> None:
         """Check to see if nbstrip is installed"""
+        logger = logging.getLogger("deriva_ml")
         try:
             if subprocess.run(
                 ["nbstripout", "--is-installed"],
                 check=False,
                 capture_output=True,
             ).returncode:
-                self._logger.warning(
+                logger.warning(
                     "nbstripout is not installed in repository. Please run nbstripout --install"
                 )
         except subprocess.CalledProcessError:
-            self._logger.error("nbstripout is not found.")
+            logger.error("nbstripout is not found.")
 
-    def _get_notebook_path(self) -> Path | None:
+    @staticmethod
+    def is_notebook() -> bool:
+        return True if Workflow._get_notebook_path() else False
+
+    @staticmethod
+    def _get_notebook_path() -> Path | None:
         """Return the absolute path of the current notebook."""
 
         server, session = Workflow._get_notebook_session()
         if server and session:
-            self._check_nbstrip_status()
+            Workflow._check_nbstrip_status()
             relative_path = session["notebook"]["path"]
             # Join the notebook directory with the relative path
             return Path(server["root_dir"]) / relative_path
@@ -154,7 +159,7 @@ class Workflow:
                 filename = Path(stack[2].filename)
                 if not filename.exists():
                     # Begin called from command line interpreter.
-                    filename = "REPL"
+                    filename = Path("REPL")
                 # Get the caller's filename, which is two up the stack from here.
             else:
                 raise DerivaMLException(
@@ -234,8 +239,8 @@ class Workflow:
         except subprocess.CalledProcessError:
             return None  # Not in a git repository
 
+    @staticmethod
     def create_workflow(
-        self,
         name: str,
         workflow_type: str,
         description: str = "",
@@ -258,7 +263,7 @@ class Workflow:
             github_url = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
             checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
         else:
-            github_url, checksum = self.get_url_and_checksum(self._get_python_script())
+            github_url, checksum = Workflow.get_url_and_checksum(Workflow._get_python_script())
 
         return Workflow(
             name=name,
@@ -266,7 +271,6 @@ class Workflow:
             checksum=checksum,
             description=description,
             workflow_type=workflow_type,
-            is_notebook=executable_path.suffix == ".ipynb",
         )
 
     @staticmethod
