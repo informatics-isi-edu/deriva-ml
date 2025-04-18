@@ -24,6 +24,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
         self.parser.add_argument(
             "--file",
+            "-f",
             type=Path,
             default=None,
             help="JSON file with parameter values to inject into the notebook.",
@@ -32,7 +33,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         self.parser.add_argument(
             "--inspect",
             action="store_true",
-            help="Enable inspect mode (sets inspect=True when present).",
+            help="Display parameters information for the given notebook path.",
         )
 
         self.parser.add_argument(
@@ -43,6 +44,10 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             metavar=("KEY", "VALUE"),
             default=[],
             help="Provide a parameter name band value to inject into the notebook.",
+        )
+
+        self.parser.add_argument(
+            "--kernel", "-k", nargs=1, help="Name of kernel to run..", default=None
         )
 
     @staticmethod
@@ -80,16 +85,23 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             exit(1)
 
         # Create a workflow instance for this specific version of the script.  Return an existing workflow if one is found.
+        notebook_parameters = pm.inspect_notebook(notebook_file)
         if args.inspect:
-            for param, value in pm.inspect_notebook(notebook_file).items():
+            for param, value in notebook_parameters:
                 print(
                     f"{param}:{value['inferred_type_name']}  (default {value['default']})"
                 )
             return
         else:
-            self.run_notebook(notebook_file, parameters)
+            notebook_parameters = {
+                k: v["default"] for k, v in notebook_parameters.items()
+            } | parameters
+            print(f"Running notebook {notebook_file.name} with paremeters:")
+            for param, value in notebook_parameters.items():
+                print(f"  {param}:{value}")
+            self.run_notebook(notebook_file.resolve(), parameters, args.kernel)
 
-    def run_notebook(self, notebook_file, parameters):
+    def run_notebook(self, notebook_file, parameters, kernel=None):
         url, checksum = Workflow.get_url_and_checksum(Path(notebook_file))
         os.environ["DERIVA_ML_WORKFLOW_URL"] = url
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
@@ -100,6 +112,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 input_path=notebook_file,
                 output_path=notebook_output,
                 parameters=parameters,
+                kernel_name=kernel,
             )
             host = catalog_id = execution_rid = None
             with open(notebook_output, "r") as f:
@@ -114,9 +127,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             if not execution_rid:
                 print("Execution RID not found.")
                 exit(1)
-            print("Execution RID:", execution_rid)
-            print("Host:", host)
-            print("Catalog ID:", catalog_id)
+            print("Uploaded notebook output for Execution RID:", execution_rid)
 
             ml_instance = DerivaML(hostname=host, catalog_id=catalog_id)
             ml_instance.add_term(
@@ -133,8 +144,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             execution.upload_execution_outputs()
 
 
-if __name__ == "__main__":
+def main():
     cli = DerivaMLRunNotebookCLI(
         description="Deriva ML Execution Script Demo", epilog=""
     )
     cli.main()
+
+
+if __name__ == "__main__":
+    main()
