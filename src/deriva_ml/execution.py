@@ -55,11 +55,14 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 try:
-    from IPython.display import display
+    from IPython.display import display, Markdown
 except ImportError:
 
     def display(s):
         print(s)
+
+    def Markdown(s):
+        return s
 
 
 class AssetFilePath(type(Path())):
@@ -219,9 +222,14 @@ class Execution:
                 ]
             )[0]["RID"]
 
-        if self.configuration.workflow.is_notebook():
+        if (
+            isinstance(self.configuration.workflow, Workflow)
+            and self.configuration.workflow.is_notebook
+        ):
             # Put execution_rid into cell output so we can find it later.
-            display(f"Execution RID: {self._ml_object.cite(self.execution_rid)}")
+            display(
+                Markdown(f"Execution RID: {self._ml_object.cite(self.execution_rid)}")
+            )
 
         # Create a directory for execution rid so we can recover state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)
@@ -286,19 +294,20 @@ class Execution:
             )
 
         # Save configuration details for later upload
-        cfile = self.asset_file_path(
-            asset_name=MLAsset.execution_metadata,
-            file_name="configuration.json",
-            asset_types=ExecMetadataVocab.execution_config.value,
-        )
-        with open(cfile.as_posix(), "w", encoding="utf-8") as config_file:
-            json.dump(self.configuration.model_dump(), config_file)
+        if not reload:
+            cfile = self.asset_file_path(
+                asset_name=MLAsset.execution_metadata,
+                file_name="configuration.json",
+                asset_types=ExecMetadataVocab.execution_config.value,
+            )
+            with open(cfile.as_posix(), "w", encoding="utf-8") as config_file:
+                json.dump(self.configuration.model_dump(), config_file)
 
-        for parameter_file in self.configuration.parameters:
-            self.asset_file_path(MLAsset.execution_assets, parameter_file)
+            for parameter_file in self.configuration.parameters:
+                self.asset_file_path(MLAsset.execution_assets, parameter_file)
 
-        # save runtime env
-        self._save_runtime_environment()
+            # save runtime env
+            self._save_runtime_environment()
 
         self.start_time = datetime.now()
         self.update_status(Status.pending, "Initialize status finished.")

@@ -18,10 +18,12 @@ from pathlib import Path
 import requests
 
 from typing import Optional, Any, Iterable, TYPE_CHECKING
+
 from deriva.core import (
     get_credential,
     urlquote,
-    format_exception, DEFAULT_SESSION_CONFIG
+    format_exception,
+    DEFAULT_SESSION_CONFIG,
 )
 import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException
@@ -1029,6 +1031,15 @@ class DerivaML(Dataset):
             exec_rid=execution_rid,
             file_name="configuration.json",
             asset_table=self.model.name_to_table("Execution_Metadata"),
+            metadata={},
         )
-        configuration = ExecutionConfiguration.load_configuration(cfile)
+
+        if cfile.exists():
+            configuration = ExecutionConfiguration.load_configuration(cfile)
+        else:
+            execution = self.retrieve_rid(execution_rid)
+            configuration = ExecutionConfiguration(
+                workflow=execution["Workflow"],
+                description=execution["Description"],
+            )
         return Execution(configuration, self, reload=execution_rid)

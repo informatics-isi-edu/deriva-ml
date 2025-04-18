@@ -14,6 +14,7 @@ __all__ = [
     "BuiltinTypes",
     "UploadState",
     "MLVocab",
+    "MLAsset",
     "ExecMetadataVocab",
     "RID",
     "DerivaSystemColumns",
@@ -32,6 +33,7 @@ from .deriva_definitions import (
     RID,
     DerivaMLException,
     MLVocab,
+    MLAsset,
     ExecMetadataVocab,
     DerivaSystemColumns,
 )
@@ -49,4 +51,3 @@ try:
 except PackageNotFoundError:
     # package is not installed
     pass
-

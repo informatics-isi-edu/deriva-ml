@@ -76,6 +76,7 @@ class Workflow(BaseModel):
     description: str = None
     rid: Optional[RID] = None
     checksum: Optional[str] = None
+    is_notebook: bool = False
 
     _logger: Any = PrivateAttr()
 
@@ -99,16 +100,11 @@ class Workflow(BaseModel):
             logger.error("nbstripout is not found.")
 
     @staticmethod
-    def is_notebook() -> bool:
-        return True if Workflow._get_notebook_path() else False
-
-    @staticmethod
     def _get_notebook_path() -> Path | None:
         """Return the absolute path of the current notebook."""
 
         server, session = Workflow._get_notebook_session()
         if server and session:
-            Workflow._check_nbstrip_status()
             relative_path = session["notebook"]["path"]
             # Join the notebook directory with the relative path
             return Path(server["root_dir"]) / relative_path
@@ -152,9 +148,11 @@ class Workflow(BaseModel):
         return None, None
 
     @staticmethod
-    def _get_python_script() -> Path:
+    def _get_python_script() -> tuple[Path, bool]:
         """Return the path to the currently executing script"""
+        is_notebook = True
         if not (filename := Workflow._get_notebook_path()):
+            is_notebook = False
             stack = inspect.stack()
             # Get the caller's filename, which is two up the stack from here.
             if len(stack) > 1:
@@ -167,7 +165,7 @@ class Workflow(BaseModel):
                 raise DerivaMLException(
                     "Looking for caller failed"
                 )  # Stack is too shallow
-        return filename
+        return filename, is_notebook
 
     @staticmethod
     def _github_url(executable_path: Path) -> tuple[str, bool]:
@@ -262,12 +260,12 @@ class Workflow(BaseModel):
 
         # Check to see if execution file info is being passed in by calling program.
         if "DERIVA_ML_WORKFLOW_URL" in os.environ:
-            github_url = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
+            github_url = os.environ["DERIVA_ML_WORKFLOW_URL"]
             checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
+            is_notebook = True
         else:
-            github_url, checksum = Workflow.get_url_and_checksum(
-                Workflow._get_python_script()
-            )
+            path, is_notebook = Workflow._get_notebook_path()
+            github_url, checksum = Workflow.get_url_and_checksum(path)
 
         return Workflow(
             name=name,
@@ -275,12 +273,12 @@ class Workflow(BaseModel):
             checksum=checksum,
             description=description,
             workflow_type=workflow_type,
+            is_notebook=is_notebook,
         )
 
     @staticmethod
     def get_url_and_checksum(executable_path: Path) -> tuple[str, str]:
         """Determine the checksum for a specified executable"""
-        is_notebook = executable_path.suffix == ".ipynb"
         try:
             subprocess.run(
                 "git rev-parse --is-inside-work-tree",
@@ -301,8 +299,8 @@ class Workflow(BaseModel):
 
         # If you are in a notebook, strip out the outputs before computing the checksum.
         cmd = (
-            f"nbstripout {executable_path} | git hash-object --stdin"
-            if is_notebook
+            f"nbstripout -t {executable_path} | git hash-object --stdin"
+            if "ipynb" == executable_path.suffix
             else f"git hash-object {executable_path}"
         )
         checksum = (
