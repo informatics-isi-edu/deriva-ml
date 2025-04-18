@@ -20,7 +20,6 @@ from typing import Iterable, Any, Optional
 from deriva.core import format_exception
 from deriva.core.datapath import DataPathException
 from deriva.core.hatrac_store import HatracStore
-from .deriva_definitions import ExecMetadataVocab
 from .deriva_definitions import (
     RID,
     Status,
@@ -28,6 +27,8 @@ from .deriva_definitions import (
     DerivaMLException,
     MLVocab,
     MLAsset,
+    ExecMetadataType,
+    ExecAssetType,
     DRY_RUN_RID,
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
@@ -237,9 +238,9 @@ class Execution:
 
     def _save_runtime_environment(self):
         runtime_env_path = self.asset_file_path(
-            asset_name="Execution_Metadata",
-            file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            asset_types=ExecMetadataVocab.runtime_env.value,
+            "Execution_Metadata",
+            f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            ExecMetadataType.runtime_env.value,
         )
         with open(runtime_env_path, "w") as fp:
             json.dump(get_execution_environment(), fp)
@@ -296,15 +297,19 @@ class Execution:
         # Save configuration details for later upload
         if not reload:
             cfile = self.asset_file_path(
-                asset_name=MLAsset.execution_metadata,
-                file_name="configuration.json",
-                asset_types=ExecMetadataVocab.execution_config.value,
+                MLAsset.execution_metadata,
+                "configuration.json",
+                ExecMetadataType.execution_config.value,
             )
             with open(cfile.as_posix(), "w", encoding="utf-8") as config_file:
                 json.dump(self.configuration.model_dump(), config_file)
 
             for parameter_file in self.configuration.parameters:
-                self.asset_file_path(MLAsset.execution_assets, parameter_file)
+                self.asset_file_path(
+                    MLAsset.execution_asset,
+                    parameter_file,
+                    ExecAssetType.input_file.value,
+                )
 
             # save runtime env
             self._save_runtime_environment()

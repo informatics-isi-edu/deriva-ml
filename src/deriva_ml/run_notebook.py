@@ -1,5 +1,6 @@
 """Module to run a notebook using papermill"""
 
+from datetime import datetime
 import json
 import os
 import papermill as pm
@@ -7,9 +8,9 @@ from pathlib import Path
 import regex as re
 import tempfile
 
-from deriva_ml import Workflow, DerivaML, MLVocab
+from deriva_ml import Workflow, DerivaML
 from deriva.core import BaseCLI
-from deriva_ml import MLAsset
+from deriva_ml import MLAsset, ExecAssetType
 
 
 class DerivaMLRunNotebookCLI(BaseCLI):
@@ -37,13 +38,26 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         )
 
         self.parser.add_argument(
+            "--log-output",
+            action="store_false",
+            help="Display logging output from notebook.",
+        )
+
+        self.parser.add_argument(
+            "--catalog",
+            metavar="<1>",
+            default=1,
+            help="Catalog number. Default 1",
+        )
+
+        self.parser.add_argument(
             "--parameter",
             "-p",
             nargs=2,
             action="append",
             metavar=("KEY", "VALUE"),
             default=[],
-            help="Provide a parameter name band value to inject into the notebook.",
+            help="Provide a parameter name and value to inject into the notebook.",
         )
 
         self.parser.add_argument(
@@ -84,19 +98,24 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             print("Notebook file must be an ipynb file.")
             exit(1)
 
+        os.environ["DERIVA_HOST"] = args.host
+        os.environ["DERIVA_CATALOG_ID"] = args.catalog
+
         # Create a workflow instance for this specific version of the script.  Return an existing workflow if one is found.
         notebook_parameters = pm.inspect_notebook(notebook_file)
         if args.inspect:
-            for param, value in notebook_parameters:
+            for param, value in notebook_parameters.items():
                 print(
                     f"{param}:{value['inferred_type_name']}  (default {value['default']})"
                 )
             return
         else:
-            notebook_parameters = {
-                k: v["default"] for k, v in notebook_parameters.items()
-            } | parameters
-            print(f"Running notebook {notebook_file.name} with paremeters:")
+            notebook_parameters = (
+                {"host": args.host, "catalog": args.catalog}
+                | {k: v["default"] for k, v in notebook_parameters.items()}
+                | parameters
+            )
+            print(f"Running notebook {notebook_file.name} with parameters:")
             for param, value in notebook_parameters.items():
                 print(f"  {param}:{value}")
             self.run_notebook(notebook_file.resolve(), parameters, args.kernel)
@@ -121,7 +140,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                         r"Execution RID: https://(?P<host>.*)/id/(?P<catalog_id>.*)/(?P<execution_rid>[\w-]+)",
                         line,
                     ):
-                        host = m["host"]
+                        hostname = m["host"]
                         catalog_id = m["catalog_id"]
                         execution_rid = m["execution_rid"]
             if not execution_rid:
@@ -129,19 +148,24 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 exit(1)
             print("Uploaded notebook output for Execution RID:", execution_rid)
 
-            ml_instance = DerivaML(hostname=host, catalog_id=catalog_id)
-            ml_instance.add_term(
-                MLVocab.asset_type,
-                "Notebook_Output",
-                description="Jupyter Notebook Output",
-            )
+            ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id)
+
             execution = ml_instance.restore_execution(execution_rid)
             execution.asset_file_path(
                 asset_name=MLAsset.execution_asset,
                 file_name=notebook_output,
-                asset_types=["Notebook_Output"],
+                asset_types=ExecAssetType.notebook_output,
             )
+            parameter_file = execution.asset_file_path(
+                asset_name=MLAsset.execution_asset,
+                file_name=f"notebook-parameters-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+                asset_types=ExecAssetType.input_file.value,
+            )
+            with open(parameter_file, "w") as f:
+                json.dump(parameters, f)
+
             execution.upload_execution_outputs()
+            print(ml_instance.cite(execution_rid))
 
 
 def main():

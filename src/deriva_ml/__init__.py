@@ -15,7 +15,7 @@ __all__ = [
     "UploadState",
     "MLVocab",
     "MLAsset",
-    "ExecMetadataVocab",
+    "ExecAssetType",
     "RID",
     "DerivaSystemColumns",
     "VersionPart",
@@ -34,7 +34,7 @@ from .deriva_definitions import (
     DerivaMLException,
     MLVocab,
     MLAsset,
-    ExecMetadataVocab,
+    ExecAssetType,
     DerivaSystemColumns,
 )
 from .deriva_ml_base import DerivaML

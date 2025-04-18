@@ -264,7 +264,7 @@ class Workflow(BaseModel):
             checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
             is_notebook = True
         else:
-            path, is_notebook = Workflow._get_notebook_path()
+            path, is_notebook = Workflow._get_python_script()
             github_url, checksum = Workflow.get_url_and_checksum(path)
 
         return Workflow(
@@ -332,7 +332,7 @@ class ExecutionConfiguration(BaseModel):
     datasets: conlist(DatasetSpec) = []
     assets: list[RID | str] = []  # List of RIDs to model files.
     workflow: RID | Workflow
-    parameters: dict[str, Any] = {}
+    parameters: dict[str, Any] | Path = {}
     description: str = ""
     argv: conlist(str) = Field(default_factory=lambda: sys.argv)
 
@@ -341,7 +341,7 @@ class ExecutionConfiguration(BaseModel):
     @field_validator("parameters", mode="before")
     @classmethod
     def validate_parameters(cls, value: Any) -> Any:
-        """If parameter is a file, assume that it has JSON contents for configuration parameters"""
+        """If a parameter is a file, assume that it has JSON contents for configuration parameters"""
         if isinstance(value, str) or isinstance(value, Path):
             with open(value, "r") as f:
                 return json.load(f)

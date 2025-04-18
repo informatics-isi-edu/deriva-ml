@@ -197,13 +197,23 @@ class MLAsset(StrEnum):
     execution_asset = "Execution_Asset"
 
 
-class ExecMetadataVocab(StrEnum):
+class ExecMetadataType(StrEnum):
     """
     Predefined execution metadata types.
     """
 
     execution_config = "Execution_Config"
     runtime_env = "Runtime_Env"
+
+
+class ExecAssetType(StrEnum):
+    """
+    Predefined execution metadata types.
+    """
+
+    input_file = "Input_File"
+    output_file = "Output_File"
+    notebook_output = "Notebook_Output"
 
 
 class ColumnDefinition(BaseModel):
