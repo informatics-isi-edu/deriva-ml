@@ -155,7 +155,7 @@ class Execution:
         Args:
             configuration: Execution configuration object that describes the execution.
             ml_object: The DerivaML instance that created the execution.
-            reload: RID of previously initialized execution object.
+            reload: RID of a previously initialized execution object.
         """
         self.asset_paths: list[AssetFilePath] = []
         self.configuration = configuration
@@ -476,7 +476,7 @@ class Execution:
         """Download an asset from a URL and place it in a local directory.
 
         Args:
-            asset_rid: URL of the asset.
+            asset_rid: RID of the asset.
             dest_dir: Destination directory for the asset.
             update_catalog: Whether to update the catalog execution information after downloading.
 

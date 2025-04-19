@@ -974,7 +974,7 @@ class DerivaML(Dataset):
     ) -> Workflow:
         """Identify current executing program and return a workflow RID for it
 
-        Determine the notebook or script that is currently being executed. Assume that  this is
+        Determine the notebook or script that is currently being executed. Assume that this is
         being executed from a cloned GitHub repository.  Determine the remote repository name for
         this object.  Then either retrieve an existing workflow for this executable or create
         a new one.
@@ -983,6 +983,9 @@ class DerivaML(Dataset):
             name: The name of the workflow.
             workflow_type: The type of the workflow.
             description: The description of the workflow.
+
+        Returns:
+            A workflow object.
         """
         # Make sure type is correct.
         self.lookup_term(MLVocab.workflow_type, workflow_type)
@@ -1000,6 +1003,9 @@ class DerivaML(Dataset):
 
         1. The datasets specified in the configuration are downloaded and placed in the cache-dir. If a version is
         not specified in the configuration, then a new minor version number is created for the dataset and downloaded.
+
+        2. If any execution assets are provided in the configuration, they are downloaded and placed in the working directory.
+
 
         Args:
             configuration: ExecutionConfiguration:

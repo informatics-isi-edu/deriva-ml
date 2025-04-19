@@ -325,7 +325,8 @@ class ExecutionConfiguration(BaseModel):
             should be materialized.
         assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
         parameters: Either a dictionary or a path to a JSON file that contains configuration parameters for the execution.
-        workflow: A RID for a workflow instance.  Must have a name, URI to the workflow instance, and a type.
+        workflow: Either a Workflow object, or a RID for a workflow instance.
+        parameters: Either a dictionary or a path to a JSON file that contains configuration parameters for the execution.
         description: A description of the execution.  Can use Markdown format.
     """
 
