@@ -47,7 +47,7 @@ Use `dry_run` only for debugging, not during model tuning, as recording all tuni
 - After validating your notebook, commit it and generate a corresponding version tag using the provided scripts. For example:
 
 ```bash
-./generate_tag.sh
+./bump-version.sh  major|minor|patch
 ```
 
 ## 6. Executing Notebooks with DerivaML
@@ -61,7 +61,7 @@ deriva-ml-run-notebook --parameter parameter1 value1 --parameter parameter2 valu
 
 This command substitutes `value1` and `value2` into the corresponding parameters within the notebook's parameters cell, executes the notebook entirely, and saves the resulting notebook as an execution asset in the catalog.
 
-- Alternatively, parameters can be specified via a JSON configuration file.
+- Alternatively, parameters can be specified via a JSON configuration file using the `--file filename` option.
 - You may also automate experiments using scripts stored in GitHub, ensuring reproducibility through version control and clear documentation.
 
 Following these practices helps leverage DerivaML’s full potential, maintaining clarity, reproducibility, and continuous fairness in your data science projects.
