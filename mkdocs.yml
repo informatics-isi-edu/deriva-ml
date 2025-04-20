@@ -1,65 +1,65 @@
 site_name: DerivaML
 site_url: https://informatics-isi-edu.github.io/deriva-ml
 theme:
-   name: material
-   logo: assets/deriva-logo.png
-   features:
-       - navigation.instant
-       - navigation.expand
-       - navigation.footer
-   palette:
-      scheme: slate
-      primary: black
-      accent: blue
-   copyright: "© Copyright 2025, USC Information Sciences Institute, Informatics Systems Research Division."
+  name: material
+  logo: assets/deriva-logo.png
+  features:
+    - navigation.instant
+    - navigation.expand
+    - navigation.footer
+  palette:
+    scheme: slate
+    primary: black
+    accent: blue
+  copyright: "© Copyright 2025, USC Information Sciences Institute, Informatics Systems Research Division."
 
 plugins:
-- search
-- autorefs
-- mkdocstrings:
-    handlers:
-      python:
-        paths:
-          - src  # Search for modules in the 'src' directory
-        options:
-          docstring_style: google
-          separate_signature: true
-          show_signature_annotations: true
-          line_length: 40
-          annotations_path: brief
-          inherited_members: true
-          preload_modules: [semver]
-          filters:
-            - "!^_"
-            - "^__"
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src  # Search for modules in the 'src' directory
+          options:
+            docstring_style: google
+            separate_signature: true
+            show_signature_annotations: true
+            line_length: 40
+            annotations_path: brief
+            inherited_members: true
+            preload_modules: [ semver ]
+            filters:
+              - "!^_"
+              - "^__"
 
-- mkdocs-jupyter:
-   include: ["*.ipynb"]
-   include_source: True
+  - mkdocs-jupyter:
+      include: [ "*.ipynb" ]
+      include_source: True
 
 nav:
   - Home: index.md
   - User Guide:
-    - Installing deriva-ml: user-guide/install.md
-    - Identifying things in deriva-ml: user-guide/identifiers.md
-    - Datasets: user-guide/datasets.md
-    - Creating a workflow: user-guide/ml_workflow_instruction.md
-    - Using DerivaML with Jupiter Notebooks: user-guide/notebooks.md
-    - DerivaML Structure: deriva_ml_structure.md
-    - Configuring an Execution: user-guide/execution-configuration.md
+      - Overview of DerivaML: user-guide/overview.md
+      - DerivaML Structure: user-guide/deriva_ml_structure.md
+      - Installing deriva-ml: user-guide/install.md
+      - Identifying things in deriva-ml: user-guide/identifiers.md
+      - Datasets: user-guide/datasets.md
+      - Using DerivaML with Jupiter Notebooks: user-guide/notebooks.md
+      - Configuring an Execution: user-guide/execution-configuration.md
   - Sample Notebooks:
-    - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
-    - Execution: 'Notebooks/DerivaML Execution.ipynb'
-    - Features : 'Notebooks/DerivaML Features.ipynb'
-    - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
+      - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
+      - Execution: 'Notebooks/DerivaML Execution.ipynb'
+      - Features: 'Notebooks/DerivaML Features.ipynb'
+      - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
   - Library Documentation:
-    - DerivaML: code-docs/deriva_ml_base.md
-    - Datasets: code-docs/dataset.md
-    - DatasetBag Auxiliary Classes: code-docs/dataset_aux_classes.md
-    - DatasetBag: code-docs/dataset_bag.md
-    - DerivaModel: code-docs/deriva_model.md
-    - Execution: code-docs/execution.md
-    - ExecutionConfiguration: code-docs/execution_configuration.md
-    - Feature: code-docs/feature.md
-   # - Upload: code-docs/upload.md
+      - DerivaML: code-docs/deriva_ml_base.md
+      - Datasets: code-docs/dataset.md
+      - DatasetBag Auxiliary Classes: code-docs/dataset_aux_classes.md
+      - DatasetBag: code-docs/dataset_bag.md
+      - DerivaModel: code-docs/deriva_model.md
+      - Execution: code-docs/execution.md
+      - ExecutionConfiguration: code-docs/execution_configuration.md
+      - Feature: code-docs/feature.md
+  # - Upload: code-docs/upload.md
   - Release Notes: release-notes.md
