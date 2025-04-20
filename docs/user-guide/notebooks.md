@@ -22,9 +22,10 @@ bumpversion major|minor|patch
 nboutputstrip --install
 ```
 
-## 3. Centralizing Notebook Parameters
+## 3. Setting Notebook Parameters
 
-- Define all configurable variables in a single "parameters" cell located immediately after your imports at the top of your notebook.
+- Define all configurable variables in a single "parameters" cell located immediately after your imports at the top of your notebook. The contents of this cell can be automatically updated when the notebook is executed. 
+DerivaML uses the tool [Papermill](https://papermill.readthedocs.io/en/latest/usage-parameterize.html) to manage parameter values.  For this to work, the parameters cell should be have the tag `parameters`. The DerivaML template already has this cell tagged. For directions on how to do this, see the Papermill documentation.
 - The parameters cell should contain only variable assignments.
 - Avoid setting configuration variables elsewhere in your notebook.
 - It is recommended to include type hints for clarity and usability.
