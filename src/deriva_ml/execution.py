@@ -707,7 +707,7 @@ class Execution:
                     }
                     for asset_path in asset_list
                 ],
-                on_conflict_skipc=True
+                on_conflict_skip=True
             )
 
 
