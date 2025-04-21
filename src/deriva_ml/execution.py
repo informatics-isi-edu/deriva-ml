@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PosixPath, WindowsPath
 
 from pydantic import validate_call, ConfigDict
 import regex as re
@@ -66,29 +66,9 @@ except ImportError:
         return s
 
 
-class AssetFilePath(type(Path())):
-    """Derived class of Path that also includes information about a downloaded.
-
-    An AssetFilePath has all  the methods associated with a pathlib.Path object. In addition, it defines additional
-    attributes associated with a DerviaML asset.
-
-    Attributes:
-        asset_types: A list of the types associated with this asset.  From the Asset_Type controlled vocabulary.
-        asset_metadata: A dictionary of names and values of any additional columns  associated with this asset.
-        asset_name: The name of the asset table
-        file_name: The name of the file in the local file system that has the asset contents
-        asset_rid: The RID of the asset if it has been uploaded into an asset table
-    """
-
-    def __new__(
-        cls,
-        asset_path,
-        asset_name: str,
-        file_name: str,
-        asset_metadata: dict[str, Any],
-        asset_types: list[str] | str,
-        asset_rid: Optional[RID] = None,
-    ):
+# Platform-specific base class
+if sys.version_info >= (3,12 ):
+    class AssetFilePath(Path):
         """
         Create a new Path object that has additional information related to the use of this path as an asset.
 
@@ -100,16 +80,50 @@ class AssetFilePath(type(Path())):
             asset_types:  A list of terms from the Asset_Type controlled vocabulary.
             asset_rid:  The RID of the asset if it has been uploaded into an asset table
         """
-        obj = super().__new__(cls, asset_path)
-        obj.asset_types = (
-            asset_types if isinstance(asset_types, list) else [asset_types]
-        )
-        obj.asset_metadata = asset_metadata
-        obj.asset_name = asset_name
-        obj.file_name = file_name
-        obj.asset_rid = asset_rid
-        return obj
 
+
+        def __init__(
+            self,
+            asset_path: str | Path,
+            asset_name: str,
+            file_name: str,
+            asset_metadata: dict[str, Any],
+            asset_types: list[str] |  str,
+            asset_rid: Optional["RID"] = None,
+        ):
+            super().__init__(asset_path)
+            # These assignments happen after __new__ returns the instance
+            self.asset_name = asset_name
+            self.file_name = file_name
+            self.asset_metadata = asset_metadata
+            self.asset_types = (
+                asset_types if isinstance(asset_types, list) else [asset_types]
+            )
+            self.asset_rid = asset_rid
+else:
+    class AssetFilePath(type(Path())):
+        """
+         Create a new Path object that has additional information related to the use of this path as an asset.
+
+         Args:
+             asset_path: Local path to the location of the asset.
+             asset_name:  The name of the asset in the catalog (e.g. the asset table name).
+             file_name:  Name of the local file that contains the contents of the asset.
+             asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
+             asset_types:  A list of terms from the Asset_Type controlled vocabulary.
+             asset_rid:  The RID of the asset if it has been uploaded into an asset table
+         """
+        def __new__(cls, asset_path: str | Path, *args, **kwargs):
+            # Only pass the path to the base Path class
+            obj =  super().__new__(cls, asset_path)
+            obj.asset_name = asset_name
+            obj.file_name = file_name
+            obj.asset_metadata = asset_metadata
+            obj.asset_types = (
+                asset_types if isinstance(asset_types, list) else [asset_types]
+            )
+            obj.asset_rid = asset_rid
+            return obj
 
 class Execution:
     """The Execution class is used to capture the context of an activity within DerivaML.  While these are primarily
@@ -656,20 +670,10 @@ class Execution:
         with open(feature_file, "r") as feature_values:
             entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
-        try:
-            self._ml_object.domain_path.tables[feature_table].insert(
-                [map_path(e) for e in entities]
-            )
-        except DataPathException as e:
-            if re.match(
-                rf'DETAIL: +Key +\("Execution", +"{target_table}", +"Feature_Name"\)=\(.*\) already exists',
-                e.message,
-            ):
-                self._logger.info(
-                    f"Skipping reload of feature values for {feature_table}"
-                )
-            else:
-                raise e
+        self._ml_object.domain_path.tables[feature_table].insert(
+            [map_path(e) for e in entities],
+            on_conflict_skip=True
+        )
 
     def _update_asset_execution_table(
         self,
@@ -694,27 +698,18 @@ class Execution:
             asset_exe = self._model.find_association(asset_table_name, "Execution")
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
 
-            try:
-                asset_exe_path.insert(
-                    [
-                        {
-                            asset_table_name: asset_path.asset_rid,
-                            "Execution": self.execution_rid,
-                            "Asset_Role": asset_role,
-                        }
-                        for asset_path in asset_list
-                    ]
-                )
-            except DataPathException as e:
-                if re.match(
-                    rf'DETAIL: +Key +\("{asset_table_name}", +"Execution"\)=\(.*\) already exists',
-                    e.message,
-                ):
-                    self._logger.info(
-                        f"Skipping reload of execution assocations for {asset_table_name}"
-                    )
-                else:
-                    raise e
+            asset_exe_path.insert(
+                [
+                    {
+                        asset_table_name: asset_path.asset_rid,
+                        "Execution": self.execution_rid,
+                        "Asset_Role": asset_role,
+                    }
+                    for asset_path in asset_list
+                ],
+                on_conflict_skipc=True
+            )
+
 
             # Now add in the type names via the asset_asset_type association table.
             # Get the list of types for each file in the asset.
@@ -740,24 +735,16 @@ class Execution:
             type_path = pb.schemas[asset_asset_type.schema.name].tables[
                 asset_asset_type.name
             ]
-            try:
-                type_path.insert(
-                    [
-                        {asset_table_name: asset.asset_rid, "Asset_Type": t}
-                        for asset in asset_list
-                        for t in asset_type_map[asset.file_name]
-                    ]
-                )
-            except DataPathException as e:
-                if re.match(
-                    rf'DETAIL: +Key +\("{asset_table_name}", +"Asset_Type"\)=\(.*\) already exists',
-                    e.message,
-                ):
-                    self._logger.info(
-                        f"Skipping reload of execution asset types for {asset_table_name}"
-                    )
-                else:
-                    raise e
+
+            type_path.insert(
+                [
+                    {asset_table_name: asset.asset_rid, "Asset_Type": t}
+                    for asset in asset_list
+                    for t in asset_type_map[asset.file_name]
+                ],
+                on_conflict_skip=True
+            )
+
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def asset_file_path(
