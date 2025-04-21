@@ -964,7 +964,8 @@ class Dataset:
             for the dataset.
         """
         if (
-            execution_rid != DRY_RUN_RID
+            execution_rid
+            and execution_rid != DRY_RUN_RID
             and self._model.catalog.resolve_rid(execution_rid).table.name != "Execution"
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
@@ -1120,17 +1121,18 @@ class Dataset:
 
         def update_status(status: Status, msg: str) -> None:
             """Update the current status for this execution in the catalog"""
-            self._model.catalog.getPathBuilder().schemas[
-                self._ml_schema
-            ].Execution.update(
-                [
-                    {
-                        "RID": execution_rid,
-                        "Status": status.value,
-                        "Status_Detail": msg,
-                    }
-                ]
-            )
+            if execution_rid and execution_rid != DRY_RUN_RID:
+                self._model.catalog.getPathBuilder().schemas[
+                    self._ml_schema
+                ].Execution.update(
+                    [
+                        {
+                            "RID": execution_rid,
+                            "Status": status.value,
+                            "Status_Detail": msg,
+                        }
+                    ]
+                )
             self._logger.info(msg)
 
         def fetch_progress_callback(current, total):
