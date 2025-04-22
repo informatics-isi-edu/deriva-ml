@@ -9,16 +9,14 @@ from datetime import datetime
 import json
 import logging
 import os
-from pathlib import Path, PosixPath, WindowsPath
+from pathlib import Path
 
 from pydantic import validate_call, ConfigDict
-import regex as re
 import sys
 import shutil
 from typing import Iterable, Any, Optional
 
 from deriva.core import format_exception
-from deriva.core.datapath import DataPathException
 from deriva.core.hatrac_store import HatracStore
 from .deriva_definitions import (
     RID,
@@ -67,7 +65,8 @@ except ImportError:
 
 
 # Platform-specific base class
-if sys.version_info >= (3,12 ):
+if sys.version_info >= (3, 12):
+
     class AssetFilePath(Path):
         """
         Create a new Path object that has additional information related to the use of this path as an asset.
@@ -81,14 +80,13 @@ if sys.version_info >= (3,12 ):
             asset_rid:  The RID of the asset if it has been uploaded into an asset table
         """
 
-
         def __init__(
             self,
             asset_path: str | Path,
             asset_name: str,
             file_name: str,
             asset_metadata: dict[str, Any],
-            asset_types: list[str] |  str,
+            asset_types: list[str] | str,
             asset_rid: Optional["RID"] = None,
         ):
             super().__init__(asset_path)
@@ -101,21 +99,31 @@ if sys.version_info >= (3,12 ):
             )
             self.asset_rid = asset_rid
 else:
+
     class AssetFilePath(type(Path())):
         """
-         Create a new Path object that has additional information related to the use of this path as an asset.
+        Create a new Path object that has additional information related to the use of this path as an asset.
 
-         Args:
-             asset_path: Local path to the location of the asset.
-             asset_name:  The name of the asset in the catalog (e.g. the asset table name).
-             file_name:  Name of the local file that contains the contents of the asset.
-             asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
-             asset_types:  A list of terms from the Asset_Type controlled vocabulary.
-             asset_rid:  The RID of the asset if it has been uploaded into an asset table
-         """
-        def __new__(cls, asset_path: str | Path, *args, **kwargs):
+        Args:
+            asset_path: Local path to the location of the asset.
+            asset_name:  The name of the asset in the catalog (e.g. the asset table name).
+            file_name:  Name of the local file that contains the contents of the asset.
+            asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
+            asset_types:  A list of terms from the Asset_Type controlled vocabulary.
+            asset_rid:  The RID of the asset if it has been uploaded into an asset table
+        """
+
+        def __new__(
+            cls,
+            asset_path: str | Path,
+            asset_name: str,
+            file_name: str,
+            asset_metadata: dict[str, Any],
+            asset_types: list[str] | str,
+            asset_rid: Optional["RID"] = None,
+        ):
             # Only pass the path to the base Path class
-            obj =  super().__new__(cls, asset_path)
+            obj = super().__new__(cls, asset_path)
             obj.asset_name = asset_name
             obj.file_name = file_name
             obj.asset_metadata = asset_metadata
@@ -124,6 +132,7 @@ else:
             )
             obj.asset_rid = asset_rid
             return obj
+
 
 class Execution:
     """The Execution class is used to capture the context of an activity within DerivaML.  While these are primarily
@@ -671,8 +680,7 @@ class Execution:
             entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
         self._ml_object.domain_path.tables[feature_table].insert(
-            [map_path(e) for e in entities],
-            on_conflict_skip=True
+            [map_path(e) for e in entities], on_conflict_skip=True
         )
 
     def _update_asset_execution_table(
@@ -707,9 +715,8 @@ class Execution:
                     }
                     for asset_path in asset_list
                 ],
-                on_conflict_skip=True
+                on_conflict_skip=True,
             )
-
 
             # Now add in the type names via the asset_asset_type association table.
             # Get the list of types for each file in the asset.
@@ -742,9 +749,8 @@ class Execution:
                     for asset in asset_list
                     for t in asset_type_map[asset.file_name]
                 ],
-                on_conflict_skip=True
+                on_conflict_skip=True,
             )
-
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def asset_file_path(
