@@ -304,7 +304,7 @@ def create_demo_catalog(
                 deriva_ml.model,
                 cache_dir=deriva_ml.cache_dir,
                 working_dir=deriva_ml.working_dir,
-            )._generate_dataset_annotations()
+            )._generate_dataset_download_annotations()
         )
         deriva_ml.model.apply()
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")

@@ -1,6 +1,6 @@
 """
 This module defines the DataSet class with is used to manipulate datasets in DerivaML,
-The intended use of this class is as a base class in DerivaML so all the methods documented here are
+The intended use of this class is as a base class in DerivaML, so all the methods documented here are
 accessible via a DerivaML class instance.
 
 
@@ -170,6 +170,9 @@ class Dataset:
         Returns:
             A list of DatasetHistory objects which indicate the version-number, creation time, and bag instantiation of the dataset.
         """
+
+        if not self._is_dataset_rid(dataset_rid):
+            raise DerivaMLException(f"RID is not for a data set: {dataset_rid}")
         version_path = (
             self._model.catalog.getPathBuilder()
             .schemas[self._ml_schema]
@@ -248,7 +251,7 @@ class Dataset:
           new semantic version of the dataset_table as a 3-tuple
 
         Raises:
-          DerivaMLException: if provided RID is not to a dataset_table.
+          DerivaMLException: if provided, RID is not to a dataset_table.
         """
 
         # Find all the datasets that are reachable from this dataset and determine their new version numbers.
@@ -452,7 +455,7 @@ class Dataset:
         )
 
         # self.model = self.catalog.getCatalogModel()
-        self.dataset_table.annotations.update(self._generate_dataset_annotations())
+        self.dataset_table.annotations.update(self._generate_dataset_download_annotations())
         self._model.model.apply()
         return table
 
@@ -464,7 +467,7 @@ class Dataset:
 
         Args:
             dataset_rid: param recurse: If this is a nested dataset_table, list the members of the contained datasets
-            recurse:  (Default value = False)
+            recurse: (Default value = False)
             limit: If provided, the maximum number of members to return for each element type.
 
         Returns:
@@ -531,7 +534,7 @@ class Dataset:
 
         Args:
             dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
-            members: List of RIDs of members to add to the  dataset_table.
+            members: List of RIDs of members to add to the dataset_table.
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             description: Markdown description of the updated dataset.
             execution_rid: Optional RID of execution associated with this dataset.
@@ -544,7 +547,7 @@ class Dataset:
 
             Args:
               member_rid:
-              path:  (Default value = None)
+              path: (Default value = None)
 
             Returns:
 
@@ -619,7 +622,7 @@ class Dataset:
 
         Args:
             dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
-            members: List of RIDs of members to add to the  dataset_table.
+            members: List of RIDs of members to add to the dataset_table.
             description: Markdown description of the updated dataset.
             execution_rid: Optional RID of execution associated with this operation.
         """
@@ -703,7 +706,7 @@ class Dataset:
             recurse: If True, return a list of RIDs of any nested datasets.
 
         Returns:
-          list of RIDs of nested datasets.
+          list of nested dataset RIDs.
 
         """
         dataset_dataset_path = (
@@ -726,7 +729,7 @@ class Dataset:
 
         return find_children(dataset_rid)
 
-    def _vocabulary_specification(
+    def _export_vocabulary(
         self, writer: Callable[[str, str, Table], list[dict[str, Any]]]
     ) -> list[dict[str, Any]]:
         """
@@ -803,7 +806,7 @@ class Dataset:
             dataset_elements = [
                 snapshot_catalog._model.name_to_table(e)
                 for e, m in snapshot_catalog.list_dataset_members(
-                    dataset_rid=dataset_rid,  #  limit=1  Limit seems to make things run slow.
+                    dataset_rid=dataset_rid,  #  limit=1 Limit seems to make things run slow.
                 ).items()
                 if m
             ]
@@ -899,7 +902,7 @@ class Dataset:
     def _dataset_specification(
         self,
         writer: Callable[[str, str, Table], list[dict[str, Any]]],
-        dataset: DatasetSpec,
+        dataset: Optional[DatasetSpec] = None,
         snapshot_catalog: Optional[DerivaML] = None,
     ) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset_table.  Each element of the dataset_table will be placed in its own dir
@@ -939,12 +942,12 @@ class Dataset:
         Returns:
             A dataset_table specification.
         """
-        element_spec = []
+        element_spec = self._export_vocabulary(writer)
         for path in self._table_paths(
             dataset=dataset, snapshot_catalog=snapshot_catalog
         ):
             element_spec.extend(writer(*path))
-        return self._vocabulary_specification(writer) + element_spec
+        return element_spec
 
     def _download_dataset_bag(
         self,
@@ -1162,9 +1165,8 @@ class Dataset:
             validated_check.touch()
         return Path(bag_path)
 
-    def _export_outputs(
+    def _export_annotation(
         self,
-        dataset: Optional[DatasetSpec] = None,
         snapshot_catalog: Optional[DerivaML] = None,
     ) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
@@ -1184,7 +1186,7 @@ class Dataset:
             Returns:
                 An export specification suitable for Chaise.
             """
-            return self._export_dataset_element(spath, dpath, table)
+            return self._export_annotation_dataset_element(spath, dpath, table)
 
         # Export specification is a specification for the datasets, plus any controlled vocabulary
         return [
@@ -1204,13 +1206,15 @@ class Dataset:
                 "destination": {"type": "json", "name": "schema"},
             },
         ] + self._dataset_specification(
-            writer, dataset, snapshot_catalog=snapshot_catalog
+            writer, None, snapshot_catalog=snapshot_catalog
         )
 
-    def _processor_params(
+    def _export_specification(
         self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML] = None
     ) -> list[dict[str, Any]]:
         """
+        Generate a specification for export engine for specific dataset.
+
         Returns:
           a download specification for the datasets in the provided model.
 
@@ -1227,7 +1231,7 @@ class Dataset:
             Returns:
 
             """
-            return self._download_dataset_element(spath, dpath, table)
+            return self._export_specification_dataset_element(spath, dpath, table)
 
         # Download spec is the spec for any controlled vocabulary and for the dataset_table.
         return [
@@ -1238,7 +1242,7 @@ class Dataset:
         ] + self._dataset_specification(writer, dataset, snapshot_catalog)
 
     @staticmethod
-    def _download_dataset_element(
+    def _export_specification_dataset_element(
         spath: str, dpath: str, table: Table
     ) -> list[dict[str, Any]]:
         """Return the download specification for the data object indicated by a path through the data model.
@@ -1276,7 +1280,7 @@ class Dataset:
         return exports
 
     @staticmethod
-    def _export_dataset_element(
+    def _export_annotation_dataset_element(
         spath: str, dpath: str, table: Table
     ) -> list[dict[str, Any]]:
         """Given a path in the data model, output an export specification for the path taken to get to the current table.
@@ -1295,7 +1299,7 @@ class Dataset:
 
         exports = [
             {
-                "source": {"api": "entity", "path": spath},
+                "source": {"api": "entity", "path": spath, "skip_root_path": True},
                 "destination": {"name": dpath, "type": "csv"},
             }
         ]
@@ -1318,7 +1322,10 @@ class Dataset:
         self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML]
     ) -> dict[str, Any]:
         """
+        Generate a specification for downloading a specific dataset.
 
+        This routine creates a download specification that can be used by the Deriva export processor to download
+        a specific dataset as a MINID.
         Returns:
         """
         s3_target = "s3://eye-ai-shared"
@@ -1374,7 +1381,65 @@ class Dataset:
                         },
                     },
                 ]
-                + self._processor_params(dataset, snapshot_catalog),
+                + self._export_specification(dataset, snapshot_catalog),
+            },
+        }
+
+    def _generate_dataset_download_annotations(self) -> dict[str, Any]:
+        return {
+            deriva_tags.export_fragment_definitions: {
+                "dataset_export_outputs": self._export_annotation()
+            },
+            deriva_tags.visible_columns: self.dataset_visible_columns(),
+            deriva_tags.visible_foreign_keys: self._dataset_visible_fkeys(),
+            deriva_tags.export_2019: {
+                "detailed": {
+                    "templates": [
+                        {
+                            "type": "BAG",
+                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
+                            "displayname": "BDBag Download",
+                            "bag_idempotent": True,
+                            "postprocessors": [
+                                {
+                                    "processor": "identifier",
+                                    "processor_params": {
+                                        "test": False,
+                                        "env_column_map": {
+                                            "Dataset_RID": "{RID}@{snaptime}",
+                                            "Description": "{Description}",
+                                        },
+                                    },
+                                }
+                            ],
+                        },
+                        {
+                            "type": "BAG",
+                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
+                            "displayname": "BDBag to Cloud",
+                            "bag_idempotent": True,
+                            "postprocessors": [
+                                {
+                                    "processor": "cloud_upload",
+                                    "processor_params": {
+                                        "acl": "public-read",
+                                        "target_url": "s3://eye-ai-shared/",
+                                    },
+                                },
+                                {
+                                    "processor": "identifier",
+                                    "processor_params": {
+                                        "test": False,
+                                        "env_column_map": {
+                                            "Dataset_RID": "{RID}@{snaptime}",
+                                            "Description": "{Description}",
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    ]
+                }
             },
         }
 
@@ -1480,61 +1545,3 @@ class Dataset:
             for fkey in dataset_table.find_associations(max_arity=3, pure=False)
         ]
         return {"detailed": source_list}
-
-    def _generate_dataset_annotations(self) -> dict[str, Any]:
-        return {
-            deriva_tags.export_fragment_definitions: {
-                "dataset_export_outputs": self._export_outputs()
-            },
-            deriva_tags.visible_columns: self.dataset_visible_columns(),
-            deriva_tags.visible_foreign_keys: self._dataset_visible_fkeys(),
-            deriva_tags.export_2019: {
-                "detailed": {
-                    "templates": [
-                        {
-                            "type": "BAG",
-                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
-                            "displayname": "BDBag Download",
-                            "bag_idempotent": True,
-                            "postprocessors": [
-                                {
-                                    "processor": "identifier",
-                                    "processor_params": {
-                                        "test": False,
-                                        "env_column_map": {
-                                            "Dataset_RID": "{RID}@{snaptime}",
-                                            "Description": "{Description}",
-                                        },
-                                    },
-                                }
-                            ],
-                        },
-                        {
-                            "type": "BAG",
-                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
-                            "displayname": "BDBag to Cloud",
-                            "bag_idempotent": True,
-                            "postprocessors": [
-                                {
-                                    "processor": "cloud_upload",
-                                    "processor_params": {
-                                        "acl": "public-read",
-                                        "target_url": "s3://eye-ai-shared/",
-                                    },
-                                },
-                                {
-                                    "processor": "identifier",
-                                    "processor_params": {
-                                        "test": False,
-                                        "env_column_map": {
-                                            "Dataset_RID": "{RID}@{snaptime}",
-                                            "Description": "{Description}",
-                                        },
-                                    },
-                                },
-                            ],
-                        },
-                    ]
-                }
-            },
-        }
