@@ -302,7 +302,7 @@ class DerivaModel:
     ) -> list[list[Table]]:
         """Recursively walk over the domain schema graph and extend the current path.
 
-        Walk a schema graph and return a list all  the paths through the graph.
+        Walk a schema graph and return a list all the paths through the graph.
 
         Args:
             path: Source path so far

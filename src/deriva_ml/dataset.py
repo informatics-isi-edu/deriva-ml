@@ -759,10 +759,10 @@ class Dataset:
     ) -> Iterator[tuple[str, str, Table]]:
         paths = self._collect_paths(dataset and dataset.rid, snapshot_catalog)
 
-        def source_path(path: tuple[Table, ...]):
+        def source_path(path: tuple[Table, ...]) -> list[str] :
             """Convert a tuple representing a path into a source path component with FK linkage"""
             path = list(path)
-            p = [f"{self._model.ml_schema}:Dataset/RID={{Dataset_RID}}"]
+            p = [f"{self._model.ml_schema}:Dataset/RID={{RID}}"]
             for table in path[1:]:
                 if table.name == "Dataset_Dataset":
                     p.append("(RID)=(deriva-ml:Dataset_Dataset:Dataset)")
@@ -773,7 +773,6 @@ class Dataset:
                 else:
                     p.append(f"{table.schema.name}:{table.name}")
             return p
-
         src_paths = ["/".join(source_path(p)) for p in paths]
         dest_paths = ["/".join([t.name for t in p]) for p in paths]
         target_tables = [p[-1] for p in paths]
@@ -1012,7 +1011,7 @@ class Dataset:
                     output_dir=tmp_dir,
                     defer_download=True,
                     timeout=(10, 610),
-                    envars={"Dataset_RID": dataset.rid},
+                    envars={"RID": dataset.rid},
                 )
                 minid_page_url = exporter.export()[0]  # Get the MINID launch page
             except (
@@ -1175,19 +1174,6 @@ class Dataset:
           An export specification suitable for Chaise.
         """
 
-        def writer(spath: str, dpath: str, table: Table) -> list[dict[str, Any]]:
-            """
-
-            Args:
-              spath: list[Table]:
-              dpath: list[Table]:
-              table: Table
-
-            Returns:
-                An export specification suitable for Chaise.
-            """
-            return self._export_annotation_dataset_element(spath, dpath, table)
-
         # Export specification is a specification for the datasets, plus any controlled vocabulary
         return [
             {
@@ -1206,7 +1192,7 @@ class Dataset:
                 "destination": {"type": "json", "name": "schema"},
             },
         ] + self._dataset_specification(
-            writer, None, snapshot_catalog=snapshot_catalog
+            self._export_annotation_dataset_element, None, snapshot_catalog=snapshot_catalog
         )
 
     def _export_specification(
@@ -1220,26 +1206,13 @@ class Dataset:
 
         """
 
-        def writer(spath: str, dpath: str, table: Table) -> list[dict[str, Any]]:
-            """
-
-            Args:
-              spath:
-              dpath:
-              table: Table
-
-            Returns:
-
-            """
-            return self._export_specification_dataset_element(spath, dpath, table)
-
         # Download spec is the spec for any controlled vocabulary and for the dataset_table.
         return [
             {
                 "processor": "json",
                 "processor_params": {"query_path": "/schema", "output_path": "schema"},
             }
-        ] + self._dataset_specification(writer, dataset, snapshot_catalog)
+        ] + self._dataset_specification(self._export_specification_dataset_element, dataset, snapshot_catalog)
 
     @staticmethod
     def _export_specification_dataset_element(
@@ -1259,7 +1232,7 @@ class Dataset:
             {
                 "processor": "csv",
                 "processor_params": {
-                    "query_path": f"/entity/{spath}?limit=none",
+                    "query_path": f"/entity/{spath}",
                     "output_path": dpath,
                 },
             }
@@ -1272,15 +1245,15 @@ class Dataset:
                 {
                     "processor": "fetch",
                     "processor_params": {
-                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5?limit=none",
+                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5",
                         "output_path": f"asset/{table.name}",
                     },
                 }
             )
         return exports
 
-    @staticmethod
     def _export_annotation_dataset_element(
+            self,
         spath: str, dpath: str, table: Table
     ) -> list[dict[str, Any]]:
         """Given a path in the data model, output an export specification for the path taken to get to the current table.
@@ -1297,9 +1270,19 @@ class Dataset:
         # into a path in the form of /S:T1/S:T2/S:Table
         # Generate the destination path in the file system using just the table names.
 
+        skip_root_path = False
+        if spath.startswith(f"{self._ml_schema}:Dataset/"):
+            # Chaise will add table name and RID filter, so strip it off.
+            spath = '/'.join(spath.split('/')[2:])
+            if spath == "":
+                # This path is to just the dataset table.
+                return []
+        else:
+            # A vocabulary table, so we don't want the root_path.
+            skip_root_path = True
         exports = [
             {
-                "source": {"api": "entity", "path": spath, "skip_root_path": True},
+                "source": {"api": "entity", "path": spath, "skip_root_path": skip_root_path},
                 "destination": {"name": dpath, "type": "csv"},
             }
         ]
@@ -1310,6 +1293,7 @@ class Dataset:
             exports.append(
                 {
                     "source": {
+                        "skip_root_path": False,
                         "api": "attribute",
                         "path": f"{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5",
                     },
@@ -1333,9 +1317,9 @@ class Dataset:
 
         catalog_id = self._version_snapshot(dataset)
         return {
-            "env": {"Dataset_RID": "{Dataset_RID}"},
+            "env": {"RID": "{RID}"},
             "bag": {
-                "bag_name": "Dataset_{Dataset_RID}",
+                "bag_name": "Dataset_{RID}",
                 "bag_algorithms": ["md5"],
                 "bag_archiver": "zip",
                 "bag_metadata": {},
@@ -1354,7 +1338,7 @@ class Dataset:
                     "processor_params": {
                         "test": minid_test,
                         "env_column_map": {
-                            "Dataset_RID": "{RID}@{snaptime}",
+                            "RID": "{RID}@{snaptime}",
                             "Description": "{Description}",
                         },
                     },
@@ -1375,7 +1359,7 @@ class Dataset:
                     {
                         "processor": "env",
                         "processor_params": {
-                            "query_path": "/entity/M:=deriva-ml:Dataset/RID={Dataset_RID}?limit=none",
+                            "query_path": "/entity/M:=deriva-ml:Dataset/RID={RID}",
                             "output_path": "Dataset",
                             "query_keys": ["RID", "Description"],
                         },
@@ -1400,18 +1384,6 @@ class Dataset:
                             "outputs": [{"fragment_key": "dataset_export_outputs"}],
                             "displayname": "BDBag Download",
                             "bag_idempotent": True,
-                            "postprocessors": [
-                                {
-                                    "processor": "identifier",
-                                    "processor_params": {
-                                        "test": False,
-                                        "env_column_map": {
-                                            "Dataset_RID": "{RID}@{snaptime}",
-                                            "Description": "{Description}",
-                                        },
-                                    },
-                                }
-                            ],
                         },
                         {
                             "type": "BAG",
@@ -1431,7 +1403,7 @@ class Dataset:
                                     "processor_params": {
                                         "test": False,
                                         "env_column_map": {
-                                            "Dataset_RID": "{RID}@{snaptime}",
+                                            "RID": "{RID}@{snaptime}",
                                             "Description": "{Description}",
                                         },
                                     },
