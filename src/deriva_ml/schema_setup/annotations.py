@@ -201,14 +201,16 @@ def generate_annotation(model: DerivaModel) -> dict:
                 "RMT",
                 [schema, "Dataset_Version_RCB_fkey"],
                 [schema, "Dataset_Version_RMB_fkey"],
-                "Description",
-               "Version",
                 {
                     "source": [
                         {"outbound": [schema, "Dataset_Version_Dataset_fkey"]},
                         "RID",
                     ]
                 },
+                "Description",
+               "Version",
+                "Minid",
+                "Execution"
             ]
         },
         deriva_tags.visible_foreign_keys: {"*": []},
