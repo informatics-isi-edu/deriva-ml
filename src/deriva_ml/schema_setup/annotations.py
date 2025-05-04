@@ -263,20 +263,16 @@ def generate_annotation(model: DerivaModel) -> dict:
                                 "name": "Execution",
                             },
                             {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Type",
+                                "name": "Asset Type",
+                            },
+                            {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Metadata",
                                 "name": "Execution Metadata",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Metadata_Type",
-                                "name": "Execution Metadata Type",
-                            },
-                            {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset",
                                 "name": "Execution Asset",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset_Type",
-                                "name": "Execution Asset Type",
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset",
