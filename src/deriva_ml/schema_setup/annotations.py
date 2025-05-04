@@ -94,16 +94,6 @@ def generate_annotation(model: DerivaModel) -> dict:
                 "Description",
                 "Length",
                 [schema, "Execution_Asset_Execution_Asset_Type_fkey"],
-                # {
-                #     "display": {
-                #         "template_engine": "handlebars",
-                #         "markdown_pattern": "{{#if (eq  _Execution_Asset_Type \"2-5QME\")}}\n ::: iframe []("
-                #                             "https://dev.eye-ai.org/~vivi/deriva-webapps/plot/?config=test-line"
-                #                             "-plot&Execution_Asset_RID={{{RID}}}){class=chaise-autofill "
-                #                             "style=\"min-width: 500px; min-height: 300px;\"} \\n:::\n {{/if}}"
-                #     },
-                #     "markdown_name": "ROC Plot"
-                # }
             ],
             "detailed": [
                 "RID",
@@ -111,17 +101,6 @@ def generate_annotation(model: DerivaModel) -> dict:
                 "RMT",
                 "RCB",
                 "RMB",
-                # {
-                #     "display": {
-                #         "template_engine": "handlebars",
-                #         "markdown_pattern": "{{#if (eq _Execution_Asset_Type \"2-5QME\")}} ::: iframe []("
-                #                             "https://dev.eye-ai.org/~vivi/deriva-webapps/plot/?config=test-line"
-                #                             "-plot&Execution_Asset_RID={{{RID}}}){style=\"min-width:1000px; "
-                #                             "min-height:700px; height:70vh;\" class=\"chaise-autofill\"} \\n::: {"
-                #                             "{/if}}"
-                #     },
-                #     "markdown_name": "ROC Plot"
-                # },
                 "URL",
                 "Filename",
                 "Description",
@@ -137,16 +116,109 @@ def generate_annotation(model: DerivaModel) -> dict:
             "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
         }
     }
-
+    rcb_name = [schema, "Dataset_RCB_fkey"]
+    rmb_name = [schema, "Dataset_RMB_fkey"]
     dataset_annotation = {
-        # Setup Facet on types
-        # Make types in visible columns
-        # Have all connected values be visible FK.
+        deriva_tags.visible_columns: {
+            "*": [
+                "RID",
+                "Description",
+                rcb_name,
+                rmb_name,
+                {
+                    "source": [{"outbound": ["deriva-ml", "Dataset_Version_fkey"]}, "Version"],
+                    "markdown_name": "Dataset Version",
+                },
+            ],
+            "detailed": [
+                "RID",
+                "Description",
+                {
+                    "source": [
+                        {"inbound": ["deriva-ml", "Dataset_Dataset_Type_Dataset_fkey"]},
+                        {
+                            "outbound": [
+                                "deriva-ml",
+                                "Dataset_Dataset_Type_Dataset_Type_fkey",
+                            ]
+                        },
+                        "RID",
+                    ],
+                    "markdown_name": "Dataset Types",
+                },
+                {
+                    "source": [{"outbound": ["deriva-ml", "Dataset_Version_fkey"]}, "Version"],
+                    "markdown_name": "Dataset Version",
+                },
+                rcb_name,
+                rmb_name,
+            ],
+            "filter": {
+                "and": [
+                    {"source": "RID"},
+                    {"source": "Description"},
+                    {
+                        "source": [
+                            {
+                                "inbound": [
+                                    "deriva-ml",
+                                    "Dataset_Dataset_Type_Dataset_fkey",
+                                ]
+                            },
+                            {
+                                "outbound": [
+                                    "deriva-ml",
+                                    "Dataset_Dataset_Type_Dataset_Type_fkey",
+                                ]
+                            },
+                            "RID",
+                        ],
+                        "markdown_name": "Dataset Types",
+                    },
+                    {
+                        "source": [{"outbound": rcb_name}, "RID"],
+                        "markdown_name": "Created By",
+                    },
+                    {
+                        "source": [{"outbound": rmb_name}, "RID"],
+                        "markdown_name": "Modified By",
+                    }
+                ]
+            }
+        }
     }
 
     schema_annotation = {
         "name_style": {"underline_space": True},
     }
+
+    dataset_version_annotation = {
+        deriva_tags.visible_columns: {
+            "*": [
+                "RID",
+                "RCT",
+                "RMT",
+                [schema, "Dataset_Version_RCB_fkey"],
+                [schema, "Dataset_Version_RMB_fkey"],
+                "Description",
+               "Version",
+                {
+                    "source": [
+                        {"outbound": [schema, "Dataset_Version_Dataset_fkey"]},
+                        "RID",
+                    ]
+                },
+            ]
+        },
+        deriva_tags.visible_foreign_keys: {"*": []},
+        deriva_tags.table_display:
+            {
+                "row_name": {
+                    "row_markdown_pattern": "{{{$fkey_deriva-ml_Dataset_Version_Dataset_fkey.RID}}}:{{{Version}}}"
+                }
+            }
+        }
+
 
     catalog_annotation = {
         deriva_tags.display: {"name_style": {"underline_space": True}},
@@ -210,6 +282,10 @@ def generate_annotation(model: DerivaModel) -> dict:
                                 "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset",
                                 "name": "Dataset",
                             },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset_Version",
+                                "name": "Dataset Versions",
+                            },
                         ],
                     },
                 ],
@@ -232,6 +308,7 @@ def generate_annotation(model: DerivaModel) -> dict:
         "execution_metadata_annotation": execution_metadata_annotation,
         "schema_annotation": schema_annotation,
         "catalog_annotation": catalog_annotation,
+        "dataset_version_annotation": dataset_version_annotation,
     }
 
 

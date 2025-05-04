@@ -243,7 +243,7 @@ class Dataset:
 
         Args:
             dataset_rid: RID of the dataset whose version is to be incremented.
-            component: Which version of the dataset_table to increment. Major, Minor or Patch
+            component: Which version of the dataset_table to increment. Major, Minor, or Patch
             description: Description of the version update of the dataset_table.
             execution_rid: Which execution is performing increment.
 
@@ -533,7 +533,7 @@ class Dataset:
         dataset is incremented and the description, if provide is applied to that new version.
 
         Args:
-            dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
+            dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
             members: List of RIDs of members to add to the dataset_table.
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             description: Markdown description of the updated dataset.
@@ -621,7 +621,7 @@ class Dataset:
         dataset is incremented and the description, if provide is applied to that new version.
 
         Args:
-            dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
+            dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
             members: List of RIDs of members to add to the dataset_table.
             description: Markdown description of the updated dataset.
             execution_rid: Optional RID of execution associated with this operation.
@@ -673,7 +673,7 @@ class Dataset:
         )
 
     @validate_call
-    def list_dataset_parents(self, dataset_rid: RID) -> list[RID]:
+    def list_dataset_parents(self, dataset_rid: RID) -> list[str]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
 
@@ -699,7 +699,7 @@ class Dataset:
 
     @validate_call
     def list_dataset_children(self, dataset_rid: RID, recurse=False) -> list[RID]:
-        """Given a dataset_table RID, return a list of RIDs of any nested datasets.
+        """Given a dataset_table RID, return a list of RIDs for any nested datasets.
 
         Args:
             dataset_rid: A dataset_table RID.
@@ -859,7 +859,7 @@ class Dataset:
         """
 
         def children_depth(
-            dataset_rid: RID, nested_datasets: dict[RID, list[RID]]
+            dataset_rid: RID, nested_datasets: dict[str, list[str]]
         ) -> int:
             """Return the number of nested datasets for the dataset_rid if provided, otherwise in the current catalog"""
             try:
@@ -905,7 +905,7 @@ class Dataset:
         snapshot_catalog: Optional[DerivaML] = None,
     ) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset_table.  Each element of the dataset_table will be placed in its own dir
-        The top level data directory of the resulting BDBag will have one subdirectory for element type. the subdirectory
+        The top level data directory of the resulting BDBag will have one subdirectory for element type. The subdirectory
         will contain the CSV indicating which elements of that type are present in the dataset_table, and then there will be a
         subdirectories for each object that is reachable from the dataset_table members.
 
@@ -1083,7 +1083,7 @@ class Dataset:
         return DatasetMinid(dataset_version=dataset.version, **r.json())
 
     def _download_dataset_minid(self, minid: DatasetMinid) -> Path:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and validate
         that all the metadata is correct
 
         Args:
@@ -1092,7 +1092,7 @@ class Dataset:
             the location of the unpacked and validated dataset_table bag and the RID of the bag and the bag MINID
         """
 
-        # Check to see if we have an existing idempotent materialization of the desired bag. If so, then just reuse
+        # Check to see if we have an existing idempotent materialization of the desired bag. If so, then  reuse
         # it.  If not, then we need to extract the contents of the archive into our cache directory.
         bag_dir = self._cache_dir / f"{minid.dataset_rid}_{minid.checksum}"
         if bag_dir.exists():
@@ -1374,7 +1374,6 @@ class Dataset:
             deriva_tags.export_fragment_definitions: {
                 "dataset_export_outputs": self._export_annotation()
             },
-            deriva_tags.visible_columns: self.dataset_visible_columns(),
             deriva_tags.visible_foreign_keys: self._dataset_visible_fkeys(),
             deriva_tags.export_2019: {
                 "detailed": {
@@ -1415,90 +1414,6 @@ class Dataset:
             },
         }
 
-    def dataset_visible_columns(self) -> dict[str, Any]:
-        dataset_table = self._model.schemas["deriva-ml"].tables["Dataset"]
-        rcb_name = next(
-            [fk.name[0].name, fk.name[1]]
-            for fk in dataset_table.foreign_keys
-            if fk.name[1] == "Dataset_RCB_fkey"
-        )
-        rmb_name = next(
-            [fk.name[0].name, fk.name[1]]
-            for fk in dataset_table.foreign_keys
-            if fk.name[1] == "Dataset_RMB_fkey"
-        )
-        return {
-            "*": [
-                "RID",
-                "Description",
-                {
-                    "display": {
-                        "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
-                    },
-                    "markdown_name": "Annotation App",
-                },
-                rcb_name,
-                rmb_name,
-            ],
-            "detailed": [
-                "RID",
-                "Description",
-                {
-                    "source": [
-                        {"inbound": ["deriva-ml", "Dataset_Dataset_Type_Dataset_fkey"]},
-                        {
-                            "outbound": [
-                                "deriva-ml",
-                                "Dataset_Dataset_Type_Dataset_Type_fkey",
-                            ]
-                        },
-                        "RID",
-                    ],
-                    "markdown_name": "Dataset Types",
-                },
-                {
-                    "display": {
-                        "markdown_pattern": "[Annotate Dataset](https://www.eye-ai.org/apps/grading-interface/main?dataset_rid={{{RID}}}){: .btn}"
-                    },
-                    "markdown_name": "Annotation App",
-                },
-                rcb_name,
-                rmb_name,
-            ],
-            "filter": {
-                "and": [
-                    {"source": "RID"},
-                    {"source": "Description"},
-                    {
-                        "source": [
-                            {
-                                "inbound": [
-                                    "deriva-ml",
-                                    "Dataset_Dataset_Type_Dataset_fkey",
-                                ]
-                            },
-                            {
-                                "outbound": [
-                                    "deriva-ml",
-                                    "Dataset_Dataset_Type_Dataset_Type_fkey",
-                                ]
-                            },
-                            "RID",
-                        ],
-                        "markdown_name": "Dataset Types",
-                    },
-                    {
-                        "source": [{"outbound": rcb_name}, "RID"],
-                        "markdown_name": "Created By",
-                    },
-                    {
-                        "source": [{"outbound": rmb_name}, "RID"],
-                        "markdown_name": "Modified By",
-                    },
-                ]
-            },
-        }
-
     def _dataset_visible_fkeys(self) -> dict[str, Any]:
         def fkey_name(fk):
             return [fk.name[0].name, fk.name[1]]
@@ -1506,6 +1421,57 @@ class Dataset:
         dataset_table = self._model.schemas["deriva-ml"].tables["Dataset"]
 
         source_list = [
+            {
+                "source": [
+                    {
+                        "inbound": [
+                            "deriva-ml",
+                            "Dataset_Version_Dataset_fkey"
+                        ]
+                    },
+                    "RID"
+                ],
+                "markdown_name": "Previous Versions",
+                "entity": True
+            },
+            {
+                "source": [
+                    {
+                        "inbound": [
+                            "deriva-ml",
+                            "Dataset_Dataset_Nested_Dataset_fkey"
+                        ]
+                    },
+                    {
+                        "outbound": [
+                            "deriva-ml",
+                            "Dataset_Dataset_Dataset_fkey"
+                        ]
+                    },
+                    "RID"
+                ],
+                "markdown_name": "Parent Datasets"
+            },
+            {
+                "source": [
+                    {
+                        "inbound": [
+                            "deriva-ml",
+                            "Dataset_Dataset_Dataset_fkey"
+                        ]
+                    },
+                    {
+                        "outbound": [
+                            "deriva-ml",
+                            "Dataset_Dataset_Nested_Dataset_fkey"
+                        ]
+                    },
+                    "RID"
+                ],
+                "markdown_name": "Child Datasets"
+            }
+        ]
+        source_list.extend([
             {
                 "source": [
                     {"inbound": fkey_name(fkey.self_fkey)},
@@ -1516,4 +1482,5 @@ class Dataset:
             }
             for fkey in dataset_table.find_associations(max_arity=3, pure=False)
         ]
+        )
         return {"detailed": source_list}

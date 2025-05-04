@@ -24,6 +24,7 @@ def create_dataset_table(
     execution_table: Table,
     project_name: str,
     dataset_annotation: Optional[dict] = None,
+        version_annotation: Optional[dict] = None,
 ):
     dataset_table = schema.create_table(
         Table.define(
@@ -48,7 +49,7 @@ def create_dataset_table(
         )
     )
 
-    dataset_version = schema.create_table(define_table_dataset_version(schema.name))
+    dataset_version = schema.create_table(define_table_dataset_version(schema.name, version_annotation))
     dataset_table.create_reference(("Version", True, dataset_version))
 
     # Nested datasets.
@@ -64,7 +65,7 @@ def create_dataset_table(
     )
 
 
-def define_table_dataset_version(sname: str):
+def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
     return Table.define(
         tname="Dataset_Version",
         column_defs=[
@@ -79,8 +80,8 @@ def define_table_dataset_version(sname: str):
             Column.define("Execution", builtin_types.text, comment="RID of execution"),
             Column.define(
                 "Minid", builtin_types.text, comment="URL to MINID for dataset"
-            ),
-        ],
+            )],
+            annotations=annotation,
         key_defs=[Key.define(["Dataset", "Version"])],
         fkey_defs=[ForeignKey.define(["Dataset"], sname, "Dataset", ["RID"])],
     )
@@ -248,7 +249,7 @@ def create_ml_schema(
         schema, annotations["execution_annotation"]
     )
     create_dataset_table(
-        schema, execution_table, project_name, annotations["dataset_annotation"]
+        schema, execution_table, project_name, annotations["dataset_annotation"], annotations["dataset_version_annotation"]
     )
 
     create_asset_table(
