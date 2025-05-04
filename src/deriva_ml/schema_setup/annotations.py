@@ -13,6 +13,8 @@ def generate_annotation(model: DerivaModel) -> dict:
         deriva_tags.visible_columns: {
             "*": [
                 "RID",
+                [schema, "Workflow_RCB_fkey"],
+                [schema, "Workflow_RMB_fkey"],
                 "Name",
                 "Description",
                 {
@@ -36,6 +38,7 @@ def generate_annotation(model: DerivaModel) -> dict:
             "*": [
                 "RID",
                 [schema, "Execution_RCB_fkey"],
+                [schema, "Execution_RMB_fkey"],
                 "RCT",
                 "Description",
                 {"source": [{"outbound": [schema, "Execution_Workflow_fkey"]}, "RID"]},
@@ -116,15 +119,13 @@ def generate_annotation(model: DerivaModel) -> dict:
             "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
         }
     }
-    rcb_name = [schema, "Dataset_RCB_fkey"]
-    rmb_name = [schema, "Dataset_RMB_fkey"]
     dataset_annotation = {
         deriva_tags.visible_columns: {
             "*": [
                 "RID",
                 "Description",
-                rcb_name,
-                rmb_name,
+                [schema, "Dataset_RCB_fkey"],
+                [schema, "Dataset_RMB_fkey"],
                 {
                     "source": [{"outbound": ["deriva-ml", "Dataset_Version_fkey"]}, "Version"],
                     "markdown_name": "Dataset Version",
@@ -150,8 +151,8 @@ def generate_annotation(model: DerivaModel) -> dict:
                     "source": [{"outbound": ["deriva-ml", "Dataset_Version_fkey"]}, "Version"],
                     "markdown_name": "Dataset Version",
                 },
-                rcb_name,
-                rmb_name,
+                [schema, "Dataset_RCB_fkey"],
+                [schema, "Dataset_RMB_fkey"],
             ],
             "filter": {
                 "and": [
@@ -176,11 +177,11 @@ def generate_annotation(model: DerivaModel) -> dict:
                         "markdown_name": "Dataset Types",
                     },
                     {
-                        "source": [{"outbound": rcb_name}, "RID"],
+                        "source": [{"outbound":  [schema, "Dataset_RCB_fkey"]}, "RID"],
                         "markdown_name": "Created By",
                     },
                     {
-                        "source": [{"outbound": rmb_name}, "RID"],
+                        "source": [{"outbound": [schema, "Dataset_RMB_fkey"]}, "RID"],
                         "markdown_name": "Modified By",
                     }
                 ]
