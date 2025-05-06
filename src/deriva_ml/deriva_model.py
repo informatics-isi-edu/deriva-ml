@@ -21,7 +21,7 @@ from .deriva_definitions import (
 
 from collections import Counter
 from pydantic import validate_call, ConfigDict
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Any
 
 
 class DerivaModel:
@@ -72,6 +72,11 @@ class DerivaModel:
         except IndexError:
             # No domain schema defined.
             self.domain_schema = domain_schema
+
+    @property
+    def chaise_config(self) -> dict[str, Any]:
+        """Return the chaise configuration."""
+        return self.model.chaise_config
 
     def __getattr__(self, name):
         # Called only if `name` is not found in Manager.  Delegate attributes to model class.

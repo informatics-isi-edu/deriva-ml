@@ -1,10 +1,11 @@
 import atexit
 from importlib.metadata import version
 from importlib.resources import files
+import itertools
 import logging
 from random import randint, random
 from typing import Optional
-import itertools
+from tempfile import TemporaryDirectory
 
 from deriva.config.acl_config import AclConfig
 from deriva.core import DerivaServer
@@ -23,8 +24,11 @@ from deriva_ml import (
     RID,
 )
 
-from deriva_ml.schema_setup.create_schema import initialize_ml_schema, create_ml_schema
-from deriva_ml.dataset import Dataset
+from deriva_ml.schema_setup.create_schema import (
+    initialize_ml_schema,
+    create_ml_schema,
+    add_domain_menu,
+)
 
 TEST_DATASET_SIZE = 4
 
@@ -80,12 +84,9 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
 
 
 def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
-    ml_instance.add_dataset_element_type("Subject")
-    ml_instance.add_dataset_element_type("Image")
-
     type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
     training_rid = ml_instance.add_term(
-        "Dataset_Type", "Training", description="A traing set"
+        "Dataset_Type", "Training", description="A training set"
     )
     testing_rid = ml_instance.add_term(
         "Dataset_Type", "Testing", description="A testing set"
@@ -251,20 +252,37 @@ def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
     :return:
     """
 
-    # Make sure that we have a ml schema
     _ = ml_instance.model.schemas["deriva-ml"]
 
     if ml_instance.model.schemas.get(sname):
         # Clean out any old junk....
         ml_instance.model.schemas[sname].drop()
 
-    domain_schema = ml_instance.model.model.create_schema(
+    domain_schema = ml_instance.model.create_schema(
         Schema.define(sname, annotations={"name_style": {"underline_space": True}})
     )
     subject_table = domain_schema.create_table(
         Table.define("Subject", column_defs=[Column.define("Name", builtin_types.text)])
     )
     ml_instance.create_asset("Image", referenced_tables=[subject_table])
+
+    ml_instance.add_dataset_element_type("Subject")
+    ml_instance.add_dataset_element_type("Image")
+
+    add_domain_menu(
+        ml_instance.model,
+        "Demo Model",
+        [
+            {
+                "url": f"/chaise/recordset/#{ml_instance.catalog_id}/{domain_schema.name}:Subject",
+                "name": "Subject",
+            },
+            {
+                "url": f"/chaise/recordset/#{ml_instance.catalog_id}/{domain_schema.name}:Image",
+                "name": "Image",
+            },
+        ],
+    )
 
 
 def destroy_demo_catalog(catalog):
@@ -283,40 +301,32 @@ def create_demo_catalog(
     credentials = get_credential(hostname)
     server = DerivaServer("https", hostname, credentials=credentials)
     test_catalog = server.create_ermrest_catalog()
+
+    policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
+    AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
+
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)
-    model = test_catalog.getCatalogModel()
 
     try:
-        create_ml_schema(model, project_name=project_name)
-        deriva_ml = DerivaML(
-            hostname=hostname,
-            catalog_id=test_catalog.catalog_id,
-            project_name=project_name,
-            domain_schema=domain_schema,
-            logging_level=logging.WARN,
-        )
-        create_domain_schema(deriva_ml, domain_schema)
-        working_dir = deriva_ml.working_dir
-        dataset_table = deriva_ml.dataset_table
-        dataset_table.annotations.update(
-            Dataset(
-                deriva_ml.model,
-                cache_dir=deriva_ml.cache_dir,
-                working_dir=deriva_ml.working_dir,
-            )._generate_dataset_download_annotations()
-        )
-        deriva_ml.model.apply()
-        policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
-        AclConfig(
-            hostname, test_catalog.catalog_id, policy_file, credentials=credentials
-        )
-        if populate or create_features or create_datasets:
-            populate_demo_catalog(deriva_ml, domain_schema)
-            if create_features:
-                create_demo_features(deriva_ml)
-            if create_datasets:
-                create_demo_datasets(deriva_ml)
+        with TemporaryDirectory() as tmpdir:
+            create_ml_schema(test_catalog, project_name=project_name)
+            deriva_ml = DerivaML(
+                hostname=hostname,
+                catalog_id=test_catalog.catalog_id,
+                project_name=project_name,
+                domain_schema=domain_schema,
+                logging_level=logging.WARN,
+                working_dir=tmpdir,
+            )
+            create_domain_schema(deriva_ml, domain_schema)
+
+            if populate or create_features or create_datasets:
+                populate_demo_catalog(deriva_ml, domain_schema)
+                if create_features:
+                    create_demo_features(deriva_ml)
+                if create_datasets:
+                    create_demo_datasets(deriva_ml)
 
     except Exception:
         # on failure, delete catalog and re-raise exception

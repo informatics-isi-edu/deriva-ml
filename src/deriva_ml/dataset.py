@@ -455,7 +455,9 @@ class Dataset:
         )
 
         # self.model = self.catalog.getCatalogModel()
-        self.dataset_table.annotations.update(self._generate_dataset_download_annotations())
+        self.dataset_table.annotations.update(
+            self._generate_dataset_download_annotations()
+        )
         self._model.model.apply()
         return table
 
@@ -759,7 +761,7 @@ class Dataset:
     ) -> Iterator[tuple[str, str, Table]]:
         paths = self._collect_paths(dataset and dataset.rid, snapshot_catalog)
 
-        def source_path(path: tuple[Table, ...]) -> list[str] :
+        def source_path(path: tuple[Table, ...]) -> list[str]:
             """Convert a tuple representing a path into a source path component with FK linkage"""
             path = list(path)
             p = [f"{self._model.ml_schema}:Dataset/RID={{RID}}"]
@@ -773,6 +775,7 @@ class Dataset:
                 else:
                     p.append(f"{table.schema.name}:{table.name}")
             return p
+
         src_paths = ["/".join(source_path(p)) for p in paths]
         dest_paths = ["/".join([t.name for t in p]) for p in paths]
         target_tables = [p[-1] for p in paths]
@@ -1192,7 +1195,9 @@ class Dataset:
                 "destination": {"type": "json", "name": "schema"},
             },
         ] + self._dataset_specification(
-            self._export_annotation_dataset_element, None, snapshot_catalog=snapshot_catalog
+            self._export_annotation_dataset_element,
+            None,
+            snapshot_catalog=snapshot_catalog,
         )
 
     def _export_specification(
@@ -1212,7 +1217,9 @@ class Dataset:
                 "processor": "json",
                 "processor_params": {"query_path": "/schema", "output_path": "schema"},
             }
-        ] + self._dataset_specification(self._export_specification_dataset_element, dataset, snapshot_catalog)
+        ] + self._dataset_specification(
+            self._export_specification_dataset_element, dataset, snapshot_catalog
+        )
 
     @staticmethod
     def _export_specification_dataset_element(
@@ -1253,8 +1260,7 @@ class Dataset:
         return exports
 
     def _export_annotation_dataset_element(
-            self,
-        spath: str, dpath: str, table: Table
+        self, spath: str, dpath: str, table: Table
     ) -> list[dict[str, Any]]:
         """Given a path in the data model, output an export specification for the path taken to get to the current table.
 
@@ -1273,7 +1279,7 @@ class Dataset:
         skip_root_path = False
         if spath.startswith(f"{self._ml_schema}:Dataset/"):
             # Chaise will add table name and RID filter, so strip it off.
-            spath = '/'.join(spath.split('/')[2:])
+            spath = "/".join(spath.split("/")[2:])
             if spath == "":
                 # This path is to just the dataset table.
                 return []
@@ -1282,7 +1288,11 @@ class Dataset:
             skip_root_path = True
         exports = [
             {
-                "source": {"api": "entity", "path": spath, "skip_root_path": skip_root_path},
+                "source": {
+                    "api": "entity",
+                    "path": spath,
+                    "skip_root_path": skip_root_path,
+                },
                 "destination": {"name": dpath, "type": "csv"},
             }
         ]
@@ -1423,64 +1433,40 @@ class Dataset:
         source_list = [
             {
                 "source": [
-                    {
-                        "inbound": [
-                            "deriva-ml",
-                            "Dataset_Version_Dataset_fkey"
-                        ]
-                    },
-                    "RID"
-                ],
-                "markdown_name": "Previous Versions",
-                "entity": True
-            },
-            {
-                "source": [
-                    {
-                        "inbound": [
-                            "deriva-ml",
-                            "Dataset_Dataset_Nested_Dataset_fkey"
-                        ]
-                    },
-                    {
-                        "outbound": [
-                            "deriva-ml",
-                            "Dataset_Dataset_Dataset_fkey"
-                        ]
-                    },
-                    "RID"
-                ],
-                "markdown_name": "Parent Datasets"
-            },
-            {
-                "source": [
-                    {
-                        "inbound": [
-                            "deriva-ml",
-                            "Dataset_Dataset_Dataset_fkey"
-                        ]
-                    },
-                    {
-                        "outbound": [
-                            "deriva-ml",
-                            "Dataset_Dataset_Nested_Dataset_fkey"
-                        ]
-                    },
-                    "RID"
-                ],
-                "markdown_name": "Child Datasets"
-            }
-        ]
-        source_list.extend([
-            {
-                "source": [
-                    {"inbound": fkey_name(fkey.self_fkey)},
-                    {"outbound": fkey_name(other_fkey := fkey.other_fkeys.pop())},
+                    {"inbound": ["deriva-ml", "Dataset_Version_Dataset_fkey"]},
                     "RID",
                 ],
-                "markdown_name": other_fkey.pk_table.name,
-            }
-            for fkey in dataset_table.find_associations(max_arity=3, pure=False)
+                "markdown_name": "Previous Versions",
+                "entity": True,
+            },
+            {
+                "source": [
+                    {"inbound": ["deriva-ml", "Dataset_Dataset_Nested_Dataset_fkey"]},
+                    {"outbound": ["deriva-ml", "Dataset_Dataset_Dataset_fkey"]},
+                    "RID",
+                ],
+                "markdown_name": "Parent Datasets",
+            },
+            {
+                "source": [
+                    {"inbound": ["deriva-ml", "Dataset_Dataset_Dataset_fkey"]},
+                    {"outbound": ["deriva-ml", "Dataset_Dataset_Nested_Dataset_fkey"]},
+                    "RID",
+                ],
+                "markdown_name": "Child Datasets",
+            },
         ]
+        source_list.extend(
+            [
+                {
+                    "source": [
+                        {"inbound": fkey_name(fkey.self_fkey)},
+                        {"outbound": fkey_name(other_fkey := fkey.other_fkeys.pop())},
+                        "RID",
+                    ],
+                    "markdown_name": other_fkey.pk_table.name,
+                }
+                for fkey in dataset_table.find_associations(max_arity=3, pure=False)
+            ]
         )
         return {"detailed": source_list}

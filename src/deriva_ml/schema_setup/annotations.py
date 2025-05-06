@@ -1,14 +1,181 @@
 import argparse
 import sys
 
+from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 from ..deriva_model import DerivaModel
 from ..upload import bulk_upload_configuration
 
 
-def generate_annotation(model: DerivaModel) -> dict:
+def catalog_annotation(model: Model, schema: str):
     catalog_id = model.catalog.catalog_id
-    schema = model.ml_schema
+
+    return {
+        deriva_tags.display: {"name_style": {"underline_space": True}},
+        deriva_tags.chaise_config: {
+            "headTitle": "Catalog ML",
+            "navbarBrandText": "ML Data Browser",
+            "systemColumnsDisplayEntry": ["RID"],
+            "systemColumnsDisplayCompact": ["RID"],
+            "navbarMenu": {
+                "newTab": False,
+                "children": [
+                    {
+                        "name": "User Info",
+                        "children": [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Client",
+                                "name": "Users",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Group",
+                                "name": "Groups",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_RID_Lease",
+                                "name": "ERMrest RID Lease",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "Deriva-ML",
+                        "children": [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow",
+                                "name": "Workflow",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution",
+                                "name": "Execution",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Metadata",
+                                "name": "Execution Metadata",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset",
+                                "name": "Execution Asset",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset",
+                                "name": "Dataset",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset_Version",
+                                "name": "Dataset Versions",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Type",
+                                "name": "Asset Type",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Feature_Name",
+                                "name": "Feature Name",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow_Type",
+                                "name": "Workflow Type",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Role",
+                                "name": "Execution Role",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "Vocabulary",
+                        "children": [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Type",
+                                "name": "Asset Type",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Feature_Name",
+                                "name": "Feature Name",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow_Type",
+                                "name": "Workflow Type",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Role",
+                                "name": "Asset Role",
+                            },
+                        ],
+                    },
+                ],
+            },
+            "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
+            "deleteRecord": True,
+            "showFaceting": True,
+            "shareCiteAcls": True,
+            "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
+            "resolverImplicitCatalog": None,
+        },
+        deriva_tags.bulk_upload: bulk_upload_configuration(model=DerivaModel(model)),
+    }
+
+
+def asset_annotation(asset_table: Table):
+    schema = asset_table.schema.name
+    asset_name = asset_table.name
+    model = DerivaModel(asset_table.schema.model)
+
+    def fkey_column(column):
+        """Map the column name to a FK if a constraint exists on the column"""
+        return next(
+            (
+                (fk.name[0].name, fk.name[1])
+                for fk in asset_table.foreign_keys
+                if asset_table.columns[column] in fk.column_map
+            ),
+            column,
+        )
+
+    annotations = {
+        deriva_tags.table_display: {
+            "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
+        },
+        deriva_tags.visible_columns: {
+            "*": [
+                "RID",
+                "RCT",
+                "RMT",
+                [schema, f"{asset_name}_RCB_fkey"],
+                [schema, f"{asset_name}_RMB_fkey"],
+                "URL",
+                "Filename",
+                "Description",
+                "Length",
+                "MD5",
+                {
+                    "source": [
+                        {
+                            "inbound": [
+                                schema,
+                                f"{asset_name}_Asset_Type_{asset_name}_fkey",
+                            ]
+                        },
+                        {
+                            "outbound": [
+                                schema,
+                                f"{asset_name}_Asset_Type_Asset_Type_fkey",
+                            ]
+                        },
+                        "RID",
+                    ],
+                    "markdown_name": "Asset Types",
+                },
+            ]
+            + [fkey_column(c) for c in model.asset_metadata(asset_table)],
+        },
+    }
+    asset_table.annotations.update(annotations)
+    model.apply()
+
+
+def generate_annotation(model: Model, schema: str) -> dict:
+    catalog_id = model.catalog.catalog_id
     workflow_annotation = {
         deriva_tags.visible_columns: {
             "*": [
@@ -86,39 +253,6 @@ def generate_annotation(model: DerivaModel) -> dict:
         },
     }
 
-    execution_asset_annotation = {
-        deriva_tags.table_display: {
-            "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
-        },
-        deriva_tags.visible_columns: {
-            "compact": [
-                "RID",
-                "URL",
-                "Description",
-                "Length",
-                [schema, "Execution_Asset_Execution_Asset_Type_fkey"],
-            ],
-            "detailed": [
-                "RID",
-                "RCT",
-                "RMT",
-                "RCB",
-                "RMB",
-                "URL",
-                "Filename",
-                "Description",
-                "Length",
-                "MD5",
-                [schema, "Execution_Asset_Execution_Asset_Type_fkey"],
-            ],
-        },
-    }
-
-    execution_metadata_annotation = {
-        deriva_tags.table_display: {
-            "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
-        }
-    }
     dataset_annotation = {
         deriva_tags.visible_columns: {
             "*": [
@@ -127,7 +261,10 @@ def generate_annotation(model: DerivaModel) -> dict:
                 [schema, "Dataset_RCB_fkey"],
                 [schema, "Dataset_RMB_fkey"],
                 {
-                    "source": [{"outbound": ["deriva-ml", "Dataset_Version_fkey"]}, "Version"],
+                    "source": [
+                        {"outbound": ["deriva-ml", "Dataset_Version_fkey"]},
+                        "Version",
+                    ],
                     "markdown_name": "Dataset Version",
                 },
             ],
@@ -148,7 +285,10 @@ def generate_annotation(model: DerivaModel) -> dict:
                     "markdown_name": "Dataset Types",
                 },
                 {
-                    "source": [{"outbound": ["deriva-ml", "Dataset_Version_fkey"]}, "Version"],
+                    "source": [
+                        {"outbound": ["deriva-ml", "Dataset_Version_fkey"]},
+                        "Version",
+                    ],
                     "markdown_name": "Dataset Version",
                 },
                 [schema, "Dataset_RCB_fkey"],
@@ -177,15 +317,15 @@ def generate_annotation(model: DerivaModel) -> dict:
                         "markdown_name": "Dataset Types",
                     },
                     {
-                        "source": [{"outbound":  [schema, "Dataset_RCB_fkey"]}, "RID"],
+                        "source": [{"outbound": [schema, "Dataset_RCB_fkey"]}, "RID"],
                         "markdown_name": "Created By",
                     },
                     {
                         "source": [{"outbound": [schema, "Dataset_RMB_fkey"]}, "RID"],
                         "markdown_name": "Modified By",
-                    }
+                    },
                 ]
-            }
+            },
         }
     }
 
@@ -208,105 +348,25 @@ def generate_annotation(model: DerivaModel) -> dict:
                     ]
                 },
                 "Description",
-               "Version",
+                "Version",
                 "Minid",
-                "Execution"
+                "Execution",
             ]
         },
         deriva_tags.visible_foreign_keys: {"*": []},
-        deriva_tags.table_display:
-            {
-                "row_name": {
-                    "row_markdown_pattern": "{{{$fkey_deriva-ml_Dataset_Version_Dataset_fkey.RID}}}:{{{Version}}}"
-                }
+        deriva_tags.table_display: {
+            "row_name": {
+                "row_markdown_pattern": "{{{$fkey_deriva-ml_Dataset_Version_Dataset_fkey.RID}}}:{{{Version}}}"
             }
-        }
-
-
-    catalog_annotation = {
-        deriva_tags.display: {"name_style": {"underline_space": True}},
-        deriva_tags.chaise_config: {
-            "headTitle": "Catalog ML",
-            "navbarBrandText": "ML Data Browser",
-            "systemColumnsDisplayEntry": ["RID"],
-            "systemColumnsDisplayCompact": ["RID"],
-            "navbarMenu": {
-                "newTab": False,
-                "children": [
-                    {
-                        "name": "User Info",
-                        "children": [
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Client",
-                                "name": "Users",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Group",
-                                "name": "Groups",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_RID_Lease",
-                                "name": "ERMrest RID Lease",
-                            },
-                        ],
-                    },
-                    {
-                        "name": "Deriva-ML",
-                        "children": [
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow",
-                                "name": "Workflow",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow_Type",
-                                "name": "Workflow Type",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution",
-                                "name": "Execution",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Type",
-                                "name": "Asset Type",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Metadata",
-                                "name": "Execution Metadata",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset",
-                                "name": "Execution Asset",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset",
-                                "name": "Dataset",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset_Version",
-                                "name": "Dataset Versions",
-                            },
-                        ],
-                    },
-                ],
-            },
-            "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
-            "deleteRecord": True,
-            "showFaceting": True,
-            "shareCiteAcls": True,
-            "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
-            "resolverImplicitCatalog": catalog_id,
         },
-        deriva_tags.bulk_upload: bulk_upload_configuration(model=DerivaModel(model)),
     }
 
     return {
         "workflow_annotation": workflow_annotation,
         "dataset_annotation": dataset_annotation,
         "execution_annotation": execution_annotation,
-        "execution_asset_annotation": execution_asset_annotation,
-        "execution_metadata_annotation": execution_metadata_annotation,
         "schema_annotation": schema_annotation,
-        "catalog_annotation": catalog_annotation,
+        "catalog_annotation": catalog_annotation(model, schema),
         "dataset_version_annotation": dataset_version_annotation,
     }
 
@@ -316,7 +376,7 @@ def main():
     parser.add_argument("--catalog_id", type=str, required=True)
     parser.add_argument("--schema_name", type=str, required=True)
     args = parser.parse_args()
-    generate_annotation(args.catalog_id)
+    generate_annotation(args.catalog_id, args.schema_name)
 
 
 if __name__ == "__main__":

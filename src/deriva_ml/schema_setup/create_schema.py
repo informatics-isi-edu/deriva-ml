@@ -2,7 +2,7 @@ import argparse
 import sys
 from typing import Optional, Any
 
-from deriva.core import DerivaServer, get_credential
+from deriva.core import DerivaServer, get_credential, ErmrestCatalog
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import (
     builtin_types,
@@ -15,7 +15,7 @@ from deriva.core.ermrest_model import (
 from deriva.core.utils.core_utils import tag as chaise_tags
 
 from deriva_ml import MLVocab
-from deriva_ml.schema_setup.annotations import generate_annotation
+from deriva_ml.schema_setup.annotations import generate_annotation, asset_annotation
 from deriva_ml.deriva_model import DerivaModel
 
 
@@ -24,7 +24,7 @@ def create_dataset_table(
     execution_table: Table,
     project_name: str,
     dataset_annotation: Optional[dict] = None,
-        version_annotation: Optional[dict] = None,
+    version_annotation: Optional[dict] = None,
 ):
     dataset_table = schema.create_table(
         Table.define(
@@ -49,7 +49,9 @@ def create_dataset_table(
         )
     )
 
-    dataset_version = schema.create_table(define_table_dataset_version(schema.name, version_annotation))
+    dataset_version = schema.create_table(
+        define_table_dataset_version(schema.name, version_annotation)
+    )
     dataset_table.create_reference(("Version", True, dataset_version))
 
     # Nested datasets.
@@ -80,8 +82,9 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
             Column.define("Execution", builtin_types.text, comment="RID of execution"),
             Column.define(
                 "Minid", builtin_types.text, comment="URL to MINID for dataset"
-            )],
-            annotations=annotation,
+            ),
+        ],
+        annotations=annotation,
         key_defs=[Key.define(["Dataset", "Version"])],
         fkey_defs=[ForeignKey.define(["Dataset"], sname, "Dataset", ["RID"])],
     )
@@ -114,18 +117,15 @@ def create_asset_table(
     execution_table,
     asset_type_table,
     asset_role_table,
-    annotation: Optional[dict] = None,
 ):
-    annotation = annotation if annotation is not None else {}
     asset_table = schema.create_table(
         Table.define_asset(
             sname=schema.name,
             tname=asset_name,
             hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
-            annotations=annotation,
         )
     )
-    atable = schema.create_table(
+    schema.create_table(
         Table.define_association(
             [
                 (asset_name, asset_table),
@@ -143,6 +143,7 @@ def create_asset_table(
         )
     )
     atable.create_reference(asset_role_table)
+    asset_annotation(asset_table)
     return asset_table
 
 
@@ -204,13 +205,18 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
 
 
 def create_ml_schema(
-    model: Model, schema_name: str = "deriva-ml", project_name: Optional[str] = None
+    catalog: ErmrestCatalog,
+    schema_name: str = "deriva-ml",
+    project_name: Optional[str] = None,
 ):
+    project_name = project_name or schema_name
+
+    model = catalog.getCatalogModel()
     if model.schemas.get(schema_name):
         model.schemas[schema_name].drop(cascade=True)
+
     # get annotations
-    deriva_model = DerivaModel(model)
-    annotations = generate_annotation(deriva_model)
+    annotations = generate_annotation(model, schema_name)
 
     model.annotations.update(annotations["catalog_annotation"])
     client_annotation = {
@@ -230,7 +236,6 @@ def create_ml_schema(
     schema = model.create_schema(
         Schema.define(schema_name, annotations=annotations["schema_annotation"])
     )
-    project_name = project_name or schema_name
 
     # Create workflow and execution table.
 
@@ -249,7 +254,11 @@ def create_ml_schema(
         schema, annotations["execution_annotation"]
     )
     create_dataset_table(
-        schema, execution_table, project_name, annotations["dataset_annotation"], annotations["dataset_version_annotation"]
+        schema,
+        execution_table,
+        project_name,
+        annotations["dataset_annotation"],
+        annotations["dataset_version_annotation"],
     )
 
     create_asset_table(
@@ -258,15 +267,14 @@ def create_ml_schema(
         execution_table,
         asset_type_table,
         asset_role_table,
-        annotations["execution_metadata_annotation"],
     )
+
     create_asset_table(
         schema,
         "Execution_Asset",
         execution_table,
         asset_type_table,
         asset_role_table,
-        annotations["execution_asset_annotation"],
     )
 
     # File table
@@ -353,6 +361,27 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         ],
         defaults={"ID", "URI"},
     )
+
+
+def add_domain_menu(model: DerivaModel, name: str, menu: list[dict[str, str]]) -> None:
+    """Add a menu for domain tables to the Chaise menu bar
+
+    Args:
+        model: The model for the catalog on which the menu will be added
+        name:  Name for the menu on the menu bar
+        menu: List of menu items to add to the menu bar in the form of [{'name':str, "url": str}, ...]
+
+    Returns:
+
+    """
+    # Get existing chaise config
+
+    chaise_menus = model.chaise_config["navbarMenu"]["children"]
+    if domain_menu := next((m for m in chaise_menus if m["name"] == name), None):
+        domain_menu.update({"name": name, "children": menu})
+    else:
+        chaise_menus.append({"name": name, "children": menu})
+    model.apply()
 
 
 def main():

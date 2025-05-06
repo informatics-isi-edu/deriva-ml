@@ -98,7 +98,7 @@ class DatasetHistory(BaseModel):
         version_rid (RID): The RID of the version record for the dataset in the Dataset_Version table.
         minid (str): The URL that represents the handle of the dataset bag.  This will be None if a MINID has not
                      been created yet.
-        timestamp (datetime): The timestamp of when the  dataset was created.
+        timestamp (datetime): The timestamp of when the dataset was created.
     """
 
     dataset_version: DatasetVersion
