@@ -120,7 +120,12 @@ class DerivaModel:
         return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
     def is_association(
-        self, table_name: str | Table, unqualified: bool = True, pure: bool = True
+        self,
+        table_name: str | Table,
+        unqualified: bool = True,
+        pure: bool = True,
+        min_arity: int = 2,
+        max_arity: int = 2,
     ) -> bool | set | int:
         """Check the specified table to see if it is an association table.
 
@@ -135,7 +140,9 @@ class DerivaModel:
 
         """
         table = self.name_to_table(table_name)
-        return table.is_association(unqualified=unqualified, pure=pure)
+        return table.is_association(
+            unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity
+        )
 
     def find_association(self, table1: Table | str, table2: Table | str) -> Table:
         """Given two tables, return an association table that connects the two.

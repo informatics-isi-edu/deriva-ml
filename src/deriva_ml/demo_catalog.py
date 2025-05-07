@@ -14,6 +14,7 @@ from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
 
+from .schema_setup.annotations import catalog_annotation
 from deriva_ml import (
     DerivaML,
     ExecutionConfiguration,
@@ -27,7 +28,6 @@ from deriva_ml import (
 from deriva_ml.schema_setup.create_schema import (
     initialize_ml_schema,
     create_ml_schema,
-    add_domain_menu,
 )
 
 TEST_DATASET_SIZE = 4
@@ -269,20 +269,7 @@ def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
     ml_instance.add_dataset_element_type("Subject")
     ml_instance.add_dataset_element_type("Image")
 
-    add_domain_menu(
-        ml_instance.model,
-        "Demo Model",
-        [
-            {
-                "url": f"/chaise/recordset/#{ml_instance.catalog_id}/{domain_schema.name}:Subject",
-                "name": "Subject",
-            },
-            {
-                "url": f"/chaise/recordset/#{ml_instance.catalog_id}/{domain_schema.name}:Image",
-                "name": "Image",
-            },
-        ],
-    )
+    catalog_annotation(ml_instance.model)
 
 
 def destroy_demo_catalog(catalog):

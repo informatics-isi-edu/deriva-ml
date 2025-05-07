@@ -7,16 +7,23 @@ from ..deriva_model import DerivaModel
 from ..upload import bulk_upload_configuration
 
 
-def catalog_annotation(model: Model, schema: str):
+def catalog_annotation(model: DerivaModel):
     catalog_id = model.catalog.catalog_id
+    ml_schema = model.ml_schema
 
-    return {
+    catalog_annotation = {
         deriva_tags.display: {"name_style": {"underline_space": True}},
         deriva_tags.chaise_config: {
             "headTitle": "Catalog ML",
             "navbarBrandText": "ML Data Browser",
             "systemColumnsDisplayEntry": ["RID"],
             "systemColumnsDisplayCompact": ["RID"],
+            "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
+            "deleteRecord": True,
+            "showFaceting": True,
+            "shareCiteAcls": True,
+            "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
+            "resolverImplicitCatalog": None,
             "navbarMenu": {
                 "newTab": False,
                 "children": [
@@ -41,79 +48,132 @@ def catalog_annotation(model: Model, schema: str):
                         "name": "Deriva-ML",
                         "children": [
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Workflow",
                                 "name": "Workflow",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution",
                                 "name": "Execution",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Metadata",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Metadata",
                                 "name": "Execution Metadata",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Asset",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Asset",
                                 "name": "Execution Asset",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset",
                                 "name": "Dataset",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Dataset_Version",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset_Version",
                                 "name": "Dataset Versions",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Type",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Asset_Type",
                                 "name": "Asset Type",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Feature_Name",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Feature_Name",
                                 "name": "Feature Name",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow_Type",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Workflow_Type",
                                 "name": "Workflow Type",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Execution_Role",
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Role",
                                 "name": "Execution Role",
                             },
                         ],
                     },
                     {
-                        "name": "Vocabulary",
+                        "name": model.domain_schema,
                         "children": [
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Type",
-                                "name": "Asset Type",
+                                "name": tname,
+                                "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
+                            }
+                            for tname in model.schemas[model.domain_schema].tables
+                            if not (
+                                model.is_vocabulary(tname)
+                                or model.is_association(tname, pure=False, max_arity=3)
+                            )
+                        ],
+                    },
+                    {
+                        "name": "Vocabulary",
+                        "children": [
+                            {"name": f"{ml_schema} Vocabularies", "header": True}
+                        ]
+                        + [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
+                                "name": tname,
+                            }
+                            for tname in model.schemas[model.ml_schema].tables
+                            if model.is_vocabulary(tname)
+                        ]
+                        + [
+                            {
+                                "name": f"{model.domain_schema} Vocabularies",
+                                "header": True,
+                            }
+                        ]
+                        + [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
+                                "name": tname,
+                            }
+                            for tname in model.schemas[model.domain_schema].tables
+                            if model.is_vocabulary(tname)
+                        ],
+                    },
+                    {
+                        "name": "Assets",
+                        "children":
+                         [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
+                                "name": tname,
+                            }
+                            for tname in model.schemas[model.ml_schema].tables
+                            if model.is_asset(tname)
+                        ] + [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
+                                "name": tname,
+                            }
+                            for tname in model.schemas[model.domain_schema].tables
+                            if model.is_asset(tname)
+                        ],
+                    },
+                    {
+                        "url": "/chaise/recordset/#0/ermrest:registry@sort(RID)",
+                        "name": "Catalog Registry",
+                    },
+                    {
+                        "name": "Documentation",
+                        "children": [
+                            {
+                                "url": "https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/ml_workflow_instruction.md",
+                                "name": "ML Notebook Instruction",
                             },
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Feature_Name",
-                                "name": "Feature Name",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Workflow_Type",
-                                "name": "Workflow Type",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{schema}:Asset_Role",
-                                "name": "Asset Role",
+                                "url": "https://informatics-isi-edu.github.io/deriva-ml/",
+                                "name": "Deriva-ML Documentation",
                             },
                         ],
                     },
                 ],
             },
-            "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
-            "deleteRecord": True,
-            "showFaceting": True,
-            "shareCiteAcls": True,
-            "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
-            "resolverImplicitCatalog": None,
         },
-        deriva_tags.bulk_upload: bulk_upload_configuration(model=DerivaModel(model)),
+        deriva_tags.bulk_upload: bulk_upload_configuration(model=model),
     }
+    model.annotations.update(catalog_annotation)
+    model.apply()
 
 
 def asset_annotation(asset_table: Table):
@@ -366,7 +426,6 @@ def generate_annotation(model: Model, schema: str) -> dict:
         "dataset_annotation": dataset_annotation,
         "execution_annotation": execution_annotation,
         "schema_annotation": schema_annotation,
-        "catalog_annotation": catalog_annotation(model, schema),
         "dataset_version_annotation": dataset_version_annotation,
     }
 

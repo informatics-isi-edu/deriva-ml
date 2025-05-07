@@ -16,7 +16,6 @@ from deriva.core.utils.core_utils import tag as chaise_tags
 
 from deriva_ml import MLVocab
 from deriva_ml.schema_setup.annotations import generate_annotation, asset_annotation
-from deriva_ml.deriva_model import DerivaModel
 
 
 def create_dataset_table(
@@ -218,7 +217,6 @@ def create_ml_schema(
     # get annotations
     annotations = generate_annotation(model, schema_name)
 
-    model.annotations.update(annotations["catalog_annotation"])
     client_annotation = {
         "tag:misd.isi.edu,2015:display": {"name": "Users"},
         "tag:isrd.isi.edu,2016:table-display": {
@@ -361,27 +359,6 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         ],
         defaults={"ID", "URI"},
     )
-
-
-def add_domain_menu(model: DerivaModel, name: str, menu: list[dict[str, str]]) -> None:
-    """Add a menu for domain tables to the Chaise menu bar
-
-    Args:
-        model: The model for the catalog on which the menu will be added
-        name:  Name for the menu on the menu bar
-        menu: List of menu items to add to the menu bar in the form of [{'name':str, "url": str}, ...]
-
-    Returns:
-
-    """
-    # Get existing chaise config
-
-    chaise_menus = model.chaise_config["navbarMenu"]["children"]
-    if domain_menu := next((m for m in chaise_menus if m["name"] == name), None):
-        domain_menu.update({"name": name, "children": menu})
-    else:
-        chaise_menus.append({"name": name, "children": menu})
-    model.apply()
 
 
 def main():
