@@ -8,8 +8,8 @@ from typing import Optional
 from tempfile import TemporaryDirectory
 
 from deriva.config.acl_config import AclConfig
-from deriva.core import DerivaServer
-from deriva.core import ErmrestCatalog, get_credential
+from deriva.core import DerivaServer, get_credential
+from deriva.core import ErmrestCatalog
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
@@ -285,12 +285,16 @@ def create_demo_catalog(
     create_datasets=False,
     on_exit_delete=True,
 ) -> ErmrestCatalog:
-    credentials = get_credential(hostname)
-    server = DerivaServer("https", hostname, credentials=credentials)
+    credential = (
+        {"username": "deriva-admin", "password": "deriva-admin"}
+        if hostname == "localhost"
+        else get_credential(hostname)
+    )
+    server = DerivaServer("https", hostname, credentials=credential)
     test_catalog = server.create_ermrest_catalog()
 
     policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
-    AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credentials)
+    AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credential)
 
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)
@@ -305,6 +309,7 @@ def create_demo_catalog(
                 domain_schema=domain_schema,
                 logging_level=logging.WARN,
                 working_dir=tmpdir,
+                credential=credential,
             )
             create_domain_schema(deriva_ml, domain_schema)
 

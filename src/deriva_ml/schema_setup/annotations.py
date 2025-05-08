@@ -7,7 +7,18 @@ from ..deriva_model import DerivaModel
 from ..upload import bulk_upload_configuration
 
 
-def catalog_annotation(model: DerivaModel):
+def catalog_annotation(model: DerivaModel) -> None:
+    """Set the annotations for a catalog.
+
+    This routine will dynamically walk the domain schema and create menu bar for the catalog based on the current
+    configuration.  A side effect is that the annotation attribute of the catalog will be updated and the result
+    pushed to the catalog.
+
+
+    Args:
+        model: A deriva model to the current catalog.
+
+    """
     catalog_id = model.catalog.catalog_id
     ml_schema = model.ml_schema
 
@@ -44,7 +55,7 @@ def catalog_annotation(model: DerivaModel):
                             },
                         ],
                     },
-                    {
+                    {   # All the primary tables in deriva-ml schema.
                         "name": "Deriva-ML",
                         "children": [
                             {
@@ -71,22 +82,6 @@ def catalog_annotation(model: DerivaModel):
                                 "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset_Version",
                                 "name": "Dataset Versions",
                             },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Asset_Type",
-                                "name": "Asset Type",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Feature_Name",
-                                "name": "Feature Name",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Workflow_Type",
-                                "name": "Workflow Type",
-                            },
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Role",
-                                "name": "Execution Role",
-                            },
                         ],
                     },
                     {
@@ -97,13 +92,14 @@ def catalog_annotation(model: DerivaModel):
                                 "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
                             }
                             for tname in model.schemas[model.domain_schema].tables
+                            # Don't include controlled vocabularies, association tables, or feature tables.
                             if not (
                                 model.is_vocabulary(tname)
                                 or model.is_association(tname, pure=False, max_arity=3)
                             )
                         ],
                     },
-                    {
+                    {   # Vocabulary menu which will list all the controlled vocabularies in deriva-ml and domain.
                         "name": "Vocabulary",
                         "children": [
                             {"name": f"{ml_schema} Vocabularies", "header": True}
@@ -131,7 +127,7 @@ def catalog_annotation(model: DerivaModel):
                             if model.is_vocabulary(tname)
                         ],
                     },
-                    {
+                    {   # List of all of the asset tables in deriva-ml and domain schemas.
                         "name": "Assets",
                         "children":
                          [
