@@ -2,8 +2,8 @@
 THis module defines the DataSet class with is used to manipulate n
 """
 
-from datetime import datetime
 from .deriva_definitions import RID
+
 from enum import Enum
 from pydantic import (
     BaseModel,
@@ -98,7 +98,7 @@ class DatasetHistory(BaseModel):
         version_rid (RID): The RID of the version record for the dataset in the Dataset_Version table.
         minid (str): The URL that represents the handle of the dataset bag.  This will be None if a MINID has not
                      been created yet.
-        timestamp (datetime): The timestamp of when the dataset was created.
+        snapshot (str): Catalog snapshot ID of when the version record was created.
     """
 
     dataset_version: DatasetVersion
@@ -107,7 +107,7 @@ class DatasetHistory(BaseModel):
     execution_rid: Optional[RID] = None
     description: str = ""
     minid: Optional[str] = None
-    timestamp: Optional[datetime] = None
+    snapshot: Optional[str] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

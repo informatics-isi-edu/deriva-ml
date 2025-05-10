@@ -7,12 +7,12 @@ from random import randint, random
 from typing import Optional
 from tempfile import TemporaryDirectory
 
-from deriva.config.acl_config import AclConfig
 from deriva.core import DerivaServer, get_credential
 from deriva.core import ErmrestCatalog
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
 from requests import HTTPError
+import subprocess
 
 from .schema_setup.annotations import catalog_annotation
 from deriva_ml import (
@@ -285,16 +285,30 @@ def create_demo_catalog(
     create_datasets=False,
     on_exit_delete=True,
 ) -> ErmrestCatalog:
-    credential = (
-        {"username": "deriva-admin", "password": "deriva-admin"}
-        if hostname == "localhost"
-        else get_credential(hostname)
-    )
+    credential = get_credential(hostname)
+
     server = DerivaServer("https", hostname, credentials=credential)
     test_catalog = server.create_ermrest_catalog()
+    model = test_catalog.getCatalogModel()
+    model.configure_baseline_catalog()
 
-    policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
-    AclConfig(hostname, test_catalog.catalog_id, policy_file, credentials=credential)
+    if hostname == "localhost":
+        # modify local representation of catalog ACL config
+        model.acls.update({"enumerate": ["*"]})
+        # apply these local config changes to the server
+        model.apply()
+    else:
+        policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
+        subprocess.run(
+            [
+                "deriva-acl-config",
+                "--host",
+                test_catalog.deriva_server.server,
+                "--config-file",
+                policy_file,
+                test_catalog.catalog_id,
+            ]
+        )
 
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)

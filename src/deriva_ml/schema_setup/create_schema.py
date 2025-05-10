@@ -12,7 +12,6 @@ from deriva.core.ermrest_model import (
     ForeignKey,
     Key,
 )
-from deriva.core.utils.core_utils import tag as chaise_tags
 
 from deriva_ml import MLVocab
 from deriva_ml.schema_setup.annotations import generate_annotation, asset_annotation
@@ -81,6 +80,11 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
             Column.define("Execution", builtin_types.text, comment="RID of execution"),
             Column.define(
                 "Minid", builtin_types.text, comment="URL to MINID for dataset"
+            ),
+            Column.define(
+                "Snapshot",
+                builtin_types.text,
+                comment="Catalog Snapshot ID for dataset",
             ),
         ],
         annotations=annotation,
@@ -278,53 +282,7 @@ def create_ml_schema(
     # File table
     create_file_table(schema, execution_table, project_name)
 
-    create_www_schema(model)
     initialize_ml_schema(model, schema_name)
-
-
-def create_www_schema(model: Model):
-    """
-    Set up a new schema and tables to hold web-page like content.  The tables include a page table, and an asset
-    table that can have images that are referred to by the web page.  Pages are written using markdown.
-    :return:
-    """
-    if model.schemas.get("www"):
-        model.schemas["www"].drop(cascade=True)
-    www_schema = model.create_schema(
-        Schema.define(
-            "www", comment="Schema for tables that will be displayed as web content"
-        )
-    )
-    www_schema.create_table(
-        Table.define(
-            "Page",
-            column_defs=[
-                Column.define(
-                    "Title",
-                    builtin_types.text,
-                    nullok=False,
-                    comment="Unique title for the page",
-                ),
-                Column.define(
-                    "Content",
-                    builtin_types.markdown,
-                    comment="Content of the page in markdown",
-                ),
-            ],
-            key_defs=[Key.define(["Title"])],
-            annotations={
-                chaise_tags.table_display: {
-                    "detailed": {
-                        "hide_column_headers": True,
-                        "collapse_toc_panel": True,
-                    }
-                },
-                chaise_tags.visible_foreign_keys: {"detailed": {}},
-                chaise_tags.visible_columns: {"detailed": ["Content"]},
-            },
-        )
-    )
-    return www_schema
 
 
 def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):

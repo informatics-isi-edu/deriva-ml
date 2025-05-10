@@ -34,7 +34,7 @@ def catalog_annotation(model: DerivaModel) -> None:
             "showFaceting": True,
             "shareCiteAcls": True,
             "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
-            "resolverImplicitCatalog": None,
+            "resolverImplicitCatalog": False,
             "navbarMenu": {
                 "newTab": False,
                 "children": [
@@ -55,7 +55,7 @@ def catalog_annotation(model: DerivaModel) -> None:
                             },
                         ],
                     },
-                    {   # All the primary tables in deriva-ml schema.
+                    {  # All the primary tables in deriva-ml schema.
                         "name": "Deriva-ML",
                         "children": [
                             {
@@ -80,7 +80,20 @@ def catalog_annotation(model: DerivaModel) -> None:
                             },
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset_Version",
-                                "name": "Dataset Versions",
+                                "name": "Dataset Version",
+                            },
+                        ],
+                    },
+                    {  # All the primary tables in deriva-ml schema.
+                        "name": "WWW",
+                        "children": [
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/WWW:Page",
+                                "name": "Page",
+                            },
+                            {
+                                "url": f"/chaise/recordset/#{catalog_id}/WWW:File",
+                                "name": "File",
                             },
                         ],
                     },
@@ -99,7 +112,7 @@ def catalog_annotation(model: DerivaModel) -> None:
                             )
                         ],
                     },
-                    {   # Vocabulary menu which will list all the controlled vocabularies in deriva-ml and domain.
+                    {  # Vocabulary menu which will list all the controlled vocabularies in deriva-ml and domain.
                         "name": "Vocabulary",
                         "children": [
                             {"name": f"{ml_schema} Vocabularies", "header": True}
@@ -127,17 +140,17 @@ def catalog_annotation(model: DerivaModel) -> None:
                             if model.is_vocabulary(tname)
                         ],
                     },
-                    {   # List of all of the asset tables in deriva-ml and domain schemas.
+                    {  # List of all of the asset tables in deriva-ml and domain schemas.
                         "name": "Assets",
-                        "children":
-                         [
+                        "children": [
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
                                 "name": tname,
                             }
                             for tname in model.schemas[model.ml_schema].tables
                             if model.is_asset(tname)
-                        ] + [
+                        ]
+                        + [
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
                                 "name": tname,
@@ -404,7 +417,13 @@ def generate_annotation(model: Model, schema: str) -> dict:
                     ]
                 },
                 "Description",
-                "Version",
+                {
+                    "display": {
+                        "template_engine": "handlebars",
+                        "markdown_pattern": "[{{{Version}}}](https://{{{$location.host}}}/id/{{{$catalog.id}}}/{{{Dataset}}}@{{{Snapshot}}})",
+                    },
+                    "markdown_name": "Version",
+                },
                 "Minid",
                 "Execution",
             ]

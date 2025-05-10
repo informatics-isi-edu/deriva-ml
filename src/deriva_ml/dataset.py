@@ -10,6 +10,18 @@ from __future__ import annotations
 from bdbag.fetch.fetcher import fetch_single_file
 from bdbag import bdbag_api as bdb
 from collections import defaultdict
+from graphlib import TopologicalSorter
+import json
+import logging
+from pathlib import Path
+from pydantic import (
+    validate_call,
+    ConfigDict,
+)
+import requests
+from tempfile import TemporaryDirectory, NamedTemporaryFile
+from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
+
 
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
@@ -27,19 +39,6 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
-from graphlib import TopologicalSorter
-import json
-import logging
-from pathlib import Path
-from pydantic import (
-    validate_call,
-    ConfigDict,
-)
-import requests
-
-from tempfile import TemporaryDirectory, NamedTemporaryFile
-from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
-
 from deriva_ml import DatasetBag
 from .deriva_definitions import (
     ML_SCHEMA,
@@ -49,7 +48,6 @@ from .deriva_definitions import (
     RID,
     DRY_RUN_RID,
 )
-from .history import iso_to_snap
 from .deriva_model import DerivaModel
 from .database_model import DatabaseModel
 from .dataset_aux_classes import (
@@ -100,27 +98,28 @@ class Dataset:
         dataset_list: list[DatasetSpec],
         description: Optional[str] = "",
         execution_rid: Optional[RID] = None,
-    ) -> list[dict[str, Any]]:
+    ) -> None:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
-
+        # determine snapshot after changes were made
+        snap = self._model.catalog.get("/").json()["snaptime"]
         # Construct version records for insert
-        version_records = [
-            {
-                "Dataset": dataset.rid,
-                "Version": str(dataset.version),
-                "Description": description,
-                "Execution": execution_rid,
-            }
-            for dataset in dataset_list
-        ]
+        version_records = schema_path.tables["Dataset_Version"].insert(
+            [
+                {
+                    "Dataset": dataset.rid,
+                    "Version": str(dataset.version),
+                    "Description": description,
+                    "Execution": execution_rid,
+                    "Snapshot": snap,
+                }
+                for dataset in dataset_list
+            ]
+        )
 
-        # Insert version records and construct entities for updating the dataset version column.
-        version_rids = [
-            {"Version": v["RID"], "RID": v["Dataset"]}
-            for v in schema_path.tables["Dataset_Version"].insert(version_records)
-        ]
-        schema_path.tables["Dataset"].update(version_rids)
-        return version_rids
+        # And update the dataset records.
+        schema_path.tables["Dataset"].update(
+            [{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records]
+        )
 
     def _bootstrap_versions(self):
         datasets = [ds["RID"] for ds in self.find_datasets()]
@@ -182,7 +181,7 @@ class Dataset:
             DatasetHistory(
                 dataset_version=DatasetVersion.parse(v["Version"]),
                 minid=v["Minid"],
-                timestamp=v["RCT"],
+                snapshot=v["Snapshot"],
                 dataset_rid=dataset_rid,
                 version_rid=v["RID"],
                 description=v["Description"],
@@ -536,7 +535,7 @@ class Dataset:
 
         Args:
             dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
-            members: List of RIDs of members to add to the dataset_table.
+            members: List of member RIDs to add to the dataset_table.
             validate: Check rid_list to make sure elements are not already in the dataset_table.
             description: Markdown description of the updated dataset.
             execution_rid: Optional RID of execution associated with this dataset.
@@ -575,7 +574,7 @@ class Dataset:
             a.other_fkeys.pop().pk_table.name: a.table.name
             for a in self.dataset_table.find_associations()
         }
-        # Get a list of all the types of objects that can be linked to a dataset_table.
+        # Get a list of all the object types that can be linked to a dataset_table.
         for m in members:
             try:
                 rid_info = self._model.catalog.resolve_rid(m)
@@ -624,7 +623,7 @@ class Dataset:
 
         Args:
             dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
-            members: List of RIDs of members to add to the dataset_table.
+            members: List of member RIDs to add to the dataset_table.
             description: Markdown description of the updated dataset.
             execution_rid: Optional RID of execution associated with this operation.
         """
@@ -639,7 +638,7 @@ class Dataset:
             a.other_fkeys.pop().pk_table.name: a.table.name
             for a in self.dataset_table.find_associations()
         }
-        # Get a list of all the types of objects that can be linked to a dataset_table.
+        # Get a list of all the object types that can be linked to a dataset_table.
         for m in members:
             try:
                 rid_info = self._model.catalog.resolve_rid(m)
@@ -705,7 +704,7 @@ class Dataset:
 
         Args:
             dataset_rid: A dataset_table RID.
-            recurse: If True, return a list of RIDs of any nested datasets.
+            recurse: If True, return a list of nested datasets RIDs.
 
         Returns:
           list of nested dataset RIDs.
@@ -910,7 +909,7 @@ class Dataset:
         """Output a download/export specification for a dataset_table.  Each element of the dataset_table will be placed in its own dir
         The top level data directory of the resulting BDBag will have one subdirectory for element type. The subdirectory
         will contain the CSV indicating which elements of that type are present in the dataset_table, and then there will be a
-        subdirectories for each object that is reachable from the dataset_table members.
+         subdirectory for each object that is reachable from the dataset_table members.
 
         To simplify reconstructing the relationship between tables, the CVS for each
         The top level data directory will also contain a subdirectory for any controlled vocabularies used in the dataset_table.
@@ -918,7 +917,7 @@ class Dataset:
 
         For example, consider a dataset_table that consists of two element types, T1 and T2. T1 has foreign key relationships to
         objects in tables T3 and T4.  There are also two controlled vocabularies, CV1 and CV2.  T2 is an asset table
-        which has two asset in it. The layout of the resulting bdbag would be:
+        which has two assets in it. The layout of the resulting bdbag would be:
               data
                 CV1/
                     cv1.csv
@@ -990,7 +989,7 @@ class Dataset:
             for h in self.dataset_history(dataset_rid=dataset.rid)
             if h.dataset_version == dataset.version
         ][0]
-        return f"{self._model.catalog.catalog_id}@{iso_to_snap(version_record.timestamp.isoformat())}"
+        return f"{self._model.catalog.catalog_id}@{version_record.snapshot}"
 
     def _create_dataset_minid(
         self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML] = None
@@ -1095,7 +1094,7 @@ class Dataset:
             the location of the unpacked and validated dataset_table bag and the RID of the bag and the bag MINID
         """
 
-        # Check to see if we have an existing idempotent materialization of the desired bag. If so, then  reuse
+        # Check to see if we have an existing idempotent materialization of the desired bag. If so, then reuse
         # it.  If not, then we need to extract the contents of the archive into our cache directory.
         bag_dir = self._cache_dir / f"{minid.dataset_rid}_{minid.checksum}"
         if bag_dir.exists():

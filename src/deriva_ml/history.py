@@ -54,6 +54,8 @@ def datetime_epoch_us(dt):
 # -- --------------------------------------------------------------------------------------
 # Take the iso format string (same as RMT) and return the version number
 #
+
+
 def iso_to_snap(iso_datetime):
     rmt = datetime.fromisoformat(iso_datetime)
     return urlb32_encode(datetime_epoch_us(rmt))
