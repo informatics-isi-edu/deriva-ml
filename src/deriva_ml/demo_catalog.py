@@ -294,9 +294,7 @@ def create_demo_catalog(
 
     if hostname == "localhost":
         # modify local representation of catalog ACL config
-        model.acls.update({"enumerate": ["*"]})
-        # apply these local config changes to the server
-        model.apply()
+        test_catalog.put("/acl/enumerate", json=["*"])
     else:
         policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
         subprocess.run(
