@@ -291,22 +291,17 @@ def create_demo_catalog(
     test_catalog = server.create_ermrest_catalog()
     model = test_catalog.getCatalogModel()
     model.configure_baseline_catalog()
-
-    if hostname == "localhost":
-        # modify local representation of catalog ACL config
-        test_catalog.put("/acl/enumerate", json=["*"])
-    else:
-        policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
-        subprocess.run(
-            [
-                "deriva-acl-config",
-                "--host",
-                test_catalog.deriva_server.server,
-                "--config-file",
-                policy_file,
-                test_catalog.catalog_id,
-            ]
-        )
+    policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
+    subprocess.run(
+        [
+            "deriva-acl-config",
+            "--host",
+            test_catalog.deriva_server.server,
+            "--config-file",
+            policy_file,
+            test_catalog.catalog_id,
+        ]
+    )
 
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)
