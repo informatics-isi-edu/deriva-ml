@@ -425,7 +425,12 @@ def generate_annotation(model: Model, schema: str) -> dict:
                     "markdown_name": "Version",
                 },
                 "Minid",
-                "Execution",
+                {
+                    "source": [
+                        {"outbound": [schema, "Dataset_Version_Execution_fkey"]},
+                        "RID",
+                    ]
+                },
             ]
         },
         deriva_tags.visible_foreign_keys: {"*": []},
