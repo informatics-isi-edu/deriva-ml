@@ -128,12 +128,12 @@ class DatasetMinid(BaseModel):
     """
 
     dataset_version: DatasetVersion
-    metadata: dict[str, str | int]
-    minid: str = Field(alias="compact_uri")
+    metadata: dict[str, str | int] = {}
+    minid: str = Field(alias="compact_uri", default=None)
     bag_url: str = Field(alias="location")
-    identifier: str
-    landing_page: str
-    version_rid: RID = Field(alias="Dataset_RID")
+    identifier: Optional[str] = None
+    landing_page: Optional[str] = None
+    version_rid: RID = Field(alias="RID")
     checksum: str = Field(alias="checksums", default="")
 
     @computed_field
@@ -156,8 +156,8 @@ class DatasetMinid(BaseModel):
 
     @field_validator("bag_url", mode="before")
     @classmethod
-    def convert_location_to_str(cls, value: list[str]) -> str:
-        return value[0]
+    def convert_location_to_str(cls, value: list[str] | str) -> str:
+        return value[0] if isinstance(value, list) else value
 
     @field_validator("checksum", mode="before")
     @classmethod
