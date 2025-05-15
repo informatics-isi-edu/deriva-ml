@@ -25,6 +25,7 @@ from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
 
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
+import deriva.core.utils.hash_utils as hash_utils
 from deriva.transfer.download.deriva_export import DerivaExport
 from deriva.transfer.download.deriva_download import (
     DerivaDownloadConfigurationError,
@@ -33,6 +34,7 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadAuthorizationError,
     DerivaDownloadTimeoutError,
 )
+
 
 try:
     from icecream import ic
@@ -72,13 +74,20 @@ class Dataset:
 
     _Logger = logging.getLogger("deriva_ml")
 
-    def __init__(self, model: DerivaModel, cache_dir: Path, working_dir: Path):
+    def __init__(
+        self,
+        model: DerivaModel,
+        cache_dir: Path,
+        working_dir: Path,
+        use_minid: bool = True,
+    ):
         self._model = model
         self._ml_schema = ML_SCHEMA
         self.dataset_table = self._model.schemas[self._ml_schema].tables["Dataset"]
         self._cache_dir = cache_dir
         self._working_dir = working_dir
         self._logger = logging.getLogger("deriva_ml")
+        self._use_minid = use_minid
 
     def _is_dataset_rid(self, dataset_rid: RID, deleted: bool = False) -> bool:
         try:
@@ -270,7 +279,7 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
         self,
-        type: str | list[str],
+        dataset_types: str | list[str],
         description: str,
         execution_rid: Optional[RID] = None,
         version: Optional[DatasetVersion] = None,
@@ -278,7 +287,7 @@ class Dataset:
         """Create a new dataset_table from the specified list of RIDs.
 
         Args:
-            type: One or more dataset_table types.  Must be a term from the DatasetType controlled vocabulary.
+            dataset_types: One or more dataset_table types.  Must be a term from the DatasetType controlled vocabulary.
             description: Description of the dataset_table.
             execution_rid: Execution under which the dataset_table will be created.
             version: Version of the dataset_table.
@@ -306,7 +315,7 @@ class Dataset:
             return False
 
         # Create the entry for the new dataset_table and get its RID.
-        ds_types = [type] if isinstance(type, str) else type
+        ds_types = [dataset_types] if isinstance(dataset_types, str) else dataset_types
         pb = self._model.catalog.getPathBuilder()
         for ds_type in ds_types:
             if not check_dataset_type(ds_type):
@@ -1016,6 +1025,7 @@ class Dataset:
                     envars={"RID": dataset.rid},
                 )
                 minid_page_url = exporter.export()[0]  # Get the MINID launch page
+
             except (
                 DerivaDownloadError,
                 DerivaDownloadConfigurationError,
@@ -1025,17 +1035,18 @@ class Dataset:
             ) as e:
                 raise DerivaMLException(format_exception(e))
             # Update version table with MINID.
-            version_path = (
-                self._model.catalog.getPathBuilder()
-                .schemas[self._ml_schema]
-                .tables["Dataset_Version"]
-            )
-            version_rid = [
-                h
-                for h in self.dataset_history(dataset_rid=dataset.rid)
-                if h.dataset_version == dataset.version
-            ][0].version_rid
-            version_path.update([{"RID": version_rid, "Minid": minid_page_url}])
+            if self._use_minid:
+                version_path = (
+                    self._model.catalog.getPathBuilder()
+                    .schemas[self._ml_schema]
+                    .tables["Dataset_Version"]
+                )
+                version_rid = [
+                    h
+                    for h in self.dataset_history(dataset_rid=dataset.rid)
+                    if h.dataset_version == dataset.version
+                ][0].version_rid
+                version_path.update([{"RID": version_rid, "Minid": minid_page_url}])
         return minid_page_url
 
     def _get_dataset_minid(
@@ -1078,11 +1089,22 @@ class Dataset:
                     raise DerivaMLException(
                         f"Minid for dataset {dataset.rid} doesn't exist"
                     )
-                self._logger.info("Creating new MINID for dataset %s", dataset.rid)
+                if self._use_minid:
+                    self._logger.info("Creating new MINID for dataset %s", dataset.rid)
                 minid_url = self._create_dataset_minid(dataset, snapshot_catalog)
             # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
-        r = requests.get(minid_url, headers={"accept": "application/json"})
-        return DatasetMinid(dataset_version=dataset.version, **r.json())
+            if self._use_minid:
+                r = requests.get(minid_url, headers={"accept": "application/json"})
+                dataset_minid = DatasetMinid(
+                    dataset_version=dataset.version, **r.json()
+                )
+            else:
+                dataset_minid = DatasetMinid(
+                    dataset_version=dataset.version,
+                    RID=f"{dataset.rid}@{dataset_version_record.snapshot}",
+                    location=minid_url,
+                )
+            return dataset_minid
 
     def _download_dataset_minid(self, minid: DatasetMinid) -> Path:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and validate
@@ -1098,15 +1120,23 @@ class Dataset:
         # it.  If not, then we need to extract the contents of the archive into our cache directory.
         bag_dir = self._cache_dir / f"{minid.dataset_rid}_{minid.checksum}"
         if bag_dir.exists():
-            bag_path = (bag_dir / f"Dataset_{minid.dataset_rid}").as_posix()
-        else:
-            bag_dir.mkdir(parents=True, exist_ok=True)
-            with NamedTemporaryFile(
-                delete=False, suffix=f"Dataset_{minid.dataset_rid}.zip"
-            ) as zip_file:
-                archive_path = fetch_single_file(minid.bag_url, zip_file.name)
-                bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())
-            bdb.validate_bag_structure(bag_path)
+            return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
+
+        # Either bag hasn't been downloaded yet, or we are not using a Minid, so we don't know the checksum yet.
+        with NamedTemporaryFile(
+            delete=False, suffix=f"Dataset_{minid.dataset_rid}.zip"
+        ) as zip_file:
+            archive_path = fetch_single_file(minid.bag_url, zip_file.name)
+            if not self._use_minid:
+                hashes = hash_utils.compute_file_hashes(
+                    zip_file.name, hashes=["md5", "sha256"]
+                )
+                checksum = hashes["sha256"][0]
+                bag_dir = self._cache_dir / f"{minid.dataset_rid}_{checksum}"
+                if bag_dir.exists():
+                    return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
+            bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())
+        bdb.validate_bag_structure(bag_path)
         return Path(bag_path)
 
     def _materialize_dataset_bag(
@@ -1312,7 +1342,7 @@ class Dataset:
         return exports
 
     def _generate_dataset_download_spec(
-        self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML]
+        self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML] = None
     ) -> dict[str, Any]:
         """
         Generate a specification for downloading a specific dataset.
@@ -1325,7 +1355,32 @@ class Dataset:
         minid_test = False
 
         catalog_id = self._version_snapshot(dataset)
-        return {
+        post_processors = (
+            {
+                "post_processors": [
+                    {
+                        "processor": "cloud_upload",
+                        "processor_params": {
+                            "acl": "public-read",
+                            "target_url": s3_target,
+                        },
+                    },
+                    {
+                        "processor": "identifier",
+                        "processor_params": {
+                            "test": minid_test,
+                            "env_column_map": {
+                                "RID": "{RID}@{snaptime}",
+                                "Description": "{Description}",
+                            },
+                        },
+                    },
+                ]
+            }
+            if self._use_minid
+            else {}
+        )
+        return post_processors | {
             "env": {"RID": "{RID}"},
             "bag": {
                 "bag_name": "Dataset_{RID}",
@@ -1334,25 +1389,6 @@ class Dataset:
                 "bag_metadata": {},
                 "bag_idempotent": True,
             },
-            "post_processors": [
-                {
-                    "processor": "cloud_upload",
-                    "processor_params": {
-                        "acl": "public-read",
-                        "target_url": s3_target,
-                    },
-                },
-                {
-                    "processor": "identifier",
-                    "processor_params": {
-                        "test": minid_test,
-                        "env_column_map": {
-                            "RID": "{RID}@{snaptime}",
-                            "Description": "{Description}",
-                        },
-                    },
-                },
-            ],
             "catalog": {
                 "host": f"{self._model.catalog.deriva_server.scheme}://{self._model.catalog.deriva_server.server}",
                 "catalog_id": catalog_id,
@@ -1379,6 +1415,35 @@ class Dataset:
         }
 
     def _generate_dataset_download_annotations(self) -> dict[str, Any]:
+        post_processors = (
+            {
+                "type": "BAG",
+                "outputs": [{"fragment_key": "dataset_export_outputs"}],
+                "displayname": "BDBag to Cloud",
+                "bag_idempotent": True,
+                "postprocessors": [
+                    {
+                        "processor": "cloud_upload",
+                        "processor_params": {
+                            "acl": "public-read",
+                            "target_url": "s3://eye-ai-shared/",
+                        },
+                    },
+                    {
+                        "processor": "identifier",
+                        "processor_params": {
+                            "test": False,
+                            "env_column_map": {
+                                "RID": "{RID}@{snaptime}",
+                                "Description": "{Description}",
+                            },
+                        },
+                    },
+                ],
+            }
+            if self._use_minid
+            else {}
+        )
         return {
             deriva_tags.export_fragment_definitions: {
                 "dataset_export_outputs": self._export_annotation()
@@ -1392,32 +1457,8 @@ class Dataset:
                             "outputs": [{"fragment_key": "dataset_export_outputs"}],
                             "displayname": "BDBag Download",
                             "bag_idempotent": True,
-                        },
-                        {
-                            "type": "BAG",
-                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
-                            "displayname": "BDBag to Cloud",
-                            "bag_idempotent": True,
-                            "postprocessors": [
-                                {
-                                    "processor": "cloud_upload",
-                                    "processor_params": {
-                                        "acl": "public-read",
-                                        "target_url": "s3://eye-ai-shared/",
-                                    },
-                                },
-                                {
-                                    "processor": "identifier",
-                                    "processor_params": {
-                                        "test": False,
-                                        "env_column_map": {
-                                            "RID": "{RID}@{snaptime}",
-                                            "Description": "{Description}",
-                                        },
-                                    },
-                                },
-                            ],
-                        },
+                        }
+                        | post_processors
                     ]
                 }
             },
