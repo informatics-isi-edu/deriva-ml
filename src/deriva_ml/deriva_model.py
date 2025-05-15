@@ -61,7 +61,7 @@ class DerivaModel:
         self.schemas = self.model.schemas
 
         self.ml_schema = ml_schema
-        builtin_schemas = ["public", self.ml_schema, "www"]
+        builtin_schemas = ["public", self.ml_schema, "www", "WWW"]
         try:
             self.domain_schema = (
                 domain_schema
