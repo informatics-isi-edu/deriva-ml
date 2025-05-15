@@ -19,6 +19,11 @@ from .dataset_aux_classes import DatasetVersion, DatasetMinid
 from .deriva_model import DerivaModel
 from .dataset_bag import DatasetBag
 
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 class DatabaseModelMeta(type):
     """Use metaclass to ensure that there is onl one instance per path"""
@@ -103,7 +108,6 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         )
 
         self._logger = logging.getLogger("deriva_ml")
-        self.domain_schema = self._guess_domain_schema()
         self._load_model()
         self.ml_schema = ML_SCHEMA
         self._load_sqlite()
@@ -209,16 +213,6 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             dataset_rid = self.bag_path.name.replace("Dataset_", "")
             logging.info(f"No downloaded assets in bag {dataset_rid}")
         return fetch_map
-
-    def _guess_domain_schema(self) -> str:
-        """Guess the domain schema name by eliminating all the "builtin" schema.
-
-        Returns:
-            String for domain schema name.
-        """
-        return [
-            s for s in self.model.schemas if s not in ["deriva-ml", "public", "www"]
-        ][0]
 
     def _is_asset(self, table_name: str) -> bool:
         """
