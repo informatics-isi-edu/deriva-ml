@@ -1,5 +1,4 @@
 import atexit
-from importlib.metadata import version
 from importlib.resources import files
 import itertools
 import logging
@@ -84,6 +83,9 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
 
 
 def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
+    ml_instance.add_dataset_element_type("Subject")
+    ml_instance.add_dataset_element_type("Image")
+
     type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
     training_rid = ml_instance.add_term(
         "Dataset_Type", "Training", description="A training set"
@@ -99,32 +101,46 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     )
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
 
-    dataset_rids = []
-    for r in subject_rids[0:4]:
-        d = ml_instance.create_dataset(
-            type=[type_rid.name, "Testing"],
-            description=f"Dataset {r}",
-            version=DatasetVersion(1, 0, 0),
-        )
-        ml_instance.add_dataset_members(d, [r])
-        dataset_rids.append(d)
-
-    nested_datasets = []
-    for i in range(0, 4, 2):
-        nested_dataset = ml_instance.create_dataset(
-            type=[type_rid.name, "Training"],
-            description=f"Nested Dataset {i}",
-            version=DatasetVersion(1, 0, 0),
-        )
-        ml_instance.add_dataset_members(nested_dataset, dataset_rids[i : i + 2])
-        nested_datasets.append(nested_dataset)
-
-    double_nested_dataset = ml_instance.create_dataset(
-        type_rid.name,
-        description="Double nested dataset",
-        version=DatasetVersion(1, 0, 0),
+    ml_instance.add_term(
+        MLVocab.workflow_type,
+        "Create Dataset Workflow",
+        description="A Workflow that creates a new dataset.",
     )
-    ml_instance.add_dataset_members(double_nested_dataset, nested_datasets)
+    dataset_workflow = ml_instance.create_workflow(
+        name="API Workflow", workflow_type="Create Dataset Workflow"
+    )
+
+    dataset_execution = ml_instance.create_execution(
+        ExecutionConfiguration(workflow=dataset_workflow, description="Create Dataset")
+    )
+
+    with dataset_execution.execute() as exe:
+        dataset_rids = []
+        for r in subject_rids[0:4]:
+            d = exe.create_dataset(
+                dataset_types=[type_rid.name, "Testing"],
+                description=f"Dataset {r}",
+                version=DatasetVersion(1, 0, 0),
+            )
+            ml_instance.add_dataset_members(d, [r])
+            dataset_rids.append(d)
+
+        nested_datasets = []
+        for i in range(0, 4, 2):
+            nested_dataset = exe.create_dataset(
+                dataset_types=[type_rid.name, "Training"],
+                description=f"Nested Dataset {i}",
+                version=DatasetVersion(1, 0, 0),
+            )
+            exe.add_dataset_members(nested_dataset, dataset_rids[i : i + 2])
+            nested_datasets.append(nested_dataset)
+
+        double_nested_dataset = exe.create_dataset(
+            dataset_types=type_rid.name,
+            description="Double nested dataset",
+            version=DatasetVersion(1, 0, 0),
+        )
+        exe.add_dataset_members(double_nested_dataset, nested_datasets)
     return double_nested_dataset, nested_datasets, dataset_rids
 
 
@@ -266,9 +282,6 @@ def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
     )
     ml_instance.create_asset("Image", referenced_tables=[subject_table])
 
-    ml_instance.add_dataset_element_type("Subject")
-    ml_instance.add_dataset_element_type("Image")
-
     catalog_annotation(ml_instance.model)
 
 
@@ -341,6 +354,7 @@ class DemoML(DerivaML):
         catalog_id,
         cache_dir: Optional[str] = None,
         working_dir: Optional[str] = None,
+        use_minid=True,
     ):
         super().__init__(
             hostname=hostname,
@@ -348,5 +362,5 @@ class DemoML(DerivaML):
             project_name="ml-test",
             cache_dir=cache_dir,
             working_dir=working_dir,
-            model_version=version(__name__.split(".")[0]),
+            use_minid=use_minid,
         )
