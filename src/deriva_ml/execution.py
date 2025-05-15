@@ -882,19 +882,25 @@ class Execution:
                 feature.Execution = self.execution_rid
                 file.write(json.dumps(feature.model_dump(mode="json")) + "\n")
 
-    @validate_call
-    def create_dataset(self, dataset_types: str | list[str], description: str) -> RID:
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def create_dataset(
+        self,
+        dataset_types: str | list[str],
+        description: str,
+        version: Optional[DatasetVersion] = None,
+    ) -> RID:
         """Create a new dataset with specified types.
 
         Args:
             dataset_types: param description:
             description: Markdown description of the dataset being created.
+            version: Version to assign to the dataset.  Defaults to 0.1.0
 
         Returns:
             RID of the newly created dataset.
         """
         return self._ml_object.create_dataset(
-            dataset_types, description, self.execution_rid
+            dataset_types, description, self.execution_rid, version=version
         )
 
     def add_dataset_members(
