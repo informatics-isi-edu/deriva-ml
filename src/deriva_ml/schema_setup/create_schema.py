@@ -89,7 +89,10 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
         ],
         annotations=annotation,
         key_defs=[Key.define(["Dataset", "Version"])],
-        fkey_defs=[ForeignKey.define(["Dataset"], sname, "Dataset", ["RID"])],
+        fkey_defs=[
+            ForeignKey.define(["Dataset"], sname, "Dataset", ["RID"]),
+            ForeignKey.define(["Execution"], sname, "Execution", ["RID"]),
+        ],
     )
 
 
