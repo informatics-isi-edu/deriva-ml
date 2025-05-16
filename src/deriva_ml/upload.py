@@ -98,10 +98,10 @@ def is_feature_dir(path: Path) -> Optional[re.Match]:
 
 def normalize_asset_dir(path: str) -> Optional[tuple[str, str]]:
     """Parse a path to an asset file and return the asset table name and file name"""
-
-    if not (m := re.match(asset_path_regex, path)):
+    path = Path(path)
+    if not (m := re.match(asset_path_regex, path.as_posix())):
         return None
-    return f"{m['schema']}/{m['asset_table']}", Path(path).name
+    return f"{m['schema']}/{m['asset_table']}", path.name
 
 
 def upload_root(prefix: Path | str) -> Path:
