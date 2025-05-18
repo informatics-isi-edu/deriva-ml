@@ -7,10 +7,10 @@
 
     "local-admin": ["admin"],
     "project-admins":   ["isrd-systems"],
-    "project-curators": ["isrd-systems", "eye-ai"],
     "project-writers":  ["isrd-systems", "eye-ai"],
-    "project-users":    ["isrd-systems", "eye-ai"],
 
+    "project-curators": ["isrd-systems", "local-admin", "eye-ai" ],
+    "project-users":    ["isrd-systems", "local-admin", "eye-ai"],
 
     "empty": [],
     "public": ["*"],

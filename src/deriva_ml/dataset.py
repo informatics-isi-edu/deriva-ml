@@ -7,8 +7,8 @@ accessible via a DerivaML class instance.
 """
 
 from __future__ import annotations
-from bdbag.fetch.fetcher import fetch_single_file
 from bdbag import bdbag_api as bdb
+from bdbag.fetch.fetcher import fetch_single_file
 from collections import defaultdict
 from graphlib import TopologicalSorter
 import json
@@ -19,7 +19,7 @@ from pydantic import (
     ConfigDict,
 )
 import requests
-from tempfile import TemporaryDirectory, NamedTemporaryFile
+from tempfile import TemporaryDirectory
 from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
 
 
@@ -1013,7 +1013,7 @@ class Dataset:
                 )
             try:
                 self._logger.info(
-                    f"Downloading dataset minid for catalog: {dataset.rid}@{str(dataset.version)}"
+                    f"Downloading dataset {'minid' if self._use_minid else 'bag'} for catalog: {dataset.rid}@{str(dataset.version)}"
                 )
                 # Generate the bag and put into S3 storage.
                 exporter = DerivaExport(
@@ -1120,20 +1120,30 @@ class Dataset:
         # it.  If not, then we need to extract the contents of the archive into our cache directory.
         bag_dir = self._cache_dir / f"{minid.dataset_rid}_{minid.checksum}"
         if bag_dir.exists():
+            self._logger.info(
+                f"Using cached bag for  {minid.dataset_rid} Version:{minid.dataset_version}"
+            )
             return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
 
         # Either bag hasn't been downloaded yet, or we are not using a Minid, so we don't know the checksum yet.
-        with NamedTemporaryFile(
-            delete=False, suffix=f"Dataset_{minid.dataset_rid}.zip"
-        ) as zip_file:
-            archive_path = fetch_single_file(minid.bag_url, zip_file.name)
-            if not self._use_minid:
+        with TemporaryDirectory() as tmp_dir:
+            if self._use_minid:
+                # Get bag from S3
+                archive_path = fetch_single_file(minid.bag_url)
+            else:
+                exporter = DerivaExport(
+                    host=self._model.catalog.deriva_server.server, output_dir=tmp_dir
+                )
+                archive_path = exporter.retrieve_file(minid.bag_url)
                 hashes = hash_utils.compute_file_hashes(
-                    zip_file.name, hashes=["md5", "sha256"]
+                    archive_path, hashes=["md5", "sha256"]
                 )
                 checksum = hashes["sha256"][0]
                 bag_dir = self._cache_dir / f"{minid.dataset_rid}_{checksum}"
                 if bag_dir.exists():
+                    self._logger.info(
+                        f"Using cached bag for  {minid.dataset_rid} Version:{minid.dataset_version}"
+                    )
                     return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
             bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())
         bdb.validate_bag_structure(bag_path)
@@ -1188,6 +1198,9 @@ class Dataset:
 
         # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
         if not validated_check.exists():
+            self._logger.info(
+                f"Materializing bag {minid.dataset_rid} Version:{minid.dataset_version}"
+            )
             bdb.materialize(
                 bag_path.as_posix(),
                 fetch_callback=fetch_progress_callback,
