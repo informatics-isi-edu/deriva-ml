@@ -27,6 +27,7 @@ from .deriva_definitions import (
     MLAsset,
     ExecMetadataType,
     ExecAssetType,
+    FileSpec,
     DRY_RUN_RID,
 )
 from .deriva_ml_base import DerivaML, FeatureRecord
@@ -956,6 +957,16 @@ class Execution:
             component=component,
             description=description,
             execution_rid=self.execution_rid,
+        )
+
+    def add_files(
+        self,
+        path: Iterable[FileSpec],
+        description: str = "",
+    ):
+        """Add files to the file table"""
+        self._ml_object.add_files(
+            path, description=description, execution_rid=self.execution_rid
         )
 
     def __str__(self):

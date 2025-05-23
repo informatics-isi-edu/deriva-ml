@@ -819,6 +819,8 @@ class DerivaML(Dataset):
     ) -> Iterable[RID]:
         """Add a new file to the File table in the catalog.
 
+        The input is an iterator of FileSpec objects which provide the MD5 checksum, length, and URL.
+
         Args:
             file_types: One or more file types.  Must be a term from the File_Type controlled vocabulary.
             files: A sequence of file specifications that describe the files to add.

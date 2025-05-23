@@ -2,12 +2,16 @@
 Shared definitions that are used in different DerivaML modules.
 """
 
+from __future__ import annotations
+
 import warnings
 from datetime import date
 from enum import Enum
-from typing import Any, Iterable, Optional, Annotated
+from pathlib import Path
+from typing import Any, Iterable, Optional, Annotated, Generator
 
 import deriva.core.ermrest_model as em
+import deriva.core.utils.hash_utils as hash_utils
 from urllib.parse import urlparse
 from deriva.core.ermrest_model import builtin_types
 from pydantic import (
@@ -136,11 +140,14 @@ class FileSpec(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_file_url(cls, v):
+        """Examine the provided URL.  If it's a local path, convert it into a tag URL."""
         url_parts = urlparse(v)
         if url_parts.scheme == "tag":
+            # Already a tag URL, so just return it.
             return v
-        elif not url_parts.scheme:
-            return f"tag://{gethostname()},{date.today()}:file://{v}"
+        elif (not url_parts.scheme) or url_parts.scheme == "file":
+            # There is no scheme part tof the URL, or it is a file URL, so it is a local file path, so convert to a tag URL.
+            return f"tag://{gethostname()},{date.today()}:file://{url_parts.path}"
         else:
             raise ValidationError("url is not a file URL")
 
@@ -153,6 +160,37 @@ class FileSpec(BaseModel):
             "Length": self.length,
         }
 
+    @staticmethod
+    def create_filespecs(
+        path: Path, description: str
+    ) -> Generator["FileSpec", None, None]:
+        """Given a file or directory, generate the sequence of corresponding FileSpecs sutable to create a File table
+
+        Arguments:
+            path: Path to the file or directory.
+            description: The description of the file(s)
+
+        Returns:
+            An iterable of FileSpecs for each file in the directory.
+        """
+
+        def list_all_files(p) -> list[Path]:
+            return (
+                [f for f in Path(p).rglob("*") if f.is_file()] if path.is_dir() else [p]
+            )
+
+        def create_spec(p: Path, description: str) -> FileSpec:
+            hashes = hash_utils.compute_file_hashes(p, hashes=["md5", "sha256"])
+            md5 = hashes["md5"][0]
+            return FileSpec(
+                length=path.stat().st_size,
+                md5=md5,
+                description=description,
+                url=path.as_posix(),
+            )
+
+        return (create_spec(path, description) for file in list_all_files(path))
+
 
 class VocabularyTerm(BaseModel):
     """An entry in a vocabulary table.
@@ -162,7 +200,7 @@ class VocabularyTerm(BaseModel):
        synonyms: List of alternative names for the term
        id: CURI identifier for the term
        uri: Unique URI for the term.
-       description: A description of the meaning of the term
+       description: A description of the term meaning
        rid: Resource identifier assigned to the term
 
     Args:

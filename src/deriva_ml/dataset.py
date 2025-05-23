@@ -1,8 +1,7 @@
 """
-This module defines the DataSet class with is used to manipulate datasets in DerivaML,
+This module defines the DataSet class with is used to manipulate datasets in DerivaML.
 The intended use of this class is as a base class in DerivaML, so all the methods documented here are
 accessible via a DerivaML class instance.
-
 
 """
 
