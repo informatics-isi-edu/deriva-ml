@@ -842,7 +842,6 @@ class DerivaML(Dataset):
                     return True
             return False
 
-        # Create the entry for the new dataset_table and get its RID.
         file_types = [file_types] if isinstance(file_types, str) else file_types
         pb = self._model.catalog.getPathBuilder()
         for file_type in file_types:
@@ -869,18 +868,12 @@ class DerivaML(Dataset):
 
         if execution_rid:
             # Get the name of the association table between file_table and execution.
-            exec_table = next(
-                self._model.schemas[self._ml_schema]
-                .tables["Execution"]
-                .find_associations()
-            ).name
-            pb.schemas[self._ml_schema].tables[exec_table].insert(
+            pb.schemas[self._ml_schema].File_Execution.insert(
                 [
                     {"File": file_rid, "Execution": execution_rid}
                     for file_rid in file_rids
                 ]
             )
-
         return file_rids
 
     def list_files(
@@ -891,9 +884,10 @@ class DerivaML(Dataset):
         file_path = ml_path.File
         type_path = ml_path.File_File_Type
 
-        # Get a list of all the dataset_type values associated with this dataset_table.
-        path = file_path.link(type_path)
-        path = path.attributes(
+        path = file_path.link(
+            type_path, on=file_path.RID == type_path.File, join_type="left"
+        )
+        path = path.File.attributes(
             path.File.RID,
             path.File.URL,
             path.File.MD5,
@@ -903,9 +897,9 @@ class DerivaML(Dataset):
         )
         file_map = {}
         for f in path.fetch():
-            file_map.setdefault(f["RID"], f | {"File_Types": []})["File_Types"].append(
-                f["File_Type"]
-            )
+            entry = file_map.setdefault(f["RID"], {**f, "File_Types": []})
+            if ft := f.get("File_Type"):  # assign-and-test in one go
+                entry["File_Types"].append(ft)
 
         # Now get rid of the File_Type key and return the result
         return [(f, f.pop("File_Type"))[0] for f in file_map.values()]

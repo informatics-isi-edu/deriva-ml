@@ -959,14 +959,17 @@ class Execution:
             execution_rid=self.execution_rid,
         )
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_files(
         self,
-        path: Iterable[FileSpec],
-        description: str = "",
-    ):
+        files: Iterable[FileSpec],
+        file_types: str | list[str],
+    ) -> Iterable[RID]:
         """Add files to the file table"""
-        self._ml_object.add_files(
-            path, description=description, execution_rid=self.execution_rid
+        return self._ml_object.add_files(
+            files=files,
+            file_types=file_types,
+            execution_rid=self.execution_rid,
         )
 
     def __str__(self):

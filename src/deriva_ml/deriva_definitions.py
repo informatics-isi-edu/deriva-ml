@@ -162,7 +162,7 @@ class FileSpec(BaseModel):
 
     @staticmethod
     def create_filespecs(
-        path: Path, description: str
+        path: Path | str, description: str
     ) -> Generator["FileSpec", None, None]:
         """Given a file or directory, generate the sequence of corresponding FileSpecs sutable to create a File table
 
@@ -173,10 +173,11 @@ class FileSpec(BaseModel):
         Returns:
             An iterable of FileSpecs for each file in the directory.
         """
+        path = Path(path)
 
         def list_all_files(p) -> list[Path]:
             return (
-                [f for f in Path(p).rglob("*") if f.is_file()] if path.is_dir() else [p]
+                (f for f in Path(p).rglob("*") if f.is_file()) if path.is_dir() else [p]
             )
 
         def create_spec(p: Path, description: str) -> FileSpec:
@@ -186,10 +187,10 @@ class FileSpec(BaseModel):
                 length=path.stat().st_size,
                 md5=md5,
                 description=description,
-                url=path.as_posix(),
+                url=p.as_posix(),
             )
 
-        return (create_spec(path, description) for file in list_all_files(path))
+        return (create_spec(file, description) for file in list_all_files(path))
 
 
 class VocabularyTerm(BaseModel):
