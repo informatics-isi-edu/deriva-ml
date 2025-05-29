@@ -21,7 +21,7 @@ import requests
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
 
-
+from .history import iso_to_snap
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 import deriva.core.utils.hash_utils as hash_utils
@@ -165,6 +165,21 @@ class Dataset:
             [
                 {"RID": dataset, "Version": version["RID"]}
                 for dataset, version in versions.items()
+            ]
+        )
+
+    def _set_version_snapshot(self):
+        dataset_version_path = (
+            self._model.catalog.getPathBuilder()
+            .schemas[self._ml_schema]
+            .tables["Dataset_Version"]
+        )
+        versions = dataset_version_path.entities().fetch()
+        dataset_version_path.update(
+            [
+                {"RID": h["RID"], "Snapshot": iso_to_snap(h["RCT"])}
+                for h in versions
+                if not h["Snapshot"]
             ]
         )
 

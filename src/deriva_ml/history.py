@@ -1,4 +1,5 @@
 from datetime import datetime
+from dateutil.parser import isoparse
 from deriva.core import urlquote
 
 
@@ -57,7 +58,7 @@ def datetime_epoch_us(dt):
 
 
 def iso_to_snap(iso_datetime):
-    rmt = datetime.fromisoformat(iso_datetime)
+    rmt = isoparse(iso_datetime)  # datetime.fromisoformat(iso_datetime)
     return urlb32_encode(datetime_epoch_us(rmt))
 
 
