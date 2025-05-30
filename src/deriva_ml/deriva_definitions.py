@@ -8,10 +8,11 @@ import warnings
 from datetime import date
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable, Optional, Annotated, Generator
+from typing import Any, Iterable, Optional, Annotated, Generator, Iterator
 
 import deriva.core.ermrest_model as em
 import deriva.core.utils.hash_utils as hash_utils
+import json
 from urllib.parse import urlparse
 from deriva.core.ermrest_model import builtin_types
 from pydantic import (
@@ -191,6 +192,24 @@ class FileSpec(BaseModel):
             )
 
         return (create_spec(file, description) for file in list_all_files(path))
+
+    @staticmethod
+    def read_filespec(path: Path | str) -> Iterator[FileSpec]:
+        """Get FileSpecs from a JSON lines file.
+
+        Arguments:
+         path: Path to the .jsonl file (string or Path).
+
+        Yields:
+             A FileSpec object.
+        """
+        path = Path(path)
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                yield FileSpec(**json.loads(line))
 
 
 class VocabularyTerm(BaseModel):
