@@ -41,7 +41,10 @@ class DerivaModel:
     """
 
     def __init__(
-        self, model: Model, ml_schema: str = ML_SCHEMA, domain_schema: str = ""
+        self,
+        model: Model,
+        ml_schema: str = ML_SCHEMA,
+        domain_schema: Optional[str] = None,
     ):
         """Create and initialize a DerivaML instance.
 
@@ -61,17 +64,20 @@ class DerivaModel:
         self.schemas = self.model.schemas
 
         self.ml_schema = ml_schema
-        builtin_schemas = ["public", self.ml_schema, "www", "WWW"]
-        try:
-            self.domain_schema = (
-                domain_schema
-                or [
-                    s for s in self.model.schemas.keys() if s not in builtin_schemas
-                ].pop()
-            )
-        except IndexError:
-            # No domain schema defined.
+        builtin_schemas = ("public", self.ml_schema, "www", "WWW")
+        if domain_schema:
             self.domain_schema = domain_schema
+        else:
+            if (
+                len(
+                    user_schemas := {k for k in self.model.schemas.keys()}
+                    - set(builtin_schemas)
+                )
+                == 1
+            ):
+                self.domain_schema = user_schemas.pop()
+            else:
+                raise DerivaMLException(f"Ambiguous domain schema: {user_schemas}")
 
     @property
     def chaise_config(self) -> dict[str, Any]:
