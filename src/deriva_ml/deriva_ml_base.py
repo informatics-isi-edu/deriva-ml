@@ -832,7 +832,7 @@ class DerivaML(Dataset):
         Returns:
             Iterable of the RIDs of the files that were added.
         """
-        defined_types = self.list_vocabulary_terms(MLVocab.file_type)
+        defined_types = self.list_vocabulary_terms(MLVocab.file_type.value)
         if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
             raise DerivaMLException(
                 f"RID {execution_rid} is not for an execution table."
@@ -858,7 +858,7 @@ class DerivaML(Dataset):
         # Get the name of the association table between file_table and file_type.
         atable = next(
             self._model.schemas[self._ml_schema]
-            .tables[MLVocab.file_type]
+            .tables[MLVocab.file_type.value]
             .find_associations()
         ).name
         pb.schemas[self._ml_schema].tables[atable].insert(
