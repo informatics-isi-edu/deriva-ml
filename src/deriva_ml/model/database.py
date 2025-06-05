@@ -1,11 +1,21 @@
-import logging
-from pathlib import Path
-from typing import Dict, List, Any, Set, TypeVar, Type
-import sqlite3
-import deriva.core.ermrest_model as em
-import os
-import json
+"""
+Database model for managing local SQLite database operations.
+"""
 
+from __future__ import annotations
+
+# Standard library imports
+import json
+import logging
+import os
+import sqlite3
+from pathlib import Path
+from typing import Any, Dict, List, Set, Type, TypeVar
+
+# Deriva imports
+import deriva.core.ermrest_model as em
+
+# Type variables
 T = TypeVar("T")
 
 

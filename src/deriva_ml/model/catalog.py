@@ -1,28 +1,31 @@
 """
-`base.py` is the core module for the Deriva ML project.  This module implements the DerivaML class, which is
-the primary interface to the Deriva based catalogs.  The module also implements the Feature and Vocabulary functions
-in the DerivaML.
+Model management for Deriva ML catalogs.
 
-DerivaML and its associated classes all depend on a catalog that implements a `deriva-ml` schema with tables and
-relationships that follow a specific data model.
-
+This module provides the DerivaModel class which augments the standard Deriva model class with
+ML-specific functionality. It handles schema management, feature definitions, and asset tracking.
 """
 
+from __future__ import annotations
+
+# Standard library imports
+from collections import Counter
+from typing import Any, Iterable, List, Set, Dict
+
+# Third-party imports
+from pydantic import validate_call, ConfigDict
+
+# Deriva imports
 from deriva.core.ermrest_model import Table, Column, Model, FindAssociationResult
 from deriva.core.ermrest_catalog import ErmrestCatalog
-from feature import Feature
 
-from core.definitions import (
+# Local imports
+from deriva_ml.feature import Feature
+from deriva_ml.core.definitions import (
     DerivaMLException,
     ML_SCHEMA,
     DerivaSystemColumns,
     TableDefinition,
 )
-
-from collections import Counter
-from pydantic import validate_call, ConfigDict
-from typing import Iterable, Optional, Any
-
 
 class DerivaModel:
     """Augmented interface to deriva model class.
@@ -44,7 +47,7 @@ class DerivaModel:
         self,
         model: Model,
         ml_schema: str = ML_SCHEMA,
-        domain_schema: Optional[str] = None,
+        domain_schema: str | None = None,
     ):
         """Create and initialize a DerivaML instance.
 
@@ -52,6 +55,9 @@ class DerivaModel:
         This class is intended to be used as a base class on which domain-specific interfaces are built.
 
         Args:
+            model: The ERMRest model for the catalog.
+            ml_schema: The ML schema name.
+            domain_schema: The domain schema name.
         """
         self.model = model
         self.configuration = None
@@ -315,20 +321,19 @@ class DerivaModel:
 
     def _schema_to_paths(
         self,
-        root: Table = None,
-        path: Optional[list[Table]] = None,
+        root: Table | None = None,
+        path: list[Table] | None = None,
     ) -> list[list[Table]]:
-        """Recursively walk over the domain schema graph and extend the current path.
-
-        Walk a schema graph and return a list all the paths through the graph.
+        """Return a list of paths through the schema graph.
 
         Args:
-            path: Source path so far
+            root: The root table to start from.
+            path: The current path being built.
 
         Returns:
-          A list of all the paths through the graph.  Each path is a list of tables.
-
+            A list of paths through the schema graph.
         """
+        path = path or []
 
         root = root or self.model.schemas[self.ml_schema].tables["Dataset"]
         path = path.copy() if path else []
