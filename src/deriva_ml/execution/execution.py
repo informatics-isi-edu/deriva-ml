@@ -18,7 +18,7 @@ from typing import Iterable, Any, Optional
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
-from .deriva_definitions import (
+from core.deriva_definitions import (
     RID,
     Status,
     FileUploadState,
@@ -30,12 +30,12 @@ from .deriva_definitions import (
     FileSpec,
     DRY_RUN_RID,
 )
-from .deriva_ml_base import DerivaML, FeatureRecord
-from .dataset_aux_classes import DatasetSpec, DatasetVersion, VersionPart
-from .dataset_bag import DatasetBag
-from .execution_configuration import ExecutionConfiguration, Workflow
-from .execution_environment import get_execution_environment
-from .upload import (
+from core.deriva_ml_base import DerivaML, FeatureRecord
+from dataset.dataset_aux_classes import DatasetSpec, DatasetVersion, VersionPart
+from dataset.dataset_bag import DatasetBag
+from execution_configuration import ExecutionConfiguration, Workflow
+from execution_environment import get_execution_environment
+from upload import (
     execution_root,
     feature_root,
     asset_root,

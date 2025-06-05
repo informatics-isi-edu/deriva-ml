@@ -48,14 +48,14 @@ from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
 from pydantic import validate_call, ConfigDict
 
-from deriva_ml.deriva_definitions import (
+from core.deriva_definitions import (
     RID,
     DerivaMLException,
     FileUploadState,
     UploadState,
     DerivaSystemColumns,
 )
-from deriva_ml.deriva_model import DerivaModel
+from model.deriva_model import DerivaModel
 
 
 try:

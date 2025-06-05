@@ -10,9 +10,9 @@ relationships that follow a specific data model.
 
 from deriva.core.ermrest_model import Table, Column, Model, FindAssociationResult
 from deriva.core.ermrest_catalog import ErmrestCatalog
-from .feature import Feature
+from feature import Feature
 
-from .deriva_definitions import (
+from core.deriva_definitions import (
     DerivaMLException,
     ML_SCHEMA,
     DerivaSystemColumns,

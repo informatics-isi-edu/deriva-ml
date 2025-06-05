@@ -33,15 +33,15 @@ from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 from pydantic import validate_call, ConfigDict
 
-from .execution_configuration import ExecutionConfiguration, Workflow
-from .feature import Feature, FeatureRecord
-from .dataset import Dataset
-from .dataset_aux_classes import DatasetSpec
-from .dataset_bag import DatasetBag
-from .deriva_model import DerivaModel
-from .upload import table_path, execution_rids, asset_file_path
-from .deriva_definitions import ColumnDefinition
-from .deriva_definitions import (
+from execution.execution_configuration import ExecutionConfiguration, Workflow
+from feature import Feature, FeatureRecord
+from dataset.dataset import Dataset
+from dataset.dataset_aux_classes import DatasetSpec
+from dataset.dataset_bag import DatasetBag
+from model.deriva_model import DerivaModel
+from upload import table_path, execution_rids, asset_file_path
+from deriva_definitions import ColumnDefinition
+from deriva_definitions import (
     RID,
     Status,
     DerivaMLException,
@@ -51,7 +51,7 @@ from .deriva_definitions import (
     FileSpec,
     TableDefinition,
 )
-from .schema_setup.annotations import asset_annotation
+from annotations import asset_annotation
 
 try:
     from icecream import ic
@@ -60,7 +60,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 if TYPE_CHECKING:
-    from .execution import Execution
+    from execution.execution import Execution
 
 
 class DerivaML(Dataset):

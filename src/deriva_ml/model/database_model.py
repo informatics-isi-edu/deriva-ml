@@ -14,10 +14,10 @@ from urllib.parse import urlparse
 
 from deriva.core.ermrest_model import Model
 
-from .deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
-from .dataset_aux_classes import DatasetVersion, DatasetMinid
-from .deriva_model import DerivaModel
-from .dataset_bag import DatasetBag
+from core.deriva_definitions import ML_SCHEMA, MLVocab, RID, DerivaMLException
+from dataset.dataset_aux_classes import DatasetVersion, DatasetMinid
+from model.deriva_model import DerivaModel
+from dataset.dataset_bag import DatasetBag
 
 try:
     from icecream import ic

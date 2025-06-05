@@ -21,7 +21,7 @@ import requests
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
 
-from .history import iso_to_snap
+from history import iso_to_snap
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 import deriva.core.utils.hash_utils as hash_utils
@@ -41,7 +41,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 from deriva_ml import DatasetBag
-from .deriva_definitions import (
+from core.deriva_definitions import (
     ML_SCHEMA,
     DerivaMLException,
     MLVocab,
@@ -49,9 +49,9 @@ from .deriva_definitions import (
     RID,
     DRY_RUN_RID,
 )
-from .deriva_model import DerivaModel
-from .database_model import DatabaseModel
-from .dataset_aux_classes import (
+from model.deriva_model import DerivaModel
+from model.database_model import DatabaseModel
+from dataset_aux_classes import (
     DatasetVersion,
     DatasetMinid,
     DatasetHistory,
@@ -60,7 +60,7 @@ from .dataset_aux_classes import (
 )
 
 if TYPE_CHECKING:
-    from .deriva_ml_base import DerivaML
+    from core.deriva_ml_base import DerivaML
 
 
 class Dataset:

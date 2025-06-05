@@ -21,9 +21,9 @@ __all__ = [
     "VersionPart",
 ]
 
-from .dataset_aux_classes import VersionPart, DatasetSpec, DatasetVersion
-from .dataset_bag import DatasetBag
-from .deriva_definitions import (
+from dataset.dataset_aux_classes import VersionPart, DatasetSpec, DatasetVersion
+from dataset.dataset_bag import DatasetBag
+from core.deriva_definitions import (
     ColumnDefinition,
     TableDefinition,
     BuiltinTypes,
@@ -37,12 +37,12 @@ from .deriva_definitions import (
     ExecAssetType,
     DerivaSystemColumns,
 )
-from .deriva_ml_base import DerivaML
-from .execution_configuration import (
+from core.deriva_ml_base import DerivaML
+from execution.execution_configuration import (
     ExecutionConfiguration,
     Workflow,
 )
-from .execution import Execution
+from execution.execution import Execution
 
 from importlib.metadata import version, PackageNotFoundError
 

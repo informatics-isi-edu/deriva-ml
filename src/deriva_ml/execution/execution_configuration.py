@@ -26,8 +26,8 @@ from pathlib import Path
 import sys
 
 
-from .dataset_aux_classes import DatasetSpec
-from .deriva_definitions import RID, DerivaMLException
+from dataset.dataset_aux_classes import DatasetSpec
+from core.deriva_definitions import RID, DerivaMLException
 
 try:
     from IPython import get_ipython

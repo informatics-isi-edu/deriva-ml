@@ -11,11 +11,11 @@ from typing import Any, Generator, TYPE_CHECKING, Optional, Iterable
 
 import pandas as pd
 from pydantic import validate_call
-from .deriva_definitions import RID
-from .feature import Feature
+from core.deriva_definitions import RID
+from feature import Feature
 
 if TYPE_CHECKING:
-    from .database_model import DatabaseModel
+    from model.database_model import DatabaseModel
 
 try:
     from icecream import ic

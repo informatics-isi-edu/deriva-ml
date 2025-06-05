@@ -3,7 +3,7 @@ import sys
 
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
-from ..deriva_model import DerivaModel
+from model.deriva_model import DerivaModel
 from ..upload import bulk_upload_configuration
 
 
