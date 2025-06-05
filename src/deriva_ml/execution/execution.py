@@ -14,7 +14,7 @@ from pathlib import Path
 from pydantic import validate_call, ConfigDict
 import sys
 import shutil
-from typing import Iterable, Any, Optional
+from typing import Iterable, Any, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
@@ -88,7 +88,7 @@ if sys.version_info >= (3, 12):
             file_name: str,
             asset_metadata: dict[str, Any],
             asset_types: list[str] | str,
-            asset_rid: Optional["RID"] = None,
+            asset_rid: RID | None = None,
         ):
             super().__init__(asset_path)
             # These assignments happen after __new__ returns the instance
@@ -105,7 +105,7 @@ else:
         """
         Create a new Path object that has additional information related to the use of this path as an asset.
 
-        Args:
+        Attrubytes:
             asset_path: Local path to the location of the asset.
             asset_name:  The name of the asset in the catalog (e.g. the asset table name).
             file_name:  Name of the local file that contains the contents of the asset.
@@ -121,7 +121,7 @@ else:
             file_name: str,
             asset_metadata: dict[str, Any],
             asset_types: list[str] | str,
-            asset_rid: Optional["RID"] = None,
+            asset_rid: RID | None = None,
         ):
             # Only pass the path to the base Path class
             obj = super().__new__(cls, asset_path)
@@ -146,7 +146,7 @@ class Execution:
     datasets will be used, what additional files (assets) are required, what code is being run (Workflow) and an
     optional description of the Execution.  Side effects of creating an execution object are:
 
-    1. An execution record is created in the catalog and the RID of that record  recorded,
+    1. An execution record is created in the catalog and the RID of that record recorded,
     2. Any specified datasets are downloaded and materialized
     3. Any additional required assets are downloaded.
 
@@ -171,7 +171,7 @@ class Execution:
         self,
         configuration: ExecutionConfiguration,
         ml_object: "DerivaML",
-        reload: Optional[RID] = None,
+        reload: RID | None = None,
         dry_run: bool = False,
     ):
         """
@@ -189,10 +189,10 @@ class Execution:
         self.start_time = None
         self.stop_time = None
         self.status = Status.created
-        self.uploaded_assets: Optional[dict[str, list[AssetFilePath]]] = None
+        self.uploaded_assets: dict[str, list[AssetFilePath]] | None = None
         self.configuration.argv = sys.argv
 
-        self.dataset_rids: list[RID] = []
+        self.dataset_rids: List[RID] = []
         self.datasets: list[DatasetBag] = []
         self.parameters = self.configuration.parameters
 
@@ -269,7 +269,7 @@ class Execution:
         with open(runtime_env_path, "w") as fp:
             json.dump(get_execution_environment(), fp)
 
-    def _initialize_execution(self, reload: Optional[RID] = None) -> None:
+    def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution by a configuration  in the Execution_Metadata table.
         Setup working directory and download all the assets and data.
 
@@ -758,7 +758,7 @@ class Execution:
         self,
         asset_name: str,
         file_name: str | Path,
-        asset_types: Optional[list[str] | str] = None,
+        asset_types: list[str] | str | None = None,
         copy_file=False,
         **kwargs,
     ) -> AssetFilePath:
@@ -888,7 +888,7 @@ class Execution:
         self,
         dataset_types: str | list[str],
         description: str,
-        version: Optional[DatasetVersion] = None,
+        version: DatasetVersion | None = None,
     ) -> RID:
         """Create a new dataset with specified types.
 
@@ -907,7 +907,7 @@ class Execution:
     def add_dataset_members(
         self,
         dataset_rid: RID,
-        members: list[RID],
+        members: List[RID],
         validate: bool = True,
         description: str = "",
     ) -> None:
