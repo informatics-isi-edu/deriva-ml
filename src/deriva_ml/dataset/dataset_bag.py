@@ -15,7 +15,7 @@ import pandas as pd
 from pydantic import validate_call, ConfigDict
 
 # Deriva imports
-from deriva.core.ermrest_model import Table, Column, Model
+from deriva.core.ermrest_model import Table, Column
 import deriva.core.datapath as datapath
 
 # Local imports
@@ -65,8 +65,10 @@ class DatasetBag:
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         if not self.dataset_rid:
             raise DerivaMLException("No dataset RID provided")
-            
-        self.model.rid_lookup(self.dataset_rid)  # Check to make sure that this dataset is in the bag.
+
+        self.model.rid_lookup(
+            self.dataset_rid
+        )  # Check to make sure that this dataset is in the bag.
 
         self.version = self.model.dataset_version(self.dataset_rid)
         self._dataset_table = self.model.dataset_table
@@ -176,7 +178,9 @@ class DatasetBag:
                 yield dict(zip(col_names, row))
 
     @validate_call
-    def list_dataset_members(self, recurse: bool = False) -> dict[str, dict[str, list[Any]]]:
+    def list_dataset_members(
+        self, recurse: bool = False
+    ) -> dict[str, dict[str, list[Any]]]:
         """Return a list of entities associated with a specific dataset.
 
         Args:

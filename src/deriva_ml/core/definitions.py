@@ -11,7 +11,7 @@ from datetime import date
 from enum import Enum
 from pathlib import Path
 from socket import gethostname
-from typing import Any, Iterable, Generator, Iterator, List, Annotated
+from typing import Any, Iterable, Generator, Iterator, List, Annotated, NewType
 from urllib.parse import urlparse
 
 # Third-party imports
@@ -48,7 +48,7 @@ warnings.filterwarnings(
 rid_part = r"(?P<rid>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+))"
 snapshot_part = r"(?:@(?P<snapshot>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)))?"
 rid_regex = f"^{rid_part}{snapshot_part}$"
-RID = Annotated[str, Field(pattern=rid_regex)]
+RID = NewType("RID", Annotated[str, Field(pattern=rid_regex)])
 
 DerivaSystemColumns = ["RID", "RCT", "RMT", "RCB", "RMB"]
 
@@ -69,6 +69,7 @@ class UploadState(Enum):
 
 class BaseStrEnum(str, Enum):
     """Base class for string enums in Python 3.10"""
+
     pass
 
 
@@ -187,7 +188,9 @@ class FileSpec(BaseModel):
             return [f for f in files if f.is_file()]
 
         def create_spec(p: Path, description: str) -> FileSpec:
-            hashes = hash_utils.compute_file_hashes(p, hashes=frozenset(["md5", "sha256"]))
+            hashes = hash_utils.compute_file_hashes(
+                p, hashes=frozenset(["md5", "sha256"])
+            )
             md5 = hashes["md5"][0]
             return FileSpec(
                 length=path.stat().st_size,

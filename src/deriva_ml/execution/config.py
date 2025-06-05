@@ -12,11 +12,10 @@ import os
 from requests import RequestException
 import requests
 import subprocess
-from typing import Optional, Any
+from typing import Any
 
 from pydantic import (
     BaseModel,
-    conlist,
     ConfigDict,
     field_validator,
     Field,
@@ -26,34 +25,43 @@ from pathlib import Path
 import sys
 
 
-from dataset.aux_classes import DatasetSpec
-from core.definitions import RID, DerivaMLException
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.core.definitions import RID, DerivaMLException
 
 try:
-    from IPython import get_ipython
+    from IPython.core.getipython import get_ipython
 except ImportError:  # Graceful fallback if IPython isn't installed.
 
-    def get_ipython():
-        """Dummy routine in case you are not running in IPython."""
+    def get_ipython() -> None:
         return None
 
 
 try:
     from jupyter_server.serverapp import list_running_servers
+
+    def get_servers() -> list[Any]:
+        return list(list_running_servers())
 except ImportError:
 
     def list_running_servers():
-        """Dummy routine in case you are not running in Jupyter."""
         return []
+
+    def get_servers() -> list[Any]:
+        return list_running_servers()
 
 
 try:
-    from ipykernel import get_connection_file
+    from ipykernel.connect import get_connection_file
+
+    def get_kernel_connection() -> str:
+        return get_connection_file()
 except ImportError:
 
     def get_connection_file():
-        """Dummy routine in case you are not running in Jupyter."""
         return ""
+
+    def get_kernel_connection() -> str:
+        return get_connection_file()
 
 
 class Workflow(BaseModel):
@@ -72,10 +80,10 @@ class Workflow(BaseModel):
     name: str
     url: str
     workflow_type: str
-    version: Optional[str] = None
-    description: str = None
-    rid: Optional[RID] = None
-    checksum: Optional[str] = None
+    version: str | None = None
+    description: str | None = None
+    rid: RID | None = None
+    checksum: str | None = None
     is_notebook: bool = False
 
     _logger: Any = PrivateAttr()
@@ -116,7 +124,7 @@ class Workflow(BaseModel):
         """Return the absolute path of the current notebook."""
         # Get the kernel's connection file and extract the kernel ID
         try:
-            if not (connection_file := Path(get_connection_file()).name):
+            if not (connection_file := Path(get_kernel_connection()).name):
                 return None, None
         except RuntimeError:
             return None, None
@@ -124,7 +132,7 @@ class Workflow(BaseModel):
         kernel_id = connection_file.split("-", 1)[1].split(".")[0]
 
         # Look through the running server sessions to find the matching kernel ID
-        for server in list_running_servers():
+        for server in get_servers():
             try:
                 # If a token is required for authentication, include it in headers
                 token = server.get("token", "")
@@ -169,13 +177,13 @@ class Workflow(BaseModel):
 
     @staticmethod
     def _github_url(executable_path: Path) -> tuple[str, bool]:
-        """Return a GitHUB URL for the latest commit of the script from which this routine is called.
+        """Return a GitHub URL for the latest commit of the script from which this routine is called.
 
         This routine is used to be called from a script or notebook (e.g. python -m file). It assumes that
-        the file is in a gitHUB repository and commited.  It returns a URL to the last commited version of this
-        file in GitHUB.
+        the file is in a GitHub repository and committed.  It returns a URL to the last commited version of this
+        file in GitHub.
 
-        Returns: A tuple with the gethub_url and a boolean to indicated if uncommited changes
+        Returns: A tuple with the gethub_url and a boolean to indicate if uncommited changes
             have been made to the file.
 
         """
@@ -210,7 +218,7 @@ class Workflow(BaseModel):
                 "M " in result.stdout.strip()
             )  # Returns True if output indicates a modified file
         except subprocess.CalledProcessError:
-            is_dirty = False  # If Git command fails, assume no changes
+            is_dirty = False  # If the Git command fails, assume no changes
 
         """Get SHA-1 hash of latest commit of the file in the repository"""
         result = subprocess.run(
@@ -245,9 +253,9 @@ class Workflow(BaseModel):
         workflow_type: str,
         description: str = "",
     ) -> Workflow:
-        """Identify current executing program and return a workflow RID for it
+        """Identify the current executing program and return a workflow RID for it
 
-        Determine the notebook or script that is currently being executed. Assume that  this is
+        Determine the notebook or script that is currently being executed. Assume that this is
         being executed from a cloned GitHub repository.  Determine the remote repository name for
         this object.  Then either retrieve an existing workflow for this executable or create
         a new one.
@@ -321,7 +329,7 @@ class ExecutionConfiguration(BaseModel):
     """Define the parameters that are used to configure a specific execution.
 
     Attributes:
-        datasets: List of dataset specifications which specify the dataset RID, version and if the dataset
+        datasets: List of dataset specifications which specify the dataset RID, version, and if the dataset
             should be materialized.
         assets: List of assets to be downloaded prior to execution.  The values must be RIDs in an asset table
         parameters: Either a dictionary or a path to a JSON file that contains configuration parameters for the execution.
@@ -330,12 +338,12 @@ class ExecutionConfiguration(BaseModel):
         description: A description of the execution.  Can use Markdown format.
     """
 
-    datasets: conlist(DatasetSpec) = []
-    assets: list[RID | str] = []  # List of RIDs to model files.
+    datasets: list[DatasetSpec] = []
+    assets: list[RID] = []  # List of RIDs to model files.
     workflow: RID | Workflow
     parameters: dict[str, Any] | Path = {}
     description: str = ""
-    argv: conlist(str) = Field(default_factory=lambda: sys.argv)
+    argv: list[str] = Field(default_factory=lambda: sys.argv)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
