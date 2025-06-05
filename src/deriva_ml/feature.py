@@ -9,7 +9,7 @@ from typing import Optional, Type, ClassVar, TYPE_CHECKING
 from types import UnionType
 
 if TYPE_CHECKING:
-    from model.deriva_model import DerivaModel
+    from model.catalog import DerivaModel
 
 
 class FeatureRecord(BaseModel):

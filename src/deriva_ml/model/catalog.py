@@ -1,5 +1,5 @@
 """
-`deriva_ml_base.py` is the core module for the Deriva ML project.  This module implements the DerivaML class, which is
+`base.py` is the core module for the Deriva ML project.  This module implements the DerivaML class, which is
 the primary interface to the Deriva based catalogs.  The module also implements the Feature and Vocabulary functions
 in the DerivaML.
 
@@ -12,7 +12,7 @@ from deriva.core.ermrest_model import Table, Column, Model, FindAssociationResul
 from deriva.core.ermrest_catalog import ErmrestCatalog
 from feature import Feature
 
-from core.deriva_definitions import (
+from core.definitions import (
     DerivaMLException,
     ML_SCHEMA,
     DerivaSystemColumns,

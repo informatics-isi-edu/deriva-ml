@@ -3,8 +3,8 @@ import sys
 
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
-from model.deriva_model import DerivaModel
-from ..upload import bulk_upload_configuration
+from model.catalog import DerivaModel
+from dataset.upload import bulk_upload_configuration
 
 
 def catalog_annotation(model: DerivaModel) -> None:

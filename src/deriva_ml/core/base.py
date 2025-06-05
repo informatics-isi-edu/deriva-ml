@@ -1,5 +1,5 @@
 """
-`deriva_ml_base.py` is the core module for the Deriva ML project.  This module implements the DerivaML class, which is
+`base.py` is the core module for the Deriva ML project.  This module implements the DerivaML class, which is
 the primary interface to the Deriva based catalogs.  The module also implements the Feature and Vocabulary functions
 in the DerivaML.
 
@@ -33,15 +33,15 @@ from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 from pydantic import validate_call, ConfigDict
 
-from execution.execution_configuration import ExecutionConfiguration, Workflow
+from execution.config import ExecutionConfiguration, Workflow
 from feature import Feature, FeatureRecord
 from dataset.dataset import Dataset
-from dataset.dataset_aux_classes import DatasetSpec
+from dataset.aux_classes import DatasetSpec
 from dataset.dataset_bag import DatasetBag
-from model.deriva_model import DerivaModel
-from upload import table_path, execution_rids, asset_file_path
-from deriva_definitions import ColumnDefinition
-from deriva_definitions import (
+from model.catalog import DerivaModel
+from dataset.upload import table_path, execution_rids, asset_file_path
+from definitions import ColumnDefinition
+from definitions import (
     RID,
     Status,
     DerivaMLException,

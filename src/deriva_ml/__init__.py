@@ -21,9 +21,9 @@ __all__ = [
     "VersionPart",
 ]
 
-from dataset.dataset_aux_classes import VersionPart, DatasetSpec, DatasetVersion
+from dataset.aux_classes import VersionPart, DatasetSpec, DatasetVersion
 from dataset.dataset_bag import DatasetBag
-from core.deriva_definitions import (
+from core.definitions import (
     ColumnDefinition,
     TableDefinition,
     BuiltinTypes,
@@ -37,8 +37,8 @@ from core.deriva_definitions import (
     ExecAssetType,
     DerivaSystemColumns,
 )
-from core.deriva_ml_base import DerivaML
-from execution.execution_configuration import (
+from core.base import DerivaML
+from execution.config import (
     ExecutionConfiguration,
     Workflow,
 )

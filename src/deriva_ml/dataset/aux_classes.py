@@ -2,7 +2,7 @@
 THis module defines the DataSet class with is used to manipulate n
 """
 
-from core.deriva_definitions import RID
+from core.definitions import RID
 
 from enum import Enum
 from pydantic import (

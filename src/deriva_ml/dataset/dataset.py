@@ -41,7 +41,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 from deriva_ml import DatasetBag
-from core.deriva_definitions import (
+from core.definitions import (
     ML_SCHEMA,
     DerivaMLException,
     MLVocab,
@@ -49,9 +49,9 @@ from core.deriva_definitions import (
     RID,
     DRY_RUN_RID,
 )
-from model.deriva_model import DerivaModel
-from model.database_model import DatabaseModel
-from dataset_aux_classes import (
+from model.catalog import DerivaModel
+from model.databasel import DatabaseModel
+from aux_classes import (
     DatasetVersion,
     DatasetMinid,
     DatasetHistory,
@@ -60,7 +60,7 @@ from dataset_aux_classes import (
 )
 
 if TYPE_CHECKING:
-    from core.deriva_ml_base import DerivaML
+    from core.base import DerivaML
 
 
 class Dataset:
