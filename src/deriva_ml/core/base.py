@@ -1012,7 +1012,7 @@ class DerivaML(Dataset):
         Returns:
             An execution object.
         """
-        from .execution import Execution
+        from ..execution.execution import Execution
 
         self._execution = Execution(configuration, self, dry_run=dry_run)
         return self._execution
@@ -1021,7 +1021,7 @@ class DerivaML(Dataset):
     def restore_execution(self, execution_rid: Optional[RID] = None) -> "Execution":
         """Return an Execution object for a previously started execution with the specified RID."""
 
-        from .execution import Execution
+        from ..execution.execution import Execution
 
         # Find path to execution
         if not execution_rid:
