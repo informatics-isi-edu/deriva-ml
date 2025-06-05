@@ -15,7 +15,7 @@ from core.definitions import RID
 from feature import Feature
 
 if TYPE_CHECKING:
-    from model.databasel import DatabaseModel
+    from model.database import DatabaseModel
 
 try:
     from icecream import ic

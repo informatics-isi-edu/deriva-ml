@@ -50,7 +50,7 @@ from core.definitions import (
     DRY_RUN_RID,
 )
 from model.catalog import DerivaModel
-from model.databasel import DatabaseModel
+from model.database import DatabaseModel
 from aux_classes import (
     DatasetVersion,
     DatasetMinid,

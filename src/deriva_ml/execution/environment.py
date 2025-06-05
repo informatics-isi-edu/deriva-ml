@@ -1,15 +1,15 @@
-""" Module that captures details of execution environment for use as execution metadata"""
+"""Module that captures details of execution environment for use as execution metadata"""
 
 import locale
 import os
 import platform
 import sys
-
+from typing import Dict, List, Any
 import site
 import importlib
 
 
-def get_execution_environment() -> dict:
+def get_execution_environment() -> Dict[str, Any]:
     return dict(
         imports=get_loaded_modules(),
         os=get_os_info(),
@@ -20,30 +20,30 @@ def get_execution_environment() -> dict:
     )
 
 
-def get_loaded_modules():
+def get_loaded_modules() -> Dict[str, str]:
     return {
         dist.metadata["Name"]: dist.version
         for dist in importlib.metadata.distributions()
     }
 
 
-def get_site_info():
+def get_site_info() -> Dict[str, Any]:
     return {
         attr: getattr(site, attr)
         for attr in ["PREFIXES", "ENABLE_USER_SITE", "USER_SITE", "USER_BASE"]
     }
 
 
-def get_platform_info():
+def get_platform_info() -> Dict[str, Any]:
     """
     Returns all available attributes from the platform module.
     """
-    attributes = [
+    attributes: List[str] = [
         attr
         for attr in dir(platform)
         if (not attr.startswith("_")) and callable(getattr(platform, attr))
     ]
-    platform_info = {}
+    platform_info: Dict[str, Any] = {}
     for attr in attributes:
         try:
             platform_info[attr] = getattr(platform, attr)()
@@ -53,8 +53,8 @@ def get_platform_info():
     return platform_info
 
 
-def get_os_info():
-    values = {}
+def get_os_info() -> Dict[str, Any]:
+    values: Dict[str, Any] = {}
     for func in [
         "cwd",
         "egid",
@@ -75,15 +75,15 @@ def get_os_info():
     return values
 
 
-def get_umask():
+def get_umask() -> int:
     # https://stackoverflow.com/questions/53227072/reading-umask-thread-safe
-    current_value = os.umask(0)
+    current_value: int = os.umask(0)
     os.umask(current_value)
     return current_value
 
 
-def get_sys_info():
-    values = {}
+def get_sys_info() -> Dict[str, Any]:
+    values: Dict[str, Any] = {}
     for attr in [
         "argv",
         "byteorder",
@@ -91,10 +91,8 @@ def get_sys_info():
         "executable",
         "flags",
         "float_info",
-        #      "maxint",
         "maxsize",
         "maxunicode",
-        #   "meta_path",
     ]:
         values[attr] = getattr(sys, attr)
     for func in [
@@ -109,8 +107,8 @@ def get_sys_info():
     return values
 
 
-def localeconv():
-    values = []
+def localeconv() -> List[str]:
+    values: List[str] = []
     for key, value in sorted(locale.localeconv().items()):
         if isinstance(value, bytes):
             value = value.decode("ascii", errors="replace")
@@ -120,8 +118,8 @@ def localeconv():
     return values
 
 
-def locale_module():
-    values = []
+def locale_module() -> List[str]:
+    values: List[str] = []
     values.append("getdefaultlocale(): {}".format(locale.getdefaultlocale()))
     for category in [
         "LC_CTYPE",
