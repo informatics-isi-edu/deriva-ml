@@ -4,17 +4,17 @@ Shared definitions that are used in different DerivaML modules.
 
 from __future__ import annotations
 
+# Standard library imports
+import json
 import warnings
 from datetime import date
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable, Optional, Annotated, Generator, Iterator
-
-import deriva.core.ermrest_model as em
-import deriva.core.utils.hash_utils as hash_utils
-import json
+from socket import gethostname
+from typing import Any, Iterable, Generator, Iterator, List, Annotated
 from urllib.parse import urlparse
-from deriva.core.ermrest_model import builtin_types
+
+# Third-party imports
 from pydantic import (
     BaseModel,
     model_serializer,
@@ -23,16 +23,20 @@ from pydantic import (
     field_validator,
     ValidationError,
 )
-from socket import gethostname
 
+# Deriva imports
+import deriva.core.ermrest_model as em
+from deriva.core.ermrest_model import builtin_types
+import deriva.core.utils.hash_utils as hash_utils
+
+# Constants
 ML_SCHEMA = "deriva-ml"
 DRY_RUN_RID = "0000"
 
-# We are going to use schema as a field name and this collides with method in pydantic base class
+# Pydantic warnings suppression
 warnings.filterwarnings(
     "ignore", message='Field name "schema"', category=Warning, module="pydantic"
 )
-
 warnings.filterwarnings(
     "ignore",
     message="fields may not start with an underscore",
@@ -40,6 +44,7 @@ warnings.filterwarnings(
     module="pydantic",
 )
 
+# RID definitions
 rid_part = r"(?P<rid>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+))"
 snapshot_part = r"(?:@(?P<snapshot>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)))?"
 rid_regex = f"^{rid_part}{snapshot_part}$"
@@ -73,7 +78,7 @@ class FileUploadState(BaseModel):
 
     @computed_field
     @property
-    def rid(self) -> Optional[RID]:
+    def rid(self) -> RID | None:
         return self.result and self.result["RID"]
 
 
@@ -134,7 +139,7 @@ class FileSpec(BaseModel):
     """
 
     url: str
-    description: Optional[str] = ""
+    description: str | None = ""
     md5: str
     length: int
 
@@ -176,13 +181,12 @@ class FileSpec(BaseModel):
         """
         path = Path(path)
 
-        def list_all_files(p) -> list[Path]:
-            return (
-                (f for f in Path(p).rglob("*") if f.is_file()) if path.is_dir() else [p]
-            )
+        def list_all_files(p) -> List[Path]:
+            files = [p] if path.is_file() else list(Path(p).rglob("*"))
+            return [f for f in files if f.is_file()]
 
         def create_spec(p: Path, description: str) -> FileSpec:
-            hashes = hash_utils.compute_file_hashes(p, hashes=["md5", "sha256"])
+            hashes = hash_utils.compute_file_hashes(p, hashes=frozenset(["md5", "sha256"]))
             md5 = hashes["md5"][0]
             return FileSpec(
                 length=path.stat().st_size,
@@ -230,7 +234,7 @@ class VocabularyTerm(BaseModel):
     """
 
     name: str = Field(alias="Name")
-    synonyms: Optional[list[str]] = Field(alias="Synonyms")
+    synonyms: list[str] | None = Field(alias="Synonyms")
     id: str = Field(alias="ID")
     uri: str = Field(alias="URI")
     description: str = Field(alias="Description")
@@ -281,7 +285,7 @@ class ColumnDefinition(BaseModel):
     type: BuiltinTypes
     nullok: bool = True
     default: Any = None
-    comment: Optional[str] = None
+    comment: str | None = None
     acls: dict = Field(default_factory=dict)
     acl_bindings: dict = Field(default_factory=dict)
     annotations: dict = Field(default_factory=dict)
@@ -311,7 +315,7 @@ class ColumnDefinition(BaseModel):
 class KeyDefinition(BaseModel):
     colnames: Iterable[str]
     constraint_names: Iterable[str]
-    comment: Optional[str] = None
+    comment: str | None = None
     annotations: dict = Field(default_factory=dict)
 
     @model_serializer()
@@ -334,7 +338,7 @@ class ForeignKeyDefinition(BaseModel):
     constraint_names: Iterable[str] = Field(default_factory=list)
     on_update: str = "NO ACTION"
     on_delete: str = "NO ACTION"
-    comment: str = None
+    comment: str | None = None
     acls: dict[str, Any] = Field(default_factory=dict)
     acl_bindings: dict[str, Any] = Field(default_factory=dict)
     annotations: dict[str, Any] = Field(default_factory=dict)
@@ -360,7 +364,7 @@ class TableDefinition(BaseModel):
     column_defs: Iterable[ColumnDefinition]
     key_defs: Iterable[KeyDefinition] = Field(default_factory=list)
     fkey_defs: Iterable[ForeignKeyDefinition] = Field(default_factory=list)
-    comment: str = None
+    comment: str | None = None
     acls: dict = Field(default_factory=dict)
     acl_bindings: dict = Field(default_factory=dict)
     annotations: dict = Field(default_factory=dict)

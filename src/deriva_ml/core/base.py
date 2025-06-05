@@ -10,15 +10,19 @@ relationships that follow a specific data model.
 
 from __future__ import annotations
 
+# Standard library imports
 import getpass
 import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
+from typing import Any, Iterable, TYPE_CHECKING, Dict, List, cast
+
+# Third-party imports
 import requests
+from pydantic import validate_call, ConfigDict
 
-from typing import Optional, Any, Iterable, TYPE_CHECKING
-
+# Deriva imports
 from deriva.core import (
     get_credential,
     urlquote,
@@ -31,17 +35,17 @@ from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
-from pydantic import validate_call, ConfigDict
 
-from execution.config import ExecutionConfiguration, Workflow
-from feature import Feature, FeatureRecord
-from dataset.dataset import Dataset
-from dataset.aux_classes import DatasetSpec
-from dataset.dataset_bag import DatasetBag
-from model.catalog import DerivaModel
-from dataset.upload import table_path, execution_rids, asset_file_path
-from definitions import ColumnDefinition
-from definitions import (
+# Local imports
+from deriva_ml.execution.config import ExecutionConfiguration, Workflow
+from deriva_ml.feature import Feature, FeatureRecord
+from deriva_ml.dataset.dataset import Dataset
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.dataset.upload import table_path, execution_rids, asset_file_path
+from deriva_ml.core.definitions import (
+    ColumnDefinition,
     RID,
     Status,
     DerivaMLException,
@@ -51,16 +55,17 @@ from definitions import (
     FileSpec,
     TableDefinition,
 )
-from annotations import asset_annotation
+from deriva_ml.schema_setup.annotations import asset_annotation
 
+# Optional debug imports
 try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
-
+# Type checking imports
 if TYPE_CHECKING:
-    from execution.execution import Execution
+    from deriva_ml.execution.execution import Execution
 
 
 class DerivaML(Dataset):
@@ -79,10 +84,10 @@ class DerivaML(Dataset):
         self,
         hostname: str,
         catalog_id: str | int,
-        domain_schema: Optional[str] = None,
-        project_name: Optional[str] = None,
-        cache_dir: Optional[str] = None,
-        working_dir: Optional[str] = None,
+        domain_schema: str | None = None,
+        project_name: str | None = None,
+        cache_dir: str | None = None,
+        working_dir: str | None = None,
         ml_schema: str = ML_SCHEMA,
         logging_level=logging.INFO,
         credential=None,
@@ -140,7 +145,7 @@ class DerivaML(Dataset):
         self.catalog_id = catalog_id
         self.ml_schema = ml_schema
         self.configuration = None
-        self._execution: Optional[Execution] = None
+        self._execution: "Execution" | None = None
         self.domain_schema = self.model.domain_schema
         self.project_name = project_name or self.domain_schema
         self.start_time = datetime.now()
@@ -240,12 +245,11 @@ class DerivaML(Dataset):
             )
             print("Login Successful")
 
-    def chaise_url(self, table: RID | Table) -> str:
+    def chaise_url(self, table: RID | Table | str) -> str:
         """Return a Chaise URL to the specified table.
 
         Args:
             table: Table or RID to be visited
-            table: str | Table:
 
         Returns:
             URL to the table in Chaise format.
@@ -257,10 +261,10 @@ class DerivaML(Dataset):
             )
         except DerivaMLException:
             # Perhaps we have a RID....
-            uri = self.cite(table)
+            uri = self.cite(cast(str, table))
         return f"{uri}/{urlquote(table_obj.schema.name)}:{urlquote(table_obj.name)}"
 
-    def cite(self, entity: dict | str) -> str:
+    def cite(self, entity: Dict[str, Any] | str) -> str:
         """Return a citation URL for the provided entity.
 
         Args:
@@ -287,7 +291,7 @@ class DerivaML(Dataset):
         except DerivaMLException as _e:
             raise DerivaMLException("Entity RID does not exist")
 
-    def user_list(self) -> list[dict[str, str]]:
+    def user_list(self) -> List[Dict[str, str]]:
         """List of users in the catalog
 
         Args:
@@ -348,7 +352,7 @@ class DerivaML(Dataset):
         )
 
     def create_vocabulary(
-        self, vocab_name: str, comment: str = "", schema: Optional[str] = None
+        self, vocab_name: str, comment: str = "", schema: str | None = None
     ) -> Table:
         """Create a controlled vocabulary table with the given vocab name.
 
@@ -376,11 +380,11 @@ class DerivaML(Dataset):
     def create_asset(
         self,
         asset_name: str,
-        column_defs: Optional[Iterable[ColumnDefinition]] = None,
-        fkey_defs: Optional[Iterable[ColumnDefinition]] = None,
-        referenced_tables: Optional[Iterable[Table]] = None,
+        column_defs: Iterable[ColumnDefinition] | None = None,
+        fkey_defs: Iterable[ColumnDefinition] | None = None,
+        referenced_tables: Iterable[Table] | None = None,
         comment: str = "",
-        schema: Optional[str] = None,
+        schema: str | None = None,
     ) -> Table:
         """Create an asset table with the given asset name.
 
@@ -442,13 +446,13 @@ class DerivaML(Dataset):
         asset_annotation(asset_table)
         return asset_table
 
-    # @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_assets(self, asset_table: Table | str):
         """Return the contents of an asset table"""
 
+        asset_table = self.model.name_to_table(asset_table)
         if not self.model.is_asset(asset_table):
             raise DerivaMLException(f"Table {asset_table.name} is not an asset")
-        asset_table = self.model.name_to_table(asset_table)
+
         pb = self._model.catalog.getPathBuilder()
         asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
 
@@ -481,10 +485,10 @@ class DerivaML(Dataset):
         self,
         target_table: Table | str,
         feature_name: str,
-        terms: Optional[list[Table | str]] = None,
-        assets: Optional[list[Table | str]] = None,
-        metadata: Optional[Iterable[ColumnDefinition | Table | Key | str]] = None,
-        optional: Optional[list[str]] = None,
+        terms: Iterable[Table | str] | None = None,
+        assets: Iterable[Table | str] | None = None,
+        metadata: Iterable[ColumnDefinition | Table | Key | str] | None = None,
+        optional: Iterable[str] | None = None,
         comment: str = "",
     ) -> type[FeatureRecord]:
         """Create a new feature that can be associated with a table.
@@ -660,7 +664,7 @@ class DerivaML(Dataset):
         table: str | Table,
         term_name: str,
         description: str,
-        synonyms: Optional[list[str]] = None,
+        synonyms: Iterable[str] | None = None,
         exists_ok: bool = True,
     ) -> VocabularyTerm:
         """Creates a new control vocabulary term in the control vocabulary table.
@@ -768,7 +772,7 @@ class DerivaML(Dataset):
     def download_dataset_bag(
         self,
         dataset: DatasetSpec,
-        execution_rid: Optional[RID] = None,
+        execution_rid: RID | None = None,
     ) -> DatasetBag:
         """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
 
@@ -818,7 +822,7 @@ class DerivaML(Dataset):
         self,
         files: Iterable[FileSpec],
         file_types: str | list[str],
-        execution_rid: Optional[RID] = None,
+        execution_rid: RID | None = None,
     ) -> Iterable[RID]:
         """Add a new file to the File table in the catalog.
 
@@ -880,7 +884,7 @@ class DerivaML(Dataset):
         return file_rids
 
     def list_files(
-        self, file_types: Optional[list[str]] = None
+        self, file_types: Iterable[str] | None = None
     ) -> list[dict[str, Any]]:
         """Return the contents of the file table.  Denormalized file types into the file record."""
         ml_path = self.pathBuilder.schemas[self._ml_schema]
@@ -958,7 +962,7 @@ class DerivaML(Dataset):
             raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
         return workflow_rid
 
-    def lookup_workflow(self, url: str) -> Optional[RID]:
+    def lookup_workflow(self, url: str) -> RID | None:
         """Given a URL, look in the workflow table to find a matching workflow."""
         workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
         try:
@@ -1012,16 +1016,16 @@ class DerivaML(Dataset):
         Returns:
             An execution object.
         """
-        from ..execution.execution import Execution
+        from deriva_ml.execution.execution import Execution
 
         self._execution = Execution(configuration, self, dry_run=dry_run)
         return self._execution
 
     # @validate_call
-    def restore_execution(self, execution_rid: Optional[RID] = None) -> "Execution":
+    def restore_execution(self, execution_rid: RID | None = None) -> "Execution":
         """Return an Execution object for a previously started execution with the specified RID."""
 
-        from ..execution.execution import Execution
+        from deriva_ml.execution.execution import Execution
 
         # Find path to execution
         if not execution_rid:
