@@ -2,20 +2,28 @@
 The module implements the sqllite interface to a set of directories representing a dataset bag.
 """
 
-from deriva.core.ermrest_model import Table, Column
-import deriva.core.datapath as datapath
+from __future__ import annotations
 
+# Standard library imports
 from collections import defaultdict
 from copy import copy
-from typing import Any, Generator, TYPE_CHECKING, Optional, Iterable
+from typing import Any, Generator, Iterable, TYPE_CHECKING, cast
+import sqlite3
 
+# Third-party imports
 import pandas as pd
-from pydantic import validate_call
-from core.definitions import RID
-from feature import Feature
+from pydantic import validate_call, ConfigDict
+
+# Deriva imports
+from deriva.core.ermrest_model import Table, Column, Model
+import deriva.core.datapath as datapath
+
+# Local imports
+from deriva_ml.core.definitions import RID, DerivaMLException
+from deriva_ml.feature import Feature
 
 if TYPE_CHECKING:
-    from model.database import DatabaseModel
+    from deriva_ml.model.database import DatabaseModel
 
 try:
     from icecream import ic
@@ -32,33 +40,33 @@ class DatasetBag:
 
     All the metadata associated with the dataset is stored in a SQLLite database that can be queried using SQL.
 
-    Attributes
+    Attributes:
         dataset_rid (RID): RID for the specified dataset
         version: The version of the dataset
         model (DatabaseModel): The Database model that has all the catalog metadata associated with this dataset.
             database:
-        dbase (Connection): connection to the sqlite database holding table values
+        dbase (sqlite3.Connection): connection to the sqlite database holding table values
         domain_schema (str): Name of the domain schema
     """
 
-    # Validate call
     def __init__(
-        self, database_model: "DatabaseModel", dataset_rid: Optional[RID]
+        self, database_model: DatabaseModel, dataset_rid: RID | None = None
     ) -> None:
         """
         Initialize a DatasetBag instance.
 
         Args:
             database_model: Database version of the bag.
+            dataset_rid: Optional RID for the dataset.
         """
-
         self.model = database_model
-        self.database = self.model.dbase
+        self.database = cast(sqlite3.Connection, self.model.dbase)
 
         self.dataset_rid = dataset_rid or self.model.dataset_rid
-        self.model.rid_lookup(
-            dataset_rid
-        )  # Check to make sure that this dataset is in the bag.
+        if not self.dataset_rid:
+            raise DerivaMLException("No dataset RID provided")
+            
+        self.model.rid_lookup(self.dataset_rid)  # Check to make sure that this dataset is in the bag.
 
         self.version = self.model.dataset_version(self.dataset_rid)
         self._dataset_table = self.model.dataset_table
@@ -168,15 +176,14 @@ class DatasetBag:
                 yield dict(zip(col_names, row))
 
     @validate_call
-    def list_dataset_members(self, recurse: bool = False) -> dict[str, dict[str, list]]:
-        """Return a list of entities associated with a specific _dataset_table.
+    def list_dataset_members(self, recurse: bool = False) -> dict[str, dict[str, list[Any]]]:
+        """Return a list of entities associated with a specific dataset.
 
         Args:
-           recurse:  (Default value = False)
+           recurse: Whether to include nested datasets.
 
         Returns:
-            Dictionary of entities associated with a specific _dataset_table.  Key is the table from which the elements
-            were taken.
+            Dictionary of entities associated with the dataset.
         """
 
         # Look at each of the element types that might be in the _dataset_table and get the list of rid for them from
@@ -234,43 +241,42 @@ class DatasetBag:
         return dict(members)
 
     def find_features(self, table: str | Table) -> Iterable[Feature]:
-        """
+        """Find features for a table.
+
         Args:
             table: The table to find features for.
-            table: Table | str:
 
         Returns:
-            An iterable of FeatureResult instances that describe the current features in the table.
+            An iterable of Feature instances.
         """
         return self.model.find_features(table)
 
-    # noinspection PyProtectedMember
     def list_feature_values(
         self, table: Table | str, feature_name: str
     ) -> datapath._ResultSet:
-        """Return a datapath ResultSet containing all values of a feature associated with a table.
+        """Return feature values for a table.
 
         Args:
-            table: param feature_name:
-            table: Table | str:
-            feature_name: str:
+            table: The table to get feature values for.
+            feature_name: Name of the feature.
 
         Returns:
-
+            Feature values.
         """
         feature = self.model.lookup_feature(table, feature_name)
         feature_table = self.model.normalize_table_name(feature.feature_table.name)
         with self.database as db:
             sql_cmd = f'SELECT * FROM "{feature_table}"'
-            return db.execute(sql_cmd).fetchall()
+            return cast(datapath._ResultSet, db.execute(sql_cmd).fetchall())
 
-    # @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_children(self, recurse: bool = False) -> list["DatasetBag"]:
-        """Given a _dataset_table RID, return a list of RIDs of any nested datasets.
+    def list_dataset_children(self, recurse: bool = False) -> list[DatasetBag]:
+        """Get nested datasets.
+
+        Args:
+            recurse: Whether to include children of children.
 
         Returns:
-          list of RIDs of nested datasets.
-
+            List of child dataset bags.
         """
         ds_table = self.model.normalize_table_name("Dataset")
         nds_table = self.model.normalize_table_name("Dataset_Dataset")
@@ -297,6 +303,6 @@ class DatasetBag:
 # Add annotations after definition to deal with forward reference issues in pydantic
 
 DatasetBag.list_dataset_children = validate_call(
-    config=dict(arbitrary_types_allowed=True),
+    config=ConfigDict(arbitrary_types_allowed=True),
     validate_return=True,
 )(DatasetBag.list_dataset_children)

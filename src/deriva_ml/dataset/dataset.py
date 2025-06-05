@@ -6,23 +6,26 @@ accessible via a DerivaML class instance.
 """
 
 from __future__ import annotations
-from bdbag import bdbag_api as bdb
-from bdbag.fetch.fetcher import fetch_single_file
-from collections import defaultdict
-from graphlib import TopologicalSorter
+
+# Standard library imports
 import json
 import logging
+import os
+import sqlite3
+from collections import defaultdict
+from graphlib import TopologicalSorter
 from pathlib import Path
-from pydantic import (
-    validate_call,
-    ConfigDict,
-)
-import requests
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Optional, Iterable, Iterator, TYPE_CHECKING
+from typing import Any, Callable, Iterable, Iterator, cast, TYPE_CHECKING
 
-from history import iso_to_snap
-from deriva.core.ermrest_model import Table
+# Third-party imports
+from bdbag import bdbag_api as bdb
+from bdbag.fetch.fetcher import fetch_single_file
+from pydantic import validate_call, ConfigDict
+import requests
+
+# Deriva imports
+from deriva.core.ermrest_model import Table, Model, FindAssociationResult
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 import deriva.core.utils.hash_utils as hash_utils
 from deriva.transfer.download.deriva_export import DerivaExport
@@ -34,14 +37,14 @@ from deriva.transfer.download.deriva_download import (
     DerivaDownloadTimeoutError,
 )
 
-
+# Local imports
 try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
-from deriva_ml import DatasetBag
-from core.definitions import (
+from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.core.definitions import (
     ML_SCHEMA,
     DerivaMLException,
     MLVocab,
@@ -49,18 +52,19 @@ from core.definitions import (
     RID,
     DRY_RUN_RID,
 )
-from model.catalog import DerivaModel
-from model.database import DatabaseModel
-from aux_classes import (
+from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.model.database import DatabaseModel
+from deriva_ml.dataset.aux_classes import (
     DatasetVersion,
     DatasetMinid,
     DatasetHistory,
     VersionPart,
     DatasetSpec,
 )
+from deriva_ml.history import iso_to_snap
 
 if TYPE_CHECKING:
-    from core.base import DerivaML
+    from deriva_ml.core.base import DerivaML
 
 
 class Dataset:
@@ -104,8 +108,8 @@ class Dataset:
     def _insert_dataset_versions(
         self,
         dataset_list: list[DatasetSpec],
-        description: Optional[str] = "",
-        execution_rid: Optional[RID] = None,
+        description: str | None = "",
+        execution_rid: RID | None = None,
     ) -> None:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         # determine snapshot after changes were made
@@ -258,8 +262,8 @@ class Dataset:
         self,
         dataset_rid: RID,
         component: VersionPart,
-        description: Optional[str] = "",
-        execution_rid: Optional[RID] = None,
+        description: str | None = "",
+        execution_rid: RID | None = None,
     ) -> DatasetVersion:
         """Increment the version of the specified dataset_table.
 
@@ -295,8 +299,8 @@ class Dataset:
         self,
         dataset_types: str | list[str],
         description: str,
-        execution_rid: Optional[RID] = None,
-        version: Optional[DatasetVersion] = None,
+        execution_rid: RID | None = None,
+        version: DatasetVersion | None = None,
     ) -> RID:
         """Create a new dataset_table from the specified list of RIDs.
 
@@ -485,7 +489,7 @@ class Dataset:
 
     # @validate_call
     def list_dataset_members(
-        self, dataset_rid: RID, recurse: bool = False, limit: Optional[int] = None
+        self, dataset_rid: RID, recurse: bool = False, limit: int | None = None
     ) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset_table.
 
@@ -548,8 +552,8 @@ class Dataset:
         dataset_rid: RID,
         members: list[RID],
         validate: bool = True,
-        description: Optional[str] = "",
-        execution_rid: Optional[RID] = None,
+        description: str | None = "",
+        execution_rid: RID | None = None,
     ) -> None:
         """Add additional elements to an existing dataset_table.
 
@@ -637,7 +641,7 @@ class Dataset:
         dataset_rid: RID,
         members: list[RID],
         description: str = "",
-        execution_rid: Optional[RID] = None,
+        execution_rid: RID | None = None,
     ) -> None:
         """Remove elements to an existing dataset_table.
 
@@ -778,8 +782,8 @@ class Dataset:
 
     def _table_paths(
         self,
-        dataset: Optional[DatasetSpec] = None,
-        snapshot_catalog: Optional[DerivaML] = None,
+        dataset: DatasetSpec | None = None,
+        snapshot_catalog: DerivaML | None = None,
     ) -> Iterator[tuple[str, str, Table]]:
         paths = self._collect_paths(dataset and dataset.rid, snapshot_catalog)
 
@@ -805,9 +809,9 @@ class Dataset:
 
     def _collect_paths(
         self,
-        dataset_rid: Optional[RID] = None,
-        snapshot: Optional[Dataset] = None,
-        dataset_nesting_depth: Optional[int] = None,
+        dataset_rid: RID | None = None,
+        snapshot: Dataset | None = None,
+        dataset_nesting_depth: int | None = None,
     ) -> set[tuple[Table, ...]]:
         snapshot_catalog = snapshot if snapshot else self
 
@@ -876,7 +880,7 @@ class Dataset:
         paths |= {(self.dataset_table, dataset_dataset) + p for p in nested_paths}
         return paths
 
-    def _dataset_nesting_depth(self, dataset_rid: Optional[RID] = None) -> int:
+    def _dataset_nesting_depth(self, dataset_rid: RID | None = None) -> int:
         """Determine the maximum dataset nesting depth in the current catalog.
 
         Returns:
@@ -926,8 +930,8 @@ class Dataset:
     def _dataset_specification(
         self,
         writer: Callable[[str, str, Table], list[dict[str, Any]]],
-        dataset: Optional[DatasetSpec] = None,
-        snapshot_catalog: Optional[DerivaML] = None,
+        dataset: DatasetSpec | None = None,
+        snapshot_catalog: DerivaML | None = None,
     ) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset_table.  Each element of the dataset_table will be placed in its own dir
         The top level data directory of the resulting BDBag will have one subdirectory for element type. The subdirectory
@@ -976,8 +980,8 @@ class Dataset:
     def _download_dataset_bag(
         self,
         dataset: DatasetSpec,
-        execution_rid: Optional[RID] = None,
-        snapshot_catalog: Optional[DerivaML] = None,
+        execution_rid: RID | None = None,
+        snapshot_catalog: DerivaML | None = None,
     ) -> DatasetBag:
         """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
 
@@ -1015,7 +1019,7 @@ class Dataset:
         return f"{self._model.catalog.catalog_id}@{version_record.snapshot}"
 
     def _create_dataset_minid(
-        self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML] = None
+        self, dataset: DatasetSpec, snapshot_catalog: DerivaML | None = None
     ) -> str:
         with TemporaryDirectory() as tmp_dir:
             # Generate a download specification file for the current catalog schema. By default, this spec
@@ -1066,7 +1070,7 @@ class Dataset:
     def _get_dataset_minid(
         self,
         dataset: DatasetSpec,
-        snapshot_catalog: Optional[DerivaML] = None,
+        snapshot_catalog: DerivaML | None = None,
         create: bool = True,
     ) -> DatasetMinid:
         """Return a MINID to the specified dataset.  If no version is specified, use the latest.
@@ -1166,7 +1170,7 @@ class Dataset:
     def _materialize_dataset_bag(
         self,
         minid: DatasetMinid,
-        execution_rid: Optional[RID] = None,
+        execution_rid: RID | None = None,
     ) -> Path:
         """Materialize a dataset_table bag into a local directory
 
@@ -1225,7 +1229,7 @@ class Dataset:
 
     def _export_annotation(
         self,
-        snapshot_catalog: Optional[DerivaML] = None,
+        snapshot_catalog: DerivaML | None = None,
     ) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
 
@@ -1257,7 +1261,7 @@ class Dataset:
         )
 
     def _export_specification(
-        self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML] = None
+        self, dataset: DatasetSpec, snapshot_catalog: DerivaML | None = None
     ) -> list[dict[str, Any]]:
         """
         Generate a specification for export engine for specific dataset.
@@ -1369,7 +1373,7 @@ class Dataset:
         return exports
 
     def _generate_dataset_download_spec(
-        self, dataset: DatasetSpec, snapshot_catalog: Optional[DerivaML] = None
+        self, dataset: DatasetSpec, snapshot_catalog: DerivaML | None = None
     ) -> dict[str, Any]:
         """
         Generate a specification for downloading a specific dataset.

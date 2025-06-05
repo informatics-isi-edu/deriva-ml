@@ -101,7 +101,6 @@ class DerivaModel:
 
         Args:
           table: A ERMRest table object or a string that is the name of the table.
-          table: str | Table:
 
         Returns:
           Table object.
@@ -118,7 +117,6 @@ class DerivaModel:
 
         Args:
           table_name: A ERMRest table object or the name of the table.
-          table_name: str | Table:
 
         Returns:
           Table object if the table is a controlled vocabulary, False otherwise.

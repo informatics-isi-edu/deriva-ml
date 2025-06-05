@@ -67,7 +67,8 @@ class UploadState(Enum):
     timeout = 7
 
 
-class StrEnum(str, Enum):
+class BaseStrEnum(str, Enum):
+    """Base class for string enums in Python 3.10"""
     pass
 
 
@@ -82,7 +83,7 @@ class FileUploadState(BaseModel):
         return self.result and self.result["RID"]
 
 
-class Status(StrEnum):
+class Status(BaseStrEnum):
     """Enumeration class defining execution status.
 
     Attributes:
@@ -244,7 +245,7 @@ class VocabularyTerm(BaseModel):
         extra = "ignore"
 
 
-class MLVocab(StrEnum):
+class MLVocab(BaseStrEnum):
     """Names of controlled vocabulary for various types within DerivaML."""
 
     dataset_type = "Dataset_Type"
@@ -254,12 +255,12 @@ class MLVocab(StrEnum):
     asset_role = "Asset_Role"
 
 
-class MLAsset(StrEnum):
+class MLAsset(BaseStrEnum):
     execution_metadata = "Execution_Metadata"
     execution_asset = "Execution_Asset"
 
 
-class ExecMetadataType(StrEnum):
+class ExecMetadataType(BaseStrEnum):
     """
     Predefined execution metadata types.
     """
@@ -268,7 +269,7 @@ class ExecMetadataType(StrEnum):
     runtime_env = "Runtime_Env"
 
 
-class ExecAssetType(StrEnum):
+class ExecAssetType(BaseStrEnum):
     """
     Predefined execution metadata types.
     """
