@@ -33,9 +33,9 @@ from core.definitions import (
 from core.base import DerivaML, FeatureRecord
 from dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from dataset.dataset_bag import DatasetBag
-from config import ExecutionConfiguration, Workflow
-from environment import get_execution_environment
-from dataset.upload import (
+from deriva_ml.execution.config import ExecutionConfiguration, Workflow
+from deriva_ml.execution.environment import get_execution_environment
+from deriva_ml.dataset.upload import (
     execution_root,
     feature_root,
     asset_root,

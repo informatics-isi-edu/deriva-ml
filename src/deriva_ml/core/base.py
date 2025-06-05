@@ -145,7 +145,7 @@ class DerivaML(Dataset):
         self.catalog_id = catalog_id
         self.ml_schema = ml_schema
         self.configuration = None
-        self._execution: "Execution" | None = None
+        self._execution: Execution | None = None
         self.domain_schema = self.model.domain_schema
         self.project_name = project_name or self.domain_schema
         self.start_time = datetime.now()

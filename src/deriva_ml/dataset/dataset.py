@@ -10,13 +10,11 @@ from __future__ import annotations
 # Standard library imports
 import json
 import logging
-import os
-import sqlite3
 from collections import defaultdict
 from graphlib import TopologicalSorter
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Iterable, Iterator, cast, TYPE_CHECKING
+from typing import Any, Callable, Iterable, Iterator, TYPE_CHECKING
 
 # Third-party imports
 from bdbag import bdbag_api as bdb
@@ -25,7 +23,7 @@ from pydantic import validate_call, ConfigDict
 import requests
 
 # Deriva imports
-from deriva.core.ermrest_model import Table, Model, FindAssociationResult
+from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags, format_exception
 import deriva.core.utils.hash_utils as hash_utils
 from deriva.transfer.download.deriva_export import DerivaExport
