@@ -1,10 +1,11 @@
 import argparse
 import sys
 
+from core.constants import DerivaAssetColumns
+from dataset.upload import bulk_upload_configuration
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 from model.catalog import DerivaModel
-from dataset.upload import bulk_upload_configuration
 
 
 def catalog_annotation(model: DerivaModel) -> None:
@@ -106,17 +107,12 @@ def catalog_annotation(model: DerivaModel) -> None:
                             }
                             for tname in model.schemas[model.domain_schema].tables
                             # Don't include controlled vocabularies, association tables, or feature tables.
-                            if not (
-                                model.is_vocabulary(tname)
-                                or model.is_association(tname, pure=False, max_arity=3)
-                            )
+                            if not (model.is_vocabulary(tname) or model.is_association(tname, pure=False, max_arity=3))
                         ],
                     },
                     {  # Vocabulary menu which will list all the controlled vocabularies in deriva-ml and domain.
                         "name": "Vocabulary",
-                        "children": [
-                            {"name": f"{ml_schema} Vocabularies", "header": True}
-                        ]
+                        "children": [{"name": f"{ml_schema} Vocabularies", "header": True}]
                         + [
                             {
                                 "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
@@ -188,7 +184,7 @@ def catalog_annotation(model: DerivaModel) -> None:
 def asset_annotation(asset_table: Table):
     schema = asset_table.schema.name
     asset_name = asset_table.name
-    model = DerivaModel(asset_table.schema.model)
+    asset_metadata = {c.name for c in asset_table.columns} - DerivaAssetColumns
 
     def fkey_column(column):
         """Map the column name to a FK if a constraint exists on the column"""
@@ -202,9 +198,7 @@ def asset_annotation(asset_table: Table):
         )
 
     annotations = {
-        deriva_tags.table_display: {
-            "row_name": {"row_markdown_pattern": "{{{Filename}}}"}
-        },
+        deriva_tags.table_display: {"row_name": {"row_markdown_pattern": "{{{Filename}}}"}},
         deriva_tags.visible_columns: {
             "*": [
                 "RID",
@@ -236,11 +230,11 @@ def asset_annotation(asset_table: Table):
                     "markdown_name": "Asset Types",
                 },
             ]
-            + [fkey_column(c) for c in model.asset_metadata(asset_table)],
+            + [fkey_column(c) for c in asset_metadata],
         },
     }
     asset_table.annotations.update(annotations)
-    model.apply()
+    asset_table.schema.model.apply()
 
 
 def generate_annotation(model: Model, schema: str) -> dict:
@@ -435,9 +429,7 @@ def generate_annotation(model: Model, schema: str) -> dict:
         },
         deriva_tags.visible_foreign_keys: {"*": []},
         deriva_tags.table_display: {
-            "row_name": {
-                "row_markdown_pattern": "{{{$fkey_deriva-ml_Dataset_Version_Dataset_fkey.RID}}}:{{{Version}}}"
-            }
+            "row_name": {"row_markdown_pattern": "{{{$fkey_deriva-ml_Dataset_Version_Dataset_fkey.RID}}}:{{{Version}}}"}
         },
     }
 

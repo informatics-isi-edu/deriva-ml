@@ -4,19 +4,21 @@ The module implements the sqllite interface to a set of directories representing
 
 from __future__ import annotations
 
+import sqlite3
+
 # Standard library imports
 from collections import defaultdict
 from copy import copy
-from typing import Any, Generator, Iterable, TYPE_CHECKING, cast
-import sqlite3
+from typing import TYPE_CHECKING, Any, Generator, Iterable, cast
+
+import deriva.core.datapath as datapath
 
 # Third-party imports
 import pandas as pd
-from pydantic import validate_call, ConfigDict
 
 # Deriva imports
-from deriva.core.ermrest_model import Table, Column
-import deriva.core.datapath as datapath
+from deriva.core.ermrest_model import Column, Table
+from pydantic import ConfigDict, validate_call
 
 # Local imports
 from deriva_ml.core.definitions import RID, DerivaMLException
@@ -49,9 +51,7 @@ class DatasetBag:
         domain_schema (str): Name of the domain schema
     """
 
-    def __init__(
-        self, database_model: DatabaseModel, dataset_rid: RID | None = None
-    ) -> None:
+    def __init__(self, database_model: DatabaseModel, dataset_rid: RID | None = None) -> None:
         """
         Initialize a DatasetBag instance.
 
@@ -66,9 +66,7 @@ class DatasetBag:
         if not self.dataset_rid:
             raise DerivaMLException("No dataset RID provided")
 
-        self.model.rid_lookup(
-            self.dataset_rid
-        )  # Check to make sure that this dataset is in the bag.
+        self.model.rid_lookup(self.dataset_rid)  # Check to make sure that this dataset is in the bag.
 
         self.version = self.model.dataset_version(self.dataset_rid)
         self._dataset_table = self.model.dataset_table
@@ -88,16 +86,10 @@ class DatasetBag:
         table_name = self.model.normalize_table_name(table)
         with self.database as dbase:
             select_args = ",".join(
-                [
-                    f'"{table_name}"."{c[1]}"'
-                    for c in dbase.execute(
-                        f'PRAGMA table_info("{table_name}")'
-                    ).fetchall()
-                ]
+                [f'"{table_name}"."{c[1]}"' for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
             )
         datasets = ",".join(
-            [f'"{self.dataset_rid}"']
-            + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
+            [f'"{self.dataset_rid}"'] + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
         )
         paths = [
             (
@@ -109,18 +101,14 @@ class DatasetBag:
         ]
 
         sql = []
-        dataset_table_name = (
-            f'"{self.model.normalize_table_name(self._dataset_table.name)}"'
-        )
+        dataset_table_name = f'"{self.model.normalize_table_name(self._dataset_table.name)}"'
 
         def column_name(col: Column) -> str:
             return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
 
         for ts, on in paths:
             tables = " JOIN ".join(ts)
-            on_expression = " and ".join(
-                [f"{column_name(left)}={column_name(right)}" for left, right in on]
-            )
+            on_expression = " and ".join([f"{column_name(left)}={column_name(right)}" for left, right in on])
             sql.append(
                 f"SELECT {select_args} FROM {tables} ON {on_expression} WHERE {dataset_table_name}.RID IN ({datasets})"
             )
@@ -169,18 +157,13 @@ class DatasetBag:
         """
         table_name = self.model.normalize_table_name(table)
         with self.database as dbase:
-            col_names = [
-                c[1]
-                for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()
-            ]
+            col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
             result = self.database.execute(self._dataset_table_view(table))
             while row := result.fetchone():
                 yield dict(zip(col_names, row))
 
     @validate_call
-    def list_dataset_members(
-        self, recurse: bool = False
-    ) -> dict[str, dict[str, list[Any]]]:
+    def list_dataset_members(self, recurse: bool = False) -> dict[str, dict[str, list[Any]]]:
         """Return a list of entities associated with a specific dataset.
 
         Args:
@@ -199,10 +182,7 @@ class DatasetBag:
             target_table = other_fkey.pk_table
             member_table = assoc_table.table
 
-            if (
-                target_table.schema.name != self.model.domain_schema
-                and target_table != self._dataset_table
-            ):
+            if target_table.schema.name != self.model.domain_schema and target_table != self._dataset_table:
                 # Look at domain tables and nested datasets.
                 continue
             if target_table == self._dataset_table:
@@ -212,24 +192,17 @@ class DatasetBag:
             sql_member = self.model.normalize_table_name(member_table.name)
 
             # Get the names of the columns that we are going to need for linking
-            member_link = tuple(
-                c.name for c in next(iter(other_fkey.column_map.items()))
-            )
+            member_link = tuple(c.name for c in next(iter(other_fkey.column_map.items())))
 
             with self.database as db:
-                col_names = [
-                    c[1]
-                    for c in db.execute(f'PRAGMA table_info("{sql_target}")').fetchall()
-                ]
+                col_names = [c[1] for c in db.execute(f'PRAGMA table_info("{sql_target}")').fetchall()]
                 select_cols = ",".join([f'"{sql_target}".{c}' for c in col_names])
                 sql_cmd = (
                     f'SELECT {select_cols} FROM "{sql_member}" '
                     f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
                     f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
                 )
-                target_entities = [
-                    dict(zip(col_names, e)) for e in db.execute(sql_cmd).fetchall()
-                ]
+                target_entities = [dict(zip(col_names, e)) for e in db.execute(sql_cmd).fetchall()]
                 members[target_table.name].extend(target_entities)
 
             target_entities = []  # path.entities().fetch()
@@ -238,9 +211,7 @@ class DatasetBag:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in target_entities]
                 for ds in nested_datasets:
-                    for k, v in DatasetBag.list_dataset_members(
-                        ds, recurse=False
-                    ).items():
+                    for k, v in DatasetBag.list_dataset_members(ds, recurse=False).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -255,9 +226,7 @@ class DatasetBag:
         """
         return self.model.find_features(table)
 
-    def list_feature_values(
-        self, table: Table | str, feature_name: str
-    ) -> datapath._ResultSet:
+    def list_feature_values(self, table: Table | str, feature_name: str) -> datapath._ResultSet:
         """Return feature values for a table.
 
         Args:
@@ -293,9 +262,7 @@ class DatasetBag:
                 f'"{nds_table}".Nested_Dataset == "{ds_table}".RID '
                 f'where "{nds_table}".Dataset == "{self.dataset_rid}"'
             )
-            nested = [
-                DatasetBag(self.model, r[0]) for r in db.execute(sql_cmd).fetchall()
-            ]
+            nested = [DatasetBag(self.model, r[0]) for r in db.execute(sql_cmd).fetchall()]
 
         result = copy(nested)
         if recurse:

@@ -1,20 +1,20 @@
 import argparse
 import sys
-from typing import Optional, Any
+from typing import Any, Optional
 
-from deriva.core import DerivaServer, get_credential, ErmrestCatalog
-from deriva.core.ermrest_model import Model
+from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import (
-    builtin_types,
-    Schema,
-    Table,
     Column,
     ForeignKey,
     Key,
+    Model,
+    Schema,
+    Table,
+    builtin_types,
 )
 
 from deriva_ml import MLVocab
-from deriva_ml.schema_setup.annotations import generate_annotation, asset_annotation
+from deriva_ml.schema_setup.annotations import asset_annotation, generate_annotation
 
 
 def create_dataset_table(
@@ -35,9 +35,7 @@ def create_dataset_table(
         )
     )
 
-    dataset_type = schema.create_table(
-        Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}")
-    )
+    dataset_type = schema.create_table(Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}"))
     schema.create_table(
         Table.define_association(
             associates=[
@@ -47,21 +45,15 @@ def create_dataset_table(
         )
     )
 
-    dataset_version = schema.create_table(
-        define_table_dataset_version(schema.name, version_annotation)
-    )
+    dataset_version = schema.create_table(define_table_dataset_version(schema.name, version_annotation))
     dataset_table.create_reference(("Version", True, dataset_version))
 
     # Nested datasets.
     schema.create_table(
-        Table.define_association(
-            associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)]
-        )
+        Table.define_association(associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)])
     )
     schema.create_table(
-        Table.define_association(
-            associates=[("Dataset", dataset_table), ("Execution", execution_table)]
-        )
+        Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
     )
 
 
@@ -78,9 +70,7 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
             Column.define("Description", builtin_types.markdown),
             Column.define("Dataset", builtin_types.text, comment="RID of dataset"),
             Column.define("Execution", builtin_types.text, comment="RID of execution"),
-            Column.define(
-                "Minid", builtin_types.text, comment="URL to MINID for dataset"
-            ),
+            Column.define("Minid", builtin_types.text, comment="URL to MINID for dataset"),
             Column.define(
                 "Snapshot",
                 builtin_types.text,
@@ -108,9 +98,7 @@ def create_execution_table(schema, annotation: Optional[dict] = None):
                 Column.define("Status", builtin_types.text),
                 Column.define("Status_Detail", builtin_types.text),
             ],
-            fkey_defs=[
-                ForeignKey.define(["Workflow"], schema.name, "Workflow", ["RID"])
-            ],
+            fkey_defs=[ForeignKey.define(["Workflow"], schema.name, "Workflow", ["RID"])],
             annotations=annotation,
         )
     )
@@ -161,13 +149,9 @@ def create_file_table(
 ):
     """Define files table structure"""
     annotation = annotation or {}
-    file_table = schema.create_table(
-        Table.define_asset(sname=schema.name, tname="File")
-    )
+    file_table = schema.create_table(Table.define_asset(sname=schema.name, tname="File"))
 
-    file_type = schema.create_table(
-        Table.define_vocabulary(MLVocab.file_type, f"{project_name}:{{RID}}")
-    )
+    file_type = schema.create_table(Table.define_vocabulary(MLVocab.file_type, f"{project_name}:{{RID}}"))
 
     schema.create_table(
         Table.define_association(
@@ -203,9 +187,7 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
         )
     )
     workflow_table.create_reference(
-        schema.create_table(
-            Table.define_vocabulary(MLVocab.workflow_type, f"{schema.name}:{{RID}}")
-        )
+        schema.create_table(Table.define_vocabulary(MLVocab.workflow_type, f"{schema.name}:{{RID}}"))
     )
     return workflow_table
 
@@ -226,38 +208,22 @@ def create_ml_schema(
 
     client_annotation = {
         "tag:misd.isi.edu,2015:display": {"name": "Users"},
-        "tag:isrd.isi.edu,2016:table-display": {
-            "row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}
-        },
-        "tag:isrd.isi.edu,2016:visible-columns": {
-            "compact": ["Full_Name", "Display_Name", "Email", "ID"]
-        },
+        "tag:isrd.isi.edu,2016:table-display": {"row_name": {"row_markdown_pattern": "{{{Full_Name}}}"}},
+        "tag:isrd.isi.edu,2016:visible-columns": {"compact": ["Full_Name", "Display_Name", "Email", "ID"]},
     }
-    model.schemas["public"].tables["ERMrest_Client"].annotations.update(
-        client_annotation
-    )
+    model.schemas["public"].tables["ERMrest_Client"].annotations.update(client_annotation)
     model.apply()
 
-    schema = model.create_schema(
-        Schema.define(schema_name, annotations=annotations["schema_annotation"])
-    )
+    schema = model.create_schema(Schema.define(schema_name, annotations=annotations["schema_annotation"]))
 
     # Create workflow and execution table.
 
-    schema.create_table(
-        Table.define_vocabulary("Feature_Name", f"{project_name}:{{RID}}")
-    )
-    asset_type_table = schema.create_table(
-        Table.define_vocabulary("Asset_Type", f"{project_name}:{{RID}}")
-    )
-    asset_role_table = schema.create_table(
-        Table.define_vocabulary("Asset_Role", f"{project_name}:{{RID}}")
-    )
+    schema.create_table(Table.define_vocabulary("Feature_Name", f"{project_name}:{{RID}}"))
+    asset_type_table = schema.create_table(Table.define_vocabulary("Asset_Type", f"{project_name}:{{RID}}"))
+    asset_role_table = schema.create_table(Table.define_vocabulary("Asset_Role", f"{project_name}:{{RID}}"))
 
     create_workflow_table(schema, annotations["workflow_annotation"])
-    execution_table = create_execution_table(
-        schema, annotations["execution_annotation"]
-    )
+    execution_table = create_execution_table(schema, annotations["execution_annotation"])
     create_dataset_table(
         schema,
         execution_table,

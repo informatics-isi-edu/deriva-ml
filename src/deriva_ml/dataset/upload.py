@@ -46,17 +46,16 @@ from deriva.core.ermrest_model import Table
 from deriva.core.hatrac_store import HatracStore
 from deriva.core.utils import hash_utils, mime_utils
 from deriva.transfer.upload.deriva_upload import GenericUploader
-from pydantic import validate_call, ConfigDict
+from pydantic import ConfigDict, validate_call
 
-from core.definitions import (
+from deriva_ml.core.definitions import (
     RID,
     DerivaMLException,
+    DerivaSystemColumns,
     FileUploadState,
     UploadState,
-    DerivaSystemColumns,
 )
-from model.catalog import DerivaModel
-
+from deriva_ml.model.catalog import DerivaModel
 
 try:
     from icecream import ic
@@ -69,26 +68,16 @@ upload_root_regex = r"(?i)^.*/deriva-ml"
 exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"
 
 feature_dir_regex = exec_dir_regex + r"/feature"
-feature_table_dir_regex = (
-    feature_dir_regex
-    + r"/(?P<schema>[-\w]+)/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)"
-)
-feature_value_regex = (
-    feature_table_dir_regex + r"/(?P=feature_name)[.](?P<ext>[(csv|json)]*)$"
-)
+feature_table_dir_regex = feature_dir_regex + r"/(?P<schema>[-\w]+)/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)"
+feature_value_regex = feature_table_dir_regex + r"/(?P=feature_name)[.](?P<ext>[(csv|json)]*)$"
 feature_asset_dir_regex = feature_table_dir_regex + r"/asset/(?P<asset_table>[-\w]+)"
-feature_asset_regex = (
-    feature_asset_dir_regex + r"/(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
-)
+feature_asset_regex = feature_asset_dir_regex + r"/(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
 
 asset_path_regex = exec_dir_regex + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)"
 
 asset_file_regex = r"(?P<file>[-\w]+)[.](?P<ext>[a-z0-9]*)$"
 
-table_regex = (
-    exec_dir_regex
-    + r"/table/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
-)
+table_regex = exec_dir_regex + r"/table/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
 
 
 def is_feature_dir(path: Path) -> Optional[re.Match]:
@@ -138,18 +127,14 @@ def asset_root(prefix: Path | str, exec_rid: str) -> Path:
     return path
 
 
-def feature_dir(
-    prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
-) -> Path:
+def feature_dir(prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str) -> Path:
     """Return the path to eht directory in which a named feature for an execution should be placed."""
     path = feature_root(prefix, exec_rid) / schema / target_table / feature_name
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def feature_value_path(
-    prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str
-) -> Path:
+def feature_value_path(prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str) -> Path:
     """Return the path to a CSV file in which to place feature values that are to be uploaded.
 
     Args:
@@ -162,10 +147,7 @@ def feature_value_path(
     Returns:
         Path to CSV file in which to place feature values
     """
-    return (
-        feature_dir(prefix, exec_rid, schema, target_table, feature_name)
-        / f"{feature_name}.jsonl"
-    )
+    return feature_dir(prefix, exec_rid, schema, target_table, feature_name) / f"{feature_name}.jsonl"
 
 
 def table_path(prefix: Path | str, schema: str, table: str) -> Path:
@@ -229,9 +211,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
         model: Model from which to generate the upload configuration
     """
     asset_tables_with_metadata = [
-        asset_table_upload_spec(model=model, asset_table=t)
-        for t in model.find_assets()
-        if model.asset_metadata(t)
+        asset_table_upload_spec(model=model, asset_table=t) for t in model.find_assets() if model.asset_metadata(t)
     ]
     return {
         "asset_mappings": asset_tables_with_metadata
@@ -246,9 +226,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                 },
                 "asset_type": "file",
                 "target_table": ["{schema}", "{asset_table}"],
-                "file_pattern": asset_path_regex
-                + "/"
-                + asset_file_regex,  # Sets schema, asset_table, name, ext
+                "file_pattern": asset_path_regex + "/" + asset_file_regex,  # Sets schema, asset_table, name, ext
                 "checksum_types": ["sha256", "md5"],
                 "hatrac_options": {"versioned_urls": True},
                 "hatrac_templates": {
@@ -280,9 +258,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-def upload_directory(
-    model: DerivaModel, directory: Path | str
-) -> dict[Any, FileUploadState] | None:
+def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, FileUploadState] | None:
     """Upload assets from a directory. This routine assumes that the current upload specification includes a
     configuration for the specified directory.  Every asset in the specified directory is uploaded
 
@@ -294,7 +270,7 @@ def upload_directory(
         Results of the upload operation.
 
     Raises:
-        DerivaMLException: If there is an issue uploading the assets.
+        DerivaMLException: If there is an issue with uploading the assets.
     """
     directory = Path(directory)
     if not directory.is_dir():
@@ -331,9 +307,7 @@ def upload_directory(
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-def upload_asset(
-    model: DerivaModel, file: Path | str, table: Table, **kwargs: Any
-) -> dict:
+def upload_asset(model: DerivaModel, file: Path | str, table: Table, **kwargs: Any) -> dict:
     """Upload the specified file into Hatrac and update the associated asset table.
 
     Args:
@@ -359,9 +333,7 @@ def upload_asset(
         credentials=model.catalog.deriva_server.credentials,
     )
     md5_hashes = hash_utils.compute_file_hashes(file, ["md5"])["md5"]
-    sanitized_filename = urlquote(
-        re.sub("[^a-zA-Z0-9_.-]", "_", md5_hashes[0] + "." + file_name)
-    )
+    sanitized_filename = urlquote(re.sub("[^a-zA-Z0-9_.-]", "_", md5_hashes[0] + "." + file_name))
     hatrac_path = f"{hatrac_path}{sanitized_filename}"
 
     try:
@@ -377,9 +349,7 @@ def upload_asset(
         raise e
     try:
         # Now update the asset table.
-        ipath = (
-            model.catalog.getPathBuilder().schemas[table.schema.name].tables[table.name]
-        )
+        ipath = model.catalog.getPathBuilder().schemas[table.schema.name].tables[table.name]
         return list(
             ipath.insert(
                 [
@@ -429,9 +399,7 @@ def asset_file_path(
     }.union(set(DerivaSystemColumns))
     asset_metadata = {c.name for c in asset_table.columns} - asset_columns
     if not (asset_metadata >= set(metadata.keys())):
-        raise DerivaMLException(
-            f"Metadata {metadata} does not match asset metadata {asset_metadata}"
-        )
+        raise DerivaMLException(f"Metadata {metadata} does not match asset metadata {asset_metadata}")
 
     for m in asset_metadata:
         path = path / metadata.get(m, "None")
@@ -450,10 +418,6 @@ def asset_type_path(prefix: Path | str, exec_rid: RID, asset_table: Table) -> Pa
     Returns:
         Path to the file in which to place asset_type values for the named asset.
     """
-    path = (
-        execution_root(prefix, exec_rid=exec_rid)
-        / "asset-type"
-        / asset_table.schema.name
-    )
+    path = execution_root(prefix, exec_rid=exec_rid) / "asset-type" / asset_table.schema.name
     path.mkdir(parents=True, exist_ok=True)
     return path / f"{asset_table.name}.jsonl"

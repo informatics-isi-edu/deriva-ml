@@ -8,7 +8,7 @@ relationships that follow a specific data model.
 
 """
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 # Standard library imports
 import getpass
@@ -16,56 +16,58 @@ import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import Any, Iterable, TYPE_CHECKING, Dict, List, cast
+from typing import Any, Dict, Iterable, List, cast, TYPE_CHECKING
+
+import deriva.core.datapath as datapath
 
 # Third-party imports
 import requests
-from pydantic import validate_call, ConfigDict
 
 # Deriva imports
 from deriva.core import (
+    DEFAULT_SESSION_CONFIG,
+    format_exception,
     get_credential,
     urlquote,
-    format_exception,
-    DEFAULT_SESSION_CONFIG,
 )
-import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException
 from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
+from pydantic import ConfigDict, validate_call
+
+from deriva_ml.core.definitions import (
+    ML_SCHEMA,
+    RID,
+    ColumnDefinition,
+    DerivaMLException,
+    FileSpec,
+    MLVocab,
+    Status,
+    TableDefinition,
+    VocabularyTerm,
+)
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.dataset import Dataset
+from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.dataset.upload import asset_file_path, execution_rids, table_path
 
 # Local imports
-from deriva_ml.execution.config import ExecutionConfiguration, Workflow
+from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import Feature, FeatureRecord
-from deriva_ml.dataset.dataset import Dataset
-from deriva_ml.dataset.aux_classes import DatasetSpec
-from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.model.catalog import DerivaModel
-from deriva_ml.dataset.upload import table_path, execution_rids, asset_file_path
-from deriva_ml.core.definitions import (
-    ColumnDefinition,
-    RID,
-    Status,
-    DerivaMLException,
-    ML_SCHEMA,
-    VocabularyTerm,
-    MLVocab,
-    FileSpec,
-    TableDefinition,
-)
 from deriva_ml.schema_setup.annotations import asset_annotation
+
+if TYPE_CHECKING:
+    from deriva_ml.execution.execution import Execution
 
 # Optional debug imports
 try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
-# Type checking imports
-if TYPE_CHECKING:
-    from deriva_ml.execution.execution import Execution
 
 
 class DerivaML(Dataset):
@@ -118,15 +120,11 @@ class DerivaML(Dataset):
             session_config=self._get_session_config(),
         )
         self.catalog = server.connect_ermrest(catalog_id)
-        self.model = DerivaModel(
-            self.catalog.getCatalogModel(), domain_schema=domain_schema
-        )
+        self.model = DerivaModel(self.catalog.getCatalogModel(), domain_schema=domain_schema)
 
         default_workdir = self.__class__.__name__ + "_working"
         self.working_dir = (
-            Path(working_dir) / getpass.getuser()
-            if working_dir
-            else Path.home() / "deriva-ml"
+            Path(working_dir) / getpass.getuser() if working_dir else Path.home() / "deriva-ml"
         ) / default_workdir
 
         self.working_dir.mkdir(parents=True, exist_ok=True)
@@ -135,9 +133,7 @@ class DerivaML(Dataset):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize dataset class.
-        super().__init__(
-            self.model, self.cache_dir, self.working_dir, use_minid=use_minid
-        )
+        super().__init__(self.model, self.cache_dir, self.working_dir, use_minid=use_minid)
         self._logger = logging.getLogger("deriva_ml")
         self._logger.setLevel(logging_level)
 
@@ -256,9 +252,7 @@ class DerivaML(Dataset):
         """
         table_obj = self.model.name_to_table(table)
         try:
-            uri = self.catalog.get_server_uri().replace(
-                "ermrest/catalog/", "chaise/recordset/#"
-            )
+            uri = self.catalog.get_server_uri().replace("ermrest/catalog/", "chaise/recordset/#")
         except DerivaMLException:
             # Perhaps we have a RID....
             uri = self.cite(cast(str, table))
@@ -276,15 +270,11 @@ class DerivaML(Dataset):
         Raises:
             DerivaMLException: if provided RID does not exist.
         """
-        if isinstance(entity, str) and entity.startswith(
-            f"https://{self.host_name}/id/{self.catalog_id}/"
-        ):
+        if isinstance(entity, str) and entity.startswith(f"https://{self.host_name}/id/{self.catalog_id}/"):
             # Already got a citation...
             return entity
         try:
-            self.resolve_rid(
-                rid := entity if isinstance(entity, str) else entity["RID"]
-            )
+            self.resolve_rid(rid := entity if isinstance(entity, str) else entity["RID"])
             return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot().snaptime}"
         except KeyError as e:
             raise DerivaMLException(f"Entity {e} does not have RID column")
@@ -301,10 +291,7 @@ class DerivaML(Dataset):
 
         """
         user_path = self.pathBuilder.public.ERMrest_Client.path
-        return [
-            {"ID": u["ID"], "Full_Name": u["Full_Name"]}
-            for u in user_path.entities().fetch()
-        ]
+        return [{"ID": u["ID"], "Full_Name": u["Full_Name"]} for u in user_path.entities().fetch()]
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
         """Return a named tuple with information about the specified RID.
@@ -347,13 +334,9 @@ class DerivaML(Dataset):
         Returns:
 
         """
-        self.pathBuilder.www.tables[self.domain_schema].insert(
-            [{"Title": title, "Content": content}]
-        )
+        self.pathBuilder.www.tables[self.domain_schema].insert([{"Title": title, "Content": content}])
 
-    def create_vocabulary(
-        self, vocab_name: str, comment: str = "", schema: str | None = None
-    ) -> Table:
+    def create_vocabulary(self, vocab_name: str, comment: str = "", schema: str | None = None) -> Table:
         """Create a controlled vocabulary table with the given vocab name.
 
         Args:
@@ -367,9 +350,7 @@ class DerivaML(Dataset):
         """
         schema = schema or self.domain_schema
         return self.model.schemas[schema].create_table(
-            Table.define_vocabulary(
-                vocab_name, f"{self.project_name}:{{RID}}", comment=comment
-            )
+            Table.define_vocabulary(vocab_name, f"{self.project_name}:{{RID}}", comment=comment)
         )
 
     def create_table(self, table: TableDefinition) -> Table:
@@ -406,9 +387,7 @@ class DerivaML(Dataset):
         referenced_tables = referenced_tables or []
         schema = schema or self.domain_schema
 
-        self.add_term(
-            MLVocab.asset_type, asset_name, description=f"A {asset_name} asset"
-        )
+        self.add_term(MLVocab.asset_type, asset_name, description=f"A {asset_name} asset")
         asset_table = self.model.schemas[schema].create_table(
             Table.define_asset(
                 schema,
@@ -457,9 +436,7 @@ class DerivaML(Dataset):
         asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
 
         asset_type_table = self._model.find_association(asset_table, MLVocab.asset_type)
-        type_path = pb.schemas[asset_type_table.schema.name].tables[
-            asset_type_table.name
-        ]
+        type_path = pb.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
 
         # Get a list of all the asset_type values associated with this dataset_table.
         assets = []
@@ -470,13 +447,7 @@ class DerivaML(Dataset):
                 .fetch()
             )
             assets.append(
-                asset
-                | {
-                    MLVocab.asset_type.value: [
-                        asset_type[MLVocab.asset_type.value]
-                        for asset_type in asset_types
-                    ]
-                }
+                asset | {MLVocab.asset_type.value: [asset_type[MLVocab.asset_type.value] for asset_type in asset_types]}
             )
         return assets
 
@@ -544,9 +515,7 @@ class DerivaML(Dataset):
         target_table = self.model.name_to_table(target_table)
         execution = self.model.schemas[self.ml_schema].tables["Execution"]
         feature_name_table = self.model.schemas[self.ml_schema].tables["Feature_Name"]
-        feature_name_term = self.add_term(
-            "Feature_Name", feature_name, description=comment
-        )
+        feature_name_term = self.add_term("Feature_Name", feature_name, description=comment)
         atable_name = f"Execution_{target_table.name}_{feature_name_term.name}"
 
         # Now create the association table that implements the feature.
@@ -554,9 +523,7 @@ class DerivaML(Dataset):
             target_table.define_association(
                 table_name=atable_name,
                 associates=[execution, target_table, feature_name_table],
-                metadata=[
-                    normalize_metadata(m) for m in chain(assets, terms, metadata)
-                ],
+                metadata=[normalize_metadata(m) for m in chain(assets, terms, metadata)],
                 comment=comment,
             )
         )
@@ -566,9 +533,7 @@ class DerivaML(Dataset):
         atable.columns["Feature_Name"].alter(default=feature_name_term.name)
         return self.feature_record_class(target_table, feature_name)
 
-    def feature_record_class(
-        self, table: str | Table, feature_name: str
-    ) -> type[FeatureRecord]:
+    def feature_record_class(self, table: str | Table, feature_name: str) -> type[FeatureRecord]:
         """Create a pydantic model for entries into the specified feature table.
 
         For information on how to
@@ -596,9 +561,7 @@ class DerivaML(Dataset):
         """
         table = self.model.name_to_table(table)
         try:
-            feature = next(
-                f for f in self.find_features(table) if f.feature_name == feature_name
-            )
+            feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
             feature.feature_table.drop()
             return True
         except StopIteration:
@@ -635,9 +598,7 @@ class DerivaML(Dataset):
 
     # noinspection PyProtectedMember
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_feature_values(
-        self, table: Table | str, feature_name: str
-    ) -> datapath._ResultSet:
+    def list_feature_values(self, table: Table | str, feature_name: str) -> datapath._ResultSet:
         """Return a datapath ResultSet containing all values of a feature associated with a table.
 
         Args:
@@ -651,12 +612,7 @@ class DerivaML(Dataset):
         table = self.model.name_to_table(table)
         feature = self.lookup_feature(table, feature_name)
         pb = self.catalog.getPathBuilder()
-        return (
-            pb.schemas[feature.feature_table.schema.name]
-            .tables[feature.feature_table.name]
-            .entities()
-            .fetch()
-        )
+        return pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_term(
@@ -738,9 +694,7 @@ class DerivaML(Dataset):
         schema_path = self.catalog.getPathBuilder().schemas[schema_name]
 
         for term in schema_path.tables[table_name].entities().fetch():
-            if term_name == term["Name"] or (
-                term["Synonyms"] and term_name in term["Synonyms"]
-            ):
+            if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
                 return VocabularyTerm.model_validate(term)
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
 
@@ -763,10 +717,7 @@ class DerivaML(Dataset):
         if not (self.model.is_vocabulary(table)):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
-        return [
-            VocabularyTerm(**v)
-            for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()
-        ]
+        return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(
@@ -790,9 +741,7 @@ class DerivaML(Dataset):
             snapshot_catalog=DerivaML(self.host_name, self._version_snapshot(dataset)),
         )
 
-    def _update_status(
-        self, new_status: Status, status_detail: str, execution_rid: RID
-    ):
+    def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID):
         """Update the status of an execution in the catalog.
 
         Args:
@@ -838,9 +787,7 @@ class DerivaML(Dataset):
         """
         defined_types = self.list_vocabulary_terms(MLVocab.file_type.value)
         if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
-            raise DerivaMLException(
-                f"RID {execution_rid} is not for an execution table."
-            )
+            raise DerivaMLException(f"RID {execution_rid} is not for an execution table.")
 
         def check_file_type(dtype: str) -> bool:
             """Make sure that the specified string is either the name or synonym for a file type term."""
@@ -855,45 +802,28 @@ class DerivaML(Dataset):
             if not check_file_type(file_type):
                 raise DerivaMLException("File type must be a vocabulary term.")
         file_table_path = pb.schemas[self.ml_schema].tables["File"]
-        file_rids = [
-            e["RID"] for e in file_table_path.insert([f.model_dump() for f in files])
-        ]
+        file_rids = [e["RID"] for e in file_table_path.insert([f.model_dump() for f in files])]
 
         # Get the name of the association table between file_table and file_type.
-        atable = next(
-            self._model.schemas[self._ml_schema]
-            .tables[MLVocab.file_type.value]
-            .find_associations()
-        ).name
+        atable = next(self._model.schemas[self._ml_schema].tables[MLVocab.file_type.value].find_associations()).name
         pb.schemas[self._ml_schema].tables[atable].insert(
-            [
-                {"File_Type": file_type, "File": file_rid}
-                for file_rid in file_rids
-                for file_type in file_types
-            ]
+            [{"File_Type": file_type, "File": file_rid} for file_rid in file_rids for file_type in file_types]
         )
 
         if execution_rid:
             # Get the name of the association table between file_table and execution.
             pb.schemas[self._ml_schema].File_Execution.insert(
-                [
-                    {"File": file_rid, "Execution": execution_rid}
-                    for file_rid in file_rids
-                ]
+                [{"File": file_rid, "Execution": execution_rid} for file_rid in file_rids]
             )
         return file_rids
 
-    def list_files(
-        self, file_types: Iterable[str] | None = None
-    ) -> list[dict[str, Any]]:
+    def list_files(self, file_types: Iterable[str] | None = None) -> list[dict[str, Any]]:
         """Return the contents of the file table.  Denormalized file types into the file record."""
         ml_path = self.pathBuilder.schemas[self._ml_schema]
         file_path = ml_path.File
         type_path = ml_path.File_File_Type
 
-        path = file_path.link(
-            type_path, on=file_path.RID == type_path.File, join_type="left"
-        )
+        path = file_path.link(type_path, on=file_path.RID == type_path.File, join_type="left")
         path = path.File.attributes(
             path.File.RID,
             path.File.URL,
@@ -952,9 +882,7 @@ class DerivaML(Dataset):
                 "Description": workflow.description,
                 "Checksum": workflow.checksum,
                 "Version": workflow.version,
-                MLVocab.workflow_type: self.lookup_term(
-                    MLVocab.workflow_type, workflow.workflow_type
-                ).name,
+                MLVocab.workflow_type: self.lookup_term(MLVocab.workflow_type, workflow.workflow_type).name,
             }
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]["RID"]
         except Exception as e:
@@ -971,9 +899,7 @@ class DerivaML(Dataset):
         except IndexError:
             return None
 
-    def create_workflow(
-        self, name: str, workflow_type: str, description: str = ""
-    ) -> Workflow:
+    def create_workflow(self, name: str, workflow_type: str, description: str = "") -> Workflow:
         """Identify current executing program and return a workflow RID for it
 
         Determine the notebook or script that is currently being executed. Assume that this is
@@ -995,9 +921,7 @@ class DerivaML(Dataset):
         return Workflow.create_workflow(name, workflow_type, description)
 
     # @validate_call
-    def create_execution(
-        self, configuration: ExecutionConfiguration, dry_run: bool = False
-    ) -> "Execution":
+    def create_execution(self, configuration: ExecutionConfiguration, dry_run: bool = False) -> "Execution":
         """Create an execution object
 
         Given an execution configuration, initialize the local compute environment to prepare for executing an
@@ -1022,9 +946,8 @@ class DerivaML(Dataset):
         return self._execution
 
     # @validate_call
-    def restore_execution(self, execution_rid: RID | None = None) -> "Execution":
+    def restore_execution(self, execution_rid: RID | None = None) -> Execution:
         """Return an Execution object for a previously started execution with the specified RID."""
-
         from deriva_ml.execution.execution import Execution
 
         # Find path to execution

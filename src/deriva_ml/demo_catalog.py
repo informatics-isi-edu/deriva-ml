@@ -1,32 +1,30 @@
 import atexit
-from importlib.resources import files
 import itertools
 import logging
-from random import randint, random
-from typing import Optional
-from tempfile import TemporaryDirectory
-
-from deriva.core import DerivaServer, get_credential
-from deriva.core import ErmrestCatalog
-from deriva.core.datapath import DataPathException
-from deriva.core.ermrest_model import builtin_types, Schema, Table, Column
-from requests import HTTPError
 import subprocess
+from importlib.resources import files
+from random import randint, random
+from tempfile import TemporaryDirectory
+from typing import Optional
 
-from .schema_setup.annotations import catalog_annotation
+from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva.core.datapath import DataPathException
+from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
+from requests import HTTPError
+
 from deriva_ml import (
-    DerivaML,
-    ExecutionConfiguration,
-    MLVocab,
+    RID,
     BuiltinTypes,
     ColumnDefinition,
     DatasetVersion,
-    RID,
+    DerivaML,
+    ExecutionConfiguration,
+    MLVocab,
 )
-
+from deriva_ml.schema_setup.annotations import catalog_annotation
 from deriva_ml.schema_setup.create_schema import (
-    initialize_ml_schema,
     create_ml_schema,
+    initialize_ml_schema,
 )
 
 TEST_DATASET_SIZE = 4
@@ -67,16 +65,12 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
     )
     execution = deriva_ml.create_execution(
         ExecutionConfiguration(
-            workflow=deriva_ml.create_workflow(
-                name="Demo Catalog", workflow_type="Demo Catalog Creation"
-            )
+            workflow=deriva_ml.create_workflow(name="Demo Catalog", workflow_type="Demo Catalog Creation")
         )
     )
     with execution.execute() as e:
         for s in ss:
-            image_file = e.asset_file_path(
-                "Image", f"test_{s['RID']}.txt", Subject=s["RID"]
-            )
+            image_file = e.asset_file_path("Image", f"test_{s['RID']}.txt", Subject=s["RID"])
             with open(image_file, "w") as f:
                 f.write(f"Hello there {random()}\n")
         execution.upload_execution_outputs()
@@ -87,18 +81,10 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     ml_instance.add_dataset_element_type("Image")
 
     type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-    training_rid = ml_instance.add_term(
-        "Dataset_Type", "Training", description="A training set"
-    )
-    testing_rid = ml_instance.add_term(
-        "Dataset_Type", "Testing", description="A testing set"
-    )
+    training_rid = ml_instance.add_term("Dataset_Type", "Training", description="A training set")
+    testing_rid = ml_instance.add_term("Dataset_Type", "Testing", description="A testing set")
 
-    table_path = (
-        ml_instance.catalog.getPathBuilder()
-        .schemas[ml_instance.domain_schema]
-        .tables["Subject"]
-    )
+    table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
 
     ml_instance.add_term(
@@ -106,9 +92,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
         "Create Dataset Workflow",
         description="A Workflow that creates a new dataset.",
     )
-    dataset_workflow = ml_instance.create_workflow(
-        name="API Workflow", workflow_type="Create Dataset Workflow"
-    )
+    dataset_workflow = ml_instance.create_workflow(name="API Workflow", workflow_type="Create Dataset Workflow")
 
     dataset_execution = ml_instance.create_execution(
         ExecutionConfiguration(workflow=dataset_workflow, description="Create Dataset")
@@ -156,14 +140,10 @@ def create_demo_features(ml_instance):
         "Well",
         description="The subject self reports that they feel well",
     )
-    ml_instance.create_vocabulary(
-        "ImageQuality", "Controlled vocabulary for image quality"
-    )
+    ml_instance.create_vocabulary("ImageQuality", "Controlled vocabulary for image quality")
     ml_instance.add_term("ImageQuality", "Good", description="The image is good")
     ml_instance.add_term("ImageQuality", "Bad", description="The image is bad")
-    box_asset = ml_instance.create_asset(
-        "BoundingBox", comment="A file that contains a cropped version of a image"
-    )
+    box_asset = ml_instance.create_asset("BoundingBox", comment="A file that contains a cropped version of a image")
 
     ml_instance.create_feature(
         "Subject",
@@ -186,25 +166,15 @@ def create_demo_features(ml_instance):
         "Feature Notebook Workflow",
         description="A Workflow that uses Deriva ML API",
     )
-    ml_instance.add_term(
-        MLVocab.asset_type, "API_Model", description="Model for our Notebook workflow"
-    )
-    notebook_workflow = ml_instance.create_workflow(
-        name="API Workflow", workflow_type="Feature Notebook Workflow"
-    )
+    ml_instance.add_term(MLVocab.asset_type, "API_Model", description="Model for our Notebook workflow")
+    notebook_workflow = ml_instance.create_workflow(name="API Workflow", workflow_type="Feature Notebook Workflow")
 
     feature_execution = ml_instance.create_execution(
-        ExecutionConfiguration(
-            workflow=notebook_workflow, description="Our Sample Workflow instance"
-        )
+        ExecutionConfiguration(workflow=notebook_workflow, description="Our Sample Workflow instance")
     )
 
-    subject_rids = [
-        i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()
-    ]
-    image_rids = [
-        i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()
-    ]
+    subject_rids = [i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()]
+    image_rids = [i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()]
     subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
@@ -218,9 +188,7 @@ def create_demo_features(ml_instance):
     # Create a new set of images.  For fun, lets wrap this in an execution so we get status updates
     bounding_box_files = []
     for i in range(10):
-        bounding_box_file = feature_execution.asset_file_path(
-            "BoundingBox", f"box{i}.txt"
-        )
+        bounding_box_file = feature_execution.asset_file_path("BoundingBox", f"box{i}.txt")
         with open(bounding_box_file, "w") as fp:
             fp.write(f"Hi there {i}")
         bounding_box_files.append(bounding_box_file)
@@ -230,9 +198,7 @@ def create_demo_features(ml_instance):
             Image=image_rid,
             BoundingBox=asset_name,
         )
-        for image_rid, asset_name in zip(
-            image_rids, itertools.cycle(bounding_box_files)
-        )
+        for image_rid, asset_name in zip(image_rids, itertools.cycle(bounding_box_files))
     ]
 
     image_quality_feature_list = [

@@ -21,30 +21,28 @@ __all__ = [
     "VersionPart",
 ]
 
-from dataset.aux_classes import VersionPart, DatasetSpec, DatasetVersion
-from dataset.dataset_bag import DatasetBag
-from core.definitions import (
-    ColumnDefinition,
-    TableDefinition,
-    BuiltinTypes,
-    UploadState,
-    FileUploadState,
-    FileSpec,
-    RID,
-    DerivaMLException,
-    MLVocab,
-    MLAsset,
-    ExecAssetType,
-    DerivaSystemColumns,
-)
-from core.base import DerivaML
-from execution.config import (
-    ExecutionConfiguration,
-    Workflow,
-)
-from execution.execution import Execution
+from importlib.metadata import PackageNotFoundError, version
 
-from importlib.metadata import version, PackageNotFoundError
+from core.definitions import (
+    RID,
+    BuiltinTypes,
+    ColumnDefinition,
+    DerivaMLException,
+    DerivaSystemColumns,
+    ExecAssetType,
+    FileSpec,
+    FileUploadState,
+    MLAsset,
+    MLVocab,
+    TableDefinition,
+    UploadState,
+)
+
+from deriva_ml.core.base import DerivaML
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
+from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.execution.execution import Execution, ExecutionConfiguration
+from deriva_ml.execution.workflow import Workflow
 
 try:
     __version__ = version("deriva_ml")

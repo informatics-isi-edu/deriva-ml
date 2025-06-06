@@ -2,21 +2,21 @@
 THis module defines the DataSet class with is used to manipulate n
 """
 
-from core.definitions import RID
-
 from enum import Enum
+from typing import Any, Optional, SupportsInt
+
 from pydantic import (
     BaseModel,
     ConfigDict,
-    field_validator,
     Field,
     computed_field,
-    model_validator,
     field_serializer,
+    field_validator,
+    model_validator,
 )
-
 from semver import Version
-from typing import Optional, Any, SupportsInt
+
+from deriva_ml.core.definitions import RID
 
 
 class VersionPart(Enum):
@@ -41,9 +41,7 @@ class DatasetVersion(Version):
         replace(major, minor, patch): Replace the major and minor versions
     """
 
-    def __init__(
-        self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0
-    ):
+    def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0):
         """Initialize a DatasetVersion object.
 
         Args:

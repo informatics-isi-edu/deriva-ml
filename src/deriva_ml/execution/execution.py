@@ -4,49 +4,51 @@ This module defined the Execution class which is used to interact with the state
 
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import datetime
 import json
 import logging
 import os
-from pathlib import Path
-
-from pydantic import validate_call, ConfigDict
-import sys
 import shutil
-from typing import Iterable, Any, List
+import sys
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Iterable, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
-from core.definitions import (
-    RID,
-    Status,
-    FileUploadState,
-    DerivaMLException,
-    MLVocab,
-    MLAsset,
-    ExecMetadataType,
-    ExecAssetType,
-    FileSpec,
+from pydantic import ConfigDict, validate_call
+
+from deriva_ml.core.base import DerivaML
+from deriva_ml.core.definitions import (
     DRY_RUN_RID,
+    RID,
+    DerivaMLException,
+    ExecAssetType,
+    ExecMetadataType,
+    FileSpec,
+    FileUploadState,
+    MLAsset,
+    MLVocab,
+    Status,
 )
-from core.base import DerivaML, FeatureRecord
-from dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
-from dataset.dataset_bag import DatasetBag
-from deriva_ml.execution.config import ExecutionConfiguration, Workflow
-from deriva_ml.execution.environment import get_execution_environment
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
+from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import (
+    asset_file_path,
+    asset_root,
+    asset_type_path,
     execution_root,
     feature_root,
-    asset_root,
     feature_value_path,
     is_feature_dir,
+    normalize_asset_dir,
     table_path,
     upload_directory,
-    normalize_asset_dir,
-    asset_file_path,
-    asset_type_path,
 )
+from deriva_ml.execution.environment import get_execution_environment
+from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution.workflow import Workflow
+from deriva_ml.feature import FeatureRecord
 
 try:
     from icecream import ic
@@ -55,7 +57,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 try:
-    from IPython.display import display, Markdown
+    from IPython.display import Markdown, display
 except ImportError:
 
     def display(s):
@@ -74,7 +76,7 @@ if sys.version_info >= (3, 12):
 
         Args:
             asset_path: Local path to the location of the asset.
-            asset_name:  The name of the asset in the catalog (e.g. the asset table name).
+            asset_name:  The name of the asset in the catalog (e.g., the asset table name).
             file_name:  Name of the local file that contains the contents of the asset.
             asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
             asset_types:  A list of terms from the Asset_Type controlled vocabulary.
@@ -95,9 +97,7 @@ if sys.version_info >= (3, 12):
             self.asset_name = asset_name
             self.file_name = file_name
             self.asset_metadata = asset_metadata
-            self.asset_types = (
-                asset_types if isinstance(asset_types, list) else [asset_types]
-            )
+            self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
             self.asset_rid = asset_rid
 else:
 
@@ -107,7 +107,7 @@ else:
 
         Attrubytes:
             asset_path: Local path to the location of the asset.
-            asset_name:  The name of the asset in the catalog (e.g. the asset table name).
+            asset_name:  The name of the asset in the catalog (e.g., the asset table name).
             file_name:  Name of the local file that contains the contents of the asset.
             asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
             asset_types:  A list of terms from the Asset_Type controlled vocabulary.
@@ -128,9 +128,7 @@ else:
             obj.asset_name = asset_name
             obj.file_name = file_name
             obj.asset_metadata = asset_metadata
-            obj.asset_types = (
-                asset_types if isinstance(asset_types, list) else [asset_types]
-            )
+            obj.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
             obj.asset_rid = asset_rid
             return obj
 
@@ -151,7 +149,7 @@ class Execution:
     3. Any additional required assets are downloaded.
 
     Once execution is complete, a method can be called to upload any data produced by the execution. In addition, the
-    Execution object provides methods for locating where to find downloaded datasets and assets, and also where to
+    Execution object provides methods for locating where to find downloaded datasets and assets and also where to
     place any data that may be uploaded.
 
     Finally, the execution object can update its current state in the DerivaML catalog, allowing users to remotely
@@ -159,7 +157,7 @@ class Execution:
 
     Attributes:
         dataset_rids (list[RID]): The RIDs of the datasets to be downloaded and materialized as part of the execution.
-        datasets (list[DatasetBag]): List of datasetBag objects that referred the materialized datasets specified in.
+        datasets (list[DatasetBag]): List of datasetBag objects that referred to the materialized datasets specified in.
             `dataset_rids`.
         configuration (ExecutionConfiguration): The configuration of the execution.
         workflow_rid (RID): The RID of the workflow associated with the execution.
@@ -170,7 +168,7 @@ class Execution:
     def __init__(
         self,
         configuration: ExecutionConfiguration,
-        ml_object: "DerivaML",
+        ml_object: DerivaML,
         reload: RID | None = None,
         dry_run: bool = False,
     ):
@@ -203,32 +201,21 @@ class Execution:
         # Make sure we have a good workflow.
         if isinstance(self.configuration.workflow, Workflow):
             self.workflow_rid = (
-                self._ml_object.add_workflow(self.configuration.workflow)
-                if not self._dry_run
-                else DRY_RUN_RID
+                self._ml_object.add_workflow(self.configuration.workflow) if not self._dry_run else DRY_RUN_RID
             )
         else:
             self.workflow_rid = self.configuration.workflow
-            if (
-                self._ml_object.resolve_rid(configuration.workflow).table.name
-                != "Workflow"
-            ):
-                raise DerivaMLException(
-                    "Workflow specified in execution configuration is not a Workflow"
-                )
+            if self._ml_object.resolve_rid(configuration.workflow).table.name != "Workflow":
+                raise DerivaMLException("Workflow specified in execution configuration is not a Workflow")
 
         # Validate the datasets and assets to be valid.
         for d in self.configuration.datasets:
             if self._ml_object.resolve_rid(d.rid).table.name != "Dataset":
-                raise DerivaMLException(
-                    "Dataset specified in execution configuration is not a dataset"
-                )
+                raise DerivaMLException("Dataset specified in execution configuration is not a dataset")
 
         for a in self.configuration.assets:
             if not self._model.is_asset(self._ml_object.resolve_rid(a).table.name):
-                raise DerivaMLException(
-                    "Asset specified in execution configuration is not a asset table"
-                )
+                raise DerivaMLException("Asset specified in execution configuration is not a asset table")
 
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         if reload:
@@ -247,16 +234,11 @@ class Execution:
                 ]
             )[0]["RID"]
 
-        if (
-            isinstance(self.configuration.workflow, Workflow)
-            and self.configuration.workflow.is_notebook
-        ):
-            # Put execution_rid into cell output so we can find it later.
-            display(
-                Markdown(f"Execution RID: {self._ml_object.cite(self.execution_rid)}")
-            )
+        if isinstance(self.configuration.workflow, Workflow) and self.configuration.workflow.is_notebook:
+            # Put execution_rid into the cell output so we can find it later.
+            display(Markdown(f"Execution RID: {self._ml_object.cite(self.execution_rid)}"))
 
-        # Create a directory for execution rid so we can recover state in case of a crash.
+        # Create a directory for execution rid so we can recover the state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)
         self._initialize_execution(reload)
 
@@ -270,8 +252,8 @@ class Execution:
             json.dump(get_execution_environment(), fp)
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
-        """Initialize the execution by a configuration  in the Execution_Metadata table.
-        Setup working directory and download all the assets and data.
+        """Initialize the execution by a configuration in the Execution_Metadata table.
+        Set up a working directory and download all the assets and data.
 
         :raise DerivaMLException: If there is an issue initializing the execution.
 
@@ -283,9 +265,7 @@ class Execution:
         """
         # Materialize bdbag
         for dataset in self.configuration.datasets:
-            self.update_status(
-                Status.initializing, f"Materialize bag {dataset.rid}... "
-            )
+            self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
             self.datasets.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
 
@@ -293,10 +273,7 @@ class Execution:
         schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
         if self.dataset_rids and not (reload or self._dry_run):
             schema_path.Dataset_Execution.insert(
-                [
-                    {"Dataset": d, "Execution": self.execution_rid}
-                    for d in self.dataset_rids
-                ]
+                [{"Dataset": d, "Execution": self.execution_rid} for d in self.dataset_rids]
             )
 
         # Download assets....
@@ -305,9 +282,7 @@ class Execution:
         for asset_rid in self.configuration.assets:
             asset_table = self._ml_object.resolve_rid(asset_rid).table.name
             dest_dir = (
-                execution_root(self._ml_object.working_dir, self.execution_rid)
-                / "downloaded-assets"
-                / asset_table
+                execution_root(self._ml_object.working_dir, self.execution_rid) / "downloaded-assets" / asset_table
             )
             dest_dir.mkdir(parents=True, exist_ok=True)
             self.asset_paths.setdefault(asset_table, []).append(
@@ -355,7 +330,7 @@ class Execution:
 
     @property
     def _feature_root(self) -> Path:
-        """The root path to all execution specific files.
+        """The root path to all execution-specific files.
         :return:
 
         Args:
@@ -367,7 +342,7 @@ class Execution:
 
     @property
     def _asset_root(self) -> Path:
-        """The root path to all execution specific files.
+        """The root path to all execution-specific files.
         :return:
 
         Args:
@@ -379,8 +354,8 @@ class Execution:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it and validate
-        that all the metadata is correct
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it,
+         and validate that all the metadata is correct
 
         Args:
             dataset: A dataset specification of a dataset_table or a minid to an existing bag.
@@ -388,9 +363,7 @@ class Execution:
         Returns:
             the location of the unpacked and validated dataset_table bag and the RID of the bag
         """
-        return self._ml_object.download_dataset_bag(
-            dataset, execution_rid=self.execution_rid
-        )
+        return self._ml_object.download_dataset_bag(dataset, execution_rid=self.execution_rid)
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
@@ -424,7 +397,7 @@ class Execution:
         self.update_status(Status.initializing, "Start execution  ...")
 
     def execution_stop(self) -> None:
-        """Finish the execution and update the duration and status of execution."""
+        """Finish the execution and update the duration and status of the execution."""
         self.stop_time = datetime.now()
         duration = self.stop_time - self.start_time
         hours, remainder = divmod(duration.total_seconds(), 3600)
@@ -433,22 +406,22 @@ class Execution:
 
         self.update_status(Status.completed, "Algorithm execution ended.")
         if not self._dry_run:
-            self._ml_object.pathBuilder.schemas[
-                self._ml_object.ml_schema
-            ].Execution.update([{"RID": self.execution_rid, "Duration": duration}])
+            self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
+                [{"RID": self.execution_rid, "Duration": duration}]
+            )
 
     def _upload_execution_dirs(self) -> dict[str, list[AssetFilePath]]:
         """Upload execution assets at _working_dir/Execution_asset.
 
         This routine uploads the contents of the
-        Execution_Asset directory, and then updates the execution_asset table in the ML schema to have references
+        Execution_Asset directory and then updates the execution_asset table in the ML schema to have references
         to these newly uploaded files.
 
         Returns:
           dict: Results of the upload operation.
 
         Raises:
-          DerivaMLException: If there is an issue uploading the assets.
+          DerivaMLException: If there is an issue when uploading the assets.
         """
 
         try:
@@ -494,9 +467,7 @@ class Execution:
         return asset_map
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def download_asset(
-        self, asset_rid: RID, dest_dir: Path, update_catalog=True
-    ) -> AssetFilePath:
+    def download_asset(self, asset_rid: RID, dest_dir: Path, update_catalog=True) -> AssetFilePath:
         """Download an asset from a URL and place it in a local directory.
 
         Args:
@@ -513,25 +484,17 @@ class Execution:
             raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
 
         asset_record = self._ml_object.retrieve_rid(asset_rid)
-        asset_metadata = {
-            k: v
-            for k, v in asset_record.items()
-            if k in self._model.asset_metadata(asset_table)
-        }
+        asset_metadata = {k: v for k, v in asset_record.items() if k in self._model.asset_metadata(asset_table)}
         asset_url = asset_record["URL"]
         asset_filename = dest_dir / asset_record["Filename"]
         hs = HatracStore("https", self._ml_object.host_name, self._ml_object.credential)
         hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
 
         asset_type_table = self._model.find_association(asset_table, MLVocab.asset_type)
-        type_path = self._ml_object.pathBuilder.schemas[
-            asset_type_table.schema.name
-        ].tables[asset_type_table.name]
+        type_path = self._ml_object.pathBuilder.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
         asset_types = [
             asset_type[MLVocab.asset_type.value]
-            for asset_type in type_path.filter(
-                type_path.columns[asset_table.name] == asset_rid
-            )
+            for asset_type in type_path.filter(type_path.columns[asset_table.name] == asset_rid)
             .attributes(type_path.Asset_Type)
             .fetch()
         ]
@@ -569,30 +532,26 @@ class Execution:
             Results of the upload operation.
 
         Raises:
-            DerivaMLException: If there is an issue uploading the assets.
+            DerivaMLException: If there is an issue in uploading the assets.
         """
 
         def path_to_asset(path: str) -> str:
             """Pull the asset name out of a path to that asset in the filesystem"""
             components = path.split("/")
-            return components[
-                components.index("asset") + 2
-            ]  # Look for asset in the path to find the name
+            return components[components.index("asset") + 2]  # Look for asset in the path to find the name
 
         if not self._model.is_asset(Path(assets_dir).name):
             raise DerivaMLException("Directory does not have name of an asset table.")
         results = upload_directory(self._model, assets_dir)
         return {path_to_asset(p): r for p, r in results.items()}
 
-    def upload_execution_outputs(
-        self, clean_folder: bool = True
-    ) -> dict[str, list[AssetFilePath]]:
+    def upload_execution_outputs(self, clean_folder: bool = True) -> dict[str, list[AssetFilePath]]:
         """Upload all the assets and metadata associated with the current execution.
 
         This will include any new assets, features, or table values.
 
         Args:
-            clean_folder: bool:  (Default value = True)
+            clean_folder: bool: (Default value = True)
 
         Returns:
             Results of the upload operation. Asset names are all relative to the execution upload directory.
@@ -642,28 +601,21 @@ class Execution:
             target_table: str:
             feature_name: str:
             feature_file: str | Path:
-            uploaded_files: Dictionary whose key ia an asset name, file-name pair, and whose value is a filename, RID of that asset.
+            uploaded_files: Dictionary whose key is an asset name, file-name pair, and whose value is a filename,
+                RID of that asset.
         """
 
         # Get the column names of all the Feature columns that should be the RID of an asset
         asset_columns = [
-            c.name
-            for c in self._ml_object.feature_record_class(
-                target_table, feature_name
-            ).feature.asset_columns
+            c.name for c in self._ml_object.feature_record_class(target_table, feature_name).feature.asset_columns
         ]
 
         # Get the names of the columns in the feature that are assets.
         asset_columns = [
-            c.name
-            for c in self._ml_object.feature_record_class(
-                target_table, feature_name
-            ).feature.asset_columns
+            c.name for c in self._ml_object.feature_record_class(target_table, feature_name).feature.asset_columns
         ]
 
-        feature_table = self._ml_object.feature_record_class(
-            target_table, feature_name
-        ).feature.feature_table.name
+        feature_table = self._ml_object.feature_record_class(target_table, feature_name).feature.feature_table.name
         asset_map = {
             (asset_table, asset.file_name): asset.asset_rid
             for asset_table, assets in uploaded_files.items()
@@ -680,30 +632,26 @@ class Execution:
         with open(feature_file, "r") as feature_values:
             entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
-        self._ml_object.domain_path.tables[feature_table].insert(
-            [map_path(e) for e in entities], on_conflict_skip=True
-        )
+        self._ml_object.domain_path.tables[feature_table].insert([map_path(e) for e in entities], on_conflict_skip=True)
 
     def _update_asset_execution_table(
         self,
         uploaded_assets: dict[str, list[AssetFilePath]],
         asset_role: str = "Output",
     ):
-        """Add entry to association table connecting an asset to an execution RID
+        """Add entry to the association table connecting an asset to an execution RID
 
         Args:
-            uploaded_assets: Dictionary whose key is the name of an asset table, and whose value is a list of RIDs for
+            uploaded_assets: Dictionary whose key is the name of an asset table and whose value is a list of RIDs for
                 newly added assets to that table.
              asset_role: A term or list of terms from the Asset_Role vocabulary.
         """
-        # Make sure  the asset role is in the controlled vocabulary table.
+        # Make sure the asset role is in the controlled vocabulary table.
         self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
 
         pb = self._ml_object.pathBuilder
         for asset_table, asset_list in uploaded_assets.items():
-            asset_table_name = asset_table.split("/")[
-                1
-            ]  # Peel off the schema from the asset table
+            asset_table_name = asset_table.split("/")[1]  # Peel off the schema from the asset table
             asset_exe = self._model.find_association(asset_table_name, "Execution")
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
 
@@ -737,12 +685,8 @@ class Execution:
             for asset_path in asset_list:
                 asset_path.asset_types = asset_type_map[asset_path.file_name]
 
-            asset_asset_type = self._model.find_association(
-                asset_table_name, "Asset_Type"
-            )
-            type_path = pb.schemas[asset_asset_type.schema.name].tables[
-                asset_asset_type.name
-            ]
+            asset_asset_type = self._model.find_association(asset_table_name, "Asset_Type")
+            type_path = pb.schemas[asset_asset_type.schema.name].tables[asset_asset_type.name]
 
             type_path.insert(
                 [
@@ -764,7 +708,7 @@ class Execution:
     ) -> AssetFilePath:
         """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
 
-        Given the name of an asset table, and a file name, register the file for upload, and return a path to that
+        Given the name of an asset table, and a file name, register the file for upload and return a path to that
         file in the upload directory.  In addition to the filename, additional asset metadata and file asset types may
         be specified.
 
@@ -772,13 +716,13 @@ class Execution:
         to a new file with the specified name is returned.  The caller can then open that file for writing.
 
         If the provided filename refers to an existing file and the copy_file argument is False (the default), then the
-        returned path contains a symbolic link to that file.  If the copy_file argument is True then the contents of
+        returned path contains a symbolic link to that file.  If the copy_file argument is True, then the contents of
         file_name are copied into the target directory.
 
         Args:
             asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
             file_name: Name of file to be uploaded.
-            asset_types: Type of asset to be uploaded.  Defaults to name of the asset.
+            asset_types: Type of asset to be uploaded.  Defaults to the name of the asset.
             **kwargs: Any additional metadata values that may be part of the asset table.
 
         Returns:
@@ -838,16 +782,12 @@ class Execution:
             Pathlib path to the file in which to place table values.
         """
         if table not in self._model.schemas[self._ml_object.domain_schema].tables:
-            raise DerivaMLException(
-                "Table '{}' not found in domain schema".format(table)
-            )
+            raise DerivaMLException("Table '{}' not found in domain schema".format(table))
 
-        return table_path(
-            self._working_dir, schema=self._ml_object.domain_schema, table=table
-        )
+        return table_path(self._working_dir, schema=self._ml_object.domain_schema, table=table)
 
     def execute(self) -> Execution:
-        """Initiate an execution with provided configuration. Can be used in a context manager."""
+        """Initiate an execution with the provided configuration. Can be used in a context manager."""
         self.execution_start()
         return self
 
@@ -900,9 +840,7 @@ class Execution:
         Returns:
             RID of the newly created dataset.
         """
-        return self._ml_object.create_dataset(
-            dataset_types, description, self.execution_rid, version=version
-        )
+        return self._ml_object.create_dataset(dataset_types, description, self.execution_rid, version=version)
 
     def add_dataset_members(
         self,
@@ -920,7 +858,7 @@ class Execution:
         been configured to be a dataset element type.
 
         Args:
-            dataset_rid: RID of dataset_table to extend or None if new dataset_table is to be created.
+            dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
             members: List of RIDs of members to add to the  dataset_table. RID must be to a table type that is a
                 dataset element type (see DerivaML.add_dataset_element_type).
             validate: Check rid_list to make sure elements are not already in the dataset_table.
@@ -943,7 +881,7 @@ class Execution:
           dataset_rid: RID to a dataset_table
           component: Which version of the dataset_table to increment.
           dataset_rid: RID of the dataset whose version is to be incremented.
-          component: Major, Minor or Patch
+          component: Major, Minor, or Patch
           description: Description of the version update of the dataset_table.
 
         Returns:
@@ -1015,7 +953,5 @@ class Execution:
                 Status.failed,
                 f"Exception type: {exc_type}, Exception value: {exc_value}",
             )
-            logging.error(
-                f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}"
-            )
+            logging.error(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
             return False

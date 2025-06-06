@@ -2,11 +2,12 @@
 This module provides the implementation of the Feature capability in deriva-ml
 """
 
-from deriva.core.ermrest_model import FindAssociationResult, Column
 from pathlib import Path
-from pydantic import BaseModel, create_model
-from typing import Optional, Type, ClassVar, TYPE_CHECKING
 from types import UnionType
+from typing import TYPE_CHECKING, ClassVar, Optional, Type
+
+from deriva.core.ermrest_model import Column, FindAssociationResult
+from pydantic import BaseModel, create_model
 
 if TYPE_CHECKING:
     from model.catalog import DerivaModel
@@ -98,9 +99,7 @@ class Feature:
             self.target_table.name,
             "Execution",
         }
-        self.feature_columns = {
-            c for c in self.feature_table.columns if c.name not in skip_columns
-        }
+        self.feature_columns = {c for c in self.feature_table.columns if c.name not in skip_columns}
 
         assoc_fkeys = {atable.self_fkey} | atable.other_fkeys
 
@@ -117,9 +116,7 @@ class Feature:
             if fk not in assoc_fkeys and self._model.is_vocabulary(fk.pk_table)
         }
 
-        self.value_columns = self.feature_columns - (
-            self.asset_columns | self.term_columns
-        )
+        self.value_columns = self.feature_columns - (self.asset_columns | self.term_columns)
 
     def feature_record_class(self) -> type[FeatureRecord]:
         """Create a pydantic model for entries into the specified feature table
@@ -177,9 +174,7 @@ class Feature:
             __doc__=docstring,
             **feature_columns,
         )
-        model.feature = (
-            self  # Set value of class variable within the feature class definition.
-        )
+        model.feature = self  # Set value of class variable within the feature class definition.
 
         return model
 

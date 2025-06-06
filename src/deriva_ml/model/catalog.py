@@ -9,23 +9,26 @@ from __future__ import annotations
 
 # Standard library imports
 from collections import Counter
-from typing import Any, Iterable, List, Set, Dict
+from typing import Any, Iterable
 
-# Third-party imports
-from pydantic import validate_call, ConfigDict
+from deriva.core.ermrest_catalog import ErmrestCatalog
 
 # Deriva imports
-from deriva.core.ermrest_model import Table, Column, Model, FindAssociationResult
-from deriva.core.ermrest_catalog import ErmrestCatalog
+from deriva.core.ermrest_model import Column, FindAssociationResult, Model, Table
+
+# Third-party imports
+from pydantic import ConfigDict, validate_call
+
+from deriva_ml.core.definitions import (
+    ML_SCHEMA,
+    DerivaAssetColumns,
+    DerivaMLException,
+    TableDefinition,
+)
 
 # Local imports
 from deriva_ml.feature import Feature
-from deriva_ml.core.definitions import (
-    DerivaMLException,
-    ML_SCHEMA,
-    DerivaSystemColumns,
-    TableDefinition,
-)
+
 
 class DerivaModel:
     """Augmented interface to deriva model class.
@@ -62,11 +65,7 @@ class DerivaModel:
         self.model = model
         self.configuration = None
         self.catalog: ErmrestCatalog = self.model.catalog
-        self.hostname = (
-            self.catalog.deriva_server.server
-            if isinstance(self.catalog, ErmrestCatalog)
-            else "localhost"
-        )
+        self.hostname = self.catalog.deriva_server.server if isinstance(self.catalog, ErmrestCatalog) else "localhost"
         self.schemas = self.model.schemas
 
         self.ml_schema = ml_schema
@@ -74,13 +73,7 @@ class DerivaModel:
         if domain_schema:
             self.domain_schema = domain_schema
         else:
-            if (
-                len(
-                    user_schemas := {k for k in self.model.schemas.keys()}
-                    - set(builtin_schemas)
-                )
-                == 1
-            ):
+            if len(user_schemas := {k for k in self.model.schemas.keys()} - set(builtin_schemas)) == 1:
                 self.domain_schema = user_schemas.pop()
             else:
                 raise DerivaMLException(f"Ambiguous domain schema: {user_schemas}")
@@ -150,9 +143,7 @@ class DerivaModel:
 
         """
         table = self.name_to_table(table_name)
-        return table.is_association(
-            unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity
-        )
+        return table.is_association(unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity)
 
     def find_association(self, table1: Table | str, table2: Table | str) -> Table:
         """Given two tables, return an association table that connects the two.
@@ -163,17 +154,11 @@ class DerivaModel:
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)
 
-        tables = [
-            a.table
-            for a in table1.find_associations(pure=False)
-            if a.other_fkeys.pop().pk_table == table2
-        ]
+        tables = [a.table for a in table1.find_associations(pure=False) if a.other_fkeys.pop().pk_table == table2]
         if len(tables) == 1:
             return tables[0]
         elif len(tables) == 0:
-            raise DerivaMLException(
-                f"No association tables found between {table1.name} and {table2.name}."
-            )
+            raise DerivaMLException(f"No association tables found between {table1.name} and {table2.name}.")
         else:
             raise DerivaMLException(
                 f"There are {len(tables)} association tables between {table1.name} and {table2.name}."
@@ -195,21 +180,11 @@ class DerivaModel:
 
     def find_assets(self, with_metadata: bool = False) -> list[Table]:
         """Return the list of asset tables in the current model"""
-        return [
-            t
-            for s in self.model.schemas.values()
-            for t in s.tables.values()
-            if self.is_asset(t)
-        ]
+        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
     def find_vocabularies(self) -> list[Table]:
         """Return a list of all the controlled vocabulary tables in the domain schema."""
-        return [
-            t
-            for s in self.model.schemas.values()
-            for t in s.tables.values()
-            if self.is_vocabulary(t)
-        ]
+        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def find_features(self, table: Table | str) -> Iterable[Feature]:
@@ -241,9 +216,7 @@ class DerivaModel:
             }.issubset({c.name for c in a.table.columns})
 
         return [
-            Feature(a, self)
-            for a in table.find_associations(min_arity=3, max_arity=3, pure=False)
-            if is_feature(a)
+            Feature(a, self) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
         ]
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
@@ -262,29 +235,18 @@ class DerivaModel:
         """
         table = self.name_to_table(table)
         try:
-            return [
-                f for f in self.find_features(table) if f.feature_name == feature_name
-            ][0]
+            return [f for f in self.find_features(table) if f.feature_name == feature_name][0]
         except IndexError:
-            raise DerivaMLException(
-                f"Feature {table.name}:{feature_name} doesn't exist."
-            )
+            raise DerivaMLException(f"Feature {table.name}:{feature_name} doesn't exist.")
 
     def asset_metadata(self, table: str | Table) -> set[str]:
         """Return the metadata columns for an asset table."""
 
         table = self.name_to_table(table)
-        asset_columns = {
-            "Filename",
-            "URL",
-            "Length",
-            "MD5",
-            "Description",
-        }.union(set(DerivaSystemColumns))
 
         if not self.is_asset(table):
             raise DerivaMLException(f"{table.name} is not an asset table.")
-        return {c.name for c in table.columns} - asset_columns
+        return {c.name for c in table.columns} - DerivaAssetColumns
 
     def apply(self):
         """Call ERMRestModel.apply"""
@@ -293,28 +255,18 @@ class DerivaModel:
         else:
             self.model.apply()
 
-    def _table_relationship(
-        self, table1: Table | str, table2: Table | str
-    ) -> tuple[Column, Column]:
+    def _table_relationship(self, table1: Table | str, table2: Table | str) -> tuple[Column, Column]:
         """Return columns used to relate two tables."""
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)
         relationships = [
-            (fk.foreign_key_columns[0], fk.referenced_columns[0])
-            for fk in table1.foreign_keys
-            if fk.pk_table == table2
+            (fk.foreign_key_columns[0], fk.referenced_columns[0]) for fk in table1.foreign_keys if fk.pk_table == table2
         ]
         relationships.extend(
-            [
-                (fk.referenced_columns[0], fk.foreign_key_columns[0])
-                for fk in table1.referenced_by
-                if fk.table == table2
-            ]
+            [(fk.referenced_columns[0], fk.foreign_key_columns[0]) for fk in table1.referenced_by if fk.table == table2]
         )
         if len(relationships) != 1:
-            raise DerivaMLException(
-                f"Ambiguous linkage between {table1.name} and {table2.name}"
-            )
+            raise DerivaMLException(f"Ambiguous linkage between {table1.name} and {table2.name}")
         return relationships[0]
 
     def _schema_to_paths(
@@ -341,21 +293,11 @@ class DerivaModel:
 
         def find_arcs(table: Table) -> set[Table]:
             """Given a path through the model, return the FKs that link the tables"""
-            arc_list = [fk.pk_table for fk in table.foreign_keys] + [
-                fk.table for fk in table.referenced_by
-            ]
-            arc_list = [
-                t
-                for t in arc_list
-                if t.schema.name in {self.domain_schema, self.ml_schema}
-            ]
+            arc_list = [fk.pk_table for fk in table.foreign_keys] + [fk.table for fk in table.referenced_by]
+            arc_list = [t for t in arc_list if t.schema.name in {self.domain_schema, self.ml_schema}]
             domain_tables = [t for t in arc_list if t.schema.name == self.domain_schema]
-            if multiple_columns := [
-                c for c, cnt in Counter(domain_tables).items() if cnt > 1
-            ]:
-                raise DerivaMLException(
-                    f"Ambiguous relationship in {table.name} {multiple_columns}"
-                )
+            if multiple_columns := [c for c, cnt in Counter(domain_tables).items() if cnt > 1]:
+                raise DerivaMLException(f"Ambiguous relationship in {table.name} {multiple_columns}")
             return set(arc_list)
 
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
@@ -363,9 +305,7 @@ class DerivaModel:
             # If we have node_name <- node_name_dataset-> Dataset then we are looping
             # back around to a new dataset element
             dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
-            assoc_table = [
-                a for a in dataset_table.find_associations() if a.table == n2
-            ]
+            assoc_table = [a for a in dataset_table.find_associations() if a.table == n2]
             return len(assoc_table) == 1 and n1 != dataset_table
 
         # Don't follow vocabulary terms back to their use.
@@ -381,9 +321,7 @@ class DerivaModel:
             if is_nested_dataset_loopback(root, child):
                 continue
             if child in path:
-                raise DerivaMLException(
-                    f"Cycle in schema path: {child.name} path:{[p.name for p in path]}"
-                )
+                raise DerivaMLException(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}")
 
             paths.extend(self._schema_to_paths(child, path))
         return paths
@@ -391,6 +329,4 @@ class DerivaModel:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_table(self, table_def: TableDefinition) -> Table:
         """Create a new table from TableDefinition."""
-        return self.model.schemas[self.domain_schema].create_table(
-            table_def.model_dump()
-        )
+        return self.model.schemas[self.domain_schema].create_table(table_def.model_dump())
