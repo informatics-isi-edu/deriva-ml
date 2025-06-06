@@ -1,11 +1,14 @@
-"""
-`base.py` is the core module for the Deriva ML project.  This module implements the DerivaML class, which is
-the primary interface to the Deriva based catalogs.  The module also implements the Feature and Vocabulary functions
-in the DerivaML.
+"""Core module for the Deriva ML project.
 
-DerivaML and its associated classes all depend on a catalog that implements a `deriva-ml` schema with tables and
-relationships that follow a specific data model.
+This module implements the DerivaML class, which is the primary interface to Deriva-based catalogs. It provides
+functionality for managing features, vocabularies, and other ML-related operations.
 
+The module requires a catalog that implements a 'deriva-ml' schema with specific tables and relationships.
+
+Typical usage example:
+    >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+    >>> ml.create_feature('my_table', 'new_feature')
+    >>> ml.add_term('vocabulary_table', 'new_term', 'Description of term')
 """
 
 from __future__ import annotations  # noqa: I001
@@ -71,15 +74,28 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 class DerivaML(Dataset):
-    """Base class for ML operations on a Deriva catalog.
+    """A base class for machine learning operations on a Deriva catalog.
 
-    This class is intended to be used as a base class on which more domain specific interfaces are built.
+    This class provides core functionality for managing ML workflows, features, and datasets in a Deriva catalog. It handles
+    data versioning, feature management, vocabulary control, and execution tracking.
 
     Attributes:
-        host_name: Hostname of the Deriva server.
-        catalog_id: Catalog ID. Either and identifier, or a catalog name.
-        domain_schema: Schema name for domain specific tables and relationships.
-        model: ERMRest model for the catalog
+        host_name (str): Hostname of the Deriva server (e.g., 'deriva.example.org').
+        catalog_id (Union[str, int]): Catalog identifier or name.
+        domain_schema (str): Schema name for domain-specific tables and relationships.
+        model (DerivaModel): ERMRest model for the catalog.
+        working_dir (Path): Directory for storing computation data and results.
+        cache_dir (Path): Directory for caching downloaded datasets.
+        ml_schema (str): Schema name for ML-specific tables (default: 'deriva_ml').
+        configuration (ExecutionConfiguration): Current execution configuration.
+        project_name (str): Name of the current project.
+        start_time (datetime): Timestamp when this instance was created.
+        status (str): Current status of operations.
+
+    Example:
+        >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+        >>> ml.create_feature('my_table', 'new_feature')
+        >>> ml.add_term('vocabulary_table', 'new_term', 'Description of term')
     """
 
     def __init__(
@@ -165,7 +181,20 @@ class DerivaML(Dataset):
 
     @staticmethod
     def _get_session_config():
-        """ """
+        """Returns a customized session configuration for Deriva HTTP requests.
+
+        Configures retry behavior and connection settings for HTTP requests to the Deriva server. Settings include:
+        - Idempotent retry behavior for all HTTP methods
+        - Increased retry attempts for read and connect operations
+        - Exponential backoff for retries
+
+        Returns:
+            dict: Session configuration dictionary with retry and connection settings.
+
+        Example:
+            >>> config = DerivaML._get_session_config()
+            >>> print(config['retry_read'])  # 8
+        """
         session_config = DEFAULT_SESSION_CONFIG.copy()
         session_config.update(
             {
@@ -180,26 +209,52 @@ class DerivaML(Dataset):
         )
         return session_config
 
-    # noinspection PyProtectedMember
     @property
     def pathBuilder(self) -> datapath._CatalogWrapper:
-        """Get a new instance of a pathBuilder object."""
+        """Returns a catalog path builder for constructing ERMrest queries.
+
+        The path builder provides a fluent interface for constructing complex queries against the catalog.
+        This is a core component used by many other methods to interact with the catalog.
+
+        Returns:
+            datapath._CatalogWrapper: A new instance of the catalog path builder.
+
+        Example:
+            >>> path = ml.pathBuilder.schemas['my_schema'].tables['my_table']
+            >>> results = path.entities().fetch()
+        """
         return self.catalog.getPathBuilder()
 
     @property
     def domain_path(self):
-        """Get a new instance of a pathBuilder object to the domain schema"""
+        """Returns a path builder scoped to the domain schema.
 
+        Provides a convenient way to access tables and construct queries within the domain-specific schema.
+
+        Returns:
+            datapath._CatalogWrapper: Path builder object scoped to the domain schema.
+
+        Example:
+            >>> domain = ml.domain_path
+            >>> results = domain.my_table.entities().fetch()
+        """
         return self.pathBuilder.schemas[self.domain_schema]
 
     def table_path(self, table: str | Table) -> Path:
-        """Return a local file path in which to place a CSV to add values to a table on upload.
+        """Returns the local filesystem path for a table's CSV upload file.
+
+        Generates a standardized path where CSV files should be placed when preparing to upload data to a table.
+        The path follows the project's directory structure conventions.
 
         Args:
-          table: str | Table:
+            table: Name of the table or Table object to get the path for.
 
         Returns:
-            Path to a CSV file in which to add values to a table on upload.
+            Path: Filesystem path where the CSV file should be placed.
+
+        Example:
+            >>> path = ml.table_path("experiment_results")
+            >>> df.to_csv(path)  # Save data for upload
         """
         return table_path(
             self.working_dir,
@@ -208,25 +263,35 @@ class DerivaML(Dataset):
         )
 
     def download_dir(self, cached: bool = False) -> Path:
-        """Location where downloaded files are placed.
+        """Returns the directory path for downloaded files.
+
+        Provides the appropriate directory path for storing downloaded files, either in the cache or working directory.
 
         Args:
-          cached: bool:  (Default value = False)
+            cached: If True, returns the cache directory path. If False, returns the working directory path.
 
         Returns:
+            Path: Directory path where downloaded files should be stored.
 
+        Example:
+            >>> cache_dir = ml.download_dir(cached=True)
+            >>> work_dir = ml.download_dir(cached=False)
         """
         return self.cache_dir if cached else self.working_dir
 
     @staticmethod
     def globus_login(host: str) -> None:
-        """Log  into the specified host using Globus.
+        """Authenticates with Globus for accessing Deriva services.
+
+        Performs authentication using Globus Auth to access Deriva services. If already logged in, notifies the user.
+        Uses non-interactive authentication flow without browser or local server.
 
         Args:
-            host:
+            host: The hostname of the Deriva server to authenticate with (e.g., 'deriva.example.org').
 
-        Returns:
-
+        Example:
+            >>> DerivaML.globus_login('deriva.example.org')
+            'Login Successful'
         """
         gnl = GlobusNativeLogin(host=host)
         if gnl.is_logged_in([host]):
@@ -242,13 +307,27 @@ class DerivaML(Dataset):
             print("Login Successful")
 
     def chaise_url(self, table: RID | Table | str) -> str:
-        """Return a Chaise URL to the specified table.
+        """Generates a URL for viewing a table or record in the Chaise web interface.
+
+        Chaise is Deriva's web interface for data exploration. This method creates a URL that directly links to
+        the specified table or record.
 
         Args:
-            table: Table or RID to be visited
+            table: Table to generate URL for (name, Table object, or RID).
 
         Returns:
-            URL to the table in Chaise format.
+            str: URL in format: https://{host}/chaise/recordset/#{catalog}/{schema}:{table}
+
+        Raises:
+            DerivaMLException: If table or RID cannot be found.
+
+        Examples:
+            Using table name:
+                >>> ml.chaise_url("experiment_table")
+                'https://deriva.org/chaise/recordset/#1/schema:experiment_table'
+
+            Using RID:
+                >>> ml.chaise_url("1-abc123")
         """
         table_obj = self.model.name_to_table(table)
         try:
@@ -259,16 +338,28 @@ class DerivaML(Dataset):
         return f"{uri}/{urlquote(table_obj.schema.name)}:{urlquote(table_obj.name)}"
 
     def cite(self, entity: Dict[str, Any] | str) -> str:
-        """Return a citation URL for the provided entity.
+        """Generates a permanent citation URL for a catalog entity.
+
+        Creates a versioned URL that can be used to reference a specific entity in the catalog. The URL includes
+        the catalog snapshot time to ensure version stability.
 
         Args:
-            entity: A dict that contains the column values for a specific entity or a RID.
+            entity: Either a RID string or a dictionary containing entity data with a 'RID' key.
 
         Returns:
-            The URI for the provided entity.
+            str: Permanent citation URL in format: https://{host}/id/{catalog}/{rid}@{snapshot_time}
 
         Raises:
-            DerivaMLException: if provided RID does not exist.
+            DerivaMLException: If entity doesn't exist or lacks a RID.
+
+        Examples:
+            Using a RID string:
+                >>> url = ml.cite("1-abc123")
+                >>> print(url)
+                'https://deriva.org/id/1/1-abc123@2024-01-01T12:00:00'
+
+            Using a dictionary:
+                >>> url = ml.cite({"RID": "1-abc123"})
         """
         if isinstance(entity, str) and entity.startswith(f"https://{self.host_name}/id/{self.catalog_id}/"):
             # Already got a citation...
@@ -282,28 +373,47 @@ class DerivaML(Dataset):
             raise DerivaMLException("Entity RID does not exist")
 
     def user_list(self) -> List[Dict[str, str]]:
-        """List of users in the catalog
+        """Returns a list of users with access to the catalog.
 
-        Args:
+        Retrieves basic information about all users who have access to the catalog, including their
+        identifiers and full names.
 
         Returns:
-          A list of dictionaries containing user information.
+            List[Dict[str, str]]: List of user information dictionaries, each containing:
+                - 'ID': User identifier
+                - 'Full_Name': User's full name
 
+        Example:
+            >>> users = ml.user_list()
+            >>> for user in users:
+            ...     print(f"{user['Full_Name']} ({user['ID']})")
         """
         user_path = self.pathBuilder.public.ERMrest_Client.path
         return [{"ID": u["ID"], "Full_Name": u["Full_Name"]} for u in user_path.entities().fetch()]
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
-        """Return a named tuple with information about the specified RID.
+        """Resolves a Resource Identifier (RID) to its catalog location.
+
+        Looks up a RID and returns information about where it exists in the catalog, including schema,
+        table, and column metadata.
 
         Args:
-            rid: RID of the object of interest
+            rid: Resource Identifier to resolve.
 
         Returns:
-            ResolveRidResult which has information about the specified RID.
+            ResolveRidResult: Named tuple containing:
+                - schema: Schema name
+                - table: Table name
+                - columns: Column definitions
+                - datapath: Path builder for accessing the entity
 
         Raises:
-          DerivaMLException: if the RID doesn't exist.
+            DerivaMLException: If RID doesn't exist in catalog.
+
+        Examples:
+            >>> result = ml.resolve_rid("1-abc123")
+            >>> print(f"Found in {result.schema}.{result.table}")
+            >>> data = result.datapath.entities().fetch()
         """
         try:
             return self.catalog.resolve_rid(rid, self.model.model)
@@ -311,42 +421,70 @@ class DerivaML(Dataset):
             raise DerivaMLException(f"Invalid RID {rid}")
 
     def retrieve_rid(self, rid: RID) -> dict[str, Any]:
-        """Return a dictionary that represents the values of the specified RID.
+        """Retrieves the complete record for a given RID.
+
+        Fetches all column values for the entity identified by the RID.
 
         Args:
-            rid: RID of the object of interest
+            rid: Resource Identifier of the record to retrieve.
 
         Returns:
-          A dictionary that represents the values of the specified RID.
+            dict[str, Any]: Dictionary containing all column values for the entity.
 
         Raises:
-          DerivaMLException: if the RID doesn't exist.
+            DerivaMLException: If the RID doesn't exist in the catalog.
+
+        Example:
+            >>> record = ml.retrieve_rid("1-abc123")
+            >>> print(f"Name: {record['name']}, Created: {record['creation_date']}")
         """
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
     def add_page(self, title: str, content: str) -> None:
-        """
+        """Adds a new page to the catalog's web interface.
+
+        Creates a new page in the catalog's web interface with the specified title and content. The page will be 
+        accessible through the catalog's navigation system.
 
         Args:
-          title: str:
-          content: str:
+            title: The title of the page to be displayed in navigation and headers.
+            content: The main content of the page, can include HTML markup.
 
-        Returns:
+        Raises:
+            DerivaMLException: If the page creation fails or user lacks necessary permissions.
 
+        Example:
+            >>> ml.add_page(
+            ...     title="Analysis Results",
+            ...     content="<h1>Results</h1><p>Analysis completed successfully...</p>"
+            ... )
         """
         self.pathBuilder.www.tables[self.domain_schema].insert([{"Title": title, "Content": content}])
 
     def create_vocabulary(self, vocab_name: str, comment: str = "", schema: str | None = None) -> Table:
-        """Create a controlled vocabulary table with the given vocab name.
+        """Creates a controlled vocabulary table for standardizing terminology.
+
+        A controlled vocabulary table maintains a list of standardized terms and their definitions. Each term can have
+        synonyms and descriptions to ensure consistent terminology usage across the dataset.
 
         Args:
-            vocab_name: Name of the controlled vocabulary table.
-            comment: Description of the vocabulary table. (Default value = '')
-            schema: Schema in which to create the controlled vocabulary table.  Defaults to domain_schema.
-            vocab_name: str:
+            vocab_name: Name for the new vocabulary table. Must be a valid SQL identifier.
+            comment: Description of the vocabulary's purpose and usage. Defaults to empty string.
+            schema: Schema name to create the table in. If None, uses domain_schema.
 
         Returns:
-            An ERMRest table object for the newly created vocabulary table.
+            Table: ERMRest table object representing the newly created vocabulary table.
+
+        Raises:
+            DerivaMLException: If vocab_name is invalid or already exists.
+
+        Examples:
+            Create a vocabulary for tissue types:
+                >>> table = ml.create_vocabulary(
+                ...     vocab_name="tissue_types",
+                ...     comment="Standard tissue classifications",
+                ...     schema="bio_schema"
+                ... )
         """
         schema = schema or self.domain_schema
         return self.model.schemas[schema].create_table(
@@ -354,7 +492,30 @@ class DerivaML(Dataset):
         )
 
     def create_table(self, table: TableDefinition) -> Table:
-        """Create a table from a table definition."""
+        """Creates a new table in the catalog based on a table definition.
+
+        Creates a table using the provided TableDefinition object, which specifies the table structure including
+        columns, keys, and foreign key relationships.
+
+        Args:
+            table: A TableDefinition object containing the complete specification of the table to create.
+
+        Returns:
+            Table: The newly created ERMRest table object.
+
+        Raises:
+            DerivaMLException: If table creation fails or the definition is invalid.
+
+        Example:
+            >>> table_def = TableDefinition(
+            ...     name="experiments",
+            ...     column_definitions=[
+            ...         ColumnDefinition(name="name", type="text"),
+            ...         ColumnDefinition(name="date", type="date")
+            ...     ]
+            ... )
+            >>> new_table = ml.create_table(table_def)
+        """
         return self.model.schemas[self.domain_schema].create_table(table.model_dump())
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -462,27 +623,36 @@ class DerivaML(Dataset):
         optional: Iterable[str] | None = None,
         comment: str = "",
     ) -> type[FeatureRecord]:
-        """Create a new feature that can be associated with a table.
+        """Creates a new feature definition for a table in the catalog.
 
-        The feature can associate a controlled vocabulary term, an asset, or any other values with a
-        specific instance of an object and  execution.
+        A feature represents a measurable property or characteristic that can be associated with records in the target
+        table. Features can include vocabulary terms, asset references, and additional metadata.
 
         Args:
-            feature_name: Name of the new feature to be defined
-            target_table: table name or object on which the feature is to be associated
-            terms: List of controlled vocabulary terms that will be part of the feature value
-            assets: List of asset table names or objects that will be part of the feature value
-            metadata: List of other value types that are associated with the feature
-            optional: List of columns that are optional in the feature
-            comment: return: A Feature class that can be used to create instances of the feature.
+            target_table: Table to associate the feature with (name or Table object).
+            feature_name: Unique name for the feature within the target table.
+            terms: Optional vocabulary tables/names whose terms can be used as feature values.
+            assets: Optional asset tables/names that can be referenced by this feature.
+            metadata: Optional columns, tables, or keys to include in feature definition.
+            optional: Column names that are not required when creating feature instances.
+            comment: Description of the feature's purpose and usage.
 
         Returns:
-            A Feature class that can be used to create instances of the feature.
+            type[FeatureRecord]: Feature class for creating validated instances.
 
         Raises:
-            DerivaException: If the feature cannot be created.
-        """
+            DerivaMLException: If feature definition is invalid or conflicts with existing features.
 
+        Examples:
+            Create a feature with confidence score:
+                >>> feature_class = ml.create_feature(
+                ...     target_table="samples",
+                ...     feature_name="expression_level",
+                ...     terms=["expression_values"],
+                ...     metadata=[ColumnDefinition(name="confidence", type="float4")],
+                ...     comment="Gene expression measurement"
+                ... )
+        """
         terms = terms or []
         assets = assets or []
         metadata = metadata or []
@@ -534,30 +704,46 @@ class DerivaML(Dataset):
         return self.feature_record_class(target_table, feature_name)
 
     def feature_record_class(self, table: str | Table, feature_name: str) -> type[FeatureRecord]:
-        """Create a pydantic model for entries into the specified feature table.
+        """Returns a pydantic model class for creating feature records.
 
-        For information on how to
-        See the pydantic documentation for more details about the pydantic model.
+        Creates a typed interface for creating new instances of the specified feature. The returned class includes
+        validation and type checking based on the feature's definition.
 
         Args:
-            table: table name or object on which the feature is to be associated
-            feature_name: name of the feature to be created
-            table: str | Table:
-            feature_name: str:
+            table: The table containing the feature, either as name or Table object.
+            feature_name: Name of the feature to create a record class for.
 
         Returns:
-            A Feature class that can be used to create instances of the feature.
+            type[FeatureRecord]: A pydantic model class for creating validated feature records.
+
+        Raises:
+            DerivaMLException: If the feature doesn't exist or the table is invalid.
+
+        Example:
+            >>> ExpressionFeature = ml.feature_record_class("samples", "expression_level")
+            >>> feature = ExpressionFeature(value="high", confidence=0.95)
         """
         return self.lookup_feature(table, feature_name).feature_record_class()
 
     def delete_feature(self, table: Table | str, feature_name: str) -> bool:
-        """
+        """Removes a feature definition and its associated data from the catalog.
+
+        Deletes the feature and its implementation table from the catalog. This operation cannot be undone and
+        will remove all feature values associated with this feature.
 
         Args:
-          table: Table | str:
-          feature_name: str:
+            table: The table containing the feature, either as name or Table object.
+            feature_name: Name of the feature to delete.
 
         Returns:
+            bool: True if the feature was successfully deleted, False if it didn't exist.
+
+        Raises:
+            DerivaMLException: If deletion fails due to constraints or permissions.
+
+        Example:
+            >>> success = ml.delete_feature("samples", "obsolete_feature")
+            >>> print("Deleted" if success else "Not found")
         """
         table = self.model.name_to_table(table)
         try:
@@ -568,46 +754,70 @@ class DerivaML(Dataset):
             return False
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
-        """Lookup the named feature associated with the provided table.
+        """Retrieves a Feature object for an existing feature in the catalog.
+
+        Looks up and returns a Feature object that provides an interface to work with an existing feature
+        definition in the catalog.
 
         Args:
-            table: param feature_name:
-            table: str | Table:
-            feature_name: str:
+            table: The table containing the feature, either as name or Table object.
+            feature_name: Name of the feature to look up.
 
         Returns:
-            A Feature class that represents the requested feature.
+            Feature: An object representing the feature and its implementation.
 
         Raises:
-          DerivaMLException: If the feature cannot be found.
+            DerivaMLException: If the feature doesn't exist in the specified table.
+
+        Example:
+            >>> feature = ml.lookup_feature("samples", "expression_level")
+            >>> print(feature.feature_name)
+            'expression_level'
         """
         return self.model.lookup_feature(table, feature_name)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def find_features(self, table: Table | str) -> Iterable[Feature]:
-        """List the names of the features in the specified table.
+        """Lists all features associated with a table.
+
+        Returns an iterator over all features defined for the specified table. Each feature object provides
+        access to the feature's definition and implementation.
 
         Args:
-            table: The table to find features for.
-            table: Table | str:
+            table: The table to find features for, either as name or Table object.
 
         Returns:
-            An iterable of FeatureResult instances that describe the current features in the table.
+            Iterable[Feature]: An iterator of Feature objects for all features in the table.
+
+        Example:
+            >>> features = ml.find_features("samples")
+            >>> for feature in features:
+            ...     print(f"{feature.feature_name}: {feature.description}")
         """
         return self.model.find_features(table)
 
     # noinspection PyProtectedMember
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_feature_values(self, table: Table | str, feature_name: str) -> datapath._ResultSet:
-        """Return a datapath ResultSet containing all values of a feature associated with a table.
+        """Retrieves all values for a specific feature.
+
+        Returns all instances of the specified feature that have been created, including their associated
+        metadata and references.
 
         Args:
-            table: param feature_name:
-            table: Table | str:
-            feature_name: str:
+            table: The table containing the feature, either as name or Table object.
+            feature_name: Name of the feature to retrieve values for.
 
         Returns:
+            datapath._ResultSet: A result set containing all feature values and their metadata.
 
+        Raises:
+            DerivaMLException: If the feature doesn't exist or cannot be accessed.
+
+        Example:
+            >>> values = ml.list_feature_values("samples", "expression_level")
+            >>> for value in values:
+            ...     print(f"Sample {value['RID']}: {value['value']}")
         """
         table = self.model.name_to_table(table)
         feature = self.lookup_feature(table, feature_name)
@@ -623,23 +833,35 @@ class DerivaML(Dataset):
         synonyms: Iterable[str] | None = None,
         exists_ok: bool = True,
     ) -> VocabularyTerm:
-        """Creates a new control vocabulary term in the control vocabulary table.
+        """Adds a term to a controlled vocabulary table.
+
+        Creates a new standardized term with description and optional synonyms in a vocabulary table.
+        Can either create a new term or return existing one if it already exists.
 
         Args:
-
-        Args:
-            table: The name of the control vocabulary table.
-            term_name: The name of the new control vocabulary.
-            description: The description of the new control vocabulary.
-            synonyms: Optional list of synonyms for the new control vocabulary. Defaults to an empty list.
-            exists_ok: Optional flag indicating whether to allow creation if the control vocabulary name
-                already exists. Defaults to True.
+            table: Vocabulary table to add term to (name or Table object).
+            term_name: Primary name of the term (must be unique within vocabulary).
+            description: Explanation of term's meaning and usage.
+            synonyms: Alternative names for the term.
+            exists_ok: If True, return existing term if found. If False, raise error.
 
         Returns:
-          The RID of the newly created control vocabulary.
+            VocabularyTerm: Object representing the created or existing term.
 
         Raises:
-          DerivaException: If the control vocabulary name already exists and exist_ok is False.
+            DerivaMLException: If term exists and exists_ok=False, or if table is not a vocabulary table.
+
+        Examples:
+            Add new tissue type:
+                >>> term = ml.add_term(
+                ...     table="tissue_types",
+                ...     term_name="epithelial",
+                ...     description="Epithelial tissue type",
+                ...     synonyms=["epithelium"]
+                ... )
+
+            Attempt to add existing term:
+                >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)
         """
         synonyms = synonyms or []
         table = self.model.name_to_table(table)
@@ -673,19 +895,28 @@ class DerivaML(Dataset):
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
-        """Given a term name, return the vocabulary record.  Can provide either the term name
-         or a synonym for the term.  Generate an exception if the term is not in the vocabulary.
+        """Finds a term in a vocabulary table by name or synonym.
+
+        Searches for a term in the specified vocabulary table, matching either the primary name
+        or any of its synonyms.
 
         Args:
-            table: The name of the controlled vocabulary table or a ERMRest table object.
-            term_name: The name of the term to look up.
+            table: Vocabulary table to search in (name or Table object).
+            term_name: Name or synonym of the term to find.
 
         Returns:
-          The entry the associated term or synonym.
+            VocabularyTerm: The matching vocabulary term.
 
         Raises:
-          DerivaException: If the schema or vocabulary table doesn't exist, or if the term is not
-            found in the vocabulary.
+            DerivaMLException: If table is not a vocabulary table or term is not found.
+
+        Examples:
+            Look up by primary name:
+                >>> term = ml.lookup_term("tissue_types", "epithelial")
+                >>> print(term.description)
+
+            Look up by synonym:
+                >>> term = ml.lookup_term("tissue_types", "epithelium")
         """
         vocab_table = self.model.name_to_table(table)
         if not self.model.is_vocabulary(vocab_table):
@@ -699,18 +930,25 @@ class DerivaML(Dataset):
         raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
 
     def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
-        """Return a list of terms that are in a vocabulary table.
+        """Lists all terms in a vocabulary table.
+
+        Retrieves all terms, their descriptions, and synonyms from a controlled vocabulary table.
 
         Args:
-            table: The name of the controlled vocabulary table or a ERMRest table object.
-            table: str | Table:
+            table: Vocabulary table to list terms from (name or Table object).
 
         Returns:
-            The list of terms that are in a vocabulary table.
+            list[VocabularyTerm]: List of vocabulary terms with their metadata.
 
         Raises:
-            DerivaMLException: If the schema or vocabulary table doesn't exist, or if the table is not
-                a controlled vocabulary.
+            DerivaMLException: If table doesn't exist or is not a vocabulary table.
+
+        Examples:
+            >>> terms = ml.list_vocabulary_terms("tissue_types")
+            >>> for term in terms:
+            ...     print(f"{term.name}: {term.description}")
+            ...     if term.synonyms:
+            ...         print(f"  Synonyms: {', '.join(term.synonyms)}")
         """
         pb = self.catalog.getPathBuilder()
         table = self.model.name_to_table(table)
@@ -725,15 +963,33 @@ class DerivaML(Dataset):
         dataset: DatasetSpec,
         execution_rid: RID | None = None,
     ) -> DatasetBag:
-        """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
+        """Downloads a dataset to the local filesystem and creates a MINID if needed.
+
+        Downloads a dataset specified by DatasetSpec to the local filesystem. If the dataset doesn't have
+        a MINID (Minimal Viable Identifier), one will be created. The dataset can optionally be associated
+        with an execution record.
 
         Args:
-            dataset: Specification of the dataset to be downloaded.
-            execution_rid: Execution RID for the dataset.
+            dataset: Specification of the dataset to download, including version and materialization options.
+            execution_rid: Optional execution RID to associate the download with.
 
         Returns:
-            Tuple consisting of the path to the dataset, the RID of the dataset that was downloaded and the MINID
-            for the dataset.
+            DatasetBag: Object containing:
+                - path: Local filesystem path to downloaded dataset
+                - rid: Dataset's Resource Identifier
+                - minid: Dataset's Minimal Viable Identifier
+
+        Examples:
+            Download with default options:
+                >>> spec = DatasetSpec(rid="1-abc123")
+                >>> bag = ml.download_dataset_bag(spec)
+                >>> print(f"Downloaded to {bag.path}")
+
+            Download with execution tracking:
+                >>> bag = ml.download_dataset_bag(
+                ...     dataset=DatasetSpec(rid="1-abc123", materialize=True),
+                ...     execution_rid="1-xyz789"
+                ... )
         """
         return self._download_dataset_bag(
             dataset=dataset,
@@ -773,17 +1029,33 @@ class DerivaML(Dataset):
         file_types: str | list[str],
         execution_rid: RID | None = None,
     ) -> Iterable[RID]:
-        """Add a new file to the File table in the catalog.
+        """Adds files to the catalog with their metadata.
 
-        The input is an iterator of FileSpec objects which provide the MD5 checksum, length, and URL.
+        Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
+        specified file types. Optionally links files to an execution record.
 
         Args:
-            file_types: One or more file types.  Must be a term from the File_Type controlled vocabulary.
-            files: A sequence of file specifications that describe the files to add.
-            execution_rid: Resource Identifier (RID) of the execution to associate with the file.
+            files: File specifications containing MD5 checksum, length, and URL.
+            file_types: One or more file type terms from File_Type vocabulary.
+            execution_rid: Optional execution RID to associate files with.
 
         Returns:
-            Iterable of the RIDs of the files that were added.
+            Iterable[RID]: Resource Identifiers of the added files.
+
+        Raises:
+            DerivaMLException: If file_types are invalid or execution_rid is not an execution record.
+
+        Examples:
+            Add single file type:
+                >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]
+                >>> rids = ml.add_files(files, file_types="text")
+
+            Add multiple file types:
+                >>> rids = ml.add_files(
+                ...     files=[FileSpec(url="image.png", md5="def456", length=2000)],
+                ...     file_types=["image", "png"],
+                ...     execution_rid="1-xyz789"
+                ... )
         """
         defined_types = self.list_vocabulary_terms(MLVocab.file_type.value)
         if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
@@ -818,7 +1090,32 @@ class DerivaML(Dataset):
         return file_rids
 
     def list_files(self, file_types: Iterable[str] | None = None) -> list[dict[str, Any]]:
-        """Return the contents of the file table.  Denormalized file types into the file record."""
+        """Lists files in the catalog with their metadata.
+
+        Returns a list of files with their metadata including URL, MD5 hash, length, description,
+        and associated file types. Files can be optionally filtered by type.
+
+        Args:
+            file_types: Filter results to only include these file types.
+
+        Returns:
+            list[dict[str, Any]]: List of file records, each containing:
+                - RID: Resource identifier
+                - URL: File location
+                - MD5: File hash
+                - Length: File size
+                - Description: File description
+                - File_Types: List of associated file types
+
+        Examples:
+            List all files:
+                >>> files = ml.list_files()
+                >>> for f in files:
+                ...     print(f"{f['RID']}: {f['URL']}")
+
+            Filter by file type:
+                >>> image_files = ml.list_files(["image", "png"])
+        """
         ml_path = self.pathBuilder.schemas[self._ml_schema]
         file_path = ml_path.File
         type_path = ml_path.File_File_Type
@@ -842,7 +1139,27 @@ class DerivaML(Dataset):
         return [(f, f.pop("File_Type"))[0] for f in file_map.values()]
 
     def list_workflows(self) -> list[Workflow]:
-        """Return a list of all the workflows in the catalog."""
+        """Lists all workflows defined in the catalog.
+
+        Retrieves all workflow definitions including their names, URLs, types, versions,
+        and descriptions.
+
+        Returns:
+            list[Workflow]: List of workflow objects, each containing:
+                - name: Workflow name
+                - url: Source code URL
+                - workflow_type: Type of workflow
+                - version: Version identifier
+                - description: Workflow description
+                - rid: Resource identifier
+                - checksum: Source code checksum
+
+        Examples:
+            >>> workflows = ml.list_workflows()
+            >>> for w in workflows:
+            ...     print(f"{w.name} (v{w.version}): {w.description}")
+            ...     print(f"  Source: {w.url}")
+        """
         workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
         return [
             Workflow(
@@ -858,16 +1175,30 @@ class DerivaML(Dataset):
         ]
 
     def add_workflow(self, workflow: Workflow) -> RID:
-        """Add a workflow to the Workflow table.
+        """Adds a workflow definition to the catalog.
+
+        Registers a new workflow in the catalog or returns the RID of an existing workflow with the same URL.
+        Each workflow represents a specific computational process or analysis pipeline.
 
         Args:
-            workflow: An instance of a Workflow object.
+            workflow: Workflow object containing name, URL, type, version, and description.
 
         Returns:
-          - str: Resource Identifier (RID) of the added workflow.
+            RID: Resource Identifier of the added or existing workflow.
 
+        Raises:
+            DerivaMLException: If workflow insertion fails or required fields are missing.
+
+        Examples:
+            >>> workflow = Workflow(
+            ...     name="Gene Analysis",
+            ...     url="https://github.com/org/repo/workflows/gene_analysis.py",
+            ...     workflow_type="python_script",
+            ...     version="1.0.0",
+            ...     description="Analyzes gene expression patterns"
+            ... )
+            >>> workflow_rid = ml.add_workflow(workflow)
         """
-
         # Check to make sure that the workflow is not already in the table. If it's not, add it.
 
         if workflow_rid := self.lookup_workflow(workflow.url):
@@ -900,20 +1231,30 @@ class DerivaML(Dataset):
             return None
 
     def create_workflow(self, name: str, workflow_type: str, description: str = "") -> Workflow:
-        """Identify current executing program and return a workflow RID for it
+        """Creates a new workflow definition.
 
-        Determine the notebook or script that is currently being executed. Assume that this is
-        being executed from a cloned GitHub repository.  Determine the remote repository name for
-        this object.  Then either retrieve an existing workflow for this executable or create
-        a new one.
+        Creates a Workflow object that represents a computational process or analysis pipeline. The workflow type
+        must be a term from the controlled vocabulary. This method is typically used to define new analysis
+        workflows before execution.
 
         Args:
-            name: The name of the workflow.
-            workflow_type: The type of the workflow.
-            description: The description of the workflow.
+            name: Name of the workflow.
+            workflow_type: Type of workflow (must exist in workflow_type vocabulary).
+            description: Description of what the workflow does.
 
         Returns:
-            A workflow object.
+            Workflow: New workflow object ready for registration.
+
+        Raises:
+            DerivaMLException: If workflow_type is not in the vocabulary.
+
+        Examples:
+            >>> workflow = ml.create_workflow(
+            ...     name="RNA Analysis",
+            ...     workflow_type="python_notebook",
+            ...     description="RNA sequence analysis pipeline"
+            ... )
+            >>> rid = ml.add_workflow(workflow)
         """
         # Make sure type is correct.
         self.lookup_term(MLVocab.workflow_type, workflow_type)

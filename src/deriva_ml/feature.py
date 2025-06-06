@@ -1,5 +1,15 @@
-"""
-This module provides the implementation of the Feature capability in deriva-ml
+"""Feature implementation for deriva-ml.
+
+This module provides classes for defining and managing features in deriva-ml. Features represent measurable
+properties or characteristics that can be associated with records in a table. The module includes:
+
+- Feature: Main class for defining and managing features
+- FeatureRecord: Base class for feature records using pydantic models
+
+Typical usage example:
+    >>> feature = Feature(association_result, model)
+    >>> FeatureClass = feature.feature_record_class()
+    >>> record = FeatureClass(value="high", confidence=0.95)
 """
 
 from pathlib import Path
@@ -14,15 +24,25 @@ if TYPE_CHECKING:
 
 
 class FeatureRecord(BaseModel):
-    """Base class for feature records.  Feature records are pydantic models which are dynamically generated and
-    describe all the columns of a feature.
+    """Base class for dynamically generated feature record models.
+
+    This class serves as the base for pydantic models that represent feature records. Each feature record
+    contains the values and metadata associated with a feature instance.
 
     Attributes:
-        Execution (str):
-        Feature_Name (str):
-        feature:
-    Returns:
+        Execution (Optional[str]): RID of the execution that created this feature record.
+        Feature_Name (str): Name of the feature this record belongs to.
+        feature (ClassVar[Optional[Feature]]): Reference to the Feature object that created this record.
 
+    Example:
+        >>> class GeneFeature(FeatureRecord):
+        ...     value: str
+        ...     confidence: float
+        >>> record = GeneFeature(
+        ...     Feature_Name="expression",
+        ...     value="high",
+        ...     confidence=0.95
+        ... )
     """
 
     # model_dump of this feature should be compatible with feature table columns.
@@ -35,53 +55,61 @@ class FeatureRecord(BaseModel):
 
     @classmethod
     def feature_columns(cls) -> set[Column]:
-        """
+        """Returns all columns specific to this feature.
 
         Returns:
-          A set of feature column names.
-
+            set[Column]: Set of feature-specific columns, excluding system and relationship columns.
         """
         return cls.feature.feature_columns
 
     @classmethod
     def asset_columns(cls) -> set[Column]:
-        """
-
-        Args:
+        """Returns columns that reference asset tables.
 
         Returns:
-          A set of asset column names.
-
+            set[Column]: Set of columns that contain references to asset tables.
         """
         return cls.feature.asset_columns
 
     @classmethod
     def term_columns(cls) -> set[Column]:
-        """
-
-        Args:
+        """Returns columns that reference vocabulary terms.
 
         Returns:
-          :return: set of term column names.
-
+            set[Column]: Set of columns that contain references to controlled vocabulary terms.
         """
         return cls.feature.term_columns
 
     @classmethod
     def value_columns(cls) -> set[Column]:
-        """
-
-        Args:
+        """Returns columns that contain direct values.
 
         Returns:
-          A set of value column names.
-
+            set[Column]: Set of columns containing direct values (not references to assets or terms).
         """
         return cls.feature.value_columns
 
 
 class Feature:
-    """Wrapper for results of Table.find_associations()"""
+    """Manages feature definitions and their relationships in the catalog.
+
+    A Feature represents a measurable property or characteristic that can be associated with records in a table.
+    Features can include asset references, controlled vocabulary terms, and custom metadata fields.
+
+    Attributes:
+        feature_table: Table containing the feature implementation.
+        target_table: Table that the feature is associated with.
+        feature_name: Name of the feature (from Feature_Name column default).
+        feature_columns: Set of columns specific to this feature.
+        asset_columns: Set of columns referencing asset tables.
+        term_columns: Set of columns referencing vocabulary tables.
+        value_columns: Set of columns containing direct values.
+
+    Example:
+        >>> feature = Feature(association_result, model)
+        >>> print(f"Feature {feature.feature_name} on {feature.target_table.name}")
+        >>> print("Asset columns:", [c.name for c in feature.asset_columns])
+    """
 
     def __init__(self, atable: FindAssociationResult, model: "DerivaModel") -> None:
         self.feature_table = atable.table
@@ -126,14 +154,25 @@ class Feature:
         """
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
-            """Map a deriva type into a pydantic model type.
+            """Maps a Deriva column type to a Python/pydantic type.
+
+            Converts ERMrest column types to appropriate Python types for use in pydantic models.
+            Special handling is provided for asset columns which can accept either strings or Path objects.
 
             Args:
-                c: column to be mapped
-                c: Column:
+                c: ERMrest column to map to a Python type.
 
             Returns:
-                A pydantic model type
+                UnionType | Type[str] | Type[int] | Type[float]: Appropriate Python type for the column:
+                    - str | Path for asset columns
+                    - str for text columns
+                    - int for integer columns
+                    - float for floating point columns
+                    - str for all other types
+
+            Example:
+                >>> col = Column(name="score", type="float4")
+                >>> typ = map_type(col)  # Returns float
             """
             if c.name in {c.name for c in self.asset_columns}:
                 return str | Path

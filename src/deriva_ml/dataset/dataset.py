@@ -1,8 +1,22 @@
-"""
-This module defines the DataSet class with is used to manipulate datasets in DerivaML.
-The intended use of this class is as a base class in DerivaML, so all the methods documented here are
-accessible via a DerivaML class instance.
+"""Dataset management for DerivaML.
 
+This module provides functionality for managing datasets in DerivaML. A dataset represents a collection
+of related data that can be versioned, downloaded, and tracked. The module includes:
+
+- Dataset class: Core class for dataset operations
+- Version management: Track and update dataset versions
+- History tracking: Record dataset changes over time
+- Download capabilities: Export datasets as BDBags
+- Relationship management: Handle dataset dependencies and hierarchies
+
+The Dataset class serves as a base class in DerivaML, making its methods accessible through
+DerivaML class instances.
+
+Typical usage example:
+    >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+    >>> dataset_rid = ml.create_dataset('experiment', 'Experimental data')
+    >>> ml.add_dataset_members(dataset_rid, ['1-abc123', '1-def456'])
+    >>> ml.increment_dataset_version(dataset_rid, 'minor', 'Added new samples')
 """
 
 from __future__ import annotations
@@ -69,11 +83,22 @@ if TYPE_CHECKING:
 
 
 class Dataset:
-    """
-    Class to manipulate a dataset.
+    """Manages dataset operations in a Deriva catalog.
+
+    The Dataset class provides functionality for creating, modifying, and tracking datasets
+    in a Deriva catalog. It handles versioning, relationships between datasets, and data export.
 
     Attributes:
-        dataset_table (Table): ERMRest table holding dataset information.
+        dataset_table (Table): ERMrest table storing dataset information.
+        _model (DerivaModel): Catalog model instance.
+        _ml_schema (str): Schema name for ML-specific tables.
+        _cache_dir (Path): Directory for caching downloaded datasets.
+        _working_dir (Path): Directory for working data.
+        _use_minid (bool): Whether to use MINID service for dataset identification.
+
+    Note:
+        This class is typically used as a base class, with its methods accessed through
+        DerivaML class instances rather than directly.
     """
 
     _Logger = logging.getLogger("deriva_ml")
@@ -85,6 +110,14 @@ class Dataset:
         working_dir: Path,
         use_minid: bool = True,
     ):
+        """Initializes a Dataset instance.
+
+        Args:
+            model: DerivaModel instance representing the catalog.
+            cache_dir: Directory path for caching downloaded datasets.
+            working_dir: Directory path for working data.
+            use_minid: Whether to use MINID service for dataset identification.
+        """
         self._model = model
         self._ml_schema = ML_SCHEMA
         self.dataset_table = self._model.schemas[self._ml_schema].tables["Dataset"]
@@ -172,13 +205,31 @@ class Dataset:
         )
 
     def dataset_history(self, dataset_rid: RID) -> list[DatasetHistory]:
-        """Return a list of DatasetHistory objects representing the dataset
+        """Retrieves the version history of a dataset.
+
+        Returns a chronological list of dataset versions, including their version numbers,
+        creation times, and associated metadata.
 
         Args:
-            dataset_rid: A RID to the dataset for which history is to be fetched.
+            dataset_rid: Resource Identifier of the dataset.
 
         Returns:
-            A list of DatasetHistory objects which indicate the version-number, creation time, and bag instantiation of the dataset.
+            list[DatasetHistory]: List of history entries, each containing:
+                - dataset_version: Version number (major.minor.patch)
+                - minid: Minimal Viable Identifier
+                - snapshot: Catalog snapshot time
+                - dataset_rid: Dataset Resource Identifier
+                - version_rid: Version Resource Identifier
+                - description: Version description
+                - execution_rid: Associated execution RID
+
+        Raises:
+            DerivaMLException: If dataset_rid is not a valid dataset RID.
+
+        Example:
+            >>> history = ml.dataset_history("1-abc123")
+            >>> for entry in history:
+            ...     print(f"Version {entry.dataset_version}: {entry.description}")
         """
 
         if not self._is_dataset_rid(dataset_rid):
@@ -243,19 +294,31 @@ class Dataset:
         description: str | None = "",
         execution_rid: RID | None = None,
     ) -> DatasetVersion:
-        """Increment the version of the specified dataset_table.
+        """Increments a dataset's version number.
+
+        Creates a new version of the dataset by incrementing the specified version component
+        (major, minor, or patch). The new version is recorded with an optional description
+        and execution reference.
 
         Args:
-            dataset_rid: RID of the dataset whose version is to be incremented.
-            component: Which version of the dataset_table to increment. Major, Minor, or Patch
-            description: Description of the version update of the dataset_table.
-            execution_rid: Which execution is performing increment.
+            dataset_rid: Resource Identifier of the dataset to version.
+            component: Which version component to increment ('major', 'minor', or 'patch').
+            description: Optional description of the changes in this version.
+            execution_rid: Optional execution RID to associate with this version.
 
         Returns:
-          new semantic version of the dataset_table as a 3-tuple
+            DatasetVersion: The new version number.
 
         Raises:
-          DerivaMLException: if provided, RID is not to a dataset_table.
+            DerivaMLException: If dataset_rid is invalid or version increment fails.
+
+        Example:
+            >>> new_version = ml.increment_dataset_version(
+            ...     dataset_rid="1-abc123",
+            ...     component="minor",
+            ...     description="Added new samples"
+            ... )
+            >>> print(f"New version: {new_version}")  # e.g., "1.2.0"
         """
 
         # Find all the datasets that are reachable from this dataset and determine their new version numbers.
@@ -278,17 +341,29 @@ class Dataset:
         execution_rid: RID | None = None,
         version: DatasetVersion | None = None,
     ) -> RID:
-        """Create a new dataset_table from the specified list of RIDs.
+        """Creates a new dataset in the catalog.
+
+        Creates a dataset with specified types and description. The dataset can be associated
+        with an execution and initialized with a specific version.
 
         Args:
-            dataset_types: One or more dataset_table types.  Must be a term from the DatasetType controlled vocabulary.
-            description: Description of the dataset_table.
-            execution_rid: Execution under which the dataset_table will be created.
-            version: Version of the dataset_table.
+            dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
+            description: Description of the dataset's purpose and contents.
+            execution_rid: Optional execution RID to associate with dataset creation.
+            version: Optional initial version number. Defaults to 0.1.0.
 
         Returns:
-            New dataset_table RID.
+            RID: Resource Identifier of the newly created dataset.
 
+        Raises:
+            DerivaMLException: If dataset_types are invalid or creation fails.
+
+        Example:
+            >>> rid = ml.create_dataset(
+            ...     dataset_types=["experiment", "raw_data"],
+            ...     description="RNA sequencing experiment data",
+            ...     version=DatasetVersion(1, 0, 0)
+            ... )
         """
 
         version = version or DatasetVersion(0, 1, 0)
@@ -424,16 +499,27 @@ class Dataset:
     def list_dataset_members(
         self, dataset_rid: RID, recurse: bool = False, limit: int | None = None
     ) -> dict[str, list[dict[str, Any]]]:
-        """Return a list of entities associated with a specific dataset_table.
+        """Lists members of a dataset.
+
+        Returns a dictionary mapping member types to lists of member records. Can optionally
+        recurse through nested datasets and limit the number of results.
 
         Args:
-            dataset_rid: param recurse: If this is a nested dataset_table, list the members of the contained datasets
-            recurse: (Default value = False)
-            limit: If provided, the maximum number of members to return for each element type.
+            dataset_rid: Resource Identifier of the dataset.
+            recurse: Whether to include members of nested datasets. Defaults to False.
+            limit: Maximum number of members to return per type. None for no limit.
 
         Returns:
-            Dictionary of entities associated with a specific dataset_table.  Key is the table from which the elements
-            were taken.
+            dict[str, list[dict[str, Any]]]: Dictionary mapping member types to lists of members.
+                Each member is a dictionary containing the record's attributes.
+
+        Raises:
+            DerivaMLException: If dataset_rid is invalid.
+
+        Example:
+            >>> members = ml.list_dataset_members("1-abc123", recurse=True)
+            >>> for type_name, records in members.items():
+            ...     print(f"{type_name}: {len(records)} records")
         """
 
         if not self._is_dataset_rid(dataset_rid):
@@ -481,17 +567,31 @@ class Dataset:
         description: str | None = "",
         execution_rid: RID | None = None,
     ) -> None:
-        """Add additional elements to an existing dataset_table.
+        """Adds members to a dataset.
 
-        Add new elements to an existing dataset. In addition to adding new members, the minor version number of the
-        dataset is incremented and the description, if provide is applied to that new version.
+        Associates one or more records with a dataset. Can optionally validate member types
+        and create a new dataset version to track the changes.
 
         Args:
-            dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
-            members: List of member RIDs to add to the dataset_table.
-            validate: Check rid_list to make sure elements are not already in the dataset_table.
-            description: Markdown description of the updated dataset.
-            execution_rid: Optional RID of execution associated with this dataset.
+            dataset_rid: Resource Identifier of the dataset.
+            members: List of RIDs to add as dataset members.
+            validate: Whether to validate member types. Defaults to True.
+            description: Optional description of the member additions.
+            execution_rid: Optional execution RID to associate with changes.
+
+        Raises:
+            DerivaMLException: If:
+                - dataset_rid is invalid
+                - members are invalid or of wrong type
+                - adding members would create a cycle
+                - validation fails
+
+        Example:
+            >>> ml.add_dataset_members(
+            ...     dataset_rid="1-abc123",
+            ...     members=["1-def456", "1-ghi789"],
+            ...     description="Added sample data"
+            ... )
         """
         members = set(members)
         description = description or "Updated dataset via add_dataset_members"

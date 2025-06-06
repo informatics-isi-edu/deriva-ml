@@ -51,16 +51,30 @@ except ImportError:
 
 
 class Workflow(BaseModel):
-    """A specification of a workflow.  Must have a name, URI to the workflow instance, and a type.  The workflow type
-    needs to be an existing-controlled vocabulary term.
+    """Represents a computational workflow in DerivaML.
+
+    A workflow defines a computational process or analysis pipeline. Each workflow has
+    a unique identifier, source code location, and type. Workflows are typically
+    associated with Git repositories for version control.
 
     Attributes:
-        name: The name of the workflow
-        url: The URI to the workflow instance.  In most cases there should be a GitHub URI to the code being executed.
-        workflow_type: The type of the workflow.  Must be an existing controlled vocabulary term.
-        version: The version of the workflow instance.  Should follow semantic versioning.
-        description: A description of the workflow instance.  Can be in Markdown format.
-        is_notebook: A boolean indicating whether this workflow instance is a notebook or not.
+        name (str): Human-readable name of the workflow.
+        url (str): URI to the workflow source code (typically a GitHub URL).
+        workflow_type (str): Type of workflow (must be a controlled vocabulary term).
+        version (str | None): Version identifier (semantic versioning).
+        description (str | None): Description of workflow purpose and behavior.
+        rid (RID | None): Resource Identifier if registered in catalog.
+        checksum (str | None): Git hash of workflow source code.
+        is_notebook (bool): Whether workflow is a Jupyter notebook.
+
+    Example:
+        >>> workflow = Workflow(
+        ...     name="RNA Analysis",
+        ...     url="https://github.com/org/repo/analysis.ipynb",
+        ...     workflow_type="python_notebook",
+        ...     version="1.0.0",
+        ...     description="RNA sequence analysis"
+        ... )
     """
 
     name: str
@@ -75,6 +89,7 @@ class Workflow(BaseModel):
     _logger: Any = PrivateAttr()
 
     def __post_init__(self):
+        """Initializes logging for the workflow."""
         self._logger = logging.getLogger("deriva_ml")
 
     @staticmethod
@@ -83,22 +98,33 @@ class Workflow(BaseModel):
         workflow_type: str,
         description: str = "",
     ) -> "Workflow":
-        """Identify the current executing program and return a workflow RID for it
+        """Creates a workflow from the current execution context.
 
-        Determine the notebook or script that is currently being executed. Assume that this is
-        being executed from a cloned GitHub repository.  Determine the remote repository name for
-        this object.  Then either retrieve an existing workflow for this executable or create
-        a new one.
+        Identifies the currently executing program (script or notebook) and creates
+        a workflow definition. Automatically determines the Git repository information
+        and source code checksum.
 
-        Environment variables can be used to configure the behavior of this routine.
-            DERIVA_ML_WORKFLOW_URL: The URL of the workflow instance.
-            DERIVA_ML_WORKFLOW_CHECKSUM: The expected checksum of the workflow instance.
-
+        The behavior can be configured using environment variables:
+            - DERIVA_ML_WORKFLOW_URL: Override the detected workflow URL
+            - DERIVA_ML_WORKFLOW_CHECKSUM: Override the computed checksum
 
         Args:
-            name: The name of the workflow.
-            workflow_type: The type of the workflow.
-            description: The description of the workflow.
+            name: Human-readable name for the workflow.
+            workflow_type: Type of workflow (must be a vocabulary term).
+            description: Optional description of workflow purpose.
+
+        Returns:
+            Workflow: New workflow instance with detected Git information.
+
+        Raises:
+            DerivaMLException: If not in a Git repository or detection fails.
+
+        Example:
+            >>> workflow = Workflow.create_workflow(
+            ...     name="Sample Analysis",
+            ...     workflow_type="python_script",
+            ...     description="Process sample data"
+            ... )
         """
 
         # Check to see if execution file info is being passed in by calling program.
@@ -121,7 +147,25 @@ class Workflow(BaseModel):
 
     @staticmethod
     def get_url_and_checksum(executable_path: Path) -> tuple[str, str]:
-        """Determine the checksum for a specified executable"""
+        """Determines the Git URL and checksum for a file.
+
+        Computes the Git repository URL and file checksum for the specified path.
+        For notebooks, strips cell outputs before computing the checksum.
+
+        Args:
+            executable_path: Path to the workflow file.
+
+        Returns:
+            tuple[str, str]: (GitHub URL, Git object hash)
+
+        Raises:
+            DerivaMLException: If not in a Git repository.
+
+        Example:
+            >>> url, checksum = Workflow.get_url_and_checksum(Path("analysis.ipynb"))
+            >>> print(f"URL: {url}")
+            >>> print(f"Checksum: {checksum}")
+        """
         try:
             subprocess.run(
                 "git rev-parse --is-inside-work-tree",
@@ -160,7 +204,15 @@ class Workflow(BaseModel):
         return github_url, checksum
 
     @staticmethod
-    def _get_git_root(executable_path: Path):
+    def _get_git_root(executable_path: Path) -> str | None:
+        """Gets the root directory of the Git repository.
+
+        Args:
+            executable_path: Path to check for Git repository.
+
+        Returns:
+            str | None: Absolute path to repository root, or None if not in repository.
+        """
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--show-toplevel"],
@@ -176,7 +228,11 @@ class Workflow(BaseModel):
 
     @staticmethod
     def _check_nbstrip_status() -> None:
-        """Check to see if nbstrip is installed"""
+        """Checks if nbstripout is installed and configured.
+
+        Verifies that the nbstripout tool is available and properly installed in the
+        Git repository. Issues warnings if setup is incomplete.
+        """
         logger = logging.getLogger("deriva_ml")
         try:
             if subprocess.run(
@@ -190,7 +246,11 @@ class Workflow(BaseModel):
 
     @staticmethod
     def _get_notebook_path() -> Path | None:
-        """Return the absolute path of the current notebook."""
+        """Gets the path of the currently executing notebook.
+
+        Returns:
+            Path | None: Absolute path to current notebook, or None if not in notebook.
+        """
 
         server, session = Workflow._get_notebook_session()
         if server and session:

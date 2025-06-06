@@ -1,5 +1,24 @@
-"""
-This module defined the Execution class which is used to interact with the state of an active execution.
+"""Execution management for DerivaML.
+
+This module provides functionality for managing and tracking executions in DerivaML. An execution
+represents a computational or manual process that operates on datasets and produces outputs.
+The module includes:
+
+- Execution class: Core class for managing execution state and context
+- Asset management: Track input and output files
+- Status tracking: Monitor and update execution progress
+- Dataset handling: Download and materialize required datasets
+- Provenance tracking: Record relationships between inputs, processes, and outputs
+
+The Execution class serves as the primary interface for managing the lifecycle of a computational
+or manual process within DerivaML.
+
+Typical usage example:
+    >>> config = ExecutionConfiguration(workflow="analysis_workflow", description="Data analysis")
+    >>> with ml.create_execution(config) as execution:
+    ...     execution.download_dataset_bag(dataset_spec)
+    ...     # Run analysis
+    ...     execution.upload_execution_outputs()
 """
 
 from __future__ import annotations
@@ -71,16 +90,27 @@ except ImportError:
 if sys.version_info >= (3, 12):
 
     class AssetFilePath(Path):
-        """
-        Create a new Path object that has additional information related to the use of this path as an asset.
+        """Extended Path class for managing asset files.
 
-        Args:
-            asset_path: Local path to the location of the asset.
-            asset_name:  The name of the asset in the catalog (e.g., the asset table name).
-            file_name:  Name of the local file that contains the contents of the asset.
-            asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
-            asset_types:  A list of terms from the Asset_Type controlled vocabulary.
-            asset_rid:  The RID of the asset if it has been uploaded into an asset table
+        Represents a file path with additional metadata about its role as an asset in the catalog.
+        This class extends the standard Path class to include information about the asset's
+        catalog representation and type.
+
+        Attributes:
+            asset_name (str): Name of the asset in the catalog (e.g., asset table name).
+            file_name (str): Name of the local file containing the asset.
+            asset_metadata (dict[str, Any]): Additional columns beyond URL, Length, and checksum.
+            asset_types (list[str]): Terms from the Asset_Type controlled vocabulary.
+            asset_rid (RID | None): Resource Identifier if uploaded to an asset table.
+
+        Example:
+            >>> path = AssetFilePath(
+            ...     "/path/to/file.txt",
+            ...     asset_name="analysis_output",
+            ...     file_name="results.txt",
+            ...     asset_metadata={"version": "1.0"},
+            ...     asset_types=["text", "results"]
+            ... )
         """
 
         def __init__(
@@ -92,8 +122,17 @@ if sys.version_info >= (3, 12):
             asset_types: list[str] | str,
             asset_rid: RID | None = None,
         ):
+            """Initializes an AssetFilePath instance.
+
+            Args:
+                asset_path: Local path to the asset file.
+                asset_name: Name of the asset in the catalog.
+                file_name: Name of the local file.
+                asset_metadata: Additional metadata columns.
+                asset_types: One or more asset type terms.
+                asset_rid: Optional Resource Identifier if already in catalog.
+            """
             super().__init__(asset_path)
-            # These assignments happen after __new__ returns the instance
             self.asset_name = asset_name
             self.file_name = file_name
             self.asset_metadata = asset_metadata
@@ -134,34 +173,40 @@ else:
 
 
 class Execution:
-    """The Execution class is used to capture the context of an activity within DerivaML.  While these are primarily
-    computational, manual processes can be represented by an execution as well.
+    """Manages the lifecycle and context of a DerivaML execution.
 
-    Within DerivaML, Executions are used to provide providence. Every dataset_table and data file that is generated is
-    associated with an execution, which records which program and input parameters were used to generate that data.
+    An Execution represents a computational or manual process within DerivaML. It provides:
+    - Dataset materialization and access
+    - Asset management (inputs and outputs)
+    - Status tracking and updates
+    - Provenance recording
+    - Result upload and cataloging
 
-    Execution objects are created from an ExecutionConfiguration, which provides information about what DerivaML
-    datasets will be used, what additional files (assets) are required, what code is being run (Workflow) and an
-    optional description of the Execution.  Side effects of creating an execution object are:
-
-    1. An execution record is created in the catalog and the RID of that record recorded,
-    2. Any specified datasets are downloaded and materialized
-    3. Any additional required assets are downloaded.
-
-    Once execution is complete, a method can be called to upload any data produced by the execution. In addition, the
-    Execution object provides methods for locating where to find downloaded datasets and assets and also where to
-    place any data that may be uploaded.
-
-    Finally, the execution object can update its current state in the DerivaML catalog, allowing users to remotely
-    track the progress of their execution.
+    The class handles downloading required datasets and assets, tracking execution state,
+    and managing the upload of results. Every dataset and file generated is associated
+    with an execution record for provenance tracking.
 
     Attributes:
-        dataset_rids (list[RID]): The RIDs of the datasets to be downloaded and materialized as part of the execution.
-        datasets (list[DatasetBag]): List of datasetBag objects that referred to the materialized datasets specified in.
-            `dataset_rids`.
-        configuration (ExecutionConfiguration): The configuration of the execution.
-        workflow_rid (RID): The RID of the workflow associated with the execution.
-        status (Status): The status of the execution.
+        dataset_rids (list[RID]): RIDs of datasets used in the execution.
+        datasets (list[DatasetBag]): Materialized dataset objects.
+        configuration (ExecutionConfiguration): Execution settings and parameters.
+        workflow_rid (RID): RID of the associated workflow.
+        status (Status): Current execution status.
+        asset_paths (list[AssetFilePath]): Paths to execution assets.
+        parameters (dict): Execution parameters.
+        start_time (datetime | None): When execution started.
+        stop_time (datetime | None): When execution completed.
+
+    Example:
+        >>> config = ExecutionConfiguration(
+        ...     workflow="analysis",
+        ...     description="Process samples",
+        ...     parameters={"threshold": 0.5}
+        ... )
+        >>> with ml.create_execution(config) as execution:
+        ...     execution.download_dataset_bag(dataset_spec)
+        ...     # Run analysis
+        ...     execution.upload_execution_outputs()
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -172,12 +217,19 @@ class Execution:
         reload: RID | None = None,
         dry_run: bool = False,
     ):
-        """
+        """Initializes an Execution instance.
+
+        Creates a new execution or reloads an existing one. Initializes the execution
+        environment, downloads required datasets, and sets up asset tracking.
 
         Args:
-            configuration: Execution configuration object that describes the execution.
-            ml_object: The DerivaML instance that created the execution.
-            reload: RID of a previously initialized execution object.
+            configuration: Settings and parameters for the execution.
+            ml_object: DerivaML instance managing the execution.
+            reload: Optional RID of existing execution to reload.
+            dry_run: If True, don't create catalog records or upload results.
+
+        Raises:
+            DerivaMLException: If initialization fails or configuration is invalid.
         """
         self.asset_paths: list[AssetFilePath] = []
         self.configuration = configuration
@@ -354,24 +406,47 @@ class Execution:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it,
-         and validate that all the metadata is correct
+        """Downloads and materializes a dataset for use in the execution.
+
+        Downloads the specified dataset as a BDBag and materializes it in the execution's
+        working directory. The dataset version is determined by the DatasetSpec.
 
         Args:
-            dataset: A dataset specification of a dataset_table or a minid to an existing bag.
+            dataset: Specification of the dataset to download, including version and
+                materialization options.
 
         Returns:
-            the location of the unpacked and validated dataset_table bag and the RID of the bag
+            DatasetBag: Object containing:
+                - path: Local filesystem path to downloaded dataset
+                - rid: Dataset's Resource Identifier
+                - minid: Dataset's Minimal Viable Identifier
+
+        Raises:
+            DerivaMLException: If download or materialization fails.
+
+        Example:
+            >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")
+            >>> bag = execution.download_dataset_bag(spec)
+            >>> print(f"Downloaded to {bag.path}")
         """
         return self._ml_object.download_dataset_bag(dataset, execution_rid=self.execution_rid)
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
-        """Update the status information in the execution record in the DerivaML catalog.
+        """Updates the execution's status in the catalog.
+
+        Records a new status and associated message in the catalog, allowing remote
+        tracking of execution progress.
 
         Args:
-            status: A value from the Status Enum
-            msg: Additional information about the status
+            status: New status value (e.g., running, completed, failed).
+            msg: Description of the status change or current state.
+
+        Raises:
+            DerivaMLException: If status update fails.
+
+        Example:
+            >>> execution.update_status(Status.running, "Processing sample 1 of 10")
         """
         self.status = status
         self._logger.info(msg)
@@ -390,14 +465,36 @@ class Execution:
         )
 
     def execution_start(self) -> None:
-        """Start an execution, uploading status to catalog"""
+        """Marks the execution as started.
 
+        Records the start time and updates the execution's status to 'running'.
+        This should be called before beginning the main execution work.
+
+        Example:
+            >>> execution.execution_start()
+            >>> try:
+            ...     # Run analysis
+            ...     execution.execution_stop()
+            ... except Exception:
+            ...     execution.update_status(Status.failed, "Analysis error")
+        """
         self.start_time = datetime.now()
         self.uploaded_assets = None
         self.update_status(Status.initializing, "Start execution  ...")
 
     def execution_stop(self) -> None:
-        """Finish the execution and update the duration and status of the execution."""
+        """Marks the execution as completed.
+
+        Records the stop time and updates the execution's status to 'completed'.
+        This should be called after all execution work is finished.
+
+        Example:
+            >>> try:
+            ...     # Run analysis
+            ...     execution.execution_stop()
+            ... except Exception:
+            ...     execution.update_status(Status.failed, "Analysis error")
+        """
         self.stop_time = datetime.now()
         duration = self.stop_time - self.start_time
         hours, remainder = divmod(duration.total_seconds(), 3600)
@@ -520,19 +617,26 @@ class Execution:
         self,
         assets_dir: str | Path,
     ) -> dict[Any, FileUploadState] | None:
-        """Upload assets from a directory.
+        """Uploads assets from a directory to the catalog.
 
-        This routine assumes that the current upload specification includes a configuration for the specified directory.
-        Every asset in the specified directory is uploaded
+        Scans the specified directory for assets and uploads them to the catalog,
+        recording their metadata and types. Assets are organized by their types
+        and associated with the execution.
 
         Args:
-            assets_dir: Directory containing the assets to upload.
+            assets_dir: Directory containing assets to upload.
 
         Returns:
-            Results of the upload operation.
+            dict[Any, FileUploadState] | None: Mapping of assets to their upload states,
+                or None if no assets were found.
 
         Raises:
-            DerivaMLException: If there is an issue in uploading the assets.
+            DerivaMLException: If upload fails or assets are invalid.
+
+        Example:
+            >>> states = execution.upload_assets("output/results")
+            >>> for asset, state in states.items():
+            ...     print(f"{asset}: {state}")
         """
 
         def path_to_asset(path: str) -> str:
@@ -546,17 +650,25 @@ class Execution:
         return {path_to_asset(p): r for p, r in results.items()}
 
     def upload_execution_outputs(self, clean_folder: bool = True) -> dict[str, list[AssetFilePath]]:
-        """Upload all the assets and metadata associated with the current execution.
+        """Uploads all outputs from the execution to the catalog.
 
-        This will include any new assets, features, or table values.
+        Scans the execution's output directories for assets, features, and other results,
+        then uploads them to the catalog. Can optionally clean up the output folders
+        after successful upload.
 
         Args:
-            clean_folder: bool: (Default value = True)
+            clean_folder: Whether to delete output folders after upload. Defaults to True.
 
         Returns:
-            Results of the upload operation. Asset names are all relative to the execution upload directory.
-            Uploaded assets with key as assets' suborder name, values as an
-            ordered dictionary with RID and metadata in the Execution_Asset table.
+            dict[str, list[AssetFilePath]]: Mapping of asset types to their file paths.
+
+        Raises:
+            DerivaMLException: If upload fails or outputs are invalid.
+
+        Example:
+            >>> outputs = execution.upload_execution_outputs()
+            >>> for type_name, paths in outputs.items():
+            ...     print(f"{type_name}: {len(paths)} files")
         """
         if self._dry_run:
             return {}
@@ -793,11 +905,20 @@ class Execution:
 
     @validate_call
     def add_features(self, features: Iterable[FeatureRecord]) -> None:
-        """Given a collection of Feature records, write out a CSV file in the appropriate assets directory so that this
-        feature gets uploaded when the execution is complete.
+        """Adds feature records to the catalog.
+
+        Associates feature records with this execution and uploads them to the catalog.
+        Features represent measurable properties or characteristics of records.
 
         Args:
-            features: Iterable of Feature records to write.
+            features: Feature records to add, each containing a value and metadata.
+
+        Raises:
+            DerivaMLException: If feature addition fails or features are invalid.
+
+        Example:
+            >>> feature = FeatureRecord(value="high", confidence=0.95)
+            >>> execution.add_features([feature])
         """
 
         # Make sure feature list is homogeneous:
