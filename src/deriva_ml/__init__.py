@@ -23,7 +23,8 @@ __all__ = [
 
 from importlib.metadata import PackageNotFoundError, version
 
-from core.definitions import (
+from deriva_ml.core.base import DerivaML
+from deriva_ml.core.definitions import (
     RID,
     BuiltinTypes,
     ColumnDefinition,
@@ -37,8 +38,6 @@ from core.definitions import (
     TableDefinition,
     UploadState,
 )
-
-from deriva_ml.core.base import DerivaML
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.execution.execution import Execution, ExecutionConfiguration

@@ -5,7 +5,8 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=deriva_ml --cov-report=term-missing"
+addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"
+
 
 [tool.black]
 line-length = 88
@@ -41,6 +42,12 @@ dependencies = [
     "setuptools-scm>=8.0",
     "nbstripout",
     "papermill"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
 ]
 
 [tool.setuptools.package-data]

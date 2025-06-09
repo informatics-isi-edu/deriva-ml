@@ -1,11 +1,12 @@
 import argparse
 import sys
 
-from core.constants import DerivaAssetColumns
-from dataset.upload import bulk_upload_configuration
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
-from model.catalog import DerivaModel
+
+from deriva_ml.core.constants import DerivaAssetColumns
+from deriva_ml.dataset.upload import bulk_upload_configuration
+from deriva_ml.model.catalog import DerivaModel
 
 
 def catalog_annotation(model: DerivaModel) -> None:
