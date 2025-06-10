@@ -21,8 +21,8 @@ from deriva_ml import (
     ExecutionConfiguration,
     MLVocab,
 )
-from deriva_ml.schema_setup.annotations import catalog_annotation
-from deriva_ml.schema_setup.create_schema import (
+from deriva_ml.schema.annotations import catalog_annotation
+from deriva_ml.schema.create_schema import (
     create_ml_schema,
     initialize_ml_schema,
 )
@@ -270,7 +270,7 @@ def create_demo_catalog(
     test_catalog = server.create_ermrest_catalog()
     model = test_catalog.getCatalogModel()
     model.configure_baseline_catalog()
-    policy_file = files("deriva_ml.schema_setup").joinpath("policy.json")
+    policy_file = files("deriva_ml.schema").joinpath("policy.json")
     subprocess.run(
         [
             "deriva-acl-config",

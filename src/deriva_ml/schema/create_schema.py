@@ -14,7 +14,7 @@ from deriva.core.ermrest_model import (
 )
 
 from deriva_ml import MLVocab
-from deriva_ml.schema_setup.annotations import asset_annotation, generate_annotation
+from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
 
 def create_dataset_table(

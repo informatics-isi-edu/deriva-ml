@@ -3,10 +3,9 @@ Tests for the core models module.
 """
 
 import pytest
-from core.filespec import create_filespecs
 from pydantic import ValidationError
 
-from deriva_ml.core.ermrest import FileSpec, VocabularyTerm
+from deriva_ml.core.ermrest import VocabularyTerm
 
 
 def test_file_spec_validation(tmp_path):
@@ -95,3 +94,27 @@ def test_file_spec_read_write(tmp_path):
         assert read.description == original.description
         assert read.md5 == original.md5
         assert read.length == original.length
+
+    def test_is_vocabulary(self):
+        # Test the vocabulary table predicates.
+        self.assertTrue(self.ml_instance.model.is_vocabulary("Dataset_Type"))
+        self.assertFalse(self.ml_instance.model.is_vocabulary("Dataset"))
+        self.assertRaises(DerivaMLException, self.ml_instance.model.is_vocabulary, "FooBar")
+
+    def test_find_vocabularies(self):
+        # Look for a known vocabulary in the deriva-ml schema
+        self.assertIn("Dataset_Type", [v.name for v in self.ml_instance.model.find_vocabularies()])
+
+    def test_create_vocabulary(self):
+        self.ml_instance.create_vocabulary("CV1", "A vocab")
+        self.assertIn("CV1", [v.name for v in self.ml_instance.model.find_vocabularies()])
+        self.assertTrue(self.ml_instance.model.is_vocabulary("Dataset_Type"))
+
+    def test_find_assets(self):
+        self.assertTrue(self.ml_instance.model.is_asset("Execution_Asset"))
+        self.assertFalse(self.ml_instance.model.is_asset("Dataset"))
+        self.assertIn("Execution_Asset", [a.name for a in self.ml_instance.model.find_assets()])
+
+    def test_is_assoc(self):
+        self.assertTrue(self.ml_instance.model.is_association("Dataset_Dataset"))
+        self.assertFalse(self.ml_instance.model.is_association("Dataset"))

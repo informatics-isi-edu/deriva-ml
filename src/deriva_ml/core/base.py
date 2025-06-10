@@ -61,16 +61,10 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.model.catalog import DerivaModel
-from deriva_ml.schema_setup.annotations import asset_annotation
+from deriva_ml.schema.annotations import asset_annotation
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
-
-# Optional debug imports
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class DerivaML(Dataset):
