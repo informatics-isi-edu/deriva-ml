@@ -1,16 +1,22 @@
 __all__ = [
-    "ExecutionConfiguration",
+    "DerivaML",
     "Execution",
     "Workflow",
     "DatasetBag",
     "DatasetVersion",
     "DatasetSpec",
     "VersionPart",
+    "RID",
+    "BuiltinTypes",
+    "ColumnDefinition",
+    "MLVocab",
+    "TableDefinition",
+    "ExecutionConfiguration",
 ]
 
 from importlib.metadata import PackageNotFoundError, version
 
-from deriva_ml.core.base import *
+from deriva_ml.core import RID, BuiltinTypes, ColumnDefinition, DerivaML, MLVocab, TableDefinition
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.execution.execution import Execution, ExecutionConfiguration

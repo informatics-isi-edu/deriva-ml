@@ -795,7 +795,7 @@ class DerivaML(Dataset):
         table = self.model.name_to_table(table)
         try:
             # Find and delete feature's implementation table
-            feature = next(f for f in self.find_features(table) if f.feature_name == feature_name)
+            feature = next(f for f in self.model.find_features(table) if f.feature_name == feature_name)
             feature.feature_table.drop()
             return True
         except StopIteration:

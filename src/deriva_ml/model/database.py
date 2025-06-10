@@ -1,280 +1,330 @@
-"""
-Database model for managing local SQLite database operations.
+"""Ths module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface between the BDBag representation
+of a dataset and a sqllite database in which the contents of the bag are stored.
 """
 
 from __future__ import annotations
 
-# Standard library imports
-import json
 import logging
-import os
 import sqlite3
+from csv import reader
 from pathlib import Path
-from typing import Any, Dict, List, Set, Type, TypeVar
+from typing import Any, Generator, Optional
+from urllib.parse import urlparse
 
-# Deriva imports
-import deriva.core.ermrest_model as em
+from deriva.core.ermrest_model import Model
 
-# Type variables
-T = TypeVar("T")
+from deriva_ml.core.definitions import ML_SCHEMA, RID, DerivaMLException, MLVocab
+from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
+from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.model.catalog import DerivaModel
+
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class DatabaseModelMeta(type):
-    _paths_loaded: bool = False
+    """Use metaclass to ensure that there is onl one instance per path"""
 
-    def __call__(cls: Type[T], *args: Any, **kwargs: Any) -> T:
-        """Ensures the paths are only loaded once for all instances of the class.
+    _paths_loaded: dict[Path, "DatabaseModel"] = {}
+
+    def __call__(cls, *args, **kwargs):
+        logger = logging.getLogger("deriva_ml")
+        bag_path: Path = args[1]
+        if bag_path.as_posix() not in cls._paths_loaded:
+            logger.info(f"Loading {bag_path}")
+            cls._paths_loaded[bag_path] = super().__call__(*args, **kwargs)
+        return cls._paths_loaded[bag_path]
+
+
+class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
+    """Read in the contents of a BDBag and create a local SQLite database.
+
+        As part of its initialization, this routine will create a sqlite database that has the contents of all the tables
+    in the dataset_table.  In addition, any asset tables will the `Filename` column remapped to have the path of the local
+    copy of the file. In addition, a local version of the ERMRest model that as used to generate the dataset_table is
+    available.
+
+       The sqlite database will not have any foreign key constraints applied, however, foreign-key relationships can be
+    found by looking in the ERMRest model.  In addition, as sqllite doesn't support schema, Ermrest schema are added
+    to the table name using the convention SchemaName:TableName.  Methods in DatasetBag that have table names as the
+    argument will perform the appropriate name mappings.
+
+    Because of nested datasets, it's possible that more than one dataset rid is in a bag, or that a dataset rid might
+    appear in more than one database. To help manage this, a global list of all the datasets that have been loaded
+    into DatabaseModels, is kept in the class variable `_rid_map`.
+
+    Because you can load different versions of a dataset simultaneously, the dataset RID and version number are tracked, and a new
+    sqllite instance is created for every new dataset version present.
+
+    Attributes:
+        bag_path (Path): path to the local copy of the BDBag
+        minid (DatasetMinid): Minid for the specified bag
+        dataset_rid (RID): RID for the specified dataset
+        dbase (Connection): connection to the sqlite database holding table values
+        domain_schema (str): Name of the domain schema
+        dataset_table  (Table): the dataset table in the ERMRest model.
+    """
+
+    # Maintain a global map of RIDS to versions and databases.
+    _rid_map: dict[RID, list[tuple[DatasetVersion, "DatabaseModel"]]] = {}
+
+    @staticmethod
+    def rid_lookup(dataset_rid: RID) -> list[tuple[DatasetVersion, "DatabaseModel"]]:
+        """Return a list of DatasetVersion/DatabaseModel instances corresponding to the given RID.
 
         Args:
-            *args: Positional arguments for class instantiation.
-            **kwargs: Keyword arguments for class instantiation.
+            dataset_rid: Rit to be looked up.
 
         Returns:
-            Instance of the class with loaded paths.
-        """
-        obj = super().__call__(*args, **kwargs)
-        if not cls._paths_loaded:
-            obj._load_model()  # type: ignore
-            cls._paths_loaded = True
-        return obj
-
-
-class DatabaseModel(metaclass=DatabaseModelMeta):
-    """Handles database operations and model management for the deriva-ml package."""
-
-    _rid_map: Dict[str, Dict[str, Any]] = {}
-
-    @classmethod
-    def rid_lookup(cls, rid: str) -> Dict[str, Any]:
-        """Looks up an Asset by RID.
-
-        Args:
-            rid: Resource identifier string.
-
-        Returns:
-            Dictionary containing asset information.
+            List of DatasetVersion/DatabaseModel instances corresponding to the given RID.
 
         Raises:
-            ValueError: If the RID is not found in the database.
-        """
-        if rid not in cls._rid_map:
-            raise ValueError(f"RID {rid} not found in the database")
-        return cls._rid_map[rid]
-
-    def __init__(
-        self,
-        model: Any,
-        dataset_rid: str | None = None,
-        minid: str | None = None,
-        bag_path: str | Path | None = None,
-        dbase_file: str | Path | None = None,
-    ) -> None:
-        """Initializes the DatabaseModel.
-
-        Args:
-            model: The model instance.
-            dataset_rid: Dataset resource identifier.
-            minid: Minimal identifier.
-            bag_path: Path to the bag.
-            dbase_file: Path to the database file.
-        """
-        self.bag_path: Path | None = Path(bag_path) if bag_path else None
-        self.minid: str | None = minid
-        self.dataset_rid: str | None = dataset_rid
-        self.dbase_file: Path | None = Path(dbase_file) if dbase_file else None
-        self.dbase: sqlite3.Connection | None = None
-        self._logger: logging.Logger = logging.getLogger(__name__)
-        self.ml_schema: str = model.ml_schema
-        self.dataset_table: str = f"{self.ml_schema}.dataset"
-        self.bag_rids: Set[str] = set()
-
-    def _load_model(self) -> None:
-        """Loads the model from the database if the database file exists."""
-        if self.dbase_file and os.path.exists(self.dbase_file):
-            self._load_sqlite()
-
-    def _load_sqlite(self) -> None:
-        """Loads data from SQLite database and populates the RID map."""
-        if not self.dbase_file:
-            return
-
-        self.dbase = sqlite3.connect(str(self.dbase_file))
-        self.dbase.row_factory = sqlite3.Row
-
-        tables: List[str] = self.list_tables()
-        for table in tables:
-            rows: List[Dict[str, Any]] = self.get_table_as_dict(table)
-            for row in rows:
-                if "RID" in row:
-                    rid: str = row["RID"]
-                    self._rid_map[rid] = row
-                    if table == self.dataset_table:
-                        self.bag_rids.add(rid)
-
-    def _localize_asset_table(
-        self, table_name: str, schema: str, table: em.Table
-    ) -> None:
-        """Localizes an asset table by processing its JSON metadata files.
-
-        Args:
-            table_name: Name of the table.
-            schema: Schema name.
-            table: Table instance from ermrest_model.
-        """
-        if not self._is_asset(table):
-            return
-
-        local_path: Path = (
-            Path(self.bag_path) / schema / table_name if self.bag_path else Path()
-        )
-        if not local_path.exists():
-            return
-
-        for filename in os.listdir(local_path):
-            if filename.endswith(".json"):
-                with open(local_path / filename) as f:
-                    asset_metadata = json.load(f)
-                    self._localize_asset(asset_metadata)
-
-    def _is_asset(self, table: em.Table) -> bool:
-        """Checks if a table is an asset table.
-
-        Args:
-            table: Table instance to check.
-
-        Returns:
-            True if the table is an asset table, False otherwise.
-        """
-        asset_columns: List[str] = [
-            col.name
-            for col in table.columns
-            if col.type.typename == "text"
-            and any(
-                "asset" in tag.lower()
-                for tag in getattr(col, "annotations", {}).get("tag", [])
-            )
-        ]
-        return bool(asset_columns)
-
-    def _localize_asset(self, asset_metadata: Dict[str, Any]) -> None:
-        """Localizes an asset by updating the RID map.
-
-        Args:
-            asset_metadata: Dictionary containing asset metadata.
-        """
-        if "RID" not in asset_metadata:
-            return
-
-        rid: str = asset_metadata["RID"]
-        if rid in self._rid_map:
-            self._rid_map[rid].update(asset_metadata)
-        else:
-            self._rid_map[rid] = asset_metadata
-
-    def list_tables(self) -> List[str]:
-        """Lists all tables in the database.
-
-        Returns:
-            List of table names.
-        """
-        if not self.dbase:
-            return []
-
-        cursor: sqlite3.Cursor = self.dbase.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        return [row[0] for row in cursor.fetchall()]
-
-    def get_dataset(self, rid: str) -> Dict[str, Any]:
-        """Retrieves dataset information by RID.
-
-        Args:
-            rid: Resource identifier.
-
-        Returns:
-            Dictionary containing dataset information.
-
-        Raises:
-            ValueError: If the RID is not found.
-        """
-        return self.rid_lookup(rid)
-
-    def dataset_version(self, rid: str) -> str | None:
-        """Gets dataset version.
-
-        Args:
-            rid: Resource identifier.
-
-        Returns:
-            Version string if found, None otherwise.
+            Raise a DerivaMLException if the given RID is not found.
         """
         try:
-            dataset = self.get_dataset(rid)
-            return dataset.get("Version")
-        except ValueError:
-            return None
+            return DatabaseModel._rid_map[dataset_rid]
+        except KeyError:
+            raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
-    def find_datasets(
-        self, name: str | None = None, version: str | None = None
-    ) -> List[Dict[str, Any]]:
-        """Finds datasets matching the given criteria.
+    def __init__(self, minid: DatasetMinid, bag_path: Path, dbase_path: Path):
+        """Create a new DatabaseModel.
 
         Args:
-            name: Dataset name to search for.
-            version: Dataset version to search for.
+            minid: Minid for the specified bag.
+            bag_path:  Path to the local copy of the BDBag.
+        """
+
+        self.bag_path = bag_path
+        self.minid = minid
+        self.dataset_rid = minid.dataset_rid
+        self.dbase_file = dbase_path / f"{minid.version_rid}.db"
+        self.dbase = sqlite3.connect(self.dbase_file)
+
+        super().__init__(Model.fromfile("file-system", self.bag_path / "data/schema.json"))
+
+        self._logger = logging.getLogger("deriva_ml")
+        self._load_model()
+        self.ml_schema = ML_SCHEMA
+        self._load_sqlite()
+        self._logger.info(
+            "Creating new database for dataset: %s in %s",
+            self.dataset_rid,
+            self.dbase_file,
+        )
+        self.dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
+        # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
+        sql_dataset = self.normalize_table_name("Dataset_Version")
+        with self.dbase:
+            dataset_versions = [
+                t for t in self.dbase.execute(f'SELECT "Dataset", "Version" FROM "{sql_dataset}"').fetchall()
+            ]
+        dataset_versions = [(v[0], DatasetVersion.parse(v[1])) for v in dataset_versions]
+
+        # Get most current version of each rid
+        self.bag_rids = {}
+        for rid, version in dataset_versions:
+            self.bag_rids[rid] = max(self.bag_rids.get(rid, DatasetVersion(0, 1, 0)), version)
+
+        for dataset_rid, dataset_version in self.bag_rids.items():
+            version_list = DatabaseModel._rid_map.setdefault(dataset_rid, [])
+            version_list.append((dataset_version, self))
+
+    def _load_model(self) -> None:
+        """Create a sqlite database schema that contains all the tables within the catalog from which the BDBag was created."""
+        with self.dbase:
+            for t in self.model.schemas[self.domain_schema].tables.values():
+                self.dbase.execute(t.sqlite3_ddl())
+            for t in self.model.schemas["deriva-ml"].tables.values():
+                self.dbase.execute(t.sqlite3_ddl())
+
+    def _load_sqlite(self) -> None:
+        """Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.
+
+        If the file is for an asset table, update the FileName column of the table to have the local file path for
+        the materialized file.  Then load into the sqllite database.
+        Note: none of the foreign key constraints are included in the database.
+        """
+        dpath = self.bag_path / "data"
+        asset_map = self._localize_asset_table()  # Map of remote to local assets.
+
+        # Find all the CSV files in the subdirectory and load each file into the database.
+        for csv_file in Path(dpath).rglob("*.csv"):
+            table = csv_file.stem
+            schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else self.ml_schema
+
+            with csv_file.open(newline="") as csvfile:
+                csv_reader = reader(csvfile)
+                column_names = next(csv_reader)
+
+                # Determine which columns in the table has the Filename and the URL
+                asset_indexes = (
+                    (column_names.index("Filename"), column_names.index("URL")) if self._is_asset(table) else None
+                )
+
+                value_template = ",".join(["?"] * len(column_names))  # SQL placeholder for row (?,?..)
+                column_list = ",".join([f'"{c}"' for c in column_names])
+                with self.dbase:
+                    object_table = (self._localize_asset(o, asset_indexes, asset_map) for o in csv_reader)
+                    self.dbase.executemany(
+                        f'INSERT OR REPLACE INTO "{schema}:{table}" ({column_list}) VALUES ({value_template})',
+                        object_table,
+                    )
+
+    def _localize_asset_table(self) -> dict[str, str]:
+        """Use the fetch.txt file in a bdbag to create a map from a URL to a local file path.
 
         Returns:
-            List of matching datasets.
+            Dictionary that maps a URL to a local file path.
+
         """
-        datasets: List[Dict[str, Any]] = []
-        for rid in self.bag_rids:
-            dataset = self.get_dataset(rid)
-            if name and dataset.get("Name") != name:
-                continue
-            if version and dataset.get("Version") != version:
-                continue
-            datasets.append(dataset)
+        fetch_map = {}
+        try:
+            with open(self.bag_path / "fetch.txt", newline="\n") as fetch_file:
+                for row in fetch_file:
+                    # Rows in fetch.text are tab seperated with URL filename.
+                    fields = row.split("\t")
+                    local_file = fields[2].replace("\n", "")
+                    local_path = f"{self.bag_path}/{local_file}"
+                    fetch_map[urlparse(fields[0]).path] = local_path
+        except FileNotFoundError:
+            dataset_rid = self.bag_path.name.replace("Dataset_", "")
+            logging.info(f"No downloaded assets in bag {dataset_rid}")
+        return fetch_map
+
+    def _is_asset(self, table_name: str) -> bool:
+        """
+
+        Args:
+          table_name: str:
+
+        Returns:
+            Boolean that is true if the table looks like an asset table.
+        """
+        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
+        sname = self.domain_schema if table_name in self.model.schemas[self.domain_schema].tables else self.ml_schema
+        asset_table = self.model.schemas[sname].tables[table_name]
+        return asset_columns.issubset({c.name for c in asset_table.columns})
+
+    @staticmethod
+    def _localize_asset(o: list, indexes: tuple[int, int], asset_map: dict[str, str]) -> tuple:
+        """Given a list of column values for a table, replace the FileName column with the local file name based on
+        the URL value.
+
+        Args:
+          o: List of values for each column in a table row.
+          indexes: A tuple whose first element is the column index of the file name and whose second element
+        is the index of the URL in an asset table.  Tuple is None if table is not an asset table.
+          o: list:
+          indexes: Optional[tuple[int: int]]:
+
+        Returns:
+          Tuple of updated column values.
+
+        """
+        if indexes:
+            file_column, url_column = indexes
+            o[file_column] = asset_map[o[url_column]] if o[url_column] else ""
+        return tuple(o)
+
+    def list_tables(self) -> list[str]:
+        """List the names of the tables in the catalog
+
+        Returns:
+            A list of table names.  These names are all qualified with the Deriva schema name.
+        """
+        with self.dbase:
+            return [
+                t[0]
+                for t in self.dbase.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;"
+                ).fetchall()
+            ]
+
+    def get_dataset(self, dataset_rid: Optional[RID] = None) -> DatasetBag:
+        """Get a dataset, or nested dataset from the bag database
+
+        Args:
+            dataset_rid: Optional.  If not provided, use the main RID for the bag.  If a value is given, it must
+            be the RID for a nested dataset.
+
+        Returns:
+            DatasetBag object for the specified dataset.
+        """
+        if dataset_rid and dataset_rid not in self.bag_rids:
+            DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
+        return DatasetBag(self, dataset_rid or self.dataset_rid)
+
+    def dataset_version(self, dataset_rid: Optional[RID] = None) -> DatasetVersion:
+        """Return the version of the specified dataset."""
+        if dataset_rid and dataset_rid not in self.bag_rids:
+            DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
+        return self.bag_rids[dataset_rid]
+
+    def find_datasets(self) -> list[dict[str, Any]]:
+        """Returns a list of currently available datasets.
+
+        Returns:
+             list of currently available datasets.
+        """
+        atable = next(self.model.schemas[ML_SCHEMA].tables[MLVocab.dataset_type].find_associations()).name
+
+        # Get a list of all the dataset_type values associated with this dataset_table.
+        datasets = []
+        ds_types = list(self.get_table_as_dict(atable))
+        for dataset in self.get_table_as_dict("Dataset"):
+            my_types = [t for t in ds_types if t["Dataset"] == dataset["RID"]]
+            datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in my_types]})
         return datasets
 
-    def get_table_as_dict(self, table_name: str) -> List[Dict[str, Any]]:
-        """Gets table contents as list of dictionaries.
+    def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+        """Retrieve the contents of the specified table as a dictionary.
 
         Args:
-            table_name: Name of the table.
+            table: Table to retrieve data from. f schema is not provided as part of the table name,
+                the method will attempt to locate the schema for the table.
 
         Returns:
-            List of row dictionaries.
+          A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
-        if not self.dbase:
-            return []
+        table_name = self.normalize_table_name(table)
+        with self.dbase as dbase:
+            col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
+            result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
+            while row := result.fetchone():
+                yield dict(zip(col_names, row))
 
-        cursor: sqlite3.Cursor = self.dbase.cursor()
-        cursor.execute(f'SELECT * FROM "{table_name}"')
-        return [dict(row) for row in cursor.fetchall()]
-
-    def normalize_table_name(self, table_name: str) -> str:
-        """Normalizes a table name by ensuring proper schema prefix.
+    def normalize_table_name(self, table: str) -> str:
+        """Attempt to insert the schema into a table name if it's not provided.
 
         Args:
-            table_name: Table name to normalize.
+          table: str:
 
         Returns:
-            Normalized table name.
+          table name with schema included.
 
-        Raises:
-            ValueError: If the table name format is invalid.
         """
-        parts: List[str] = table_name.split(".")
-        if len(parts) == 1:
-            return f"{self.ml_schema}.{parts[0]}"
-        elif len(parts) == 2:
-            return table_name
-        else:
-            raise ValueError(f"Invalid table name: {table_name}")
+        sname = ""
+        try:
+            [sname, tname] = table.split(":")
+        except ValueError:
+            tname = table
+            for sname, s in self.model.schemas.items():
+                if table in s.tables:
+                    break
+        try:
+            _ = self.model.schemas[sname].tables[tname]
+            return f"{sname}:{tname}"
+        except KeyError:
+            raise DerivaMLException(f'Table name "{table}" does not exist.')
 
-    def delete_database(self) -> None:
-        """Deletes the database file and closes the connection."""
-        if self.dbase:
-            self.dbase.close()
-            self.dbase = None
-        if self.dbase_file and os.path.exists(self.dbase_file):
-            os.remove(self.dbase_file)
+    def delete_database(self):
+        """
+
+        Args:
+
+        Returns:
+
+        """
+        self.dbase_file.unlink()

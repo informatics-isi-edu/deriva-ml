@@ -15,7 +15,7 @@ from deriva_ml.core.definitions import (
 )
 
 __all__ = [
-    "DerivaML",
+    DerivaML,
     RID,
     BuiltinTypes,
     ColumnDefinition,
