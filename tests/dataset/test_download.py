@@ -1,7 +1,7 @@
-from derivaml_test import TestDerivaML
-from deriva_ml import DatasetSpec
 from pathlib import Path
 from pprint import pprint
+
+from deriva_ml import DatasetSpec
 
 
 class TestDownload(TestDerivaML):
@@ -11,17 +11,11 @@ class TestDownload(TestDerivaML):
     def test_download(self):
         double_nested_dataset, nested_datasets, datasets = self.create_nested_dataset()
         current_version = self.ml_instance.dataset_version(double_nested_dataset)
-        subject_rid = self.ml_instance.list_dataset_members(datasets[0])["Subject"][0][
-            "RID"
-        ]
+        subject_rid = self.ml_instance.list_dataset_members(datasets[0])["Subject"][0]["RID"]
         self.ml_instance.add_dataset_members(double_nested_dataset, [subject_rid])
         new_version = self.ml_instance.dataset_version(double_nested_dataset)
-        bag = self.ml_instance.download_dataset_bag(
-            DatasetSpec(rid=double_nested_dataset, version=current_version)
-        )
-        new_bag = self.ml_instance.download_dataset_bag(
-            DatasetSpec(rid=double_nested_dataset, version=new_version)
-        )
+        bag = self.ml_instance.download_dataset_bag(DatasetSpec(rid=double_nested_dataset, version=current_version))
+        new_bag = self.ml_instance.download_dataset_bag(DatasetSpec(rid=double_nested_dataset, version=new_version))
 
         # The datasets in the bag should be all the datasets we started with.
         self.assertEqual(
@@ -30,9 +24,7 @@ class TestDownload(TestDerivaML):
         )
 
         # Children of top level bag should be in datasets variable
-        self.assertCountEqual(
-            nested_datasets, {ds.dataset_rid for ds in bag.list_dataset_children()}
-        )
+        self.assertCountEqual(nested_datasets, {ds.dataset_rid for ds in bag.list_dataset_children()})
 
         self.assertCountEqual(
             nested_datasets + datasets,

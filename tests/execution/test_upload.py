@@ -1,8 +1,7 @@
-from derivaml_test import TestDerivaML
-
-from deriva_ml import MLVocab, Workflow, ExecutionConfiguration
-from tempfile import TemporaryDirectory
 from random import random
+from tempfile import TemporaryDirectory
+
+from deriva_ml import ExecutionConfiguration, MLVocab
 from deriva_ml.demo_catalog import (
     reset_demo_catalog,
 )
@@ -23,37 +22,23 @@ class TestUpload(TestDerivaML):
                     f.write(f"Hello there {random()}\n")
             self.ml_instance.upload_assets(asset_dir)
         assets = list(
-            self.ml_instance.catalog.getPathBuilder()
-            .schemas[self.domain_schema]
-            .tables["FooBar"]
-            .entities()
-            .fetch()
+            self.ml_instance.catalog.getPathBuilder().schemas[self.domain_schema].tables["FooBar"].entities().fetch()
         )
         self.assertEqual(len(assets), 2)
 
     def test_upload_directory_metadata(self):
         reset_demo_catalog(self.ml_instance, self.domain_schema)
-        subject_path = (
-            self.ml_instance.catalog.getPathBuilder()
-            .schemas[self.domain_schema]
-            .tables["Subject"]
-        )
+        subject_path = self.ml_instance.catalog.getPathBuilder().schemas[self.domain_schema].tables["Subject"]
         ss = list(subject_path.insert([{"Name": f"Thing{t + 1}"} for t in range(2)]))
         with TemporaryDirectory() as tmpdir:
             image_dir = self.ml_instance.asset_dir("Image", prefix=tmpdir)
             for s in ss:
-                image_file = image_dir.create_file(
-                    f"test_{s['RID']}.txt", {"Subject": s["RID"]}
-                )
+                image_file = image_dir.create_file(f"test_{s['RID']}.txt", {"Subject": s["RID"]})
                 with open(image_file, "w+") as f:
                     f.write(f"Hello there {random()}\n")
             self.ml_instance.upload_assets(image_dir)
         assets = list(
-            self.ml_instance.catalog.getPathBuilder()
-            .schemas[self.domain_schema]
-            .tables["Image"]
-            .entities()
-            .fetch()
+            self.ml_instance.catalog.getPathBuilder().schemas[self.domain_schema].tables["Image"].entities().fetch()
         )
         self.assertIn(assets[0]["Subject"], [s["RID"] for s in ss])
         self.assertEqual(len(assets), 2)
@@ -78,15 +63,11 @@ class TestUpload(TestDerivaML):
         )
 
         manual_execution = self.ml_instance.create_execution(
-            ExecutionConfiguration(
-                description="Sample Execution", workflow=api_workflow
-            )
+            ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)
         )
 
         # Now let us create model configuration for our program.
-        model_file = (
-            manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
-        )
+        model_file = manual_execution.execution_asset_path("API_Model") / "modelfile.txt"
         with open(model_file, "w") as fp:
             fp.write("My model")
 
