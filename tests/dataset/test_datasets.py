@@ -4,18 +4,19 @@ Tests for dataset functionality.
 
 from deriva_ml import DatasetSpec
 
+class TestDatasetManagement
 
-def test_dataset_find(test_ml_catalog):
-    """Test finding datasets."""
-    # Find all datasets
-    datasets = test_ml_catalog.find_datasets()
-    assert len(datasets) > 0
+    def test_dataset_find(test_ml_catalog):
+        """Test finding datasets."""
+        # Find all datasets
+        datasets = test_ml_catalog.find_datasets()
+        assert len(datasets) > 0
 
-    # Verify dataset types exist
-    dataset_types = {ds["Dataset_Type"] for ds in datasets}
-    assert "Training" in dataset_types
-    assert "Testing" in dataset_types
-    assert "Partitioned" in dataset_types
+        # Verify dataset types exist
+        dataset_types = {ds["Dataset_Type"] for ds in datasets}
+        assert "Training" in dataset_types
+        assert "Testing" in dataset_types
+        assert "Partitioned" in dataset_types
 
 
 def test_dataset_version(test_ml_catalog):
