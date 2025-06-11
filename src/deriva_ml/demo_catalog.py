@@ -1,16 +1,13 @@
 import atexit
 import itertools
 import logging
-import subprocess
-from importlib.resources import files
 from random import randint, random
 from tempfile import TemporaryDirectory
 from typing import Optional
 
-from deriva.core import DerivaServer, ErmrestCatalog, get_credential
-from deriva.core.datapath import DataPathException
+from deriva.core import ErmrestCatalog
 from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
-from requests import HTTPError
+from requests.exceptions import HTTPError
 
 from deriva_ml import (
     RID,
@@ -21,36 +18,19 @@ from deriva_ml import (
     ExecutionConfiguration,
     MLVocab,
 )
-from deriva_ml.schema.annotations import catalog_annotation
-from deriva_ml.schema.create_schema import (
-    create_ml_schema,
-    initialize_ml_schema,
+from deriva_ml.schema import (
+    create_ml_catalog,
 )
+from deriva_ml.schema.annotations import catalog_annotation
+from deriva_ml.schema.create_schema import reset_ml_schema
 
 TEST_DATASET_SIZE = 4
 
 
-def reset_demo_catalog(deriva_ml: DerivaML, sname: str):
-    model = deriva_ml.model
-    for trial in range(3):
-        for t in [v for v in model.schemas[sname].tables.values()]:
-            try:
-                t.drop()
-            except HTTPError:
-                pass
-    model.schemas[sname].drop()
-    # Empty out remaining tables.
-    pb = deriva_ml.pathBuilder
-    retry = True
-    while retry:
-        for t in pb.schemas["deriva-ml"].tables.values():
-            for e in t.entities().fetch():
-                try:
-                    t.filter(t.RID == e["RID"]).delete()
-                except DataPathException:  # FK constraint.
-                    retry = True
-    initialize_ml_schema(model, "deriva-ml")
-    create_domain_schema(deriva_ml, sname)
+def reset_demo_catalog(deriva_ml: DerivaML):
+    reset_ml_schema(deriva_ml.catalog)
+    deriva_ml.model.refresh_model()
+    create_domain_schema(deriva_ml, deriva_ml.domain_schema)
 
 
 def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
@@ -236,9 +216,16 @@ def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
 
     _ = ml_instance.model.schemas["deriva-ml"]
 
-    if ml_instance.model.schemas.get(sname):
-        # Clean out any old junk....
-        ml_instance.model.schemas[sname].drop()
+    try:
+        ml_instance.model.schemas[sname].drop(cascade=True)
+    except KeyError:
+        pass
+    except HTTPError as e:
+        print(e)
+        if f"Schema {sname} does not exist" in str(e):
+            pass
+        else:
+            raise e
 
     domain_schema = ml_instance.model.create_schema(
         Schema.define(sname, annotations={"name_style": {"underline_space": True}})
@@ -264,30 +251,12 @@ def create_demo_catalog(
     create_datasets=False,
     on_exit_delete=True,
 ) -> ErmrestCatalog:
-    credential = get_credential(hostname)
-
-    server = DerivaServer("https", hostname, credentials=credential)
-    test_catalog = server.create_ermrest_catalog()
-    model = test_catalog.getCatalogModel()
-    model.configure_baseline_catalog()
-    policy_file = files("deriva_ml.schema").joinpath("policy.json")
-    subprocess.run(
-        [
-            "deriva-acl-config",
-            "--host",
-            test_catalog.deriva_server.server,
-            "--config-file",
-            policy_file,
-            test_catalog.catalog_id,
-        ]
-    )
-
-    if on_exit_delete:
-        atexit.register(destroy_demo_catalog, test_catalog)
-
     try:
         with TemporaryDirectory() as tmpdir:
-            create_ml_schema(test_catalog, project_name=project_name)
+            test_catalog = create_ml_catalog(hostname, project_name=project_name)
+            if on_exit_delete:
+                atexit.register(destroy_demo_catalog, test_catalog)
+
             deriva_ml = DerivaML(
                 hostname=hostname,
                 catalog_id=test_catalog.catalog_id,
@@ -295,7 +264,6 @@ def create_demo_catalog(
                 domain_schema=domain_schema,
                 logging_level=logging.WARN,
                 working_dir=tmpdir,
-                credential=credential,
             )
             create_domain_schema(deriva_ml, domain_schema)
 

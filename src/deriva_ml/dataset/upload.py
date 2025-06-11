@@ -36,6 +36,7 @@ Here is the directory layout we support:
 """
 
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Optional
@@ -62,22 +63,23 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
+# Use os.path.sep for OS-agnostic paths in regex patterns
+SEP = re.escape(os.path.sep)
+upload_root_regex = f"(?i)^.*{SEP}deriva-ml"
 
-upload_root_regex = r"(?i)^.*/deriva-ml"
+exec_dir_regex = upload_root_regex + f"{SEP}execution{SEP}(?P<execution_rid>[-\\w]+)"
 
-exec_dir_regex = upload_root_regex + r"/execution/(?P<execution_rid>[-\w]+)"
+feature_dir_regex = exec_dir_regex + f"{SEP}feature"
+feature_table_dir_regex = feature_dir_regex + f"{SEP}(?P<schema>[-\\w]+){SEP}(?P<target_table>[-\\w]+){SEP}(?P<feature_name>[-\\w]+)"
+feature_value_regex = feature_table_dir_regex + f"{SEP}(?P=feature_name)[.](?P<ext>[(csv|json)]*)$"
+feature_asset_dir_regex = feature_table_dir_regex + f"{SEP}asset{SEP}(?P<asset_table>[-\\w]+)"
+feature_asset_regex = feature_asset_dir_regex + f"{SEP}(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
 
-feature_dir_regex = exec_dir_regex + r"/feature"
-feature_table_dir_regex = feature_dir_regex + r"/(?P<schema>[-\w]+)/(?P<target_table>[-\w]+)/(?P<feature_name>[-\w]+)"
-feature_value_regex = feature_table_dir_regex + r"/(?P=feature_name)[.](?P<ext>[(csv|json)]*)$"
-feature_asset_dir_regex = feature_table_dir_regex + r"/asset/(?P<asset_table>[-\w]+)"
-feature_asset_regex = feature_asset_dir_regex + r"/(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
-
-asset_path_regex = exec_dir_regex + r"/asset/(?P<schema>[-\w]+)/(?P<asset_table>[-\w]*)"
+asset_path_regex = exec_dir_regex + f"{SEP}asset{SEP}(?P<schema>[-\\w]+){SEP}(?P<asset_table>[-\\w]*)"
 
 asset_file_regex = r"(?P<file>[-\w]+)[.](?P<ext>[a-z0-9]*)$"
 
-table_regex = exec_dir_regex + r"/table/(?P<schema>[-\w]+)/(?P<table>[-\w]+)/(?P=table)[.](csv|json)$"
+table_regex = exec_dir_regex + f"{SEP}table{SEP}(?P<schema>[-\\w]+){SEP}(?P<table>[-\\w]+){SEP}(?P=table)[.](csv|json)$"
 
 
 def is_feature_dir(path: Path) -> Optional[re.Match]:
@@ -86,9 +88,16 @@ def is_feature_dir(path: Path) -> Optional[re.Match]:
 
 
 def normalize_asset_dir(path: str) -> Optional[tuple[str, str]]:
-    """Parse a path to an asset file and return the asset table name and file name"""
+    """Parse a path to an asset file and return the asset table name and file name.
+    
+    Args:
+        path: Path to the asset file
+        
+    Returns:
+        Tuple of (schema/table, filename) or None if path doesn't match pattern
+    """
     path = Path(path)
-    if not (m := re.match(asset_path_regex, path.as_posix())):
+    if not (m := re.match(asset_path_regex, str(path))):
         return None
     return f"{m['schema']}/{m['asset_table']}", path.name
 

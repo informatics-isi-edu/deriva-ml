@@ -684,21 +684,39 @@ class Execution:
             raise e
 
     def _clean_folder_contents(self, folder_path: Path):
-        """
+        """Clean up folder contents with Windows-compatible error handling.
 
         Args:
-            folder_path: Path:
+            folder_path: Path to the folder to clean
         """
+        import time
+        MAX_RETRIES = 3
+        RETRY_DELAY = 1  # seconds
+
+        def remove_with_retry(path: Path, is_dir: bool = False) -> bool:
+            for attempt in range(MAX_RETRIES):
+                try:
+                    if is_dir:
+                        shutil.rmtree(path)
+                    else:
+                        os.remove(path)
+                    return True
+                except (OSError, PermissionError) as e:
+                    if attempt == MAX_RETRIES - 1:
+                        self.update_status(Status.failed, format_exception(e))
+                        return False
+                    time.sleep(RETRY_DELAY)
+            return False
+
         try:
             with os.scandir(folder_path) as entries:
                 for entry in entries:
                     if entry.is_dir() and not entry.is_symlink():
-                        shutil.rmtree(entry.path)
+                        remove_with_retry(Path(entry.path), is_dir=True)
                     else:
-                        os.remove(entry.path)
+                        remove_with_retry(Path(entry.path))
         except OSError as e:
-            error = format_exception(e)
-            self.update_status(Status.failed, error)
+            self.update_status(Status.failed, format_exception(e))
 
     def _update_feature_table(
         self,
@@ -866,7 +884,11 @@ class Execution:
             if copy_file:
                 asset_path.write_bytes(file_name.read_bytes())
             else:
-                asset_path.symlink_to(file_name)
+                try:
+                    asset_path.symlink_to(file_name)
+                except (OSError, PermissionError):
+                    # Fallback to copy if symlink fails (common on Windows)
+                    asset_path.write_bytes(file_name.read_bytes())
 
         # Persist the asset types into a file
         with open(

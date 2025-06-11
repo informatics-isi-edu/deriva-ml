@@ -45,9 +45,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-cov",
+]
+
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
+  "ruff",
 ]
 
 [tool.setuptools.package-data]

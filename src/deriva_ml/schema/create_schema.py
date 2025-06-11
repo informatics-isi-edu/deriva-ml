@@ -1,8 +1,11 @@
 import argparse
+import subprocess
 import sys
+from importlib.resources import files
 from typing import Any, Optional
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import (
     Column,
     ForeignKey,
@@ -12,8 +15,9 @@ from deriva.core.ermrest_model import (
     Table,
     builtin_types,
 )
+from requests.exceptions import HTTPError
 
-from deriva_ml import MLVocab
+from deriva_ml.core.definitions import ML_SCHEMA, MLVocab
 from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
 
@@ -286,6 +290,55 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         ],
         defaults={"ID", "URI"},
     )
+
+
+def create_ml_catalog(hostname: str, project_name: str) -> ErmrestCatalog:
+    server = DerivaServer("https", hostname, credentials=get_credential(hostname))
+    catalog = server.create_ermrest_catalog()
+    model = catalog.getCatalogModel()
+    model.configure_baseline_catalog()
+    policy_file = files("deriva_ml.schema").joinpath("policy.json")
+    subprocess.run(
+        [
+            "deriva-acl-config",
+            "--host",
+            catalog.deriva_server.server,
+            "--config-file",
+            policy_file,
+            catalog.catalog_id,
+        ]
+    )
+    create_ml_schema(catalog, project_name=project_name)
+    return catalog
+
+
+def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
+    builtin_schemas = ("public", ml_schema, "www", "WWW")
+    model = catalog.getCatalogModel()
+
+    if sname_list := [s for s in model.schemas if s not in builtin_schemas]:
+        sname = sname_list[0]
+        for trial in range(3):
+            for t in [v for v in model.schemas[sname].tables.values()]:
+                try:
+                    t.drop()
+                except HTTPError:
+                    pass
+        model.schemas[sname].drop()
+    # Empty out remaining tables.
+    pb = catalog.getPathBuilder()
+    retry = True
+    while retry:
+        for t in pb.schemas[ML_SCHEMA].tables.values():
+            try:
+                t.delete()
+            except DataPathException as e:  # FK constraint.
+                if "Resource not found" in e.message:
+                    retry = False
+                else:
+                    raise e
+
+    initialize_ml_schema(model, ml_schema)
 
 
 def main():

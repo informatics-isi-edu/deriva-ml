@@ -14,7 +14,7 @@ from typing import Any, Iterable
 from deriva.core.ermrest_catalog import ErmrestCatalog
 
 # Deriva imports
-from deriva.core.ermrest_model import Column, FindAssociationResult, Model, Table
+from deriva.core.ermrest_model import Column, FindAssociationResult, Model, Schema, Table
 
 # Third-party imports
 from pydantic import ConfigDict, validate_call
@@ -66,7 +66,6 @@ class DerivaModel:
         self.configuration = None
         self.catalog: ErmrestCatalog = self.model.catalog
         self.hostname = self.catalog.deriva_server.server if isinstance(self.catalog, ErmrestCatalog) else "localhost"
-        self.schemas = self.model.schemas
 
         self.ml_schema = ml_schema
         builtin_schemas = ("public", self.ml_schema, "www", "WWW")
@@ -77,6 +76,13 @@ class DerivaModel:
                 self.domain_schema = user_schemas.pop()
             else:
                 raise DerivaMLException(f"Ambiguous domain schema: {user_schemas}")
+
+    def refresh_model(self):
+        self.model = self.catalog.getCatalogModel()
+
+    @property
+    def schemas(self) -> dict[str, Schema]:
+        return self.model.schemas
 
     @property
     def chaise_config(self) -> dict[str, Any]:

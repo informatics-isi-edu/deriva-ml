@@ -2,56 +2,40 @@
 Tests for the execution module.
 """
 
-import pytest
-
 from deriva_ml import (
-    Workflow,
-    ExecutionConfiguration,
-    MLVocab as vc,
     DatasetSpec,
+    ExecutionConfiguration,
+    Workflow,
+)
+from deriva_ml import (
+    MLVocab as vc,
 )
 
 
-def test_execution_workflow(demo_ml):
+def test_execution_workflow(test_ml_catalog):
     """Test creating and configuring an execution workflow."""
     # Get dataset RIDs
-    training_dataset_rid = [
-        ds["RID"]
-        for ds in demo_ml.find_datasets()
-        if "Training" in ds["Dataset_Type"]
-    ][0]
-    testing_dataset_rid = [
-        ds["RID"]
-        for ds in demo_ml.find_datasets()
-        if "Testing" in ds["Dataset_Type"]
-    ][0]
-    nested_dataset_rid = [
-        ds["RID"]
-        for ds in demo_ml.find_datasets()
-        if "Partitioned" in ds["Dataset_Type"]
-    ][0]
+    training_dataset_rid = [ds["RID"] for ds in test_ml_catalog.find_datasets() if "Training" in ds["Dataset_Type"]][0]
+    testing_dataset_rid = [ds["RID"] for ds in test_ml_catalog.find_datasets() if "Testing" in ds["Dataset_Type"]][0]
+    nested_dataset_rid = [ds["RID"] for ds in test_ml_catalog.find_datasets() if "Partitioned" in ds["Dataset_Type"]][0]
 
     # Add required terms
-    demo_ml.add_term(
-        vc.workflow_type, "Manual Workflow", description="Initial setup of Model File"
-    )
-    demo_ml.add_term(
-        vc.execution_asset_type, "API_Model", description="Model for our API workflow"
-    )
-    demo_ml.add_term(
-        vc.workflow_type, "ML Demo", description="A ML Workflow that uses Deriva ML API"
-    )
+    test_ml_catalog.add_term(vc.workflow_type, "Manual Workflow", description="Initial setup of Model File")
+    test_ml_catalog.add_term(vc.execution_asset_type, "API_Model", description="Model for our API workflow")
+    test_ml_catalog.add_term(vc.workflow_type, "ML Demo", description="A ML Workflow that uses Deriva ML API")
 
     # Create manual workflow
-    api_workflow = demo_ml.add_workflow(Workflow(
-        name="Manual Workflow",
-        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/Notebooks/DerivaML%20Execution.ipynb",
-        workflow_type="Manual Workflow",
-        description="A manual operation",
-    ))
+    api_workflow = test_ml_catalog.add_workflow(
+        Workflow(
+            name="Manual Workflow",
+            url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/Notebooks/DerivaML%20Execution.ipynb",
+            workflow_type="Manual Workflow",
+            description="A manual operation",
+        )
+    )
 
     # Create manual execution
-    manual_execution = demo_ml.create_execution(
+    manual_execution = test_ml_catalog.create_execution(
         ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)
     )
 
@@ -77,11 +61,11 @@ def test_execution_workflow(demo_ml):
         datasets=[
             DatasetSpec(
                 rid=nested_dataset_rid,
-                version=demo_ml.dataset_version(nested_dataset_rid),
+                version=test_ml_catalog.dataset_version(nested_dataset_rid),
             ),
             DatasetSpec(
                 rid=testing_dataset_rid,
-                version=demo_ml.dataset_version(testing_dataset_rid),
+                version=test_ml_catalog.dataset_version(testing_dataset_rid),
             ),
         ],
         assets=[training_model_rid],
@@ -91,4 +75,4 @@ def test_execution_workflow(demo_ml):
 
     assert len(config.datasets) == 2
     assert len(config.assets) == 1
-    assert config.workflow.name == "ML Demo" 
+    assert config.workflow.name == "ML Demo"
