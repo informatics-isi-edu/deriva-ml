@@ -273,11 +273,11 @@ class Dataset:
             return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
 
     def _build_dataset_graph(self, dataset_rid: RID) -> Iterable[RID]:
-        ts: TopologicalSorter[RID] = TopologicalSorter()
+        ts: TopologicalSorter = TopologicalSorter()
         self._build_dataset_graph_1(dataset_rid, ts, set())
         return ts.static_order()
 
-    def _build_dataset_graph_1(self, dataset_rid: RID, ts: TopologicalSorter[RID], visited) -> None:
+    def _build_dataset_graph_1(self, dataset_rid: RID, ts: TopologicalSorter, visited) -> None:
         """Use topological sort to return bottom up list of nested datasets"""
         ts.add(dataset_rid)
         if dataset_rid not in visited:
@@ -729,7 +729,7 @@ class Dataset:
         return [p["Dataset"] for p in atable_path.filter(atable_path.Nested_Dataset == dataset_rid).entities().fetch()]
 
     @validate_call
-    def list_dataset_children(self, dataset_rid: RID, recurse=False) -> list[RID]:
+    def list_dataset_children(self, dataset_rid: RID, recurse: bool = False) -> list[RID]:
         """Given a dataset_table RID, return a list of RIDs for any nested datasets.
 
         Args:

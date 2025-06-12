@@ -8,7 +8,7 @@ The module requires a catalog that implements a 'deriva-ml' schema with specific
 Typical usage example:
     >>> ml = DerivaML('deriva.example.org', 'my_catalog')
     >>> ml.create_feature('my_table', 'new_feature')
-    >>> ml.add_term('vocabulary_table', 'new_term', 'Description of term')
+    >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')
 """
 
 from __future__ import annotations  # noqa: I001
@@ -98,7 +98,7 @@ class DerivaML(Dataset):
     Example:
         >>> ml = DerivaML('deriva.example.org', 'my_catalog')
         >>> ml.create_feature('my_table', 'new_feature')
-        >>> ml.add_term('vocabulary_table', 'new_term', 'Description of term')
+        >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')
     """
 
     def __init__(
@@ -536,8 +536,8 @@ class DerivaML(Dataset):
             >>> table_def = TableDefinition(
             ...     name="experiments",
             ...     column_definitions=[
-            ...         ColumnDefinition(name="name", type="text"),
-            ...         ColumnDefinition(name="date", type="date")
+            ...         ColumnDefinition(name="name", type=BuiltinTypes.text),
+            ...         ColumnDefinition(name="date", type=BuiltinTypes.date)
             ...     ]
             ... )
             >>> new_table = ml.create_table(table_def)
@@ -705,7 +705,7 @@ class DerivaML(Dataset):
                 ...     target_table="samples",
                 ...     feature_name="expression_level",
                 ...     terms=["expression_values"],
-                ...     metadata=[ColumnDefinition(name="confidence", type="float4")],
+                ...     metadata=[ColumnDefinition(name="confidence", type=BuiltinTypes.float4)],
                 ...     comment="Gene expression measurement"
                 ... )
         """
@@ -899,7 +899,7 @@ class DerivaML(Dataset):
                 ...     synonyms=["epithelium"]
                 ... )
 
-            Attempt to add existing term:
+            Attempt to add an existing term:
                 >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)
         """
         # Initialize empty synonyms list if None

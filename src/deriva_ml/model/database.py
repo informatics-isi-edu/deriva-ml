@@ -1,4 +1,4 @@
-"""Ths module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface between the BDBag representation
+"""This module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface between the BDBag representation
 of a dataset and a sqllite database in which the contents of the bag are stored.
 """
 

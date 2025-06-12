@@ -23,7 +23,7 @@ import os
 import platform
 import site
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 
 def get_execution_environment() -> Dict[str, Any]:
@@ -114,7 +114,7 @@ def get_platform_info() -> Dict[str, Any]:
         >>> print(f"OS: {info['system']} {info['release']}")
         >>> print(f"Architecture: {info['machine']}")
     """
-    attributes: List[str] = [
+    attributes: list[str] = [
         attr for attr in dir(platform) if (not attr.startswith("_")) and callable(getattr(platform, attr))
     ]
     platform_info: Dict[str, Any] = {}
@@ -238,7 +238,7 @@ def get_sys_info() -> Dict[str, Any]:
     return values
 
 
-def localeconv() -> List[str]:
+def localeconv() -> list[str]:
     """Gets locale convention information.
 
     Returns formatted strings containing locale-specific formatting information
@@ -252,7 +252,7 @@ def localeconv() -> List[str]:
         >>> for item in info:
         ...     print(item)  # e.g., "decimal_point: ."
     """
-    values: List[str] = []
+    values: list[str] = []
     for key, value in sorted(locale.localeconv().items()):
         if isinstance(value, bytes):
             value = value.decode("ascii", errors="replace")
@@ -262,7 +262,7 @@ def localeconv() -> List[str]:
     return values
 
 
-def locale_module() -> List[str]:
+def locale_module() -> list[str]:
     """Gets locale settings information.
 
     Returns formatted strings containing information about the current locale

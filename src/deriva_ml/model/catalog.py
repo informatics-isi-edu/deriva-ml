@@ -9,7 +9,7 @@ from __future__ import annotations
 
 # Standard library imports
 from collections import Counter
-from typing import Any, Iterable
+from typing import Any, Callable, Final, Iterable, NewType, TypeAlias
 
 from deriva.core.ermrest_catalog import ErmrestCatalog
 
@@ -29,6 +29,22 @@ from deriva_ml.core.definitions import (
 # Local imports
 from deriva_ml.feature import Feature
 
+# Define common types:
+TableInput: TypeAlias = str | Table
+SchemaDict: TypeAlias = dict[str, Schema]
+FeatureList: TypeAlias = Iterable[Feature]
+SchemaName = NewType("SchemaName", str)
+ColumnSet: TypeAlias = set[Column]
+AssociationResult: TypeAlias = FindAssociationResult
+TableSet: TypeAlias = set[Table]
+PathList: TypeAlias = list[list[Table]]
+
+# Define constants:
+VOCAB_COLUMNS: Final[set[str]] = {"NAME", "URI", "SYNONYMS", "DESCRIPTION", "ID"}
+ASSET_COLUMNS: Final[set[str]] = {"Filename", "URL", "Length", "MD5", "Description"}
+
+FilterPredicate = Callable[[Table], bool]
+
 
 class DerivaModel:
     """Augmented interface to deriva model class.
@@ -36,9 +52,8 @@ class DerivaModel:
     This class provides a number of DerivaML specific methods that augment the interface in the deriva model class.
 
     Attributes:
-        domain_schema: Schema name for domain specific tables and relationships.
+        domain_schema: Schema name for domain-specific tables and relationships.
         model: ERMRest model for the catalog.
-        schemas: ERMRest model for the catalog.
         catalog: ERMRest catalog for the model
         hostname: ERMRest catalog for the model
         ml_schema: The ML schema for the catalog.
@@ -77,7 +92,7 @@ class DerivaModel:
             else:
                 raise DerivaMLException(f"Ambiguous domain schema: {user_schemas}")
 
-    def refresh_model(self):
+    def refresh_model(self) -> None:
         self.model = self.catalog.getCatalogModel()
 
     @property
@@ -89,11 +104,11 @@ class DerivaModel:
         """Return the chaise configuration."""
         return self.model.chaise_config
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         # Called only if `name` is not found in Manager.  Delegate attributes to model class.
         return getattr(self.model, name)
 
-    def name_to_table(self, table: str | Table) -> Table:
+    def name_to_table(self, table: TableInput) -> Table:
         """Return the table object corresponding to the given table name.
 
         If the table name appears in more than one schema, return the first one you find.
@@ -111,7 +126,7 @@ class DerivaModel:
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
 
-    def is_vocabulary(self, table_name: str | Table) -> bool:
+    def is_vocabulary(self, table_name: TableInput) -> bool:
         """Check if a given table is a controlled vocabulary table.
 
         Args:
@@ -135,7 +150,7 @@ class DerivaModel:
         pure: bool = True,
         min_arity: int = 2,
         max_arity: int = 2,
-    ) -> bool | set | int:
+    ) -> bool | set[str] | int:
         """Check the specified table to see if it is an association table.
 
         Args:
@@ -170,7 +185,7 @@ class DerivaModel:
                 f"There are {len(tables)} association tables between {table1.name} and {table2.name}."
             )
 
-    def is_asset(self, table_name: str | Table) -> bool:
+    def is_asset(self, table_name: TableInput) -> bool:
         """True if the specified table is an asset table.
 
         Args:
@@ -193,7 +208,7 @@ class DerivaModel:
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def find_features(self, table: Table | str) -> Iterable[Feature]:
+    def find_features(self, table: TableInput) -> Iterable[Feature]:
         """List the names of the features in the specified table.
 
         Args:
@@ -206,15 +221,13 @@ class DerivaModel:
         table = self.name_to_table(table)
 
         def is_feature(a: FindAssociationResult) -> bool:
-            """
+            """Check if association represents a feature.
 
             Args:
-              a: FindAssociationResult:
-
+                a: Association result to check
             Returns:
-
+                bool: True if association represents a feature
             """
-            # return {'Feature_Name', 'Execution'}.issubset({c.name for c in a.table.columns})
             return {
                 "Feature_Name",
                 "Execution",
@@ -225,7 +238,7 @@ class DerivaModel:
             Feature(a, self) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
         ]
 
-    def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
+    def lookup_feature(self, table: TableInput, feature_name: str) -> Feature:
         """Lookup the named feature associated with the provided table.
 
         Args:
@@ -254,14 +267,18 @@ class DerivaModel:
             raise DerivaMLException(f"{table.name} is not an asset table.")
         return {c.name for c in table.columns} - DerivaAssetColumns
 
-    def apply(self):
+    def apply(self) -> None:
         """Call ERMRestModel.apply"""
         if self.catalog == "file-system":
             raise DerivaMLException("Cannot apply() to non-catalog model.")
         else:
             self.model.apply()
 
-    def _table_relationship(self, table1: Table | str, table2: Table | str) -> tuple[Column, Column]:
+    def _table_relationship(
+        self,
+        table1: TableInput,
+        table2: TableInput,
+    ) -> tuple[Column, Column]:
         """Return columns used to relate two tables."""
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)

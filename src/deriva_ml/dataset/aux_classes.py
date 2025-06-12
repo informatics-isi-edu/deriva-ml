@@ -3,10 +3,9 @@ THis module defines the DataSet class with is used to manipulate n
 """
 
 from enum import Enum
-from typing import Any, Optional, SupportsInt
+from typing import Any, Optional, SupportsInt, Annotated
 
 from pydantic import (
-    Annotated,
     BaseModel,
     ConfigDict,
     Field,
