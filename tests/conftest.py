@@ -9,16 +9,21 @@ from pathlib import Path
 import pytest
 
 from deriva_ml import DerivaML
-from deriva_ml.demo_catalog import create_demo_catalog, reset_demo_catalog
+from deriva_ml.demo_catalog import (
+    create_demo_catalog,
+    create_demo_datasets,
+    create_demo_features,
+    populate_demo_catalog,
+    reset_demo_catalog,
+)
 
 
 class MLCatalog:
     def __init__(self, hostname, tmpdir):
-        test_catalog = create_demo_catalog(hostname, populate=False, on_exit_delete=False)
+        test_catalog = create_demo_catalog(hostname, domain_schema="test-schema", populate=False, on_exit_delete=False)
         self.deriva_ml = DerivaML(
             hostname=hostname,
             catalog_id=test_catalog.catalog_id,
-            domain_schema="deriva-test",
             logging_level=logging.WARN,
             working_dir=tmpdir,
             use_minid=False,
@@ -57,6 +62,16 @@ def ml_catalog(test_host, shared_tmp_path):
 def test_ml_catalog(ml_catalog):
     """Create a demo ML instance for testing."""
     hostname = ml_catalog.deriva_ml.catalog.deriva_server.server
+    yield DerivaML(hostname, ml_catalog.deriva_ml.catalog_id, use_minid=False)
+    reset_demo_catalog(ml_catalog.deriva_ml)
+
+
+@pytest.fixture(scope="class")
+def test_ml_catalog_populated(ml_catalog):
+    hostname = ml_catalog.deriva_ml.catalog.deriva_server.server
+    populate_demo_catalog(ml_catalog.deriva_ml, ml_catalog.deriva_ml.domain_schema)
+    create_demo_features(ml_catalog.deriva_ml)
+    create_demo_datasets(ml_catalog.deriva_ml)
     yield DerivaML(hostname, ml_catalog.deriva_ml.catalog_id, use_minid=False)
     reset_demo_catalog(ml_catalog.deriva_ml)
 

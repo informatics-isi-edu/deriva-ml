@@ -57,10 +57,10 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
+from deriva_ml.core.constants import RID
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     ML_SCHEMA,
-    RID,
     DerivaMLException,
     MLVocab,
     Status,
@@ -77,6 +77,9 @@ from deriva_ml.model.catalog import DerivaModel
 from deriva_ml.model.database import DatabaseModel
 
 from .history import iso_to_snap
+
+# Stop pycharm from complaining about undefined reference in docstring....
+ml: DerivaML
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
@@ -331,7 +334,7 @@ class Dataset:
             for ds_rid in related_datasets
         ]
         self._insert_dataset_versions(version_update_list, description=description, execution_rid=execution_rid)
-        return [d.version for d in version_update_list if d.rid == dataset_rid][0]
+        return next((d.version for d in version_update_list if d.rid == dataset_rid))
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
@@ -449,7 +452,7 @@ class Dataset:
             filtered_path = dataset_path
         else:
             filtered_path = dataset_path.filter(
-                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)  # noqa: E712
+                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)  # noqa: E711, E712
             )
 
         # Get a list of all the dataset_type values associated with this dataset_table.
@@ -1062,8 +1065,8 @@ class Dataset:
         return dataset_minid
 
     def _download_dataset_minid(self, minid: DatasetMinid) -> Path:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and validate
-        that all the metadata is correct
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and
+        validate that all the metadata is correct
 
         Args:
             minid: The RID of a dataset_table or a minid to an existing bag.

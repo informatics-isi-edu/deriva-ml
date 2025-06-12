@@ -4,11 +4,9 @@ from pprint import pprint
 from deriva_ml import DatasetSpec
 
 
-class TestDownload(TestDerivaML):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def test_download(self):
+class TestDownload:
+    def test_download(self, ml_catalog):
+        ml_instance = ml_catalog.ml_instance
         double_nested_dataset, nested_datasets, datasets = self.create_nested_dataset()
         current_version = self.ml_instance.dataset_version(double_nested_dataset)
         subject_rid = self.ml_instance.list_dataset_members(datasets[0])["Subject"][0]["RID"]

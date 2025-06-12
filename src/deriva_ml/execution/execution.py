@@ -69,6 +69,11 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 
+# Keep pycharm from complaining about undefined references in docstrings.
+execution: Execution
+ml: DerivaML
+dataset_spec: DatasetSpec
+
 try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
@@ -690,6 +695,7 @@ class Execution:
             folder_path: Path to the folder to clean
         """
         import time
+
         MAX_RETRIES = 3
         RETRY_DELAY = 1  # seconds
 

@@ -6,10 +6,12 @@ from enum import Enum
 from typing import Any, Optional, SupportsInt
 
 from pydantic import (
+    Annotated,
     BaseModel,
     ConfigDict,
     Field,
     computed_field,
+    conlist,
     field_serializer,
     field_validator,
     model_validator,
@@ -137,7 +139,8 @@ class DatasetMinid(BaseModel):
     @computed_field
     @property
     def dataset_rid(self) -> str:
-        return self.version_rid.split("@")[0]
+        rid_parts = self.version_rid.split("@")
+        return rid_parts[0]
 
     @computed_field
     @property
@@ -154,7 +157,7 @@ class DatasetMinid(BaseModel):
 
     @field_validator("bag_url", mode="before")
     @classmethod
-    def convert_location_to_str(cls, value: list[str] | str) -> str:
+    def convert_location_to_str(cls, value: Annotated[list[str] | str]) -> str:
         return value[0] if isinstance(value, list) else value
 
     @field_validator("checksum", mode="before")
@@ -175,13 +178,13 @@ class DatasetSpec(BaseModel):
 
     Attributes:
         rid (RID): A dataset_table RID
-        materialize (bool): If False, do not materialize datasets, only download table data, no assets.  Defaults to True
+        materialize (bool): If False do not materialize datasets, only download table data, no assets.  Defaults to True
         version (DatasetVersion): The version of the dataset.  Should follow semantic versioning.
     """
 
     rid: RID
     materialize: bool = True
-    version: DatasetVersion
+    version: DatasetVersion | conlist(item_type=int, min_length=3, max_length=3) | tuple[int, int, int] | str
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -190,6 +193,10 @@ class DatasetSpec(BaseModel):
     def version_field_validator(cls, v: Any) -> Any:
         if isinstance(v, dict):
             return DatasetVersion(**v)
+        elif isinstance(v, str):
+            return DatasetVersion.parse(v)
+        elif (isinstance(v, list) or isinstance(v, tuple)) and len(v) == 3:
+            return DatasetVersion(int(v[0]), int(v[1]), int(v[2]))
         else:
             return v
 

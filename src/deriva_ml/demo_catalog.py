@@ -60,8 +60,8 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     ml_instance.add_dataset_element_type("Subject")
     ml_instance.add_dataset_element_type("Image")
 
-    type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-    training_rid = ml_instance.add_term("Dataset_Type", "Training", description="A training set")
+    type_rid = ml_instance.add_term("Dataset_Type", "Complete", synonyms=["Whole"], description="A test")
+    training_rid = ml_instance.add_term("Dataset_Type", "Training", synonyms=["Train"], description="A training set")
     testing_rid = ml_instance.add_term("Dataset_Type", "Testing", description="A testing set")
 
     table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
@@ -82,7 +82,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
         dataset_rids = []
         for r in subject_rids[0:4]:
             d = exe.create_dataset(
-                dataset_types=[type_rid.name, "Testing"],
+                dataset_types=["Testing"],
                 description=f"Dataset {r}",
                 version=DatasetVersion(1, 0, 0),
             )
@@ -92,7 +92,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
         nested_datasets = []
         for i in range(0, 4, 2):
             nested_dataset = exe.create_dataset(
-                dataset_types=[type_rid.name, "Training"],
+                dataset_types=["Training"],
                 description=f"Nested Dataset {i}",
                 version=DatasetVersion(1, 0, 0),
             )
@@ -244,7 +244,7 @@ def destroy_demo_catalog(catalog):
 
 def create_demo_catalog(
     hostname,
-    domain_schema="test-schema",
+    domain_schema="demo-schema",
     project_name="ml-test",
     populate=True,
     create_features=False,

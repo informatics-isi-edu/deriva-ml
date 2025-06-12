@@ -2,8 +2,8 @@
 Constants used throughout the DerivaML package.
 """
 
-from typing import Annotated, NewType  # noqa: I001
-from pydantic import Field
+from typing import NewType  # noqa: I001
+from pydantic import constr
 
 # Schema name
 ML_SCHEMA = "deriva-ml"
@@ -17,7 +17,8 @@ snapshot_part = r"(?:@(?P<snapshot>(?:[A-Z\d]{1,4}|[A-Z\d]{1,4}(?:-[A-Z\d]{4})+)
 rid_regex = f"^{rid_part}{snapshot_part}$"
 
 # RID type definition
-RID = NewType("RID", Annotated[str, Field(pattern=rid_regex)])
+BaseRIDString = constr(pattern=rid_regex)
+RID = NewType("RID", BaseRIDString)
 
 # System columns in Deriva
 DerivaSystemColumns = ["RID", "RCT", "RMT", "RCB", "RMB"]

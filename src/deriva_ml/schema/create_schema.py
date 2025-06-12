@@ -335,6 +335,8 @@ def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
             except DataPathException as e:  # FK constraint.
                 if "Resource not found" in e.message:
                     retry = False
+                elif "still referenced from table" in e.message:
+                    pass   # Foreign key constraint.
                 else:
                     raise e
 
