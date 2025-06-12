@@ -273,11 +273,11 @@ class Dataset:
             return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
 
     def _build_dataset_graph(self, dataset_rid: RID) -> Iterable[RID]:
-        ts = TopologicalSorter()
+        ts: TopologicalSorter[RID] = TopologicalSorter()
         self._build_dataset_graph_1(dataset_rid, ts, set())
         return ts.static_order()
 
-    def _build_dataset_graph_1(self, dataset_rid: RID, ts, visited) -> None:
+    def _build_dataset_graph_1(self, dataset_rid: RID, ts: TopologicalSorter[RID], visited) -> None:
         """Use topological sort to return bottom up list of nested datasets"""
         ts.add(dataset_rid)
         if dataset_rid not in visited:

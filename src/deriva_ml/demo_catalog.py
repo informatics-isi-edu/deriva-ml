@@ -1,7 +1,7 @@
 import atexit
 import itertools
 import logging
-from random import randint, random
+from random import choice, randint, random
 from tempfile import TemporaryDirectory
 from typing import Optional
 
@@ -159,7 +159,7 @@ def create_demo_features(ml_instance):
         SubjectWellnessFeature(
             Subject=subject_rid,
             Execution=feature_execution.execution_rid,
-            SubjectHealth=["Well", "Sick"][randint(0, 1)],
+            SubjectHealth=choice(["Well", "Sick"]),
             Scale=randint(1, 10),
         )
         for subject_rid in subject_rids
@@ -184,7 +184,7 @@ def create_demo_features(ml_instance):
     image_quality_feature_list = [
         ImageQualityFeature(
             Image=image_rid,
-            ImageQuality=["Good", "Bad"][randint(0, 1)],
+            ImageQuality=choice(["Good", "Bad"]),
         )
         for image_rid in image_rids
     ]
@@ -192,7 +192,7 @@ def create_demo_features(ml_instance):
     subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
-            SubjectHealth=["Well", "Sick"][randint(0, 1)],
+            SubjectHealth=choice(["Well", "Sick"]),
             Scale=randint(1, 10),
         )
         for subject_rid in subject_rids

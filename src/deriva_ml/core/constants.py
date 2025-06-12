@@ -2,7 +2,10 @@
 Constants used throughout the DerivaML package.
 """
 
-from typing import NewType  # noqa: I001
+from __future__ import annotations
+
+from typing import TypeVar
+
 from pydantic import constr
 
 # Schema name
@@ -18,7 +21,7 @@ rid_regex = f"^{rid_part}{snapshot_part}$"
 
 # RID type definition
 BaseRIDString = constr(pattern=rid_regex)
-RID = NewType("RID", BaseRIDString)
+RID = TypeVar("RID", bound=BaseRIDString)
 
 # System columns in Deriva
 DerivaSystemColumns = ["RID", "RCT", "RMT", "RCB", "RMB"]
