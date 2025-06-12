@@ -46,12 +46,13 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-  "pytest",
-  "pytest-cov",
+    "pytest",
+    "pytest-cov",
 ]
 
 dev = [
-  "ruff",
+    "ruff",
+    "icecream"
 ]
 
 [tool.setuptools.package-data]
