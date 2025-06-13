@@ -53,6 +53,7 @@ def shared_tmp_path(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def ml_catalog(test_host, shared_tmp_path):
+    """Create a demo ML instance for testing with schema, but no data.."""""
     resource = MLCatalog(test_host, shared_tmp_path)
     yield resource
     resource.cleanup()
@@ -60,7 +61,7 @@ def ml_catalog(test_host, shared_tmp_path):
 
 @pytest.fixture(scope="class")
 def test_ml_catalog(ml_catalog):
-    """Create a demo ML instance for testing."""
+    """Create a demo ML instance for testing.   Resets after each class."""""
     hostname = ml_catalog.deriva_ml.catalog.deriva_server.server
     yield DerivaML(hostname, ml_catalog.deriva_ml.catalog_id, use_minid=False)
     reset_demo_catalog(ml_catalog.deriva_ml)
@@ -68,6 +69,7 @@ def test_ml_catalog(ml_catalog):
 
 @pytest.fixture(scope="class")
 def test_ml_catalog_populated(ml_catalog):
+    """Create a demo ML instance for testing with populated domain schema.   Resets after each class."""""
     hostname = ml_catalog.deriva_ml.catalog.deriva_server.server
     populate_demo_catalog(ml_catalog.deriva_ml, ml_catalog.deriva_ml.domain_schema)
     create_demo_features(ml_catalog.deriva_ml)

@@ -61,10 +61,10 @@ from deriva_ml.core.constants import RID
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     ML_SCHEMA,
-    DerivaMLException,
     MLVocab,
     Status,
 )
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import (
     DatasetHistory,
     DatasetMinid,

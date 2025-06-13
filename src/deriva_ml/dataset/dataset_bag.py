@@ -21,7 +21,8 @@ from deriva.core.ermrest_model import Column, Table
 from pydantic import ConfigDict, validate_call
 
 # Local imports
-from deriva_ml.core.definitions import RID, DerivaMLException
+from deriva_ml.core.definitions import RID
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.feature import Feature
 
 if TYPE_CHECKING:

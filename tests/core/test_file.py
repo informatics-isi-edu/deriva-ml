@@ -1,5 +1,6 @@
+import shutil
 from pathlib import Path
-from random import randbytes, choice
+from random import choice, randbytes
 
 import pytest
 
@@ -8,13 +9,16 @@ from deriva_ml import ExecutionConfiguration, FileSpec, MLVocab
 
 class TestFile:
     @pytest.fixture(scope="class", autouse=True)
-    def test_file_table_setup(self, test_ml_catalog, test_files, tmp_path):
+    def test_file_table_setup(self, test_ml_catalog, shared_tmp_path):
         self.ml_instance = test_ml_catalog
-        self.workflow = self.ml_instance.create_workflow("Test Workflow")
+        self.ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow",
+                                  description="Workflow for testing files")
+        self.workflow = self.ml_instance.create_workflow(name="Test Workflow",
+                                                         workflow_type="File Test Workflow")
         self.execution = self.ml_instance.create_execution(
             ExecutionConfiguration(workflow=self.workflow, description="Test Execution")
         )
-        self.test_dir = Path(tmp_path) / "test_dir"
+        self.test_dir = Path(shared_tmp_path) / "test_dir"
         d1 = self.test_dir / "d1"
         d2 = self.test_dir / "d2"
         self.file_count = 0
@@ -25,9 +29,10 @@ class TestFile:
                     self.file_count += 1
         self.ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Test workflow")
         yield self.test_dir
+        shutil.rmtree(self.test_dir)
         # Cleanup
 
-    def test_file_table(self, test_ml_catalog):
+    def test_file_table(self):
         with self.execution.execute() as exe:
             filespecs = FileSpec.create_filespecs(self.test_dir, "Test Directory")
             files = list(exe.add_files(filespecs))
@@ -35,7 +40,7 @@ class TestFile:
             for r in files:
                 assert self.ml_instance.retrieve_rid(r)
 
-      def test_file_types(self, test_ml_catalog, test_files):
+    def test_file_types(self, test_ml_catalog, test_files):
             with self.execution.execute() as exe:
                 filespecs = FileSpec.create_filespecs(test_files, "Test Directory")
                 files = list(exe.add_files(filespecs))

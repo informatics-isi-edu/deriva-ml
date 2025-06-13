@@ -40,17 +40,18 @@ from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 from pydantic import ConfigDict, validate_call
 
+from deriva_ml.core.exceptions import DerivaMLInvalidTerm
 from deriva_ml.core.definitions import (
     ML_SCHEMA,
     RID,
     ColumnDefinition,
-    DerivaMLException,
     FileSpec,
     MLVocab,
     Status,
     TableDefinition,
     VocabularyTerm,
 )
+from deriva_ml.core.exceptions import DerivaMLTableTypeError, DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
@@ -79,8 +80,8 @@ ml: DerivaML
 class DerivaML(Dataset):
     """Core class for machine learning operations on a Deriva catalog.
 
-    This class provides core functionality for managing ML workflows, features, and datasets in a Deriva catalog. It handles
-    data versioning, feature management, vocabulary control, and execution tracking.
+    This class provides core functionality for managing ML workflows, features, and datasets in a Deriva catalog.
+    It handles data versioning, feature management, vocabulary control, and execution tracking.
 
     Attributes:
         host_name (str): Hostname of the Deriva server (e.g., 'deriva.example.org').
@@ -515,9 +516,13 @@ class DerivaML(Dataset):
         schema = schema or self.domain_schema
 
         # Create and return vocabulary table with RID-based URI pattern
-        return self.model.schemas[schema].create_table(
+        try:
+            vocab_table = self.model.schemas[schema].create_table(
             Table.define_vocabulary(vocab_name, f"{self.project_name}:{{RID}}", comment=comment)
-        )
+            )
+        except ValueError:
+            raise DerivaMLException(f"Table {vocab_name} already exist")
+        return vocab_table
 
     def create_table(self, table: TableDefinition) -> Table:
         """Creates a new table in the catalog.
@@ -912,7 +917,7 @@ class DerivaML(Dataset):
         table = self.model.name_to_table(table)
         pb = self.catalog.getPathBuilder()
         if not (self.model.is_vocabulary(table)):
-            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
+            raise DerivaMLTableTypeError("vocabulary", table.name)
 
         # Get schema and table names for path building
         schema_name = table.schema.name
@@ -938,7 +943,7 @@ class DerivaML(Dataset):
             # Term exists - look it up or raise an error
             term_id = self.lookup_term(table, term_name)
             if not exists_ok:
-                raise DerivaMLException(f"{term_name} already exists")
+                raise DerivaMLInvalidTerm(table.name,term_name, msg = "term already exists")
         return term_id
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -956,7 +961,7 @@ class DerivaML(Dataset):
             VocabularyTerm: The matching vocabulary term.
 
         Raises:
-            DerivaMLException: If the table is not a vocabulary table, or term is not found.
+            DerivaMLVocabularyException: If the table is not a vocabulary table, or term is not found.
 
         Examples:
             Look up by primary name:
@@ -981,7 +986,7 @@ class DerivaML(Dataset):
                 return VocabularyTerm.model_validate(term)
 
         # Term not found
-        raise DerivaMLException(f"Term {term_name} is not in vocabulary {table_name}")
+        raise DerivaMLInvalidTerm(table_name, term_name)
 
     def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
         """Lists all terms in a vocabulary table.
@@ -1345,7 +1350,8 @@ class DerivaML(Dataset):
         1. The datasets specified in the configuration are downloaded and placed in the cache-dir. If a version is
         not specified in the configuration, then a new minor version number is created for the dataset and downloaded.
 
-        2. If any execution assets are provided in the configuration, they are downloaded and placed in the working directory.
+        2. If any execution assets are provided in the configuration, they are downloaded
+        and placed in the working directory.
 
 
         Args:

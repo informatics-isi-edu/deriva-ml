@@ -41,7 +41,6 @@ from deriva_ml.core.base import DerivaML
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     RID,
-    DerivaMLException,
     ExecAssetType,
     ExecMetadataType,
     FileSpec,
@@ -50,6 +49,7 @@ from deriva_ml.core.definitions import (
     MLVocab,
     Status,
 )
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import (

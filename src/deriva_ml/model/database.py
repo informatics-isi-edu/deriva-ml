@@ -13,7 +13,8 @@ from urllib.parse import urlparse
 
 from deriva.core.ermrest_model import Model
 
-from deriva_ml.core.definitions import ML_SCHEMA, RID, DerivaMLException, MLVocab
+from deriva_ml.core.definitions import ML_SCHEMA, RID, MLVocab
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.model.catalog import DerivaModel

@@ -12,7 +12,8 @@ from pydantic import (
 )
 from requests import RequestException
 
-from deriva_ml.core.definitions import RID, DerivaMLException
+from deriva_ml.core.definitions import RID
+from deriva_ml.core.exceptions import DerivaMLException
 
 try:
     from IPython.core.getipython import get_ipython

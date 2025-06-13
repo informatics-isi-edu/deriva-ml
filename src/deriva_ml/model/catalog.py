@@ -22,9 +22,9 @@ from pydantic import ConfigDict, validate_call
 from deriva_ml.core.definitions import (
     ML_SCHEMA,
     DerivaAssetColumns,
-    DerivaMLException,
     TableDefinition,
 )
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
 # Local imports
 from deriva_ml.feature import Feature
@@ -264,7 +264,7 @@ class DerivaModel:
         table = self.name_to_table(table)
 
         if not self.is_asset(table):
-            raise DerivaMLException(f"{table.name} is not an asset table.")
+            raise DerivaMLTableTypeError("asset table", table.name)
         return {c.name for c in table.columns} - DerivaAssetColumns
 
     def apply(self) -> None:

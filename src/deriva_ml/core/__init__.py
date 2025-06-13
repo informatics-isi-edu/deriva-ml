@@ -3,7 +3,6 @@ from deriva_ml.core.definitions import (
     RID,
     BuiltinTypes,
     ColumnDefinition,
-    DerivaMLException,
     DerivaSystemColumns,
     ExecAssetType,
     FileSpec,
@@ -13,6 +12,7 @@ from deriva_ml.core.definitions import (
     TableDefinition,
     UploadState,
 )
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm, DerivaMLTableTypeError
 
 __all__ = [
     DerivaML,
@@ -20,6 +20,8 @@ __all__ = [
     BuiltinTypes,
     ColumnDefinition,
     DerivaMLException,
+    DerivaMLInvalidTerm,
+    DerivaMLTableTypeError,
     DerivaSystemColumns,
     ExecAssetType,
     FileSpec,

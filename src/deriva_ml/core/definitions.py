@@ -40,7 +40,6 @@ from deriva_ml.core.ermrest import (
 )
 
 # Re-export exceptions
-from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.filespec import FileSpec
 
 __all__ = [
@@ -70,6 +69,4 @@ __all__ = [
     "KeyDefinition",
     "ForeignKeyDefinition",
     "TableDefinition",
-    # Exceptions
-    "DerivaMLException",
 ]

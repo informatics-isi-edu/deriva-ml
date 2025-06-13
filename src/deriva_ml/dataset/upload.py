@@ -51,11 +51,11 @@ from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import (
     RID,
-    DerivaMLException,
     DerivaSystemColumns,
     FileUploadState,
     UploadState,
 )
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.model.catalog import DerivaModel
 
 try:
