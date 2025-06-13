@@ -4,7 +4,7 @@ Constants used throughout the DerivaML package.
 
 from __future__ import annotations
 
-from typing import TypeAlias
+from typing import NewType, TypeAlias
 
 from pydantic import constr
 
@@ -22,8 +22,8 @@ rid_regex = f"^{rid_part}{snapshot_part}$"
 # RID type definition
 BaseRIDString = constr(pattern=rid_regex)
 # RID = TypeVar("RID", bound=BaseRIDString)
-RID: TypeAlias = constr(pattern=rid_regex)
-
+RIDType: TypeAlias = constr(pattern=rid_regex)
+RID = NewType("RID", BaseRIDString)
 
 # System columns in Deriva
 DerivaSystemColumns = ["RID", "RCT", "RMT", "RCB", "RMB"]
