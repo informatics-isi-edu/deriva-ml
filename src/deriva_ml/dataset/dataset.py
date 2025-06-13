@@ -15,8 +15,8 @@ DerivaML class instances.
 Typical usage example:
     >>> ml = DerivaML('deriva.example.org', 'my_catalog')
     >>> dataset_rid = ml.create_dataset('experiment', 'Experimental data')
-    >>> ml.add_dataset_members(dataset_rid, ['1-abc123', '1-def456'])
-    >>> ml.increment_dataset_version(dataset_rid, 'minor', 'Added new samples')
+    >>> ml.add_dataset_members(dataset_rid=dataset_rid, members=['1-abc123', '1-def456'])
+    >>> ml.increment_dataset_version(datset_rid=dataset_rid, component=VersionPart.minor, description='Added new samples')
 """
 
 from __future__ import annotations
@@ -429,7 +429,7 @@ class Dataset:
         pb = self._model.catalog.getPathBuilder()
         dataset_path = pb.schemas[self.dataset_table.schema.name].tables[self.dataset_table.name]
 
-        rid_list = [dataset_rid] + (self.list_dataset_children(dataset_rid) if recurse else [])
+        rid_list = [dataset_rid] + (self.list_dataset_children(dataset_rid=dataset_rid) if recurse else [])
         dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
 
     def find_datasets(self, deleted: bool = False) -> Iterable[dict[str, Any]]:
@@ -879,7 +879,7 @@ class Dataset:
                     "Dataset": dataset_rid,
                     "Nested_Dataset": c,
                 }  # Make uniform with return from datapath
-                for c in self.list_dataset_children(dataset_rid)
+                for c in self.list_dataset_children(dataset_rid=dataset_rid)
             ]
             if dataset_rid
             else pb.entities().fetch()
