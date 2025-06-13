@@ -3,7 +3,7 @@ THis module defines the DataSet class with is used to manipulate n
 """
 
 from enum import Enum
-from typing import Any, Optional, SupportsInt, Annotated
+from typing import Any, Optional, SupportsInt
 
 from pydantic import (
     BaseModel,
@@ -156,7 +156,7 @@ class DatasetMinid(BaseModel):
 
     @field_validator("bag_url", mode="before")
     @classmethod
-    def convert_location_to_str(cls, value: Annotated[list[str] | str]) -> str:
+    def convert_location_to_str(cls, value: list[str] | str) -> str:
         return value[0] if isinstance(value, list) else value
 
     @field_validator("checksum", mode="before")

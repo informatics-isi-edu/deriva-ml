@@ -72,7 +72,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
 
-# Stop pycharm from complaining  about undefined references.
+# Stop pycharm from complaining about undefined references.
 ml: DerivaML
 
 
@@ -116,7 +116,7 @@ class DerivaML(Dataset):
     ):
         """Initializes a DerivaML instance.
 
-        This method will connect to a catalog, and initialize local configuration for the ML execution.
+        This method will connect to a catalog and initialize local configuration for the ML execution.
         This class is intended to be used as a base class on which domain-specific interfaces are built.
 
         Args:
@@ -154,7 +154,7 @@ class DerivaML(Dataset):
         self.cache_dir = Path(cache_dir) if cache_dir else self.working_dir / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize dataset functionality from parent class
+        # Initialize dataset functionality from the parent class
         super().__init__(self.model, self.cache_dir, self.working_dir, use_minid=use_minid)
 
         # Set up logging
@@ -205,9 +205,9 @@ class DerivaML(Dataset):
 
         Example:
             >>> config = DerivaML._get_session_config()
-            >>> print(config['retry_read'])  # 8
+            >>> print(config['retry_read']) # 8
         """
-        # Start with default configuration
+        # Start with a default configuration
         session_config = DEFAULT_SESSION_CONFIG.copy()
 
         # Customize retry behavior for robustness
@@ -256,7 +256,7 @@ class DerivaML(Dataset):
         return self.pathBuilder.schemas[self.domain_schema]
 
     def table_path(self, table: str | Table) -> Path:
-        """Returns local filesystem path for table CSV files.
+        """Returns a local filesystem path for table CSV files.
 
         Generates a standardized path where CSV files should be placed when preparing to upload data to a table.
         The path follows the project's directory structure conventions.
@@ -269,7 +269,7 @@ class DerivaML(Dataset):
 
         Example:
             >>> path = ml.table_path("experiment_results")
-            >>> df.to_csv(path)  # Save data for upload
+            >>> df.to_csv(path) # Save data for upload
         """
         return table_path(
             self.working_dir,
@@ -278,7 +278,7 @@ class DerivaML(Dataset):
         )
 
     def download_dir(self, cached: bool = False) -> Path:
-        """Returns appropriate download directory.
+        """Returns the appropriate download directory.
 
         Provides the appropriate directory path for storing downloaded files, either in the cache or working directory.
 
@@ -300,7 +300,7 @@ class DerivaML(Dataset):
         """Authenticates with Globus for accessing Deriva services.
 
         Performs authentication using Globus Auth to access Deriva services. If already logged in, notifies the user.
-        Uses non-interactive authentication flow without browser or local server.
+        Uses non-interactive authentication flow without a browser or local server.
 
         Args:
             host: The hostname of the Deriva server to authenticate with (e.g., 'deriva.example.org').
@@ -345,7 +345,7 @@ class DerivaML(Dataset):
             Using RID:
                 >>> ml.chaise_url("1-abc123")
         """
-        # Get table object and build base URI
+        # Get the table object and build base URI
         table_obj = self.model.name_to_table(table)
         try:
             uri = self.catalog.get_server_uri().replace("ermrest/catalog/", "chaise/recordset/#")
@@ -367,7 +367,7 @@ class DerivaML(Dataset):
             str: Permanent citation URL in format: https://{host}/id/{catalog}/{rid}@{snapshot_time}
 
         Raises:
-            DerivaMLException: If entity doesn't exist or lacks a RID.
+            DerivaMLException: If an entity doesn't exist or lacks a RID.
 
         Examples:
             Using a RID string:
@@ -402,12 +402,13 @@ class DerivaML(Dataset):
                 - 'ID': User identifier
                 - 'Full_Name': User's full name
 
-        Example:
+        Examples:
+
             >>> users = ml.user_list()
             >>> for user in users:
             ...     print(f"{user['Full_Name']} ({user['ID']})")
         """
-        # Get user table path and fetch basic user info
+        # Get the user table path and fetch basic user info
         user_path = self.pathBuilder.public.ERMrest_Client.path
         return [{"ID": u["ID"], "Full_Name": u["Full_Name"]} for u in user_path.entities().fetch()]
 
@@ -459,7 +460,7 @@ class DerivaML(Dataset):
             >>> record = ml.retrieve_rid("1-abc123")
             >>> print(f"Name: {record['name']}, Created: {record['creation_date']}")
         """
-        # Resolve RID and fetch first (only) matching record
+        # Resolve RID and fetch the first (only) matching record
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
 
     def add_page(self, title: str, content: str) -> None:
@@ -470,10 +471,10 @@ class DerivaML(Dataset):
 
         Args:
             title: The title of the page to be displayed in navigation and headers.
-            content: The main content of the page, can include HTML markup.
+            content: The main content of the page can include HTML markup.
 
         Raises:
-            DerivaMLException: If the page creation fails or user lacks necessary permissions.
+            DerivaMLException: If the page creation fails or the user lacks necessary permissions.
 
         Example:
             >>> ml.add_page(
@@ -503,6 +504,7 @@ class DerivaML(Dataset):
 
         Examples:
             Create a vocabulary for tissue types:
+
                 >>> table = ml.create_vocabulary(
                 ...     vocab_name="tissue_types",
                 ...     comment="Standard tissue classifications",
@@ -533,6 +535,7 @@ class DerivaML(Dataset):
             DerivaMLException: If table creation fails or the definition is invalid.
 
         Example:
+
             >>> table_def = TableDefinition(
             ...     name="experiments",
             ...     column_definitions=[
@@ -574,7 +577,7 @@ class DerivaML(Dataset):
         referenced_tables = referenced_tables or []
         schema = schema or self.domain_schema
 
-        # Add asset type to vocabulary
+        # Add an asset type to vocabulary
         self.add_term(MLVocab.asset_type, asset_name, description=f"A {asset_name} asset")
 
         # Create the main asset table
@@ -588,7 +591,7 @@ class DerivaML(Dataset):
             )
         )
 
-        # Create association table between asset and asset type
+        # Create an association table between asset and asset type
         self.model.schemas[self.domain_schema].create_table(
             Table.define_association(
                 [
@@ -602,7 +605,7 @@ class DerivaML(Dataset):
         for t in referenced_tables:
             asset_table.create_reference(self.model.name_to_table(t))
 
-        # Create association table for tracking execution
+        # Create an association table for tracking execution
         atable = self.model.schemas[self.domain_schema].create_table(
             Table.define_association(
                 [
@@ -653,7 +656,7 @@ class DerivaML(Dataset):
         asset_type_table = self._model.find_association(asset_table, MLVocab.asset_type)
         type_path = pb.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
 
-        # Build list of assets with their types
+        # Build a list of assets with their types
         assets = []
         for asset in asset_path.entities().fetch():
             # Get associated asset types for each asset
@@ -689,7 +692,7 @@ class DerivaML(Dataset):
             feature_name: Unique name for the feature within the target table.
             terms: Optional vocabulary tables/names whose terms can be used as feature values.
             assets: Optional asset tables/names that can be referenced by this feature.
-            metadata: Optional columns, tables, or keys to include in feature definition.
+            metadata: Optional columns, tables, or keys to include in a feature definition.
             optional: Column names that are not required when creating feature instances.
             comment: Description of the feature's purpose and usage.
 
@@ -697,7 +700,7 @@ class DerivaML(Dataset):
             type[FeatureRecord]: Feature class for creating validated instances.
 
         Raises:
-            DerivaMLException: If feature definition is invalid or conflicts with existing features.
+            DerivaMLException: If a feature definition is invalid or conflicts with existing features.
 
         Examples:
             Create a feature with confidence score:
@@ -739,7 +742,7 @@ class DerivaML(Dataset):
         feature_name_term = self.add_term("Feature_Name", feature_name, description=comment)
         atable_name = f"Execution_{target_table.name}_{feature_name_term.name}"
 
-        # Create association table implementing the feature
+        # Create an association table implementing the feature
         atable = self.model.schemas[self.domain_schema].create_table(
             target_table.define_association(
                 table_name=atable_name,
@@ -777,7 +780,7 @@ class DerivaML(Dataset):
             >>> ExpressionFeature = ml.feature_record_class("samples", "expression_level")
             >>> feature = ExpressionFeature(value="high", confidence=0.95)
         """
-        # Look up feature and return its record class
+        # Look up a feature and return its record class
         return self.lookup_feature(table, feature_name).feature_record_class()
 
     def delete_feature(self, table: Table | str, feature_name: str) -> bool:
@@ -803,7 +806,7 @@ class DerivaML(Dataset):
         # Get table reference and find feature
         table = self.model.name_to_table(table)
         try:
-            # Find and delete feature's implementation table
+            # Find and delete the feature's implementation table
             feature = next(f for f in self.model.find_features(table) if f.feature_name == feature_name)
             feature.feature_table.drop()
             return True
@@ -875,23 +878,23 @@ class DerivaML(Dataset):
         """Adds a term to a vocabulary table.
 
         Creates a new standardized term with description and optional synonyms in a vocabulary table.
-        Can either create a new term or return existing one if it already exists.
+        Can either create a new term or return an existing one if it already exists.
 
         Args:
             table: Vocabulary table to add term to (name or Table object).
             term_name: Primary name of the term (must be unique within vocabulary).
             description: Explanation of term's meaning and usage.
             synonyms: Alternative names for the term.
-            exists_ok: If True, return existing term if found. If False, raise error.
+            exists_ok: If True, return the existing term if found. If False, raise error.
 
         Returns:
             VocabularyTerm: Object representing the created or existing term.
 
         Raises:
-            DerivaMLException: If term exists and exists_ok=False, or if table is not a vocabulary table.
+            DerivaMLException: If a term exists and exists_ok=False, or if the table is not a vocabulary table.
 
         Examples:
-            Add new tissue type:
+            Add a new tissue type:
                 >>> term = ml.add_term(
                 ...     table="tissue_types",
                 ...     term_name="epithelial",
@@ -902,10 +905,10 @@ class DerivaML(Dataset):
             Attempt to add an existing term:
                 >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)
         """
-        # Initialize empty synonyms list if None
+        # Initialize an empty synonyms list if None
         synonyms = synonyms or []
 
-        # Get table reference and validate it's a vocabulary
+        # Get table reference and validate if it is a vocabulary table
         table = self.model.name_to_table(table)
         pb = self.catalog.getPathBuilder()
         if not (self.model.is_vocabulary(table)):
@@ -916,7 +919,7 @@ class DerivaML(Dataset):
         table_name = table.name
 
         try:
-            # Attempt to insert new term
+            # Attempt to insert a new term
             term_id = VocabularyTerm.model_validate(
                 pb.schemas[schema_name]
                 .tables[table_name]
@@ -932,7 +935,7 @@ class DerivaML(Dataset):
                 )[0]
             )
         except DataPathException:
-            # Term exists - look it up or raise error
+            # Term exists - look it up or raise an error
             term_id = self.lookup_term(table, term_name)
             if not exists_ok:
                 raise DerivaMLException(f"{term_name} already exists")
@@ -953,7 +956,7 @@ class DerivaML(Dataset):
             VocabularyTerm: The matching vocabulary term.
 
         Raises:
-            DerivaMLException: If table is not a vocabulary table or term is not found.
+            DerivaMLException: If the table is not a vocabulary table, or term is not found.
 
         Examples:
             Look up by primary name:
@@ -1005,7 +1008,7 @@ class DerivaML(Dataset):
         pb = self.catalog.getPathBuilder()
         table = self.model.name_to_table(table)
 
-        # Validate table is a vocabulary
+        # Validate table is a vocabulary table
         if not (self.model.is_vocabulary(table)):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
@@ -1037,7 +1040,7 @@ class DerivaML(Dataset):
         Examples:
             Download with default options:
                 >>> spec = DatasetSpec(rid="1-abc123")
-                >>> bag = ml.download_dataset_bag(spec)
+                >>> bag = ml.download_dataset_bag(dataset=spec)
                 >>> print(f"Downloaded to {bag.path}")
 
             Download with execution tracking:
@@ -1101,7 +1104,7 @@ class DerivaML(Dataset):
             DerivaMLException: If file_types are invalid or execution_rid is not an execution record.
 
         Examples:
-            Add single file type:
+            Add a single file type:
                 >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]
                 >>> rids = ml.add_files(files, file_types="text")
 
@@ -1196,7 +1199,7 @@ class DerivaML(Dataset):
     def list_workflows(self) -> list[Workflow]:
         """Lists all workflows in the catalog.
 
-        Retrieves all workflow definitions including their names, URLs, types, versions,
+        Retrieves all workflow definitions, including their names, URLs, types, versions,
         and descriptions.
 
         Returns:
@@ -1215,7 +1218,7 @@ class DerivaML(Dataset):
                     print(f"{w.name} (v{w.version}): {w.description}")
                     print(f"  Source: {w.url}")
         """
-        # Get workflow table path and fetch all workflows
+        # Get a workflow table path and fetch all workflows
         workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
         return [
             Workflow(
@@ -1255,14 +1258,14 @@ class DerivaML(Dataset):
             ... )
             >>> workflow_rid = ml.add_workflow(workflow)
         """
-        # Check if workflow already exists by URL
+        # Check if a workflow already exists by URL
         if workflow_rid := self.lookup_workflow(workflow.url):
             return workflow_rid
 
-        # Get ML schema path for workflow table
+        # Get an ML schema path for the workflow table
         ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
         try:
-            # Create workflow record
+            # Create a workflow record
             workflow_record = {
                 "URL": workflow.url,
                 "Name": workflow.name,
@@ -1271,7 +1274,7 @@ class DerivaML(Dataset):
                 "Version": workflow.version,
                 MLVocab.workflow_type: self.lookup_term(MLVocab.workflow_type, workflow.workflow_type).name,
             }
-            # Insert workflow and get its RID
+            # Insert a workflow and get its RID
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]["RID"]
         except Exception as e:
             error = format_exception(e)
@@ -1292,7 +1295,7 @@ class DerivaML(Dataset):
             >>> if rid:
             ...     print(f"Found workflow: {rid}")
         """
-        # Get workflow table path
+        # Get a workflow table path
         workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
         try:
             # Search for workflow by URL
@@ -1330,7 +1333,7 @@ class DerivaML(Dataset):
         # Validate workflow type exists in vocabulary
         self.lookup_term(MLVocab.workflow_type, workflow_type)
 
-        # Create and return new workflow object
+        # Create and return a new workflow object
         return Workflow.create_workflow(name, workflow_type, description)
 
     def create_execution(self, configuration: ExecutionConfiguration, dry_run: bool = False) -> "Execution":
@@ -1355,7 +1358,7 @@ class DerivaML(Dataset):
         # Import here to avoid circular dependency
         from deriva_ml.execution.execution import Execution
 
-        # Create and store execution instance
+        # Create and store an execution instance
         self._execution = Execution(configuration, self, dry_run=dry_run)
         return self._execution
 
@@ -1392,7 +1395,7 @@ class DerivaML(Dataset):
                 raise DerivaMLException(f"Multiple execution RIDs were found {e_rids}.")
             execution_rid = e_rids[0]
 
-        # Try to load configuration from file
+        # Try to load configuration from a file
         cfile = asset_file_path(
             prefix=self.working_dir,
             exec_rid=execution_rid,
@@ -1401,7 +1404,7 @@ class DerivaML(Dataset):
             metadata={},
         )
 
-        # Load configuration from file or create from execution record
+        # Load configuration from a file or create from an execution record
         if cfile.exists():
             configuration = ExecutionConfiguration.load_configuration(cfile)
         else:
@@ -1411,5 +1414,5 @@ class DerivaML(Dataset):
                 description=execution["Description"],
             )
 
-        # Create and return execution instance
+        # Create and return an execution instance
         return Execution(configuration, self, reload=execution_rid)
