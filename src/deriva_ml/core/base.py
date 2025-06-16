@@ -1202,7 +1202,7 @@ class DerivaML(Dataset):
 
         return dataset
 
-    def list_files(self, file_types: Iterable[str] | None = None) -> list[dict[str, Any]]:
+    def list_files(self, file_types: list[str] | None = None) -> list[dict[str, Any]]:
         """Lists files in the catalog with their metadata.
 
         Returns a list of files with their metadata including URL, MD5 hash, length, description,
@@ -1231,7 +1231,7 @@ class DerivaML(Dataset):
         """
         ml_path = self.pathBuilder.schemas[self._ml_schema]
         file_path = ml_path.File
-        type_path = ml_path.File_File_Type
+        type_path = ml_path.Asset_Type
 
         path = file_path.link(type_path, on=file_path.RID == type_path.File, join_type="left")
         path = path.File.attributes(

@@ -93,3 +93,20 @@ class TestFile:
             for subdir in ml_instance.list_dataset_children(file_dataset):
                 ds = ml_instance.list_dataset_members(subdir)
                 assert len(ds["File"]) == 5
+
+    def test_list_files(self, test_file_table_setup):
+        ml_instance = test_file_table_setup.ml_instance
+        test_dir = test_file_table_setup.test_dir
+        execution = test_file_table_setup.execution
+
+        def use_extension(filename: Path) -> [str]:
+            return [filename.suffix.lstrip(".")]
+
+        ml_instance.add_term(MLVocab.asset_type, "jpeg", description="A Image file")
+        ml_instance.add_term(MLVocab.asset_type, "txt", description="A Text file")
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
+            file_dataset = exe.add_files(filespecs)
+
+        files = ml_instance.list_files()
+        assert len(files) == 15
