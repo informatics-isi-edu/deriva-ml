@@ -1,4 +1,5 @@
 import argparse
+import json
 import subprocess
 import sys
 from importlib.resources import files
@@ -17,7 +18,7 @@ from deriva.core.ermrest_model import (
 )
 from requests.exceptions import HTTPError
 
-from deriva_ml.core.definitions import ML_SCHEMA, MLVocab
+from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
 from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
 
@@ -27,10 +28,10 @@ def create_dataset_table(
     project_name: str,
     dataset_annotation: Optional[dict] = None,
     version_annotation: Optional[dict] = None,
-):
+) -> Table:
     dataset_table = schema.create_table(
         Table.define(
-            tname="Dataset",
+            tname=MLTable.dataset,
             column_defs=[
                 Column.define("Description", builtin_types.markdown),
                 Column.define("Deleted", builtin_types.boolean),
@@ -40,6 +41,7 @@ def create_dataset_table(
     )
 
     dataset_type = schema.create_table(Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}"))
+
     schema.create_table(
         Table.define_association(
             associates=[
@@ -59,11 +61,12 @@ def create_dataset_table(
     schema.create_table(
         Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
     )
+    return dataset_table
 
 
 def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
     return Table.define(
-        tname="Dataset_Version",
+        tname=MLTable.dataset_version,
         column_defs=[
             Column.define(
                 "Version",
@@ -94,7 +97,7 @@ def create_execution_table(schema, annotation: Optional[dict] = None):
     annotation = annotation if annotation is not None else {}
     execution = schema.create_table(
         Table.define(
-            "Execution",
+            MLTable.execution,
             column_defs=[
                 Column.define("Workflow", builtin_types.text),
                 Column.define("Description", builtin_types.markdown),
@@ -115,6 +118,7 @@ def create_asset_table(
     execution_table,
     asset_type_table,
     asset_role_table,
+    use_hatrac: bool = True,
 ):
     asset_table = schema.create_table(
         Table.define_asset(
@@ -145,41 +149,11 @@ def create_asset_table(
     return asset_table
 
 
-def create_file_table(
-    schema: Schema,
-    execution_table: Table,
-    project_name: str,
-    annotation: Optional[dict] = None,
-):
-    """Define files table structure"""
-    annotation = annotation or {}
-    file_table = schema.create_table(Table.define_asset(sname=schema.name, tname="File"))
-
-    file_type = schema.create_table(Table.define_vocabulary(MLVocab.file_type, f"{project_name}:{{RID}}"))
-
-    schema.create_table(
-        Table.define_association(
-            associates=[
-                ("File", file_table),
-                (MLVocab.file_type, file_type),
-            ]
-        )
-    )
-    schema.create_table(
-        Table.define_association(
-            [
-                ("File", file_table),
-                ("Execution", execution_table),
-            ]
-        )
-    )
-
-
 def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] = None):
     annotations = annotations or {}
     workflow_table = schema.create_table(
         Table.define(
-            "Workflow",
+            MLTable.workflow,
             column_defs=[
                 Column.define("Name", builtin_types.text),
                 Column.define("Description", builtin_types.markdown),
@@ -222,13 +196,13 @@ def create_ml_schema(
 
     # Create workflow and execution table.
 
-    schema.create_table(Table.define_vocabulary("Feature_Name", f"{project_name}:{{RID}}"))
-    asset_type_table = schema.create_table(Table.define_vocabulary("Asset_Type", f"{project_name}:{{RID}}"))
-    asset_role_table = schema.create_table(Table.define_vocabulary("Asset_Role", f"{project_name}:{{RID}}"))
+    schema.create_table(Table.define_vocabulary(MLVocab.feature_name, f"{project_name}:{{RID}}"))
+    asset_type_table = schema.create_table(Table.define_vocabulary(MLVocab.asset_type, f"{project_name}:{{RID}}"))
+    asset_role_table = schema.create_table(Table.define_vocabulary(MLVocab.asset_role, f"{project_name}:{{RID}}"))
 
     create_workflow_table(schema, annotations["workflow_annotation"])
     execution_table = create_execution_table(schema, annotations["execution_annotation"])
-    create_dataset_table(
+    dataset_table = create_dataset_table(
         schema,
         execution_table,
         project_name,
@@ -238,7 +212,7 @@ def create_ml_schema(
 
     create_asset_table(
         schema,
-        "Execution_Metadata",
+        MLTable.execution_metadata,
         execution_table,
         asset_type_table,
         asset_role_table,
@@ -246,21 +220,37 @@ def create_ml_schema(
 
     create_asset_table(
         schema,
-        "Execution_Asset",
+        MLTable.execution_asset,
         execution_table,
         asset_type_table,
         asset_role_table,
     )
 
     # File table
-    create_file_table(schema, execution_table, project_name)
+    file_table = create_asset_table(
+        schema,
+        MLTable.file,
+        execution_table,
+        asset_type_table,
+        asset_role_table,
+        use_hatrac=False,
+    )
+    # And make Files be part of a dataset.
+    schema.create_table(
+        Table.define_association(
+            associates=[
+                ("Dataset", dataset_table),
+                (MLTable.file, file_table),
+            ]
+        )
+    )
 
     initialize_ml_schema(model, schema_name)
 
 
 def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     catalog = model.catalog
-    asset_type = catalog.getPathBuilder().schemas[schema_name].tables["Asset_Type"]
+    asset_type = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.asset_type]
     asset_type.insert(
         [
             {
@@ -279,15 +269,21 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
                 "Name": "Execution_Asset",
                 "Description": "A file generated by an execution",
             },
+            {"Name": "File", "Description": "A file that is not managed by Hatrac"},
         ],
         defaults={"ID", "URI"},
     )
-    asset_role = catalog.getPathBuilder().schemas[schema_name].tables["Asset_Role"]
+    asset_role = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.asset_role]
     asset_role.insert(
         [
             {"Name": "Input", "Description": "Asset used for input of an execution."},
             {"Name": "Output", "Description": "Asset used for output of an execution."},
         ],
+        defaults={"ID", "URI"},
+    )
+    dataset_type = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.dataset_type]
+    dataset_type.insert(
+        [{"Name": "File", "Description": "A dataset that contains file assets."}],
         defaults={"ID", "URI"},
     )
 
@@ -310,6 +306,14 @@ def create_ml_catalog(hostname: str, project_name: str) -> ErmrestCatalog:
     )
     create_ml_schema(catalog, project_name=project_name)
     return catalog
+
+
+def dump_ml_catalog_schema(hostname: str, catalog_id: str | int, filename: str) -> None:
+    """Dump the schema of the ML catalog to stdout."""
+    catalog = ErmrestCatalog("https", hostname, catalog_id=catalog_id, credentials=get_credential(hostname))
+    model = catalog.getCatalogModel()
+    with open(filename, "w") as f:
+        json.dump(model.prejson(), f, indent=2)
 
 
 def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
@@ -336,7 +340,7 @@ def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
                 if "Resource not found" in e.message:
                     retry = False
                 elif "still referenced from table" in e.message:
-                    pass   # Foreign key constraint.
+                    pass  # Foreign key constraint.
                 else:
                     raise e
 

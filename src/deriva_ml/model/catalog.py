@@ -121,7 +121,9 @@ class DerivaModel:
         """
         if isinstance(table, Table):
             return table
-        for s in self.model.schemas.values():
+        if table in (s := self.model.schemas[self.domain_schema].tables):
+            return s[table]
+        for s in [self.model.schemas[sname] for sname in [self.domain_schema, self.ml_schema, "WWW"]]:
             if table in s.tables.keys():
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
@@ -176,6 +178,7 @@ class DerivaModel:
         table2 = self.name_to_table(table2)
 
         tables = [a.table for a in table1.find_associations(pure=False) if a.other_fkeys.pop().pk_table == table2]
+
         if len(tables) == 1:
             return tables[0]
         elif len(tables) == 0:

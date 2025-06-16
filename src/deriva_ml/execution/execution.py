@@ -1050,13 +1050,42 @@ class Execution:
     def add_files(
         self,
         files: Iterable[FileSpec],
-        file_types: str | list[str],
-    ) -> Iterable[RID]:
-        """Add files to the file table"""
+        dataset_types: str | list[str] | None = None,
+        description: str = "",
+    ) -> RID:
+        """Adds files to the catalog with their metadata.
+
+        Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
+        specified file types.
+
+        Args:
+            files: File specifications containing MD5 checksum, length, and URL.
+            dataset_types: One or more dataset type terms from File_Type vocabulary.
+            description: Description of the files.
+
+        Returns:
+            RID: Dataset RID that identifes newly added files. Will be nested to mirror origioanl directory structure
+            of the files.
+
+        Raises:
+            DerivaMLInvalidTerm: If file_types are invalid or execution_rid is not an execution record.
+
+        Examples:
+            Add a single file type:
+                >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]
+                >>> rids = exe.add_files(files, file_types="text")
+
+            Add multiple file types:
+                >>> rids = exe.add_files(
+                ...     files=[FileSpec(url="image.png", md5="def456", length=2000)],
+                ...     file_types=["image", "png"],
+                ... )
+        """
         return self._ml_object.add_files(
             files=files,
-            file_types=file_types,
+            dataset_types=dataset_types,
             execution_rid=self.execution_rid,
+            description=description,
         )
 
     def __str__(self):

@@ -14,12 +14,14 @@ Typical usage example:
 from __future__ import annotations  # noqa: I001
 
 # Standard library imports
+from collections import defaultdict
 import getpass
 import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, cast, TYPE_CHECKING
+from urllib.parse import urlsplit
 
 import deriva.core.datapath as datapath
 
@@ -47,6 +49,7 @@ from deriva_ml.core.definitions import (
     ColumnDefinition,
     FileSpec,
     MLVocab,
+    MLTable,
     Status,
     TableDefinition,
     VocabularyTerm,
@@ -518,7 +521,7 @@ class DerivaML(Dataset):
         # Create and return vocabulary table with RID-based URI pattern
         try:
             vocab_table = self.model.schemas[schema].create_table(
-            Table.define_vocabulary(vocab_name, f"{self.project_name}:{{RID}}", comment=comment)
+                Table.define_vocabulary(vocab_name, f"{self.project_name}:{{RID}}", comment=comment)
             )
         except ValueError:
             raise DerivaMLException(f"Table {vocab_name} already exist")
@@ -943,7 +946,7 @@ class DerivaML(Dataset):
             # Term exists - look it up or raise an error
             term_id = self.lookup_term(table, term_name)
             if not exists_ok:
-                raise DerivaMLInvalidTerm(table.name,term_name, msg = "term already exists")
+                raise DerivaMLInvalidTerm(table.name, term_name, msg="term already exists")
         return term_id
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -1011,7 +1014,7 @@ class DerivaML(Dataset):
         """
         # Get path builder and table reference
         pb = self.catalog.getPathBuilder()
-        table = self.model.name_to_table(table)
+        table = self.model.name_to_table(table.value if isinstance(table, MLVocab) else table)
 
         # Validate table is a vocabulary table
         if not (self.model.is_vocabulary(table)):
@@ -1089,9 +1092,10 @@ class DerivaML(Dataset):
     def add_files(
         self,
         files: Iterable[FileSpec],
-        file_types: str | list[str],
+        dataset_types: str | list[str] | None = None,
+        description: str = "",
         execution_rid: RID | None = None,
-    ) -> Iterable[RID]:
+    ) -> RID:
         """Adds files to the catalog with their metadata.
 
         Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
@@ -1099,11 +1103,12 @@ class DerivaML(Dataset):
 
         Args:
             files: File specifications containing MD5 checksum, length, and URL.
-            file_types: One or more file type terms from File_Type vocabulary.
+            dataset_types: One or more dataset type terms from File_Type vocabulary.
+            description: Description of the files.
             execution_rid: Optional execution RID to associate files with.
 
         Returns:
-            Iterable[RID]: Resource Identifiers of the added files.
+            RID: Resource of dataset that represents the newly added files.
 
         Raises:
             DerivaMLException: If file_types are invalid or execution_rid is not an execution record.
@@ -1120,37 +1125,82 @@ class DerivaML(Dataset):
                 ...     execution_rid="1-xyz789"
                 ... )
         """
-        defined_types = self.list_vocabulary_terms(MLVocab.file_type.value)
         if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
-            raise DerivaMLException(f"RID {execution_rid} is not for an execution table.")
+            raise DerivaMLTableTypeError("Execution", execution_rid)
 
-        def check_file_type(dtype: str) -> bool:
-            """Make sure that the specified string is either the name or synonym for a file type term."""
-            for term in defined_types:
-                if dtype == term.name or (term.synonyms and file_type in term.synonyms):
-                    return True
-            return False
+        filespec_list = list(files)
 
-        file_types = [file_types] if isinstance(file_types, str) else file_types
-        pb = self._model.catalog.getPathBuilder()
-        for file_type in file_types:
-            if not check_file_type(file_type):
-                raise DerivaMLException("File type must be a vocabulary term.")
-        file_table_path = pb.schemas[self.ml_schema].tables["File"]
-        file_rids = [e["RID"] for e in file_table_path.insert([f.model_dump() for f in files])]
-
-        # Get the name of the association table between file_table and file_type.
-        atable = next(self._model.schemas[self._ml_schema].tables[MLVocab.file_type.value].find_associations()).name
-        pb.schemas[self._ml_schema].tables[atable].insert(
-            [{"File_Type": file_type, "File": file_rid} for file_rid in file_rids for file_type in file_types]
+        # Get a list of all defined file types and their synonyms.
+        defined_types = set(
+            chain.from_iterable([[t.name] + t.synonyms for t in self.list_vocabulary_terms(MLVocab.asset_type)])
         )
+
+        # Get a list of al of the file types used in the filespec_list
+        spec_types = set(chain.from_iterable(filespec.file_types for filespec in filespec_list))
+
+        # Now make sure that all of the file types and dataset_types in the spec list are defined.
+        if spec_types - defined_types:
+            raise DerivaMLInvalidTerm(MLVocab.asset_type.name, f"{spec_types - defined_types}")
+
+        # Normalize dataset_types, make sure FIle type is included.
+        if isinstance(dataset_types, list):
+            dataset_types = ["File"] + dataset_types if "File" not in dataset_types else dataset_types
+        else:
+            dataset_types = ["File", dataset_types] if dataset_types else ["File"]
+        for ds_type in dataset_types:
+            self.lookup_term(MLVocab.dataset_type, ds_type)
+
+        # Add files to the file table, and collect up the resulting entries by directory name.
+        pb = self._model.catalog.getPathBuilder()
+        file_records = list(pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump() for f in filespec_list]))
+
+        # Get the name of the association table between file_table and file_type and add file_type records
+        atable = self.model.find_association(MLTable.file, MLVocab.asset_type).name
+        # Need to get a link between file record and file_types.
+        type_map = {
+            file_spec.md5: file_spec.file_types + ([] if "File" in file_spec.file_types else [])
+            for file_spec in filespec_list
+        }
+        file_type_records = [
+            {MLVocab.asset_type.value: file_type, "File": file_record["RID"]}
+            for file_record in file_records
+            for file_type in type_map[file_record["MD5"]]
+        ]
+        pb.schemas[self._ml_schema].tables[atable].insert(file_type_records)
 
         if execution_rid:
             # Get the name of the association table between file_table and execution.
             pb.schemas[self._ml_schema].File_Execution.insert(
-                [{"File": file_rid, "Execution": execution_rid} for file_rid in file_rids]
+                [
+                    {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Output"}
+                    for file_record in file_records
+                ]
             )
-        return file_rids
+
+        # Now create datasets to capture the original directory structure of the files.
+        dir_rid_map = defaultdict(list)
+        for e in file_records:
+            dir_rid_map[Path(urlsplit(e["URL"]).path).parent].append(e["RID"])
+
+        nested_datasets = []
+        path_length = 0
+        dataset = None
+        # Start with the longest path so we get subdirectories first.
+        print(f"dir_rid_map: {dir_rid_map}")
+        for p, rids in sorted(dir_rid_map.items(), key=lambda kv: len(kv[0].parts), reverse=True):
+            dataset = self.create_dataset(
+                dataset_types=dataset_types, execution_rid=execution_rid, description=description
+            )
+            members = rids
+            if len(p.parts) < path_length:
+                # Going up one level in directory, so Create nested dataset
+                members = nested_datasets + rids
+                nested_datasets = []
+            self.add_dataset_members(dataset_rid=dataset, members=members, execution_rid=execution_rid)
+            nested_datasets.append(dataset)
+            path_length = len(p.parts)
+
+        return dataset
 
     def list_files(self, file_types: Iterable[str] | None = None) -> list[dict[str, Any]]:
         """Lists files in the catalog with their metadata.
@@ -1377,7 +1427,8 @@ class DerivaML(Dataset):
         1. The datasets specified in the configuration are downloaded and placed in the cache-dir. If a version is
         not specified in the configuration, then a new minor version number is created for the dataset and downloaded.
 
-        2. If any execution assets are provided in the configuration, they are downloaded and placed in the working directory.
+        2. If any execution assets are provided in the configuration, they are downloaded and placed
+        in the working directory.
 
         Args:
             execution_rid: Resource Identifier (RID) of the execution to restore.

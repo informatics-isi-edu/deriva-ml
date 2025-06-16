@@ -48,11 +48,13 @@ dependencies = [
 test = [
     "pytest",
     "pytest-cov",
+    "jupyter"
 ]
 
 dev = [
     "ruff",
-    "icecream"
+    "icecream",
+    "jupyter"
 ]
 
 [tool.setuptools.package-data]

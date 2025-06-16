@@ -339,8 +339,8 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
         self,
-        dataset_types: str | list[str],
-        description: str,
+        dataset_types: str | list[str] | None = None,
+        description: str = "",
         execution_rid: RID | None = None,
         version: DatasetVersion | None = None,
     ) -> RID:
@@ -370,6 +370,7 @@ class Dataset:
         """
 
         version = version or DatasetVersion(0, 1, 0)
+        dataset_types = dataset_types or []
 
         type_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema].tables[MLVocab.dataset_type.value]
         defined_types = list(type_path.entities().fetch())
@@ -538,7 +539,9 @@ class Dataset:
             member_table = assoc_table.table
 
             # Look at domain tables and nested datasets.
-            if target_table.schema.name != self._model.domain_schema and target_table != self.dataset_table:
+            if target_table.schema.name != self._model.domain_schema and not (
+                target_table == self.dataset_table or target_table.name == "File"
+            ):
                 continue
             member_column = (
                 "Nested_Dataset" if target_table == self.dataset_table else other_fkey.foreign_key_columns[0].name
@@ -623,6 +626,7 @@ class Dataset:
         association_map = {
             a.other_fkeys.pop().pk_table.name: a.table.name for a in self.dataset_table.find_associations()
         }
+
         # Get a list of all the object types that can be linked to a dataset_table.
         for m in members:
             try:
@@ -637,7 +641,9 @@ class Dataset:
         # Now make the entries into the association tables.
         pb = self._model.catalog.getPathBuilder()
         for table, elements in dataset_elements.items():
-            schema_path = pb.schemas[self._ml_schema if table == "Dataset" else self._model.domain_schema]
+            schema_path = pb.schemas[
+                self._ml_schema if (table == "Dataset" or table == "File") else self._model.domain_schema
+            ]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
             if len(elements):
                 # Find out the name of the column in the association table.

@@ -15,6 +15,7 @@ Classes:
 """
 
 from enum import Enum
+
 from deriva.core.ermrest_model import builtin_types
 
 
@@ -30,6 +31,7 @@ class BaseStrEnum(str, Enum):
         >>> isinstance(MyEnum.VALUE, str)  # True
         >>> isinstance(MyEnum.VALUE, Enum)  # True
     """
+
     pass
 
 
@@ -48,6 +50,7 @@ class UploadState(Enum):
         cancelled (int): Upload was cancelled.
         timeout (int): Upload timed out.
     """
+
     success = 0
     failed = 1
     pending = 2
@@ -72,6 +75,7 @@ class Status(BaseStrEnum):
         completed (str): Execution finished successfully.
         failed (str): Execution encountered an error.
     """
+
     initializing = "Initializing"
     created = "Created"
     pending = "Pending"
@@ -114,6 +118,7 @@ class BuiltinTypes(Enum):
         serial4 (str): 32-bit auto-incrementing.
         serial8 (str): 64-bit auto-incrementing.
     """
+
     text = builtin_types.text.typename
     int2 = builtin_types.int2.typename
     jsonb = builtin_types.json.typename
@@ -150,15 +155,15 @@ class MLVocab(BaseStrEnum):
     Attributes:
         dataset_type (str): Dataset classification vocabulary.
         workflow_type (str): Workflow classification vocabulary.
-        file_type (str): File type classification vocabulary.
         asset_type (str): Asset classification vocabulary.
         asset_role (str): Asset role classification vocabulary.
     """
+
     dataset_type = "Dataset_Type"
     workflow_type = "Workflow_Type"
-    file_type = "File_Type"
     asset_type = "Asset_Type"
     asset_role = "Asset_Role"
+    feature_name = "Feature_Name"
 
 
 class MLAsset(BaseStrEnum):
@@ -170,6 +175,18 @@ class MLAsset(BaseStrEnum):
         execution_metadata (str): Metadata about an execution.
         execution_asset (str): Asset produced by an execution.
     """
+
+    execution_metadata = "Execution_Metadata"
+    execution_asset = "Execution_Asset"
+
+
+class MLTable(BaseStrEnum):
+    dataset = "Dataset"
+    workflow = "Workflow"
+    file = "File"
+    asset = "Asset"
+    execution = "Execution"
+    dataset_version = "Dataset_Version"
     execution_metadata = "Execution_Metadata"
     execution_asset = "Execution_Asset"
 
@@ -183,6 +200,7 @@ class ExecMetadataType(BaseStrEnum):
         execution_config (str): Execution configuration data.
         runtime_env (str): Runtime environment information.
     """
+
     execution_config = "Execution_Config"
     runtime_env = "Runtime_Env"
 
@@ -197,6 +215,7 @@ class ExecAssetType(BaseStrEnum):
         output_file (str): Output file produced by the execution.
         notebook_output (str): Jupyter notebook output from the execution.
     """
+
     input_file = "Input_File"
     output_file = "Output_File"
-    notebook_output = "Notebook_Output" 
+    notebook_output = "Notebook_Output"

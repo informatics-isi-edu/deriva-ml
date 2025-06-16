@@ -2,15 +2,17 @@
 File-related utility functions for DerivaML.
 """
 
+from __future__ import annotations
+
 import json
 from datetime import date
 from pathlib import Path
 from socket import gethostname
-from typing import Generator, List
+from typing import Callable, Generator
 from urllib.parse import urlparse
 
 import deriva.core.utils.hash_utils as hash_utils
-from pydantic import BaseModel, ValidationError, field_validator, model_serializer
+from pydantic import BaseModel, conlist, field_validator, model_serializer, validate_call
 
 
 class FileSpec(BaseModel):
@@ -19,12 +21,16 @@ class FileSpec(BaseModel):
     Attributes:
         url: The File url to the url.
         description: The description of the file.
+        md5: The MD5 hash of the file.
+        length: The length of the file in bytes.
+        file_types: A list of file types.  Each files_type should be a defined term in MLVocab.file_type vocabulary.
     """
 
     url: str
-    description: str | None = ""
     md5: str
     length: int
+    description: str | None = ""
+    file_types: conlist(str) | None = []
 
     @field_validator("url")
     @classmethod
@@ -48,7 +54,7 @@ class FileSpec(BaseModel):
             # There is no scheme part of the URL, or it is a file URL, so it is a local file path, so convert to a tag URL.
             return f"tag://{gethostname()},{date.today()}:file://{url_parts.path}"
         else:
-            raise ValidationError("url is not a file URL")
+            raise ValueError("url is not a file URL")
 
     @model_serializer()
     def serialize_filespec(self):
@@ -60,55 +66,41 @@ class FileSpec(BaseModel):
         }
 
     @classmethod
-    def create_filespecs(cls, path: Path | str, description: str) -> Generator["FileSpec", None, None]:
+    def create_filespecs(
+        cls, path: Path | str, description: str, file_types: list[str] | Callable[[Path], list[str]] | None = None
+    ) -> Generator[FileSpec, None, None]:
         """Given a file or directory, generate the sequence of corresponding FileSpecs suitable to create a File table.
 
         Args:
             path: Path to the file or directory.
             description: The description of the file(s)
+            file_types: A list of file types or a function that takes a file path and returns a list of file types.
 
         Returns:
             An iterable of FileSpecs for each file in the directory.
         """
 
         path = Path(path)
+        file_types = file_types or []
+        file_types_fn = file_types if callable(file_types) else lambda _x: file_types
 
-        def list_all_files(path: Path) -> List[Path]:
-            """List all files in a directory or return a single file.
+        def create_spec(file_path: Path) -> FileSpec:
+            hashes = hash_utils.compute_file_hashes(file_path, hashes=frozenset(["md5", "sha256"]))
+            md5 = hashes["md5"][0]
+            type_list = file_types_fn(file_path)
+            return FileSpec(
+                length=path.stat().st_size,
+                md5=md5,
+                description=description,
+                url=file_path.as_posix(),
+                file_types=type_list if "File" in type_list else ["File"] + type_list,
+            )
 
-            Args:
-                path: Path to file or directory
-
-            Returns:
-                List of Path objects for all files
-            """
-            files = [path] if path.is_file() else list(Path(path).rglob("*"))
-            return [f for f in files if f.is_file()]
-
-        return (cls.create_spec(file, description) for file in list_all_files(path))
-
-    @classmethod
-    def create_spec(cls, path: Path, description: str) -> "FileSpec":
-        """Create a FileSpec for a single file.
-
-        Args:
-            path: Path to the file
-            description: Description of the file
-
-        Returns:
-            FileSpec object for the file
-        """
-        hashes = hash_utils.compute_file_hashes(path, hashes=frozenset(["md5", "sha256"]))
-        md5 = hashes["md5"][0]
-        return FileSpec(
-            length=path.stat().st_size,
-            md5=md5,
-            description=description,
-            url=path.as_posix(),
-        )
+        files = [path] if path.is_file() else [f for f in Path(path).rglob("*") if f.is_file()]
+        return (create_spec(file) for file in files)
 
     @staticmethod
-    def read_filespec(path: Path | str) -> Generator["FileSpec", None, None]:
+    def read_filespec(path: Path | str) -> Generator[FileSpec, None, None]:
         """Get FileSpecs from a JSON lines file.
 
         Args:
@@ -124,3 +116,9 @@ class FileSpec(BaseModel):
                 if not line:
                     continue
                 yield FileSpec(**json.loads(line))
+
+
+# Hack round pydantic validate_call and forward reference.
+_raw = FileSpec.create_filespecs.__func__
+# wrap it with validate_call, then re‐make it a classmethod
+FileSpec.create_filespecs = classmethod(validate_call(_raw))
