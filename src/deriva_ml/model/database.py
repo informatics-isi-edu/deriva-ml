@@ -279,6 +279,10 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in my_types]})
         return datasets
 
+    def list_dataset_members(self, dataset_rid: RID) -> dict[str, Any]:
+        """Returns a list of all the dataset_table entries associated with a dataset."""
+        return self.get_dataset(dataset_rid).list_dataset_members()
+
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
 
@@ -311,8 +315,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             [sname, tname] = table.split(":")
         except ValueError:
             tname = table
-            for sname, s in self.model.schemas.items():
-                if table in s.tables:
+            for sname in [self.domain_schema, self.ml_schema, "WWW"]:  # Be carefule of File table.
+                if table in self.model.schemas[sname].tables:
                     break
         try:
             _ = self.model.schemas[sname].tables[tname]

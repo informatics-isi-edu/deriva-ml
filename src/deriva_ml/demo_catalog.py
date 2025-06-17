@@ -87,7 +87,6 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
                 description=f"Dataset {r}",
                 version=DatasetVersion(1, 0, 0),
             )
-            print(f"dataset {d} created")
             ml_instance.add_dataset_members(d, [r])
             dataset_rids.append(d)
 
