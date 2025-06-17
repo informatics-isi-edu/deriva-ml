@@ -11,12 +11,6 @@ class TestVocabulary:
         assert len(vocabs) == len(MLVocab) + 2
         assert all(map(ml_instance.model.is_vocabulary, vocabs))
 
-    def test_demo_terms(self, test_ml_catalog_populated):
-        pass
-
-    def test_demo_assets(self, test_ml_catalog_populated):
-        pass
-
     def test_dataset_relationships(self, test_ml_catalog_populated):
         """Test dataset relationship management."""
         ml_instance = test_ml_catalog_populated
@@ -45,6 +39,3 @@ class TestVocabulary:
     def test_demo_datasets(self, test_ml_catalog_populated):
         ml_instance = test_ml_catalog_populated
         datasets = ml_instance.find_datasets()
-
-    def test_demo_files(self, test_ml_catalog_populated, shared_tmp_path):
-        pass

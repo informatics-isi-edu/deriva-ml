@@ -9,7 +9,7 @@ from deriva_ml import DerivaMLInvalidTerm, ExecutionConfiguration, FileSpec, MLV
 
 
 class TestFile:
-    @pytest.fixture(scope="class", autouse=True)
+    @pytest.fixture(scope="function", autouse=True)
     def test_file_table_setup(self, test_ml_catalog, shared_tmp_path):
         def random_string(length: int) -> str:
             alphabet = string.ascii_letters + string.digits
@@ -99,14 +99,30 @@ class TestFile:
         test_dir = test_file_table_setup.test_dir
         execution = test_file_table_setup.execution
 
-        def use_extension(filename: Path) -> [str]:
-            return [filename.suffix.lstrip(".")]
+        jpeg_cnt = 0
+        txt_cnt = 0
+
+        def use_extension(filename: Path) -> list[str]:
+            nonlocal jpeg_cnt, txt_cnt
+            ext = filename.suffix.lstrip(".")
+            if ext == "jpeg":
+                jpeg_cnt += 1
+            else:
+                txt_cnt += 1
+            return [ext]
 
         ml_instance.add_term(MLVocab.asset_type, "jpeg", description="A Image file")
         ml_instance.add_term(MLVocab.asset_type, "txt", description="A Text file")
+
         with execution.execute() as exe:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
             file_dataset = exe.add_files(filespecs)
 
         files = ml_instance.list_files()
         assert len(files) == 15
+        files = ml_instance.list_files(file_types=["jpeg"])
+        assert len(files) == jpeg_cnt
+        files = ml_instance.list_files(file_types=["txt"])
+        assert len(files) == txt_cnt
+        files = ml_instance.list_files(file_types=["jpeg", "txt"])
+        assert len(files) == jpeg_cnt + txt_cnt

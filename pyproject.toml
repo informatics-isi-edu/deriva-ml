@@ -34,11 +34,12 @@ requires-python = ">=3.10"
 dependencies = [
     "bump-my-version",
     "deriva~=1.7.7",
+    "deepdiff",
     "pandas",
     "regex~=2024.7.24",
     "pydantic>=2.10.6",
     "semver>3.0.0",
-     "setuptools>=64",
+    "setuptools>=64",
     "setuptools-scm>=8.0",
     "nbstripout",
     "papermill"
@@ -54,7 +55,7 @@ test = [
 dev = [
     "ruff",
     "icecream",
-    "jupyter"
+    "jupyter",
 ]
 
 [tool.setuptools.package-data]
