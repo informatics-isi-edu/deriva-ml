@@ -18,10 +18,11 @@ from deriva_ml import (
 
 
 class TestDatasetManagement:
-    def test_dataset_find(self, test_ml_catalog):
+    def test_dataset_find(self, test_ml_catalog_populated):
         """Test finding datasets."""
         # Find all datasets
-        datasets = test_ml_catalog.find_datasets()
+        ml_instance = test_ml_catalog_populated
+        datasets = ml_instance.find_datasets()
         assert len(datasets) > 0
 
         # Verify dataset types exist

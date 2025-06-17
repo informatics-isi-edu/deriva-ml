@@ -1,8 +1,8 @@
 import atexit
 import itertools
 import logging
-from random import choice, choices, randint, random
 import string
+from random import choice, choices, randint, random
 from tempfile import TemporaryDirectory
 from typing import Optional
 
@@ -87,6 +87,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
                 description=f"Dataset {r}",
                 version=DatasetVersion(1, 0, 0),
             )
+            print(f"dataset {d} created")
             ml_instance.add_dataset_members(d, [r])
             dataset_rids.append(d)
 
@@ -206,12 +207,13 @@ def create_demo_features(ml_instance):
 
     feature_execution.upload_execution_outputs()
 
+
 def create_demo_files(ml_instance: DerivaML):
     def random_string(length: int) -> str:
         alphabet = string.ascii_letters + string.digits
         return "".join(choices(alphabet, k=length))
 
-    test_dir =ml_instance.working_dir / "test_dir"
+    test_dir = ml_instance.working_dir / "test_dir"
     test_dir.mkdir(parents=True, exist_ok=True)
     d1 = test_dir / "d1"
     d1.mkdir(parents=True, exist_ok=True)
@@ -223,6 +225,7 @@ def create_demo_files(ml_instance: DerivaML):
             with open(d / f"file{i}.{choice(['txt', 'jpeg'])}", "w") as f:
                 f.write(random_string(10))
     ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Test workflow")
+
 
 def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
     """
