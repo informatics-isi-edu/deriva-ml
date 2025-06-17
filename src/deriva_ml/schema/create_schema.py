@@ -1,5 +1,4 @@
 import argparse
-import json
 import subprocess
 import sys
 from importlib.resources import files
@@ -306,14 +305,6 @@ def create_ml_catalog(hostname: str, project_name: str) -> ErmrestCatalog:
     )
     create_ml_schema(catalog, project_name=project_name)
     return catalog
-
-
-def dump_ml_catalog_schema(hostname: str, catalog_id: str | int, filename: str) -> None:
-    """Dump the schema of the ML catalog to stdout."""
-    catalog = ErmrestCatalog("https", hostname, catalog_id=catalog_id, credentials=get_credential(hostname))
-    model = catalog.getCatalogModel()
-    with open(filename, "w") as f:
-        json.dump(model.prejson(), f, indent=2)
 
 
 def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:

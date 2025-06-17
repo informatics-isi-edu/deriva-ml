@@ -168,8 +168,8 @@ class DerivaModel:
         table = self.name_to_table(table_name)
         return table.is_association(unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity)
 
-    def find_association(self, table1: Table | str, table2: Table | str) -> Table:
-        """Given two tables, return an association table that connects the two.
+    def find_association(self, table1: Table | str, table2: Table | str) -> tuple[Table, Column, Column]:
+        """Given two tables, return an association table that connects the two and the two columns used to link them..
 
         Raises:
             DerivaML exception if there is either not an association table or more than one association table.
@@ -177,7 +177,11 @@ class DerivaModel:
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)
 
-        tables = [a.table for a in table1.find_associations(pure=False) if a.other_fkeys.pop().pk_table == table2]
+        tables = [
+            (a.table, a.self_fkey.columns[0].name, other_key.columns[0].name)
+            for a in table1.find_associations(pure=False)
+            if len(a.other_fkeys) == 1 and (other_key := a.other_fkeys.pop()).pk_table == table2
+        ]
 
         if len(tables) == 1:
             return tables[0]

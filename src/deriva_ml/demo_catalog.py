@@ -1,7 +1,8 @@
 import atexit
 import itertools
 import logging
-from random import choice, randint, random
+from random import choice, choices, randint, random
+import string
 from tempfile import TemporaryDirectory
 from typing import Optional
 
@@ -205,6 +206,23 @@ def create_demo_features(ml_instance):
 
     feature_execution.upload_execution_outputs()
 
+def create_demo_files(ml_instance: DerivaML):
+    def random_string(length: int) -> str:
+        alphabet = string.ascii_letters + string.digits
+        return "".join(choices(alphabet, k=length))
+
+    test_dir =ml_instance.working_dir / "test_dir"
+    test_dir.mkdir(parents=True, exist_ok=True)
+    d1 = test_dir / "d1"
+    d1.mkdir(parents=True, exist_ok=True)
+    d2 = test_dir / "d2"
+    d2.mkdir(parents=True, exist_ok=True)
+
+    for d in [test_dir, d1, d2]:
+        for i in range(5):
+            with open(d / f"file{i}.{choice(['txt', 'jpeg'])}", "w") as f:
+                f.write(random_string(10))
+    ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Test workflow")
 
 def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
     """

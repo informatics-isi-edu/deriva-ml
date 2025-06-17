@@ -788,14 +788,14 @@ class Execution:
         pb = self._ml_object.pathBuilder
         for asset_table, asset_list in uploaded_assets.items():
             asset_table_name = asset_table.split("/")[1]  # Peel off the schema from the asset table
-            asset_exe = self._model.find_association(asset_table_name, "Execution")
+            asset_exe, asset_fk, execution_fk = self._model.find_association(asset_table_name, "Execution")
             asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
 
             asset_exe_path.insert(
                 [
                     {
-                        asset_table_name: asset_path.asset_rid,
-                        "Execution": self.execution_rid,
+                        asset_fk: asset_path.asset_rid,
+                        execution_fk: self.execution_rid,
                         "Asset_Role": asset_role,
                     }
                     for asset_path in asset_list
@@ -821,7 +821,7 @@ class Execution:
             for asset_path in asset_list:
                 asset_path.asset_types = asset_type_map[asset_path.file_name]
 
-            asset_asset_type = self._model.find_association(asset_table_name, "Asset_Type")
+            asset_asset_type, _, _ = self._model.find_association(asset_table_name, "Asset_Type")
             type_path = pb.schemas[asset_asset_type.schema.name].tables[asset_asset_type.name]
 
             type_path.insert(

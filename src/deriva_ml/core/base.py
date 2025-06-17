@@ -23,10 +23,10 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, cast, TYPE_CHECKING
 from urllib.parse import urlsplit
 
-import deriva.core.datapath as datapath
 
 # Third-party imports
 import requests
+from pydantic import ConfigDict, validate_call
 
 # Deriva imports
 from deriva.core import (
@@ -35,12 +35,13 @@ from deriva.core import (
     get_credential,
     urlquote,
 )
+
+import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException
 from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
-from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.exceptions import DerivaMLInvalidTerm
 from deriva_ml.core.definitions import (
@@ -661,7 +662,10 @@ class DerivaML(Dataset):
         # Get path builders for asset and type tables
         pb = self._model.catalog.getPathBuilder()
         asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
-        asset_type_table = self._model.find_association(asset_table, MLVocab.asset_type)
+        (
+            asset_type_table,
+            _,
+        ) = self._model.find_association(asset_table, MLVocab.asset_type)
         type_path = pb.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
 
         # Build a list of assets with their types
@@ -1155,7 +1159,7 @@ class DerivaML(Dataset):
         file_records = list(pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump() for f in filespec_list]))
 
         # Get the name of the association table between file_table and file_type and add file_type records
-        atable = self.model.find_association(MLTable.file, MLVocab.asset_type).name
+        atable = self.model.find_association(MLTable.file, MLVocab.asset_type)[0].name
         # Need to get a link between file record and file_types.
         type_map = {
             file_spec.md5: file_spec.file_types + ([] if "File" in file_spec.file_types else [])
@@ -1186,7 +1190,6 @@ class DerivaML(Dataset):
         path_length = 0
         dataset = None
         # Start with the longest path so we get subdirectories first.
-        print(f"dir_rid_map: {dir_rid_map}")
         for p, rids in sorted(dir_rid_map.items(), key=lambda kv: len(kv[0].parts), reverse=True):
             dataset = self.create_dataset(
                 dataset_types=dataset_types, execution_rid=execution_rid, description=description
@@ -1229,27 +1232,33 @@ class DerivaML(Dataset):
             Filter by file type:
                 >>> image_files = ml.list_files(["image", "png"])
         """
-        ml_path = self.pathBuilder.schemas[self._ml_schema]
-        file_path = ml_path.File
-        type_path = ml_path.Asset_Type
 
-        path = file_path.link(type_path, on=file_path.RID == type_path.File, join_type="left")
-        path = path.File.attributes(
+        asset_type_atable, file_fk, asset_type_fk = self.model.find_association("File", "Asset_Type")
+        ml_path = self.pathBuilder.schemas[self._ml_schema]
+        file = ml_path.File
+        asset_type = ml_path.tables[asset_type_atable.name]
+
+        path = file.path
+        path = path.link(asset_type.alias("AT"), on=file.RID == asset_type.columns[file_fk], join_type="left")
+        if file_types:
+            path = path.filter(asset_type.columns[asset_type_fk].in_(file_types))
+        path = path.attributes(
             path.File.RID,
             path.File.URL,
             path.File.MD5,
             path.File.Length,
             path.File.Description,
-            path.File_File_Type.File_Type,
+            path.AT.columns[asset_type_fk],
         )
+
         file_map = {}
         for f in path.fetch():
             entry = file_map.setdefault(f["RID"], {**f, "File_Types": []})
-            if ft := f.get("File_Type"):  # assign-and-test in one go
+            if ft := f.get("Asset_Type"):  # assign-and-test in one go
                 entry["File_Types"].append(ft)
 
         # Now get rid of the File_Type key and return the result
-        return [(f, f.pop("File_Type"))[0] for f in file_map.values()]
+        return [(f, f.pop("Asset_Type"))[0] for f in file_map.values()]
 
     def list_workflows(self) -> list[Workflow]:
         """Lists all workflows in the catalog.
