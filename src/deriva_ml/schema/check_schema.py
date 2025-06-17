@@ -1,7 +1,9 @@
 import json
+from pathlib import Path
+from pprint import pprint
 
 from deepdiff import DeepDiff
-from deriva.core import BaseCLI, DerivaServer, get_credential
+from deriva.core import BaseCLI, get_credential
 from deriva.core.ermrest_catalog import ErmrestCatalog
 
 from deriva_ml.core.definitions import ML_SCHEMA
@@ -9,38 +11,27 @@ from deriva_ml.core.definitions import ML_SCHEMA
 
 def check_ml_schema(hostname, catalog_id, schema_file):
     catalog = ErmrestCatalog("https", hostname, catalog_id, credentials=get_credential(hostname))
-    target_schema = catalog.getCatalogModel().schemas[ML_SCHEMA].prejson()["schemas"][ML_SCHEMA]
+
+    # Need to get rid of attribute dicts....
+    target_schema = json.loads(json.dumps(catalog.getCatalogModel().schemas[ML_SCHEMA].prejson()))
 
     with open(schema_file, "r") as f:
         reference_schema = json.load(f)["schemas"][ML_SCHEMA]
 
     # Compute the diff
-    diff = DeepDiff(reference_schema, target_schema, ignore_order=True)
-
+    diff = DeepDiff(reference_schema, target_schema, ignore_order=True, view="tree")
+    print(f"Diff between {schema_file} and {ML_SCHEMA} schema:")
     # Pretty‐print as JSON
-    print(json.dumps(diff, indent=2))
+    pprint(diff, indent=2)
 
 
 def dump_ml_schema(hostname: str, catalog_id: str | int, filename: str) -> None:
     """Dump the schema of the ML catalog to stdout."""
     catalog = ErmrestCatalog("https", hostname, catalog_id=catalog_id, credentials=get_credential(hostname))
     model = catalog.getCatalogModel()
+    print(f"Dumping ML schema to {Path(filename).resolve()}...")
     with open(filename, "w") as f:
         json.dump(model.prejson(), f, indent=2)
-
-
-def main():
-    scheme = "https"
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--hostname", type=str, required=True)
-    parser.add_argument("--schema_name", type=str, required=True)
-    parser.add_argument("--catalog_id", type=str, required=True)
-    parser.add_argument("--curie_prefix", type=str, required=True)
-    args = parser.parse_args()
-    credentials = get_credential(args.hostname)
-    server = DerivaServer(scheme, args.hostname, credentials)
-    model = server.connect_ermrest(args.catalog_id).getCatalogModel()
-    create_ml_schema(model, args.schema_name)
 
 
 class CheckMLSchemaCLI(BaseCLI):
@@ -84,11 +75,6 @@ class CheckMLSchemaCLI(BaseCLI):
         with self.execution as e:
             self.do_stuff(e)
         self.execution.upload_execution_outputs()
-
-    def do_stuff(self, execution: Execution):
-        print(f" Execution with parameters: {execution.parameters}")
-        print(f" Execution with input assets: {[a.as_posix() for a in execution.asset_paths]}")
-        print(f"Execution datasets: {execution.datasets}")
 
 
 if __name__ == "__main__":
