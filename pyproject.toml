@@ -59,7 +59,8 @@ dev = [
 ]
 
 [tool.setuptools.package-data]
-deriva_ml = ["schema_setup/*.json"]
+deriva_ml = ["schema/*.json"]
+
 
 [tool.setuptools_scm]
 

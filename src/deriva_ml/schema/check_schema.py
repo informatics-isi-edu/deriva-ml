@@ -1,4 +1,5 @@
 import json
+from importlib.resources import files
 from pathlib import Path
 from pprint import pprint
 
@@ -9,7 +10,9 @@ from deriva.core.ermrest_catalog import ErmrestCatalog
 from deriva_ml.core.definitions import ML_SCHEMA
 
 
-def check_ml_schema(hostname, catalog_id, schema_file):
+def check_ml_schema(hostname, catalog_id, schema_file: None):
+    schema_file = schema_file or files("deriva-ml.data").joinpath("deriva-ml-reference.json")
+
     catalog = ErmrestCatalog("https", hostname, catalog_id, credentials=get_credential(hostname))
 
     # Need to get rid of attribute dicts....
