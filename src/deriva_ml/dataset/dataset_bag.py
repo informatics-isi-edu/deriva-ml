@@ -183,7 +183,9 @@ class DatasetBag:
             target_table = other_fkey.pk_table
             member_table = assoc_table.table
 
-            if target_table.schema.name != self.model.domain_schema and target_table != self._dataset_table:
+            if target_table.schema.name != self.model.domain_schema and not (
+                target_table == self._dataset_table or target_table.name == "File"
+            ):
                 # Look at domain tables and nested datasets.
                 continue
             if target_table == self._dataset_table:
@@ -203,6 +205,7 @@ class DatasetBag:
                     f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
                     f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
                 )
+
                 target_entities = [dict(zip(col_names, e)) for e in db.execute(sql_cmd).fetchall()]
                 members[target_table.name].extend(target_entities)
 

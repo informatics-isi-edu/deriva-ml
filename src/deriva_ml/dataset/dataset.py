@@ -493,9 +493,14 @@ class Dataset:
         """
         # Add table to map
         element_table = self._model.name_to_table(element)
-        table = self._model.schemas[self._model.domain_schema].create_table(
-            Table.define_association([self._dataset_table, element_table])
-        )
+        atable_def = Table.define_association([self._dataset_table, element_table])
+        try:
+            table = self._model.schemas[self._model.domain_schema].create_table(atable_def)
+        except ValueError as e:
+            if "already exists" in str(e):
+                table = self._model.name_to_table(atable_def["table_name"])
+            else:
+                raise e
 
         # self.model = self.catalog.getCatalogModel()
         self._dataset_table.annotations.update(self._generate_dataset_download_annotations())
