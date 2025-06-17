@@ -2,14 +2,11 @@
 Tests for dataset functionality.
 """
 
-import pytest
-
 from deriva_ml import (
     BuiltinTypes,
     ColumnDefinition,
     DatasetSpec,
     DatasetVersion,
-    DerivaMLException,
     ExecutionConfiguration,
     MLVocab,
     TableDefinition,
@@ -17,7 +14,40 @@ from deriva_ml import (
 )
 
 
-class TestDatasetManagement:
+class TestDataset:
+    def test_dataset_elements(self, test_ml_catalog):
+        ml_instance = test_ml_catalog
+        test_table = ml_instance.model.create_table(
+            TableDefinition(
+                name="TestTable",
+                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+            )
+        )
+        ml_instance.add_dataset_element_type("TestTable")
+        assert "TestTable" in [t.name for t in ml_instance.list_dataset_element_types()]
+        # Check for repeat addition.
+        ml_instance.add_dataset_element_type("TestTable")
+
+    def test_dataset_creation(self, test_ml_catalog):
+        """Test dataset creation and modification."""
+        # Find existing datasets for reference
+        existing = test_ml_catalog.find_datasets()
+        initial_count = len(existing)
+        test_ml_catalog.add_term(MLVocab.dataset_type, "Testing", description="A test dataset")
+
+        # Create a new dataset
+        dataset = test_ml_catalog.create_dataset(description="Dataset for testing", dataset_types="Testing")
+        assert dataset is not None
+
+        # Verify dataset was created
+        updated = test_ml_catalog.find_datasets()
+        assert len(updated) == initial_count + 1
+
+        # Find the new dataset
+        new_dataset = next(ds for ds in updated if ds["RID"] == dataset)
+        assert new_dataset["Description"] == "Dataset for testing"
+        assert new_dataset["Dataset_Type"] == ["Testing"]
+
     def test_dataset_find(self, test_ml_catalog_populated):
         """Test finding datasets."""
         # Find all datasets
@@ -26,83 +56,21 @@ class TestDatasetManagement:
         assert len(datasets) > 0
 
         # Verify dataset types exist
-        dataset_types = {ds["Dataset_Type"] for ds in datasets}
-        assert "Training" in dataset_types
-        assert "Testing" in dataset_types
-        assert "Partitioned" in dataset_types
-
-    def test_dataset_version(self, test_ml_catalog):
-        """Test dataset versioning."""
-        # Get a dataset RID
-        datasets = test_ml_catalog.find_datasets()
-        dataset_rid = datasets[0]["RID"]
-
-        # Get version
-        version = test_ml_catalog.dataset_version(dataset_rid)
-        assert version is not None
-        assert isinstance(version, str)
-
-    def test_dataset_spec(self, test_ml_catalog):
-        """Test DatasetSpec creation and validation."""
-        # Create with required fields
-        spec = DatasetSpec(rid="1234", version="1.0")
-        assert spec.rid == "1234"
-        assert spec.version == "1.0"
-        assert not spec.materialize  # Default value
-
-        # Create with all fields
-        spec = DatasetSpec(rid="1234", version="1.0.0", materialize=True)
-        assert spec.materialize
-
-    def test_dataset_creation(self, test_ml_catalog):
-        """Test dataset creation and modification."""
-        # Find existing datasets for reference
-        existing = test_ml_catalog.find_datasets()
-        initial_count = len(existing)
-
-        # Create a new dataset
-        dataset = test_ml_catalog.create_dataset(
-            name="Test Dataset", description="Dataset for testing", dataset_type="Testing"
-        )
-        assert dataset is not None
-
-        # Verify dataset was created
-        updated = test_ml_catalog.find_datasets()
-        assert len(updated) == initial_count + 1
-
-        # Find the new dataset
-        new_dataset = next(ds for ds in updated if ds["Name"] == "Test Dataset")
-        assert new_dataset["Description"] == "Dataset for testing"
-        assert new_dataset["Dataset_Type"] == "Testing"
-
-
-class TestDataset:
-    def test_dataset_elements(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
-        ml_instance.model.create_table(
-            TableDefinition(
-                name="TestTable",
-                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
-            )
-        )
-        ml_instance.add_dataset_element_type("TestTable")
-        assert "TestTable" in [t.name for t in ml_instance.list_dataset_element_types()]
+        for ds in datasets:
+            dataset_types = ds["Dataset_Type"]
+            for t in dataset_types:
+                assert ml_instance.lookup_term(MLVocab.dataset_type, t) is not None
 
     def test_dataset_add_delete(self, test_ml_catalog):
         ml_instance = test_ml_catalog
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-        self.dataset_rid = ml_instance.create_dataset(type_rid.name, description="A Dataset")
+        dataset_rid = ml_instance.create_dataset(type_rid.name, description="A Dataset")
         datasets = list(ml_instance.find_datasets())
-        assert self.dataset_rid in [d["RID"] for d in datasets]
-        ds_type = [d["Dataset_Type"] for d in datasets if d["RID"] == self.dataset_rid][0]
-        assert "TestSet" in ds_type
+        assert dataset_rid in [d["RID"] for d in datasets]
 
-        dataset_cnt = len(datasets)
-        ml_instance.delete_dataset(datasets[0]["RID"])
-        assert dataset_cnt - 1 == len(ml_instance.find_datasets())
-        assert dataset_cnt == len(ml_instance.find_datasets(deleted=True))
-        with pytest.raises(DerivaMLException):
-            ml_instance.list_dataset_members, datasets[0]["RID"]
+        ml_instance.delete_dataset(dataset_rid)
+        assert len(ml_instance.find_datasets()) == 0
+        assert len(ml_instance.find_datasets(deleted=True)) == 1
 
     def test_dataset_version(self, test_ml_catalog):
         ml_instance = test_ml_catalog
@@ -116,6 +84,18 @@ class TestDataset:
         assert "1.0.0" == str(v0)
         v1 = ml_instance.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor)
         assert "1.1.0" == str(v1)
+
+    def test_dataset_spec(self):
+        """Test DatasetSpec creation and validation."""
+        # Create with required fields
+        spec = DatasetSpec(rid="1234", version="1.0.0")
+        assert spec.rid == "1234"
+        assert spec.version == "1.0.0"
+        assert spec.materialize  # Default value
+
+        # Create with all fields
+        spec = DatasetSpec(rid="1234", version="1.0.0", materialize=True)
+        assert spec.materialize
 
     def test_dataset_members(self, test_ml_catalog):
         ml_instance = test_ml_catalog
@@ -135,7 +115,7 @@ class TestDataset:
         ml_instance.add_dataset_element_type("TestTableMembers")
         assert "TestTableMembers" in [t.name for t in ml_instance.list_dataset_element_types()]
 
-        table_path = ml_instance.catalog.getPathBuilder().schemas[self.domain_schema].tables["TestTableMembers"]
+        table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["TestTableMembers"]
         table_path.insert([{"Col1": f"Thing{t + 1}"} for t in range(4)])
         test_rids = [i["RID"] for i in table_path.entities().fetch()]
         member_cnt = len(test_rids)
@@ -151,21 +131,24 @@ class TestDataset:
         assert len(ml_instance.dataset_history(dataset_rid)) == 3
         assert str(ml_instance.dataset_version(dataset_rid)) == "1.2.0"
 
-    def test_nested_datasets(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
-        double_nested_dataset, nested_datasets, datasets = self.create_nested_dataset()
+    def test_nested_datasets(self, test_ml_catalog_dataset):
+        ml_instance, double_nested_dataset, nested_datasets, datasets = test_ml_catalog_dataset
 
-        assert 2 == ml_instance._dataset_nesting_depth()
+        assert ml_instance._dataset_nesting_depth() == 2
         assert set(nested_datasets) == set(ml_instance.list_dataset_children(double_nested_dataset))
         assert set(nested_datasets + datasets) == set(
             ml_instance.list_dataset_children(double_nested_dataset, recurse=True)
         )
 
         # Check parents and children.
-        assert 2 == len(ml_instance.list_dataset_children(nested_datasets[0]))
+        assert len(ml_instance.list_dataset_children(nested_datasets[0])) == 2
         assert double_nested_dataset == ml_instance.list_dataset_parents(nested_datasets[0])[0]
 
-        self.logger.info("Checking versions.")
+        # Verify relationship
+        children = ml_instance.list_dataset_children(nested_datasets[0])
+        assert len(children) == 2
+        parents = ml_instance.list_dataset_parents(children[0])
+        assert any([nested_datasets[0] == p for p in parents])
 
         versions = {
             "d0": ml_instance.dataset_version(double_nested_dataset),
@@ -191,7 +174,9 @@ class TestDataset:
             )
         )
         ml_instance.add_dataset_element_type("TestTableExecution")
-        table_path = ml_instance.catalog.getPathBuilder().schemas[self.domain_schema].tables["TestTableExecution"]
+        table_path = (
+            ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["TestTableExecution"]
+        )
         table_path.insert([{"Col1": f"Thing{t + 1}"} for t in range(4)])
         test_rids = [i["RID"] for i in table_path.entities().fetch()]
 

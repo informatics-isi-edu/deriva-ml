@@ -69,7 +69,7 @@ def test_ml_catalog(ml_catalog):
 
 @pytest.fixture(scope="function")
 def test_ml_catalog_populated(ml_catalog):
-    """Create a demo ML instance for testing with populated domain schema.   Resets after each test.""" ""
+    """Create a demo ML instance for testing with populated domain schema.   Resets after each test."""
     print("Setting up populated catalog for testing... ", end="")
     hostname = ml_catalog.deriva_ml.catalog.deriva_server.server
     populate_demo_catalog(ml_catalog.deriva_ml, ml_catalog.deriva_ml.domain_schema)
@@ -79,6 +79,16 @@ def test_ml_catalog_populated(ml_catalog):
     print("Resetting catalog... ", end="")
     reset_demo_catalog(ml_catalog.deriva_ml)
 
+@pytest.fixture(scope="function")
+def test_ml_catalog_dataset(ml_catalog):
+    """Create a demo ML instance for testing with populated domain schema.   Resets after each test."""
+    print("Setting up populated catalog for testing... ", end="")
+    hostname = ml_catalog.deriva_ml.catalog.deriva_server.server
+    populate_demo_catalog(ml_catalog.deriva_ml, ml_catalog.deriva_ml.domain_schema)
+    ds1, ds2, ds3 = create_demo_datasets(ml_catalog.deriva_ml)
+    yield DerivaML(hostname, ml_catalog.deriva_ml.catalog_id, use_minid=False), ds1, ds2, ds3
+    print("Resetting catalog... ", end="")
+    reset_demo_catalog(ml_catalog.deriva_ml)
 
 @pytest.fixture
 def test_files_dir():

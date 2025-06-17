@@ -126,3 +126,32 @@ class TestFile:
         assert len(files) == txt_cnt
         files = ml_instance.list_files(file_types=["jpeg", "txt"])
         assert len(files) == jpeg_cnt + txt_cnt
+
+    def test_file_spec_read_write(self, tmp_path):
+        """Test reading and writing FileSpecs to JSONL."""
+        # Create test files
+        file1 = tmp_path / "file1.txt"
+        file2 = tmp_path / "file2.txt"
+        file1.write_text("content 1")
+        file2.write_text("content 2")
+
+        # Create FileSpecs
+        specs = list(FileSpec.create_filespecs(tmp_path, "Test files"))
+        assert len(specs) == 2
+
+        # Write to JSONL
+        jsonl_file = tmp_path / "specs.jsonl"
+        with jsonl_file.open("w") as f:
+            for spec in specs:
+                f.write(spec.model_dump_json() + "\n")
+
+        # Read back
+        read_specs = list(FileSpec.read_filespec(jsonl_file))
+        assert len(read_specs) == 2
+
+        # Compare
+        for original, read in zip(specs, read_specs):
+            assert read.url == original.url
+            assert read.description == original.description
+            assert read.md5 == original.md5
+            assert read.length == original.length
