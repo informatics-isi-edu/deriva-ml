@@ -985,9 +985,12 @@ class Dataset:
 
     def _version_snapshot(self, dataset: DatasetSpec) -> str:
         """Return a catalog with snapshot for the specified dataset version"""
-        version_record = [
-            h for h in self.dataset_history(dataset_rid=dataset.rid) if h.dataset_version == dataset.version
-        ][0]
+        try:
+            version_record = next(
+                h for h in self.dataset_history(dataset_rid=dataset.rid) if h.dataset_version == dataset.version
+            )
+        except StopIteration:
+            raise DerivaMLException(f"Dataset version {dataset.version} not found for dataset {dataset.rid}")
         return f"{self._model.catalog.catalog_id}@{version_record.snapshot}"
 
     def _create_dataset_minid(self, dataset: DatasetSpec, snapshot_catalog: DerivaML | None = None) -> str:
