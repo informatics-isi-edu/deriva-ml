@@ -164,7 +164,7 @@ class DatasetBag:
                 yield dict(zip(col_names, row))
 
     @validate_call
-    def list_dataset_members(self, recurse: bool = False) -> dict[str, dict[str, list[Any]]]:
+    def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
         Args:
