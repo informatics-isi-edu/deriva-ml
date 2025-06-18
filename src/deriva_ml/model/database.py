@@ -1,5 +1,5 @@
-"""This module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface between the BDBag representation
-of a dataset and a sqllite database in which the contents of the bag are stored.
+"""This module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface
+between the BDBag representation of a dataset and a sqllite database in which the contents of the bag are stored.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ import logging
 import sqlite3
 from csv import reader
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Iterable, Optional, Sequence
 from urllib.parse import urlparse
 
 from deriva.core.ermrest_model import Model
@@ -42,10 +42,10 @@ class DatabaseModelMeta(type):
 class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     """Read in the contents of a BDBag and create a local SQLite database.
 
-        As part of its initialization, this routine will create a sqlite database that has the contents of all the tables
-    in the dataset_table.  In addition, any asset tables will the `Filename` column remapped to have the path of the local
-    copy of the file. In addition, a local version of the ERMRest model that as used to generate the dataset_table is
-    available.
+        As part of its initialization, this routine will create a sqlite database that has the contents of all the
+    tables in the dataset_table.  In addition, any asset tables will the `Filename` column remapped to have the path
+    of the local copy of the file. In addition, a local version of the ERMRest model that as used to generate the
+    dataset_table is available.
 
        The sqlite database will not have any foreign key constraints applied, however, foreign-key relationships can be
     found by looking in the ERMRest model.  In addition, as sqllite doesn't support schema, Ermrest schema are added
@@ -56,8 +56,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     appear in more than one database. To help manage this, a global list of all the datasets that have been loaded
     into DatabaseModels, is kept in the class variable `_rid_map`.
 
-    Because you can load different versions of a dataset simultaneously, the dataset RID and version number are tracked, and a new
-    sqllite instance is created for every new dataset version present.
+    Because you can load different versions of a dataset simultaneously, the dataset RID and version number are tracked,
+    and a new sqllite instance is created for every new dataset version present.
 
     Attributes:
         bag_path (Path): path to the local copy of the BDBag
@@ -294,11 +294,32 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
         table_name = self.normalize_table_name(table)
+        table = self.name_to_table(table)
+
+        def replace_tf(data: Sequence[Any], idxs: Iterable[int]) -> tuple[Any, ...]:
+            """
+            Return a new tuple based on `data` where, for each index in `idxs`,
+            the value 't' → True, 'f' → False; everything else is left unchanged.
+
+            Raises IndexError if any index in `idxs` is out of bounds.
+            """
+            idxs_set = set(idxs)
+            tf_map = {"t": True, "f": False}
+
+            return tuple((tf_map.get(v, v) if i in idxs_set else v) for i, v in enumerate(data))
+
         with self.dbase as dbase:
             col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
+            boolean_columns = [
+                col_names.index(c.name)
+                for c in self.model.schemas[table.schema.name].tables[table.name].columns
+                if c.type.typename == "boolean"
+            ]
             result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
-            while row := result.fetchone():
-                yield dict(zip(col_names, row))
+
+            transform = (lambda row: replace_tf(row, boolean_columns)) if boolean_columns else (lambda row: row)
+            while (row := result.fetchone()) is not None:
+                yield dict(zip(col_names, transform(row)))
 
     def normalize_table_name(self, table: str) -> str:
         """Attempt to insert the schema into a table name if it's not provided.
