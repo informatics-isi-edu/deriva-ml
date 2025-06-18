@@ -1061,6 +1061,9 @@ class DerivaML(Dataset):
                 ...     execution_rid="1-xyz789"
                 ... )
         """
+        if not self._is_dataset_rid(dataset.rid):
+            raise DerivaMLTableTypeError("Dataset", dataset.rid)
+
         return self._download_dataset_bag(
             dataset=dataset,
             execution_rid=execution_rid,
