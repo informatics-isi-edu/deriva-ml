@@ -1244,7 +1244,7 @@ class DerivaML(Dataset):
         path = file.path
         path = path.link(asset_type.alias("AT"), on=file.RID == asset_type.columns[file_fk], join_type="left")
         if file_types:
-            path = path.filter(asset_type.columns[asset_type_fk].in_(file_types))
+            path = path.filter(asset_type.columns[asset_type_fk] == any(file_types))
         path = path.attributes(
             path.File.RID,
             path.File.URL,
