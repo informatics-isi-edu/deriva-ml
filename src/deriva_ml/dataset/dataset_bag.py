@@ -85,13 +85,20 @@ class DatasetBag:
 
     def _dataset_table_view(self, table: str) -> str:
         table_name = self.model.normalize_table_name(table)
+
+        # Get the names of the columns in the table.
         with self.database as dbase:
             select_args = ",".join(
                 [f'"{table_name}"."{c[1]}"' for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
             )
+
+        # Get the list of datasets in the bag.
         datasets = ",".join(
             [f'"{self.dataset_rid}"'] + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
         )
+
+        # Find the paths that terminate in the table we are looking for
+        # Assemble the ON clause by looking at each table pair, and looking up the FK columns that connect them.
         paths = [
             (
                 [f'"{self.model.normalize_table_name(t.name)}"' for t in p],
@@ -111,7 +118,9 @@ class DatasetBag:
             tables = " JOIN ".join(ts)
             on_expression = " and ".join([f"{column_name(left)}={column_name(right)}" for left, right in on])
             sql.append(
-                f"SELECT {select_args} FROM {tables} ON {on_expression} WHERE {dataset_table_name}.RID IN ({datasets})"
+                f"SELECT {select_args} FROM {tables} "
+                f"{'ON ' + on_expression if on_expression else ''} "
+                f"WHERE {dataset_table_name}.RID IN ({datasets})"
             )
         sql = " UNION ".join(sql) if len(sql) > 1 else sql[0]
         return sql
