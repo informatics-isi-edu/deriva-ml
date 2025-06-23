@@ -174,8 +174,10 @@ class TestDataset:
         dataset_spec = test_ml_catalog_dataset.dataset_spec
         spec = test_ml_catalog_dataset.dataset_spec
 
-        for dataset_rid, dataset_members in spec.member_lis():
-            assert ml_instance.list_dataset_members(dataset_rid) == dataset_members
+        catalog_datasets = ml_instance.find_datasets()
+        reference_datasets = test_ml_catalog_dataset.find_datasets()
+        assert len(catalog_datasets) == len(reference_datasets)
+        assert catalog_datasets == reference_datasets
 
     def test_dataset_members_recurse(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.deriva_ml
