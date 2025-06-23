@@ -28,18 +28,6 @@ deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
 deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-    "pytest-cov",
-    "jupyter"
-]
-
-dev = [
-    "ruff",
-    "icecream",
-    "ipython",
-    "jupyter",
-]
 
 [build-system]
 requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
@@ -97,3 +85,14 @@ known-first-party = ["deriva_ml"]
 [metadata]
 license = "Apache 2.0"
 keywords = ["deriva-ml"]
+
+[dependency-groups]
+dev = [
+    "icecream>=2.1.4",
+    "jupyter>=1.1.1",
+    "pytest>=8.4.1",
+    "pytest-coverage>=0.0",
+]
+lint = [
+    "ruff>=0.12.0",
+]
