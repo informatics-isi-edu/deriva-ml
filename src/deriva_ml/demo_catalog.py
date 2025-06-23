@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import atexit
 import itertools
 import logging
 import string
+from collections.abc import Sequence
+from numbers import Integral
 from random import choice, choices, randint, random
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Iterator, Optional
 
 from deriva.core import ErmrestCatalog
 from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
+from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError
 
 from deriva_ml import (
@@ -16,6 +21,7 @@ from deriva_ml import (
     ColumnDefinition,
     DatasetVersion,
     DerivaML,
+    Execution,
     ExecutionConfiguration,
     MLVocab,
 )
@@ -25,7 +31,13 @@ from deriva_ml.schema import (
 from deriva_ml.schema.annotations import catalog_annotation
 from deriva_ml.schema.create_schema import reset_ml_schema
 
-TEST_DATASET_SIZE = 4
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
+TEST_DATASET_SIZE = 8
 
 
 def reset_demo_catalog(deriva_ml: DerivaML):
@@ -57,7 +69,94 @@ def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
         execution.upload_execution_outputs()
 
 
-def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RID]]:
+class DatasetDescription(BaseModel):
+    types: list[str]  # Types of the dataset.
+    description: str  # Description.
+    members: dict[
+        str, int | list[DatasetDescription]
+    ]  # Either a list of nested dataset, or then number of elements to add
+    member_rids: dict[str, list[RID]] = {}  # The rids of the members of the dataset.
+    version: DatasetVersion = DatasetVersion(1, 0, 0)  # The initial version.
+    rid: RID = None  # RID of dataset that was created.
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+def create_datasets(
+    client: Execution,
+    spec: DatasetDescription,
+    member_rids: dict[str, Iterator[RID]],
+) -> DatasetDescription:
+    """
+    Create a dataset per `spec`, then add child members (either by slicing
+    off pre-generated RIDs or by recursing on nested specs).
+    """
+    dataset_rid = client.create_dataset(
+        dataset_types=spec.types,
+        description=spec.description,
+        version=spec.version,
+    )
+
+    result_spec = DatasetDescription(
+        description=spec.description,
+        members={},
+        types=spec.types,
+        rid=dataset_rid,
+        version=spec.version,
+    )
+    for member_type, value in spec.members.items():
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            nested_specs: list[DatasetDescription] = list(value)
+            rids: list[RID] = []
+            for child_spec in nested_specs:
+                child_ds = create_datasets(client, child_spec, member_rids)
+                result_spec.members.setdefault(member_type, []).append(child_ds)
+                rids.append(child_ds.rid)
+        elif isinstance(value, Integral):
+            count = int(value)
+            # take exactly `count` RIDs (or an empty list if count <= 0)
+            rids = list(itertools.islice(member_rids[member_type], count))
+            result_spec.members[member_type] = count
+        else:
+            raise TypeError(
+                f"Expected spec.members['{member_type}'] to be either an int or a list, got {type(value).__name__!r}"
+            )
+
+        # attach and record
+        if rids:
+            client.add_dataset_members(dataset_rid, rids, description="Added by create_datasets")
+            result_spec.member_rids.setdefault(member_type, []).extend(rids)
+    return result_spec
+
+
+def dataset_spec() -> DatasetDescription:
+    dataset = DatasetDescription(
+        description="A dataset",
+        members={"Subject": 2},
+        types=[],
+    )
+
+    training_dataset = DatasetDescription(
+        description="A dataset that is nested",
+        members={"Dataset": [dataset, dataset], "Image": 2},
+        types=["Testing"],
+    )
+
+    testing_dataset = DatasetDescription(
+        description="A dataset that is nested",
+        members={"Dataset": [dataset, dataset], "Image": 2},
+        types=["Testing"],
+    )
+
+    double_nested_dataset = DatasetDescription(
+        description="A dataset that is double nested",
+        members={"Dataset": [training_dataset, testing_dataset]},
+        types=["Complete"],
+    )
+    return double_nested_dataset
+
+
+def create_demo_datasets(ml_instance: DerivaML) -> DatasetDescription:
     ml_instance.add_dataset_element_type("Subject")
     ml_instance.add_dataset_element_type("Image")
 
@@ -67,6 +166,8 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
 
     table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
+    table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Image"]
+    image_rids = [i["RID"] for i in table_path.entities().fetch()]
 
     ml_instance.add_term(
         MLVocab.workflow_type,
@@ -80,33 +181,9 @@ def create_demo_datasets(ml_instance: DerivaML) -> tuple[RID, list[RID], list[RI
     )
 
     with dataset_execution.execute() as exe:
-        dataset_rids = []
-        for r in subject_rids[0:4]:
-            d = exe.create_dataset(
-                dataset_types=["Testing"],
-                description=f"Dataset {r}",
-                version=DatasetVersion(1, 0, 0),
-            )
-            ml_instance.add_dataset_members(d, [r])
-            dataset_rids.append(d)
-
-        nested_datasets = []
-        for i in range(0, 4, 2):
-            nested_dataset = exe.create_dataset(
-                dataset_types=["Training"],
-                description=f"Nested Dataset {i}",
-                version=DatasetVersion(1, 0, 0),
-            )
-            exe.add_dataset_members(nested_dataset, dataset_rids[i : i + 2])
-            nested_datasets.append(nested_dataset)
-
-        double_nested_dataset = exe.create_dataset(
-            dataset_types=type_rid.name,
-            description="Double nested dataset",
-            version=DatasetVersion(1, 0, 0),
-        )
-        exe.add_dataset_members(double_nested_dataset, nested_datasets)
-    return double_nested_dataset, nested_datasets, dataset_rids
+        spec = dataset_spec()
+        dataset = create_datasets(exe, spec, {"Subject": iter(subject_rids), "Image": iter(image_rids)})
+    return dataset
 
 
 def create_demo_features(ml_instance):
