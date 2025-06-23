@@ -273,8 +273,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
         # Get a list of all the dataset_type values associated with this dataset_table.
         datasets = []
-        ds_types = list(self.get_table_as_dict(atable))
-        for dataset in self.get_table_as_dict("Dataset"):
+        ds_types = list(self._get_table_as_dict(atable))
+        for dataset in self._get_table_as_dict("Dataset"):
             my_types = [t for t in ds_types if t["Dataset"] == dataset["RID"]]
             datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in my_types]})
         return datasets
@@ -283,7 +283,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         """Returns a list of all the dataset_table entries associated with a dataset."""
         return self.get_dataset(dataset_rid).list_dataset_members()
 
-    def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+    def _get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
 
         Args:
@@ -336,7 +336,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             [sname, tname] = table.split(":")
         except ValueError:
             tname = table
-            for sname in [self.domain_schema, self.ml_schema, "WWW"]:  # Be carefule of File table.
+            for sname in [self.domain_schema, self.ml_schema, "WWW"]:  # Be careful of File table.
                 if table in self.model.schemas[sname].tables:
                     break
         try:
