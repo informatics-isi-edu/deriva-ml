@@ -116,6 +116,7 @@ def create_datasets(
             count = int(value)
             # take exactly `count` RIDs (or an empty list if count <= 0)
             rids = list(itertools.islice(member_rids[member_type], count))
+            assert len(rids) == count, f"Expected {count} RIDs, got {len(rids)}"
             result_spec.members[member_type] = count
         else:
             raise TypeError(

@@ -171,8 +171,7 @@ class TestDataset:
 
     def test_dataset_members_nested(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.deriva_ml
-        dataset_spec = test_ml_catalog_dataset.dataset_spec
-        spec = test_ml_catalog_dataset.dataset_spec
+        dataset_description = test_ml_catalog_dataset.dataset_description
 
         catalog_datasets = ml_instance.find_datasets()
         reference_datasets = test_ml_catalog_dataset.find_datasets()

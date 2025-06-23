@@ -45,7 +45,7 @@ class MLDatasetTest:
 
     def _find_datasets(self, dataset: DatasetDescription) -> list[RID]:
         return [dataset.rid] + [
-            dsets.rid for dset in self.dataset_description.members["Datasets"] for dsets in self._find_datasets(dset)
+            dsets.rid for dset in self.dataset_description.members["Dataset"] for dsets in self._find_datasets(dset)
         ]
 
     def member_list(self) -> list[tuple[RID, list[RID]]]:
