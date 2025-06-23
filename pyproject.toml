@@ -1,27 +1,3 @@
-[build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"
-
-
-[tool.black]
-line-length = 88
-target-version = ['py39']
-include = '\.pyi?$'
-
-[tool.ruff]
-line-length = 120
-target-version = "py310"
-select = ["E", "F", "I"]
-ignore = []
-
-[tool.ruff.isort]
-known-first-party = ["deriva_ml"]
-
 [project]
 name = "deriva-ml"
 dynamic = ["version"]
@@ -37,13 +13,19 @@ dependencies = [
     "deepdiff",
     "pandas",
     "regex~=2024.7.24",
-    "pydantic>=2.10.6",
+    "pydantic>=2.11",
     "semver>3.0.0",
     "setuptools>=64",
     "setuptools-scm>=8.0",
     "nbstripout",
     "papermill"
 ]
+
+[project.scripts]
+deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:main"
+deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
+deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
+deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
 
 [project.optional-dependencies]
 test = [
@@ -55,14 +37,21 @@ test = [
 dev = [
     "ruff",
     "icecream",
+    "ipython",
     "jupyter",
 ]
+
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
 
 [tool.setuptools.package-data]
 deriva_ml = ["schema/*.json"]
 
-
 [tool.setuptools_scm]
+
 
 [tool.bumpversion]
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
@@ -85,12 +74,25 @@ setup_hooks = []
 pre_commit_hooks = []
 post_commit_hooks = []
 
-[project.scripts]
-deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:main"
-deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
-deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
-deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+#addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"
+addopts = "-v  --import-mode=importlib"
 
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+select = ["E", "F", "I"]
+ignore = []
+
+[tool.ruff.isort]
+known-first-party = ["deriva_ml"]
 
 [metadata]
 license = "Apache 2.0"
