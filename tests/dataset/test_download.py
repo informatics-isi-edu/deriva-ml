@@ -5,7 +5,11 @@ from deriva_ml import DatasetSpec
 
 class TestDownload:
     def test_download(self, test_ml_catalog_dataset):
-        ml_instance, double_nested_dataset, nested_datasets, datasets = test_ml_catalog_dataset
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        double_nested_dataset = test_ml_catalog_dataset.double_nested_dataset
+        nested_datasets = test_ml_catalog_dataset.nested_datasets
+        datasets = test_ml_catalog_dataset.datasets
+
         current_version = ml_instance.dataset_version(double_nested_dataset)
         subject_rid = ml_instance.list_dataset_members(datasets[0])["Subject"][0]["RID"]
         ml_instance.add_dataset_members(double_nested_dataset, [subject_rid])

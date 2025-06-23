@@ -131,8 +131,12 @@ class TestDataset:
         assert len(ml_instance.dataset_history(dataset_rid)) == 3
         assert str(ml_instance.dataset_version(dataset_rid)) == "1.2.0"
 
-    def test_nested_datasets(self, test_ml_catalog_dataset):
-        ml_instance, double_nested_dataset, nested_datasets, datasets = test_ml_catalog_dataset
+    def test_dataset_version(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        dataset_spec = test_ml_catalog_dataset.dataset_spec
+        double_nested_dataset = dataset_spec.rid
+        nested_datasets = test_ml_catalog_dataset.nested_datasets
+        datasets = test_ml_catalog_dataset.datasets
 
         assert ml_instance._dataset_nesting_depth() == 2
         assert set(nested_datasets) == set(ml_instance.list_dataset_children(double_nested_dataset))
@@ -164,6 +168,36 @@ class TestDataset:
 
         assert new_versions["d0"].major == 2
         assert new_versions["d2"][0].major == 2
+
+    def test_dataset_members_nested(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        dataset_spec = test_ml_catalog_dataset.dataset_spec
+        spec = test_ml_catalog_dataset.dataset_spec
+
+        for dataset_rid, dataset_members in spec.member_lis():
+            assert ml_instance.list_dataset_members(dataset_rid) == dataset_members
+
+    def test_dataset_members_recurse(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        double_nested_dataset = test_ml_catalog_dataset.double_nested_dataset
+        nested_datasets = test_ml_catalog_dataset.nested_datasets
+        datasets = test_ml_catalog_dataset.datasets
+
+        assert ml_instance._dataset_nesting_depth() == 2
+        assert set(nested_datasets) == set(ml_instance.list_dataset_children(double_nested_dataset))
+        assert set(nested_datasets + datasets) == set(
+            ml_instance.list_dataset_children(double_nested_dataset, recurse=True)
+        )
+
+        # Check parents and children.
+        assert len(ml_instance.list_dataset_children(nested_datasets[0])) == 2
+        assert double_nested_dataset == ml_instance.list_dataset_parents(nested_datasets[0])[0]
+
+        # Verify relationship
+        children = ml_instance.list_dataset_children(nested_datasets[0])
+        assert len(children) == 2
+        parents = ml_instance.list_dataset_parents(children[0])
+        assert any([nested_datasets[0] == p for p in parents])
 
     def test_dataset_execution(self, test_ml_catalog):
         ml_instance = test_ml_catalog
