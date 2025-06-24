@@ -40,13 +40,14 @@ class MLDatasetTest:
         self.dataset_description: DatasetDescription = create_demo_datasets(ml_instance)
         self.deriva_ml = ml_instance
 
-    def find_datasets(self) -> list[RID]:
-        self._find_datasets(self.dataset_description)
+    def find_datasets(self) -> dict[RID, list[RID]]:
+        return self._find_datasets(self.dataset_description)
 
-    def _find_datasets(self, dataset: DatasetDescription) -> list[RID]:
-        return [dataset.rid] + [
-            dsets.rid for dset in self.dataset_description.members["Dataset"] for dsets in self._find_datasets(dset)
-        ]
+    def _find_datasets(self, dataset: DatasetDescription) -> dict[RID, list[RID]]:
+        return {dataset.rid: dataset.member_rids} | {
+            member_type: member_list for dset in dataset.members.get("Dataset", [])
+            for member_type, member_list  in self._find_datasets(dset).items() if member_list != []
+    }
 
     def member_list(self) -> list[tuple[RID, list[RID]]]:
         return self._member_list(self.dataset_description)

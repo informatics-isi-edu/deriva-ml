@@ -171,12 +171,13 @@ class TestDataset:
 
     def test_dataset_members_nested(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.deriva_ml
-        dataset_description = test_ml_catalog_dataset.dataset_description
-
         catalog_datasets = ml_instance.find_datasets()
         reference_datasets = test_ml_catalog_dataset.find_datasets()
         assert len(catalog_datasets) == len(reference_datasets)
-        assert catalog_datasets == reference_datasets
+        for dataset, members in reference_datasets.items():
+            member_rids =  {member_type: [e['RID'] for e in members]
+                            for member_type, members in ml_instance.list_dataset_members(dataset).items() if members != []}
+            assert members == member_rids
 
     def test_dataset_members_recurse(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.deriva_ml
