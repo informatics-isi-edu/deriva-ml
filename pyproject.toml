@@ -70,14 +70,18 @@ addopts = "-v  --import-mode=importlib"
 
 [tool.black]
 line-length = 88
-target-version = ['py39']
+target-version = ['py31']
 include = '\.pyi?$'
 
 [tool.ruff]
 line-length = 120
 target-version = "py310"
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "PTH"]
 ignore = []
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
 
 [tool.ruff.isort]
 known-first-party = ["deriva_ml"]
@@ -92,6 +96,7 @@ dev = [
     "jupyter>=1.1.1",
     "pytest>=8.4.1",
     "pytest-coverage>=0.0",
+    "ruff"
 ]
 lint = [
     "ruff>=0.12.0",

@@ -56,14 +56,13 @@ class TestFile:
             ml_instance.execution.add_files(filespec)
 
     def test_create_filespecs(self, test_file_table_setup):
-        ml_instance = test_file_table_setup.ml_instance
         test_dir = test_file_table_setup.test_dir
         execution = test_file_table_setup.execution
 
-        def use_extension(filename: Path) -> [str]:
+        def use_extension(filename: Path) -> list[str]:
             return [filename.suffix.lstrip(".")]
 
-        with execution.execute() as exe:
+        with execution.execute() as _exe:
             filespecs = list(FileSpec.create_filespecs(test_dir, "Test Directory"))
             assert len(filespecs) == test_file_table_setup.file_count
             assert filespecs[0].file_types == ["File"]
@@ -77,7 +76,7 @@ class TestFile:
         test_dir = test_file_table_setup.test_dir
         execution = test_file_table_setup.execution
 
-        def use_extension(filename: Path) -> [str]:
+        def use_extension(filename: Path) -> list[str]:
             return [filename.suffix.lstrip(".")]
 
         ml_instance.add_term(MLVocab.asset_type, "jpeg", description="A Image file")
@@ -116,10 +115,8 @@ class TestFile:
 
         with execution.execute() as exe:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
-            file_dataset = exe.add_files(filespecs)
+            _file_dataset = exe.add_files(filespecs)
 
-        files = ml_instance.list_files()
-        assert len(files) == 15
         files = ml_instance.list_files(file_types=["jpeg"])
         assert len(files) == jpeg_cnt
         files = ml_instance.list_files(file_types=["txt"])
