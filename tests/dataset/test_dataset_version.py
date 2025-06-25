@@ -23,3 +23,31 @@ class TestDatasetVersion:
         assert "1.0.0" == str(v0)
         v1 = ml_instance.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor)
         assert "1.1.0" == str(v1)
+
+    def test_dataset_version(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        dataset_description = test_ml_catalog_dataset.dataset_description
+
+        nested_datasets = dataset_description.member_rids.get("Dataset", [])
+        datasets = [
+            dataset
+            for nested_description in dataset_description.members.get("Dataset", [])
+            for dataset in nested_description.member_rids.get("Dataset", [])
+        ]
+        _versions = {
+            "d0": ml_instance.dataset_version(dataset_description.rid),
+            "d1": [ml_instance.dataset_version(v) for v in nested_datasets],
+            "d2": [ml_instance.dataset_version(v) for v in datasets],
+        }
+        ml_instance.increment_dataset_version(nested_datasets[0], VersionPart.major)
+        new_versions = {
+            "d0": ml_instance.dataset_version(dataset_description.rid),
+            "d1": [ml_instance.dataset_version(v) for v in nested_datasets],
+            "d2": [ml_instance.dataset_version(v) for v in datasets],
+        }
+
+        assert new_versions["d0"].major == 2
+        assert new_versions["d2"][0].major == 2
+
+
+

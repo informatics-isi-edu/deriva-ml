@@ -18,7 +18,8 @@ dependencies = [
     "setuptools>=64",
     "setuptools-scm>=8.0",
     "nbstripout",
-    "papermill"
+    "papermill",
+    "pandas-stubs==2.2.3.250527",
 ]
 
 [project.scripts]
@@ -68,10 +69,6 @@ python_files = ["test_*.py"]
 #addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"
 addopts = "-v  --import-mode=importlib"
 
-[tool.black]
-line-length = 88
-target-version = ['py31']
-include = '\.pyi?$'
 
 [tool.ruff]
 line-length = 120
