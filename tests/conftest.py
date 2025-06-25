@@ -41,13 +41,16 @@ class MLDatasetTest:
         self.deriva_ml = ml_instance
 
     def find_datasets(self) -> dict[RID, list[RID]]:
+        """Return a dictionary that whose key is a dataset RID and whose value is a dictionary of member dataset RIDs."""
         return self._find_datasets(self.dataset_description)
 
     def _find_datasets(self, dataset: DatasetDescription) -> dict[RID, list[RID]]:
         return {dataset.rid: dataset.member_rids} | {
-            member_type: member_list for dset in dataset.members.get("Dataset", [])
-            for member_type, member_list  in self._find_datasets(dset).items() if member_list != []
-    }
+            member_type: member_list
+            for dset in dataset.members.get("Dataset", [])
+            for member_type, member_list in self._find_datasets(dset).items()
+            if member_list != []
+        }
 
     def member_list(self) -> list[tuple[RID, list[RID]]]:
         return self._member_list(self.dataset_description)

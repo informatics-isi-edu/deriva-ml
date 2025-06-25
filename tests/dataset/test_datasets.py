@@ -128,8 +128,7 @@ class TestDataset:
         assert ml_instance._dataset_nesting_depth() == 2
 
         for dataset, members in reference_datasets.items():
-            # Collect up all of the rids for the members of a dataset in the catalog.  Get rid of all of the
-            # attributes except for RID.
+            # See if the list of RIDs in the dataset matches up with what is expected.
             member_rids = {}
             for member_type, dataset_members in ml_instance.list_dataset_members(dataset).items():
                 if dataset_members:  # implicitly checks for non-empty
