@@ -9,7 +9,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "bump-my-version",
-    "deriva~=1.7.7",
+    #"deriva~=1.7.7",
+    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py",
     "deepdiff",
     "pandas",
     "regex~=2024.7.24",

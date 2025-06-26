@@ -4,6 +4,7 @@ between the BDBag representation of a dataset and a sqllite database in which th
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 from csv import reader
@@ -103,8 +104,11 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         self.dbase_file = dbase_path / f"{minid.version_rid}.db"
         self.dbase = sqlite3.connect(self.dbase_file)
 
-        super().__init__(Model.fromfile("file-system", self.bag_path / "data/schema.json"))
+        schema_file = self.bag_path / "data/schema.json"
+        with schema_file.open("r") as f:
+            self.snaptime = json.load(f)["snaptime"]
 
+        super().__init__(Model.fromfile("file-system", self.bag_path / "data/schema.json"))
         self._logger = logging.getLogger("deriva_ml")
         self._load_model()
         self.ml_schema = ML_SCHEMA
@@ -305,7 +309,6 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             """
             idxs_set = set(idxs)
             tf_map = {"t": True, "f": False}
-
             return tuple((tf_map.get(v, v) if i in idxs_set else v) for i, v in enumerate(data))
 
         with self.dbase as dbase:

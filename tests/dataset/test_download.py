@@ -1,9 +1,10 @@
 from pathlib import Path
 
+# Local imports
 from deriva_ml import DatasetSpec
 
 
-class TestDownload:
+class TestDatasetDownload:
     def test_download(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.deriva_ml
         dataset_description = test_ml_catalog_dataset.dataset_description
@@ -24,6 +25,10 @@ class TestDownload:
 
         # The datasets in the bag should be all the datasets we started with.
         assert set([dataset_description.rid] + nested_datasets + datasets) == {k for k in bag.model.bag_rids.keys()}
+        assert len(bag.list_dataset_children()) == len(ml_instance.list_dataset_children(dataset_description.rid))
+        assert len(bag.list_dataset_children(recurse=True)) == len(
+            ml_instance.list_dataset_children(dataset_description.rid, recurse=True)
+        )
 
         # Children of top level bag should be in datasets variable
         assert set(nested_datasets) == {ds.dataset_rid for ds in bag.list_dataset_children()}
@@ -40,15 +45,15 @@ class TestDownload:
                 for element, mlist in members.items()
             }
 
+        # Check all of the datasets to see if they have the same members in the bag and catalog.
         for ds in ml_instance.find_datasets():
-            bag_members = {
-                table: {m["RID"] for m in members}
-                for table, members in bag.model.list_dataset_members(ds["RID"]).items()
-            }
-            catalog_members = {
-                table: {m["RID"] for m in members}
-                for table, members in ml_instance.list_dataset_members(ds["RID"]).items()
-            }
-            print(bag_members)
-            print(catalog_members)
+            bag_members = bag.model.list_dataset_members(ds["RID"])
+            catalog_members = ml_instance.list_dataset_members(ds["RID"])
+            bag_member_rids = {table: {m["RID"] for m in members} for table, members in bag_members.items()}
+            catalog_member_rids = {table: {m["RID"] for m in members} for table, members in catalog_members.items()}
+            assert catalog_member_rids == bag_member_rids
+
+            # Now check the actual entries
+            bag_members = strip_times(bag_members)
+            catalog_members = strip_times(catalog_members)
             assert bag_members == catalog_members

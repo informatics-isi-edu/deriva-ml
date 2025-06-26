@@ -104,6 +104,7 @@ def create_datasets(
         rid=dataset_rid,
         version=spec.version,
     )
+    dataset_rids = []
     for member_type, value in spec.members.items():
         if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
             nested_specs: list[DatasetDescription] = list(value)
@@ -125,8 +126,9 @@ def create_datasets(
 
         # attach and record
         if rids:
-            client.add_dataset_members(dataset_rid, rids, description="Added by create_datasets")
+            dataset_rids.extend(rids)
             result_spec.member_rids.setdefault(member_type, []).extend(rids)
+    client.add_dataset_members(dataset_rid, dataset_rids, description="Added by create_datasets")
     return result_spec
 
 

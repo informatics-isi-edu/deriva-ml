@@ -140,6 +140,7 @@ class DerivaML(Dataset):
         self.credential = credential or get_credential(hostname)
 
         # Initialize server connection and catalog access
+        ic("Creating server", catalog_id)
         server = DerivaServer(
             "https",
             hostname,

@@ -64,7 +64,7 @@ from deriva_ml.core.definitions import (
     MLVocab,
     Status,
 )
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 from deriva_ml.dataset.aux_classes import (
     DatasetHistory,
     DatasetMinid,
@@ -154,6 +154,10 @@ class Dataset:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         # determine snapshot after changes were made
         snap = self._model.catalog.get("/").json()["snaptime"]
+        ic()
+        ic(description)
+        ic(snap)
+        ic(self._model.catalog.latest_snapshot())
         # Construct version records for insert
         version_records = schema_path.tables["Dataset_Version"].insert(
             [
@@ -169,7 +173,7 @@ class Dataset:
         )
 
         # And update the dataset records.
-        schema_path.tables["Dataset"].update([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records])
+        schema_path.tables["Dataset"].update(ic([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records]))
 
     def _bootstrap_versions(self):
         datasets = [ds["RID"] for ds in self.find_datasets()]
@@ -974,7 +978,8 @@ class Dataset:
             and self._model.catalog.resolve_rid(execution_rid).table.name != "Execution"
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
-        minid = self._get_dataset_minid(dataset, snapshot_catalog=snapshot_catalog)
+        ic()
+        minid = ic(self._get_dataset_minid(dataset, snapshot_catalog=snapshot_catalog))
 
         bag_path = (
             self._materialize_dataset_bag(minid, execution_rid=execution_rid)
@@ -997,8 +1002,8 @@ class Dataset:
         with TemporaryDirectory() as tmp_dir:
             # Generate a download specification file for the current catalog schema. By default, this spec
             # will generate a minid and place the bag into S3 storage.
-            spec_file = f"{tmp_dir}/download_spec.json"
-            with open(spec_file, "w", encoding="utf-8") as ds:
+            spec_file = Path(tmp_dir) / "download_spec.json"
+            with spec_file.open("w", encoding="utf-8") as ds:
                 json.dump(self._generate_dataset_download_spec(dataset, snapshot_catalog), ds)
             try:
                 self._logger.info(
@@ -1038,7 +1043,7 @@ class Dataset:
         snapshot_catalog: DerivaML | None = None,
         create: bool = True,
     ) -> DatasetMinid | None:
-        """Return a MINID to the specified dataset.  If no version is specified, use the latest.
+        """Return a MINID for the specified dataset. If no version is specified, use the latest.
 
         Args:
             dataset: Specification of the dataset.
@@ -1048,38 +1053,49 @@ class Dataset:
         Returns:
             New or existing MINID for the dataset.
         """
-        if dataset.rid.startswith("minid"):
-            minid_url = f"https://identifiers.org/{dataset.rid}"
-        elif dataset.rid.startswith("http"):
-            minid_url = dataset.rid
-        else:
-            if not any([dataset.rid == ds["RID"] for ds in self.find_datasets()]):
-                raise DerivaMLException(f"RID {dataset.rid} is not a dataset_table")
+        rid = dataset.rid
 
-            # Get the history record for the version we are looking for.
-            dataset_version_record = [
-                v for v in self.dataset_history(dataset.rid) if v.dataset_version == str(dataset.version)
-            ][0]
-            if not dataset_version_record:
-                raise DerivaMLException(f"Version {str(dataset.version)} does not exist for RID {dataset.rid}")
-            minid_url = dataset_version_record.minid
-            if not minid_url:
-                if not create:
-                    raise DerivaMLException(f"Minid for dataset {dataset.rid} doesn't exist")
-                if self._use_minid:
-                    self._logger.info("Creating new MINID for dataset %s", dataset.rid)
-                minid_url = self._create_dataset_minid(dataset, snapshot_catalog)
-            # If provided a MINID, use the MINID metadata to get the checksum and download the bag.
+        # Case 1: RID is already a MINID or direct URL
+        if rid.startswith("minid"):
+            return self._fetch_minid_metadata(f"https://identifiers.org/{rid}", dataset.version)
+        if rid.startswith("http"):
+            return self._fetch_minid_metadata(rid, dataset.version)
+
+        # Case 2: RID is a dataset RID – validate existence
+        if not any(rid == ds["RID"] for ds in self.find_datasets()):
+            raise DerivaMLTableTypeError("Dataset", rid)
+
+        # Find dataset version record
+        version_str = str(dataset.version)
+        history = self.dataset_history(rid)
+        try:
+            version_record = next(v for v in history if v.dataset_version == version_str)
+        except StopIteration:
+            raise DerivaMLException(f"Version {version_str} does not exist for RID {rid}")
+
+        # Check or create MINID
+        minid_url = version_record.minid
+        if not minid_url:
+            if not create:
+                raise DerivaMLException(f"Minid for dataset {rid} doesn't exist")
+            if self._use_minid:
+                self._logger.info("Creating new MINID for dataset %s", rid)
+            minid_url = self._create_dataset_minid(dataset, snapshot_catalog)
+
+        # Return based on MINID usage
         if self._use_minid:
-            r = requests.get(minid_url, headers={"accept": "application/json"})
-            dataset_minid = DatasetMinid(dataset_version=dataset.version, **r.json())
-        else:
-            dataset_minid = DatasetMinid(
-                dataset_version=dataset.version,
-                RID=f"{dataset.rid}@{dataset_version_record.snapshot}",
-                location=minid_url,
-            )
-        return dataset_minid
+            return self._fetch_minid_metadata(minid_url, dataset.version)
+
+        return DatasetMinid(
+            dataset_version=dataset.version,
+            RID=f"{rid}@{version_record.snapshot}",
+            location=minid_url,
+        )
+
+    def _fetch_minid_metadata(self, url: str, version: DatasetVersion) -> DatasetMinid:
+        r = requests.get(url, headers={"accept": "application/json"})
+        r.raise_for_status()
+        return DatasetMinid(dataset_version=version, **r.json())
 
     def _download_dataset_minid(self, minid: DatasetMinid) -> Path:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and

@@ -9,7 +9,7 @@ import sqlite3
 # Standard library imports
 from collections import defaultdict
 from copy import copy
-from typing import TYPE_CHECKING, Any, Generator, Iterable, cast
+from typing import TYPE_CHECKING, Any, Generator, Iterable, Sequence, cast
 
 import deriva.core.datapath as datapath
 
@@ -84,7 +84,11 @@ class DatasetBag:
         return self.model.list_tables()
 
     def _dataset_table_view(self, table: str) -> str:
+        """Return a SQL command that will return all of the elements in the specified table that are associated with
+        dataset_rid"""
+
         table_name = self.model.normalize_table_name(table)
+        table_schema = table_name.split(":")[0]
 
         # Get the names of the columns in the table.
         with self.database as dbase:
@@ -92,7 +96,7 @@ class DatasetBag:
                 [f'"{table_name}"."{c[1]}"' for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
             )
 
-        # Get the list of datasets in the bag.
+        # Get the list of datasets in the bag including the dataset itself.
         datasets = ",".join(
             [f'"{self.dataset_rid}"'] + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
         )
@@ -122,6 +126,10 @@ class DatasetBag:
                 f"{'ON ' + on_expression if on_expression else ''} "
                 f"WHERE {dataset_table_name}.RID IN ({datasets})"
             )
+            if table_name == self.model.normalize_table_name(self._dataset_table.name):
+                sql.append(
+                    f"SELECT {select_args} FROM {dataset_table_name} WHERE {dataset_table_name}.RID IN ({datasets})"
+                )
         sql = " UNION ".join(sql) if len(sql) > 1 else sql[0]
         return sql
 
@@ -165,12 +173,31 @@ class DatasetBag:
         Returns:
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
+
+        def replace_tf(data: Sequence[Any], idxs: Iterable[int]) -> tuple[Any, ...]:
+            """
+            Return a new tuple based on `data` where, for each index in `idxs`,
+            the value 't' → True, 'f' → False; everything else is left unchanged.
+
+            Raises IndexError if any index in `idxs` is out of bounds.
+            """
+            idxs_set = set(idxs)
+            tf_map = {"t": True, "f": False}
+            return tuple((tf_map.get(v, v) if i in idxs_set else v) for i, v in enumerate(data))
+
         table_name = self.model.normalize_table_name(table)
+        schema, table = table_name.split(":")
         with self.database as dbase:
             col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
+            boolean_columns = [
+                col_names.index(c.name)
+                for c in self.model.schemas[schema].tables[table].columns
+                if c.type.typename == "boolean"
+            ]
+            transform = (lambda row: replace_tf(row, boolean_columns)) if boolean_columns else (lambda row: row)
             result = self.database.execute(self._dataset_table_view(table))
             while row := result.fetchone():
-                yield dict(zip(col_names, row))
+                yield dict(zip(col_names, transform(row)))
 
     @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:
