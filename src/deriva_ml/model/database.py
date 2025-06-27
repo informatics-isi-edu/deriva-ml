@@ -8,7 +8,9 @@ import json
 import logging
 import sqlite3
 from csv import reader
+from datetime import datetime, timezone
 from pathlib import Path
+from time import timezone
 from typing import Any, Generator, Iterable, Optional, Sequence
 from urllib.parse import urlparse
 
@@ -311,6 +313,12 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             tf_map = {"t": True, "f": False}
             return tuple((tf_map.get(v, v) if i in idxs_set else v) for i, v in enumerate(data))
 
+        def map_timestamps(m: dict[str, Any]) -> dict[str, Any]:
+            rct = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(timzezone=timezone.utc)
+            rmt = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(timezone=timezone.utc)
+            m.update({"RMT": rmt.isoformat(), "RCT": rct.isoformat()})
+            return m
+
         with self.dbase as dbase:
             col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
             boolean_columns = [
@@ -318,11 +326,12 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                 for c in self.model.schemas[table.schema.name].tables[table.name].columns
                 if c.type.typename == "boolean"
             ]
+            time_columns = [col_names.index("RCT"), col_names.index("RMT")]
             result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
 
             transform = (lambda row: replace_tf(row, boolean_columns)) if boolean_columns else (lambda row: row)
             while (row := result.fetchone()) is not None:
-                yield dict(zip(col_names, transform(row)))
+                yield map_timestamps(dict(zip(col_names, transform(row))))
 
     def normalize_table_name(self, table: str) -> str:
         """Attempt to insert the schema into a table name if it's not provided.

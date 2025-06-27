@@ -154,10 +154,7 @@ class Dataset:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         # determine snapshot after changes were made
         snap = self._model.catalog.get("/").json()["snaptime"]
-        ic()
-        ic(description)
-        ic(snap)
-        ic(self._model.catalog.latest_snapshot())
+
         # Construct version records for insert
         version_records = schema_path.tables["Dataset_Version"].insert(
             [
@@ -173,7 +170,7 @@ class Dataset:
         )
 
         # And update the dataset records.
-        schema_path.tables["Dataset"].update(ic([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records]))
+        schema_path.tables["Dataset"].update([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records])
 
     def _bootstrap_versions(self):
         datasets = [ds["RID"] for ds in self.find_datasets()]
@@ -978,8 +975,7 @@ class Dataset:
             and self._model.catalog.resolve_rid(execution_rid).table.name != "Execution"
         ):
             raise DerivaMLException(f"RID {execution_rid} is not an execution")
-        ic()
-        minid = ic(self._get_dataset_minid(dataset, snapshot_catalog=snapshot_catalog))
+        minid = self._get_dataset_minid(dataset, snapshot_catalog=snapshot_catalog)
 
         bag_path = (
             self._materialize_dataset_bag(minid, execution_rid=execution_rid)

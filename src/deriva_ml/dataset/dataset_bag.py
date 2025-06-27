@@ -9,6 +9,7 @@ import sqlite3
 # Standard library imports
 from collections import defaultdict
 from copy import copy
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Generator, Iterable, Sequence, cast
 
 import deriva.core.datapath as datapath
@@ -185,6 +186,12 @@ class DatasetBag:
             tf_map = {"t": True, "f": False}
             return tuple((tf_map.get(v, v) if i in idxs_set else v) for i, v in enumerate(data))
 
+        def map_timestamps(m: dict[str, Any]) -> dict[str, Any]:
+            rct = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
+            rmt = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
+            m.update({"RMT": rmt.isoformat(), "RCT": rct.isoformat()})
+            return m
+
         table_name = self.model.normalize_table_name(table)
         schema, table = table_name.split(":")
         with self.database as dbase:
@@ -197,7 +204,7 @@ class DatasetBag:
             transform = (lambda row: replace_tf(row, boolean_columns)) if boolean_columns else (lambda row: row)
             result = self.database.execute(self._dataset_table_view(table))
             while row := result.fetchone():
-                yield dict(zip(col_names, transform(row)))
+                yield map_timestamps(dict(zip(col_names, transform(row))))
 
     @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:
