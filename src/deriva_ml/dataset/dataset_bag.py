@@ -175,22 +175,19 @@ class DatasetBag:
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
 
-        def replace_tf(data: Sequence[Any], idxs: Iterable[int]) -> tuple[Any, ...]:
+        def map_value(idx: int, v: Any, time_idx, boolean_idx) -> Any:
             """
-            Return a new tuple based on `data` where, for each index in `idxs`,
-            the value 't' → True, 'f' → False; everything else is left unchanged.
-
-            Raises IndexError if any index in `idxs` is out of bounds.
+            Return a new value based on `data` where, for each index in `idxs`,
             """
-            idxs_set = set(idxs)
             tf_map = {"t": True, "f": False}
-            return tuple((tf_map.get(v, v) if i in idxs_set else v) for i, v in enumerate(data))
+            if idx in boolean_idx:
+                return tf_map.get(v, v)
+            if idx in time_idx:
+                return datetime.strptime(v, "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
+            return v
 
-        def map_timestamps(m: dict[str, Any]) -> dict[str, Any]:
-            rct = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
-            rmt = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
-            m.update({"RMT": rmt.isoformat(), "RCT": rct.isoformat()})
-            return m
+        def transform_tuple(data: Sequence[Any], time_idx, boolean_idx) -> Any:
+            return tuple(map_value(i, v, time_idx, boolean_idx) for i, v in enumerate(data))
 
         table_name = self.model.normalize_table_name(table)
         schema, table = table_name.split(":")
@@ -201,10 +198,14 @@ class DatasetBag:
                 for c in self.model.schemas[schema].tables[table].columns
                 if c.type.typename == "boolean"
             ]
-            transform = (lambda row: replace_tf(row, boolean_columns)) if boolean_columns else (lambda row: row)
+            time_columns = [
+                col_names.index(c.name)
+                for c in self.model.schemas[schema].tables[table].columns
+                if c.type.typename in ["ermrest_rct", "ermrest_rmt"]
+            ]
             result = self.database.execute(self._dataset_table_view(table))
             while row := result.fetchone():
-                yield map_timestamps(dict(zip(col_names, transform(row))))
+                yield dict(zip(col_names, transform_tuple(row, time_columns, boolean_columns)))
 
     @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:

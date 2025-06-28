@@ -33,6 +33,8 @@ from deriva_ml.schema.create_schema import reset_ml_schema
 
 try:
     from icecream import ic
+
+    ic.configureOutput(includeContext=True)
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
@@ -129,6 +131,7 @@ def create_datasets(
             dataset_rids.extend(rids)
             result_spec.member_rids.setdefault(member_type, []).extend(rids)
     client.add_dataset_members(dataset_rid, dataset_rids, description="Added by create_datasets")
+
     return result_spec
 
 

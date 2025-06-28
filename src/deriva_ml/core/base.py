@@ -71,6 +71,8 @@ from deriva_ml.schema.annotations import asset_annotation
 # Optional debug imports
 try:
     from icecream import ic
+
+    ic.configureOutput(includeContext=True)
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
@@ -140,7 +142,6 @@ class DerivaML(Dataset):
         self.credential = credential or get_credential(hostname)
 
         # Initialize server connection and catalog access
-        ic("Creating server", catalog_id)
         server = DerivaServer(
             "https",
             hostname,
@@ -1064,7 +1065,6 @@ class DerivaML(Dataset):
         """
         if not self._is_dataset_rid(dataset.rid):
             raise DerivaMLTableTypeError("Dataset", dataset.rid)
-
         return self._download_dataset_bag(
             dataset=dataset,
             execution_rid=execution_rid,

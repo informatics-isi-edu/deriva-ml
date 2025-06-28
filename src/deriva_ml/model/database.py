@@ -11,7 +11,7 @@ from csv import reader
 from datetime import datetime, timezone
 from pathlib import Path
 from time import timezone
-from typing import Any, Generator, Iterable, Optional, Sequence
+from typing import Any, Generator, Optional, Sequence
 from urllib.parse import urlparse
 
 from deriva.core.ermrest_model import Model
@@ -279,8 +279,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
         # Get a list of all the dataset_type values associated with this dataset_table.
         datasets = []
-        ds_types = list(self._get_table_as_dict(atable))
-        for dataset in self._get_table_as_dict("Dataset"):
+        ds_types = list(self._get_table(atable))
+        for dataset in self._get_table("Dataset"):
             my_types = [t for t in ds_types if t["Dataset"] == dataset["RID"]]
             datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in my_types]})
         return datasets
@@ -289,7 +289,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         """Returns a list of all the dataset_table entries associated with a dataset."""
         return self.get_dataset(dataset_rid).list_dataset_members()
 
-    def _get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+    def _get_table(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
 
         Args:
@@ -302,22 +302,19 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         table_name = self.normalize_table_name(table)
         table = self.name_to_table(table)
 
-        def replace_tf(data: Sequence[Any], idxs: Iterable[int]) -> tuple[Any, ...]:
+        def map_value(idx: int, v: Any, time_idx, boolean_idx) -> Any:
             """
-            Return a new tuple based on `data` where, for each index in `idxs`,
-            the value 't' → True, 'f' → False; everything else is left unchanged.
-
-            Raises IndexError if any index in `idxs` is out of bounds.
+            Return a new value based on `data` where, for each index in `idxs`,
             """
-            idxs_set = set(idxs)
             tf_map = {"t": True, "f": False}
-            return tuple((tf_map.get(v, v) if i in idxs_set else v) for i, v in enumerate(data))
+            if idx in boolean_idx:
+                return tf_map.get(v, v)
+            if idx in time_idx:
+                return datetime.strptime(v, "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
+            return v
 
-        def map_timestamps(m: dict[str, Any]) -> dict[str, Any]:
-            rct = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(timzezone=timezone.utc)
-            rmt = datetime.strptime(m["RCT"], "%Y-%m-%d %H:%M:%S.%f+00").replace(timezone=timezone.utc)
-            m.update({"RMT": rmt.isoformat(), "RCT": rct.isoformat()})
-            return m
+        def transform_tuple(data: Sequence[Any], time_idx, boolean_idx) -> Any:
+            return tuple(map_value(i, v, time_idx, boolean_idx) for i, v in enumerate(data))
 
         with self.dbase as dbase:
             col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
@@ -326,12 +323,15 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                 for c in self.model.schemas[table.schema.name].tables[table.name].columns
                 if c.type.typename == "boolean"
             ]
-            time_columns = [col_names.index("RCT"), col_names.index("RMT")]
+            time_columns = [
+                col_names.index(c.name)
+                for c in self.model.schemas[table.schema.name].tables[table.name].columns
+                if c.name in ["RCT", "RMT"]
+            ]
             result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
 
-            transform = (lambda row: replace_tf(row, boolean_columns)) if boolean_columns else (lambda row: row)
             while (row := result.fetchone()) is not None:
-                yield map_timestamps(dict(zip(col_names, transform(row))))
+                yield dict(zip(col_names, transform_tuple(row, time_columns, boolean_columns)))
 
     def normalize_table_name(self, table: str) -> str:
         """Attempt to insert the schema into a table name if it's not provided.

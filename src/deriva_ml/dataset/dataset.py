@@ -54,6 +54,8 @@ from pydantic import ConfigDict, validate_call
 # Local imports
 try:
     from icecream import ic
+
+    ic.configureOutput(includeContext=True)
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
@@ -153,7 +155,6 @@ class Dataset:
     ) -> None:
         schema_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema]
         # determine snapshot after changes were made
-        snap = self._model.catalog.get("/").json()["snaptime"]
 
         # Construct version records for insert
         version_records = schema_path.tables["Dataset_Version"].insert(
@@ -163,11 +164,16 @@ class Dataset:
                     "Version": str(dataset.version),
                     "Description": description,
                     "Execution": execution_rid,
-                    "Snapshot": snap,
                 }
                 for dataset in dataset_list
             ]
         )
+        version_records = list(version_records)
+        snap = self._model.catalog.get("/").json()["snaptime"]
+        schema_path.tables["Dataset_Version"].update(
+                [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
+        )
+
 
         # And update the dataset records.
         schema_path.tables["Dataset"].update([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records])
