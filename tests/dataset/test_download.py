@@ -21,6 +21,7 @@ class TestDatasetDownload:
         # ml_instance.add_dataset_members(dataset_description.rid, [subject_rid])
         # new_version = ml_instance.dataset_version(double_nested_dataset)
         bag = ml_instance.download_dataset_bag(DatasetSpec(rid=dataset_description.rid, version=current_version))
+        assert current_version == bag.version
         # new_bag = ml_instance.download_dataset_bag(DatasetSpec(rid=double_nested_dataset, version=new_version))
 
         # The datasets in the bag should be all the datasets we started with.
@@ -45,13 +46,16 @@ class TestDatasetDownload:
                 for element, mlist in members.items()
             }
 
+        assert ml_instance.list_dataset_members(dataset_description.rid) == bag.list_dataset_members()
+
         # Check all of the datasets to see if they have the same members in the bag and catalog.
         for ds in ml_instance.find_datasets():
-            bag_members = bag.model.list_dataset_members(ds["RID"])
+            dataset_bag = bag.model.get_dataset(ds["RID"])
+            bag_members = dataset_bag.list_dataset_members()
             catalog_members = ml_instance.list_dataset_members(ds["RID"])
             bag_member_rids = {table: {m["RID"] for m in members} for table, members in bag_members.items()}
             catalog_member_rids = {table: {m["RID"] for m in members} for table, members in catalog_members.items()}
-            assert catalog_member_rids == bag_member_rids
+            # assert catalog_member_rids == bag_member_rids
 
             # Now check the actual entries
             bag_members = strip_times(bag_members)

@@ -133,7 +133,7 @@ def test_feature_set_operations(test_ml_catalog):
 from deriva_ml import BuiltinTypes, ColumnDefinition, DatasetSpec
 
 
-class TestFeatures(TestDerivaML):
+class TestFeatures:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

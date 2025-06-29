@@ -76,6 +76,17 @@ class TestDataBaseModel:
             assert catalog_subject == subject_table
             assert catalog_image == image_table
 
+    def test_database_methods(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        dataset_description = test_ml_catalog_dataset.dataset_description
+        current_version = ml_instance.dataset_version(dataset_description.rid)
+        current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        current_bag = ml_instance.download_dataset_bag(current_spec)
+        tables = current_bag.model.list_tables()
+        schemas = ml_instance.model.schemas
+        catalog_tables = len(schemas[ml_instance.domain_schema].tables) + len(schemas[ml_instance.ml_schema].tables)
+        assert catalog_tables == len(tables)
+
     def test_table_as_dict(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.deriva_ml
         dataset_description = test_ml_catalog_dataset.dataset_description
