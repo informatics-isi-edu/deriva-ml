@@ -78,7 +78,7 @@ def test_execution_workflow(test_ml_catalog):
     assert config.workflow.name == "ML Demo"
 
 
-class TestExecution(TestDerivaML):
+class TestExecution:
     def test_execution_no_download(self):
         self.ml_instance.add_term(
             vc.workflow_type,
