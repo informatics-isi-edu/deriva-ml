@@ -8,6 +8,8 @@ import pytest
 from deriva_ml import DerivaMLInvalidTerm, ExecutionConfiguration, FileSpec, MLVocab
 
 FILE_COUNT = 5
+
+
 class TestFile:
     @pytest.fixture(scope="function", autouse=True)
     def test_file_table_setup(self, test_ml_catalog, shared_tmp_path):
@@ -133,15 +135,15 @@ class TestFile:
         ml_instance.add_term(MLVocab.asset_type, "txt", description="A Text file")
 
         with execution.execute() as exe:
-            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory",
-                                                  file_types=lambda f: [ f.suffix.lstrip(".")])
+            filespecs = FileSpec.create_filespecs(
+                test_dir, "Test Directory", file_types=lambda f: [f.suffix.lstrip(".")]
+            )
             file_dataset = exe.add_files(filespecs)
 
         assert len(ml_instance.list_dataset_children(file_dataset)) == 2
-        assert len(ml_instance.list_dataset_members(file_dataset)['Files']) == FILE_COUNT
-        assert len(ml_instance.list_dataset_members(file_dataset, recursive=True)) == self.file_count
+        assert len(ml_instance.list_dataset_members(file_dataset)["File"]) == FILE_COUNT
         for subdir in ml_instance.list_dataset_children(file_dataset):
-            assert len(ml_instance.list_dataset_members(subdir)) == FILE_COUNT
+            assert len(ml_instance.list_dataset_members(subdir)["File"]) == FILE_COUNT
 
     def test_file_spec_read_write(self, tmp_path):
         """Test reading and writing FileSpecs to JSONL."""

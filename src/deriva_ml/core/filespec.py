@@ -12,7 +12,7 @@ from typing import Callable, Generator
 from urllib.parse import urlparse
 
 import deriva.core.utils.hash_utils as hash_utils
-from pydantic import BaseModel, conlist, field_validator, model_serializer, validate_call
+from pydantic import BaseModel, Field, conlist, field_validator, validate_call
 
 
 class FileSpec(BaseModel):
@@ -26,10 +26,10 @@ class FileSpec(BaseModel):
         file_types: A list of file types.  Each files_type should be a defined term in MLVocab.file_type vocabulary.
     """
 
-    url: str
-    md5: str
-    length: int
-    description: str | None = ""
+    url: str = Field(alias="URL", validation_alias="url")
+    md5: str = Field(alias="MD5", validation_alias="md5")
+    length: int = Field(alias="Length", validation_alias="length")
+    description: str | None = Field(default="", alias="Description", validation_alias="description")
     file_types: conlist(str) | None = []
 
     @field_validator("url")
@@ -55,15 +55,6 @@ class FileSpec(BaseModel):
             return f"tag://{gethostname()},{date.today()}:file://{url_parts.path}"
         else:
             raise ValueError("url is not a file URL")
-
-    @model_serializer()
-    def serialize_filespec(self):
-        return {
-            "URL": self.url,
-            "Description": self.description,
-            "MD5": self.md5,
-            "Length": self.length,
-        }
 
     @classmethod
     def create_filespecs(

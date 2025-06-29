@@ -20,7 +20,7 @@ import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, cast, TYPE_CHECKING
+from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 
@@ -1160,7 +1160,9 @@ class DerivaML(Dataset):
 
         # Add files to the file table, and collect up the resulting entries by directory name.
         pb = self._model.catalog.getPathBuilder()
-        file_records = list(pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump() for f in filespec_list]))
+        file_records = list(
+            pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump(by_alias=True) for f in filespec_list])
+        )
 
         # Get the name of the association table between file_table and file_type and add file_type records
         atable = self.model.find_association(MLTable.file, MLVocab.asset_type)[0].name
@@ -1245,7 +1247,7 @@ class DerivaML(Dataset):
         path = file.path
         path = path.link(asset_type.alias("AT"), on=file.RID == asset_type.columns[file_fk], join_type="left")
         if file_types:
-            path = path.filter(asset_type.columns[asset_type_fk] == any(file_types))
+            path = path.filter(asset_type.columns[asset_type_fk] == datapath.Any(*file_types))
         path = path.attributes(
             path.File.RID,
             path.File.URL,
