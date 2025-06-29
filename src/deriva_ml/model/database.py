@@ -1,5 +1,5 @@
 """This module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface
-between the BDBag representation of a dataset and a sqllite database in which the contents of the bag are stored.
+between the BDBag representation of a dataset and a sqlite database in which the contents of the bag are stored.
 """
 
 from __future__ import annotations
@@ -8,10 +8,8 @@ import json
 import logging
 import sqlite3
 from csv import reader
-from datetime import datetime, timezone
 from pathlib import Path
-from time import timezone
-from typing import Any, Generator, Optional, Sequence
+from typing import Any, Generator, Optional
 from urllib.parse import urlparse
 
 from deriva.core.ermrest_model import Model
@@ -21,6 +19,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.model.sql_mapper import SQLMapper
 
 try:
     from icecream import ic
@@ -51,7 +50,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     dataset_table is available.
 
        The sqlite database will not have any foreign key constraints applied, however, foreign-key relationships can be
-    found by looking in the ERMRest model.  In addition, as sqllite doesn't support schema, Ermrest schema are added
+    found by looking in the ERMRest model.  In addition, as sqlite doesn't support schema, Ermrest schema are added
     to the table name using the convention SchemaName:TableName.  Methods in DatasetBag that have table names as the
     argument will perform the appropriate name mappings.
 
@@ -60,7 +59,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     into DatabaseModels, is kept in the class variable `_rid_map`.
 
     Because you can load different versions of a dataset simultaneously, the dataset RID and version number are tracked,
-    and a new sqllite instance is created for every new dataset version present.
+    and a new sqlite instance is created for every new dataset version present.
 
     Attributes:
         bag_path (Path): path to the local copy of the BDBag
@@ -139,7 +138,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             version_list.append((dataset_version, self))
 
     def _load_model(self) -> None:
-        """Create a sqlite database schema that contains all the tables within the catalog from which the BDBag was created."""
+        """Create a sqlite database schema that contains all the tables within the catalog from which the BDBag
+        was created."""
         with self.dbase:
             for t in self.model.schemas[self.domain_schema].tables.values():
                 self.dbase.execute(t.sqlite3_ddl())
@@ -150,7 +150,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         """Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.
 
         If the file is for an asset table, update the FileName column of the table to have the local file path for
-        the materialized file.  Then load into the sqllite database.
+        the materialized file.  Then load into the sqlite database.
         Note: none of the foreign key constraints are included in the database.
         """
         dpath = self.bag_path / "data"
@@ -188,7 +188,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         """
         fetch_map = {}
         try:
-            with open(self.bag_path / "fetch.txt", newline="\n") as fetch_file:
+            with Path.open(self.bag_path / "fetch.txt", newline="\n") as fetch_file:
                 for row in fetch_file:
                     # Rows in fetch.text are tab seperated with URL filename.
                     fields = row.split("\t")
@@ -302,36 +302,12 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         table_name = self.normalize_table_name(table)
         table = self.name_to_table(table)
 
-        def map_value(idx: int, v: Any, time_idx, boolean_idx) -> Any:
-            """
-            Return a new value based on `data` where, for each index in `idxs`,
-            """
-            tf_map = {"t": True, "f": False}
-            if idx in boolean_idx:
-                return tf_map.get(v, v)
-            if idx in time_idx:
-                return datetime.strptime(v, "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
-            return v
-
-        def transform_tuple(data: Sequence[Any], time_idx, boolean_idx) -> Any:
-            return tuple(map_value(i, v, time_idx, boolean_idx) for i, v in enumerate(data))
-
-        with self.dbase as dbase:
-            col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
-            boolean_columns = [
-                col_names.index(c.name)
-                for c in self.model.schemas[table.schema.name].tables[table.name].columns
-                if c.type.typename == "boolean"
-            ]
-            time_columns = [
-                col_names.index(c.name)
-                for c in self.model.schemas[table.schema.name].tables[table.name].columns
-                if c.name in ["RCT", "RMT"]
-            ]
+        with self.dbase as _dbase:
+            mapper = SQLMapper(self, table.name)
             result = self.dbase.execute(f'SELECT * FROM "{table_name}"')
 
             while (row := result.fetchone()) is not None:
-                yield dict(zip(col_names, transform_tuple(row, time_columns, boolean_columns)))
+                yield mapper.transform_tuple(row)
 
     def normalize_table_name(self, table: str) -> str:
         """Attempt to insert the schema into a table name if it's not provided.
@@ -343,7 +319,6 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
           table name with schema included.
 
         """
-        sname = ""
         try:
             [sname, tname] = table.split(":")
         except ValueError:

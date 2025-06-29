@@ -9,8 +9,7 @@ import sqlite3
 # Standard library imports
 from collections import defaultdict
 from copy import copy
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Sequence, cast
+from typing import TYPE_CHECKING, Any, Generator, Iterable, cast
 
 import deriva.core.datapath as datapath
 
@@ -25,6 +24,7 @@ from pydantic import ConfigDict, validate_call
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.feature import Feature
+from deriva_ml.model.sql_mapper import SQLMapper
 
 if TYPE_CHECKING:
     from deriva_ml.model.database import DatabaseModel
@@ -175,37 +175,13 @@ class DatasetBag:
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
 
-        def map_value(idx: int, v: Any, time_idx, boolean_idx) -> Any:
-            """
-            Return a new value based on `data` where, for each index in `idxs`,
-            """
-            tf_map = {"t": True, "f": False}
-            if idx in boolean_idx:
-                return tf_map.get(v, v)
-            if idx in time_idx:
-                return datetime.strptime(v, "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
-            return v
-
-        def transform_tuple(data: Sequence[Any], time_idx, boolean_idx) -> Any:
-            return tuple(map_value(i, v, time_idx, boolean_idx) for i, v in enumerate(data))
-
         table_name = self.model.normalize_table_name(table)
         schema, table = table_name.split(":")
-        with self.database as dbase:
-            col_names = [c[1] for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
-            boolean_columns = [
-                col_names.index(c.name)
-                for c in self.model.schemas[schema].tables[table].columns
-                if c.type.typename == "boolean"
-            ]
-            time_columns = [
-                col_names.index(c.name)
-                for c in self.model.schemas[schema].tables[table].columns
-                if c.type.typename in ["ermrest_rct", "ermrest_rmt"]
-            ]
+        with self.database as _dbase:
+            mapper = SQLMapper(self.model, table)
             result = self.database.execute(self._dataset_table_view(table))
             while row := result.fetchone():
-                yield dict(zip(col_names, transform_tuple(row, time_columns, boolean_columns)))
+                yield mapper.transform_tuple(row)
 
     @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:
@@ -249,8 +225,8 @@ class DatasetBag:
                     f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
                     f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
                 )
-
-                target_entities = [dict(zip(col_names, e)) for e in db.execute(sql_cmd).fetchall()]
+                mapper = SQLMapper(self.model, sql_target)
+                target_entities = [mapper.transform_tuple(e) for e in db.execute(sql_cmd).fetchall()]
                 members[target_table.name].extend(target_entities)
 
             target_entities = []  # path.entities().fetch()
