@@ -39,7 +39,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
-TEST_DATASET_SIZE = 8
+TEST_DATASET_SIZE = 12
 
 
 def reset_demo_catalog(deriva_ml: DerivaML):

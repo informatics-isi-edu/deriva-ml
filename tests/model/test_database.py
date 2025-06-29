@@ -1,3 +1,4 @@
+from conftest import MLDatasetTest
 from deriva.core.datapath import Any
 
 from deriva_ml import DatasetSpec, DerivaML
@@ -20,14 +21,8 @@ class TestDataBaseModel:
             rid_list = {t: rid_list[t] + rids for t, rids in self.collect_rids(ds, rid_list)}
         return rid_list
 
-    def test_table_as_dict(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
-        dataset_description = test_ml_catalog_dataset.dataset_description
-        reference_datasets = test_ml_catalog_dataset.find_datasets()
-
-        dataset = dataset_description
-        current_version = ml_instance.dataset_version(dataset_description.rid)
-        dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+    def compare_catalogs(self, ml_instance: DerivaML, dataset: MLDatasetTest, dataset_spec: DatasetSpec):
+        reference_datasets = dataset.find_datasets()
 
         snapshot_catalog = DerivaML(ml_instance.host_name, ml_instance._version_snapshot(dataset_spec))
         bag = ml_instance.download_dataset_bag(dataset_spec)
@@ -81,5 +76,36 @@ class TestDataBaseModel:
             assert catalog_subject == subject_table
             assert catalog_image == image_table
 
-        def test_dataset_versions(self):
-            pass
+    def test_table_as_dict(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        dataset_description = test_ml_catalog_dataset.dataset_description
+
+        current_version = ml_instance.dataset_version(dataset_description.rid)
+        dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        self.compare_catalogs(ml_instance, test_ml_catalog_dataset, dataset_spec)
+
+    def test_table_versions(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.deriva_ml
+        dataset_description = test_ml_catalog_dataset.dataset_description
+
+        current_version = ml_instance.dataset_version(dataset_description.rid)
+        current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        self.compare_catalogs(
+            ml_instance, test_ml_catalog_dataset, DatasetSpec(rid=dataset_description.rid, version=current_version)
+        )
+
+        pb = ml_instance.pathBuilder
+        subjects = [s["RID"] for s in pb.schemas[ml_instance.domain_schema].tables["Subject"].path.entities().fetch()]
+        ml_instance.add_dataset_members(dataset_description.rid, subjects[-2:])
+        new_version = ml_instance.dataset_version(dataset_description.rid)
+        new_spec = DatasetSpec(rid=dataset_description.rid, version=new_version)
+        current_bag = ml_instance.download_dataset_bag(current_spec)
+        new_bag = ml_instance.download_dataset_bag(new_spec)
+        subjects_current = list(current_bag.get_table_as_dict("Subject"))
+        subjects_new = list(new_bag.get_table_as_dict("Subject"))
+
+        # Make sure that there is a difference between to old and new catalogs.
+        assert len(subjects_new) == len(subjects_current) + 2
+
+        self.compare_catalogs(ml_instance, test_ml_catalog_dataset, current_spec)
+        self.compare_catalogs(ml_instance, test_ml_catalog_dataset, new_spec)
