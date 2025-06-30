@@ -16,7 +16,7 @@ def test_execution_workflow(test_ml_catalog_dataset):
     """Test creating and configuring an execution workflow."""
     ml_instance = test_ml_catalog_dataset.ml_instance
     # Get dataset RIDs
-    training_dataset_rid = [ds["RID"] for ds in ml_instance.find_datasets() if "Training" in ds["Dataset_Type"]][0]
+    print(ml_instance.find_datasets())
     testing_dataset_rid = [ds["RID"] for ds in ml_instance.find_datasets() if "Testing" in ds["Dataset_Type"]][0]
     nested_dataset_rid = [ds["RID"] for ds in ml_instance.find_datasets() if "Partitioned" in ds["Dataset_Type"]][0]
 
@@ -36,7 +36,7 @@ def test_execution_workflow(test_ml_catalog_dataset):
     )
 
     # Create manual execution
-    manual_execution = test_ml_catalog.create_execution(
+    manual_execution = ml_instance.create_execution(
         ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)
     )
 
