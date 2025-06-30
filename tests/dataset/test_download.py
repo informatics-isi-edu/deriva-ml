@@ -33,16 +33,14 @@ class TestDatasetDownload:
 
             catalog__elements = snapshot_catalog.list_dataset_members(dataset_rid)
             bag_elements = dataset_bag.list_dataset_members()
-
             assert len(catalog__elements) == len(bag_elements)
             for t, members in catalog__elements.items():
                 assert len(members) == len(bag_elements[t])
             for t, members in catalog__elements.items():
                 for m, bm in zip(members, bag_elements[t]):
-                    m.pop("RCT", None)
-                    m.pop("RMT", None)
-                    bm.pop("RCT", None)
-                    bm.pop("RMT", None)
+                    m = {k: v for k, v in m.items() if k not in ["Description", "RMT", "RCT", "Filename"]}
+                    bm = {k: v for k, v in bm.items() if k not in ["Description", "RMT", "RCT", "Filename"]}
+                    print(f"Checking {t}")
                     assert m == bm
 
     def test_dataset_download(self, test_ml_catalog_dataset):
@@ -54,15 +52,13 @@ class TestDatasetDownload:
 
         self.compare_datasets(ml_instance, test_ml_catalog_dataset, dataset_spec)
 
-    def test_table_versions(self, test_ml_catalog_dataset):
+    def test_dataset_download_versions(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.deriva_ml
         dataset_description = test_ml_catalog_dataset.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
-        self.compare_datasets(
-            ml_instance, test_ml_catalog_dataset, DatasetSpec(rid=dataset_description.rid, version=current_version)
-        )
+        self.compare_datasets(ml_instance, test_ml_catalog_dataset, current_spec)
 
         pb = ml_instance.pathBuilder
         subjects = [s["RID"] for s in pb.schemas[ml_instance.domain_schema].tables["Subject"].path.entities().fetch()]

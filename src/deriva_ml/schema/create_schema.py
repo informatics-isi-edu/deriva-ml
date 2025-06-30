@@ -5,7 +5,6 @@ from importlib.resources import files
 from typing import Any, Optional
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
-from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import (
     Column,
     ForeignKey,
@@ -15,7 +14,6 @@ from deriva.core.ermrest_model import (
     Table,
     builtin_types,
 )
-from requests.exceptions import HTTPError
 
 from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
 from deriva_ml.schema.annotations import asset_annotation, generate_annotation
@@ -308,34 +306,12 @@ def create_ml_catalog(hostname: str, project_name: str) -> ErmrestCatalog:
 
 
 def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
-    builtin_schemas = ("public", ml_schema, "www", "WWW")
     model = catalog.getCatalogModel()
-
-    if sname_list := [s for s in model.schemas if s not in builtin_schemas]:
-        sname = sname_list[0]
-        for trial in range(3):
-            for t in [v for v in model.schemas[sname].tables.values()]:
-                try:
-                    t.drop()
-                except HTTPError:
-                    pass
-        model.schemas[sname].drop()
-    # Empty out remaining tables.
-    pb = catalog.getPathBuilder()
-    retry = True
-    while retry:
-        for t in pb.schemas[ML_SCHEMA].tables.values():
-            try:
-                t.delete()
-            except DataPathException as e:  # FK constraint.
-                if "Resource not found" in e.message:
-                    retry = False
-                elif "still referenced from table" in e.message:
-                    pass  # Foreign key constraint.
-                else:
-                    raise e
-
-    initialize_ml_schema(model, ml_schema)
+    schemas = [schema for sname, schema in model.schemas.items() if sname not in ["public"]]
+    for s in schemas:
+        s.drop(cascade=True)
+    create_ml_schema(catalog, ml_schema)
+    initialize_ml_schema(catalog.getCatalogModel(), ml_schema)
 
 
 def main():

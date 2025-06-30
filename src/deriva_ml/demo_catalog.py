@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import atexit
 import itertools
-import logging
 import string
 from collections.abc import Sequence
 from numbers import Integral
@@ -42,31 +41,33 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 TEST_DATASET_SIZE = 12
 
 
-def reset_demo_catalog(deriva_ml: DerivaML):
-    reset_ml_schema(deriva_ml.catalog)
-    deriva_ml.model.refresh_model()
-    create_domain_schema(deriva_ml, deriva_ml.domain_schema)
+def reset_demo_catalog(catalog: ErmrestCatalog):
+    builtin_schemas = ("public", "deriva-ml", "www", "WWW")
+    domain_schema = [s for s in catalog.getCatalogModel().schemas if s not in builtin_schemas].pop()
+    reset_ml_schema(catalog)
+    create_domain_schema(catalog, domain_schema)
 
 
-def populate_demo_catalog(deriva_ml: DerivaML, sname: str) -> None:
+def populate_demo_catalog(ml_instance: DerivaML) -> None:
     # Delete any vocabularies and features.
-    domain_schema = deriva_ml.catalog.getPathBuilder().schemas[sname]
+    domain_schema = ml_instance.pathBuilder.schemas[ml_instance.domain_schema]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
-    deriva_ml.add_term(
+
+    ml_instance.add_term(
         MLVocab.workflow_type,
         "Demo Catalog Creation",
         description="A workflow demonstrating how to create a demo catalog.",
     )
-    execution = deriva_ml.create_execution(
+    execution = ml_instance.create_execution(
         ExecutionConfiguration(
-            workflow=deriva_ml.create_workflow(name="Demo Catalog", workflow_type="Demo Catalog Creation")
+            workflow=ml_instance.create_workflow(name="Demo Catalog", workflow_type="Demo Catalog Creation")
         )
     )
     with execution.execute() as e:
         for s in ss:
             image_file = e.asset_file_path("Image", f"test_{s['RID']}.txt", Subject=s["RID"])
-            with open(image_file, "w") as f:
+            with image_file.open("w") as f:
                 f.write(f"Hello there {random()}\n")
         execution.upload_execution_outputs()
 
@@ -163,12 +164,13 @@ def dataset_spec() -> DatasetDescription:
 
 
 def create_demo_datasets(ml_instance: DerivaML) -> DatasetDescription:
+    """Create datasets from a populated catalog."""
     ml_instance.add_dataset_element_type("Subject")
     ml_instance.add_dataset_element_type("Image")
 
-    type_rid = ml_instance.add_term("Dataset_Type", "Complete", synonyms=["Whole"], description="A test")
-    training_rid = ml_instance.add_term("Dataset_Type", "Training", synonyms=["Train"], description="A training set")
-    testing_rid = ml_instance.add_term("Dataset_Type", "Testing", description="A testing set")
+    _type_rid = ml_instance.add_term("Dataset_Type", "Complete", synonyms=["Whole"], description="A test")
+    _training_rid = ml_instance.add_term("Dataset_Type", "Training", synonyms=["Train"], description="A training set")
+    _testing_rid = ml_instance.add_term("Dataset_Type", "Testing", description="A testing set")
 
     table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
@@ -192,7 +194,7 @@ def create_demo_datasets(ml_instance: DerivaML) -> DatasetDescription:
     return dataset
 
 
-def create_demo_features(ml_instance):
+def create_demo_features(ml_instance: DerivaML) -> None:
     ml_instance.create_vocabulary("SubjectHealth", "A vocab")
     ml_instance.add_term(
         "SubjectHealth",
@@ -239,7 +241,7 @@ def create_demo_features(ml_instance):
 
     subject_rids = [i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()]
     image_rids = [i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()]
-    subject_feature_list = [
+    _subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
             Execution=feature_execution.execution_rid,
@@ -253,7 +255,7 @@ def create_demo_features(ml_instance):
     bounding_box_files = []
     for i in range(10):
         bounding_box_file = feature_execution.asset_file_path("BoundingBox", f"box{i}.txt")
-        with open(bounding_box_file, "w") as fp:
+        with bounding_box_file.open("w") as fp:
             fp.write(f"Hi there {i}")
         bounding_box_files.append(bounding_box_file)
 
@@ -283,9 +285,9 @@ def create_demo_features(ml_instance):
     ]
 
     with feature_execution.execute() as execution:
-        feature_execution.add_features(image_bounding_box_feature_list)
-        feature_execution.add_features(image_quality_feature_list)
-        feature_execution.add_features(subject_feature_list)
+        execution.add_features(image_bounding_box_feature_list)
+        execution.add_features(image_quality_feature_list)
+        execution.add_features(subject_feature_list)
 
     feature_execution.upload_execution_outputs()
 
@@ -304,23 +306,23 @@ def create_demo_files(ml_instance: DerivaML):
 
     for d in [test_dir, d1, d2]:
         for i in range(5):
-            with open(d / f"file{i}.{choice(['txt', 'jpeg'])}", "w") as f:
+            fname = d / f"file{i}.{choice(['txt', 'jpeg'])}"
+            with fname.open("w") as f:
                 f.write(random_string(10))
     ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Test workflow")
 
 
-def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
+def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
     """
     Create a domain schema.  Assumes that the ml-schema has already been created.
-    :param model:
     :param sname:
     :return:
     """
-
-    _ = ml_instance.model.schemas["deriva-ml"]
+    model = catalog.getCatalogModel()
+    _ = model.schemas["deriva-ml"]
 
     try:
-        ml_instance.model.schemas[sname].drop(cascade=True)
+        model.schemas[sname].drop(cascade=True)
     except KeyError:
         pass
     except HTTPError as e:
@@ -330,15 +332,14 @@ def create_domain_schema(ml_instance: DerivaML, sname: str) -> None:
         else:
             raise e
 
-    domain_schema = ml_instance.model.create_schema(
-        Schema.define(sname, annotations={"name_style": {"underline_space": True}})
-    )
+    domain_schema = model.create_schema(Schema.define(sname, annotations={"name_style": {"underline_space": True}}))
     subject_table = domain_schema.create_table(
         Table.define("Subject", column_defs=[Column.define("Name", builtin_types.text)])
     )
-    ml_instance.create_asset("Image", referenced_tables=[subject_table])
-
-    catalog_annotation(ml_instance.model)
+    with TemporaryDirectory() as tmpdir:
+        ml_instance = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
+        ml_instance.create_asset("Image", referenced_tables=[subject_table])
+        catalog_annotation(ml_instance.model)
 
 
 def destroy_demo_catalog(catalog):
@@ -354,28 +355,22 @@ def create_demo_catalog(
     create_datasets=False,
     on_exit_delete=True,
 ) -> ErmrestCatalog:
+    test_catalog = create_ml_catalog(hostname, project_name=project_name)
+    if on_exit_delete:
+        atexit.register(destroy_demo_catalog, test_catalog)
     try:
         with TemporaryDirectory() as tmpdir:
-            test_catalog = create_ml_catalog(hostname, project_name=project_name)
-            if on_exit_delete:
-                atexit.register(destroy_demo_catalog, test_catalog)
-
-            deriva_ml = DerivaML(
-                hostname=hostname,
-                catalog_id=test_catalog.catalog_id,
-                project_name=project_name,
-                domain_schema=domain_schema,
-                logging_level=logging.WARN,
-                working_dir=tmpdir,
+            create_domain_schema(test_catalog, domain_schema)
+            ml_instance = DerivaML(
+                hostname, catalog_id=test_catalog.catalog_id, domain_schema=domain_schema, working_dir=tmpdir
             )
-            create_domain_schema(deriva_ml, domain_schema)
 
             if populate or create_features or create_datasets:
-                populate_demo_catalog(deriva_ml, domain_schema)
+                populate_demo_catalog(ml_instance)
                 if create_features:
-                    create_demo_features(deriva_ml)
+                    create_demo_features(ml_instance)
                 if create_datasets:
-                    create_demo_datasets(deriva_ml)
+                    create_demo_datasets(ml_instance)
 
     except Exception:
         # on failure, delete catalog and re-raise exception
