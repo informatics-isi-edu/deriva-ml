@@ -11,8 +11,8 @@ FILE_COUNT = 5
 
 
 class TestFile:
-    @pytest.fixture(scope="function", autouse=True)
-    def test_file_table_setup(self, test_ml_catalog, shared_tmp_path):
+    @pytest.fixture(scope="function")
+    def test_file_table_setup(self, test_ml_catalog, tmp_path):
         def random_string(length: int) -> str:
             alphabet = string.ascii_letters + string.digits
             return "".join(choices(alphabet, k=length))
@@ -23,7 +23,7 @@ class TestFile:
         self.execution = self.ml_instance.create_execution(
             ExecutionConfiguration(workflow=self.workflow, description="Test Execution")
         )
-        self.test_dir = Path(shared_tmp_path) / "test_dir"
+        self.test_dir = Path(tmp_path) / "test_dir"
         self.test_dir.mkdir(parents=True, exist_ok=True)
         d1 = self.test_dir / "d1"
         d1.mkdir(parents=True, exist_ok=True)

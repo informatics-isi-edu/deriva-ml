@@ -77,7 +77,7 @@ class TestDataBaseModel:
             assert catalog_image == image_table
 
     def test_database_methods(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
         current_version = ml_instance.dataset_version(dataset_description.rid)
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
@@ -88,7 +88,7 @@ class TestDataBaseModel:
         assert catalog_tables == len(tables)
 
     def test_table_as_dict(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
@@ -96,7 +96,7 @@ class TestDataBaseModel:
         self.compare_catalogs(ml_instance, test_ml_catalog_dataset, dataset_spec)
 
     def test_table_versions(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)

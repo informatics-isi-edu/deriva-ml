@@ -7,7 +7,7 @@ from deriva_ml.demo_catalog import (
 )
 
 
-class TestUpload(TestDerivaML):
+class TestUpload:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -24,7 +24,7 @@ class TestUpload(TestDerivaML):
         assets = list(
             self.ml_instance.catalog.getPathBuilder().schemas[self.domain_schema].tables["FooBar"].entities().fetch()
         )
-        self.assertEqual(len(assets), 2)
+        assert len(assets) == 2
 
     def test_upload_directory_metadata(self):
         reset_demo_catalog(self.ml_instance, self.domain_schema)
@@ -40,8 +40,8 @@ class TestUpload(TestDerivaML):
         assets = list(
             self.ml_instance.catalog.getPathBuilder().schemas[self.domain_schema].tables["Image"].entities().fetch()
         )
-        self.assertIn(assets[0]["Subject"], [s["RID"] for s in ss])
-        self.assertEqual(len(assets), 2)
+        assert assets[0]["Subject"] in [s["RID"] for s in ss]
+        assert len(assets) == 2
 
     def test_upload_execution_outputs(self):
         reset_demo_catalog(self.ml_instance, self.domain_schema)
@@ -51,7 +51,7 @@ class TestUpload(TestDerivaML):
             description="Initial setup of Model File",
         )
         self.ml_instance.add_term(
-            MLVocab.execution_asset_type,
+            MLVocab.asset_type,
             "API_Model",
             description="Model for our API workflow",
         )
@@ -74,8 +74,8 @@ class TestUpload(TestDerivaML):
         # Now upload the file and retrieve the RID of the new asset from the returned results.
         manual_execution.upload_execution_outputs()
         path = self.ml_instance.catalog.getPathBuilder().schemas["deriva-ml"]
-        self.assertEqual(1, len(list(path.Execution_Asset.entities().fetch())))
+        assert 1 == len(list(path.Execution_Asset.entities().fetch()))
 
         execution_metadata = list(path.Execution_Metadata.entities().fetch())
         print([m for m in execution_metadata])
-        self.assertEqual(2, len(execution_metadata))
+        assert 2 == len(execution_metadata)

@@ -1,14 +1,8 @@
-from demo_catalog import DatasetDescription
 from deriva_ml import (
-    BuiltinTypes,
-    ColumnDefinition,
-    DatasetSpec,
     DatasetVersion,
-    ExecutionConfiguration,
-    MLVocab,
-    TableDefinition,
     VersionPart,
 )
+
 
 class TestDatasetVersion:
     def test_dataset_version_simple(self, test_ml_catalog):
@@ -25,7 +19,7 @@ class TestDatasetVersion:
         assert "1.1.0" == str(v1)
 
     def test_dataset_version(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
 
         nested_datasets = dataset_description.member_rids.get("Dataset", [])
@@ -48,6 +42,3 @@ class TestDatasetVersion:
 
         assert new_versions["d0"].major == 2
         assert new_versions["d2"][0].major == 2
-
-
-

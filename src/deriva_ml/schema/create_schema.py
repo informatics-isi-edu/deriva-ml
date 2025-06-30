@@ -307,11 +307,11 @@ def create_ml_catalog(hostname: str, project_name: str) -> ErmrestCatalog:
 
 def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
     model = catalog.getCatalogModel()
-    schemas = [schema for sname, schema in model.schemas.items() if sname not in ["public"]]
+    schemas = [schema for sname, schema in model.schemas.items() if sname not in ["public", "WWW"]]
     for s in schemas:
         s.drop(cascade=True)
+        print(f"Dropping, {s.name}")
     create_ml_schema(catalog, ml_schema)
-    initialize_ml_schema(catalog.getCatalogModel(), ml_schema)
 
 
 def main():

@@ -119,7 +119,7 @@ class TestDataset:
         assert str(ml_instance.dataset_version(dataset_rid)) == "1.2.0"
 
     def test_dataset_members_nested(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
         catalog_datasets = ml_instance.find_datasets()
         reference_datasets = test_ml_catalog_dataset.find_datasets()
@@ -147,7 +147,7 @@ class TestDataset:
         check_relationships(dataset_description)
 
     def test_dataset_members_recurse(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
 
         def collect_rids(description: DatasetDescription):

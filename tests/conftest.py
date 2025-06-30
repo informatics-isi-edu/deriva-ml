@@ -12,7 +12,6 @@ from deriva_ml import RID, DerivaML
 from deriva_ml.demo_catalog import (
     create_demo_catalog,
     create_demo_datasets,
-    create_demo_features,
     populate_demo_catalog,
     reset_demo_catalog,
 )
@@ -42,7 +41,8 @@ class MLCatalog:
 class MLDatasetTest:
     def __init__(self, catalog: MLCatalog, tmp_dir: Path):
         reset_demo_catalog(catalog.catalog)
-        self.ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, working_dir=tmp_dir)
+        self.ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, working_dir=tmp_dir, use_minid=False)
+
         populate_demo_catalog(self.ml_instance)
         self.dataset_description: DatasetDescription = create_demo_datasets(self.ml_instance)
         self.catalog = catalog
@@ -102,8 +102,6 @@ def test_ml_catalog_populated(ml_catalog, tmp_path):
     reset_demo_catalog(ml_catalog.catalog)
     ml_instance = DerivaML(ml_catalog.hostname, ml_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
     populate_demo_catalog(ml_instance)
-    create_demo_features(ml_instance.catalog)
-    create_demo_datasets(ml_instance)
     return ml_instance
 
 
