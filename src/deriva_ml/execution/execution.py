@@ -592,7 +592,7 @@ class Execution:
         hs = HatracStore("https", self._ml_object.host_name, self._ml_object.credential)
         hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
 
-        asset_type_table = self._model.find_association(asset_table, MLVocab.asset_type)
+        asset_type_table, _col_l, _col_r = self._model.find_association(asset_table, MLVocab.asset_type)
         type_path = self._ml_object.pathBuilder.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
         asset_types = [
             asset_type[MLVocab.asset_type.value]

@@ -219,3 +219,4 @@ class ExecAssetType(BaseStrEnum):
     input_file = "Input_File"
     output_file = "Output_File"
     notebook_output = "Notebook_Output"
+    model_file = "Model_File"

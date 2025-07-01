@@ -4,6 +4,8 @@ __all__ = [
     "DerivaMLInvalidTerm",
     "DerivaMLTableTypeError",
     "Execution",
+    "ExecAssetType",
+    "ExecMetadataType",
     "Workflow",
     "DatasetBag",
     "DatasetVersion",
@@ -14,6 +16,7 @@ __all__ = [
     "BuiltinTypes",
     "ColumnDefinition",
     "MLVocab",
+    "MLAsset",
     "TableDefinition",
     "ExecutionConfiguration",
 ]
@@ -25,7 +28,10 @@ from deriva_ml.core import (
     BuiltinTypes,
     ColumnDefinition,
     DerivaML,
+    ExecAssetType,
+    ExecMetadataType,
     FileSpec,
+    MLAsset,
     MLVocab,
     TableDefinition,
 )

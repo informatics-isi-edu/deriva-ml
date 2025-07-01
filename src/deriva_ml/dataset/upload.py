@@ -70,7 +70,9 @@ upload_root_regex = f"(?i)^.*{SEP}deriva-ml"
 exec_dir_regex = upload_root_regex + f"{SEP}execution{SEP}(?P<execution_rid>[-\\w]+)"
 
 feature_dir_regex = exec_dir_regex + f"{SEP}feature"
-feature_table_dir_regex = feature_dir_regex + f"{SEP}(?P<schema>[-\\w]+){SEP}(?P<target_table>[-\\w]+){SEP}(?P<feature_name>[-\\w]+)"
+feature_table_dir_regex = (
+    feature_dir_regex + f"{SEP}(?P<schema>[-\\w]+){SEP}(?P<target_table>[-\\w]+){SEP}(?P<feature_name>[-\\w]+)"
+)
 feature_value_regex = feature_table_dir_regex + f"{SEP}(?P=feature_name)[.](?P<ext>[(csv|json)]*)$"
 feature_asset_dir_regex = feature_table_dir_regex + f"{SEP}asset{SEP}(?P<asset_table>[-\\w]+)"
 feature_asset_regex = feature_asset_dir_regex + f"{SEP}(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
@@ -89,10 +91,10 @@ def is_feature_dir(path: Path) -> Optional[re.Match]:
 
 def normalize_asset_dir(path: str) -> Optional[tuple[str, str]]:
     """Parse a path to an asset file and return the asset table name and file name.
-    
+
     Args:
         path: Path to the asset file
-        
+
     Returns:
         Tuple of (schema/table, filename) or None if path doesn't match pattern
     """
@@ -287,9 +289,9 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
 
     # Now upload the files by creating an upload spec and then calling the uploader.
     with TemporaryDirectory() as temp_dir:
-        spec_file = f"{temp_dir}/config.json"
+        spec_file = Path(temp_dir) / "config.json"
 
-        with open(spec_file, "w+") as cfile:
+        with spec_file.open("w+") as cfile:
             json.dump(bulk_upload_configuration(model), cfile)
         uploader = GenericUploader(
             server={

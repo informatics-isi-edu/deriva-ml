@@ -634,7 +634,7 @@ class DerivaML(Dataset):
         asset_annotation(asset_table)
         return asset_table
 
-    def list_assets(self, asset_table: Table | str):
+    def list_assets(self, asset_table: Table | str) -> list[dict[str, Any]]:
         """Lists contents of an asset table.
 
         Returns a list of assets with their types for the specified asset table.
@@ -666,6 +666,7 @@ class DerivaML(Dataset):
         asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
         (
             asset_type_table,
+            _,
             _,
         ) = self._model.find_association(asset_table, MLVocab.asset_type)
         type_path = pb.schemas[asset_type_table.schema.name].tables[asset_type_table.name]

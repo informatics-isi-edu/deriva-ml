@@ -44,7 +44,7 @@ class TestDatasetDownload:
                     assert m == bm
 
     def test_dataset_download(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
@@ -53,7 +53,7 @@ class TestDatasetDownload:
         self.compare_datasets(ml_instance, test_ml_catalog_dataset, dataset_spec)
 
     def test_dataset_download_versions(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.deriva_ml
+        ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
