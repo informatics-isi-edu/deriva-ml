@@ -26,6 +26,7 @@ class TestFeatures:
 
     def test_lookup_feature(self, test_ml_catalog_populated):
         ml_instance = test_ml_catalog_populated
+        print(ml_instance.lookup_feature("Subject", "Health").feature_name)
         assert "Health" == ml_instance.lookup_feature("Subject", "Health").feature_name
         with pytest.raises(DerivaMLException):
             ml_instance.lookup_feature("Foobar", "Health")
