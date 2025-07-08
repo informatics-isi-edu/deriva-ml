@@ -614,7 +614,6 @@ class Dataset:
             ...     description="Added sample data"
             ... )
         """
-        members = set(members)
         description = description or "Updated dataset via add_dataset_members"
 
         def check_dataset_cycle(member_rid, path=None):
@@ -644,6 +643,7 @@ class Dataset:
 
         # Get a list of all the object types that can be linked to a dataset_table.
         if type(members) is list:
+            members = set(members)
             for m in members:
                 try:
                     rid_info = self._model.catalog.resolve_rid(m)
@@ -655,7 +655,7 @@ class Dataset:
                     raise DerivaMLException("Creating cycle of datasets is not allowed")
                 dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
         else:
-            dataset_elements = members
+            dataset_elements = {t: set(ms) for t, ms in members.items()}
         # Now make the entries into the association tables.
         pb = self._model.catalog.getPathBuilder()
         for table, elements in dataset_elements.items():
