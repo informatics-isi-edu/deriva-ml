@@ -582,7 +582,7 @@ class Dataset:
     def add_dataset_members(
         self,
         dataset_rid: RID,
-        members: list[RID],
+        members: list[RID] | dict[str, list[RID]],
         validate: bool = True,
         description: str | None = "",
         execution_rid: RID | None = None,
@@ -594,7 +594,8 @@ class Dataset:
 
         Args:
             dataset_rid: Resource Identifier of the dataset.
-            members: List of RIDs to add as dataset members.
+            members: List of RIDs to add as dataset members. Can be orginized into a dictionary that indicates the
+                table that the member rids belong to.
             validate: Whether to validate member types. Defaults to True.
             description: Optional description of the member additions.
             execution_rid: Optional execution RID to associate with changes.
@@ -642,16 +643,19 @@ class Dataset:
         }
 
         # Get a list of all the object types that can be linked to a dataset_table.
-        for m in members:
-            try:
-                rid_info = self._model.catalog.resolve_rid(m)
-            except KeyError:
-                raise DerivaMLException(f"Invalid RID: {m}")
-            if rid_info.table.name not in association_map:
-                raise DerivaMLException(f"RID table: {rid_info.table.name} not part of dataset_table")
-            if rid_info.table == self._dataset_table and check_dataset_cycle(rid_info.rid):
-                raise DerivaMLException("Creating cycle of datasets is not allowed")
-            dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
+        if type(members) is list:
+            for m in members:
+                try:
+                    rid_info = self._model.catalog.resolve_rid(m)
+                except KeyError:
+                    raise DerivaMLException(f"Invalid RID: {m}")
+                if rid_info.table.name not in association_map:
+                    raise DerivaMLException(f"RID table: {rid_info.table.name} not part of dataset_table")
+                if rid_info.table == self._dataset_table and check_dataset_cycle(rid_info.rid):
+                    raise DerivaMLException("Creating cycle of datasets is not allowed")
+                dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
+        else:
+            dataset_elements = members
         # Now make the entries into the association tables.
         pb = self._model.catalog.getPathBuilder()
         for table, elements in dataset_elements.items():
