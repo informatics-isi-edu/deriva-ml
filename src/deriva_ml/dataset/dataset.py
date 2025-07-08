@@ -171,9 +171,8 @@ class Dataset:
         version_records = list(version_records)
         snap = self._model.catalog.get("/").json()["snaptime"]
         schema_path.tables["Dataset_Version"].update(
-                [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
+            [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
         )
-
 
         # And update the dataset records.
         schema_path.tables["Dataset"].update([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records])
@@ -575,7 +574,7 @@ class Dataset:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in target_entities]
                 for ds in nested_datasets:
-                    for k, v in self.list_dataset_members(ds, recurse=False).items():
+                    for k, v in self.list_dataset_members(ds, recurse=recurse).items():
                         members[k].extend(v)
         return dict(members)
 

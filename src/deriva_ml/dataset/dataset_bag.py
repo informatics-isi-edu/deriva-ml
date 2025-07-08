@@ -198,9 +198,12 @@ class DatasetBag:
         # the appropriate association table.
         members = defaultdict(list)
         for assoc_table in self._dataset_table.find_associations():
-            other_fkey = assoc_table.other_fkeys.pop()
-            self_fkey = assoc_table.self_fkey
-            target_table = other_fkey.pk_table
+            member_fkey = assoc_table.other_fkeys.pop()
+            if member_fkey.pk_table.name == "Dataset" and member_fkey.foreign_key_columns[0].name != "Nested_Dataset":
+                # Sometimes find_assoc gets confused on Dataset_Dataset.
+                member_fkey = assoc_table.self_fkey
+
+            target_table = member_fkey.pk_table
             member_table = assoc_table.table
 
             if target_table.schema.name != self.model.domain_schema and not (
@@ -208,15 +211,11 @@ class DatasetBag:
             ):
                 # Look at domain tables and nested datasets.
                 continue
-            if target_table == self._dataset_table:
-                # find_assoc gives us the keys in the wrong position, so swap.
-                self_fkey, other_fkey = other_fkey, self_fkey
             sql_target = self.model.normalize_table_name(target_table.name)
             sql_member = self.model.normalize_table_name(member_table.name)
 
             # Get the names of the columns that we are going to need for linking
-            member_link = tuple(c.name for c in next(iter(other_fkey.column_map.items())))
-
+            member_link = tuple(c.name for c in next(iter(member_fkey.column_map.items())))
             with self.database as db:
                 col_names = [c[1] for c in db.execute(f'PRAGMA table_info("{sql_target}")').fetchall()]
                 select_cols = ",".join([f'"{sql_target}".{c}' for c in col_names])
@@ -228,7 +227,6 @@ class DatasetBag:
                 mapper = SQLMapper(self.model, sql_target)
                 target_entities = [mapper.transform_tuple(e) for e in db.execute(sql_cmd).fetchall()]
                 members[target_table.name].extend(target_entities)
-
             target_entities = []  # path.entities().fetch()
             members[target_table.name].extend(target_entities)
             if recurse and target_table.name == self._dataset_table:
@@ -262,9 +260,11 @@ class DatasetBag:
         """
         feature = self.model.lookup_feature(table, feature_name)
         feature_table = self.model.normalize_table_name(feature.feature_table.name)
+
         with self.database as db:
+            col_names = [c[1] for c in db.execute(f'PRAGMA table_info("{feature_table}")').fetchall()]
             sql_cmd = f'SELECT * FROM "{feature_table}"'
-            return cast(datapath._ResultSet, db.execute(sql_cmd).fetchall())
+            return cast(datapath._ResultSet, [dict(zip(col_names, r)) for r in db.execute(sql_cmd).fetchall()])
 
     def list_dataset_children(self, recurse: bool = False) -> list[DatasetBag]:
         """Get nested datasets.

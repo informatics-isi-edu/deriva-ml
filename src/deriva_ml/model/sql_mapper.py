@@ -37,7 +37,7 @@ class SQLMapper:
         if idx in self.boolean_columns:
             return tf_map.get(v, v)
         if idx in self.time_columns:
-            return datetime.strptime(v, "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc)
+            return datetime.strptime(v, "%Y-%m-%d %H:%M:%S.%f+00").replace(tzinfo=timezone.utc).isoformat()
         return v
 
     def transform_tuple(self, data: Sequence[Any]) -> Any:

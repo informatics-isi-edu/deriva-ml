@@ -938,6 +938,8 @@ class Execution:
         Associates feature records with this execution and uploads them to the catalog.
         Features represent measurable properties or characteristics of records.
 
+        NOTE: The catalog is not updated until upload_execution_outputs() is called.
+
         Args:
             features: Feature records to add, each containing a value and metadata.
 
@@ -967,7 +969,7 @@ class Execution:
             feature_name=feature.feature_name,
             exec_rid=self.execution_rid,
         )
-        with open(json_path, "a", encoding="utf-8") as file:
+        with json_path.open("a", encoding="utf-8") as file:
             for feature in features:
                 feature.Execution = self.execution_rid
                 file.write(json.dumps(feature.model_dump(mode="json")) + "\n")

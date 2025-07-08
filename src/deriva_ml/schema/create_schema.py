@@ -18,6 +18,11 @@ from deriva.core.ermrest_model import (
 from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
 from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 def create_dataset_table(
     schema: Schema,
@@ -311,6 +316,7 @@ def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
     schemas = [schema for sname, schema in model.schemas.items() if sname not in ["public", "WWW"]]
     for s in schemas:
         s.drop(cascade=True)
+    model = catalog.getCatalogModel()
     create_ml_schema(catalog, ml_schema)
 
 

@@ -173,7 +173,9 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                 value_template = ",".join(["?"] * len(column_names))  # SQL placeholder for row (?,?..)
                 column_list = ",".join([f'"{c}"' for c in column_names])
                 with self.dbase:
-                    object_table = (self._localize_asset(o, asset_indexes, asset_map) for o in csv_reader)
+                    object_table = (
+                        self._localize_asset(o, asset_indexes, asset_map, table == "Dataset") for o in csv_reader
+                    )
                     self.dbase.executemany(
                         f'INSERT OR REPLACE INTO "{schema}:{table}" ({column_list}) VALUES ({value_template})',
                         object_table,
@@ -215,7 +217,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         return asset_columns.issubset({c.name for c in asset_table.columns})
 
     @staticmethod
-    def _localize_asset(o: list, indexes: tuple[int, int], asset_map: dict[str, str]) -> tuple:
+    def _localize_asset(o: list, indexes: tuple[int, int], asset_map: dict[str, str], debug: bool == False) -> tuple:
         """Given a list of column values for a table, replace the FileName column with the local file name based on
         the URL value.
 

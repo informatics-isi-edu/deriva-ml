@@ -32,7 +32,7 @@ class MLCatalog:
         self.catalog_id = self.catalog.catalog_id
         self.hostname = hostname
         self.domain_schema = "ml-test"
-        print("🚀 Created demo catalog")
+        print(f"🚀 Created demo catalog {self.catalog_id}")
 
     def cleanup(self):
         print("Deleting demo catalog")
@@ -41,15 +41,17 @@ class MLCatalog:
 
 class MLDatasetTest:
     def __init__(self, catalog: MLCatalog, tmp_dir: Path):
+        print("Resetting catalog for testing...\n")
         reset_demo_catalog(catalog.catalog)
         self.ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, working_dir=tmp_dir, use_minid=False)
-
         populate_demo_catalog(self.ml_instance)
+        create_demo_features(self.ml_instance)
         self.dataset_description: DatasetDescription = create_demo_datasets(self.ml_instance)
         self.catalog = catalog
 
     def find_datasets(self) -> dict[RID, list[RID]]:
-        """Return a dictionary that whose key is a dataset RID and whose value is a dictionary of member dataset RIDs."""
+        """Return a dictionary that whose key is a dataset RID and whose value is a dictionary of member dataset RIDs.
+        grouped by element typee"""
         return self._find_datasets(self.dataset_description)
 
     def _find_datasets(self, dataset: DatasetDescription) -> dict[RID, list[RID]]:
@@ -59,14 +61,6 @@ class MLDatasetTest:
             for member_type, member_list in self._find_datasets(dset).items()
             if member_list != []
         }
-
-    def member_list(self) -> list[tuple[RID, list[RID]]]:
-        return self._member_list(self.dataset_description)
-
-    def _member_list(self, dataset: DatasetDescription) -> list[tuple[RID, list[RID]]]:
-        return [(dataset.rid, dataset.member_rids)] + [
-            self._member_list(d) for t, d in dataset.members.items() if t == "Dataset"
-        ]
 
 
 @pytest.fixture(scope="session")
@@ -103,8 +97,6 @@ def test_ml_catalog_populated(ml_catalog, tmp_path):
     reset_demo_catalog(ml_catalog.catalog)
     ml_instance = DerivaML(ml_catalog.hostname, ml_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
     populate_demo_catalog(ml_instance)
-    create_demo_features(ml_instance)
-    create_demo_datasets(ml_instance)
     return ml_instance
 
 
@@ -113,6 +105,16 @@ def test_ml_catalog_dataset(ml_catalog, tmp_path):
     """Create a demo ML instance for testing with populated domain schema.   Resets after each test."""
     print("Setting up catalog with datasets for testing... ", end="")
     return MLDatasetTest(ml_catalog, tmp_path)
+
+
+@pytest.fixture(scope="function")
+def test_ml_demo_catalog(ml_catalog, tmp_path):
+    reset_demo_catalog(ml_catalog.catalog)
+    ml_instance = DerivaML(ml_catalog.hostname, ml_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
+    populate_demo_catalog(ml_instance)
+    create_demo_features(ml_instance)
+    create_demo_datasets(ml_instance)
+    return ml_instance
 
 
 @pytest.fixture
