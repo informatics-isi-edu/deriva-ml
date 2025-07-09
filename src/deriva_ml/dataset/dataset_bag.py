@@ -320,15 +320,14 @@ class DatasetBag:
                 >>> term = ml.lookup_term("tissue_types", "epithelium")
         """
         # Get and validate vocabulary table reference
-        ic()
         vocab_table = self.model.normalize_table_name(table)
-        if not self.model.is_vocabulary(vocab_table):
+        if not self.model.is_vocabulary(table):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
         # Search for term by name or synonym
         for term in self.get_table_as_dict(vocab_table):
-            ic(term)
             if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
+                term["Synonyms"] = list(term["Synonyms"])
                 return VocabularyTerm.model_validate(term)
 
         # Term not found
