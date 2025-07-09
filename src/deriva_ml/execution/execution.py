@@ -996,7 +996,7 @@ class Execution:
     def add_dataset_members(
         self,
         dataset_rid: RID,
-        members: List[RID],
+        members: list[RID] | dict[str, list[RID]],
         validate: bool = True,
         description: str = "",
     ) -> None:

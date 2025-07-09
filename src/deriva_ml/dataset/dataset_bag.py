@@ -21,8 +21,8 @@ from deriva.core.ermrest_model import Column, Table
 from pydantic import ConfigDict, validate_call
 
 # Local imports
-from deriva_ml.core.definitions import RID
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.definitions import RID, VocabularyTerm
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
 from deriva_ml.feature import Feature
 from deriva_ml.model.sql_mapper import SQLMapper
 
@@ -227,13 +227,13 @@ class DatasetBag:
                 mapper = SQLMapper(self.model, sql_target)
                 target_entities = [mapper.transform_tuple(e) for e in db.execute(sql_cmd).fetchall()]
                 members[target_table.name].extend(target_entities)
-            target_entities = []  # path.entities().fetch()
             members[target_table.name].extend(target_entities)
-            if recurse and target_table.name == self._dataset_table:
+            if recurse and (target_table.name == self._dataset_table.name):
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in target_entities]
                 for ds in nested_datasets:
-                    for k, v in DatasetBag.list_dataset_members(ds, recurse=False).items():
+                    nested_dataset = self.model.get_dataset(ds)
+                    for k, v in nested_dataset.list_dataset_members(recurse=recurse).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -293,6 +293,46 @@ class DatasetBag:
             for child in nested:
                 result.extend(child.list_dataset_children(recurse))
         return result
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
+        """Finds a term in a vocabulary table.
+
+        Searches for a term in the specified vocabulary table, matching either the primary name
+        or any of its synonyms.
+
+        Args:
+            table: Vocabulary table to search in (name or Table object).
+            term_name: Name or synonym of the term to find.
+
+        Returns:
+            VocabularyTerm: The matching vocabulary term.
+
+        Raises:
+            DerivaMLVocabularyException: If the table is not a vocabulary table, or term is not found.
+
+        Examples:
+            Look up by primary name:
+                >>> term = ml.lookup_term("tissue_types", "epithelial")
+                >>> print(term.description)
+
+            Look up by synonym:
+                >>> term = ml.lookup_term("tissue_types", "epithelium")
+        """
+        # Get and validate vocabulary table reference
+        ic()
+        vocab_table = self.model.normalize_table_name(table)
+        if not self.model.is_vocabulary(vocab_table):
+            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
+
+        # Search for term by name or synonym
+        for term in self.get_table_as_dict(vocab_table):
+            ic(term)
+            if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
+                return VocabularyTerm.model_validate(term)
+
+        # Term not found
+        raise DerivaMLInvalidTerm(vocab_table, term_name)
 
 
 # Add annotations after definition to deal with forward reference issues in pydantic
