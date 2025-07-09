@@ -3,7 +3,7 @@ from pathlib import Path
 from conftest import MLDatasetTest
 
 # Local imports
-from deriva_ml import DatasetSpec, DerivaML
+from deriva_ml import DatasetSpec, DerivaML, MLVocab
 from deriva_ml.demo_catalog import DatasetDescription
 
 
@@ -16,7 +16,7 @@ class TestDatasetDownload:
         }
         return {dataset_description.rid} | nested_datasets
 
-    def compare_datasets(self, ml_instance: DerivaML, dataset: MLDatasetTest, dataset_spec: DatasetSpec):
+    def compare_datasets(self, ml_instance: DerivaML, dataset: MLDatasetTest, dataset_spec: DatasetSpec, recurse=False):
         reference_datasets = self.list_datasets(dataset.dataset_description)
 
         snapshot_catalog = DerivaML(ml_instance.host_name, ml_instance._version_snapshot(dataset_spec))
@@ -33,11 +33,14 @@ class TestDatasetDownload:
         # Now look at each dataset to see if they line up.
         for dataset_rid in reference_datasets:
             dataset_bag = bag.model.get_dataset(dataset_rid)
-            catalog_elements = snapshot_catalog.list_dataset_members(dataset_rid)
-            bag_elements = dataset_bag.list_dataset_members()
+            catalog_elements = snapshot_catalog.list_dataset_members(dataset_rid, recurse=recurse)
+            bag_elements = dataset_bag.list_dataset_members(recurse=recurse)
             assert len(catalog_elements) == len(bag_elements)
 
+            print("catalog_elements", catalog_elements["Subject"])
+            print(bag_elements["Subject"])
             for t, members in catalog_elements.items():
+                print("Checking element", t, len(members), len(bag_elements[t]))
                 bag_members = bag_elements[t]
                 bag_members.sort(key=lambda x: x["RID"])
                 members.sort(key=lambda x: x["RID"])
@@ -48,21 +51,40 @@ class TestDatasetDownload:
                     bm = {k: v for k, v in bm.items() if k not in skip_keys}
                     assert m == bm
 
-    def test_bag_datasets(self, test_ml_catalog_dataset):
+    def test_bag_dataset_find(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
         current_version = ml_instance.dataset_version(dataset_description.rid)
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
 
-        dbase_catalog = bag.model
-        reference_datasets = self.list_datasets(dataset_description)
-        assert reference_datasets == {ds["RID"] for ds in dbase_catalog.find_datasets()}
-        bag_members = {
-            table: [m["RID"] for m in members] for table, members in bag.list_dataset_members().items() if members
-        }
-        dataset_members = {table: rids for table, rids in dataset_description.member_rids.items() if rids != []}
-        assert dataset_members == bag_members
+        reference_datasets = {ds.rid for ds in test_ml_catalog_dataset.list_datasets(dataset_description)}
+        assert reference_datasets == {ds["RID"] for ds in bag.model.find_datasets()}
+
+        for ds in bag.model.find_datasets():
+            dataset_types = ds["Dataset_Type"]
+            for t in dataset_types:
+                assert bag.lookup_term(MLVocab.dataset_type, t) is not None
+
+        # Now check top level nesting
+        assert set(dataset_description.member_rids["Dataset"]) == set(
+            ml_instance.list_dataset_children(dataset_description.rid)
+        )
+        # Now look two levels down
+        for ds in dataset_description.members["Dataset"]:
+            assert set(ds.member_rids["Dataset"]) == set(ml_instance.list_dataset_children(ds.rid))
+
+        def check_relationships(description: DatasetDescription):
+            """Check relationships between datasets."""
+            dataset_children = ml_instance.list_dataset_children(description.rid)
+            assert set(description.member_rids.get("Dataset", [])) == set(dataset_children)
+
+            for child in dataset_children:
+                assert ml_instance.list_dataset_parents(child)[0] == description.rid
+            for nested_dataset in description.members.get("Dataset", []):
+                check_relationships(nested_dataset)
+
+        check_relationships(dataset_description)
 
     def test_dataset_download(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.ml_instance
@@ -72,6 +94,25 @@ class TestDatasetDownload:
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
 
         self.compare_datasets(ml_instance, test_ml_catalog_dataset, dataset_spec)
+
+    def test_dataset_download_recurse(self, test_ml_catalog_dataset):
+        ml_instance = test_ml_catalog_dataset.ml_instance
+        dataset_description = test_ml_catalog_dataset.dataset_description
+        reference_datasets = test_ml_catalog_dataset.list_datasets(dataset_description)
+
+        current_version = ml_instance.dataset_version(dataset_description.rid)
+        dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        bag = ml_instance.download_dataset_bag(dataset_spec)
+
+        for dataset in reference_datasets:
+            reference_members = test_ml_catalog_dataset.collect_rids(dataset)
+            member_rids = {dataset.rid}
+            dataset_bag = bag.model.get_dataset(dataset.rid)
+            for member_type, dataset_members in dataset_bag.list_dataset_members(recurse=True).items():
+                if member_type == "File":
+                    continue
+                member_rids |= {e["RID"] for e in dataset_members}
+            assert reference_members == member_rids
 
     def test_dataset_download_versions(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.ml_instance

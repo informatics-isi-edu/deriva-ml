@@ -47,31 +47,13 @@ class TestDataset:
         assert new_dataset["Description"] == "Dataset for testing"
         assert new_dataset["Dataset_Type"] == ["Testing"]
 
-    def list_datasets(self, dataset_description: DatasetDescription) -> set[str]:
-        nested_datasets = {
-            ds
-            for dset_member in dataset_description.members.get("Dataset", [])
-            for ds in self.list_datasets(dset_member)
-        }
-        return {dataset_description.rid} | nested_datasets
-
-    def collect_rids(self, description: DatasetDescription) -> set[str]:
-        """Collect rids for a dataset and its nested datasets."""
-        rids = {description.rid}
-        for member_type, member_descriptor in description.members.items():
-            rids |= set(description.member_rids.get(member_type, []))
-            if member_type == "Dataset":
-                for dataset in member_descriptor:
-                    rids |= self.collect_rids(dataset)
-        return rids
-
     def test_dataset_find(self, test_ml_catalog_dataset):
         """Test finding datasets."""
         # Find all datasets
         ml_instance = test_ml_catalog_dataset.ml_instance
         dset_description = test_ml_catalog_dataset.dataset_description
 
-        reference_datasets = self.list_datasets(dset_description)
+        reference_datasets = {ds.rid for ds in test_ml_catalog_dataset.list_datasets(dset_description)}
         # Check all of the dataset.
         assert reference_datasets == {ds["RID"] for ds in ml_instance.find_datasets()}
 
@@ -127,32 +109,31 @@ class TestDataset:
         spec = DatasetSpec(rid="1234", version="1.0.0", materialize=True)
         assert spec.materialize
 
-    def test_dataset_members_nested(self, test_ml_catalog_dataset):
+    def test_dataset_members(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_description = test_ml_catalog_dataset.dataset_description
         catalog_datasets = ml_instance.find_datasets()
-        reference_datasets = test_ml_catalog_dataset.find_datasets()
+        reference_datasets = test_ml_catalog_dataset.list_datasets(dataset_description)
         assert len(catalog_datasets) == len(reference_datasets)
 
         assert ml_instance._dataset_nesting_depth() == 2
 
-        for dataset, members in reference_datasets.items():
+        for dataset in reference_datasets:
             # See if the list of RIDs in the dataset matches up with what is expected.
-            member_rids = {}
-            for member_type, dataset_members in ml_instance.list_dataset_members(dataset).items():
-                if dataset_members:  # implicitly checks for non-empty
-                    member_rids[member_type] = [e["RID"] for e in dataset_members]
-            assert set(members) == set(member_rids)
+            for member_type, dataset_members in ml_instance.list_dataset_members(dataset.rid).items():
+                if member_type == "File":
+                    continue
+                member_rids = {e["RID"] for e in dataset_members}
+                assert set(dataset.member_rids.get(member_type, set())) == set(member_rids)
 
-        rids = {
-            member["RID"]
-            for members in ml_instance.list_dataset_members(dataset_description.rid, recurse=True).values()
-            for member in members
-        } | {dataset_description.rid}
-        all_rids = set(self.collect_rids(dataset_description))
-        print("all_rids", len(all_rids))
-        print("rids", len(rids))
-        assert rids == all_rids
+        for dataset in reference_datasets:
+            reference_members = test_ml_catalog_dataset.collect_rids(dataset)
+            member_rids = {dataset.rid}
+            for member_type, dataset_members in ml_instance.list_dataset_members(dataset.rid, recurse=True).items():
+                if member_type == "File":
+                    continue
+                member_rids |= {e["RID"] for e in dataset_members}
+            assert reference_members == member_rids
 
     def test_dataset_execution(self, test_ml_catalog):
         ml_instance = test_ml_catalog

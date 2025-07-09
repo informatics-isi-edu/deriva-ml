@@ -24,9 +24,9 @@ class TestFeatures:
         assert "BoundingBox" in [f.feature_name for f in ml_instance.model.find_features("Image")]
         assert "Quality" in [f.feature_name for f in ml_instance.model.find_features("Image")]
 
-    def test_lookup_feature(self, test_ml_catalog_populated):
-        ml_instance = test_ml_catalog_populated
-        print(ml_instance.lookup_feature("Subject", "Health").feature_name)
+    def test_lookup_feature(self, test_ml_demo_catalog):
+        ml_instance = test_ml_demo_catalog
+
         assert "Health" == ml_instance.lookup_feature("Subject", "Health").feature_name
         with pytest.raises(DerivaMLException):
             ml_instance.lookup_feature("Foobar", "Health")
@@ -67,21 +67,37 @@ class TestFeatures:
         ml_instance = test_ml_catalog_dataset.ml_instance
         dataset_rid = test_ml_catalog_dataset.dataset_description.rid
 
-        # Get the members of the dataset....
-        dataset_rids = ml_instance.list_dataset_members(dataset_rid, recurse=True)
-
-        assert len(dataset_rids["Subject"]) == 2
-        assert len(dataset_rids["Image"]) == 2
-
-        # Download a bag with feature values in it
-
-        # Check to see if feature value is in the bag.
         bag = ml_instance.download_dataset_bag(
             DatasetSpec(rid=dataset_rid, version=ml_instance.dataset_version(dataset_rid))
         )
+
+        # Get the members of the dataset....
+        dataset_rids = {
+            t: [m["RID"] for m in members]
+            for t, members in ml_instance.list_dataset_members(dataset_rid, recurse=True).items()
+        }
+
+        bag_rids = {t: [m["RID"] for m in members] for t, members in bag.list_dataset_members(recurse=True).items()}
+
+        print("dataset_rids", dataset_rids["Subject"])
+        print("bag_rids", bag_rids)
+        # Download a bag with feature values in it
+
+        # Check to see if feature value is in the bag.
         s_features = [f"{f.target_table.name}:{f.feature_name}" for f in ml_instance.model.find_features("Subject")]
         s_features_bag = [f"{f.target_table.name}:{f.feature_name}" for f in bag.find_features("Subject")]
         assert s_features == s_features_bag
+
+        print("subject rids", dataset_rids["Subject"])
+        print([m for m in ml_instance.list_feature_values("Subject", "Health")])
+        catalog_feature_values = {
+            f["RID"]
+            for f in ml_instance.list_feature_values("Subject", "Health")
+            if f["Subject"] in dataset_rids["Subject"]
+        }
+        bag_feature_values = {f["RID"] for f in bag.list_feature_values("Subject", "Health")}
+        print("bag_features", [f for f in bag.list_feature_values("Subject", "Health")])
+        assert catalog_feature_values == bag_feature_values
 
         for f in ml_instance.model.find_features("Subject"):
             catalog_subject_features = [
