@@ -71,48 +71,40 @@ class TestFeatures:
             DatasetSpec(rid=dataset_rid, version=ml_instance.dataset_version(dataset_rid))
         )
 
-        # Get the members of the dataset....
-        dataset_rids = {
-            t: [m["RID"] for m in members]
-            for t, members in ml_instance.list_dataset_members(dataset_rid, recurse=True).items()
-        }
+        # Get the lists of all of the rinds in the datasets....datasets....
+        subject_rids = {r["RID"] for r in bag.get_table_as_dict("Subject")}
+        image_rids = {r["RID"] for r in bag.get_table_as_dict("Image")}
 
-        bag_rids = {t: [m["RID"] for m in members] for t, members in bag.list_dataset_members(recurse=True).items()}
-
-        # Check to see if feature value is in the bag.
+        # Check to see if the bag has the same features defined as the catalog.
         s_features = [f"{f.target_table.name}:{f.feature_name}" for f in ml_instance.model.find_features("Subject")]
         s_features_bag = [f"{f.target_table.name}:{f.feature_name}" for f in bag.find_features("Subject")]
         assert s_features == s_features_bag
 
-        catalog_feature_values = {
-            f["RID"]
-            for f in ml_instance.list_feature_values("Subject", "Health")
-            if f["Subject"] in dataset_rids["Subject"]
-        }
-        bag_feature_values = {f["RID"] for f in bag.list_feature_values("Subject", "Health")}
+        s_features = [f"{f.target_table.name}:{f.feature_name}" for f in ml_instance.model.find_features("Image")]
+        s_features_bag = [f"{f.target_table.name}:{f.feature_name}" for f in bag.find_features("Image")]
+        assert s_features == s_features_bag
 
-        print("subject rids", dataset_rids["Subject"])
-        print("catalog_features", [m for m in ml_instance.list_feature_values("Subject", "Health")])
-        print("bag_features", [f for f in bag.list_feature_values("Subject", "Health")])
+        catalog_feature_values = {
+            f["RID"] for f in ml_instance.list_feature_values("Subject", "Health") if f["Subject"] in subject_rids
+        }
+
+        bag_feature_values = {f["RID"] for f in bag.list_feature_values("Subject", "Health")}
         assert catalog_feature_values == bag_feature_values
 
-        for f in ml_instance.model.find_features("Subject"):
-            catalog_subject_features = [
-                {"Execution": e["Execution"], "Feature_Name": e["Feature_Name"], "Subject": e["Subject"]}
-                for e in ml_instance.list_feature_values("Subject", f.feature_name)
-                if e["Subject"] in dataset_rids["Subject"]
-            ]
-            bag_subject_features = [
-                {"Execution": e["Execution"], "Feature_Name": e["Feature_Name"], "Subject": e["Subject"]}
-                for e in bag.list_feature_values("Subject", f.feature_name)
-            ]
-            print(len(catalog_subject_features), len(bag_subject_features))
-            assert catalog_subject_features == bag_subject_features
-
-        for f in ml_instance.model.find_features("Image"):
-            assert len(list(ml_instance.list_feature_values("Image", f.feature_name))) == len(
-                list(bag.list_feature_values("Image", f.feature_name))
-            )
+        for t in ["Subject", "Image"]:
+            for f in ml_instance.model.find_features(t):
+                catalog_features = [
+                    {"Execution": e["Execution"], "Feature_Name": e["Feature_Name"], t: e[t]}
+                    for e in ml_instance.list_feature_values(t, f.feature_name)
+                    if e[t] in (subject_rids | image_rids)
+                ]
+                catalog_features.sort(key=lambda x: x[t])
+                bag_features = [
+                    {"Execution": e["Execution"], "Feature_Name": e["Feature_Name"], t: e[t]}
+                    for e in bag.list_feature_values(t, f.feature_name)
+                ]
+                bag_features.sort(key=lambda x: x[t])
+                assert catalog_features == bag_features
 
     def test_delete_feature(self, test_ml_catalog):
         pass
