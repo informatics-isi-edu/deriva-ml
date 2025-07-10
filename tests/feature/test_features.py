@@ -79,23 +79,20 @@ class TestFeatures:
 
         bag_rids = {t: [m["RID"] for m in members] for t, members in bag.list_dataset_members(recurse=True).items()}
 
-        print("dataset_rids", dataset_rids["Subject"])
-        print("bag_rids", bag_rids)
-        # Download a bag with feature values in it
-
         # Check to see if feature value is in the bag.
         s_features = [f"{f.target_table.name}:{f.feature_name}" for f in ml_instance.model.find_features("Subject")]
         s_features_bag = [f"{f.target_table.name}:{f.feature_name}" for f in bag.find_features("Subject")]
         assert s_features == s_features_bag
 
-        print("subject rids", dataset_rids["Subject"])
-        print([m for m in ml_instance.list_feature_values("Subject", "Health")])
         catalog_feature_values = {
             f["RID"]
             for f in ml_instance.list_feature_values("Subject", "Health")
             if f["Subject"] in dataset_rids["Subject"]
         }
         bag_feature_values = {f["RID"] for f in bag.list_feature_values("Subject", "Health")}
+
+        print("subject rids", dataset_rids["Subject"])
+        print("catalog_features", [m for m in ml_instance.list_feature_values("Subject", "Health")])
         print("bag_features", [f for f in bag.list_feature_values("Subject", "Health")])
         assert catalog_feature_values == bag_feature_values
 
