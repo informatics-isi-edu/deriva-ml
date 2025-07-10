@@ -1,2 +1,2 @@
-::: deriva_ml.upload
+::: deriva_ml.dataset.upload
     handler: python

@@ -17,6 +17,6 @@ These methods assume tha tthe catalog contains a ```deriva-ml``` and a domain sc
     - An *Execution Asset* is an output file that results from the execution of a workflow.
     - An *Execution Metadata* is an asset entity for saving metadata files referencing a given execution.
 
-::: deriva_ml.deriva_ml_base
+::: deriva_ml.core
     handler: python
 

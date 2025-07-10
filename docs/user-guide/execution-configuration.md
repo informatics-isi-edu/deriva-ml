@@ -11,7 +11,7 @@ These inputs include
 * A list of other files (assets) that are to be used. This can include existing models, or any other infomration that the execution might need.
 * The actual code that is being executed.
 
-[`ExecutionConfiguration`][deriva_ml.execution_configuration.ExecutionConfiguration]  is a Pydantic dataclass.
+[`ExecutionConfiguration`][deriva_ml.execution.execution_configuration.ExecutionConfiguration]  is a Pydantic dataclass.
 As part of initializing an execution, the assets and datasets in the configuration object are downloaded and cached. 
 The datasets are provided as a list of DatasetSpecw which 
 ```DatasetSpec(dataset_rid:RID, version:DatasetVersion, materialize:bool)```

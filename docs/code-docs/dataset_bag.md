@@ -1,4 +1,4 @@
 # DatasetBag Class
 
-::: deriva_ml.dataset_bag
+::: deriva_ml.dataset.dataset_bag
     handler: python

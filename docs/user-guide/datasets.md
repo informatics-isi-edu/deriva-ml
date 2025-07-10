@@ -90,9 +90,10 @@ Within the DerivaML catalog, assets are represented by an *asset table.*  Each d
 
 ## Downloaded Datasets and Assets
 
-While it is possible to retrieve the assets associated with a dataset directly from the catalog, if your computation requres access to many assets, its typically much more effective to download the asset along with all the other elements of the dataset into the local compute environment.  For this reason, creating a new execution using [`DerivaML.create_execution`][deriva_ml.dataset.create_execution] will automatically download all of the datasets listed in the `datasets` component of an [`ExecutionConfiguration`][deriva_ml.execution_configuration.execution_configuration].
+While it is possible to retrieve the assets associated with a dataset directly from the catalog, if your computation requres access to many assets, its typically much more effective to download the asset along with all the other elements of the dataset into the local compute environment.  
+For this reason, creating a new execution using [`DerivaML.create_execution`][deriva_ml.DerivaML.create_execution] will automatically download all of the datasets listed in the `datasets` component of an [`ExecutionConfiguration`][deriva_ml.execution.execution_configuration.ExecutionConfiguration].
 
-Once downloaded, the dataset is represented by a [`Dataset_Bag`][deriva_ml.dataset_bag.DatasetBag] object. 
+Once downloaded, the dataset is represented by a [`Dataset_Bag`][deriva_ml.dataset.dataset_bag.DatasetBag] object. 
 
 Every asset in a dataset is recorded in an asset table, which has its location on the local file system, along with other metadata.
 Asset tables can be retrieved from the dataset_bag via the get_table_as_?() method.

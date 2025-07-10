@@ -1,2 +1,2 @@
-::: deriva_ml.dataset.dataset
+::: deriva_ml.dataset
     handler: python

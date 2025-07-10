@@ -20,7 +20,7 @@ plugins:
       handlers:
         python:
           paths:
-            - deriva_ml  # Search for modules in the 'src' directory
+            - src  # Search for modules in the 'src' directory
           options:
             docstring_style: google
             separate_signature: true
@@ -54,7 +54,6 @@ nav:
       - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
   - Library Documentation:
       - DerivaML: code-docs/deriva_ml_base.md
-      - Datasets: code-docs/dataset.md
       - DatasetBag Auxiliary Classes: code-docs/dataset_aux_classes.md
       - DatasetBag: code-docs/dataset_bag.md
       - Helper Classes: code-docs/deriva_definitions.md
@@ -62,5 +61,5 @@ nav:
       - Execution: code-docs/execution.md
       - ExecutionConfiguration: code-docs/execution_configuration.md
       - Feature: code-docs/feature.md
-  # - Upload: code-docs/upload.md
+      - Upload: code-docs/upload.md
   - Release Notes: release-notes.md

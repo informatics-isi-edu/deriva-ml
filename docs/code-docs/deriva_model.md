@@ -1,2 +1,2 @@
-::: deriva_ml.deriva_model
+::: deriva_ml.model
     handler: python

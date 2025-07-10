@@ -1,2 +1,2 @@
-::: deriva_ml.deriva_definitions
+::: deriva_ml.core.definitions
     handler: python

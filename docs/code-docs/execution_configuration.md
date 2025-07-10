@@ -1,4 +1,4 @@
 # ExecutionConfiguration class
 
-::: deriva_ml.execution_configuration
+::: deriva_ml.execution.execution_configuration
     handler: python
