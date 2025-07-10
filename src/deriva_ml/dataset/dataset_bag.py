@@ -196,6 +196,7 @@ class DatasetBag:
 
         # Look at each of the element types that might be in the _dataset_table and get the list of rid for them from
         # the appropriate association table.
+        ic()
         members = defaultdict(list)
         for assoc_table in self._dataset_table.find_associations():
             member_fkey = assoc_table.other_fkeys.pop()
@@ -226,7 +227,6 @@ class DatasetBag:
                 )
                 mapper = SQLMapper(self.model, sql_target)
                 target_entities = [mapper.transform_tuple(e) for e in db.execute(sql_cmd).fetchall()]
-                members[target_table.name].extend(target_entities)
             members[target_table.name].extend(target_entities)
             if recurse and (target_table.name == self._dataset_table.name):
                 # Get the members for all the nested datasets and add to the member list.
