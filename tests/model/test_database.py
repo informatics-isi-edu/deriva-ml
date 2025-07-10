@@ -1,7 +1,7 @@
-from conftest import MLDatasetTest
+from conftest import DatasetDescription, MLDatasetTest
 from deriva.core.datapath import Any
 
-from deriva_ml import DatasetSpec, DerivaML
+from deriva_ml import DatasetSpec
 
 
 class TestDataBaseModel:
@@ -14,17 +14,19 @@ class TestDataBaseModel:
             e["Description"] = ""
         return frozenset(e.items())
 
-    def collect_rids(self, dataset, rid_list=None):
-        if not rid_list:
-            rid_list = dataset.member_rids
-        for ds in dataset.members():
-            rid_list = {t: rid_list[t] + rids for t, rids in self.collect_rids(ds, rid_list)}
-        return rid_list
+    def list_datasets(self, dataset_description: DatasetDescription) -> set[str]:
+        nested_datasets = {
+            ds
+            for dset_member in dataset_description.members.get("Dataset", [])
+            for ds in self.list_datasets(dset_member)
+        }
+        return {dataset_description.rid} | nested_datasets
 
-    def compare_catalogs(self, ml_instance: DerivaML, dataset: MLDatasetTest, dataset_spec: DatasetSpec):
-        reference_datasets = dataset.find_datasets()
+    def compare_catalogs(self, dataset: MLDatasetTest, dataset_spec: DatasetSpec):
+        ml_instance = dataset.ml_instance
+        reference_datasets = self.list_datasets(dataset.dataset_description)
 
-        snapshot_catalog = DerivaML(ml_instance.host_name, ml_instance._version_snapshot(dataset_spec))
+        snapshot_catalog = dataset.snapshot_catalog(dataset_spec)
         bag = ml_instance.download_dataset_bag(dataset_spec)
 
         pb = snapshot_catalog.pathBuilder
@@ -38,7 +40,6 @@ class TestDataBaseModel:
         # Check to make sure that all of the datasets are present.
         assert {r for r in bag.model.bag_rids.keys()} == {r for r in reference_datasets}
         for dataset_rid in reference_datasets:
-            print(f"Checking {dataset_rid} {reference_datasets[dataset_rid]} ")
             dataset_bag = bag.model.get_dataset(dataset_rid)
             dataset_rids = tuple(ml_instance.list_dataset_children(dataset_rid, recurse=True) + [dataset_rid])
             bag_rids = [b.dataset_rid for b in dataset_bag.list_dataset_children(recurse=True)] + [
@@ -93,7 +94,7 @@ class TestDataBaseModel:
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
-        self.compare_catalogs(ml_instance, test_ml_catalog_dataset, dataset_spec)
+        self.compare_catalogs(test_ml_catalog_dataset, dataset_spec)
 
     def test_table_versions(self, test_ml_catalog_dataset):
         ml_instance = test_ml_catalog_dataset.ml_instance
@@ -102,7 +103,7 @@ class TestDataBaseModel:
         current_version = ml_instance.dataset_version(dataset_description.rid)
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         self.compare_catalogs(
-            ml_instance, test_ml_catalog_dataset, DatasetSpec(rid=dataset_description.rid, version=current_version)
+            test_ml_catalog_dataset, DatasetSpec(rid=dataset_description.rid, version=current_version)
         )
 
         pb = ml_instance.pathBuilder
@@ -116,7 +117,9 @@ class TestDataBaseModel:
         subjects_new = list(new_bag.get_table_as_dict("Subject"))
 
         # Make sure that there is a difference between to old and new catalogs.
+        print(subjects_current)
+        print(subjects_new)
         assert len(subjects_new) == len(subjects_current) + 2
-
-        self.compare_catalogs(ml_instance, test_ml_catalog_dataset, current_spec)
-        self.compare_catalogs(ml_instance, test_ml_catalog_dataset, new_spec)
+        print("compare")
+        self.compare_catalogs(test_ml_catalog_dataset, current_spec)
+        self.compare_catalogs(test_ml_catalog_dataset, new_spec)

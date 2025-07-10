@@ -37,8 +37,6 @@ class TestDatasetDownload:
             bag_elements = dataset_bag.list_dataset_members(recurse=recurse)
             assert len(catalog_elements) == len(bag_elements)
 
-            print("catalog_elements", catalog_elements["Subject"])
-            print(bag_elements["Subject"])
             for t, members in catalog_elements.items():
                 print("Checking element", t, len(members), len(bag_elements[t]))
                 bag_members = bag_elements[t]

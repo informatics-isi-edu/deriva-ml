@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from demo_catalog import DatasetDescription
 
-from deriva_ml import DerivaML
+from deriva_ml import DatasetSpec, DerivaML
 from deriva_ml.demo_catalog import (
     create_demo_catalog,
     create_demo_datasets,
@@ -44,23 +44,11 @@ class MLDatasetTest:
         print("Resetting catalog for testing...\n")
         reset_demo_catalog(catalog.catalog)
         self.ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, working_dir=tmp_dir, use_minid=False)
+        self.tmp_dir = tmp_dir
         populate_demo_catalog(self.ml_instance)
         create_demo_features(self.ml_instance)
         self.dataset_description: DatasetDescription = create_demo_datasets(self.ml_instance)
         self.catalog = catalog
-
-    # def find_datasets(self) -> dict[RID, list[RID]]:
-    #    """Return a dictionary that whose key is a dataset RID and whose value is a list of member dataset RIDs.
-    #    grouped by element typee"""
-    #    return self._find_datasets(self.dataset_description)
-
-    # def _find_datasets(self, dataset: DatasetDescription) -> dict[RID, list[RID]]:
-    #    return {dataset.rid: dataset.member_rids} | {
-    #        member_type: member_list
-    #        for dset in dataset.members.get("Dataset", [])
-    #        for member_type, member_list in self._find_datasets(dset).items()
-    #        if member_list != []
-    #    }
 
     def list_datasets(self, dataset_description: DatasetDescription) -> list[DatasetDescription]:
         """Return a set of RIDs whose members are members of the given dataset description."""
@@ -81,6 +69,14 @@ class MLDatasetTest:
                     rids |= self.collect_rids(dataset)
         return rids
 
+    def snapshot_catalog(self, dataset_spec: DatasetSpec) -> DerivaML:
+        return DerivaML(
+            self.ml_instance.host_name,
+            self.ml_instance._version_snapshot(dataset_spec),
+            working_dir=self.tmp_dir,
+            use_minid=False,
+        )
+
 
 @pytest.fixture(scope="session")
 def test_host():
@@ -94,7 +90,7 @@ def test_catalog_id():
     return os.environ.get("DERIVA_CATALOG_ID", "eye-ai")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def ml_catalog(test_host):
     """Create a demo ML instance for testing with schema, but no data..""" ""
     resource = MLCatalog(test_host)
