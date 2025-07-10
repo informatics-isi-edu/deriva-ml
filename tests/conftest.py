@@ -4,6 +4,7 @@ Pytest configuration and shared fixtures.
 
 import os
 from pathlib import Path
+from urllib.parse import quote as urlquote
 
 import pytest
 from demo_catalog import DatasetDescription
@@ -102,6 +103,9 @@ def ml_catalog(test_host):
 def test_ml_catalog(ml_catalog, tmp_path):
     """Create a demo ML instance for testing.   Resets after each class.""" ""
     reset_demo_catalog(ml_catalog.catalog)
+    cat_desc = ml_catalog.catalog.get().json()
+    latest = cat_desc["snaptime"]
+    ml_catalog.catalog.delete("/history/,%s" % (urlquote(latest),))
     return DerivaML(ml_catalog.hostname, ml_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
 
 
@@ -110,6 +114,7 @@ def test_ml_catalog_populated(ml_catalog, tmp_path):
     """Create a demo ML instance for testing with populated domain schema.   Resets after each test."""
     print("Setting up populated catalog for testing... ", end="")
     reset_demo_catalog(ml_catalog.catalog)
+
     ml_instance = DerivaML(ml_catalog.hostname, ml_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
     populate_demo_catalog(ml_instance)
     return ml_instance
