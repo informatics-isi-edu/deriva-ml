@@ -37,7 +37,7 @@ from deriva.core import (
 )
 
 import deriva.core.datapath as datapath
-from deriva.core.datapath import DataPathException
+from deriva.core.datapath import DataPathException, _SchemaWrapper as SchemaWrapper
 from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
@@ -119,7 +119,7 @@ class DerivaML(Dataset):
         ml_schema: str = ML_SCHEMA,
         logging_level=logging.INFO,
         credential=None,
-        use_minid=True,
+        use_minid: bool = True,
     ):
         """Initializes a DerivaML instance.
 
@@ -232,7 +232,7 @@ class DerivaML(Dataset):
         return session_config
 
     @property
-    def pathBuilder(self) -> datapath._CatalogWrapper:
+    def pathBuilder(self) -> SchemaWrapper:
         """Returns catalog path builder for queries.
 
         The path builder provides a fluent interface for constructing complex queries against the catalog.
@@ -248,7 +248,7 @@ class DerivaML(Dataset):
         return self.catalog.getPathBuilder()
 
     @property
-    def domain_path(self):
+    def domain_path(self) -> datapath.DataPath:
         """Returns path builder for domain schema.
 
         Provides a convenient way to access tables and construct queries within the domain-specific schema.

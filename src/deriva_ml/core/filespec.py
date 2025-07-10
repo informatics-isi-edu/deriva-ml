@@ -34,7 +34,7 @@ class FileSpec(BaseModel):
 
     @field_validator("url")
     @classmethod
-    def validate_file_url(cls, url) -> str:
+    def validate_file_url(cls, url: str) -> str:
         """Examine the provided URL. If it's a local path, convert it into a tag URL.
 
         Args:

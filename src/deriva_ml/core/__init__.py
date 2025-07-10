@@ -17,12 +17,16 @@ from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm, De
 
 __all__ = [
     "DerivaML",
-    "RID",
-    "BuiltinTypes",
-    "ColumnDefinition",
+
+    # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",
     "DerivaMLTableTypeError",
+
+    # Definitions
+    "RID",
+    "BuiltinTypes",
+    "ColumnDefinition",
     "DerivaSystemColumns",
     "ExecAssetType",
     "ExecMetadataType",
