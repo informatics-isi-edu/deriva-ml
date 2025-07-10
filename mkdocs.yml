@@ -20,7 +20,7 @@ plugins:
       handlers:
         python:
           paths:
-            - src  # Search for modules in the 'src' directory
+            - deriva_ml  # Search for modules in the 'src' directory
           options:
             docstring_style: google
             separate_signature: true
