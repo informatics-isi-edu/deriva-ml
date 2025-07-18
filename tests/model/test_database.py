@@ -111,8 +111,10 @@ class TestDataBaseModel:
         )
 
         pb = ml_instance.pathBuilder
-        subjects = [s["RID"] for s in pb.schemas[ml_instance.domain_schema].tables["Subject"].path.entities().fetch()]
-        ml_instance.add_dataset_members(dataset_description.rid, subjects[-2:])
+        subject = pb.schemas[ml_instance.domain_schema].Subject
+        new_subjects = [s["RID"] for s in subject.insert([{"Name": f"Mew Thing{t + 1}"} for t in range(2)])]
+        ml_instance.add_dataset_members(dataset_description.rid, new_subjects)
+        print("Adding subjects: ", new_subjects)
         new_version = ml_instance.dataset_version(dataset_description.rid)
         new_spec = DatasetSpec(rid=dataset_description.rid, version=new_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
@@ -121,9 +123,10 @@ class TestDataBaseModel:
         subjects_new = list(new_bag.get_table_as_dict("Subject"))
 
         # Make sure that there is a difference between to old and new catalogs.
-        print(subjects_current)
-        print(subjects_new)
+        print(new_subjects)
+        print([s["RID"] for s in subjects_current])
+        print([s["RID"] for s in subjects_new])
         assert len(subjects_new) == len(subjects_current) + 2
         print("compare")
-        self.compare_catalogs(dataset_test, current_spec)
-        self.compare_catalogs(dataset_test, new_spec)
+        self.compare_catalogs(ml_instance, dataset_test, current_spec)
+        self.compare_catalogs(ml_instance, dataset_test, new_spec)
