@@ -16,7 +16,8 @@ Typical usage example:
     >>> ml = DerivaML('deriva.example.org', 'my_catalog')
     >>> dataset_rid = ml.create_dataset('experiment', 'Experimental data')
     >>> ml.add_dataset_members(dataset_rid=dataset_rid, members=['1-abc123', '1-def456'])
-    >>> ml.increment_dataset_version(datset_rid=dataset_rid, component=VersionPart.minor, description='Added new samples')
+    >>> ml.increment_dataset_version(datset_rid=dataset_rid, component=VersionPart.minor,
+    ...     description='Added new samples')
 """
 
 from __future__ import annotations
@@ -279,7 +280,9 @@ class Dataset:
         if not history:
             return DatasetVersion(0, 1, 0)
         else:
-            return max([h.dataset_version for h in self.dataset_history(dataset_rid)])
+            # Ensure we return a DatasetVersion, not a string
+            versions = [h.dataset_version for h in history]
+            return max(versions) if versions else DatasetVersion(0, 1, 0)
 
     def _build_dataset_graph(self, dataset_rid: RID) -> Iterable[RID]:
         ts: TopologicalSorter = TopologicalSorter()
@@ -294,7 +297,8 @@ class Dataset:
             children = self.list_dataset_children(dataset_rid=dataset_rid)
             parents = self.list_dataset_parents(dataset_rid=dataset_rid)
             for parent in parents:
-                self._build_dataset_graph_1(parent, ts, visited)
+                # Convert string to RID type
+                self._build_dataset_graph_1(RID(parent), ts, visited)
             for child in children:
                 self._build_dataset_graph_1(child, ts, visited)
 
@@ -407,7 +411,8 @@ class Dataset:
         )[0]["RID"]
 
         # Get the name of the association table between dataset_table and dataset_type.
-        atable = next(self._model.schemas[self._ml_schema].tables[MLVocab.dataset_type].find_associations()).name
+        associations = list(self._model.schemas[self._ml_schema].tables[MLVocab.dataset_type].find_associations())
+        atable = associations[0].name if associations else None
         pb.schemas[self._ml_schema].tables[atable].insert(
             [{MLVocab.dataset_type: ds_type, "Dataset": dataset_rid} for ds_type in ds_types]
         )
@@ -454,7 +459,8 @@ class Dataset:
         # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
         pb = self._model.catalog.getPathBuilder()
         dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
-        atable = next(self._model.schemas[self._ml_schema].tables[MLVocab.dataset_type].find_associations()).name
+        associations = list(self._model.schemas[self._ml_schema].tables[MLVocab.dataset_type].find_associations())
+        atable = associations[0].name if associations else None
         ml_path = pb.schemas[self._ml_schema]
         atable_path = ml_path.tables[atable]
 
@@ -919,18 +925,21 @@ class Dataset:
         dataset: DatasetSpec | None = None,
         snapshot_catalog: DerivaML | None = None,
     ) -> list[dict[str, Any]]:
-        """Output a download/export specification for a dataset_table.  Each element of the dataset_table will be placed in its own dir
-        The top level data directory of the resulting BDBag will have one subdirectory for element type. The subdirectory
-        will contain the CSV indicating which elements of that type are present in the dataset_table, and then there will be a
-         subdirectory for each object that is reachable from the dataset_table members.
+        """Output a download/export specification for a dataset_table.  Each element of the dataset_table
+        will be placed in its own directory.
+        The top level data directory of the resulting BDBag will have one subdirectory for element type.
+        The subdirectory will contain the CSV indicating which elements of that type are present in the
+        dataset_table, and then there will be a subdirectory for each object that is reachable from the
+        dataset_table members.
 
-        To simplify reconstructing the relationship between tables, the CVS for each
-        The top level data directory will also contain a subdirectory for any controlled vocabularies used in the dataset_table.
-        All assets will be placed into a directory named asset in a subdirectory with the asset table name.
+        To simplify reconstructing the relationship between tables, the CVS for each element is included.
+        The top level data directory will also contain a subdirectory for any controlled vocabularies used in
+        the dataset_table. All assets will be placed into a directory named asset in a subdirectory with the
+        asset table name.
 
-        For example, consider a dataset_table that consists of two element types, T1 and T2. T1 has foreign key relationships to
-        objects in tables T3 and T4.  There are also two controlled vocabularies, CV1 and CV2.  T2 is an asset table
-        which has two assets in it. The layout of the resulting bdbag would be:
+        For example, consider a dataset_table that consists of two element types, T1 and T2. T1 has foreign
+        key relationships to objects in tables T3 and T4. There are also two controlled vocabularies, CV1 and
+        CV2. T2 is an asset table which has two assets in it. The layout of the resulting bdbag would be:
               data
                 CV1/
                     cv1.csv
@@ -1012,7 +1021,12 @@ class Dataset:
                 json.dump(self._generate_dataset_download_spec(dataset, snapshot_catalog), ds)
             try:
                 self._logger.info(
-                    f"Downloading dataset {'minid' if self._use_minid else 'bag'} for catalog: {dataset.rid}@{str(dataset.version)}"
+                    "Downloading dataset %s for catalog: %s@%s"
+                    % (
+                        'minid' if self._use_minid else 'bag',
+                        dataset.rid,
+                        str(dataset.version),
+                    )
                 )
                 # Generate the bag and put into S3 storage.
                 exporter = DerivaExport(
@@ -1282,7 +1296,8 @@ class Dataset:
         return exports
 
     def _export_annotation_dataset_element(self, spath: str, dpath: str, table: Table) -> list[dict[str, Any]]:
-        """Given a path in the data model, output an export specification for the path taken to get to the current table.
+        """Given a path in the data model, output an export specification for the path taken to get to the
+        current table.
 
         Args:
           spath: Source path

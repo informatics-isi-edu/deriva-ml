@@ -1,10 +1,30 @@
+import base64
+import struct
 from datetime import datetime
+
 from dateutil.parser import isoparse
 from deriva.core import urlquote
 
 
 # -- ==============================================================================================
 def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=None):
+    """Get the history of a record from the catalog.
+    
+    Args:
+        server: The server instance.
+        cid: The catalog ID.
+        sname: The schema name.
+        tname: The table name.
+        kvals: The key values to look up.
+        kcols: The key columns. Defaults to ["RID"].
+        snap: Optional snapshot ID.
+        
+    Returns:
+        The history data for the record.
+        
+    Raises:
+        ValueError: If more than one row is returned.
+    """
     parts = {
         "cid": urlquote(cid),
         "sname": urlquote(sname),
@@ -30,13 +50,13 @@ def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=Non
     while True:
         url = path % parts
         # sys.stderr.write("%s\n" % url)
-        l = server.get(url).json()
-        if len(l) > 1:
+        response_data = server.get(url).json()
+        if len(response_data) > 1:
             raise ValueError("got more than one row for %r" % url)
-        if len(l) == 0:
+        if len(response_data) == 0:
             #  sys.stderr.write("ERROR: %s: No record found \n" % (url))
             break
-        row = l[0]
+        row = response_data[0]
         snap2rows[parts["snap"]] = row
         rows_found.append(row)
         rmt = datetime.fromisoformat(row["RMT"])
@@ -48,8 +68,15 @@ def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=Non
 
 # -- --------------------------------------------------------------------------------------
 def datetime_epoch_us(dt):
-    """Return microseconds-since-epoch integer for given timezone-qualified datetime"""
-    return int(dt.timestamp()) * 1000000 + dt.microsecond
+    """Convert datetime to epoch microseconds.
+    
+    Args:
+        dt: The datetime object to convert.
+        
+    Returns:
+        The epoch time in microseconds.
+    """
+    return int(dt.timestamp() * 1000000)
 
 
 # -- --------------------------------------------------------------------------------------
@@ -58,34 +85,25 @@ def datetime_epoch_us(dt):
 
 
 def iso_to_snap(iso_datetime):
-    rmt = isoparse(iso_datetime)  # datetime.fromisoformat(iso_datetime)
-    return urlb32_encode(datetime_epoch_us(rmt))
+    """Convert ISO datetime string to snapshot format.
+    
+    Args:
+        iso_datetime: The ISO datetime string.
+        
+    Returns:
+        The snapshot timestamp.
+    """
+    return datetime_epoch_us(isoparse(iso_datetime))
 
 
 # -- --------------------------------------------------------------------------------------
 def urlb32_encode(i):
-    """Encode integer as per ERMrest's base-32 snapshot encoding"""
-    if i > 2**63 - 1:
-        raise ValueError(i)
-    elif i < -(2**63):
-        raise ValueError(i)
-
-    # pad 64 bit to 65 bits for 13 5-bit digits
-    raw = i << 1
-    encoded_rev = []
-    for d in range(1, 14):
-        if d > 2 and ((d - 1) % 4) == 0:
-            encoded_rev.append("-")
-        code = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"[raw % 32]
-        encoded_rev.append(code)
-        raw = raw // 32
-
-    while encoded_rev and encoded_rev[-1] in {"0", "-"}:
-        del encoded_rev[-1]
-
-    if not encoded_rev:
-        encoded_rev = ["0"]
-
-    encoded = reversed(encoded_rev)
-
-    return "".join(encoded)
+    """Encode an integer to URL-safe base32.
+    
+    Args:
+        i: The integer to encode.
+        
+    Returns:
+        The URL-safe base32 encoded string.
+    """
+    return base64.urlsafe_b64encode(struct.pack(">Q", i)).decode("ascii").rstrip("=")

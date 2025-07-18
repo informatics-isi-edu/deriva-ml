@@ -178,14 +178,14 @@ def table_path(prefix: Path | str, schema: str, table: str) -> Path:
 
 
 def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
-    """Generate a pattern to an asset table that may include additional metadata columns.
+    """Generate upload specification for an asset table.
 
     Args:
-        model:
-        asset_table:
+        model: The DerivaModel instance.
+        asset_table: The asset table name or Table object.
 
     Returns:
-
+        A dictionary containing the upload specification for the asset table.
     """
     metadata_columns = model.asset_metadata(asset_table)
     asset_table = model.name_to_table(asset_table)
@@ -194,7 +194,9 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
     asset_path = f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
-    return {
+
+    # Create upload specification
+    spec = {
         # Upload assets into an asset table of an asset table.
         "column_map": {
             "MD5": "{md5}",
@@ -214,6 +216,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
         },
         "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
     }
+    return spec
 
 
 def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:

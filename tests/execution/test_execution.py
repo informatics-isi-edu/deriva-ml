@@ -17,8 +17,8 @@ from deriva_ml import (
 
 
 class TestExecution:
-    def test_execution_no_download(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
+    def test_execution_no_download(self, test_ml):
+        ml_instance = test_ml
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
 
@@ -52,8 +52,8 @@ class TestExecution:
         ]
         assert 2 == len(execution_metadata)
 
-    def test_execution_upload(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
+    def test_execution_upload(self, test_ml):
+        ml_instance = test_ml
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
 
@@ -65,13 +65,15 @@ class TestExecution:
 
         self.create_execution_asset(ml_instance, api_workflow)
 
-    def test_execution_workflow_download(self, test_ml_catalog_dataset):
+    def test_execution_workflow_download(self, dataset_test, tmp_path):
         """Test creating and configuring an execution workflow."""
-        ml_instance = test_ml_catalog_dataset.ml_instance
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
 
-        dataset_rid = test_ml_catalog_dataset.dataset_description.rid
+        dataset_rid = dataset_test.dataset_description.rid
 
         # Create a workflow
         api_workflow = ml_instance.create_workflow(

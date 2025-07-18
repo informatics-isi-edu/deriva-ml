@@ -99,7 +99,7 @@ class ExecutionConfiguration(BaseModel):
             >>> print(config.parameters)  # Contents of params.json as dict
         """
         if isinstance(value, str) or isinstance(value, Path):
-            with open(value, "r") as f:
+            with Path(value).open("r") as f:
                 return json.load(f)
         else:
             return value
@@ -139,7 +139,7 @@ class ExecutionConfiguration(BaseModel):
             >>> print(f"Workflow: {config.workflow}")
             >>> print(f"Datasets: {len(config.datasets)}")
         """
-        with open(path) as fd:
+        with Path(path).open() as fd:
             config = json.load(fd)
         return ExecutionConfiguration.model_validate(config)
 

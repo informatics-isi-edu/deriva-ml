@@ -1,16 +1,16 @@
 """Module to run a notebook using papermill"""
 
-from datetime import datetime
 import json
 import os
-import papermill as pm
-from pathlib import Path
-import regex as re
 import tempfile
+from datetime import datetime
+from pathlib import Path
 
-from deriva_ml import Workflow, DerivaML
+import papermill as pm
+import regex as re
 from deriva.core import BaseCLI
-from deriva_ml import MLAsset, ExecAssetType
+
+from deriva_ml import DerivaML, ExecAssetType, MLAsset, Workflow
 
 
 class DerivaMLRunNotebookCLI(BaseCLI):
@@ -91,7 +91,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             if not (parameter_file.is_file() and parameter_file.suffix == ".json"):
                 print("Parameter file must be an json file.")
                 exit(1)
-            with open(parameter_file, "r") as f:
+            with Path(parameter_file).open("r") as f:
                 parameters |= json.load(f)
 
         if not (notebook_file.is_file() and notebook_file.suffix == ".ipynb"):
@@ -101,7 +101,8 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         os.environ["DERIVA_HOST"] = args.host
         os.environ["DERIVA_CATALOG_ID"] = args.catalog
 
-        # Create a workflow instance for this specific version of the script.  Return an existing workflow if one is found.
+        # Create a workflow instance for this specific version of the script.
+        # Return an existing workflow if one is found.
         notebook_parameters = pm.inspect_notebook(notebook_file)
         if args.inspect:
             for param, value in notebook_parameters.items():
@@ -133,8 +134,8 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 parameters=parameters,
                 kernel_name=kernel,
             )
-            host = catalog_id = execution_rid = None
-            with open(notebook_output, "r") as f:
+            catalog_id = execution_rid = None
+            with Path(notebook_output).open("r") as f:
                 for line in f:
                     if m := re.search(
                         r"Execution RID: https://(?P<host>.*)/id/(?P<catalog_id>.*)/(?P<execution_rid>[\w-]+)",
@@ -161,7 +162,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 file_name=f"notebook-parameters-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
                 asset_types=ExecAssetType.input_file.value,
             )
-            with open(parameter_file, "w") as f:
+            with Path(parameter_file).open("w") as f:
                 json.dump(parameters, f)
 
             execution.upload_execution_outputs()
@@ -169,6 +170,13 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
 
 def main():
+    """Main entry point for the notebook runner CLI.
+    
+    Creates and runs the DerivaMLRunNotebookCLI instance.
+    
+    Returns:
+        None. Executes the CLI.
+    """
     cli = DerivaMLRunNotebookCLI(
         description="Deriva ML Execution Script Demo", epilog=""
     )

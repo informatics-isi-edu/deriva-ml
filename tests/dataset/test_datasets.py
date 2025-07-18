@@ -6,6 +6,7 @@ from deriva_ml import (
     BuiltinTypes,
     ColumnDefinition,
     DatasetSpec,
+    DerivaML,
     ExecutionConfiguration,
     MLVocab,
     TableDefinition,
@@ -14,8 +15,10 @@ from deriva_ml.demo_catalog import DatasetDescription
 
 
 class TestDataset:
-    def test_dataset_elements(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
+    def test_dataset_elements(self, deriva_catalog, tmp_path):
+        ml_instance = DerivaML(
+            deriva_catalog.hostname, deriva_catalog.catalog_id, working_dir=tmp_path, use_minid=False
+        )
         _test_table = ml_instance.model.create_table(
             TableDefinition(
                 name="TestTable",
@@ -27,19 +30,24 @@ class TestDataset:
         # Check for repeat addition.
         ml_instance.add_dataset_element_type("TestTable")
 
-    def test_dataset_creation(self, test_ml_catalog):
+    def test_dataset_creation(self, deriva_catalog, tmp_path):
         """Test dataset creation and modification."""
+
+        ml_instance = DerivaML(
+            deriva_catalog.hostname, deriva_catalog.catalog_id, working_dir=tmp_path, use_minid=False
+        )
+
         # Find existing datasets for reference
-        existing = test_ml_catalog.find_datasets()
+        existing = ml_instance.find_datasets()
         initial_count = len(existing)
-        test_ml_catalog.add_term(MLVocab.dataset_type, "Testing", description="A test dataset")
+        ml_instance.add_term(MLVocab.dataset_type, "Testing", description="A test dataset")
 
         # Create a new dataset
-        dataset = test_ml_catalog.create_dataset(description="Dataset for testing", dataset_types="Testing")
+        dataset = ml_instance.create_dataset(description="Dataset for testing", dataset_types="Testing")
         assert dataset is not None
 
         # Verify dataset was created
-        updated = test_ml_catalog.find_datasets()
+        updated = ml_instance.find_datasets()
         assert len(updated) == initial_count + 1
 
         # Find the new dataset
@@ -47,13 +55,15 @@ class TestDataset:
         assert new_dataset["Description"] == "Dataset for testing"
         assert new_dataset["Dataset_Type"] == ["Testing"]
 
-    def test_dataset_find(self, test_ml_catalog_dataset):
+    def test_dataset_find(self, dataset_test, tmp_path):
         """Test finding datasets."""
         # Find all datasets
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dset_description = test_ml_catalog_dataset.dataset_description
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dset_description = dataset_test.dataset_description
 
-        reference_datasets = {ds.rid for ds in test_ml_catalog_dataset.list_datasets(dset_description)}
+        reference_datasets = {ds.rid for ds in dataset_test.list_datasets(dset_description)}
         # Check all of the dataset.
         assert reference_datasets == {ds["RID"] for ds in ml_instance.find_datasets()}
 
@@ -86,8 +96,8 @@ class TestDataset:
 
         check_relationships(dset_description)
 
-    def test_dataset_add_delete(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
+    def test_dataset_add_delete(self, test_ml):
+        ml_instance = test_ml
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
         dataset_rid = ml_instance.create_dataset(type_rid.name, description="A Dataset")
         datasets = list(ml_instance.find_datasets())
@@ -109,11 +119,13 @@ class TestDataset:
         spec = DatasetSpec(rid="1234", version="1.0.0", materialize=True)
         assert spec.materialize
 
-    def test_dataset_members(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_dataset_members(self, dataset_test, tmp_path):
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
         catalog_datasets = ml_instance.find_datasets()
-        reference_datasets = test_ml_catalog_dataset.list_datasets(dataset_description)
+        reference_datasets = dataset_test.list_datasets(dataset_description)
         assert len(catalog_datasets) == len(reference_datasets)
 
         assert ml_instance._dataset_nesting_depth() == 2
@@ -127,7 +139,7 @@ class TestDataset:
                 assert set(dataset.member_rids.get(member_type, set())) == set(member_rids)
 
         for dataset in reference_datasets:
-            reference_members = test_ml_catalog_dataset.collect_rids(dataset)
+            reference_members = dataset_test.collect_rids(dataset)
             member_rids = {dataset.rid}
             for member_type, dataset_members in ml_instance.list_dataset_members(dataset.rid, recurse=True).items():
                 if member_type == "File":
@@ -135,8 +147,8 @@ class TestDataset:
                 member_rids |= {e["RID"] for e in dataset_members}
             assert reference_members == member_rids
 
-    def test_dataset_execution(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
+    def test_dataset_execution(self, test_ml):
+        ml_instance = test_ml
         ml_instance.model.create_table(
             TableDefinition(
                 name="TestTableExecution",

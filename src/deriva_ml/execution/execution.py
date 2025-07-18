@@ -305,7 +305,7 @@ class Execution:
             f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
             ExecMetadataType.runtime_env.value,
         )
-        with open(runtime_env_path, "w") as fp:
+        with Path(runtime_env_path).open("w") as fp:
             json.dump(get_execution_environment(), fp)
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
@@ -357,7 +357,7 @@ class Execution:
                 "configuration.json",
                 ExecMetadataType.execution_config.value,
             )
-            with open(cfile.as_posix(), "w", encoding="utf-8") as config_file:
+            with Path(cfile).open("w", encoding="utf-8") as config_file:
                 json.dump(self.configuration.model_dump(), config_file)
 
             for parameter_file in self.configuration.parameters:
@@ -705,7 +705,7 @@ class Execution:
                     if is_dir:
                         shutil.rmtree(path)
                     else:
-                        os.remove(path)
+                        Path(path).unlink()
                     return True
                 except (OSError, PermissionError) as e:
                     if attempt == MAX_RETRIES - 1:
@@ -765,7 +765,7 @@ class Execution:
             return e
 
         # Load the JSON file that has the set of records that contain the feature values.
-        with open(feature_file, "r") as feature_values:
+        with Path(feature_file).open("r") as feature_values:
             entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
         self._ml_object.domain_path.tables[feature_table].insert([map_path(e) for e in entities], on_conflict_skip=True)
@@ -808,15 +808,14 @@ class Execution:
             if asset_role == "Input":
                 return
             asset_type_map = {}
-            with open(
+            with Path(
                 asset_type_path(
                     self._working_dir,
                     self.execution_rid,
                     self._model.name_to_table(asset_table_name),
-                ),
-                "r",
-            ) as f:
-                for line in f:
+                )
+            ).open("r") as asset_type_file:
+                for line in asset_type_file:
                     asset_type_map.update(json.loads(line.strip()))
             for asset_path in asset_list:
                 asset_path.asset_types = asset_type_map[asset_path.file_name]
@@ -897,12 +896,10 @@ class Execution:
                     asset_path.write_bytes(file_name.read_bytes())
 
         # Persist the asset types into a file
-        with open(
-            asset_type_path(self._working_dir, self.execution_rid, asset_table),
-            "a",
-            encoding="utf-8",
-        ) as f:
-            f.write(json.dumps({file_name.name: asset_types}) + "\n")
+        with Path(
+            asset_type_path(self._working_dir, self.execution_rid, asset_table)
+        ).open("a") as asset_type_file:
+            asset_type_file.write(json.dumps({file_name.name: asset_types}) + "\n")
 
         return AssetFilePath(
             asset_path=asset_path,
@@ -969,7 +966,7 @@ class Execution:
             feature_name=feature.feature_name,
             exec_rid=self.execution_rid,
         )
-        with json_path.open("a", encoding="utf-8") as file:
+        with Path(json_path).open("a", encoding="utf-8") as file:
             for feature in features:
                 feature.Execution = self.execution_rid
                 file.write(json.dumps(feature.model_dump(mode="json")) + "\n")

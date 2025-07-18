@@ -1,12 +1,13 @@
 from deriva_ml import (
     DatasetVersion,
+    DerivaML,
     VersionPart,
 )
 
 
 class TestDatasetVersion:
-    def test_dataset_version_simple(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
+    def test_dataset_version_simple(self, test_ml):
+        ml_instance = test_ml
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
         dataset_rid = ml_instance.create_dataset(
             type_rid.name,
@@ -18,9 +19,11 @@ class TestDatasetVersion:
         v1 = ml_instance.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor)
         assert "1.1.0" == str(v1)
 
-    def test_dataset_version(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_dataset_version(self, dataset_test, tmp_path):
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
 
         nested_datasets = dataset_description.member_rids.get("Dataset", [])
         datasets = [

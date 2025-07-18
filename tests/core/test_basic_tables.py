@@ -1,10 +1,9 @@
-
 from deriva_ml import BuiltinTypes, ColumnDefinition
 
 
 class TestAssets:
-    def test_create_assets(self, test_ml_catalog):
-        ml_instance = test_ml_catalog
+    def test_create_assets(self, test_ml, tmp_path):
+        ml_instance = test_ml
         ml_instance.create_asset("FooAsset")
         assert "FooAsset" in [a.name for a in ml_instance.model.find_assets()]
         ml_instance.create_asset(

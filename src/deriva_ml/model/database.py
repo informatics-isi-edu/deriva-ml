@@ -217,7 +217,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         return asset_columns.issubset({c.name for c in asset_table.columns})
 
     @staticmethod
-    def _localize_asset(o: list, indexes: tuple[int, int], asset_map: dict[str, str], debug: bool == False) -> tuple:
+    def _localize_asset(o: list, indexes: tuple[int, int], asset_map: dict[str, str], debug: bool = False) -> tuple:
         """Given a list of column values for a table, replace the FileName column with the local file name based on
         the URL value.
 

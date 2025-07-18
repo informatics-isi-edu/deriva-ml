@@ -67,7 +67,16 @@ def create_dataset_table(
 
 
 def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
-    return Table.define(
+    """Define the dataset version table in the specified schema.
+
+    Args:
+        sname: The schema name where the table should be created.
+        annotation: Optional annotation dictionary for the table.
+
+    Returns:
+        The created Table object.
+    """
+    table = Table.define(
         tname=MLTable.dataset_version,
         column_defs=[
             Column.define(
@@ -93,9 +102,19 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
             ForeignKey.define(["Execution"], sname, "Execution", ["RID"]),
         ],
     )
+    return table
 
 
 def create_execution_table(schema, annotation: Optional[dict] = None):
+    """Create the execution table in the specified schema.
+
+    Args:
+        schema: The schema where the table should be created.
+        annotation: Optional annotation dictionary for the table.
+
+    Returns:
+        The created Table object.
+    """
     annotation = annotation if annotation is not None else {}
     execution = schema.create_table(
         Table.define(
@@ -152,10 +171,18 @@ def create_asset_table(
 
 
 def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] = None):
-    annotations = annotations or {}
+    """Create the workflow table in the specified schema.
+
+    Args:
+        schema: The schema where the table should be created.
+        annotations: Optional annotation dictionary for the table.
+
+    Returns:
+        The created Table object.
+    """
     workflow_table = schema.create_table(
         Table.define(
-            MLTable.workflow,
+            tname=MLTable.workflow,
             column_defs=[
                 Column.define("Name", builtin_types.text),
                 Column.define("Description", builtin_types.markdown),
@@ -251,6 +278,16 @@ def create_ml_schema(
 
 
 def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
+    """Initialize the ML schema with all required tables.
+
+    Args:
+        model: The ERMrest model to add the schema to.
+        schema_name: The name of the schema to create. Defaults to "deriva-ml".
+
+    Returns:
+        None. Modifies the model in place.
+    """
+
     catalog = model.catalog
     asset_type = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.asset_type]
     asset_type.insert(
@@ -276,6 +313,7 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         ],
         defaults={"ID", "URI"},
     )
+
     asset_role = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.asset_role]
     asset_role.insert(
         [
@@ -321,17 +359,28 @@ def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
 
 
 def main():
+    """Main entry point for the schema creation CLI.
+
+    Creates ML schema and catalog based on command line arguments.
+
+    Returns:
+        None. Executes the CLI.
+    """
     scheme = "https"
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--hostname", type=str, required=True)
-    parser.add_argument("--schema_name", type=str, required=True)
-    parser.add_argument("--catalog_id", type=str, required=True)
-    parser.add_argument("--curie_prefix", type=str, required=True)
+    parser = argparse.ArgumentParser(description="Create ML schema and catalog")
+    parser.add_argument("hostname", help="Hostname for the catalog")
+    parser.add_argument("project_name", help="Project name for the catalog")
+    parser.add_argument("schema-name", default="deriva-ml", help="Schema name (default: deriva-ml)")
+    parser.add_argument("curie_prefix", type=str, required=True)
+
     args = parser.parse_args()
     credentials = get_credential(args.hostname)
     server = DerivaServer(scheme, args.hostname, credentials)
     model = server.connect_ermrest(args.catalog_id).getCatalogModel()
     create_ml_schema(model, args.schema_name)
+
+    print(f"Created ML catalog at {args.hostname} with project {args.project_name}")
+    print(f"Schema '{args.schema_name}' initialized successfully")
 
 
 if __name__ == "__main__":

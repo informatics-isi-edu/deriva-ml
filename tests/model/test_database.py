@@ -1,7 +1,7 @@
-from conftest import DatasetDescription, MLDatasetTest
 from deriva.core.datapath import Any
 
 from deriva_ml import DatasetSpec
+from tests.test_utils import DatasetDescription, DerivaML, MLDatasetCatalog
 
 
 class TestDataBaseModel:
@@ -22,11 +22,15 @@ class TestDataBaseModel:
         }
         return {dataset_description.rid} | nested_datasets
 
-    def compare_catalogs(self, dataset: MLDatasetTest, dataset_spec: DatasetSpec):
-        ml_instance = dataset.ml_instance
+    def compare_catalogs(self, ml_instance: DerivaML, dataset: MLDatasetCatalog, dataset_spec: DatasetSpec):
         reference_datasets = self.list_datasets(dataset.dataset_description)
 
-        snapshot_catalog = dataset.snapshot_catalog(dataset_spec)
+        snapshot_catalog = DerivaML(
+            ml_instance.host_name,
+            ml_instance._version_snapshot(dataset_spec),
+            working_dir=ml_instance.working_dir,
+            use_minid=False,
+        )
         bag = ml_instance.download_dataset_bag(dataset_spec)
 
         pb = snapshot_catalog.pathBuilder
@@ -77,9 +81,9 @@ class TestDataBaseModel:
             assert catalog_subject == subject_table
             assert catalog_image == image_table
 
-    def test_database_methods(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_database_methods(self, dataset_test):
+        ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
+        dataset_description = dataset_test.dataset_description
         current_version = ml_instance.dataset_version(dataset_description.rid)
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
@@ -88,22 +92,22 @@ class TestDataBaseModel:
         catalog_tables = len(schemas[ml_instance.domain_schema].tables) + len(schemas[ml_instance.ml_schema].tables)
         assert catalog_tables == len(tables)
 
-    def test_table_as_dict(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_table_as_dict(self, dataset_test):
+        ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
+        dataset_description = dataset_test.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
-        self.compare_catalogs(test_ml_catalog_dataset, dataset_spec)
+        self.compare_catalogs(ml_instance, dataset_test, dataset_spec)
 
-    def test_table_versions(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_table_versions(self, dataset_test):
+        ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
+        dataset_description = dataset_test.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         self.compare_catalogs(
-            test_ml_catalog_dataset, DatasetSpec(rid=dataset_description.rid, version=current_version)
+            ml_instance, dataset_test, DatasetSpec(rid=dataset_description.rid, version=current_version)
         )
 
         pb = ml_instance.pathBuilder
@@ -121,5 +125,5 @@ class TestDataBaseModel:
         print(subjects_new)
         assert len(subjects_new) == len(subjects_current) + 2
         print("compare")
-        self.compare_catalogs(test_ml_catalog_dataset, current_spec)
-        self.compare_catalogs(test_ml_catalog_dataset, new_spec)
+        self.compare_catalogs(dataset_test, current_spec)
+        self.compare_catalogs(dataset_test, new_spec)

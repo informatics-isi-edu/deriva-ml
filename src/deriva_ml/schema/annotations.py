@@ -1,5 +1,4 @@
 import argparse
-import sys
 
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
@@ -183,6 +182,15 @@ def catalog_annotation(model: DerivaModel) -> None:
 
 
 def asset_annotation(asset_table: Table):
+    """Generate annotations for an asset table.
+    
+    Args:
+        asset_table: The Table object representing the asset table.
+        
+    Returns:
+        A dictionary containing the annotations for the asset table.
+    """
+
     schema = asset_table.schema.name
     asset_name = asset_table.name
     asset_metadata = {c.name for c in asset_table.columns} - DerivaAssetColumns
@@ -444,9 +452,17 @@ def generate_annotation(model: Model, schema: str) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--catalog_id", type=str, required=True)
-    parser.add_argument("--schema_name", type=str, required=True)
+    """Main entry point for the annotations CLI.
+    
+    Applies annotations to the ML schema based on command line arguments.
+    
+    Returns:
+        None. Executes the CLI.
+    """
+    parser = argparse.ArgumentParser(description="Apply annotations to ML schema")
+    parser.add_argument("hostname", help="Hostname for the catalog")
+    parser.add_argument("catalog_id", help="Catalog ID")
+    parser.add_argument("schema-name", default="deriva-ml", help="Schema name (default: deriva-ml)")
     args = parser.parse_args()
     generate_annotation(args.catalog_id, args.schema_name)
 

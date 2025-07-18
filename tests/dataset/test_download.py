@@ -1,10 +1,9 @@
 from pathlib import Path
 
-from conftest import MLDatasetTest
-
 # Local imports
 from deriva_ml import DatasetSpec, DerivaML, MLVocab
 from deriva_ml.demo_catalog import DatasetDescription
+from tests.test_utils import MLDatasetCatalog
 
 
 class TestDatasetDownload:
@@ -16,7 +15,9 @@ class TestDatasetDownload:
         }
         return {dataset_description.rid} | nested_datasets
 
-    def compare_datasets(self, ml_instance: DerivaML, dataset: MLDatasetTest, dataset_spec: DatasetSpec, recurse=False):
+    def compare_datasets(
+        self, ml_instance: DerivaML, dataset: MLDatasetCatalog, dataset_spec: DatasetSpec, recurse=False
+    ):
         reference_datasets = self.list_datasets(dataset.dataset_description)
 
         snapshot_catalog = DerivaML(ml_instance.host_name, ml_instance._version_snapshot(dataset_spec))
@@ -49,14 +50,16 @@ class TestDatasetDownload:
                     bm = {k: v for k, v in bm.items() if k not in skip_keys}
                     assert m == bm
 
-    def test_bag_dataset_find(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_bag_dataset_find(self, dataset_test, tmp_path):
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
         current_version = ml_instance.dataset_version(dataset_description.rid)
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
 
-        reference_datasets = {ds.rid for ds in test_ml_catalog_dataset.list_datasets(dataset_description)}
+        reference_datasets = {ds.rid for ds in dataset_test.list_datasets(dataset_description)}
         assert reference_datasets == {ds["RID"] for ds in bag.model.find_datasets()}
 
         for ds in bag.model.find_datasets():
@@ -84,26 +87,30 @@ class TestDatasetDownload:
 
         check_relationships(dataset_description)
 
-    def test_dataset_download(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_dataset_download(self, dataset_test, tmp_path):
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
 
-        self.compare_datasets(ml_instance, test_ml_catalog_dataset, dataset_spec)
+        self.compare_datasets(ml_instance, dataset_test, dataset_spec)
 
-    def test_dataset_download_recurse(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
-        reference_datasets = test_ml_catalog_dataset.list_datasets(dataset_description)
+    def test_dataset_download_recurse(self, dataset_test, tmp_path):
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
+        reference_datasets = dataset_test.list_datasets(dataset_description)
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
 
         for dataset in reference_datasets:
-            reference_members = test_ml_catalog_dataset.collect_rids(dataset)
+            reference_members = dataset_test.collect_rids(dataset)
             member_rids = {dataset.rid}
             dataset_bag = bag.model.get_dataset(dataset.rid)
             for member_type, dataset_members in dataset_bag.list_dataset_members(recurse=True).items():
@@ -112,13 +119,15 @@ class TestDatasetDownload:
                 member_rids |= {e["RID"] for e in dataset_members}
             assert reference_members == member_rids
 
-    def test_dataset_download_versions(self, test_ml_catalog_dataset):
-        ml_instance = test_ml_catalog_dataset.ml_instance
-        dataset_description = test_ml_catalog_dataset.dataset_description
+    def test_dataset_download_versions(self, dataset_test, tmp_path):
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
 
         current_version = ml_instance.dataset_version(dataset_description.rid)
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
-        self.compare_datasets(ml_instance, test_ml_catalog_dataset, current_spec)
+        self.compare_datasets(ml_instance, dataset_test, current_spec)
 
         pb = ml_instance.pathBuilder
         subjects = [s["RID"] for s in pb.schemas[ml_instance.domain_schema].tables["Subject"].path.entities().fetch()]
@@ -135,5 +144,5 @@ class TestDatasetDownload:
         # Make sure that there is a difference between to old and new catalogs.
         #    assert len(subjects_new) == len(subjects_current) + 2
 
-        self.compare_datasets(ml_instance, test_ml_catalog_dataset, current_spec)
-        self.compare_datasets(ml_instance, test_ml_catalog_dataset, new_spec)
+        self.compare_datasets(ml_instance, dataset_test, current_spec)
+        self.compare_datasets(ml_instance, dataset_test, new_spec)

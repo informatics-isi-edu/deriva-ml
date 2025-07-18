@@ -3,32 +3,26 @@ from __future__ import annotations
 import atexit
 import itertools
 import string
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from numbers import Integral
-from random import choice, choices, randint, random
+from pathlib import Path
+from random import choice, randint, random
 from tempfile import TemporaryDirectory
-from typing import Iterator, Optional
 
 from deriva.core import ErmrestCatalog
 from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
 from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError
 
-from deriva_ml import (
-    RID,
-    BuiltinTypes,
-    ColumnDefinition,
-    DatasetVersion,
-    DerivaML,
-    Execution,
-    ExecutionConfiguration,
-    MLVocab,
-)
+from deriva_ml import DerivaML, MLVocab
+from deriva_ml.core.definitions import RID, BuiltinTypes, ColumnDefinition
+from deriva_ml.dataset.aux_classes import DatasetVersion
+from deriva_ml.execution.execution import Execution
+from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema import (
     create_ml_catalog,
 )
 from deriva_ml.schema.annotations import catalog_annotation
-from deriva_ml.schema.create_schema import reset_ml_schema
 
 try:
     from icecream import ic
@@ -39,13 +33,6 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 TEST_DATASET_SIZE = 12
-
-
-def reset_demo_catalog(catalog: ErmrestCatalog):
-    builtin_schemas = ("public", "deriva-ml", "www", "WWW")
-    domain_schema = [s for s in catalog.getCatalogModel().schemas if s not in builtin_schemas].pop()
-    reset_ml_schema(catalog)
-    create_domain_schema(catalog, domain_schema)
 
 
 def populate_demo_catalog(ml_instance: DerivaML) -> None:
@@ -293,9 +280,25 @@ def create_demo_features(ml_instance: DerivaML) -> None:
 
 
 def create_demo_files(ml_instance: DerivaML):
+    """Create demo files for testing purposes.
+
+    Args:
+        ml_instance: The DerivaML instance to create files for.
+
+    Returns:
+        None. Creates files in the working directory.
+    """
+
     def random_string(length: int) -> str:
-        alphabet = string.ascii_letters + string.digits
-        return "".join(choices(alphabet, k=length))
+        """Generate a random string of specified length.
+
+        Args:
+            length: The length of the string to generate.
+
+        Returns:
+            A random string of the specified length.
+        """
+        return "".join(random.choice(string.ascii_letters) for _ in range(length))
 
     test_dir = ml_instance.working_dir / "test_dir"
     test_dir.mkdir(parents=True, exist_ok=True)
@@ -304,9 +307,10 @@ def create_demo_files(ml_instance: DerivaML):
     d2 = test_dir / "d2"
     d2.mkdir(parents=True, exist_ok=True)
 
+    # Create some demo files
     for d in [test_dir, d1, d2]:
         for i in range(5):
-            fname = d / f"file{i}.{choice(['txt', 'jpeg'])}"
+            fname = Path(d) / f"file{i}.{random.choice(['txt', 'jpeg'])}"
             with fname.open("w") as f:
                 f.write(random_string(10))
     ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Test workflow")
@@ -343,6 +347,14 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
 
 
 def destroy_demo_catalog(catalog):
+    """Destroy the demo catalog and clean up resources.
+
+    Args:
+        catalog: The ErmrestCatalog instance to destroy.
+
+    Returns:
+        None. Destroys the catalog.
+    """
     catalog.delete_ermrest_catalog(really=True)
 
 
@@ -384,8 +396,8 @@ class DemoML(DerivaML):
         self,
         hostname,
         catalog_id,
-        cache_dir: Optional[str] = None,
-        working_dir: Optional[str] = None,
+        cache_dir: str | None = None,
+        working_dir: str | None = None,
         use_minid=True,
     ):
         super().__init__(

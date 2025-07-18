@@ -1,29 +1,24 @@
-import shutil
 import string
 from pathlib import Path
 from random import choice, choices
+from tempfile import TemporaryDirectory
 
 import pytest
+from deriva.core.datapath import DataPathException
 
-from deriva_ml import DerivaMLInvalidTerm, ExecutionConfiguration, FileSpec, MLVocab
+from deriva_ml import DerivaML, DerivaMLInvalidTerm, ExecutionConfiguration, FileSpec, MLVocab
 
 FILE_COUNT = 5
 
 
-class TestFile:
-    @pytest.fixture(scope="function")
-    def test_file_table_setup(self, test_ml_catalog, tmp_path):
+class TestFiles:
+    def __init__(self, test_ml):
         def random_string(length: int) -> str:
             alphabet = string.ascii_letters + string.digits
             return "".join(choices(alphabet, k=length))
 
-        self.ml_instance = test_ml_catalog
-        self.ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Workflow for testing files")
-        self.workflow = self.ml_instance.create_workflow(name="Test Workflow", workflow_type="File Test Workflow")
-        self.execution = self.ml_instance.create_execution(
-            ExecutionConfiguration(workflow=self.workflow, description="Test Execution")
-        )
-        self.test_dir = Path(tmp_path) / "test_dir"
+        self.tmp_dir = Path(TemporaryDirectory().name)
+        self.test_dir = self.tmp_dir / "test_dir"
         self.test_dir.mkdir(parents=True, exist_ok=True)
         d1 = self.test_dir / "d1"
         d1.mkdir(parents=True, exist_ok=True)
@@ -34,15 +29,41 @@ class TestFile:
         for d in [self.test_dir, d1, d2]:
             for i in range(FILE_COUNT):
                 self.file_count += 1
-                with open(d / f"file{i}.{choice(['txt', 'jpeg'])}", "w") as f:
+                with (d / f"file{i}.{choice(['txt', 'jpeg'])}").open("w") as f:
                     f.write(random_string(10))
-        self.ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Test workflow")
-        yield self
-        shutil.rmtree(self.test_dir)
-        # Cleanup
 
-    def test_file_table_bad_type(self, test_file_table_setup):
-        ml_instance = test_file_table_setup
+        self.ml_instance = DerivaML(hostname=test_ml.hostname, catalog_id=test_ml.catalog_id, working_dir=self.tmp_dir)
+        self.ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Workflow for testing files")
+        self.workflow = self.ml_instance.create_workflow(name="Test Workflow", workflow_type="File Test Workflow")
+        self.execution = self.ml_instance.create_execution(
+            ExecutionConfiguration(workflow=self.workflow, description="Test Execution")
+        )
+        self.ml_instance.add_term(MLVocab.workflow_type, "File Test Workflow", description="Test workflow")
+
+        self.ml_instance.add_term(MLVocab.asset_type, "jpeg", description="A Image file")
+        self.ml_instance.add_term(MLVocab.asset_type, "txt", description="A Text file")
+
+    def clean_up(self):
+        print("Cleaning up test files....")
+        try:
+            self.ml_instance.pathBuilder.schemas[self.ml_instance.ml_schema].tables["File"].delete()
+        except DataPathException as e:
+            print(type(e))
+
+
+@pytest.fixture(scope="function")
+def file_table_setup(deriva_catalog):
+    print("Setting up file_table_catalog....")
+    test_files = TestFiles(deriva_catalog)
+    yield test_files
+    test_files.clean_up()
+
+    # Cleanup
+
+
+class TestFile:
+    def test_file_table_bad_type(self, file_table_setup):
+        ml_instance = file_table_setup
         with pytest.raises(DerivaMLInvalidTerm):
             filespec = [
                 FileSpec(
@@ -57,32 +78,30 @@ class TestFile:
             ]
             ml_instance.execution.add_files(filespec)
 
-    def test_create_filespecs(self, test_file_table_setup):
-        test_dir = test_file_table_setup.test_dir
-        execution = test_file_table_setup.execution
+    def test_create_filespecs(self, file_table_setup):
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
 
         def use_extension(filename: Path) -> list[str]:
             return [filename.suffix.lstrip(".")]
 
         with execution.execute() as _exe:
             filespecs = list(FileSpec.create_filespecs(test_dir, "Test Directory"))
-            assert len(filespecs) == test_file_table_setup.file_count
+            assert len(filespecs) == file_table_setup.file_count
             assert filespecs[0].file_types == ["File"]
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=["txt"])
             assert all([set(filespec.file_types) == {"txt", "File"} for filespec in filespecs])
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
             assert all([set(filespec.file_types) < {"txt", "jpeg", "File"} for filespec in filespecs])
 
-    def test_add_files(self, test_file_table_setup):
-        ml_instance = test_file_table_setup.ml_instance
-        test_dir = test_file_table_setup.test_dir
-        execution = test_file_table_setup.execution
+    def test_add_files(self, file_table_setup):
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
 
         def use_extension(filename: Path) -> list[str]:
             return [filename.suffix.lstrip(".")]
 
-        ml_instance.add_term(MLVocab.asset_type, "jpeg", description="A Image file")
-        ml_instance.add_term(MLVocab.asset_type, "txt", description="A Text file")
         with execution.execute() as exe:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
 
@@ -95,10 +114,10 @@ class TestFile:
                 ds = ml_instance.list_dataset_members(subdir)
                 assert len(ds["File"]) == 5
 
-    def test_list_files(self, test_file_table_setup):
-        ml_instance = test_file_table_setup.ml_instance
-        test_dir = test_file_table_setup.test_dir
-        execution = test_file_table_setup.execution
+    def test_list_files(self, file_table_setup):
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
 
         jpeg_cnt = 0
         txt_cnt = 0
@@ -112,9 +131,6 @@ class TestFile:
                 txt_cnt += 1
             return [ext]
 
-        ml_instance.add_term(MLVocab.asset_type, "jpeg", description="A Image file")
-        ml_instance.add_term(MLVocab.asset_type, "txt", description="A Text file")
-
         with execution.execute() as exe:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
             _file_dataset = exe.add_files(filespecs)
@@ -126,10 +142,10 @@ class TestFile:
         files = ml_instance.list_files(file_types=["jpeg", "txt"])
         assert len(files) == jpeg_cnt + txt_cnt
 
-    def test_files_datasets(self, test_file_table_setup):
-        ml_instance = test_file_table_setup.ml_instance
-        test_dir = test_file_table_setup.test_dir
-        execution = test_file_table_setup.execution
+    def test_files_datasets(self, file_table_setup):
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
 
         ml_instance.add_term(MLVocab.asset_type, "jpeg", description="A Image file")
         ml_instance.add_term(MLVocab.asset_type, "txt", description="A Text file")

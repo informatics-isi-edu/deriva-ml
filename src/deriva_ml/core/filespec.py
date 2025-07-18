@@ -51,7 +51,8 @@ class FileSpec(BaseModel):
             # Already a tag URL, so just return it.
             return url
         elif (not url_parts.scheme) or url_parts.scheme == "file":
-            # There is no scheme part of the URL, or it is a file URL, so it is a local file path, so convert to a tag URL.
+            # There is no scheme part of the URL, or it is a file URL, so it is a local file path.
+            # Convert to a tag URL.
             return f"tag://{gethostname()},{date.today()}:file://{url_parts.path}"
         else:
             raise ValueError("url is not a file URL")

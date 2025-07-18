@@ -204,7 +204,10 @@ class Feature:
             ),  # Set default value for Feature_Name
             self.target_table.name: (str, ...),
         }
-        docstring = f"Class to capture fields in a feature {self.feature_name} on table {self.target_table}. Feature columns include:\n"
+        docstring = (
+            f"Class to capture fields in a feature {self.feature_name} on table {self.target_table}. "
+            "Feature columns include:\n"
+        )
         docstring += "\n".join([f"    {c.name}" for c in self.feature_columns])
 
         model = create_model(

@@ -36,11 +36,13 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 class DatasetBag:
-    """DatasetBag is a class that manages a materialized bag.  It is created from a locally materialized BDBag for a
-    dataset_table, which is created either by DerivaML.create_execution, or directly by calling DerivaML.download_dataset.
+    """
+    DatasetBag is a class that manages a materialized bag.  It is created from a locally materialized
+    BDBag for a dataset_table, which is created either by DerivaML.create_execution, or directly by
+    calling DerivaML.download_dataset.
 
-    A general a bag may contain multiple datasets, if the dataset is nested. The DatasetBag is used to represent only
-    one of the datasets in the bag.
+    A general a bag may contain multiple datasets, if the dataset is nested. The DatasetBag is used to
+    represent only one of the datasets in the bag.
 
     All the metadata associated with the dataset is stored in a SQLLite database that can be queried using SQL.
 
@@ -89,7 +91,6 @@ class DatasetBag:
         dataset_rid"""
 
         table_name = self.model.normalize_table_name(table)
-        table_schema = table_name.split(":")[0]
 
         # Get the names of the columns in the table.
         with self.database as dbase:
