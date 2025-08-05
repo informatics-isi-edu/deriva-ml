@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import atexit
 import itertools
+import logging
 import string
 from collections.abc import Iterator, Sequence
 from numbers import Integral
@@ -366,6 +367,7 @@ def create_demo_catalog(
     create_features=False,
     create_datasets=False,
     on_exit_delete=True,
+    logging_level=logging.INFO,
 ) -> ErmrestCatalog:
     test_catalog = create_ml_catalog(hostname, project_name=project_name)
     if on_exit_delete:
@@ -374,7 +376,11 @@ def create_demo_catalog(
         with TemporaryDirectory() as tmpdir:
             create_domain_schema(test_catalog, domain_schema)
             ml_instance = DerivaML(
-                hostname, catalog_id=test_catalog.catalog_id, domain_schema=domain_schema, working_dir=tmpdir
+                hostname,
+                catalog_id=test_catalog.catalog_id,
+                domain_schema=domain_schema,
+                working_dir=tmpdir,
+                logging_level=logging_level,
             )
 
             if populate or create_features or create_datasets:
