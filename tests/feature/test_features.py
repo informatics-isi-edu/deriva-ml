@@ -112,6 +112,23 @@ class TestFeatures:
         assert "BoundingBox" in [f.feature_name for f in ml_instance.model.find_features("Image")]
         assert "Quality" in [f.feature_name for f in ml_instance.model.find_features("Image")]
 
+        subject_health_feature = ml_instance.feature_record_class("Subject", "Health")
+        assert len(subject_health_feature.asset_columns()) == 0
+        assert len(subject_health_feature.term_columns()) == 1
+        assert len(subject_health_feature.feature_columns()) == 2
+        assert len(subject_health_feature.value_columns()) == 1
+
+        bounding_box_feature = ml_instance.feature_record_class("Image", "BoundingBox")
+        assert len(bounding_box_feature.asset_columns()) == 1
+        assert len(bounding_box_feature.term_columns()) == 0
+        assert len(bounding_box_feature.feature_columns()) == 1
+        assert len(bounding_box_feature.value_columns()) == 0
+
+        image_quality_feature = ml_instance.feature_record_class("Image", "Quality")
+        assert len(image_quality_feature.asset_columns()) == 0
+        assert len(image_quality_feature.term_columns()) == 1
+        assert len(image_quality_feature.feature_columns()) == 1
+
     def test_lookup_feature(self, dataset_test, tmp_path):
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
@@ -130,6 +147,10 @@ class TestFeatures:
         )
         subject_table = ml_instance.pathBuilder.schemas[ml_instance.domain_schema].tables["Subject"]
         subject_rids = [s["RID"] for s in subject_table.path.entities().fetch()]
+
+        assert "Health" in [f.feature_name for f in ml_instance.model.find_features("Subject")]
+        assert "BoundingBox" in [f.feature_name for f in ml_instance.model.find_features("Image")]
+        assert "Quality" in [f.feature_name for f in ml_instance.model.find_features("Image")]
 
         ml_instance.add_term(
             vc.workflow_type, "Test Feature Workflow", description="A ML Workflow that uses Deriva ML API"
@@ -204,16 +225,19 @@ class TestFeatures:
 
     def create_features(self, ml_instance: DerivaML):
         ml_instance.create_vocabulary("SubjectHealth", "A vocab")
-        ml_instance.add_term(
-            "SubjectHealth",
-            "Sick",
-            description="The subject self reports that they are sick",
-        )
-        ml_instance.add_term(
-            "SubjectHealth",
-            "Well",
-            description="The subject self reports that they feel well",
-        )
+        ml_instance.create_vocabulary("SubjectHealth1", "A vocab")
+        for t in ["SubjectHeath", "SubjectHealth1"]:
+            ml_instance.add_term(
+                t,
+                "Sick",
+                description="The subject self reports that they are sick",
+            )
+            ml_instance.add_term(
+                t,
+                "Well",
+                description="The subject self reports that they feel well",
+            )
+
         ml_instance.create_vocabulary("ImageQuality", "Controlled vocabulary for image quality")
         ml_instance.add_term("ImageQuality", "Good", description="The image is good")
         ml_instance.add_term("ImageQuality", "Bad", description="The image is bad")
@@ -222,7 +246,7 @@ class TestFeatures:
         ml_instance.create_feature(
             "Subject",
             "Health",
-            terms=["SubjectHealth"],
+            terms=["SubjectHealth", "SubjectHealth1"],
             metadata=[ColumnDefinition(name="Scale", type=BuiltinTypes.int2, nullok=True)],
             optional=["Scale"],
         )

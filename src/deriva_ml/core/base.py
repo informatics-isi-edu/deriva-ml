@@ -691,10 +691,10 @@ class DerivaML(Dataset):
         self,
         target_table: Table | str,
         feature_name: str,
-        terms: Iterable[Table | str] | None = None,
-        assets: Iterable[Table | str] | None = None,
-        metadata: Iterable[ColumnDefinition | Table | Key | str] | None = None,
-        optional: Iterable[str] | None = None,
+        terms: list[Table | str] | None = None,
+        assets: list[Table | str] | None = None,
+        metadata: list[ColumnDefinition | Table | Key | str] | None = None,
+        optional: list[str] | None = None,
         comment: str = "",
     ) -> type[FeatureRecord]:
         """Creates a new feature definition.
@@ -756,7 +756,6 @@ class DerivaML(Dataset):
         # Add feature name to vocabulary
         feature_name_term = self.add_term("Feature_Name", feature_name, description=comment)
         atable_name = f"Execution_{target_table.name}_{feature_name_term.name}"
-
         # Create an association table implementing the feature
         atable = self.model.schemas[self.domain_schema].create_table(
             target_table.define_association(
@@ -766,7 +765,6 @@ class DerivaML(Dataset):
                 comment=comment,
             )
         )
-
         # Configure optional columns and default feature name
         for c in optional:
             atable.columns[c].alter(nullok=True)
