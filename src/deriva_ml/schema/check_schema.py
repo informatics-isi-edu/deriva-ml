@@ -1,35 +1,29 @@
 import json
-import logging
 import re
-from importlib.resources import files
 from pathlib import Path
 from pprint import pprint
-from typing import Optional
 
 from deepdiff import DeepDiff
 from deriva.core import AttrDict, BaseCLI, get_credential
 from deriva.core.ermrest_catalog import ErmrestCatalog
 
-from deriva_ml import DerivaML
-from deriva_ml.core.definitions import ML_SCHEMA, MLVocab
-from deriva_ml.dataset.aux_classes import DatasetSpec
-from deriva_ml.execution.execution import Execution
-from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.core.definitions import ML_SCHEMA
 from deriva_ml.schema.create_schema import create_ml_catalog
 
 
 def normalize_schema(d):
     if isinstance(d, dict) or isinstance(d, AttrDict):
-        return {k:  normalize_schema(v) for k, v in d.items()}
+        return {k: normalize_schema(v) for k, v in d.items()}
     elif isinstance(d, list):
         return [normalize_schema(i) for i in d]
     elif isinstance(d, str):
         # ID templates for controlled vocabulary
         if m := re.match("(?P<s>.*):{RID}", d):
-            d = d if m['s'] == 'deriva-ml' else  "reference-catalog:{RID}" if re.match(".*:{RID}", d) else d
+            d = d if m["s"] == "deriva-ml" else "reference-catalog:{RID}" if re.match(".*:{RID}", d) else d
         return d
     else:
         return d
+
 
 def check_ml_schema(hostname, catalog_id, schema_file: Path | None = None):
     """Check the ML schema against a reference schema file.
@@ -42,8 +36,8 @@ def check_ml_schema(hostname, catalog_id, schema_file: Path | None = None):
     Returns:
         None. Prints the diff between target and reference schemas.
     """
-    schema_file = schema_file or files("deriva-ml.data").joinpath("deriva-ml-reference.json")
-
+    # schema_file = schema_file or files("deriva-ml.data").joinpath("deriva-ml-reference.json")
+    schema_file = schema_file or Path("deriva-ml-reference.json")
     # Now map
 
     with Path(schema_file).open("r") as f:
@@ -78,13 +72,7 @@ class CheckMLSchemaCLI(BaseCLI):
         BaseCLI.__init__(self, description, epilog, **kwargs)
 
         self.parser.add_argument("--catalog", default=1, metavar="<1>", help="Catalog number. Default: 1")
-        self.parser.add_argument("--test", action="store_true", help="Use demo catalog.")
-        self.parser.add_argument("--dry-run", action="store_true", help="Perform execution in dry-run mode.")
         self.parser.add_argument("--dump", action="store_true", help="Perform execution in dry-run mode.")
-
-        self.execution: Optional[Execution] = None
-        self.deriva_ml: Optional[DerivaML] = None
-        self.logger = logging.getLogger(__name__)
 
     def main(self):
         """Parse arguments and set up execution environment."""
@@ -96,28 +84,7 @@ class CheckMLSchemaCLI(BaseCLI):
             dump_ml_schema(hostname, catalog_id)
             return
 
-        self.deriva_ml = DerivaML(hostname, catalog_id)  # This should be changed to the domain specific class.
-        print(f"Executing script {self.deriva_ml.executable_path} version: {self.deriva_ml.get_version()}")
-
-        # Create a workflow instance for this specific version of the script.
-        # Return an existing workflow if one is found.
-        self.deriva_ml.add_term(MLVocab.workflow_type, "Demo Notebook", description="Initial setup of Model Notebook")
-        workflow = self.deriva_ml.create_workflow("demo-workflow", "Demo Notebook")
-
-        # Create an execution instance that will work with the latest version of the input datasets.
-        config = ExecutionConfiguration(
-            datasets=[
-                DatasetSpec(rid=dataset, version=self.deriva_ml.dataset_version(dataset)) for dataset in datasets
-            ],
-            assets=models,
-            workflow=workflow,
-            parameters="parameters..json",
-        )
-
-        self.execution = self.deriva_ml.create_execution(config, dry_run=args.dry_run)
-        with self.execution as e:
-            self.do_stuff(e)
-        self.execution.upload_execution_outputs()
+        check_ml_schema(hostname, catalog_id)
 
 
 if __name__ == "__main__":
