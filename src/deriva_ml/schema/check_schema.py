@@ -1,5 +1,6 @@
 import json
 import re
+from importlib.resources import files
 from pathlib import Path
 from pprint import pprint
 
@@ -37,7 +38,8 @@ def check_ml_schema(hostname, catalog_id, schema_file: Path | None = None):
         None. Prints the diff between target and reference schemas.
     """
     # schema_file = schema_file or files("deriva-ml.data").joinpath("deriva-ml-reference.json")
-    schema_file = schema_file or Path("deriva-ml-reference.json")
+    schema_file = schema_file or files("deriva_ml.schema").joinpath("deriva-ml-reference.json")
+
     # Now map
 
     with Path(schema_file).open("r") as f:
