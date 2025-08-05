@@ -88,7 +88,9 @@ class CheckMLSchemaCLI(BaseCLI):
 
         check_ml_schema(hostname, catalog_id)
 
+def main():
+    cli = CheckMLSchemaCLI(description="Check DerivaML Catalog for Compliance", epilog="")
+    cli.main()
 
 if __name__ == "__main__":
-    cli = CheckMLSchemaCLI(description="Deriva ML Execution Script Demo", epilog="")
-    cli.main()
+    main()
