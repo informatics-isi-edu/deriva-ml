@@ -14,7 +14,12 @@ from deriva_ml.schema.create_schema import create_ml_catalog
 
 def normalize_schema(d):
     if isinstance(d, dict) or isinstance(d, AttrDict):
-        return {k: normalize_schema(v) for k, v in d.items()}
+        m = {}
+        for k, v in d.items():
+            if k == "acl_bindings" or k == "annotations" or k == "comment":
+                continue
+            m[k] = normalize_schema(v)
+        return m
     elif isinstance(d, list):
         return [normalize_schema(i) for i in d]
     elif isinstance(d, str):
@@ -43,7 +48,7 @@ def check_ml_schema(hostname, catalog_id, schema_file: Path | None = None):
     # Now map
 
     with Path(schema_file).open("r") as f:
-        reference_schema = json.load(f)["schemas"][ML_SCHEMA]
+        reference_schema = normalize_schema(json.load(f)["schemas"][ML_SCHEMA])
 
     catalog = ErmrestCatalog("https", hostname, catalog_id, credentials=get_credential(hostname))
     target_schema = normalize_schema(catalog.getCatalogModel().schemas[ML_SCHEMA].prejson())
@@ -53,6 +58,7 @@ def check_ml_schema(hostname, catalog_id, schema_file: Path | None = None):
     print(f"Diff between {schema_file} and {ML_SCHEMA} schema:")
     # Pretty‐print as JSON
     pprint(diff, indent=2)
+    return diff
 
 
 def dump_ml_schema(hostname: str, filename: str = "deriva-ml-reference.json") -> None:
@@ -88,9 +94,11 @@ class CheckMLSchemaCLI(BaseCLI):
 
         check_ml_schema(hostname, catalog_id)
 
+
 def main():
     cli = CheckMLSchemaCLI(description="Check DerivaML Catalog for Compliance", epilog="")
     cli.main()
+
 
 if __name__ == "__main__":
     main()
