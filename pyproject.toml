@@ -26,6 +26,7 @@ deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:ma
 deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
 deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
 deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
+deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
 
 [project.optional-dependencies]
 
