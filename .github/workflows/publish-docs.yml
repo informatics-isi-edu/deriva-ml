@@ -1,4 +1,4 @@
-name: DerivaML 
+name: Publish DerivaML Documents
 on:
   push:
     branches:
