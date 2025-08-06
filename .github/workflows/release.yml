@@ -9,6 +9,7 @@ jobs:
   build-and-publish:
     name: Build and publish to PyPI
     runs-on: ubuntu-latest
+    environment: publish
 
     steps:
       - name: Checkout code
@@ -29,8 +30,6 @@ jobs:
 
       - name: Publish to PyPI
         run: uv publish
-        env:
-          UV_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
   create-release:
     name: Create GitHub Release with notes
