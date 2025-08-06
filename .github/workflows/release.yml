@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'  # Trigger on tags like v1.2.3
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
@@ -21,7 +22,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install uv
-        uses: supplypike/setup-bin@v3
+        uses: supplypike/setup-bin@v4
         with:
           toolName: uv
           version: latest
