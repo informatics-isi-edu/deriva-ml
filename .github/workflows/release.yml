@@ -23,9 +23,9 @@ jobs:
       - name: Install uv
         uses: supplypike/setup-bin@v3
         with:
-          uri: https://astral.sh/uv/install.sh
           toolName: uv
           version: latest
+          uri: https://astral.sh/uv/install.sh
 
       - name: Build the package
         run: uv build
