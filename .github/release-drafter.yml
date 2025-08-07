@@ -1,6 +1,11 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
+template: |
+  ## Changes
+
+  $CHANGES
+
 categories:
   - title: 🚀 Features
     labels: [feature, enhancement]
@@ -18,3 +23,4 @@ exclude-labels:
 replacers:
   - search: '\[#([0-9]+)\]'
     replace: '[#${1}](https://github.com/${{ GITHUB_REPOSITORY }}/pull/${1})'
+    
