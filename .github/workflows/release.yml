@@ -1,7 +1,6 @@
 name: Build and Release
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - 'v*.*.*'
@@ -77,4 +76,6 @@ jobs:
           uri: https://astral.sh/uv/install.sh
 
       - name: Publish to PyPI
-        run: uv publish
+        run: |
+          uv build
+          uv publish
