@@ -1,10 +1,16 @@
 name: Build and Release
 
+
+  
 on:
   push:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   build:
