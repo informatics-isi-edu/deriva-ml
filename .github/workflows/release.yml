@@ -33,8 +33,17 @@ jobs:
       - name: Prepend ~/.local/bin to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Debug working dir
+        run: |
+          pwd
+          ls -la
+          cat pyproject.toml || echo "Missing pyproject.toml!"
+
       - name: Build package
         run: uv build --verbose
+
+      - name: Show dist contents
+        run: ls -lh dist || echo "No dist/ directory"
 
       - name: Upload built dist
         uses: actions/upload-artifact@v4
