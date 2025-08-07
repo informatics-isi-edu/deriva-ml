@@ -28,17 +28,8 @@ jobs:
         with:
           version: "latest"
 
-      - name: Debug working dir
-        run: |
-          pwd
-          ls -la
-          cat pyproject.toml || echo "Missing pyproject.toml!"
-
       - name: Build package
-        run: uv build --verbose
-
-      - name: Show dist contents
-        run: ls -lh dist || echo "No dist/ directory"
+        run: uv build
 
       - name: Upload built dist
         uses: actions/upload-artifact@v4
@@ -82,9 +73,6 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: "latest"
-
-      - name: Prepend ~/.local/bin to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Download built dist
         uses: actions/download-artifact@v4
