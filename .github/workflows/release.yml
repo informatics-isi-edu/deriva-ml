@@ -75,6 +75,9 @@ jobs:
           version: latest
           uri: https://astral.sh/uv/install.sh
 
+      - name: Install setuptools_scm
+        run: uv pip install setuptools_scm
+        
       - name: Show version
         run: python -c "import setuptools_scm; print(setuptools_scm.get_version())"
 
