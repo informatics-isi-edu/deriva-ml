@@ -22,16 +22,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install uv
-        uses: supplypike/setup-bin@v4
+      
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
         with:
-          name: uv
-          version: latest
-          uri: https://astral.sh/uv/install.sh
-
-      - name: Prepend ~/.local/bin to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+          version: "latest"
 
       - name: Debug working dir
         run: |
@@ -83,12 +78,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install uv
-        uses: supplypike/setup-bin@v4
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
         with:
-          name: uv
-          version: latest
-          uri: https://astral.sh/uv/install.sh
+          version: "latest"
 
       - name: Prepend ~/.local/bin to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
