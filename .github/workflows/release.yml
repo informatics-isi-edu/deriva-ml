@@ -75,6 +75,11 @@ jobs:
           version: latest
           uri: https://astral.sh/uv/install.sh
 
+      - name: Debug uv version
+        run: echo "$HOME/.local/bin"
+        run: echo $GITHUB_PATH
+        run: which uv && uv --version
+
       - name: Build the package
         run: uv build --verbose
 
