@@ -11,7 +11,7 @@ jobs:
     name: Build Package
     runs-on: ubuntu-latest
     outputs:
-      artifact-path: ${{ steps.build.outputs.artifact-path }}
+      artifact-name: dist
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,21 +30,27 @@ jobs:
           version: latest
           uri: https://astral.sh/uv/install.sh
 
+      - name: Prepend ~/.local/bin to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Build package
-        id: build
-        run: |
-          uv build
-          echo "artifact-path=$(ls dist/*.tar.gz || true)" >> $GITHUB_OUTPUT
+        run: uv build
+
+      - name: Upload built dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
 
   create-release:
-    name: Create GitHub Release with notes
+    name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Generate GitHub Release
+      - name: Draft GitHub Release
         uses: release-drafter/release-drafter@v5
         with:
           config-name: release-drafter.yml
@@ -55,8 +61,8 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: [build, create-release]  # Ensure GitHub Release exists before publishing
-    environment: publish
+    needs: [build, create-release]
+    environment: publish  # Optional GitHub environment to protect this step
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -75,13 +81,18 @@ jobs:
           version: latest
           uri: https://astral.sh/uv/install.sh
 
-      - name: Debug uv version
-        run: echo "$HOME/.local/bin"
-        run: echo $GITHUB_PATH
-        run: which uv && uv --version
+      - name: Prepend ~/.local/bin to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Build the package
-        run: uv build --verbose
+      - name: Download built dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Debug artifact contents
+        run: ls -l dist/
 
       - name: Publish to PyPI
-        run: uv publish  --verbose
+        run: uv publish --verbose
+ 
