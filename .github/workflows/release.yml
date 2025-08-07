@@ -77,9 +77,9 @@ jobs:
 
       - name: Install setuptools_scm
         run: uv pip install setuptools_scm
-        
+
       - name: Show version
-        run: python -c "import setuptools_scm; print(setuptools_scm.get_version())"
+        run: uv run python -c "import setuptools_scm; print(setuptools_scm.get_version())"
 
       - name: Build the package
         run: uv build
