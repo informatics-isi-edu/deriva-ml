@@ -76,10 +76,7 @@ jobs:
           uri: https://astral.sh/uv/install.sh
 
       - name: Build the package
-        run: uv build
-
-      - name: List dist files
-        run: ls -lh dist/
+        run: uv build --verbose
 
       - name: Publish to PyPI
-        run: uv publish --strict
+        run: uv publish --strict --verbose
