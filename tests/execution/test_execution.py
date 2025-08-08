@@ -2,6 +2,8 @@
 Tests for the execution module.
 """
 
+import re
+import subprocess
 from tempfile import TemporaryDirectory
 
 from deriva_ml import (
@@ -14,6 +16,59 @@ from deriva_ml import (
 from deriva_ml import (
     MLVocab as vc,
 )
+
+
+class TestWorkflow:
+    def test_workflow_creation_script(self, test_ml):
+        ml_instance = test_ml
+        ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
+        ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
+        print("Running workflow-script.py ...")
+        result = subprocess.run(
+            [
+                "python",
+                "execution/workflow-script.py",
+                ml_instance.catalog.deriva_server.server,
+                ml_instance.catalog_id,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        print(result.stdout)
+        m = re.match(".*url='(?P<url>.*?)'", result.stdout)
+        url = m["url"]
+        m = re.match(".*checksum='(?P<checksum>.*?)'", result.stdout)
+        checksum = m["checksum"]
+        m = re.match(".*is_notebook=(?P<is_notebook>True|False)", result.stdout)
+        is_notebook = m["is_notebook"]
+        print("URL", url)
+        print("checksum", checksum)
+        print("is_notebook", is_notebook)
+        assert is_notebook == "False"
+        assert url.endswith("workflow-script.py")
+
+    def test_workflow_creation_notebook(self, test_ml):
+        ml_instance = test_ml
+        ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
+        ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
+        print("Running workflow-script.py ...")
+        result = subprocess.run(
+            ["runnotebook", "execution/workflow-script.ipnb", "localhost", ml_instance.catalog_id],
+            capture_output=True,
+            text=True,
+        )
+        print(result.stdout)
+        m = re.match(".*url='(?P<url>.*?)'", result.stdout)
+        url = m["url"]
+        m = re.match(".*checksum='(?P<checksum>.*?)'", result.stdout)
+        checksum = m["checksum"]
+        m = re.match(".*is_notebook=(?P<is_notebook>True|False)", result.stdout)
+        is_notebook = m["is_notebook"]
+        print("URL", url)
+        print("checksum", checksum)
+        print("is_notebook", is_notebook)
+        assert is_notebook == "False"
+        assert url.endswith("workflow-script.py")
 
 
 class TestExecution:

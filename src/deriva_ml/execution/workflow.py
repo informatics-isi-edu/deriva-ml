@@ -305,14 +305,14 @@ class Workflow(BaseModel):
             is_notebook = False
             stack = inspect.stack()
             # Get the caller's filename, which is two up the stack from here.
-            if len(stack) > 1:
-                filename = Path(stack[2].filename)
-                if not filename.exists():
-                    # Being called from the command line interpreter.
-                    filename = Path("REPL")
-                # Get the caller's filename, which is two up the stack from here.
-            else:
-                raise DerivaMLException("Looking for caller failed")  # Stack is too shallow
+
+            filename = Path(stack[-1].filename)
+            if not filename.exists():
+                # Being called from the command line interpreter.
+                filename = Path("REPL")
+            # Get the caller's filename, which is two up the stack from here.
+        else:
+            raise DerivaMLException("Looking for caller failed")  # Stack is too shallow
         return filename, is_notebook
 
     @staticmethod

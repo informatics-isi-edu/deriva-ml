@@ -211,6 +211,7 @@ class Dataset:
         dataset_path.update([{"RID": dataset, "Version": version["RID"]} for dataset, version in versions.items()])
 
     def _set_version_snapshot(self):
+        """Update the Snapshot column of the Dataset_Version table to the correct time."""
         dataset_version_path = self._model.catalog.getPathBuilder().schemas[self._ml_schema].tables["Dataset_Version"]
         versions = dataset_version_path.entities().fetch()
         dataset_version_path.update(
@@ -1023,7 +1024,7 @@ class Dataset:
                 self._logger.info(
                     "Downloading dataset %s for catalog: %s@%s"
                     % (
-                        'minid' if self._use_minid else 'bag',
+                        "minid" if self._use_minid else "bag",
                         dataset.rid,
                         str(dataset.version),
                     )
