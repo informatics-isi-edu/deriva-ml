@@ -87,7 +87,7 @@ class TestDatasetDownload:
 
         check_relationships(dataset_description)
 
-    def test_dataset_download(self, dataset_test, tmp_path):
+    def test_dataset_download_nested(self, dataset_test, tmp_path):
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
@@ -97,6 +97,7 @@ class TestDatasetDownload:
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
 
         self.compare_datasets(ml_instance, dataset_test, dataset_spec)
+
 
     def test_dataset_download_recurse(self, dataset_test, tmp_path):
         hostname = dataset_test.catalog.hostname
