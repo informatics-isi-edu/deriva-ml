@@ -14,7 +14,7 @@ echo "Bumping version: $VERSION_TYPE"
 
 # Bump the version using bump-my-version.
 # This command should update version files, commit the changes, and create a Git tag.
-bump-my-version bump "$VERSION_TYPE" --verbose
+uv run bump-my-version bump "$VERSION_TYPE" --verbose
 
 # Push commits and tags to the remote repository.
 echo "Pushing changes to remote repository..."
