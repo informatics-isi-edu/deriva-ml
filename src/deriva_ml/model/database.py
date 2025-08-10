@@ -126,8 +126,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             dataset_versions = [
                 t for t in self.dbase.execute(f'SELECT "Dataset", "Version" FROM "{sql_dataset}"').fetchall()
             ]
-        dataset_versions = [(v[0], DatasetVersion.parse(v[1])) for v in dataset_versions]
 
+        dataset_versions = [(v[0], DatasetVersion.parse(v[1])) for v in dataset_versions]
         # Get most current version of each rid
         self.bag_rids = {}
         for rid, version in dataset_versions:

@@ -19,6 +19,18 @@ class TestDatasetVersion:
         v1 = ml_instance.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor)
         assert "1.1.0" == str(v1)
 
+    def test_dataset_version_history(self, test_ml):
+        ml_instance = test_ml
+        type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
+        dataset_rid = ml_instance.create_dataset(
+            type_rid.name,
+            description="A New Dataset",
+            version=DatasetVersion(1, 0, 0),
+        )
+        assert 1 == len(ml_instance.dataset_history(dataset_rid))
+        v1 = ml_instance.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor)
+        assert 2 == len(ml_instance.dataset_history(dataset_rid))
+
     def test_dataset_version(self, dataset_test, tmp_path):
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
