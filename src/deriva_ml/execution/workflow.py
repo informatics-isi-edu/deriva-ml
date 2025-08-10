@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -298,18 +299,42 @@ class Workflow(BaseModel):
         return None, None
 
     @staticmethod
+    def _in_repl():
+        # Standard Python interactive mode
+        if hasattr(sys, "ps1"):
+            return True
+
+        # Interactive mode forced by -i
+        if sys.flags.interactive:
+            return True
+
+        # IPython / Jupyter detection
+        try:
+            from IPython import get_ipython
+
+            if get_ipython() is not None:
+                return True
+        except ImportError:
+            pass
+
+        return False
+
+    @staticmethod
     def _get_python_script() -> tuple[Path, bool]:
         """Return the path to the currently executing script"""
         is_notebook = True
         if not (filename := Workflow._get_notebook_path()):
             is_notebook = False
-            stack = inspect.stack()
+            stack = [
+                s.filename
+                for s in inspect.stack()
+                if ("pycharm" not in s.filename) and ("site-packages" not in s.filename)
+            ]
             # Get the caller's filename, which is two up the stack from here.
-
-            filename = Path(stack[-1].filename)
-            if not filename.exists():
+            filename = Path(stack[-1])
+            if not filename.exists() or Workflow._in_repl():
                 # Being called from the command line interpreter.
-                filename = Path("REPL")
+                filename = Path.cwd() / Path("REPL")
             # Get the caller's filename, which is two up the stack from here.
         else:
             raise DerivaMLException("Looking for caller failed")  # Stack is too shallow
@@ -352,19 +377,20 @@ class Workflow(BaseModel):
                 cwd=executable_path.parent,
                 capture_output=True,
                 text=True,
-                check=True,
+                check=False,
             )
             is_dirty = bool("M " in result.stdout.strip())  # Returns True if the output indicates a modified file
         except subprocess.CalledProcessError:
             is_dirty = False  # If the Git command fails, assume no changes
 
         """Get SHA-1 hash of latest commit of the file in the repository"""
+
         result = subprocess.run(
             ["git", "log", "-n", "1", "--pretty=format:%H--", executable_path],
-            cwd=executable_path.parent,
+            cwd=repo_root,
             capture_output=True,
             text=True,
-            check=True,
+            check=False,
         )
         sha = result.stdout.strip()
         url = f"{github_url}/blob/{sha}/{executable_path.relative_to(repo_root)}"
