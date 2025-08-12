@@ -23,11 +23,11 @@ class TestWorkflow:
         ml_instance = test_ml
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
-        print("Running workflow-script.py ...")
+        print("Running workflow-test.py ...")
         result = subprocess.run(
             [
                 "python",
-                "execution/workflow-script.py",
+                "execution/workflow-test.py",
                 ml_instance.catalog.deriva_server.server,
                 ml_instance.catalog_id,
             ],
@@ -45,19 +45,24 @@ class TestWorkflow:
         print("checksum", checksum)
         print("is_notebook", is_notebook)
         assert is_notebook == "False"
-        assert url.endswith("workflow-script.py")
+        assert url.endswith("workflow-test.py")
 
     def test_workflow_creation_notebook(self, test_ml):
         ml_instance = test_ml
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
-        print("Running workflow-script.py ...")
+        print("Running notebook...")
         result = subprocess.run(
-            ["runnotebook", "execution/workflow-script.ipnb", "localhost", ml_instance.catalog_id],
+            [
+                "deriva-ml-run-notebook",
+                "execution/workflow-test.ipnb",
+                "--host",
+                "localhost",
+            ],
             capture_output=True,
             text=True,
         )
-        print(result.stdout)
+        print(result)
         m = re.match(".*url='(?P<url>.*?)'", result.stdout)
         url = m["url"]
         m = re.match(".*checksum='(?P<checksum>.*?)'", result.stdout)
@@ -68,7 +73,7 @@ class TestWorkflow:
         print("checksum", checksum)
         print("is_notebook", is_notebook)
         assert is_notebook == "False"
-        assert url.endswith("workflow-script.py")
+        assert url.endswith("workflow-test.py")
 
 
 class TestExecution:

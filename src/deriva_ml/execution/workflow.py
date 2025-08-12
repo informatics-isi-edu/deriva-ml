@@ -386,7 +386,7 @@ class Workflow(BaseModel):
         """Get SHA-1 hash of latest commit of the file in the repository"""
 
         result = subprocess.run(
-            ["git", "log", "-n", "1", "--pretty=format:%H--", executable_path],
+            ["git", "log", "-n", "1", "--pretty=format:%H", executable_path],
             cwd=repo_root,
             capture_output=True,
             text=True,
