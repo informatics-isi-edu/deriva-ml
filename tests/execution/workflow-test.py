@@ -16,4 +16,5 @@ api_workflow = ml_instance.create_workflow(
     workflow_type="Test Workflow",
     description="A test operation",
 )
-print(api_workflow)
+rid = ml_instance.add_workflow(api_workflow)
+print(rid)

@@ -2,7 +2,7 @@
 Tests for the execution module.
 """
 
-import re
+import json
 import subprocess
 from tempfile import TemporaryDirectory
 
@@ -24,6 +24,9 @@ class TestWorkflow:
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
         print("Running workflow-test.py ...")
+        workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
+        workflows = list(workflow_table.entities().fetch())
+        assert 0 == len(workflows)
         result = subprocess.run(
             [
                 "python",
@@ -34,46 +37,64 @@ class TestWorkflow:
             capture_output=True,
             text=True,
         )
-        print(result.stdout)
-        m = re.match(".*url='(?P<url>.*?)'", result.stdout)
-        url = m["url"]
-        m = re.match(".*checksum='(?P<checksum>.*?)'", result.stdout)
-        checksum = m["checksum"]
-        m = re.match(".*is_notebook=(?P<is_notebook>True|False)", result.stdout)
-        is_notebook = m["is_notebook"]
-        print("URL", url)
-        print("checksum", checksum)
-        print("is_notebook", is_notebook)
-        assert is_notebook == "False"
-        assert url.endswith("workflow-test.py")
 
-    def test_workflow_creation_notebook(self, test_ml):
+        workflows = list(workflow_table.entities().fetch())
+        assert 1 == len(workflows)
+        workflow_rid = workflows[0]["RID"]
+        workflow_url = workflows[0]["URL"]
+
+        workflow_rid = ml_instance.lookup_workflow(workflow_url)
+
+        assert workflow_url.endswith("workflow-test.py")
+
+        # Make sure that workflow is not duplicated if created again.
+        result = subprocess.run(
+            [
+                "python",
+                "execution/workflow-test.py",
+                ml_instance.catalog.deriva_server.server,
+                ml_instance.catalog_id,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        new_workflow = result.stdout.strip()
+        assert new_workflow == workflow_rid
+
+    def test_workflow_creation_notebook(self, test_ml, tmp_path):
         ml_instance = test_ml
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
+        workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
+        workflows = list(workflow_table.entities().fetch())
+        assert 0 == len(workflows)
+
+        config_file = tmp_path / "config.json"
+        with config_file.open("w") as fp:
+            json.dump({"host": ml_instance.catalog.deriva_server.server, "catalog_id": ml_instance.catalog_id}, fp)
+
         print("Running notebook...")
         result = subprocess.run(
             [
                 "deriva-ml-run-notebook",
-                "execution/workflow-test.ipnb",
+                "execution/workflow-test.ipynb",
                 "--host",
-                "localhost",
+                ml_instance.catalog.deriva_server.server,
+                "--catalog",
+                ml_instance.catalog_id,
+                "--log-output",
             ],
             capture_output=True,
             text=True,
         )
         print(result)
-        m = re.match(".*url='(?P<url>.*?)'", result.stdout)
-        url = m["url"]
-        m = re.match(".*checksum='(?P<checksum>.*?)'", result.stdout)
-        checksum = m["checksum"]
-        m = re.match(".*is_notebook=(?P<is_notebook>True|False)", result.stdout)
-        is_notebook = m["is_notebook"]
-        print("URL", url)
-        print("checksum", checksum)
-        print("is_notebook", is_notebook)
-        assert is_notebook == "False"
-        assert url.endswith("workflow-test.py")
+        workflows = list(workflow_table.entities().fetch())
+        assert 1 == len(workflows)
+        workflow_rid = workflows[0]["RID"]
+        workflow_url = workflows[0]["URL"]
+
+        print(workflow_url)
+        print(workflow_rid)
 
 
 class TestExecution:

@@ -1305,7 +1305,9 @@ class DerivaML(Dataset):
     def add_workflow(self, workflow: Workflow) -> RID:
         """Adds a workflow to the catalog.
 
-        Registers a new workflow in the catalog or returns the RID of an existing workflow with the same URL.
+        Registers a new workflow in the catalog or returns the RID of an existing workflow with the same
+        URL or checksum.
+
         Each workflow represents a specific computational process or analysis pipeline.
 
         Args:
@@ -1328,11 +1330,12 @@ class DerivaML(Dataset):
             >>> workflow_rid = ml.add_workflow(workflow)
         """
         # Check if a workflow already exists by URL
-        if workflow_rid := self.lookup_workflow(workflow.url):
+        if workflow_rid := self.lookup_workflow(workflow.checksum or workflow.url):
             return workflow_rid
 
         # Get an ML schema path for the workflow table
         ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
+
         try:
             # Create a workflow record
             workflow_record = {
@@ -1350,12 +1353,11 @@ class DerivaML(Dataset):
             raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
         return workflow_rid
 
-    def lookup_workflow(self, url: str) -> RID | None:
+    def lookup_workflow(self, url_or_checksum: str) -> RID | None:
         """Finds a workflow by URL.
 
         Args:
-            url: URL of the workflow to find.
-
+            url_or_checksum: URL or checksum of the workflow.
         Returns:
             RID: Resource Identifier of the workflow if found, None otherwise.
 
@@ -1369,7 +1371,12 @@ class DerivaML(Dataset):
         try:
             # Search for workflow by URL
             url_column = workflow_path.URL
-            return list(workflow_path.filter(url_column == url).entities())[0]["RID"]
+            checksum_column = workflow_path.Checksum
+            return list(
+                workflow_path.path.filter(
+                    (url_column == url_or_checksum) | (checksum_column == url_or_checksum)
+                ).entities()
+            )[0]["RID"]
         except IndexError:
             return None
 
@@ -1403,7 +1410,7 @@ class DerivaML(Dataset):
         self.lookup_term(MLVocab.workflow_type, workflow_type)
 
         # Create and return a new workflow object
-        return Workflow.create_workflow(name, workflow_type, description)
+        return Workflow(name=name, workflow_type=workflow_type, description=description)
 
     def create_execution(self, configuration: ExecutionConfiguration, dry_run: bool = False) -> "Execution":
         """Creates an execution environment.

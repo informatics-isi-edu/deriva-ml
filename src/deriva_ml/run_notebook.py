@@ -19,9 +19,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
     def __init__(self, description, epilog, **kwargs):
         BaseCLI.__init__(self, description, epilog, **kwargs)
         Workflow._check_nbstrip_status()
-        self.parser.add_argument(
-            "notebook_file", type=Path, help="Path to the notebook file"
-        )
+        self.parser.add_argument("notebook_file", type=Path, help="Path to the notebook file")
 
         self.parser.add_argument(
             "--file",
@@ -39,7 +37,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
         self.parser.add_argument(
             "--log-output",
-            action="store_false",
+            action="store_true",
             help="Display logging output from notebook.",
         )
 
@@ -60,9 +58,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             help="Provide a parameter name and value to inject into the notebook.",
         )
 
-        self.parser.add_argument(
-            "--kernel", "-k", nargs=1, help="Name of kernel to run..", default=None
-        )
+        self.parser.add_argument("--kernel", "-k", nargs=1, help="Name of kernel to run..", default=None)
 
     @staticmethod
     def _coerce_number(val: str):
@@ -95,7 +91,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 parameters |= json.load(f)
 
         if not (notebook_file.is_file() and notebook_file.suffix == ".ipynb"):
-            print("Notebook file must be an ipynb file.")
+            print(f"Notebook file must be an ipynb file: {notebook_file.name}.")
             exit(1)
 
         os.environ["DERIVA_HOST"] = args.host
@@ -106,22 +102,20 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         notebook_parameters = pm.inspect_notebook(notebook_file)
         if args.inspect:
             for param, value in notebook_parameters.items():
-                print(
-                    f"{param}:{value['inferred_type_name']}  (default {value['default']})"
-                )
+                print(f"{param}:{value['inferred_type_name']}  (default {value['default']})")
             return
         else:
             notebook_parameters = (
-                {"host": args.host, "catalog": args.catalog}
+                {"host": args.host, "catalog_id": args.catalog, "catalog": args.catalog}
                 | {k: v["default"] for k, v in notebook_parameters.items()}
                 | parameters
             )
             print(f"Running notebook {notebook_file.name} with parameters:")
             for param, value in notebook_parameters.items():
                 print(f"  {param}:{value}")
-            self.run_notebook(notebook_file.resolve(), parameters, args.kernel)
+            self.run_notebook(notebook_file.resolve(), parameters, kernel=args.kernel, log=args.log_output)
 
-    def run_notebook(self, notebook_file, parameters, kernel=None):
+    def run_notebook(self, notebook_file, parameters, kernel=None, log=False):
         url, checksum = Workflow.get_url_and_checksum(Path(notebook_file))
         os.environ["DERIVA_ML_WORKFLOW_URL"] = url
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
@@ -133,6 +127,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 output_path=notebook_output,
                 parameters=parameters,
                 kernel_name=kernel,
+                log_output=log,
             )
             catalog_id = execution_rid = None
             with Path(notebook_output).open("r") as f:
@@ -171,15 +166,13 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
 def main():
     """Main entry point for the notebook runner CLI.
-    
+
     Creates and runs the DerivaMLRunNotebookCLI instance.
-    
+
     Returns:
         None. Executes the CLI.
     """
-    cli = DerivaMLRunNotebookCLI(
-        description="Deriva ML Execution Script Demo", epilog=""
-    )
+    cli = DerivaMLRunNotebookCLI(description="Deriva ML Execution Script Demo", epilog="")
     cli.main()
 
 
