@@ -18,7 +18,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
     def __init__(self, description, epilog, **kwargs):
         BaseCLI.__init__(self, description, epilog, **kwargs)
-        Workflow._check_nbstrip_status()
+        #       Workflow._check_nbstrip_status()
         self.parser.add_argument("notebook_file", type=Path, help="Path to the notebook file")
 
         self.parser.add_argument(

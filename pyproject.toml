@@ -91,6 +91,7 @@ keywords = ["deriva-ml"]
 dev = [
     "bump-my-version",
     "icecream>=2.1.4",
+    "ipykernel",
     "jupyter>=1.1.1",
     "mkdocs-jupyter",
     "mkdocstrings[python]",

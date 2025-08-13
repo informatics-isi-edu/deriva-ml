@@ -2,7 +2,6 @@
 Tests for the execution module.
 """
 
-import json
 import subprocess
 from tempfile import TemporaryDirectory
 
@@ -61,17 +60,13 @@ class TestWorkflow:
         new_workflow = result.stdout.strip()
         assert new_workflow == workflow_rid
 
-    def test_workflow_creation_notebook(self, test_ml, tmp_path):
+    def test_workflow_creation_notebook(self, test_ml):
         ml_instance = test_ml
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
         workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
         workflows = list(workflow_table.entities().fetch())
         assert 0 == len(workflows)
-
-        config_file = tmp_path / "config.json"
-        with config_file.open("w") as fp:
-            json.dump({"host": ml_instance.catalog.deriva_server.server, "catalog_id": ml_instance.catalog_id}, fp)
 
         print("Running notebook...")
         result = subprocess.run(
@@ -87,14 +82,11 @@ class TestWorkflow:
             capture_output=True,
             text=True,
         )
-        print(result)
         workflows = list(workflow_table.entities().fetch())
         assert 1 == len(workflows)
         workflow_rid = workflows[0]["RID"]
         workflow_url = workflows[0]["URL"]
-
-        print(workflow_url)
-        print(workflow_rid)
+        assert workflow_url.endswith("workflow-test.ipynb")
 
 
 class TestExecution:

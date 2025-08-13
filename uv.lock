@@ -22,13 +22,13 @@ name = "aiohttp"
 version = "3.12.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "aiohappyeyeballs", marker = "python_full_version >= '3.12'" },
-    { name = "aiosignal", marker = "python_full_version >= '3.12'" },
-    { name = "attrs", marker = "python_full_version >= '3.12'" },
-    { name = "frozenlist", marker = "python_full_version >= '3.12'" },
-    { name = "multidict", marker = "python_full_version >= '3.12'" },
-    { name = "propcache", marker = "python_full_version >= '3.12'" },
-    { name = "yarl", marker = "python_full_version >= '3.12'" },
+    { name = "aiohappyeyeballs", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "aiosignal", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "attrs", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "frozenlist", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "multidict", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "propcache", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "yarl", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9b/e7/d92a237d8802ca88483906c388f7c201bbe96cd80a165ffd0ac2f6a8d59f/aiohttp-3.12.15.tar.gz", hash = "sha256:4fc61385e9c98d72fcdf47e6dd81833f47b2f77c114c29cd64a361be57a763a2", size = 7823716, upload-time = "2025-07-29T05:52:32.215Z" }
 wheels = [
@@ -107,7 +107,7 @@ name = "aiosignal"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "frozenlist", marker = "python_full_version >= '3.12'" },
+    { name = "frozenlist", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
     { name = "typing-extensions", marker = "python_full_version == '3.12.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/62/06741b579156360248d1ec624842ad0edf697050bbaf7c3e46394e106ad1/aiosignal-1.4.0.tar.gz", hash = "sha256:f47eecd9468083c2029cc99945502cb7708b082c232f9aca65da147157b251c7", size = 25007, upload-time = "2025-07-03T22:54:43.528Z" }
@@ -792,6 +792,7 @@ dependencies = [
 dev = [
     { name = "bump-my-version" },
     { name = "icecream" },
+    { name = "ipykernel" },
     { name = "jupyter" },
     { name = "mkdocs-jupyter" },
     { name = "mkdocs-material" },
@@ -823,6 +824,7 @@ requires-dist = [
 dev = [
     { name = "bump-my-version" },
     { name = "icecream", specifier = ">=2.1.4" },
+    { name = "ipykernel" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "mkdocs-jupyter" },
     { name = "mkdocs-material" },
@@ -3605,9 +3607,9 @@ name = "yarl"
 version = "1.20.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "idna", marker = "python_full_version >= '3.12'" },
-    { name = "multidict", marker = "python_full_version >= '3.12'" },
-    { name = "propcache", marker = "python_full_version >= '3.12'" },
+    { name = "idna", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "multidict", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "propcache", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3c/fb/efaa23fa4e45537b827620f04cf8f3cd658b76642205162e072703a5b963/yarl-1.20.1.tar.gz", hash = "sha256:d017a4997ee50c91fd5466cef416231bb82177b93b029906cefc542ce14c35ac", size = 186428, upload-time = "2025-06-10T00:46:09.923Z" }
 wheels = [
