@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from pydantic import BaseModel, PrivateAttr, model_validator
 from requests import RequestException
 
 from deriva_ml.core.definitions import RID
@@ -48,7 +49,7 @@ except ImportError:
         return get_connection_file()
 
 
-class Workflow:
+class Workflow(BaseModel):
     """Represents a computational workflow in DerivaML.
 
     A workflow defines a computational process or analysis pipeline. Each workflow has
@@ -75,17 +76,19 @@ class Workflow:
         ... )
     """
 
-    def __init__(
-        self,
-        name: str,
-        workflow_type: str,
-        description: str | None = None,
-        url: str | None = None,
-        version: str | None = None,
-        rid: RID | None = None,
-        checksum: str | None = None,
-        is_notebook: bool = False,
-    ):
+    name: str
+    workflow_type: str
+    description: str | None = None
+    url: str | None = None
+    version: str | None = None
+    rid: RID | None = None
+    checksum: str | None = None
+    is_notebook: bool = False
+
+    _logger: logging.Logger = PrivateAttr(default=10)
+
+    @model_validator(mode="after")
+    def setup_url_checksum(self) -> "Workflow":
         """Creates a workflow from the current execution context.
 
         Identifies the currently executing program (script or notebook) and creates
@@ -114,14 +117,6 @@ class Workflow:
             ...     description="Process sample data"
             ... )
         """
-        self.name = name
-        self.url = url
-        self.workflow_type = workflow_type
-        self.version = version
-        self.description = description
-        self.rid = rid
-        self.checksum = checksum
-        self.is_notebook = is_notebook
         """Initializes logging for the workflow."""
 
         # Check to see if execution file info is being passed in by calling program.
@@ -135,6 +130,7 @@ class Workflow:
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
 
         self._logger = logging.getLogger("deriva_ml")
+        return self
 
     @staticmethod
     def get_url_and_checksum(executable_path: Path) -> tuple[str, str]:
