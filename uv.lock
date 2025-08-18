@@ -775,6 +775,7 @@ wheels = [
 name = "deriva-ml"
 source = { editable = "." }
 dependencies = [
+    { name = "bump-my-version" },
     { name = "deepdiff" },
     { name = "deriva" },
     { name = "nbstripout" },
@@ -790,7 +791,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "bump-my-version" },
     { name = "icecream" },
     { name = "ipykernel" },
     { name = "jupyter" },
@@ -807,6 +807,7 @@ lint = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bump-my-version" },
     { name = "deepdiff" },
     { name = "deriva", specifier = "~=1.7.10" },
     { name = "nbstripout" },
@@ -822,7 +823,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bump-my-version" },
     { name = "icecream", specifier = ">=2.1.4" },
     { name = "ipykernel" },
     { name = "jupyter", specifier = ">=1.1.1" },
