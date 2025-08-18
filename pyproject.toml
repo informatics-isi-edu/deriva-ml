@@ -8,6 +8,7 @@ description = "Utilities to simplify use of Dervia and Pandas to create reproduc
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "bump-my-version",
     "deriva~=1.7.10",
     "deepdiff",
     "pandas",
@@ -89,7 +90,6 @@ keywords = ["deriva-ml"]
 
 [dependency-groups]
 dev = [
-    "bump-my-version",
     "icecream>=2.1.4",
     "ipykernel",
     "jupyter>=1.1.1",
