@@ -3,10 +3,9 @@ Deriva-ML is a python library to simplify the process of creating and executing 
 using a deriva catalog.
 
 
-## Installing the GitHub CLI
+Complete on-line documentation for DerivaML can be found [here](https://informatics-isi-edu.github.io/deriva-ml/)
 
-The script release.sh will create a new release tag in GitHub.  This script requires the 
-GitHUB CLI be installed. 
+To get started using DerivaML, you can clone the [model template repository](https://github.com/informatics-isi-edu/deriva-ml-model-template), and modify it to suite your requirements.
 
-See [https://cli.github.com](https://cli.github.com) for instructions on how to install and configure the CLI.
 
+## References
