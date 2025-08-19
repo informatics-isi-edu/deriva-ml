@@ -117,7 +117,7 @@ class DerivaML(Dataset):
         cache_dir: str | Path | None = None,
         working_dir: str | Path | None = None,
         ml_schema: str = ML_SCHEMA,
-        logging_level=logging.INFO,
+        logging_level=logging.WARNING,
         credential=None,
         use_minid: bool = True,
     ):
