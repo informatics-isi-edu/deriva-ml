@@ -2,6 +2,7 @@
 Tests for the execution module.
 """
 
+import os
 import subprocess
 from tempfile import TemporaryDirectory
 
@@ -60,8 +61,10 @@ class TestWorkflow:
         new_workflow = result.stdout.strip()
         assert new_workflow == workflow_rid
 
-    def test_workflow_creation_notebook(self, test_ml):
-        ml_instance = test_ml
+    def test_workflow_creation_notebook(self, notebook_test):
+        ml_instance = notebook_test
+
+        print("env", os.environ)
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
         workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
@@ -69,6 +72,7 @@ class TestWorkflow:
         assert 0 == len(workflows)
 
         print("Running notebook...")
+
         result = subprocess.run(
             [
                 "deriva-ml-run-notebook",
@@ -77,11 +81,14 @@ class TestWorkflow:
                 ml_instance.catalog.deriva_server.server,
                 "--catalog",
                 ml_instance.catalog_id,
+                "--kernel",
+                "test_kernel",
                 "--log-output",
             ],
             capture_output=True,
             text=True,
         )
+
         workflows = list(workflow_table.entities().fetch())
         assert 1 == len(workflows)
         workflow_rid = workflows[0]["RID"]

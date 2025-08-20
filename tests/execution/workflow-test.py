@@ -6,7 +6,6 @@ from deriva_ml import MLVocab as vc
 hostname = sys.argv[1]
 catalog_id = sys.argv[2]
 
-
 ml_instance = DerivaML(hostname, catalog_id)
 
 ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")

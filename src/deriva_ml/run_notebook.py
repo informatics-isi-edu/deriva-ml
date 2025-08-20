@@ -95,7 +95,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             exit(1)
 
         os.environ["DERIVA_HOST"] = args.host
-        os.environ["DERIVA_CATALOG_ID"] = args.catalog
+        os.environ["DERIVA_CATALOG"] = args.catalog
 
         # Create a workflow instance for this specific version of the script.
         # Return an existing workflow if one is found.
@@ -106,14 +106,14 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             return
         else:
             notebook_parameters = (
-                {"host": args.host, "catalog_id": args.catalog, "catalog": args.catalog}
-                | {k: v["default"] for k, v in notebook_parameters.items()}
+                {k: v["default"] for k, v in notebook_parameters.items()}
+                | {"host": args.host, "hostname": args.host, "catalog_id": args.catalog, "catalog": args.catalog}
                 | parameters
             )
             print(f"Running notebook {notebook_file.name} with parameters:")
             for param, value in notebook_parameters.items():
                 print(f"  {param}:{value}")
-            self.run_notebook(notebook_file.resolve(), parameters, kernel=args.kernel, log=args.log_output)
+            self.run_notebook(notebook_file.resolve(), parameters, kernel=args.kernel[0], log=args.log_output)
 
     def run_notebook(self, notebook_file, parameters, kernel=None, log=False):
         url, checksum = Workflow.get_url_and_checksum(Path(notebook_file))

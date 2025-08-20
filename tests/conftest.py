@@ -5,7 +5,7 @@ Pytest configuration and shared fixtures.
 import os
 
 import pytest
-from test_utils import MLCatalog, MLDatasetCatalog
+from test_utils import MLCatalog, MLDatasetCatalog, create_jupyter_kernel, destroy_jupyter_kernel
 
 from deriva_ml import DerivaML
 from deriva_ml.demo_catalog import (
@@ -59,6 +59,16 @@ def test_ml(deriva_catalog, tmp_path):
 def dataset_test(catalog_with_datasets):
     catalog_with_datasets.reset_catalog()
     return catalog_with_datasets
+
+
+@pytest.fixture(scope="function")
+def notebook_test(deriva_catalog, tmp_path):
+    deriva_catalog.reset_demo_catalog()
+    create_jupyter_kernel("test_kernel", tmp_path)
+    yield DerivaML(deriva_catalog.hostname, deriva_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
+    print("Resetting catalog... ", end="")
+    deriva_catalog.reset_demo_catalog()
+    destroy_jupyter_kernel("test_kernel")
 
 
 @pytest.fixture(scope="function")

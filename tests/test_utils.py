@@ -1,8 +1,12 @@
+import os
+import shutil
 from tempfile import TemporaryDirectory
 from urllib.parse import quote as urlquote
 
 from demo_catalog import create_demo_features
 from deriva.core.datapath import DataPathException
+from ipykernel.kernelspec import install
+from jupyter_client.kernelspec import KernelSpecManager
 
 from deriva_ml import DerivaML
 from deriva_ml.demo_catalog import (
@@ -110,3 +114,60 @@ class MLDatasetCatalog:
         with TemporaryDirectory() as tmp_dir:
             ml_instance = DerivaML(self.catalog.hostname, self.catalog.catalog_id, working_dir=tmp_dir, use_minid=False)
             self.dataset_description: DatasetDescription = create_demo_datasets(ml_instance)
+
+
+def create_jupyter_kernel(name: str, kernel_dir, display_name: str = None, user: bool = True) -> None:
+    """
+    Create and install a Jupyter kernel spec using ipykernel.
+
+    Parameters
+    ----------
+    name : str
+        The internal name of the kernel (used in `--kernel`).
+    display_name : str, optional
+        The label shown in Jupyter’s kernel chooser (defaults to name).
+    user : bool, default=True
+        If True, install for the current user only.
+        If False, requires admin rights (system-wide).
+    """
+    if display_name is None:
+        display_name = name
+
+    os.environ["JUPYTER_PATH"] = f"{kernel_dir}/share/jupyter"
+
+    print(f"Installing Jupyter kernel '{name}' with display name '{display_name}'")
+    install(
+        kernel_name=name,
+        display_name=display_name,
+        prefix=kernel_dir,  # ensures it uses the current environment
+    )
+    print("✅ Kernel installed successfully.")
+
+
+def destroy_jupyter_kernel(name: str, user: bool = True) -> None:
+    """
+    Remove a Jupyter kernel spec by name.
+
+    Parameters
+    ----------
+    name : str
+        The internal kernel name (the same name used in create_jupyter_kernel).
+    user : bool, default=True
+        If True, remove from the user-level kernels directory.
+        If False, attempt system-wide removal (requires permissions).
+    """
+    ksm = KernelSpecManager()
+    kernels = ksm.find_kernel_specs()
+
+    if name not in kernels:
+        print(f"❌ Kernel '{name}' not found.")
+        return
+
+    kernel_path = kernels[name]
+    print(f"Removing kernel '{name}' at {kernel_path}")
+
+    try:
+        shutil.rmtree(kernel_path)
+        print(f"✅ Kernel '{name}' removed successfully.")
+    except Exception as e:
+        print(f"⚠️ Failed to remove kernel '{name}': {e}")
