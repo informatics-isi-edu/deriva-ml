@@ -46,7 +46,14 @@ class MLCatalog:
         pb = self.catalog.getPathBuilder()
         ml_path = pb.schemas["deriva-ml"]
         domain_path = pb.schemas[self.domain_schema]
-        for t in ["Dataset_Execution", "Dataset_Version", "Dataset_Dataset", "Workflow", "Workflow_Execution"]:
+        for t in [
+            "Dataset_Execution",
+            "Dataset_Version",
+            "Dataset_Dataset",
+            "Execution",
+            "Workflow_Execution",
+            "Workflow",
+        ]:
             try:
                 ml_path.tables[t].path.delete()
             except DataPathException:

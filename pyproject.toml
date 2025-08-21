@@ -64,6 +64,9 @@ setup_hooks = []
 pre_commit_hooks = []
 post_commit_hooks = []
 
+[tool.pytest]
+mock_use_standalone_module = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -97,6 +100,7 @@ dev = [
     "mkdocstrings[python]",
     "mkdocs-material",
     "pytest>=8.4.1",
+    "pytest-mock",
     "pytest-coverage>=0.0",
     "ruff"
 ]

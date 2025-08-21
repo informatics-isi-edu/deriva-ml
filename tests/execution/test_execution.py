@@ -2,8 +2,8 @@
 Tests for the execution module.
 """
 
-import os
 import subprocess
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from deriva_ml import (
@@ -24,20 +24,23 @@ class TestWorkflow:
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
         print("Running workflow-test.py ...")
+        workflow_script = Path(__file__).parent / "workflow-test.py"
+
         workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
         workflows = list(workflow_table.entities().fetch())
         assert 0 == len(workflows)
         result = subprocess.run(
             [
                 "python",
-                "execution/workflow-test.py",
+                workflow_script.as_posix(),
                 ml_instance.catalog.deriva_server.server,
                 ml_instance.catalog_id,
             ],
             capture_output=True,
             text=True,
         )
-
+        print(result.stdout)
+        print(result.stderr)
         workflows = list(workflow_table.entities().fetch())
         assert 1 == len(workflows)
         workflow_rid = workflows[0]["RID"]
@@ -51,20 +54,22 @@ class TestWorkflow:
         result = subprocess.run(
             [
                 "python",
-                "execution/workflow-test.py",
+                workflow_script.as_posix(),
                 ml_instance.catalog.deriva_server.server,
                 ml_instance.catalog_id,
             ],
             capture_output=True,
             text=True,
         )
+        print(result.stdout)
+        print(result.stderr)
         new_workflow = result.stdout.strip()
         assert new_workflow == workflow_rid
 
     def test_workflow_creation_notebook(self, notebook_test):
         ml_instance = notebook_test
 
-        print("env", os.environ)
+        notebook_path = Path(__file__).parent / "workflow-test.ipynb"  # directory where this test lives
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
         workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
@@ -76,7 +81,7 @@ class TestWorkflow:
         result = subprocess.run(
             [
                 "deriva-ml-run-notebook",
-                "execution/workflow-test.ipynb",
+                notebook_path.as_posix(),
                 "--host",
                 ml_instance.catalog.deriva_server.server,
                 "--catalog",
@@ -88,7 +93,6 @@ class TestWorkflow:
             capture_output=True,
             text=True,
         )
-
         workflows = list(workflow_table.entities().fetch())
         assert 1 == len(workflows)
         workflow_rid = workflows[0]["RID"]

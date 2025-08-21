@@ -2,9 +2,8 @@
 Tests for feature functionality.
 """
 
-from unittest.mock import Mock
-
 import pytest
+from pydantic import ValidationError
 
 from deriva_ml import (
     BuiltinTypes,
@@ -21,14 +20,14 @@ from deriva_ml.feature import FeatureRecord
 class TestFeatureRecord:
     """Test cases for the FeatureRecord base class."""
 
-    def test_feature_record_creation(self):
+    def test_feature_record_creation(self, mocker):
         """Test basic FeatureRecord creation."""
         # Create a mock feature
-        mock_feature = Mock()
-        mock_feature.feature_columns = {Mock(name="value"), Mock(name="confidence")}
-        mock_feature.asset_columns = {Mock(name="image_file")}
-        mock_feature.term_columns = {Mock(name="category")}
-        mock_feature.value_columns = {Mock(name="score")}
+        mock_feature = mocker.Mock()
+        mock_feature.feature_columns = {mocker.Mock(name="value"), mocker.Mock(name="confidence")}
+        mock_feature.asset_columns = {mocker.Mock(name="image_file")}
+        mock_feature.term_columns = {mocker.Mock(name="category")}
+        mock_feature.value_columns = {mocker.Mock(name="score")}
 
         # Create a test class that inherits from FeatureRecord
         class TestFeature(FeatureRecord):
@@ -58,17 +57,17 @@ class TestFeatureRecord:
         assert record.category == "good"
         assert record.score == 0.8
 
-    def test_feature_record_column_methods(self):
+    def test_feature_record_column_methods(self, mocker):
         """Test the column access methods of FeatureRecord."""
         # Create mock columns
-        value_col = Mock(name="value")
-        confidence_col = Mock(name="confidence")
-        asset_col = Mock(name="image_file")
-        term_col = Mock(name="category")
-        value_only_col = Mock(name="score")
+        value_col = mocker.Mock(name="value")
+        confidence_col = mocker.Mock(name="confidence")
+        asset_col = mocker.Mock(name="image_file")
+        term_col = mocker.Mock(name="category")
+        value_only_col = mocker.Mock(name="score")
 
         # Create a mock feature
-        mock_feature = Mock()
+        mock_feature = mocker.Mock()
         mock_feature.feature_columns = {value_col, confidence_col, asset_col, term_col, value_only_col}
         mock_feature.asset_columns = {asset_col}
         mock_feature.term_columns = {term_col}
@@ -141,6 +140,22 @@ class TestFeatures:
         with pytest.raises(DerivaMLException):
             ml_instance.lookup_feature("Subject", "SubjectHealth1")
 
+    def test_feature_record(self, dataset_test, tmp_path):
+        ml_instance = DerivaML(
+            dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
+        )
+        SubjectHealthFeature = ml_instance.feature_record_class("Subject", "Health")
+        print(SubjectHealthFeature.model_fields.keys())
+
+        print(SubjectHealthFeature.feature_columns())
+
+        with pytest.raises(ValidationError):
+            SubjectHealthFeature(Subject="SubjectRID", Health="Good", Scale=23, Foo="Bar")
+        print(SubjectHealthFeature.value_columns())
+        print(SubjectHealthFeature.term_columns())
+        print(SubjectHealthFeature.asset_columns())
+        print(SubjectHealthFeature.feature_columns())
+
     def test_add_feature(self, dataset_test, tmp_path):
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
@@ -166,7 +181,8 @@ class TestFeatures:
 
         with feature_execution.execute() as exe:
             SubjectHealthFeature = ml_instance.feature_record_class("Subject", "Health")
-            exe.add_features([SubjectHealthFeature(Subject=subject_rids[0], Health="Good", Scale=23)])
+            print(SubjectHealthFeature.feature_columns())
+            exe.add_features([SubjectHealthFeature(Subject=subject_rids[0], SubjectHealth="Sick", Scale=23)])
 
         feature_execution.upload_execution_outputs()
         features = list(ml_instance.list_feature_values("Subject", "Health"))
