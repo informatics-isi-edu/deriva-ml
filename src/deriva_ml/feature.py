@@ -52,6 +52,7 @@ class FeatureRecord(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        extra = "forbid"
 
     @classmethod
     def feature_columns(cls) -> set[Column]:
