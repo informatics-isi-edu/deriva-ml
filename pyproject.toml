@@ -27,6 +27,8 @@ deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:ma
 deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
 deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
 deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
+deriva-ml-install-kernel = "deriva_ml.install_kernel:main"
+
 deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
 
 [project.optional-dependencies]
@@ -77,8 +79,8 @@ addopts = "-v  --import-mode=importlib"
 [tool.ruff]
 line-length = 120
 target-version = "py310"
-select = ["E", "F", "I", "PTH"]
-ignore = []
+lint.select = ["E", "F", "I", "PTH"]
+lint.ignore = []
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.

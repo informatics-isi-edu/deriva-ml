@@ -100,9 +100,6 @@ class Workflow(BaseModel):
             - DERIVA_ML_WORKFLOW_CHECKSUM: Override the computed checksum
 
         Args:
-            name: Human-readable name for the workflow.
-            workflow_type: Type of workflow (must be a vocabulary term).
-            description: Optional description of workflow purpose.
 
         Returns:
             Workflow: New workflow instance with detected Git information.
@@ -240,6 +237,7 @@ class Workflow(BaseModel):
         """
 
         server, session = Workflow._get_notebook_session()
+
         if server and session:
             relative_path = session["notebook"]["path"]
             # Join the notebook directory with the relative path
@@ -321,8 +319,8 @@ class Workflow(BaseModel):
                 # Being called from the command line interpreter.
                 filename = Path.cwd() / Path("REPL")
             # Get the caller's filename, which is two up the stack from here.
-        else:
-            raise DerivaMLException("Looking for caller failed")  # Stack is too shallow
+            else:
+                raise DerivaMLException("Looking for caller failed")  # Stack is too shallow
         return filename, is_notebook
 
     @staticmethod
