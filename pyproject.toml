@@ -28,6 +28,7 @@ deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
 deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
 deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
 deriva-ml-install-kernel = "deriva_ml.install_kernel:main"
+bump-version = "deriva_ml.bump_version:main"
 
 deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
 
