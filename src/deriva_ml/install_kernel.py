@@ -60,7 +60,7 @@ def main() -> None:
         prefix_arg = {"prefix": sys.prefix}
 
     install_kernel(
-        user=False,  # write under sys.prefix (the active env)
+        user=True,  # write under sys.prefix (the active env)
         kernel_name=kernel_name,
         display_name=display_name,
         **prefix_arg,
