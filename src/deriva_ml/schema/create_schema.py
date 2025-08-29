@@ -298,7 +298,7 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
             },
             {
                 "Name": "Runtime_Env",
-                "Description": "Information about the execution environment",
+                "Description": "Information about the runtime environment",
             },
             {
                 "Name": "Execution_Metadata",

@@ -360,6 +360,14 @@ class Execution:
             with Path(cfile).open("w", encoding="utf-8") as config_file:
                 json.dump(self.configuration.model_dump(), config_file)
 
+            lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
+            if lock_file.exists():
+                _ = self.asset_file_path(
+                    MLAsset.execution_metadata,
+                    lock_file,
+                    ExecMetadataType.execution_config.value,
+                )
+
             for parameter_file in self.configuration.parameters:
                 self.asset_file_path(
                     MLAsset.execution_asset,
@@ -896,9 +904,7 @@ class Execution:
                     asset_path.write_bytes(file_name.read_bytes())
 
         # Persist the asset types into a file
-        with Path(
-            asset_type_path(self._working_dir, self.execution_rid, asset_table)
-        ).open("a") as asset_type_file:
+        with Path(asset_type_path(self._working_dir, self.execution_rid, asset_table)).open("a") as asset_type_file:
             asset_type_file.write(json.dumps({file_name.name: asset_types}) + "\n")
 
         return AssetFilePath(

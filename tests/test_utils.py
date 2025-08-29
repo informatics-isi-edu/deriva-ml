@@ -3,7 +3,6 @@ import shutil
 from tempfile import TemporaryDirectory
 from urllib.parse import quote as urlquote
 
-from demo_catalog import create_demo_features
 from deriva.core.datapath import DataPathException
 from ipykernel.kernelspec import install
 from jupyter_client.kernelspec import KernelSpecManager
@@ -13,6 +12,7 @@ from deriva_ml.demo_catalog import (
     DatasetDescription,
     create_demo_catalog,
     create_demo_datasets,
+    create_demo_features,
     populate_demo_catalog,
 )
 

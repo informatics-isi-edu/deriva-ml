@@ -5,7 +5,6 @@ Pytest configuration and shared fixtures.
 import os
 
 import pytest
-from test_utils import MLCatalog, MLDatasetCatalog, create_jupyter_kernel, destroy_jupyter_kernel
 
 from deriva_ml import DerivaML
 from deriva_ml.demo_catalog import (
@@ -13,6 +12,8 @@ from deriva_ml.demo_catalog import (
     create_demo_features,
     populate_demo_catalog,
 )
+
+from .test_utils import MLCatalog, MLDatasetCatalog, create_jupyter_kernel, destroy_jupyter_kernel
 
 
 @pytest.fixture(scope="session")
