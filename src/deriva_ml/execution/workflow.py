@@ -319,6 +319,8 @@ class Workflow(BaseModel):
                 # Being called from the command line interpreter.
                 filename = Path.cwd() / Path("REPL")
             # Get the caller's filename, which is two up the stack from here.
+            elif "PYTEST_CURRENT_TEST" in os.environ:
+                filename = Path.cwd() / Path("pytest")
             else:
                 raise DerivaMLException("Looking for caller failed")  # Stack is too shallow
         return filename, is_notebook
