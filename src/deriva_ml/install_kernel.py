@@ -1,7 +1,8 @@
-# your_pkg/install_kernel.py
 import re
 import sys
+from argparse import ArgumentParser
 from importlib import metadata
+from pathlib import Path
 
 from ipykernel.kernelspec import install as install_kernel
 
@@ -32,17 +33,36 @@ def _normalize_kernel_name(name: str) -> str:
     return name
 
 
+def _name_for_this_venv() -> str:
+    config_path = Path(sys.prefix) / "pyvenv.cfg"
+    with config_path.open() as f:
+        m = re.search("prompt *= *(?P<prompt>.*)", f.read())
+    return m["prompt"] if m else ""
+
+
 def main() -> None:
-    dist_name = _dist_name_for_this_package()  # e.g., "deriva-model-template"
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--install-local",
+        action="store_true",
+        help="Create kernal in local venv directory instead of sys.prefix.",
+    )
+
+    dist_name = _name_for_this_venv()  # e.g., "deriva-model-template"
     kernel_name = _normalize_kernel_name(dist_name)  # e.g., "deriva-model-template"
     display_name = f"Python ({dist_name})"
 
     # Install into the current environment's prefix (e.g., .venv/share/jupyter/kernels/..)
+    prefix_arg = {}
+    install_local = False
+    if install_local:
+        prefix_arg = {"prefix": sys.prefix}
+
     install_kernel(
-        user=False,  # write under sys.prefix (the active env)
+        user=True,  # write under sys.prefix (the active env)
         kernel_name=kernel_name,
         display_name=display_name,
-        prefix=sys.prefix,
+        **prefix_arg,
     )
     print(f"Installed Jupyter kernel '{kernel_name}' with display name '{display_name}' under {sys.prefix!s}")
 

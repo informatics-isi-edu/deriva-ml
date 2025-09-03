@@ -136,7 +136,10 @@ class TestExecution:
             }
             for a in metadata_path.entities().fetch()
         ]
-        assert 2 == len(execution_metadata)
+        assert "uv.lock" in [d["Filename"] for d in execution_metadata]
+        assert "configuration.json" in [d["Filename"] for d in execution_metadata]
+
+        assert 3 == len(execution_metadata)
 
     def test_execution_upload(self, test_ml):
         ml_instance = test_ml

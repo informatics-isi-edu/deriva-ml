@@ -84,6 +84,7 @@ class Workflow(BaseModel):
     rid: RID | None = None
     checksum: str | None = None
     is_notebook: bool = False
+    git_root: Path | None = None
 
     _logger: logging.Logger = PrivateAttr(default=10)
 
@@ -125,6 +126,7 @@ class Workflow(BaseModel):
         if not self.url:
             path, self.is_notebook = Workflow._get_python_script()
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
+            self.git_root = Workflow._get_git_root(path)
 
         self._logger = logging.getLogger("deriva_ml")
         return self
@@ -315,7 +317,7 @@ class Workflow(BaseModel):
             ]
             # Get the caller's filename, which is two up the stack from here.
             filename = Path(stack[-1])
-            if not filename.exists() or Workflow._in_repl():
+            if not (filename.exists() or Workflow._in_repl()):
                 # Being called from the command line interpreter.
                 filename = Path.cwd() / Path("REPL")
             # Get the caller's filename, which is two up the stack from here.
