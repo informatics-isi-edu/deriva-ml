@@ -326,7 +326,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         except ValueError:
             tname = table
             for sname in [self.domain_schema, self.ml_schema, "WWW"]:  # Be careful of File table.
-                if table in self.model.schemas[sname].tables:
+                if sname in self.model.schemas and table in self.model.schemas[sname].tables:
                     break
         try:
             _ = self.model.schemas[sname].tables[tname]
