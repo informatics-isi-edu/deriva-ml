@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # Local imports
-from deriva_ml import DatasetSpec, DerivaML, MLVocab
+from deriva_ml import DatasetSpec, DerivaML, MLVocab, TableDefinition, VersionPart
 from deriva_ml.demo_catalog import DatasetDescription
 from tests.test_utils import MLDatasetCatalog
 
@@ -98,7 +98,6 @@ class TestDatasetDownload:
 
         self.compare_datasets(ml_instance, dataset_test, dataset_spec)
 
-
     def test_dataset_download_recurse(self, dataset_test, tmp_path):
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
@@ -147,3 +146,28 @@ class TestDatasetDownload:
 
         self.compare_datasets(ml_instance, dataset_test, current_spec)
         self.compare_datasets(ml_instance, dataset_test, new_spec)
+
+    def test_dataset_download_schemas(self, dataset_test, tmp_path):
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
+
+        current_version = ml_instance.dataset_version(dataset_description.rid)
+        current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        ml_instance.create_table(
+            TableDefinition(
+                name="NewTable",
+                column_defs=[],
+            )
+        )
+        new_version = ml_instance.increment_dataset_version(
+            dataset_rid=dataset_description.rid, component=VersionPart.minor
+        )
+        new_spec = DatasetSpec(rid=dataset_description.rid, version=new_version)
+
+        current_bag = ml_instance.download_dataset_bag(current_spec)
+        new_bag = ml_instance.download_dataset_bag(new_spec)
+
+        assert "NewTable" in new_bag.model.schemas[ml_instance.domain_schema].tables
+        assert "NewTable" not in current_bag.model.schemas[ml_instance.domain_schema].tables
