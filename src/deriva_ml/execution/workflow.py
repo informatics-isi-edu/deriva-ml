@@ -121,6 +121,7 @@ class Workflow(BaseModel):
         if "DERIVA_ML_WORKFLOW_URL" in os.environ:
             self.url = os.environ["DERIVA_ML_WORKFLOW_URL"]
             self.checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
+            self.git_root = Workflow._get_git_root(Path(os.environ["DERIVA_ML_NOTEBOOK_PATHL"]))
             self.is_notebook = True
 
         if not self.url:

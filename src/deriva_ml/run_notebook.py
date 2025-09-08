@@ -119,6 +119,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         url, checksum = Workflow.get_url_and_checksum(Path(notebook_file))
         os.environ["DERIVA_ML_WORKFLOW_URL"] = url
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
+        os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
