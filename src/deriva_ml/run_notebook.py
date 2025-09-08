@@ -76,7 +76,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
     def main(self):
         """Parse arguments and set up execution environment."""
         args = self.parse_cli()
-        notebook_file = args.notebook_file
+        notebook_file: Path = args.notebook_file
         parameter_file = args.file
 
         # args.parameter is now a list of [KEY, VALUE] lists
@@ -115,11 +115,11 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 print(f"  {param}:{value}")
             self.run_notebook(notebook_file.resolve(), parameters, kernel=args.kernel[0], log=args.log_output)
 
-    def run_notebook(self, notebook_file, parameters, kernel=None, log=False):
+    def run_notebook(self, notebook_file: Path, parameters, kernel=None, log=False):
         url, checksum = Workflow.get_url_and_checksum(Path(notebook_file))
         os.environ["DERIVA_ML_WORKFLOW_URL"] = url
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
-        os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file
+        os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file.as_posix()
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
