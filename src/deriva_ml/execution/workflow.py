@@ -121,7 +121,7 @@ class Workflow(BaseModel):
         if "DERIVA_ML_WORKFLOW_URL" in os.environ:
             self.url = os.environ["DERIVA_ML_WORKFLOW_URL"]
             self.checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
-            self.git_root = Workflow._get_git_root(Path(os.environ["DERIVA_ML_NOTEBOOK_PATHL"]))
+            self.git_root = Workflow._get_git_root(Path(os.environ["DERIVA_ML_NOTEBOOK_PATH"]))
             self.is_notebook = True
 
         if not self.url:
@@ -322,10 +322,8 @@ class Workflow(BaseModel):
                 # Being called from the command line interpreter.
                 filename = Path.cwd() / Path("REPL")
             # Get the caller's filename, which is two up the stack from here.
-            elif "PYTEST_CURRENT_TEST" in os.environ:
+            elif (not filename.exists()) and "PYTEST_CURRENT_TEST" in os.environ:
                 filename = Path.cwd() / Path("pytest")
-            else:
-                raise DerivaMLException("Looking for caller failed")  # Stack is too shallow
         return filename, is_notebook
 
     @staticmethod
