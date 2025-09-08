@@ -1,4 +1,3 @@
-# your_pkg/install_kernel.py
 import re
 import sys
 from argparse import ArgumentParser
