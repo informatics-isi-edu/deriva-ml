@@ -49,7 +49,7 @@ class TestWorkflow:
         workflow_url = workflows[0]["URL"]
 
         workflow_rid = ml_instance.lookup_workflow(workflow_url)
-
+        print(f"Workflow url: {workflow_url}")
         assert workflow_url.endswith("workflow-test.py")
 
         # Make sure that workflow is not duplicated if created again.
