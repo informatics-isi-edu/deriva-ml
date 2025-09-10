@@ -9,8 +9,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "bump-my-version",
+    "bdbag",
     "deriva~=1.7.10",
     "deepdiff",
+    "nbconvert",
     "pandas",
     "regex~=2024.7.24",
     "pydantic>=2.11",
@@ -39,6 +41,11 @@ requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
+
+[tool.uv.sources]
+bdbag = {git = "https://github.com/fair-research/bdbag", branch = "master" }
+deriva = {git = "https://github.com/informatics-isi-edu/deriva-py", branch = "master" }
+
 
 [tool.setuptools.package-data]
 deriva_ml = ["schema/*.json"]
