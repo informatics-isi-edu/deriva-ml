@@ -101,7 +101,6 @@ class TestWorkflow:
 
         # Check to make sure that result notebook and HTML version got uploaded.
         execution_assets = ml_instance.list_assets("Execution_Asset")
-        print(execution_assets)
 
 
 class TestExecution:

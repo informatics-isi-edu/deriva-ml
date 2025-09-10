@@ -379,6 +379,9 @@ class Execution:
             # save runtime env
             self._save_runtime_environment()
 
+            # Now upload the files so we have the info in case the execution fails.
+            self.uploaded_assets = self._upload_execution_dirs()
+
         self.start_time = datetime.now()
         self.update_status(Status.pending, "Initialize status finished.")
 
