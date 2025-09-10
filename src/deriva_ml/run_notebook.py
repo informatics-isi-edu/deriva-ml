@@ -6,11 +6,13 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import nbformat
 import papermill as pm
 import regex as re
 from deriva.core import BaseCLI
+from nbconvert import HTMLExporter
 
-from deriva_ml import DerivaML, ExecAssetType, MLAsset, Workflow
+from deriva_ml import DerivaML, ExecAssetType, Execution, ExecutionConfiguration, MLAsset, Workflow
 
 
 class DerivaMLRunNotebookCLI(BaseCLI):
@@ -120,8 +122,8 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         os.environ["DERIVA_ML_WORKFLOW_URL"] = url
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
         os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file.as_posix()
-
         with tempfile.TemporaryDirectory() as tmpdirname:
+            print(f"Running notebook {notebook_file.name} with parameters:")
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
             pm.execute_notebook(
                 input_path=notebook_file,
@@ -130,6 +132,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 kernel_name=kernel,
                 log_output=log,
             )
+            print(f"Notebook output saved to {notebook_output}")
             catalog_id = execution_rid = None
             with Path(notebook_output).open("r") as f:
                 for line in f:
@@ -143,25 +146,51 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             if not execution_rid:
                 print("Execution RID not found.")
                 exit(1)
-            print("Uploaded notebook output for Execution RID:", execution_rid)
 
-            ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id)
+            ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id, working_dir=tmpdirname)
+            workflow_rid = ml_instance.retrieve_rid(execution_rid)["Workflow"]
 
-            execution = ml_instance.restore_execution(execution_rid)
+            execution = Execution(
+                configuration=ExecutionConfiguration(workflow=workflow_rid),
+                ml_object=ml_instance,
+                reload=execution_rid,
+            )
+
+            # Generate an HTML version of the output notebook.
+            nb = nbformat.read(notebook_output, as_version=4)
+            html_exporter = HTMLExporter(template_name="classic")
+            body, resources = html_exporter.from_notebook_node(nb)
+            notebook_output_html = notebook_output.with_suffix(".html")
+            notebook_output_html.write_text(body, encoding="utf-8")
+
             execution.asset_file_path(
                 asset_name=MLAsset.execution_asset,
                 file_name=notebook_output,
                 asset_types=ExecAssetType.notebook_output,
             )
+
+            execution.asset_file_path(
+                asset_name=MLAsset.execution_asset,
+                file_name=notebook_output_html,
+                asset_types=ExecAssetType.notebook_output,
+            )
+            execution.asset_file_path(
+                asset_name=MLAsset.execution_asset,
+                file_name=notebook_output_html,
+                asset_types=ExecAssetType.notebook_output,
+            )
+            print("parameter....")
+
             parameter_file = execution.asset_file_path(
                 asset_name=MLAsset.execution_asset,
                 file_name=f"notebook-parameters-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
                 asset_types=ExecAssetType.input_file.value,
             )
+
             with Path(parameter_file).open("w") as f:
                 json.dump(parameters, f)
-
             execution.upload_execution_outputs()
+
             print(ml_instance.cite(execution_rid))
 
 
@@ -178,4 +207,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(e)
+        exit(1)

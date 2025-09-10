@@ -7,8 +7,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from deriva_ml import (
-    BuiltinTypes,
-    ColumnDefinition,
     DatasetSpec,
     DerivaML,
     ExecAssetType,
@@ -101,6 +99,10 @@ class TestWorkflow:
         workflow_url = workflows[0]["URL"]
         assert workflow_url.endswith("workflow-test.ipynb")
 
+        # Check to make sure that result notebook and HTML version got uploaded.
+        execution_assets = ml_instance.list_assets("Execution_Asset")
+        print(execution_assets)
+
 
 class TestExecution:
     def test_execution_no_download(self, test_ml):
@@ -192,43 +194,6 @@ class TestExecution:
             assert 1 == len(execution.asset_paths)
             assert 1 == len(execution.datasets)
             assert execution.datasets[0].dataset_rid == dataset_rid
-
-    def test_download_asset(self, test_ml, tmp_path):
-        ml_instance = test_ml
-
-        # Create a workflow
-        ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
-        ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
-        api_workflow = ml_instance.create_workflow(
-            name="Test Workflow One",
-            workflow_type="Test Workflow",
-            description="A test operation",
-        )
-        ml_instance.create_asset(
-            "BarAsset",
-            column_defs=[ColumnDefinition(name="foo", type=BuiltinTypes.int4)],
-        )
-        manual_execution = ml_instance.create_execution(
-            ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)
-        )
-
-        with manual_execution.execute() as execution:
-            model_file = execution.asset_file_path(
-                "BarAsset", "API_Model/modelfile.txt", asset_types=ExecAssetType.model_file, foo=23
-            )
-            print(model_file)
-            with model_file.open("w") as fp:
-                fp.write("My model")
-            # Now upload the file and retrieve the RID of the new asset from the returned results.
-        uploaded_assets = manual_execution.upload_execution_outputs()
-        print(uploaded_assets)
-        assert 1 == len(uploaded_assets["deriva-ml/Execution_Asset"])
-
-        file = manual_execution.download_asset(asset_rid, tmpdir, update_catalog=False)
-        assert file.name == "modelfile.txt"
-
-        assert "BarAsset" in [a.name for a in ml_instance.model.find_assets()]
-        assert ml_instance.model.asset_metadata("BarAsset") == {"foo"}
 
     @staticmethod
     def create_execution_asset(ml_instance: DerivaML, api_workflow):

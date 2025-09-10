@@ -236,6 +236,7 @@ class Execution:
         Raises:
             DerivaMLException: If initialization fails or configuration is invalid.
         """
+
         self.asset_paths: list[AssetFilePath] = []
         self.configuration = configuration
         self._ml_object = ml_object
@@ -886,10 +887,10 @@ class Execution:
 
         file_name = Path(file_name)
         asset_path = asset_file_path(
-            self._working_dir,
-            self.execution_rid,
-            self._model.name_to_table(asset_name),
-            file_name.name,
+            prefix=self._working_dir,
+            exec_rid=self.execution_rid,
+            asset_table=self._model.name_to_table(asset_name),
+            file_name=file_name.name,
             metadata=kwargs,
         )
 
