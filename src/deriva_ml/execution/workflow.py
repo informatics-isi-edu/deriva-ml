@@ -318,7 +318,7 @@ class Workflow(BaseModel):
             ]
             # Get the caller's filename, which is two up the stack from here.
             filename = Path(stack[-1])
-            if not (filename.exists() or Workflow._in_repl()):
+            if not (filename.exists()) or Workflow._in_repl():
                 # Being called from the command line interpreter.
                 filename = Path.cwd() / Path("REPL")
             # Get the caller's filename, which is two up the stack from here.
