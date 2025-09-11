@@ -43,8 +43,8 @@ build-backend = "setuptools.build_meta"
 [tool.uv]
 
 [tool.uv.sources]
-bdbag = {git = "https://github.com/fair-research/bdbag", branch = "master" }
-deriva = {git = "https://github.com/informatics-isi-edu/deriva-py", branch = "master" }
+#bdbag = {git = "https://github.com/fair-research/bdbag", branch = "master" }
+#deriva = {git = "https://github.com/informatics-isi-edu/deriva-py", branch = "master" }
 
 
 [tool.setuptools.package-data]
