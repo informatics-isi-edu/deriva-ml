@@ -10,7 +10,7 @@ import nbformat
 import papermill as pm
 import regex as re
 from deriva.core import BaseCLI
-from nbconvert import HTMLExporter
+from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, Execution, ExecutionConfiguration, MLAsset, Workflow
 
@@ -157,11 +157,16 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             )
 
             # Generate an HTML version of the output notebook.
+            notebook_output_md = notebook_output.with_suffix(".md")
+            with notebook_output.open() as f:
+                nb = nbformat.read(f, as_version=4)
+            # Convert to Markdown
+            exporter = MarkdownExporter()
+            (body, resources) = exporter.from_notebook_node(nb)
+
+            with notebook_output_md.open("w") as f:
+                f.write(body)
             nb = nbformat.read(notebook_output, as_version=4)
-            html_exporter = HTMLExporter(template_name="classic")
-            body, resources = html_exporter.from_notebook_node(nb)
-            notebook_output_html = notebook_output.with_suffix(".html")
-            notebook_output_html.write_text(body, encoding="utf-8")
 
             execution.asset_file_path(
                 asset_name=MLAsset.execution_asset,
@@ -171,12 +176,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
             execution.asset_file_path(
                 asset_name=MLAsset.execution_asset,
-                file_name=notebook_output_html,
+                file_name=notebook_output_md,
                 asset_types=ExecAssetType.notebook_output,
             )
             execution.asset_file_path(
                 asset_name=MLAsset.execution_asset,
-                file_name=notebook_output_html,
+                file_name=notebook_output_md,
                 asset_types=ExecAssetType.notebook_output,
             )
             print("parameter....")
