@@ -22,13 +22,13 @@ name = "aiohttp"
 version = "3.12.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "aiohappyeyeballs", marker = "python_full_version >= '3.12'" },
-    { name = "aiosignal", marker = "python_full_version >= '3.12'" },
-    { name = "attrs", marker = "python_full_version >= '3.12'" },
-    { name = "frozenlist", marker = "python_full_version >= '3.12'" },
-    { name = "multidict", marker = "python_full_version >= '3.12'" },
-    { name = "propcache", marker = "python_full_version >= '3.12'" },
-    { name = "yarl", marker = "python_full_version >= '3.12'" },
+    { name = "aiohappyeyeballs", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "aiosignal", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "attrs", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "frozenlist", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "multidict", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "propcache", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "yarl", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9b/e7/d92a237d8802ca88483906c388f7c201bbe96cd80a165ffd0ac2f6a8d59f/aiohttp-3.12.15.tar.gz", hash = "sha256:4fc61385e9c98d72fcdf47e6dd81833f47b2f77c114c29cd64a361be57a763a2", size = 7823716, upload-time = "2025-07-29T05:52:32.215Z" }
 wheels = [
@@ -107,7 +107,7 @@ name = "aiosignal"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "frozenlist", marker = "python_full_version >= '3.12'" },
+    { name = "frozenlist", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
     { name = "typing-extensions", marker = "python_full_version == '3.12.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/62/06741b579156360248d1ec624842ad0edf697050bbaf7c3e46394e106ad1/aiosignal-1.4.0.tar.gz", hash = "sha256:f47eecd9468083c2029cc99945502cb7708b082c232f9aca65da147157b251c7", size = 25007, upload-time = "2025-07-03T22:54:43.528Z" }
@@ -273,9 +273,12 @@ wheels = [
 
 [[package]]
 name = "bagit"
-version = "1.9.0"
+version = "1.8.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/a0/8866b4c6f894af0eb10e4964157f3241dd4117700fc010e7825471d51a13/bagit-1.9.0.tar.gz", hash = "sha256:9455006c2d1df88be95ec1fccabc5ea623389589ea4c85b3d85bd256f29d7656", size = 23443, upload-time = "2025-06-13T17:44:26.969Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/99/927b704237a1286f1022ea02a2fdfd82d5567cfbca97a4c343e2de7e37c4/bagit-1.8.1.tar.gz", hash = "sha256:37df1330d2e8640c8dee8ab6d0073ac701f0614d25f5252f9e05263409cee60c", size = 26229, upload-time = "2021-02-08T18:53:22.129Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/fc/58b3c209fdd383744b27914d0b88d0f9db72aa043e1475618d981d7089d9/bagit-1.8.1-py2.py3-none-any.whl", hash = "sha256:d14dd7e373dd24d41f6748c42f123f7db77098dfa4a0125dbacb4c8bdf767c09", size = 35137, upload-time = "2021-02-08T18:53:20.581Z" },
+]
 
 [[package]]
 name = "bagit-profile"
@@ -292,8 +295,8 @@ wheels = [
 
 [[package]]
 name = "bdbag"
-version = "1.8.0"
-source = { git = "https://github.com/fair-research/bdbag?branch=master#0da4b9187728061c87b9fccf8fe5b4cbbb6597f5" }
+version = "1.7.5"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bagit" },
     { name = "bagit-profile" },
@@ -301,7 +304,12 @@ dependencies = [
     { name = "packaging" },
     { name = "pytz" },
     { name = "requests" },
+    { name = "setuptools-scm" },
     { name = "tzlocal" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/af/fa/12c3e3c64fcc73217b036ff013a8dde3abe651a75d8fdc0b0c66549ae97e/bdbag-1.7.5.tar.gz", hash = "sha256:395fea4a62ef786194a910940d77cbe6d2e2745c264e84237bb4898bf1e64976", size = 83233, upload-time = "2025-06-10T17:59:41.788Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7f/d4/a64eab8f3d6ffe6ab236f0b5026746e9a162feff64fa20d916b52464842a/bdbag-1.7.5-py2.py3-none-any.whl", hash = "sha256:eb0da14f5925039e4509eac18fd5c18729e22aefa6073163e3dacdcd3b6345ff", size = 75720, upload-time = "2025-06-10T17:59:40.329Z" },
 ]
 
 [[package]]
@@ -742,8 +750,8 @@ wheels = [
 
 [[package]]
 name = "deriva"
-version = "1.7.11"
-source = { git = "https://github.com/informatics-isi-edu/deriva-py?branch=master#dbdf76b6c8323aaf980e64c3beb8288ca6ddac9e" }
+version = "1.7.10"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bdbag" },
     { name = "fair-identifiers-client" },
@@ -755,6 +763,10 @@ dependencies = [
     { name = "portalocker" },
     { name = "requests" },
     { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/3e/e0efa2313e899a14f5809b29ebb8f582172d8e8ca18a6a078cded4fa196e/deriva-1.7.10.tar.gz", hash = "sha256:5400a80f2ee6b77592cd541b1e862051175a0525540fb11388cf87193e0fe38e", size = 283601, upload-time = "2025-07-11T02:10:43.855Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/ce/07c1ceb47642cf1f8e45717376ef6511d9dc0afdbece2495b0ed52941067/deriva-1.7.10-py3-none-any.whl", hash = "sha256:f457797462b95c2b59334e59e4dc8a6ff1b70c78308861467a402caf7e6f843e", size = 252568, upload-time = "2025-07-11T02:10:42.395Z" },
 ]
 
 [[package]]
@@ -796,10 +808,10 @@ lint = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bdbag", git = "https://github.com/fair-research/bdbag?branch=master" },
+    { name = "bdbag" },
     { name = "bump-my-version" },
     { name = "deepdiff" },
-    { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?branch=master" },
+    { name = "deriva", specifier = "~=1.7.10" },
     { name = "nbconvert" },
     { name = "nbstripout" },
     { name = "pandas" },
@@ -3622,9 +3634,9 @@ name = "yarl"
 version = "1.20.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "idna", marker = "python_full_version >= '3.12'" },
-    { name = "multidict", marker = "python_full_version >= '3.12'" },
-    { name = "propcache", marker = "python_full_version >= '3.12'" },
+    { name = "idna", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "multidict", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "propcache", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3c/fb/efaa23fa4e45537b827620f04cf8f3cd658b76642205162e072703a5b963/yarl-1.20.1.tar.gz", hash = "sha256:d017a4997ee50c91fd5466cef416231bb82177b93b029906cefc542ce14c35ac", size = 186428, upload-time = "2025-06-10T00:46:09.923Z" }
 wheels = [
