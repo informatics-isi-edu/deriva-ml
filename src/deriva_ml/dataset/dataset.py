@@ -1289,8 +1289,8 @@ class Dataset:
                 {
                     "processor": "fetch",
                     "processor_params": {
-                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5",
-                        "output_path": f"asset/{table.name}",
+                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid=RID",
+                        "output_path": "asset/{asset_rid}/" + table.name,
                     },
                 }
             )
@@ -1341,9 +1341,9 @@ class Dataset:
                     "source": {
                         "skip_root_path": False,
                         "api": "attribute",
-                        "path": f"{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5",
+                        "path": f"{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5, asset_rid:=RID",
                     },
-                    "destination": {"name": f"asset/{table.name}", "type": "fetch"},
+                    "destination": {"name": "asset/{asset_rid}/" + table.name, "type": "fetch"},
                 }
             )
         return exports
