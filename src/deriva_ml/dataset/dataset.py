@@ -1289,7 +1289,7 @@ class Dataset:
                 {
                     "processor": "fetch",
                     "processor_params": {
-                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid=RID",
+                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID",
                         "output_path": "asset/{asset_rid}/" + table.name,
                     },
                 }
