@@ -296,7 +296,6 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
 
         with spec_file.open("w+") as cfile:
             json.dump(bulk_upload_configuration(model), cfile)
-        print("Creating GenericUploader...")
         uploader = GenericUploader(
             server={
                 "host": model.hostname,
@@ -318,7 +317,6 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
             }
         finally:
             uploader.cleanup()
-            print(f"Cleanup called...{uploader}")
         return results
 
 
