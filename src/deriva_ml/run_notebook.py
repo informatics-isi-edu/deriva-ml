@@ -9,6 +9,7 @@ from pathlib import Path
 import nbformat
 import papermill as pm
 import regex as re
+import yaml
 from deriva.core import BaseCLI
 from nbconvert import MarkdownExporter
 
@@ -28,7 +29,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             "-f",
             type=Path,
             default=None,
-            help="JSON file with parameter values to inject into the notebook.",
+            help="JSON or YAML file with parameter values to inject into the notebook.",
         )
 
         self.parser.add_argument(
@@ -86,11 +87,14 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         parameters = {key: self._coerce_number(val) for key, val in args.parameter}
 
         if parameter_file:
-            if not (parameter_file.is_file() and parameter_file.suffix == ".json"):
-                print("Parameter file must be an json file.")
-                exit(1)
-            with Path(parameter_file).open("r") as f:
-                parameters |= json.load(f)
+            with parameter_file.open("r") as f:
+                if parameter_file.suffix == ".json":
+                    parameters |= json.load(f)
+                elif parameter_file.suffix == ".yaml":
+                    parameters |= yaml.safe_load(f)
+                else:
+                    print("Parameter file must be an json or YAML file.")
+                    exit(1)
 
         if not (notebook_file.is_file() and notebook_file.suffix == ".ipynb"):
             print(f"Notebook file must be an ipynb file: {notebook_file.name}.")
