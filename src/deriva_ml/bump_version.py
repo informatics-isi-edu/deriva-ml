@@ -105,7 +105,7 @@ def main() -> int:
 
     # Find latest semver tag with prefix
     tag = latest_semver_tag(prefix)
-
+    print(f"Latest semver tag: {tag}")
     if not tag:
         seed_initial_tag(f"{prefix}{start}")
         print(f"Seeded {prefix}{start}. Done.")
