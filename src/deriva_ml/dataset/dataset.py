@@ -1138,7 +1138,7 @@ class Dataset:
         with TemporaryDirectory() as tmp_dir:
             if self._use_minid:
                 # Get bag from S3
-                archive_path = fetch_single_file(minid.bag_url)
+                archive_path = fetch_single_file(minid.bag_url, output_path=tmp_dir)
             else:
                 exporter = DerivaExport(host=self._model.catalog.deriva_server.server, output_dir=tmp_dir)
                 archive_path = exporter.retrieve_file(minid.bag_url)
