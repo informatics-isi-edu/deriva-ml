@@ -386,6 +386,11 @@ class Execution:
         self.update_status(Status.pending, "Initialize status finished.")
 
     @property
+    def working_dir(self) -> Path:
+        """Return the working directory for the execution."""
+        return self._execution_root
+
+    @property
     def _execution_root(self) -> Path:
         """
 
