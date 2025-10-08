@@ -15,6 +15,7 @@ from __future__ import annotations  # noqa: I001
 
 # Standard library imports
 from collections import defaultdict
+from dataclasses import dataclass
 import getpass
 import logging
 from datetime import datetime
@@ -81,6 +82,21 @@ if TYPE_CHECKING:
 
 # Stop pycharm from complaining about undefined references.
 ml: DerivaML
+
+@dataclass
+class DerivaMLConfig:
+    host: str
+    catalog_id: str | int
+    domain_schema: str
+    ml_schema: str
+    project_name: str
+    cache_dir: str | None = None
+    working_dir: str | None = None
+    logging_level: int
+    use_minid: bool = True
+    check_auth: bool = True
+    assets: list[RID] = []
+    datasets: list[Any] = []
 
 
 class DerivaML(Dataset):
