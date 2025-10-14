@@ -1,5 +1,6 @@
 __all__ = [
     "DerivaML",
+    "DerivaMLConfig",
     "DerivaMLException",
     "DerivaMLInvalidTerm",
     "DerivaMLTableTypeError",
@@ -28,6 +29,7 @@ from deriva_ml.core import (
     BuiltinTypes,
     ColumnDefinition,
     DerivaML,
+    DerivaMLConfig,
     ExecAssetType,
     ExecMetadataType,
     FileSpec,

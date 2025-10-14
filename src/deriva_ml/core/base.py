@@ -15,19 +15,19 @@ from __future__ import annotations  # noqa: I001
 
 # Standard library imports
 from collections import defaultdict
-from dataclasses import dataclass
 import getpass
 import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any
+from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any, Literal
 from urllib.parse import urlsplit
 
 
 # Third-party imports
+from hydra_zen import  make_config
 import requests
-from pydantic import ConfigDict, validate_call
+from pydantic import ConfigDict, validate_call, BaseModel
 
 # Deriva imports
 from deriva.core import (
@@ -83,20 +83,19 @@ if TYPE_CHECKING:
 # Stop pycharm from complaining about undefined references.
 ml: DerivaML
 
-@dataclass
-class DerivaMLConfig:
-    host: str
-    catalog_id: str | int
-    domain_schema: str
-    ml_schema: str
-    project_name: str
-    cache_dir: str | None = None
-    working_dir: str | None = None
-    logging_level: int
-    use_minid: bool = True
-    check_auth: bool = True
-    assets: list[RID] = []
-    datasets: list[Any] = []
+# For hydra
+class DerivaMLConfig(BaseModel):
+        hostname: str
+        catalog_id:  str | int = 1
+        domain_schema: str | None = None
+        project_name:str | None = None
+        cache_dir: str | Path | None = None
+        working_dir: str | Path | None = None
+        ml_schema: str = ML_SCHEMA
+        logging_level: Any = logging.WARNING
+        credential: Any = None
+        use_minid: bool = True
+        check_auth:bool = True
 
 
 class DerivaML(Dataset):
