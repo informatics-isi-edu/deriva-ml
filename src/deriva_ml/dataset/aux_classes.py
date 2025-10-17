@@ -5,6 +5,7 @@ THis module defines the DataSet class with is used to manipulate n
 from enum import Enum
 from typing import Any, Optional, SupportsInt
 
+from hydra_zen import hydrated_dataclass
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -182,8 +183,9 @@ class DatasetSpec(BaseModel):
     """
 
     rid: RID
-    materialize: bool = True
     version: DatasetVersion | conlist(item_type=int, min_length=3, max_length=3) | tuple[int, int, int] | str
+    materialize: bool = True
+    description: str = ""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -208,3 +210,20 @@ class DatasetSpec(BaseModel):
     @field_serializer("version")
     def serialize_version(self, version: DatasetVersion) -> dict[str, Any]:
         return version.to_dict()
+
+
+@hydrated_dataclass(DatasetSpec)
+class DatasetConfig:
+    rid: str
+    version: str
+    materialize: bool = True
+    description: str = ""
+
+class DatasetList(BaseModel):
+    datasets: list[DatasetSpec]
+    description: str = ""
+
+@hydrated_dataclass(DatasetList)
+class DatasetConfigList:
+    datasets: list[DatasetConfig]
+    description: str = ""

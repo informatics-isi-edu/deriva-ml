@@ -20,14 +20,13 @@ import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any, Literal
+from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 
 # Third-party imports
-from hydra_zen import  make_config
 import requests
-from pydantic import ConfigDict, validate_call, BaseModel
+from pydantic import ConfigDict, validate_call, BaseModel, model_validator
 
 # Deriva imports
 from deriva.core import (
@@ -84,18 +83,43 @@ if TYPE_CHECKING:
 ml: DerivaML
 
 # For hydra
+
 class DerivaMLConfig(BaseModel):
-        hostname: str
-        catalog_id:  str | int = 1
-        domain_schema: str | None = None
-        project_name:str | None = None
-        cache_dir: str | Path | None = None
-        working_dir: str | Path | None = None
-        ml_schema: str = ML_SCHEMA
-        logging_level: Any = logging.WARNING
-        credential: Any = None
-        use_minid: bool = True
-        check_auth:bool = True
+    hostname: str
+    catalog_id: str | int = 1
+    domain_schema: str | None = None
+    project_name: str | None = None
+    cache_dir: str | Path | None = None
+    working_dir: str | Path | None = None
+    ml_schema: str = ML_SCHEMA
+    logging_level: Any = logging.WARNING
+    credential: Any = None
+    use_minid: bool = True
+    check_auth: bool = True
+
+    @model_validator(mode="after")
+    def init_working_dir(self):
+        """
+        Sets up the working directory for the model.
+
+        This method configures the working directory, ensuring that all required
+        file operations are performed in the appropriate location. If the user does not
+        specify a directory, a default directory based on the user's home directory
+        or username will be used.
+
+        This is a repeat of what is in the DerivaML.__init__ bu we put this here so that the working
+        directory is available to hydra.
+
+        Returns:
+            Self: The object instance with the working directory initialized.
+        """
+
+        default_workdir = "DerivaML_working"
+        self.working_dir = (
+            Path(self.working_dir) / getpass.getuser() if self.working_dir else Path.home() / "deriva-ml"
+        ) / default_workdir
+        print("Seting default working directory to: ", self.working_dir)
+        return self
 
 
 class DerivaML(Dataset):
