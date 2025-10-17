@@ -367,7 +367,7 @@ def create_demo_catalog(
     create_features=False,
     create_datasets=False,
     on_exit_delete=True,
-    logging_level=logging.INFO,
+    logging_level=logging.WARNING,
 ) -> ErmrestCatalog:
     test_catalog = create_ml_catalog(hostname, project_name=project_name)
     if on_exit_delete:

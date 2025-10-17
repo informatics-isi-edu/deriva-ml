@@ -35,13 +35,13 @@ from typing import Any, Iterable, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
+from hydra.core.hydra_config import HydraConfig
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.base import DerivaML
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     RID,
-    ExecAssetType,
     ExecMetadataType,
     FileSpec,
     FileUploadState,
@@ -198,7 +198,6 @@ class Execution:
         workflow_rid (RID): RID of the associated workflow.
         status (Status): Current execution status.
         asset_paths (list[AssetFilePath]): Paths to execution assets.
-        parameters (dict): Execution parameters.
         start_time (datetime | None): When execution started.
         stop_time (datetime | None): When execution completed.
 
@@ -206,7 +205,6 @@ class Execution:
         >>> config = ExecutionConfiguration(
         ...     workflow="analysis",
         ...     description="Process samples",
-        ...     parameters={"threshold": 0.5}
         ... )
         >>> with ml.create_execution(config) as execution:
         ...     execution.download_dataset_bag(dataset_spec)
@@ -250,7 +248,6 @@ class Execution:
 
         self.dataset_rids: List[RID] = []
         self.datasets: list[DatasetBag] = []
-        self.parameters = self.configuration.parameters
 
         self._working_dir = self._ml_object.working_dir
         self._cache_dir = self._ml_object.cache_dir
@@ -302,12 +299,27 @@ class Execution:
 
     def _save_runtime_environment(self):
         runtime_env_path = self.asset_file_path(
-            "Execution_Metadata",
-            f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            ExecMetadataType.runtime_env.value,
+            asset_name="Execution_Metadata",
+            file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            asset_types=ExecMetadataType.runtime_env.value,
         )
         with Path(runtime_env_path).open("w") as fp:
             json.dump(get_execution_environment(), fp)
+
+    def _upload_hydra_config_assets(self):
+        """Upload hydra assets to the catalog."""
+        for hydra_asset in Path(HydraConfig.get().runtime.output_dir).rglob("*"):
+            if hydra_asset.is_dir():
+                continue
+            timestamp = hydra_asset.parts[-2]
+            self.asset_file_path(
+                asset_name=MLAsset.execution_metadata,
+                file_name=f"{timestamp}-{hydra_asset.name}",
+                asset_types=ExecMetadataType.execution_config.value,
+            )
+
+    def _upload_hydra_assets(self):
+        pass
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution by a configuration in the Execution_Metadata table.
@@ -354,9 +366,9 @@ class Execution:
         # Save configuration details for later upload
         if not reload:
             cfile = self.asset_file_path(
-                MLAsset.execution_metadata,
-                "configuration.json",
-                ExecMetadataType.execution_config.value,
+                asset_name=MLAsset.execution_metadata,
+                file_name="configuration.json",
+                asset_types=ExecMetadataType.execution_config.value,
             )
             with Path(cfile).open("w", encoding="utf-8") as config_file:
                 json.dump(self.configuration.model_dump(), config_file)
@@ -364,17 +376,12 @@ class Execution:
             lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
             if lock_file.exists():
                 _ = self.asset_file_path(
-                    MLAsset.execution_metadata,
-                    lock_file,
-                    ExecMetadataType.execution_config.value,
+                    asset_name=MLAsset.execution_metadata,
+                    file_name=lock_file,
+                    asset_types=ExecMetadataType.execution_config.value,
                 )
 
-            for parameter_file in self.configuration.parameters:
-                self.asset_file_path(
-                    MLAsset.execution_asset,
-                    parameter_file,
-                    ExecAssetType.input_file.value,
-                )
+            self._upload_hydra_config_assets()
 
             # save runtime env
             self._save_runtime_environment()

@@ -1,4 +1,5 @@
-from deriva_ml.core.base import DerivaML, DerivaMLConfig
+from deriva_ml.core.base import DerivaML
+from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.definitions import (
     RID,
     BuiltinTypes,

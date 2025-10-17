@@ -30,7 +30,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from deriva_ml.core.definitions import RID
-from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.aux_classes import DatasetList, DatasetSpec
 from deriva_ml.execution.workflow import Workflow
 
 
@@ -64,45 +64,21 @@ class ExecutionConfiguration(BaseModel):
         ... )
     """
 
-    datasets: list[DatasetSpec] = []
+    datasets: list[DatasetSpec] | DatasetList = []
     assets: list[RID] = []
     workflow: RID | Workflow
-    parameters: dict[str, Any] | Path = {}
     description: str = ""
     argv: list[str] = Field(default_factory=lambda: sys.argv)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("parameters", mode="before")
+    @field_validator("datasets", mode="before")
     @classmethod
-    def validate_parameters(cls, value: Any) -> Any:
-        """Validates and loads execution parameters.
-
-        If value is a file path, loads and parses it as JSON. Otherwise, returns
-        the value as is.
-
-        Args:
-            value: Parameter value to validate, either:
-                - Dictionary of parameters
-                - Path to JSON file
-                - String path to JSON file
-
-        Returns:
-            dict[str, Any]: Validated parameter dictionary.
-
-        Raises:
-            ValueError: If JSON file is invalid or cannot be read.
-            FileNotFoundError: If parameter file doesn't exist.
-
-        Example:
-            >>> config = ExecutionConfiguration(parameters="params.json")
-            >>> print(config.parameters)  # Contents of params.json as dict
-        """
-        if isinstance(value, str) or isinstance(value, Path):
-            with Path(value).open("r") as f:
-                return json.load(f)
-        else:
-            return value
+    def validate_datasets(cls, value: Any) -> Any:
+        if isinstance(value, DatasetList):
+            config_list: DatasetList = value
+            value = config_list.datasets
+        return value
 
     @field_validator("workflow", mode="before")
     @classmethod
