@@ -8,7 +8,6 @@ from pathlib import Path
 
 import nbformat
 import papermill as pm
-import regex as re
 import yaml
 from deriva.core import BaseCLI
 from nbconvert import MarkdownExporter
@@ -129,6 +128,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         with tempfile.TemporaryDirectory() as tmpdirname:
             print(f"Running notebook {notebook_file.name} with parameters:")
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
+            os.environ["DERIVA_ML_SAVE_EXECUTION_RID"] = tmpdirname / "execution_rid.txt"
             pm.execute_notebook(
                 input_path=notebook_file,
                 output_path=notebook_output,
@@ -138,15 +138,8 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             )
             print(f"Notebook output saved to {notebook_output}")
             catalog_id = execution_rid = None
-            with Path(notebook_output).open("r") as f:
-                for line in f:
-                    if m := re.search(
-                        r"Execution RID: https://(?P<host>.*)/id/(?P<catalog_id>.*)/(?P<execution_rid>[\w-]+)",
-                        line,
-                    ):
-                        hostname = m["host"]
-                        catalog_id = m["catalog_id"]
-                        execution_rid = m["execution_rid"]
+            with Path(tmpdirname) / "execution_rid.txt" as f:
+                execution_rid = f.read_text().strip()
             if not execution_rid:
                 print("Execution RID not found.")
                 exit(1)

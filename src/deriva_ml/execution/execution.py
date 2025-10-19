@@ -289,9 +289,10 @@ class Execution:
                 ]
             )[0]["RID"]
 
-        if isinstance(self.configuration.workflow, Workflow) and self.configuration.workflow.is_notebook:
-            # Put execution_rid into the cell output so we can find it later.
-            display(Markdown(f"Execution RID: {self._ml_object.cite(self.execution_rid)}"))
+        if rid_path :=os.environ.get("DERIVA_ML_SAVE_EXECUTION_RID", None):
+            # Put execution_rid into the provided file path so we can find it later.
+            with Path(rid_path).open() as f:
+                f.write(str(self.execution_rid))
 
         # Create a directory for execution rid so we can recover the state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)

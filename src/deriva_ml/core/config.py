@@ -60,4 +60,5 @@ store(
     group="hydra",
     name="config",
 )
+
 store.add_to_hydra_store()
