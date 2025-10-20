@@ -111,6 +111,7 @@ class DerivaML(Dataset):
         project_name: str | None = None,
         cache_dir: str | Path | None = None,
         working_dir: str | Path | None = None,
+        hydra_runtime_output_dir: str | Path | None = None,
         ml_schema: str = ML_SCHEMA,
         logging_level=logging.WARNING,
         deriva_logging_level=logging.WARNING,
@@ -163,8 +164,9 @@ class DerivaML(Dataset):
 
         # Set up working and cache directories
         self.working_dir = DerivaMLConfig.compute_workdir(working_dir)
-        print("Init working dir: ", self.working_dir)
         self.working_dir.mkdir(parents=True, exist_ok=True)
+        self.hydra_runtime_output_dir = hydra_runtime_output_dir
+
         self.cache_dir = Path(cache_dir) if cache_dir else self.working_dir / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 

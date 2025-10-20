@@ -35,7 +35,6 @@ from typing import Any, Iterable, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
-from hydra.core.hydra_config import HydraConfig
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.base import DerivaML
@@ -289,7 +288,7 @@ class Execution:
                 ]
             )[0]["RID"]
 
-        if rid_path :=os.environ.get("DERIVA_ML_SAVE_EXECUTION_RID", None):
+        if rid_path := os.environ.get("DERIVA_ML_SAVE_EXECUTION_RID", None):
             # Put execution_rid into the provided file path so we can find it later.
             with Path(rid_path).open() as f:
                 f.write(str(self.execution_rid))
@@ -309,7 +308,7 @@ class Execution:
 
     def _upload_hydra_config_assets(self):
         """Upload hydra assets to the catalog."""
-        for hydra_asset in Path(HydraConfig.get().runtime.output_dir).rglob("*"):
+        for hydra_asset in self._ml_object.hydra_runtime_output_dir.rglob("*"):
             if hydra_asset.is_dir():
                 continue
             timestamp = hydra_asset.parts[-2]
@@ -318,9 +317,6 @@ class Execution:
                 file_name=f"{timestamp}-{hydra_asset.name}",
                 asset_types=ExecMetadataType.execution_config.value,
             )
-
-    def _upload_hydra_assets(self):
-        pass
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution by a configuration in the Execution_Metadata table.

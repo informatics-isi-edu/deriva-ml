@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from hydra.conf import HydraConf, RunDir
+from hydra.core.hydra_config import HydraConfig
 from hydra_zen import store
 from omegaconf import OmegaConf
 from pydantic import BaseModel, model_validator
@@ -17,6 +18,7 @@ class DerivaMLConfig(BaseModel):
     project_name: str | None = None
     cache_dir: str | Path | None = None
     working_dir: str | Path | None = None
+    hydra_runtime_output_dir: str | Path | None = None
     ml_schema: str = ML_SCHEMA
     logging_level: Any = logging.WARNING
     deriva_logging_level: Any = logging.WARNING
@@ -42,6 +44,7 @@ class DerivaMLConfig(BaseModel):
         """
 
         self.working_dir = DerivaMLConfig.compute_workdir(self.working_dir)
+        self.hydra_runtime_output_dir = Path(HydraConfig.get().runtime.output_dir)
         return self
 
     @staticmethod
