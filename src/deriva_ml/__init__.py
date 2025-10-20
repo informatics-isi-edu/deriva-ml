@@ -27,7 +27,7 @@ from deriva_ml.core.exceptions import (
 )
 from deriva_ml.dataset.aux_classes import DatasetConfig, DatasetConfigList, DatasetSpec, DatasetVersion
 
-from .execution import Execution, ExecutionConfiguration
+from .execution import Execution, ExecutionConfiguration, Workflow
 
 # Type-checking only - avoid circular import at runtime
 if TYPE_CHECKING:
@@ -57,6 +57,7 @@ __all__ = [
     "DatasetVersion",
     "Execution",
     "ExecutionConfiguration",
+    "Workflow",
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",

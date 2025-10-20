@@ -291,7 +291,15 @@ class Execution:
         if rid_path := os.environ.get("DERIVA_ML_SAVE_EXECUTION_RID", None):
             # Put execution_rid into the provided file path so we can find it later.
             with Path(rid_path).open() as f:
-                f.write(str(self.execution_rid))
+                json.dump(
+                    {
+                        "hostname": self._ml_object.host_name,
+                        "catalog_id": self._ml_object.catalog_id,
+                        "workflow_rid": self.workflow_rid,
+                        "execution_rid": self.execution_rid,
+                    },
+                    f,
+                )
 
         # Create a directory for execution rid so we can recover the state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)

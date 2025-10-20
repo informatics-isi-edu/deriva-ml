@@ -3,7 +3,6 @@
 import json
 import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 import nbformat
@@ -128,7 +127,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         with tempfile.TemporaryDirectory() as tmpdirname:
             print(f"Running notebook {notebook_file.name} with parameters:")
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
-            os.environ["DERIVA_ML_SAVE_EXECUTION_RID"] = tmpdirname / "execution_rid.txt"
+            os.environ["DERIVA_ML_SAVE_EXECUTION_RID"] = tmpdirname / "execution_rid.json"
             pm.execute_notebook(
                 input_path=notebook_file,
                 output_path=notebook_output,
@@ -138,19 +137,21 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             )
             print(f"Notebook output saved to {notebook_output}")
             catalog_id = execution_rid = None
-            with Path(tmpdirname) / "execution_rid.txt" as f:
-                execution_rid = f.read_text().strip()
-            if not execution_rid:
+            with Path(tmpdirname) / "execution_rid.json" as f:
+                execution_config = json.load(f)
+            if not execution_config:
                 print("Execution RID not found.")
                 exit(1)
 
-            ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id, working_dir=tmpdirname)
+            ml_instance = DerivaML(
+                hostname=execution_config.hostname, catalog_id=execution_config.atalog_id, working_dir=tmpdirname
+            )
             workflow_rid = ml_instance.retrieve_rid(execution_rid)["Workflow"]
 
             execution = Execution(
-                configuration=ExecutionConfiguration(workflow=workflow_rid),
+                configuration=ExecutionConfiguration(workflow=execution_config.workflow_rid),
                 ml_object=ml_instance,
-                reload=execution_rid,
+                reload=execution_config.execution_rid,
             )
 
             # Generate an HTML version of the output notebook.
@@ -176,21 +177,6 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 file_name=notebook_output_md,
                 asset_types=ExecAssetType.notebook_output,
             )
-            execution.asset_file_path(
-                asset_name=MLAsset.execution_asset,
-                file_name=notebook_output_md,
-                asset_types=ExecAssetType.notebook_output,
-            )
-            print("parameter....")
-
-            parameter_file = execution.asset_file_path(
-                asset_name=MLAsset.execution_asset,
-                file_name=f"notebook-parameters-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
-                asset_types=ExecAssetType.input_file.value,
-            )
-
-            with Path(parameter_file).open("w") as f:
-                json.dump(parameters, f)
             execution.upload_execution_outputs()
 
             print(ml_instance.cite(execution_rid))
