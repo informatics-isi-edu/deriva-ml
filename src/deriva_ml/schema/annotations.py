@@ -1,4 +1,5 @@
 import argparse
+import sys
 
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
@@ -183,10 +184,10 @@ def catalog_annotation(model: DerivaModel) -> None:
 
 def asset_annotation(asset_table: Table):
     """Generate annotations for an asset table.
-    
+
     Args:
         asset_table: The Table object representing the asset table.
-        
+
     Returns:
         A dictionary containing the annotations for the asset table.
     """
@@ -316,7 +317,8 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 },
                 {
                     "source": [
-                        {"inbound": [schema, "Execution_Metadata_Execution_fkey"]},
+                        {"inbound": [schema, "Execution_Metadata_Execution_Execution_fkey"]},
+                        {"outbound": [schema, "Execution_Metadata_Execution_Execution_Metadata_fkey"]},
                         "RID",
                     ],
                     "markdown_name": "Execution Metadata",
@@ -453,9 +455,9 @@ def generate_annotation(model: Model, schema: str) -> dict:
 
 def main():
     """Main entry point for the annotations CLI.
-    
+
     Applies annotations to the ML schema based on command line arguments.
-    
+
     Returns:
         None. Executes the CLI.
     """
