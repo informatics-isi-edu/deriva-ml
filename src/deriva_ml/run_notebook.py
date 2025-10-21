@@ -9,6 +9,7 @@ import nbformat
 import papermill as pm
 import yaml
 from deriva.core import BaseCLI
+from jupyter_client.kernelspec import KernelSpecManager
 from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, Execution, ExecutionConfiguration, MLAsset, Workflow
@@ -43,13 +44,6 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         )
 
         self.parser.add_argument(
-            "--catalog",
-            metavar="<1>",
-            default=1,
-            help="Catalog number. Default 1",
-        )
-
-        self.parser.add_argument(
             "--parameter",
             "-p",
             nargs=2,
@@ -59,7 +53,13 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             help="Provide a parameter name and value to inject into the notebook.",
         )
 
-        self.parser.add_argument("--kernel", "-k", nargs=1, help="Name of kernel to run..", default=None)
+        self.parser.add_argument(
+            "--kernel",
+            "-k",
+            type=str,
+            help="Name of kernel to run..",
+            default=self._find_kernel_for_venv(),
+        )
 
     @staticmethod
     def _coerce_number(val: str):
@@ -98,26 +98,50 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             print(f"Notebook file must be an ipynb file: {notebook_file.name}.")
             exit(1)
 
-        os.environ["DERIVA_HOST"] = args.host
-        os.environ["DERIVA_CATALOG"] = args.catalog
-
         # Create a workflow instance for this specific version of the script.
         # Return an existing workflow if one is found.
         notebook_parameters = pm.inspect_notebook(notebook_file)
+
         if args.inspect:
             for param, value in notebook_parameters.items():
                 print(f"{param}:{value['inferred_type_name']}  (default {value['default']})")
             return
         else:
-            notebook_parameters = (
-                {k: v["default"] for k, v in notebook_parameters.items()}
-                | {"host": args.host, "hostname": args.host, "catalog_id": args.catalog, "catalog": args.catalog}
-                | parameters
-            )
-            print(f"Running notebook {notebook_file.name} with parameters:")
-            for param, value in notebook_parameters.items():
-                print(f"  {param}:{value}")
-            self.run_notebook(notebook_file.resolve(), parameters, kernel=args.kernel[0], log=args.log_output)
+            notebook_parameters = {k: v["default"] for k, v in notebook_parameters.items()} | parameters
+            self.run_notebook(notebook_file.resolve(), parameters, kernel=args.kernel, log=args.log_output)
+
+    @staticmethod
+    def _find_kernel_for_venv() -> str | None:
+        """
+        Return the name and spec of an existing Jupyter kernel corresponding
+        to a given Python virtual environment path.
+
+        Parameters
+        ----------
+        venv_path : str
+            Absolute or relative path to the virtual environment.
+
+        Returns
+        -------
+        dict | None
+            The kernel spec (as a dict) if found, or None if not found.
+        """
+        venv = os.environ.get("VIRTUAL_ENV")
+        if not venv:
+            return None
+        venv_path = Path(venv).resolve()
+        ksm = KernelSpecManager()
+        for name, spec in ksm.get_all_specs().items():
+            kernel_json = spec.get("spec", {})
+            argv = kernel_json.get("argv", [])
+            # check for python executable path inside argv
+            for arg in argv:
+                try:
+                    if Path(arg).resolve() == venv_path.joinpath("bin", "python").resolve():
+                        return name
+                except Exception:
+                    continue
+        return None
 
     def run_notebook(self, notebook_file: Path, parameters, kernel=None, log=False):
         url, checksum = Workflow.get_url_and_checksum(Path(notebook_file))
@@ -125,9 +149,9 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
         os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file.as_posix()
         with tempfile.TemporaryDirectory() as tmpdirname:
-            print(f"Running notebook {notebook_file.name} with parameters:")
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
-            os.environ["DERIVA_ML_SAVE_EXECUTION_RID"] = tmpdirname / "execution_rid.json"
+            execution_rid_path = Path(tmpdirname) / "execution_rid.json"
+            os.environ["DERIVA_ML_SAVE_EXECUTION_RID"] = execution_rid_path.as_posix()
             pm.execute_notebook(
                 input_path=notebook_file,
                 output_path=notebook_output,
@@ -136,22 +160,24 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 log_output=log,
             )
             print(f"Notebook output saved to {notebook_output}")
-            catalog_id = execution_rid = None
-            with Path(tmpdirname) / "execution_rid.json" as f:
+            with execution_rid_path.open("r") as f:
                 execution_config = json.load(f)
+
             if not execution_config:
                 print("Execution RID not found.")
                 exit(1)
 
-            ml_instance = DerivaML(
-                hostname=execution_config.hostname, catalog_id=execution_config.atalog_id, working_dir=tmpdirname
-            )
-            workflow_rid = ml_instance.retrieve_rid(execution_rid)["Workflow"]
+            execution_rid = execution_config["execution_rid"]
+            hostname = execution_config["hostname"]
+            catalog_id = execution_config["catalog_id"]
+            workflow_rid = execution_config["workflow_rid"]
+            ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id, working_dir=tmpdirname)
+            workflow_rid = ml_instance.retrieve_rid(execution_config["execution_rid"])["Workflow"]
 
             execution = Execution(
-                configuration=ExecutionConfiguration(workflow=execution_config.workflow_rid),
+                configuration=ExecutionConfiguration(workflow=workflow_rid),
                 ml_object=ml_instance,
-                reload=execution_config.execution_rid,
+                reload=execution_rid,
             )
 
             # Generate an HTML version of the output notebook.
