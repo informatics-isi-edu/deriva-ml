@@ -412,6 +412,7 @@ def asset_file_path(
         "Description",
     }.union(set(DerivaSystemColumns))
     asset_metadata = {c.name for c in asset_table.columns} - asset_columns
+
     if not (asset_metadata >= set(metadata.keys())):
         raise DerivaMLException(f"Metadata {metadata} does not match asset metadata {asset_metadata}")
 

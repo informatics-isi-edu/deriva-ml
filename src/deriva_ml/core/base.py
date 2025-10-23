@@ -15,7 +15,6 @@ from __future__ import annotations  # noqa: I001
 
 # Standard library imports
 from collections import defaultdict
-import getpass
 import logging
 from datetime import datetime
 from itertools import chain
@@ -29,12 +28,7 @@ import requests
 from pydantic import ConfigDict, validate_call
 
 # Deriva imports
-from deriva.core import (
-    DEFAULT_SESSION_CONFIG,
-    format_exception,
-    get_credential,
-    urlquote,
-)
+from deriva.core import DEFAULT_SESSION_CONFIG, format_exception, get_credential, urlquote, init_logging
 
 import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException, _SchemaWrapper as SchemaWrapper
@@ -55,6 +49,7 @@ from deriva_ml.core.definitions import (
     TableDefinition,
     VocabularyTerm,
 )
+from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.exceptions import DerivaMLTableTypeError, DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.dataset.dataset import Dataset
@@ -116,8 +111,10 @@ class DerivaML(Dataset):
         project_name: str | None = None,
         cache_dir: str | Path | None = None,
         working_dir: str | Path | None = None,
+        hydra_runtime_output_dir: str | Path | None = None,
         ml_schema: str = ML_SCHEMA,
         logging_level=logging.WARNING,
+        deriva_logging_level=logging.WARNING,
         credential=None,
         use_minid: bool = True,
         check_auth: bool = True,
@@ -166,12 +163,10 @@ class DerivaML(Dataset):
         self.model = DerivaModel(self.catalog.getCatalogModel(), domain_schema=domain_schema)
 
         # Set up working and cache directories
-        default_workdir = self.__class__.__name__ + "_working"
-        self.working_dir = (
-            Path(working_dir) / getpass.getuser() if working_dir else Path.home() / "deriva-ml"
-        ) / default_workdir
-
+        self.working_dir = DerivaMLConfig.compute_workdir(working_dir)
         self.working_dir.mkdir(parents=True, exist_ok=True)
+        self.hydra_runtime_output_dir = hydra_runtime_output_dir
+
         self.cache_dir = Path(cache_dir) if cache_dir else self.working_dir / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -181,6 +176,11 @@ class DerivaML(Dataset):
         # Set up logging
         self._logger = logging.getLogger("deriva_ml")
         self._logger.setLevel(logging_level)
+
+        # Configure deriva logging level
+        init_logging(deriva_logging_level)
+        logging.getLogger("bagit").setLevel(deriva_logging_level)
+        logging.getLogger("bdbag").setLevel(deriva_logging_level)
 
         # Store instance configuration
         self.host_name = hostname

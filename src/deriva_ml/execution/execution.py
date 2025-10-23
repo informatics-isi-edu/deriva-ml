@@ -41,7 +41,6 @@ from deriva_ml.core.base import DerivaML
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     RID,
-    ExecAssetType,
     ExecMetadataType,
     FileSpec,
     FileUploadState,
@@ -198,7 +197,6 @@ class Execution:
         workflow_rid (RID): RID of the associated workflow.
         status (Status): Current execution status.
         asset_paths (list[AssetFilePath]): Paths to execution assets.
-        parameters (dict): Execution parameters.
         start_time (datetime | None): When execution started.
         stop_time (datetime | None): When execution completed.
 
@@ -206,7 +204,6 @@ class Execution:
         >>> config = ExecutionConfiguration(
         ...     workflow="analysis",
         ...     description="Process samples",
-        ...     parameters={"threshold": 0.5}
         ... )
         >>> with ml.create_execution(config) as execution:
         ...     execution.download_dataset_bag(dataset_spec)
@@ -250,7 +247,6 @@ class Execution:
 
         self.dataset_rids: List[RID] = []
         self.datasets: list[DatasetBag] = []
-        self.parameters = self.configuration.parameters
 
         self._working_dir = self._ml_object.working_dir
         self._cache_dir = self._ml_object.cache_dir
@@ -292,9 +288,18 @@ class Execution:
                 ]
             )[0]["RID"]
 
-        if isinstance(self.configuration.workflow, Workflow) and self.configuration.workflow.is_notebook:
-            # Put execution_rid into the cell output so we can find it later.
-            display(Markdown(f"Execution RID: {self._ml_object.cite(self.execution_rid)}"))
+        if rid_path := os.environ.get("DERIVA_ML_SAVE_EXECUTION_RID", None):
+            # Put execution_rid into the provided file path so we can find it later.
+            with Path(rid_path).open("w") as f:
+                json.dump(
+                    {
+                        "hostname": self._ml_object.host_name,
+                        "catalog_id": self._ml_object.catalog_id,
+                        "workflow_rid": self.workflow_rid,
+                        "execution_rid": self.execution_rid,
+                    },
+                    f,
+                )
 
         # Create a directory for execution rid so we can recover the state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)
@@ -302,12 +307,27 @@ class Execution:
 
     def _save_runtime_environment(self):
         runtime_env_path = self.asset_file_path(
-            "Execution_Metadata",
-            f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            ExecMetadataType.runtime_env.value,
+            asset_name="Execution_Metadata",
+            file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            asset_types=ExecMetadataType.runtime_env.value,
         )
         with Path(runtime_env_path).open("w") as fp:
             json.dump(get_execution_environment(), fp)
+
+    def _upload_hydra_config_assets(self):
+        """Upload hydra assets to the catalog."""
+        hydra_runtime_output_dir = self._ml_object.hydra_runtime_output_dir
+        if hydra_runtime_output_dir:
+            timestamp = hydra_runtime_output_dir.parts[-1]
+            for hydra_asset in hydra_runtime_output_dir.rglob("*"):
+                if hydra_asset.is_dir():
+                    continue
+                asset = self.asset_file_path(
+                    asset_name=MLAsset.execution_metadata,
+                    file_name=hydra_runtime_output_dir / hydra_asset,
+                    rename_file=f"hydra-{timestamp}-{hydra_asset.name}",
+                    asset_types=ExecMetadataType.execution_config.value,
+                )
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution by a configuration in the Execution_Metadata table.
@@ -354,9 +374,9 @@ class Execution:
         # Save configuration details for later upload
         if not reload:
             cfile = self.asset_file_path(
-                MLAsset.execution_metadata,
-                "configuration.json",
-                ExecMetadataType.execution_config.value,
+                asset_name=MLAsset.execution_metadata,
+                file_name="configuration.json",
+                asset_types=ExecMetadataType.execution_config.value,
             )
             with Path(cfile).open("w", encoding="utf-8") as config_file:
                 json.dump(self.configuration.model_dump(), config_file)
@@ -364,24 +384,18 @@ class Execution:
             lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
             if lock_file.exists():
                 _ = self.asset_file_path(
-                    MLAsset.execution_metadata,
-                    lock_file,
-                    ExecMetadataType.execution_config.value,
+                    asset_name=MLAsset.execution_metadata,
+                    file_name=lock_file,
+                    asset_types=ExecMetadataType.execution_config.value,
                 )
 
-            for parameter_file in self.configuration.parameters:
-                self.asset_file_path(
-                    MLAsset.execution_asset,
-                    parameter_file,
-                    ExecAssetType.input_file.value,
-                )
+            self._upload_hydra_config_assets()
 
             # save runtime env
             self._save_runtime_environment()
 
             # Now upload the files so we have the info in case the execution fails.
             self.uploaded_assets = self._upload_execution_dirs()
-
         self.start_time = datetime.now()
         self.update_status(Status.pending, "Initialize status finished.")
 
@@ -856,6 +870,7 @@ class Execution:
         file_name: str | Path,
         asset_types: list[str] | str | None = None,
         copy_file=False,
+        rename_file: str | None = None,
         **kwargs,
     ) -> AssetFilePath:
         """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
@@ -875,6 +890,8 @@ class Execution:
             asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
             file_name: Name of file to be uploaded.
             asset_types: Type of asset to be uploaded.  Defaults to the name of the asset.
+            copy_file: Whether to copy the file rather than creating a symbolic link.
+            rename_file: If provided, the file will be renamed to this name if the file already exists..
             **kwargs: Any additional metadata values that may be part of the asset table.
 
         Returns:
@@ -893,12 +910,15 @@ class Execution:
         for t in asset_types:
             self._ml_object.lookup_term(MLVocab.asset_type, t)
 
+        # Determine if we will need to rename an existing file as the asset.
         file_name = Path(file_name)
+        target_name = Path(rename_file) if file_name.exists() and rename_file else file_name
+
         asset_path = asset_file_path(
             prefix=self._working_dir,
             exec_rid=self.execution_rid,
             asset_table=self._model.name_to_table(asset_name),
-            file_name=file_name.name,
+            file_name=target_name.name,
             metadata=kwargs,
         )
 
@@ -914,12 +934,12 @@ class Execution:
 
         # Persist the asset types into a file
         with Path(asset_type_path(self._working_dir, self.execution_rid, asset_table)).open("a") as asset_type_file:
-            asset_type_file.write(json.dumps({file_name.name: asset_types}) + "\n")
+            asset_type_file.write(json.dumps({target_name.name: asset_types}) + "\n")
 
         return AssetFilePath(
             asset_path=asset_path,
             asset_name=asset_name,
-            file_name=file_name.name,
+            file_name=target_name.name,
             asset_metadata=kwargs,
             asset_types=asset_types,
         )

@@ -22,7 +22,8 @@ dependencies = [
     "nbstripout",
     "papermill",
     "pandas-stubs==2.2.3.250527",
-    "pyyaml"
+    "pyyaml",
+    "hydra_zen",
 ]
 
 [project.scripts]
