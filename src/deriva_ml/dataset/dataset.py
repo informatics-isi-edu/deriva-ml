@@ -285,16 +285,20 @@ class Dataset:
             versions = [h.dataset_version for h in history]
             return max(versions) if versions else DatasetVersion(0, 1, 0)
 
-    def denormalize(self, dataset_rid: RID, columns: list[str]) -> list[tuple]:
+    def denormalize(self, dataset_rid: RID) -> list[tuple]:
         """Normalize a dataset_rid to a string."""
-        dataset_path = (
-            self._model.catalog.getPathBuilder()
-            .schemas[self._dataset_table.schema.name]
-            .tables[self._dataset_table.name]
-        )
-        return dataset_path.denormalize(context_name=None,
-                                 heuristic=self._denomalize_dataset,
-                                 groupkey_name='RID')
+        paths = self._collect_paths(dataset_rid)
+        pb = self._model.catalog.getPathBuilder()
+        ml_path = pb.schemas[self._ml_schema]
+        domain_path = pb.schemas[self._domain_schema]
+        schema_path = self._model.catalog.getPathBuilder().schemas[self._dataset_table.schema.name]
+        domain_schemas = schema_path.tables["Domain"].entities().fetch()
+        dataset_path = schema_path.tables[self._dataset_table.name]
+        print(schema_path.tables)
+        target_table = schema_path.tables["Subject"]
+        target_path = dataset_path.link(target_table)
+        print(target_path)
+        return target_path.denormalize(context_name=None, heuristic=self._denormalize_dataset, groupkey_name="RID")
 
     def _denormalize_dataset(self, path, include_whole_entities=True):
         """Generates a denormalized form of the table expressed in a visible columns specification.
@@ -360,10 +364,6 @@ class Dataset:
                 )
 
         return vizcols
-
-    def simple_denormalization(self, path):
-        """A simple heuristic denormalization."""
-        return self._datapath_generate_simple_denormalization(path)
 
     def simple_denormalization_with_whole_entities(self, path):
         """A simple heuristic denormalization with related and associated entities."""
