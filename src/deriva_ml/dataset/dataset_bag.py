@@ -333,6 +333,38 @@ class DatasetBag:
         # Term not found
         raise DerivaMLInvalidTerm(vocab_table, term_name)
 
+    def denormalize_table(self, table: str | Table) -> pd.DataFrame:
+        table_name = self.model.normalize_table_name(table)
+
+        def column_name(col: Column) -> str:
+            return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
+
+        table_paths = [path[2:] for path in self.model._schema_to_paths() if len(path) > 2 and path[2].name == table]
+
+        #        denomalize_paths = [
+        #           (
+        #              [f'"{self.model.normalize_table_name(t.name)}"' for t in p[2:]],
+        #             [self.model._table_relationship(t1, t2) for t1, t2 in zip(p[2:], p[3:])],
+        #        )
+        #       for path in table_paths[1:]
+        #  ]
+
+        tables = {}
+        for path in table_paths:
+            for left, right in zip(path[0:], path[1:]):
+                tables.setdefault(self.model.normalize_table_name(right.name), set()).add(
+                    self.model._table_relationship(left, right)
+                )
+        print(tables)
+        sql_statement = f'SELECT * FROM "{table_name}"'
+        for t, on in tables.items():
+            sql_statement += f' LEFT JOIN "{t}" ON '
+            sql_statement += " AND ".join([f"{column_name(o[0])} = {column_name(o[1])}" for o in on])
+
+        print(sql_statement)
+        with self.database as dbase:
+            return dbase.execute(sql_statement).fetchall()
+
 
 # Add annotations after definition to deal with forward reference issues in pydantic
 
