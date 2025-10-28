@@ -9,7 +9,7 @@ import sqlite3
 # Standard library imports
 from collections import defaultdict
 from copy import copy
-from graphlib import TopologicalSorter
+from graphlib import CycleError, TopologicalSorter
 from typing import TYPE_CHECKING, Any, Generator, Iterable, cast
 
 import deriva.core.datapath as datapath
@@ -338,37 +338,62 @@ class DatasetBag:
         def column_name(col: Column) -> str:
             return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
 
-        table_paths = [path[2:] for path in self.model._schema_to_paths() if len(path) > 2 and path[2].name == table]
-
+        table_paths = self.model._schema_to_paths()
+        skip_columns = {"RCT", "RMT", "RCB", "RMB"}
         tables = {}
         graph = {}
+
         for path in table_paths:
             for left, right in zip(path[0:], path[1:]):
+                graph.setdefault(left.name, set()).add(right.name)
+
+        graph_has_cycles = True
+        join_tables = []
+        while graph_has_cycles:
+            try:
+                ts = TopologicalSorter(graph)
+                join_tables = list(reversed(list(ts.static_order())))
+                graph_has_cycles = False
+            except CycleError as e:
+                cycle_nodes = e.args[1]
+                if len(cycle_nodes) > 3:
+                    raise DerivaMLException(f"Unexpected cycle found when denormlizing dataset {cycle_nodes}")
+                # Remove cycle from graph and splice in additional ON constraint.
+                graph[cycle_nodes[1]].remove(cycle_nodes[0])
+
+        # The Dataset_Version table is a special case as it points to dataset and dataset to version.
+        join_tables.remove("Dataset_Version")
+
+        normalized_join_tables = [self.model.normalize_table_name(t) for t in join_tables]
+        for path in table_paths:
+            for left, right in zip(path[0:], path[1:]):
+                if right.name == "Dataset_Version":
+                    # The Dataset_Version table is a special case as it points to dataset and dataset to version.
+                    continue
+                if join_tables.index(right.name) < join_tables.index(left.name):
+                    continue
                 table_relationship = self.model._table_relationship(left, right)
                 tables.setdefault(self.model.normalize_table_name(right.name), set()).add(
                     (column_name(table_relationship[0]), column_name(table_relationship[1]))
                 )
-                graph.setdefault(self.model.normalize_table_name(left.name), set()).add(
-                    self.model.normalize_table_name(right.name)
-                )
 
-        ts = TopologicalSorter(graph)
-        join_tables = list(reversed(list(ts.static_order())))
         with self.database as dbase:
             select_args = [
                 # SQLlite will strip out the table name from the column in the select statement, so we need to add
                 # an explicit alias to the column name.
-                f'"{table_name}"."{c[1]}" AS "{table_name.split(":")[1]}.{c[1]}"'
-                for table_name in join_tables
-                for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()
+                f'"{normalized_table_name}"."{c[1]}" AS "{table_name}.{c[1]}"'
+                for table_name, normalized_table_name in zip(join_tables, normalized_join_tables)
+                if not self.model.is_association(table_name)
+                for c in dbase.execute(f'PRAGMA table_info("{normalized_table_name}")').fetchall()
+                if c[1] not in skip_columns
             ]
 
         # First table in the table list is the table specified in the method call.
-        sql_statement = f'SELECT {",".join(select_args)} FROM "{join_tables[0]}"'
-        for t in join_tables[1:]:
+        sql_statement = f'SELECT {",".join(select_args)} FROM "{normalized_join_tables[0]}"'
+        for t in normalized_join_tables[1:]:
             on = tables[t]
             sql_statement += f' LEFT JOIN "{t}" ON '
-            sql_statement += " AND ".join([f"{o[0]} = {o[1]}" for o in on])
+            sql_statement += " OR ".join([f"{o[0]} = {o[1]}" for o in on])
         return sql_statement
 
     def denormalize_table_as_dataframe(self, table: str | Table) -> pd.DataFrame:
