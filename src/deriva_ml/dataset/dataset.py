@@ -22,10 +22,11 @@ Typical usage example:
 
 from __future__ import annotations
 
-# Standard library imports
 import json
 import logging
 from collections import defaultdict
+
+# Standard library imports
 from graphlib import TopologicalSorter
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -284,90 +285,6 @@ class Dataset:
             # Ensure we return a DatasetVersion, not a string
             versions = [h.dataset_version for h in history]
             return max(versions) if versions else DatasetVersion(0, 1, 0)
-
-    def denormalize(self, dataset_rid: RID) -> list[tuple]:
-        """Normalize a dataset_rid to a string."""
-        paths = self._collect_paths(dataset_rid)
-        pb = self._model.catalog.getPathBuilder()
-        ml_path = pb.schemas[self._ml_schema]
-        domain_path = pb.schemas[self._domain_schema]
-        schema_path = self._model.catalog.getPathBuilder().schemas[self._dataset_table.schema.name]
-        domain_schemas = schema_path.tables["Domain"].entities().fetch()
-        dataset_path = schema_path.tables[self._dataset_table.name]
-        print(schema_path.tables)
-        target_table = schema_path.tables["Subject"]
-        target_path = dataset_path.link(target_table)
-        print(target_path)
-        return target_path.denormalize(context_name=None, heuristic=self._denormalize_dataset, groupkey_name="RID")
-
-    def _denormalize_dataset(self, path, include_whole_entities=True):
-        """Generates a denormalized form of the table expressed in a visible columns specification.
-
-        :param path: a datapath object
-        :param include_whole_entities: if a denormalization cannot find a 'name' like terminal, include the whole entity (i.e., all attributes), else return just the 'RID'
-        :return: a generated visible columns specification based on a denormalization heuristic
-        """
-        context = path.context
-        table = context._wrapped_table
-
-        fkeys = list(table.foreign_keys)
-        single_column_fkeys = {
-            fkey.foreign_key_columns[0].name: fkey for fkey in table.foreign_keys if len(fkey.foreign_key_columns) == 1
-        }
-
-        def _fkey_to_vizcol(name, fk, inbound=None):
-            # name columns to look for in related tables
-            name_candidates = ["displayname", "preferredname", "fullname", "name", "title", "label"]
-
-            # determine terminal column
-            terminal = "RID"
-            for candidate_col in fk.pk_table.columns:
-                if candidate_col.name.lower().replace(" ", "").replace("_", "") in name_candidates:
-                    terminal = candidate_col.name
-                    break
-
-            # define source path
-            source = [{"outbound": fk.names[0]}, terminal]
-            if inbound:
-                source = [{"inbound": inbound.names[0]}] + source
-
-            # return vizcol spec
-            return {"markdown_name": name, "source": source, "entity": include_whole_entities and terminal == "RID"}
-
-        # assemble the visible column:
-        #  1. column or single column fkeys
-        #  2. all other (outbound fkey) related tables
-        #  3. all associated tables
-        vizcols = []
-        for col in table.column_definitions:
-            if col.name in single_column_fkeys:
-                fkey = single_column_fkeys[col.name]
-                vizcols.append(_fkey_to_vizcol(col.name, fkey))
-                del single_column_fkeys[col.name]
-                fkeys.remove(fkey)
-            else:
-                vizcols.append(col.name)
-
-        for outbound_fkey in fkeys:
-            vizcols.append(_fkey_to_vizcol(outbound_fkey.constraint_name, outbound_fkey))
-
-        for inbound_fkey in table.referenced_by:
-            if inbound_fkey.table.is_association():
-                vizcols.append(
-                    _fkey_to_vizcol(
-                        inbound_fkey.table.name,
-                        inbound_fkey.table.foreign_keys[0]
-                        if inbound_fkey != inbound_fkey.table.foreign_keys[0]
-                        else inbound_fkey.table.foreign_keys[1],
-                        inbound=inbound_fkey,
-                    )
-                )
-
-        return vizcols
-
-    def simple_denormalization_with_whole_entities(self, path):
-        """A simple heuristic denormalization with related and associated entities."""
-        return self._datapath_generate_simple_denormalization(path, include_whole_entities=True)
 
     def _build_dataset_graph(self, dataset_rid: RID) -> Iterable[RID]:
         ts: TopologicalSorter = TopologicalSorter()
