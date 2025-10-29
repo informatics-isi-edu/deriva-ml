@@ -334,15 +334,26 @@ class DatasetBag:
         # Term not found
         raise DerivaMLInvalidTerm(vocab_table, term_name)
 
-    def _denormalize_table(self, table: str | Table) -> str:
+    def _denormalize(self, include_tables: list[str] | None) -> str:
         def column_name(col: Column) -> str:
             return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
 
-        table_paths = self.model._schema_to_paths()
+        def dataset_assoc_table(t: str) -> bool:
+            return t.startswith(f"{self.model.domain_schema}:Dataset_")
+
+        # Skip over tables that we don't want to include in the denormalized dataset.
+        # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
+        # table.
+        include_tables = set(include_tables) if include_tables else set()
+        table_paths = [
+            path
+            for path in self.model._schema_to_paths()
+            if (not include_tables) or include_tables.intersection({p.name for p in path})
+        ]
+
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
         tables = {}
         graph = {}
-
         for path in table_paths:
             for left, right in zip(path[0:], path[1:]):
                 graph.setdefault(left.name, set()).add(right.name)
@@ -362,7 +373,8 @@ class DatasetBag:
                 graph[cycle_nodes[1]].remove(cycle_nodes[0])
 
         # The Dataset_Version table is a special case as it points to dataset and dataset to version.
-        join_tables.remove("Dataset_Version")
+        if "Dataset_Version" in join_tables:
+            join_tables.remove("Dataset_Version")
 
         normalized_join_tables = [self.model.normalize_table_name(t) for t in join_tables]
         for path in table_paths:
@@ -392,16 +404,21 @@ class DatasetBag:
         sql_statement = f'SELECT {",".join(select_args)} FROM "{normalized_join_tables[0]}"'
         for t in normalized_join_tables[1:]:
             on = tables[t]
-            sql_statement += f' LEFT JOIN "{t}" ON '
-            sql_statement += " OR ".join([f"{o[0]} = {o[1]}" for o in on])
+            sql_statement += f' JOIN "{t}" ON ' if dataset_assoc_table(t) else f' LEFT JOIN "{t}" ON '
+            sql_statement += "OR ".join([f"{o[0]} = {o[1]}" for o in on])
+        dataset_rid_list = ",".join(
+            [f'"{self.dataset_rid}"'] + [f'"{b.dataset_rid}"' for b in self.list_dataset_children(recurse=True)]
+        )
+        sql_statement += f'WHERE  "{self.model.normalize_table_name("Dataset")}"."RID" IN ({dataset_rid_list})'
+        print(sql_statement)
         return sql_statement
 
-    def denormalize_table_as_dataframe(self, table: str | Table) -> pd.DataFrame:
-        return pd.read_sql(self._denormalize_table(table), self.database)
+    def denormalize_as_dataframe(self, include_tables: list[str] | None = None) -> pd.DataFrame:
+        return pd.read_sql(self._denormalize(include_tables=include_tables), self.database)
 
-    def denormalize_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+    def denormalize_as_dict(self, include_tables: list[str] | None = None) -> Generator[dict[str, Any], None, None]:
         with self.database as dbase:
-            cursor = dbase.execute(self._denormalize_table(table))
+            cursor = dbase.execute(self._denormalize(include_tables=include_tables))
             columns = [desc[0] for desc in cursor.description]
             for row in cursor:
                 yield dict(zip(columns, row))
