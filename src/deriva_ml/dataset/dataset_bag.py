@@ -461,9 +461,50 @@ class DatasetBag:
         return sql_statement
 
     def denormalize_as_dataframe(self, include_tables: list[str] | None = None) -> pd.DataFrame:
+        """
+        Denormalize the dataset and return the result as a dataframe.
+
+        This routine will examine the domain schema for the dataset, determine which tables to include and denormalize
+        the dataset values into a single wide table.  The result is returned as a dataframe.
+
+        The optional argument include_tables can be used to specify a subset of tables to include in the denormalized
+        view.  The tables in this argument can appear anywhere in the dataset schema.  The method will determine which
+        additional tables are required to complete the denormalization process.  If include_tables is not specified,
+        all of the tables in the schema will be included.
+
+        The resulting wide table will include a column for every table needed to complete the denormalization process.
+
+        Args:
+            include_tables: List of table names to include in the denormalized dataset. If None, than the entire schema
+            is used.
+
+        Returns:
+            Dataframe containing the denormalized dataset.
+        """
         return pd.read_sql(self._denormalize(include_tables=include_tables), self.database)
 
     def denormalize_as_dict(self, include_tables: list[str] | None = None) -> Generator[dict[str, Any], None, None]:
+        """
+        Denormalize the dataset and return the result as a set of dictionarys.
+
+        This routine will examine the domain schema for the dataset, determine which tables to include and denormalize
+        the dataset values into a single wide table.  The result is returned as a generateor that returns a dictionary
+        for each row in the denormlized wide table.
+
+        The optional argument include_tables can be used to specify a subset of tables to include in the denormalized
+        view.  The tables in this argument can appear anywhere in the dataset schema.  The method will determine which
+        additional tables are required to complete the denormalization process.  If include_tables is not specified,
+        all of the tables in the schema will be included.
+
+        The resulting wide table will include a column for every table needed to complete the denormalization process.
+
+        Args:
+            include_tables: List of table names to include in the denormalized dataset. If None, than the entire schema
+            is used.
+
+        Returns:
+            A generator that returns a dictionary representation of each row in the denormalized dataset.
+        """
         with self.database as dbase:
             cursor = dbase.execute(self._denormalize(include_tables=include_tables))
             columns = [desc[0] for desc in cursor.description]
