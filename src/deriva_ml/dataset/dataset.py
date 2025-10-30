@@ -22,10 +22,11 @@ Typical usage example:
 
 from __future__ import annotations
 
-# Standard library imports
 import json
 import logging
 from collections import defaultdict
+
+# Standard library imports
 from graphlib import TopologicalSorter
 from pathlib import Path
 from tempfile import TemporaryDirectory
