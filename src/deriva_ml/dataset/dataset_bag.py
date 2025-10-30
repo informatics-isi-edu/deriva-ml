@@ -267,6 +267,26 @@ class DatasetBag:
             sql_cmd = f'SELECT * FROM "{feature_table}"'
             return cast(datapath._ResultSet, [dict(zip(col_names, r)) for r in db.execute(sql_cmd).fetchall()])
 
+    def list_dataset_element_types(self) -> list[Table]:
+        """
+        Lists the data types of elements contained within a dataset.
+
+        This method analyzes the dataset and identifies the data types for all
+        elements within it. It is useful for understanding the structure and
+        content of the dataset and allows for better manipulation and usage of its
+        data.
+
+        Returns:
+            list[str]: A list of strings where each string represents a data type
+            of an element found in the dataset.
+
+        """
+
+        def domain_table(table: Table) -> bool:
+            return table.schema.name == self.model.domain_schema or table.name == self._dataset_table.name
+
+        return [t for a in self._dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
+
     def list_dataset_children(self, recurse: bool = False) -> list[DatasetBag]:
         """Get nested datasets.
 
@@ -335,21 +355,39 @@ class DatasetBag:
         raise DerivaMLInvalidTerm(vocab_table, term_name)
 
     def _denormalize(self, include_tables: list[str] | None) -> str:
+        """
+        Generates an SQL statement for denormalizing the dataset based on the tables to include. Processes cycles in
+        graph relationships, ensures proper join order, and generates selected columns for denormalization.
+
+        Args:
+            include_tables (list[str] | None): List of table names to include in the denormalized dataset. If None,
+                all tables from the dataset will be included.
+
+        Returns:
+            str: SQL query string that represents the process of denormalization.
+        """
+
         def column_name(col: Column) -> str:
             return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
-
-        def dataset_assoc_table(t: str) -> bool:
-            return t.startswith(f"{self.model.domain_schema}:Dataset_")
 
         # Skip over tables that we don't want to include in the denormalized dataset.
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
         # table.
         include_tables = set(include_tables) if include_tables else set()
+        for t in include_tables:
+            # Check to make sure the table is in the catalog.
+            _ = self.model.normalize_table_name(t)
+
         table_paths = [
             path
             for path in self.model._schema_to_paths()
             if (not include_tables) or include_tables.intersection({p.name for p in path})
         ]
+
+        # Get the names of all of the tables that can be dataset elements.
+        dataset_element_tables = {
+            e.name for e in self.list_dataset_element_types() if e.schema.name == self.model.domain_schema
+        }
 
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
         tables = {}
@@ -358,6 +396,10 @@ class DatasetBag:
             for left, right in zip(path[0:], path[1:]):
                 graph.setdefault(left.name, set()).add(right.name)
 
+        # New lets remove any cycles that we may have in the graph.
+        # We will use a topological sort to find the order in which we need to join the tables.
+        # If we find a cycle, we will remove the table from the graph and splice in an additional ON clause.
+        # We will then repeat the process until there are no cycles.
         graph_has_cycles = True
         join_tables = []
         while graph_has_cycles:
@@ -404,13 +446,18 @@ class DatasetBag:
         sql_statement = f'SELECT {",".join(select_args)} FROM "{normalized_join_tables[0]}"'
         for t in normalized_join_tables[1:]:
             on = tables[t]
-            sql_statement += f' JOIN "{t}" ON ' if dataset_assoc_table(t) else f' LEFT JOIN "{t}" ON '
+            sql_statement += f' LEFT JOIN "{t}" ON '
             sql_statement += "OR ".join([f"{o[0]} = {o[1]}" for o in on])
+
+        # Select only rows from the datasets you wish to include.
         dataset_rid_list = ",".join(
             [f'"{self.dataset_rid}"'] + [f'"{b.dataset_rid}"' for b in self.list_dataset_children(recurse=True)]
         )
         sql_statement += f'WHERE  "{self.model.normalize_table_name("Dataset")}"."RID" IN ({dataset_rid_list})'
-        print(sql_statement)
+
+        # Only include rows that have actual values in them.
+        real_row = [f'"{self.model.normalize_table_name(t)}".RID IS NOT NULL ' for t in dataset_element_tables]
+        sql_statement += f" AND ({' OR '.join(real_row)})"
         return sql_statement
 
     def denormalize_as_dataframe(self, include_tables: list[str] | None = None) -> pd.DataFrame:
