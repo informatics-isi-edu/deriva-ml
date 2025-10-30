@@ -302,7 +302,9 @@ class DerivaModel:
             [(fk.referenced_columns[0], fk.foreign_key_columns[0]) for fk in table1.referenced_by if fk.table == table2]
         )
         if len(relationships) != 1:
-            raise DerivaMLException(f"Ambiguous linkage between {table1.name} and {table2.name}")
+            raise DerivaMLException(
+                f"Ambiguous linkage between {table1.name} and {table2.name}: {[(r[0].name, r[1].name) for r in relationships]}"
+            )
         return relationships[0]
 
     def _schema_to_paths(
