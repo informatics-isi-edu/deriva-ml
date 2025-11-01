@@ -24,6 +24,7 @@ dependencies = [
     "pandas-stubs==2.2.3.250527",
     "pyyaml",
     "hydra_zen",
+    "SQLAlchemy"
 ]
 
 [project.scripts]
