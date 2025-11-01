@@ -9,7 +9,6 @@ import sqlite3
 # Standard library imports
 from collections import defaultdict
 from copy import copy
-from graphlib import CycleError, TopologicalSorter
 from typing import TYPE_CHECKING, Any, Generator, Iterable, cast
 
 import deriva.core.datapath as datapath
@@ -281,11 +280,7 @@ class DatasetBag:
             of an element found in the dataset.
 
         """
-
-        def domain_table(table: Table) -> bool:
-            return table.schema.name == self.model.domain_schema or table.name == self._dataset_table.name
-
-        return [t for a in self._dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
+        return self.model.list_dataset_element_types()
 
     def list_dataset_children(self, recurse: bool = False) -> list[DatasetBag]:
         """Get nested datasets.
@@ -373,86 +368,28 @@ class DatasetBag:
         # Skip over tables that we don't want to include in the denormalized dataset.
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
         # table.
-        include_tables = set(include_tables) if include_tables else set()
-        for t in include_tables:
-            # Check to make sure the table is in the catalog.
-            _ = self.model.normalize_table_name(t)
 
-        table_paths = [
-            path
-            for path in self.model._schema_to_paths()
-            if (not include_tables) or include_tables.intersection({p.name for p in path})
+        join_tables, tables, denormalized_columns, dataset_rids, dataset_element_tables = (
+            self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
+        )
+
+        select_args = [
+            # SQLlite will strip out the table name from the column in the select statement, so we need to add
+            # an explicit alias to the column name.
+            f'"{self.model.normalize_table_name(table_name)}"."{column_name}" AS "{table_name}.{column_name}"'
+            for table_name, column_name in denormalized_columns
         ]
 
-        # Get the names of all of the tables that can be dataset elements.
-        dataset_element_tables = {
-            e.name for e in self.list_dataset_element_types() if e.schema.name == self.model.domain_schema
-        }
-
-        skip_columns = {"RCT", "RMT", "RCB", "RMB"}
-        tables = {}
-        graph = {}
-        for path in table_paths:
-            for left, right in zip(path[0:], path[1:]):
-                graph.setdefault(left.name, set()).add(right.name)
-
-        # New lets remove any cycles that we may have in the graph.
-        # We will use a topological sort to find the order in which we need to join the tables.
-        # If we find a cycle, we will remove the table from the graph and splice in an additional ON clause.
-        # We will then repeat the process until there are no cycles.
-        graph_has_cycles = True
-        join_tables = []
-        while graph_has_cycles:
-            try:
-                ts = TopologicalSorter(graph)
-                join_tables = list(reversed(list(ts.static_order())))
-                graph_has_cycles = False
-            except CycleError as e:
-                cycle_nodes = e.args[1]
-                if len(cycle_nodes) > 3:
-                    raise DerivaMLException(f"Unexpected cycle found when denormlizing dataset {cycle_nodes}")
-                # Remove cycle from graph and splice in additional ON constraint.
-                graph[cycle_nodes[1]].remove(cycle_nodes[0])
-
-        # The Dataset_Version table is a special case as it points to dataset and dataset to version.
-        if "Dataset_Version" in join_tables:
-            join_tables.remove("Dataset_Version")
-
-        normalized_join_tables = [self.model.normalize_table_name(t) for t in join_tables]
-        for path in table_paths:
-            for left, right in zip(path[0:], path[1:]):
-                if right.name == "Dataset_Version":
-                    # The Dataset_Version table is a special case as it points to dataset and dataset to version.
-                    continue
-                if join_tables.index(right.name) < join_tables.index(left.name):
-                    continue
-                table_relationship = self.model._table_relationship(left, right)
-                tables.setdefault(self.model.normalize_table_name(right.name), set()).add(
-                    (column_name(table_relationship[0]), column_name(table_relationship[1]))
-                )
-
-        with self.database as dbase:
-            select_args = [
-                # SQLlite will strip out the table name from the column in the select statement, so we need to add
-                # an explicit alias to the column name.
-                f'"{normalized_table_name}"."{c[1]}" AS "{table_name}.{c[1]}"'
-                for table_name, normalized_table_name in zip(join_tables, normalized_join_tables)
-                if not self.model.is_association(table_name)
-                for c in dbase.execute(f'PRAGMA table_info("{normalized_table_name}")').fetchall()
-                if c[1] not in skip_columns
-            ]
-
         # First table in the table list is the table specified in the method call.
+        normalized_join_tables = [self.model.normalize_table_name(t) for t in join_tables]
         sql_statement = f'SELECT {",".join(select_args)} FROM "{normalized_join_tables[0]}"'
         for t in normalized_join_tables[1:]:
             on = tables[t]
             sql_statement += f' LEFT JOIN "{t}" ON '
-            sql_statement += "OR ".join([f"{o[0]} = {o[1]}" for o in on])
+            sql_statement += "OR ".join([f"{column_name(o[0])} = {column_name(o[1])}" for o in on])
 
         # Select only rows from the datasets you wish to include.
-        dataset_rid_list = ",".join(
-            [f'"{self.dataset_rid}"'] + [f'"{b.dataset_rid}"' for b in self.list_dataset_children(recurse=True)]
-        )
+        dataset_rid_list = ",".join([f'"{self.dataset_rid}"'] + [f'"{b.dataset_rid}"' for b in dataset_rids])
         sql_statement += f'WHERE  "{self.model.normalize_table_name("Dataset")}"."RID" IN ({dataset_rid_list})'
 
         # Only include rows that have actual values in them.

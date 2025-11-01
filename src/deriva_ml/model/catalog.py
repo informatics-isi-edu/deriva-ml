@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # Standard library imports
 from collections import Counter
+from graphlib import CycleError, TopologicalSorter
 from typing import Any, Callable, Final, Iterable, NewType, TypeAlias
 
 from deriva.core.ermrest_catalog import ErmrestCatalog
@@ -21,10 +22,12 @@ from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import (
     ML_SCHEMA,
+    RID,
     DerivaAssetColumns,
     TableDefinition,
 )
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
+from deriva_ml.dataset import DatasetLike
 
 # Local imports
 from deriva_ml.feature import Feature
@@ -286,6 +289,113 @@ class DerivaModel:
             raise DerivaMLException("Cannot apply() to non-catalog model.")
         else:
             self.model.apply()
+
+    def list_dataset_element_types(self) -> list[Table]:
+        """
+        Lists the data types of elements contained within a dataset.
+
+        This method analyzes the dataset and identifies the data types for all
+        elements within it. It is useful for understanding the structure and
+        content of the dataset and allows for better manipulation and usage of its
+        data.
+
+        Returns:
+            list[str]: A list of strings where each string represents a data type
+            of an element found in the dataset.
+
+        """
+
+        dataset_table = self.name_to_table("Dataset")
+
+        def domain_table(table: Table) -> bool:
+            return table.schema.name == self.domain_schema or table.name == dataset_table.name
+
+        return [t for a in dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
+
+    def _prepare_wide_table(self, dataset: DatasetLike, dataset_rid: RID, include_tables: list[str] | None) -> tuple:
+        """
+        Generates details of a wide table from the model
+
+        Args:
+            include_tables (list[str] | None): List of table names to include in the denormalized dataset. If None,
+                all tables from the dataset will be included.
+
+        Returns:
+            str: SQL query string that represents the process of denormalization.
+        """
+
+        # Skip over tables that we don't want to include in the denormalized dataset.
+        # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
+        # table.
+        include_tables = set(include_tables) if include_tables else set()
+        for t in include_tables:
+            # Check to make sure the table is in the catalog.
+            _ = self.name_to_table(t)
+
+        table_paths = [
+            path
+            for path in self._schema_to_paths()
+            if (not include_tables) or include_tables.intersection({p.name for p in path})
+        ]
+
+        # Get the names of all of the tables that can be dataset elements.
+        dataset_element_tables = {
+            e.name for e in self.list_dataset_element_types() if e.schema.name == self.domain_schema
+        }
+
+        skip_columns = {"RCT", "RMT", "RCB", "RMB"}
+        tables = {}
+        graph = {}
+        for path in table_paths:
+            for left, right in zip(path[0:], path[1:]):
+                graph.setdefault(left.name, set()).add(right.name)
+
+        # New lets remove any cycles that we may have in the graph.
+        # We will use a topological sort to find the order in which we need to join the tables.
+        # If we find a cycle, we will remove the table from the graph and splice in an additional ON clause.
+        # We will then repeat the process until there are no cycles.
+        graph_has_cycles = True
+        join_tables = []
+        while graph_has_cycles:
+            try:
+                ts = TopologicalSorter(graph)
+                join_tables = list(reversed(list(ts.static_order())))
+                graph_has_cycles = False
+            except CycleError as e:
+                cycle_nodes = e.args[1]
+                if len(cycle_nodes) > 3:
+                    raise DerivaMLException(f"Unexpected cycle found when normalizing dataset {cycle_nodes}")
+                # Remove cycle from graph and splice in additional ON constraint.
+                graph[cycle_nodes[1]].remove(cycle_nodes[0])
+
+        # The Dataset_Version table is a special case as it points to dataset and dataset to version.
+        if "Dataset_Version" in join_tables:
+            join_tables.remove("Dataset_Version")
+
+        for path in table_paths:
+            for left, right in zip(path[0:], path[1:]):
+                if right.name == "Dataset_Version":
+                    # The Dataset_Version table is a special case as it points to dataset and dataset to version.
+                    continue
+                if join_tables.index(right.name) < join_tables.index(left.name):
+                    continue
+                table_relationship = self._table_relationship(left, right)
+                tables.setdefault(self.normalize_table_name(right.name), set()).add(
+                    (table_relationship[0], table_relationship[1])
+                )
+
+        # Get the list of columns that will appear in the final denormalized dataset.
+        denormalized_columns = [
+            (table_name, c.name)
+            for table_name in join_tables
+            if not self.is_association(table_name)  # Don't include association columns in the denormalized view.'
+            for c in self.name_to_table(table_name).columns
+            if c.name not in skip_columns
+        ]
+
+        # List of dataset ids to include in the denormalized view.
+        dataset_rids = dataset.list_dataset_children(recurse=True)
+        return join_tables, tables, denormalized_columns, dataset_rids, dataset_element_tables
 
     def _table_relationship(
         self,

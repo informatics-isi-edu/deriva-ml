@@ -226,7 +226,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
           indexes: A tuple whose first element is the column index of the file name and whose second element
         is the index of the URL in an asset table.  Tuple is None if table is not an asset table.
           o: list:
-          indexes: Optional[tuple[int: int]]:
+          indexes: Optional[tuple[int, int]]:
 
         Returns:
           Tuple of updated column values.
@@ -262,7 +262,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             DatasetBag object for the specified dataset.
         """
         if dataset_rid and dataset_rid not in self.bag_rids:
-            DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
+            raise DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
         return DatasetBag(self, dataset_rid or self.dataset_rid)
 
     def dataset_version(self, dataset_rid: Optional[RID] = None) -> DatasetVersion:
