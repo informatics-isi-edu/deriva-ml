@@ -312,7 +312,7 @@ class DerivaModel:
 
         return [t for a in dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
 
-    def _prepare_wide_table(self, dataset: DatasetLike, dataset_rid: RID, include_tables: list[str] | None) -> tuple:
+    def _prepare_wide_table(self, dataset, dataset_rid: RID, include_tables: list[str] | None) -> tuple:
         """
         Generates details of a wide table from the model
 

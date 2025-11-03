@@ -4,8 +4,6 @@ The module implements the sqllite interface to a set of directories representing
 
 from __future__ import annotations
 
-import sqlite3
-
 # Standard library imports
 from collections import defaultdict
 from copy import copy
@@ -19,6 +17,7 @@ import pandas as pd
 # Deriva imports
 from deriva.core.ermrest_model import Column, Table
 from pydantic import ConfigDict, validate_call
+from sqlalchemy import Engine
 
 # Local imports
 from deriva_ml.core.definitions import RID, VocabularyTerm
@@ -64,7 +63,7 @@ class DatasetBag:
             dataset_rid: Optional RID for the dataset.
         """
         self.model = database_model
-        self.database = cast(sqlite3.Connection, self.model.dbase)
+        self.engine = cast(Engine, self.model.engine)
 
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         if not self.dataset_rid:
