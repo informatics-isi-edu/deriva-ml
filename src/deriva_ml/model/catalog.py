@@ -27,10 +27,10 @@ from deriva_ml.core.definitions import (
     TableDefinition,
 )
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
-from deriva_ml.dataset import DatasetLike
 
 # Local imports
 from deriva_ml.feature import Feature
+from deriva_ml.protocols.dataset import DatasetLike
 
 try:
     from icecream import ic

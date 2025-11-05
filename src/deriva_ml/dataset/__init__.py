@@ -15,8 +15,3 @@ __all__ = [
     "DatasetVersion",
     "VersionPart",
 ]
-
-
-@runtime_checkable
-class DatasetLike(Protocol):
-    def list_dataset_children(self, dataset_rid: RID, recurse: bool = False) -> list[RID]: ...
