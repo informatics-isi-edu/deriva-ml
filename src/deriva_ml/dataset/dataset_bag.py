@@ -14,12 +14,14 @@ import deriva.core.datapath as datapath
 # Third-party imports
 import pandas as pd
 
-# Deriva imports
-from deriva.core.ermrest_model import Column, Table
-from pydantic import ConfigDict, validate_call
-from sqlalchemy import Engine
-
 # Local imports
+from deriva.core.ermrest_model import Column, Table
+
+# Deriva imports
+from pydantic import ConfigDict, validate_call
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
+
 from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
 from deriva_ml.feature import Feature
@@ -64,6 +66,7 @@ class DatasetBag:
         """
         self.model = database_model
         self.engine = cast(Engine, self.model.engine)
+        self.metadata = self.model.metadata
 
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         if not self.dataset_rid:
@@ -88,15 +91,47 @@ class DatasetBag:
     def _dataset_table_view(self, table: str) -> str:
         """Return a SQL command that will return all of the elements in the specified table that are associated with
         dataset_rid"""
+        table_class = self.model.get_orm_class_by_name(table)
+        dataset_table_class = self.model.get_orm_class_by_name(self._dataset_table.name)
+
+        paths = [[t.name for t in p] for p in self.model._schema_to_paths() if p[-1].name == table]
+        # select.where(dataset_class.dataset_rid in [c.rid for c in self.list_dataset_children(recurse=True)])
+        print(paths)
+        sql_cmd = None
+        for path in paths:
+            path_sql = select(table_class)
+            for t in path:
+                print("Adding ", t, " to path sql", self.model.get_orm_class_by_name(t))
+                path_sql.join(self.model.get_orm_class_by_name(t))
+                print(path_sql)
+            if sql_cmd:
+                sql_cmd.union(path_sql)
+            else:
+                sql_cmd = path_sql
+        return sql_cmd
+        # for ts, on in paths:
+        #    tables = " JOIN ".join(ts)
+        #    on_expression = " and ".join([f"{column_name(left)}={column_name(right)}" for left, right in on])
+        #    sql.append(
+        #        f"SELECT {select_args} FROM {tables} "
+        #        f"{'ON ' + on_expression if on_expression else ''} "
+        #        f"WHERE {dataset_table_name}.RID IN ({datasets})"
+        #    )
+        #    if table_name == self.model.normalize_table_name(self._dataset_table.name):
+        #        sql.append(
+        #            f"SELECT {select_args} FROM {dataset_table_name} WHERE {dataset_table_name}.RID IN ({datasets})"
+        #        )
+        # sql = " UNION ".join(sql) if len(sql) > 1 else sql[0]
+        # return sql
 
         table_name = self.model.normalize_table_name(table)
 
         # Get the names of the columns in the table.
+
         with self.database as dbase:
             select_args = ",".join(
                 [f'"{table_name}"."{c[1]}"' for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
             )
-
         # Get the list of datasets in the bag including the dataset itself.
         datasets = ",".join(
             [f'"{self.dataset_rid}"'] + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
@@ -290,18 +325,18 @@ class DatasetBag:
         Returns:
             List of child dataset bags.
         """
-        ds_table = self.model.normalize_table_name("Dataset")
-        nds_table = self.model.normalize_table_name("Dataset_Dataset")
-        dv_table = self.model.normalize_table_name("Dataset_Version")
-        with self.database as db:
+        ds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset")
+        nds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Dataset")
+        dv_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Version")
+
+        with Session(self.engine) as session:
             sql_cmd = (
-                f'SELECT  "{nds_table}".Nested_Dataset, "{dv_table}".Version '
-                f'FROM "{nds_table}" JOIN "{dv_table}" JOIN "{ds_table}" on '
-                f'"{ds_table}".Version == "{dv_table}".RID AND '
-                f'"{nds_table}".Nested_Dataset == "{ds_table}".RID '
-                f'where "{nds_table}".Dataset == "{self.dataset_rid}"'
+                select(nds_table.Nested_Dataset, dv_table.Version)
+                .join_from(ds_table, nds_table, onclause=ds_table.RID == nds_table.Nested_Dataset)
+                .join_from(ds_table, dv_table, onclause=ds_table.Version == dv_table.RID)
+                .where(nds_table.Dataset == self.dataset_rid)
             )
-            nested = [DatasetBag(self.model, r[0]) for r in db.execute(sql_cmd).fetchall()]
+            nested = [DatasetBag(self.model, r[0]) for r in session.execute(sql_cmd).all()]
 
         result = copy(nested)
         if recurse:
