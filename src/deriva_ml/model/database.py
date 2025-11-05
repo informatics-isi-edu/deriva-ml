@@ -33,7 +33,7 @@ from sqlalchemy import ForeignKeyConstraint as SQLForeignKeyConstraint
 from sqlalchemy import Table as SQLTable
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import configure_mappers, relationship
+from sqlalchemy.orm import backref, configure_mappers, foreign, relationship
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import TypeDecorator
 
@@ -193,6 +193,17 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         def is_key(column: DerivaColumn, table: DerivaTable) -> bool:
             return column in [key.unique_columns[0] for key in table.keys]
 
+        def col(model, name: str):
+            # try ORM attribute first
+            try:
+                return getattr(model, name)
+            except AttributeError:
+                # fall back to exact DB column key on the Table
+                return model.__table__.c[name]
+
+        def guess_attr_name(col_name: str) -> str:
+            return col_name[:-3] if col_name.lower().endswith("_id") else col_name
+
         database_tables: list[SQLTable] = []
         for schema_name in [self.domain_schema, self.ml_schema]:
             for table in self.model.schemas[schema_name].tables.values():
@@ -229,31 +240,39 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             self.metadata.create_all(conn, tables=database_tables)
 
         # Now build ORM mappings for the tables.
-        self.Base.prepare(autoload_with=self.engine)
+        self.Base.prepare(self.engine, reflect=True)
         for schema in [self.domain_schema, self.ml_schema]:
             for table in self.model.schemas[schema].tables.values():
                 for fk in table.foreign_keys:
                     if fk.pk_table.schema.name not in [self.domain_schema, self.ml_schema]:
                         continue
-                    if fk.pk_table.schema.name == schema_name:
+                    if fk.pk_table.schema.name == schema:
                         continue
                     table_name = f"{schema}.{table.name}"
                     table_class = self.get_orm_class_by_name(table_name)
+                    foreign_key_column_name = fk.foreign_key_columns[0].name
+                    foreign_key_column = col(table_class, foreign_key_column_name)
+
                     referenced_table_name = f"{fk.pk_table.schema.name}.{fk.pk_table.name}"
                     referenced_class = self.get_orm_class_by_name(referenced_table_name)
+                    referenced_column = col(referenced_class, fk.referenced_columns[0].name)
 
-                    foreign_key_column = getattr(table_class, fk.foreign_key_columns[0].name)
-                    referenced_column = getattr(referenced_class, fk.referenced_columns[0].name)
+                    relationship_attr = guess_attr_name(foreign_key_column_name)
+                    backref_attr = table.name
                     print(
                         "Adding relationship: "
                         f"{table_name}.{fk.foreign_key_columns[0].name} -> {referenced_table_name}.{fk.referenced_columns[0].name}"
                     )
-                    _foreign_key_column = relationship(
-                        referenced_class,
-                        foreign_keys=[foreign_key_column],
-                        primaryjoin=foreign_key_column == referenced_column,
-                        backref=table.name,
-                        viewonly=True,  # set False for write behavior, but best with proper FKs
+                    setattr(
+                        table_class,
+                        relationship_attr,
+                        relationship(
+                            referenced_class,
+                            foreign_keys=[foreign_key_column],
+                            primaryjoin=foreign(foreign_key_column) == referenced_column,
+                            backref=backref(backref_attr, viewonly=True),
+                            viewonly=True,  # set False for write behavior, but best with proper FKs
+                        ),
                     )
         configure_mappers()
 
