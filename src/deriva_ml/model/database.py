@@ -108,36 +108,6 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     # Maintain a global map of RIDS to versions and databases.
     _rid_map: dict[RID, list[tuple[DatasetVersion, "DatabaseModel"]]] = {}
 
-    @staticmethod
-    def rid_lookup(dataset_rid: RID) -> list[tuple[DatasetVersion, "DatabaseModel"]]:
-        """Return a list of DatasetVersion/DatabaseModel instances corresponding to the given RID.
-
-        Args:
-            dataset_rid: Rit to be looked up.
-
-        Returns:
-            List of DatasetVersion/DatabaseModel instances corresponding to the given RID.
-
-        Raises:
-            Raise a DerivaMLException if the given RID is not found.
-        """
-        try:
-            return DatabaseModel._rid_map[dataset_rid]
-        except KeyError:
-            raise DerivaMLException(f"Dataset {dataset_rid} not found")
-
-    def get_orm_class_by_name(self, table: str) -> Any | None:
-        sql_table = self.metadata.tables.get(table)
-        if sql_table is None:
-            raise DerivaMLException(f"Table {table} not found")
-        return self.get_orm_class_for_table(sql_table)
-
-    def get_orm_class_for_table(self, table: SQLTable) -> Any | None:
-        for mapper in self.Base.registry.mappers:
-            if mapper.persist_selectable is table or table in mapper.tables:
-                return mapper.class_
-        return None
-
     def __init__(self, minid: DatasetMinid, bag_path: Path, dbase_path: Path):
         """Create a new DatabaseModel.
 
@@ -192,14 +162,15 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             version_list = DatabaseModel._rid_map.setdefault(dataset_rid, [])
             version_list.append((dataset_version, self))
 
-    def _attach_schemas(self, dbapi_conn, conn_record):
+    def _attach_schemas(self, dbapi_conn, _conn_record):
         cur = dbapi_conn.cursor()
         for schema in [self.domain_schema, self.ml_schema]:
             schema_file = (self.dbase_path / f"{schema}.db").resolve()
             cur.execute(f"ATTACH DATABASE '{schema_file}' AS '{schema}'")
         cur.close()
 
-    def _sql_type(self, type: DerivaType) -> TypeEngine:
+    @staticmethod
+    def _sql_type(type: DerivaType) -> TypeEngine:
         """Return the SQL type for a Deriva column."""
         return {
             "boolean": ERMRestBoolean,
@@ -273,11 +244,15 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
                     foreign_key_column = getattr(table_class, fk.foreign_key_columns[0].name)
                     referenced_column = getattr(referenced_class, fk.referenced_columns[0].name)
-
-                    foreign_key_column = relationship(
+                    print(
+                        "Adding relationship: "
+                        f"{table_name}.{fk.foreign_key_columns[0].name} -> {referenced_table_name}.{fk.referenced_columns[0].name}"
+                    )
+                    _foreign_key_column = relationship(
                         referenced_class,
                         foreign_keys=[foreign_key_column],
                         primaryjoin=foreign_key_column == referenced_column,
+                        backref=table.name,
                         viewonly=True,  # set False for write behavior, but best with proper FKs
                     )
         configure_mappers()
@@ -372,6 +347,10 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             o[file_column] = asset_map[o[url_column]] if o[url_column] else ""
         return tuple(o)
 
+    def find_table(self, table_name: str) -> SQLTable:
+        """Find a table in the catalog."""
+        return [t for t in self.metadata.tables if t == table_name or t.split(".")[1] == table_name][0]
+
     def list_tables(self) -> list[str]:
         """List the names of the tables in the catalog
 
@@ -437,6 +416,36 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             result = conn.execute(select(self.metadata.tables[table]))
             for row in result.mappings():
                 yield dict(row)
+
+    @staticmethod
+    def rid_lookup(dataset_rid: RID) -> list[tuple[DatasetVersion, "DatabaseModel"]]:
+        """Return a list of DatasetVersion/DatabaseModel instances corresponding to the given RID.
+
+        Args:
+            dataset_rid: Rit to be looked up.
+
+        Returns:
+            List of DatasetVersion/DatabaseModel instances corresponding to the given RID.
+
+        Raises:
+            Raise a DerivaMLException if the given RID is not found.
+        """
+        try:
+            return DatabaseModel._rid_map[dataset_rid]
+        except KeyError:
+            raise DerivaMLException(f"Dataset {dataset_rid} not found")
+
+    def get_orm_class_by_name(self, table: str) -> Any | None:
+        sql_table = self.metadata.tables.get(self.find_table(table))
+        if sql_table is None:
+            raise DerivaMLException(f"Table {table} not found")
+        return self.get_orm_class_for_table(sql_table)
+
+    def get_orm_class_for_table(self, table: SQLTable) -> Any | None:
+        for mapper in self.Base.registry.mappers:
+            if mapper.persist_selectable is table or table in mapper.tables:
+                return mapper.class_
+        return None
 
     def delete_database(self):
         """
