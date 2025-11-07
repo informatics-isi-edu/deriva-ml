@@ -19,7 +19,7 @@ from deriva.core.ermrest_model import Column, Table
 
 # Deriva imports
 from pydantic import ConfigDict, validate_call
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, inspect, select
 from sqlalchemy.orm import Session
 
 from deriva_ml.core.definitions import RID, VocabularyTerm
@@ -91,83 +91,34 @@ class DatasetBag:
     def _dataset_table_view(self, table: str) -> str:
         """Return a SQL command that will return all of the elements in the specified table that are associated with
         dataset_rid"""
+
+        def find_relationship_to(source_cls, target_cls):
+            """ "
+            Find the relationship between two classes."""
+            mapper = inspect(source_cls)
+            for name, rel in mapper.relationships.items():
+                if rel.mapper.class_ is target_cls:
+                    return rel.class_attribute
+            return None
+
         table_class = self.model.get_orm_class_by_name(table)
         dataset_table_class = self.model.get_orm_class_by_name(self._dataset_table.name)
-
+        dataset_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         paths = [[t.name for t in p] for p in self.model._schema_to_paths() if p[-1].name == table]
-        # select.where(dataset_class.dataset_rid in [c.rid for c in self.list_dataset_children(recurse=True)])
-        print(paths)
         sql_cmd = None
         for path in paths:
             path_sql = select(table_class)
-            for t in path:
-                print("Adding ", t, " to path sql", self.model.get_orm_class_by_name(t))
-                path_sql.join(self.model.get_orm_class_by_name(t))
-                print(path_sql)
-            if sql_cmd:
-                sql_cmd.union(path_sql)
+            last_class = self.model.get_orm_class_by_name(path[0])
+            for t in path[1:]:
+                t_class = self.model.get_orm_class_by_name(t)
+                path_sql = path_sql.join(find_relationship_to(last_class, t_class))
+                last_class = t_class
+            path_sql = path_sql.where(dataset_table_class.RID.in_(dataset_rids))
+            if sql_cmd is not None:
+                sql_cmd = sql_cmd.union(path_sql)
             else:
                 sql_cmd = path_sql
         return sql_cmd
-        # for ts, on in paths:
-        #    tables = " JOIN ".join(ts)
-        #    on_expression = " and ".join([f"{column_name(left)}={column_name(right)}" for left, right in on])
-        #    sql.append(
-        #        f"SELECT {select_args} FROM {tables} "
-        #        f"{'ON ' + on_expression if on_expression else ''} "
-        #        f"WHERE {dataset_table_name}.RID IN ({datasets})"
-        #    )
-        #    if table_name == self.model.normalize_table_name(self._dataset_table.name):
-        #        sql.append(
-        #            f"SELECT {select_args} FROM {dataset_table_name} WHERE {dataset_table_name}.RID IN ({datasets})"
-        #        )
-        # sql = " UNION ".join(sql) if len(sql) > 1 else sql[0]
-        # return sql
-
-        table_name = self.model.normalize_table_name(table)
-
-        # Get the names of the columns in the table.
-
-        with self.database as dbase:
-            select_args = ",".join(
-                [f'"{table_name}"."{c[1]}"' for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
-            )
-        # Get the list of datasets in the bag including the dataset itself.
-        datasets = ",".join(
-            [f'"{self.dataset_rid}"'] + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
-        )
-
-        # Find the paths that terminate in the table we are looking for
-        # Assemble the ON clause by looking at each table pair, and looking up the FK columns that connect them.
-        paths = [
-            (
-                [f'"{self.model.normalize_table_name(t.name)}"' for t in p],
-                [self.model._table_relationship(t1, t2) for t1, t2 in zip(p, p[1:])],
-            )
-            for p in self.model._schema_to_paths()
-            if p[-1].name == table
-        ]
-
-        sql = []
-        dataset_table_name = f'"{self.model.normalize_table_name(self._dataset_table.name)}"'
-
-        def column_name(col: Column) -> str:
-            return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
-
-        for ts, on in paths:
-            tables = " JOIN ".join(ts)
-            on_expression = " and ".join([f"{column_name(left)}={column_name(right)}" for left, right in on])
-            sql.append(
-                f"SELECT {select_args} FROM {tables} "
-                f"{'ON ' + on_expression if on_expression else ''} "
-                f"WHERE {dataset_table_name}.RID IN ({datasets})"
-            )
-            if table_name == self.model.normalize_table_name(self._dataset_table.name):
-                sql.append(
-                    f"SELECT {select_args} FROM {dataset_table_name} WHERE {dataset_table_name}.RID IN ({datasets})"
-                )
-        sql = " UNION ".join(sql) if len(sql) > 1 else sql[0]
-        return sql
 
     def get_table(self, table: str) -> Generator[tuple, None, None]:
         """Retrieve the contents of the specified table. If schema is not provided as part of the table name,
@@ -180,9 +131,10 @@ class DatasetBag:
           A generator that yields tuples of column values.
 
         """
-        result = self.database.execute(self._dataset_table_view(table))
-        while row := result.fetchone():
-            yield row
+        with Session(self.engine) as session:
+            result = session.execute(self._dataset_table_view(table))
+            for row in result:
+                yield row
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
         """Retrieve the contents of the specified table as a dataframe.
@@ -197,7 +149,7 @@ class DatasetBag:
         Returns:
           A dataframe containing the contents of the specified table.
         """
-        return pd.read_sql(self._dataset_table_view(table), self.database)
+        return pd.read_sql(self._dataset_table_view(table), self.engine)
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
@@ -210,13 +162,10 @@ class DatasetBag:
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
 
-        table_name = self.model.normalize_table_name(table)
-        schema, table = table_name.split(":")
-        with self.database as _dbase:
-            mapper = SQLMapper(self.model, table)
-            result = self.database.execute(self._dataset_table_view(table))
-            while row := result.fetchone():
-                yield mapper.transform_tuple(row)
+        with Session(self.engine) as session:
+            result = session.execute(self._dataset_table_view(table))
+            for row in result.mappings():
+                yield row
 
     @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:
