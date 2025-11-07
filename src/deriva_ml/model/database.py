@@ -196,7 +196,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         def col(model, name: str):
             # try ORM attribute first
             try:
-                return getattr(model, name)
+                return getattr(model, name).property.columns[0]
             except AttributeError:
                 # fall back to exact DB column key on the Table
                 return model.__table__.c[name]
@@ -259,10 +259,6 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
                     relationship_attr = guess_attr_name(foreign_key_column_name)
                     backref_attr = table.name
-                    print(
-                        "Adding relationship: "
-                        f"{table_name}.{fk.foreign_key_columns[0].name} -> {referenced_table_name}.{fk.referenced_columns[0].name}"
-                    )
                     setattr(
                         table_class,
                         relationship_attr,
