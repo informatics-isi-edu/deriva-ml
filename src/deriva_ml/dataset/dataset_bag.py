@@ -244,11 +244,10 @@ class DatasetBag:
             Feature values.
         """
         feature = self.model.lookup_feature(table, feature_name)
-
-        with self.database as db:
-            col_names = [c[1] for c in db.execute(f'PRAGMA table_info("{feature_table}")').fetchall()]
-            sql_cmd = f'SELECT * FROM "{feature_table}"'
-            return cast(datapath._ResultSet, [dict(zip(col_names, r)) for r in db.execute(sql_cmd).fetchall()])
+        feature_class = self.model.get_orm_class_for_table(feature.feature_table)
+        with Session(self.engine) as session:
+            sql_cmd = select(feature_class)
+            return cast(datapath._ResultSet, [row for row in session.execute(sql_cmd).mappings()])
 
     def list_dataset_element_types(self) -> list[Table]:
         """
