@@ -12,7 +12,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 class SQLMapper:
     def __init__(self, database: "DatabaseModel", table: str) -> None:
-        table_name = database.normalize_table_name(table)
+        table_name = table
         schema, table = table_name.split(":")
 
         with database.dbase as dbase:

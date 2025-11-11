@@ -380,9 +380,7 @@ class DerivaModel:
                 if join_tables.index(right.name) < join_tables.index(left.name):
                     continue
                 table_relationship = self._table_relationship(left, right)
-                tables.setdefault(self.normalize_table_name(right.name), set()).add(
-                    (table_relationship[0], table_relationship[1])
-                )
+                tables.setdefault(right.name, set()).add((table_relationship[0], table_relationship[1]))
 
         # Get the list of columns that will appear in the final denormalized dataset.
         denormalized_columns = [

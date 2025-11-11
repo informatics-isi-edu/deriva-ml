@@ -8,13 +8,14 @@ import json
 import logging
 from csv import reader
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Optional, Type
 from urllib.parse import urlparse
 
 from deriva.core.ermrest_model import Column as DerivaColumn
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
 from deriva.core.ermrest_model import Type as DerivaType
+from pydantic import ConfigDict, validate_call
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -26,11 +27,13 @@ from sqlalchemy import (
     String,
     create_engine,
     event,
+    inspect,
     select,
 )
 from sqlalchemy import Column as SQLColumn
 from sqlalchemy import ForeignKeyConstraint as SQLForeignKeyConstraint
 from sqlalchemy import Table as SQLTable
+from sqlalchemy import UniqueConstraint as SQLUniqueConstraint
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import backref, configure_mappers, foreign, relationship
@@ -191,7 +194,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         was created."""
 
         def is_key(column: DerivaColumn, table: DerivaTable) -> bool:
-            return column in [key.unique_columns[0] for key in table.keys]
+            return column in [key.unique_columns[0] for key in table.keys] and column.name == "RID"
 
         def col(model, name: str):
             # try ORM attribute first
@@ -221,26 +224,55 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                     )
                     database_columns.append(database_column)
                 database_table = SQLTable(table.name, self.metadata, *database_columns, schema=schema_name)
-
+                for key in table.keys:
+                    key_columns = [c.name for c in key.unique_columns]
+                    #     if key.name[0] == "RID":
+                    #        continue
+                    database_table.append_constraint(
+                        SQLUniqueConstraint(
+                            *key_columns,
+                            name=key.name[1],
+                        )
+                    )
                 for fk in table.foreign_keys:
                     if fk.pk_table.schema.name not in [self.domain_schema, self.ml_schema]:
                         continue
                     if fk.pk_table.schema.name != schema_name:
                         continue
                     # Attach FK to the chosen column
-                    database_fk = SQLForeignKeyConstraint(
-                        columns=[f"{c.name}" for c in fk.foreign_key_columns],
-                        refcolumns=[f"{schema_name}.{c.table.name}.{c.name}" for c in fk.referenced_columns],
-                        name=fk.name[1],
-                        comment=fk.comment,
+                    database_table.append_constraint(
+                        SQLForeignKeyConstraint(
+                            columns=[f"{c.name}" for c in fk.foreign_key_columns],
+                            refcolumns=[f"{schema_name}.{c.table.name}.{c.name}" for c in fk.referenced_columns],
+                            name=fk.name[1],
+                            comment=fk.comment,
+                        )
                     )
-                    database_table.append_constraint(database_fk)
                 database_tables.append(database_table)
         with self.engine.begin() as conn:
             self.metadata.create_all(conn, tables=database_tables)
 
+        def name_for_scalar_relationship(_base, local_cls, referred_cls, constraint):
+            cols = list(constraint.columns) if constraint is not None else []
+            if len(cols) == 1:
+                name = cols[0].key
+                if name in {c.key for c in local_cls.__table__.columns}:
+                    name += "_rel"
+                return name
+            return constraint.name or referred_cls.__name__.lower()
+
+        def name_for_collection_relationship(_base, local_cls, referred_cls, constraint):
+            backref_name = constraint.name.replace("_fkey", "_collection")
+            return backref_name or (referred_cls.__name__.lower() + "_collection")
+
         # Now build ORM mappings for the tables.
-        self.Base.prepare(self.engine, reflect=True)
+        self.Base.prepare(
+            self.engine,
+            name_for_scalar_relationship=name_for_scalar_relationship,
+            name_for_collection_relationship=name_for_collection_relationship,
+            reflect=True,
+        )
+
         for schema in [self.domain_schema, self.ml_schema]:
             for table in self.model.schemas[schema].tables.values():
                 for fk in table.foreign_keys:
@@ -258,7 +290,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                     referenced_column = col(referenced_class, fk.referenced_columns[0].name)
 
                     relationship_attr = guess_attr_name(foreign_key_column_name)
-                    backref_attr = table.name
+                    backref_attr = fk.name[1].replace("_fkey", "_collection")
                     setattr(
                         table_class,
                         relationship_attr,
@@ -270,6 +302,19 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                             viewonly=True,  # set False for write behavior, but best with proper FKs
                         ),
                     )
+
+        # Reflect won't pick up the second FK in the dataset_dataset table.  We need to do it manually
+        # dataset_dataset_class = self.get_orm_class_by_name("deriva-ml.Dataset_Dataset")
+        # dataset_class = self.get_orm_class_by_name("deriva-ml.Dataset")
+        #     dataset_dataset_class.Nested_Dataset = relationship(
+        #         dataset_class,
+        #         primaryjoin=foreign(dataset_dataset_class.__table__.c["Nested_Dataset"])
+        #         == dataset_class.__table__.c["RID"],
+        #         foreign_keys=[dataset_dataset_class.__table__.c["Nested_Dataset"]],
+        #         backref=backref("nested_dataset_collection", viewonly=True),  # pick a distinct name
+        #         viewonly=True,  # keep it read-only unless you truly want writes
+        #         overlaps="Dataset,dataset_dataset_collection",  # optional: silence overlap warnings
+        #     )
         configure_mappers()
 
     def _load_database(self) -> None:
@@ -456,10 +501,165 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             raise DerivaMLException(f"Table {table} not found")
         return self.get_orm_class_for_table(sql_table)
 
-    def get_orm_class_for_table(self, table: SQLTable) -> Any | None:
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def get_orm_class_for_table(self, table: SQLTable | DerivaTable | str) -> Any | None:
+        if isinstance(table, DerivaTable):
+            table = self.metadata.tables[f"{table.schema.name}.{table.name}"]
+            if isinstance(table, str):
+                table = self.metadata.tables.get(self.find_table(table))
         for mapper in self.Base.registry.mappers:
             if mapper.persist_selectable is table or table in mapper.tables:
                 return mapper.class_
+        return None
+
+    @staticmethod
+    def _is_association(
+        table_class, min_arity=2, max_arity=2, unqualified=True, pure=True, no_overlap=True, return_fkeys=False
+    ):
+        """Return (truthy) integer arity if self is a matching association, else False.
+
+        min_arity: minimum number of associated fkeys (default 2)
+        max_arity: maximum number of associated fkeys (default 2) or None
+        unqualified: reject qualified associations when True (default True)
+        pure: reject impure associations when True (default True)
+        no_overlap: reject overlapping associations when True (default True)
+        return_fkeys: return the set of N associated ForeignKeys if True
+
+        The default behavior with no arguments is to test for pure,
+        unqualified, non-overlapping, binary associations.
+
+        An association is comprised of several foreign keys which are
+        covered by a non-nullable composite row key. This allows
+        specific combinations of foreign keys to appear at most once.
+
+        The arity of an association is the number of foreign keys
+        being associated. A typical binary association has arity=2.
+
+        An unqualified association contains *only* the foreign key
+        material in its row key. Conversely, a qualified association
+        mixes in other material which means that a specific
+        combination of foreign keys may repeat with different
+        qualifiers.
+
+        A pure association contains *only* row key
+        material. Conversely, an impure association includes
+        additional metadata columns not covered by the row key. Unlike
+        qualifiers, impure metadata merely decorates an association
+        without augmenting its identifying characteristics.
+
+        A non-overlapping association does not share any columns
+        between multiple foreign keys. This means that all
+        combinations of foreign keys are possible. Conversely, an
+        overlapping association shares some columns between multiple
+        foreign keys, potentially limiting the combinations which can
+        be represented in an association row.
+
+        These tests ignore the five ERMrest system columns and any
+        corresponding constraints.
+
+        """
+        if min_arity < 2:
+            raise ValueError("An assocation cannot have arity < 2")
+        if max_arity is not None and max_arity < min_arity:
+            raise ValueError("max_arity cannot be less than min_arity")
+
+        mapper = inspect(table_class).mapper
+
+        # TODO: revisit whether there are any other cases we might
+        # care about where system columns are involved?
+        non_sys_cols = {col.name for col in mapper.columns if col.name not in {"RID", "RCT", "RMT", "RCB", "RMB"}}
+        unique_columns = [
+            {c.name for c in constraint.columns}
+            for constraint in inspect(table_class).local_table.constraints
+            if isinstance(constraint, SQLUniqueConstraint)
+        ]
+
+        non_sys_key_colsets = {
+            frozenset(unique_column_set)
+            for unique_column_set in unique_columns
+            if unique_column_set.issubset(non_sys_cols) and len(unique_column_set) > 1
+        }
+
+        if not non_sys_key_colsets:
+            # reject: not association
+            return False
+
+        # choose longest compound key (arbitrary choice with ties!)
+        row_key = sorted(non_sys_key_colsets, key=lambda s: len(s), reverse=True)[0]
+        foreign_keys = [constraint for constraint in inspect(table_class).relationships.values()]
+
+        covered_fkeys = {fkey for fkey in foreign_keys if {c.name for c in fkey.local_columns}.issubset(row_key)}
+        covered_fkey_cols = set()
+
+        if len(covered_fkeys) < min_arity:
+            # reject: not enough fkeys in association
+            return False
+        elif max_arity is not None and len(covered_fkeys) > max_arity:
+            # reject: too many fkeys in association
+            return False
+
+        for fkey in covered_fkeys:
+            fkcols = {c.name for c in fkey.local_columns}
+            if no_overlap and fkcols.intersection(covered_fkey_cols):
+                # reject: overlapping fkeys in association
+                return False
+            covered_fkey_cols.update(fkcols)
+
+        if unqualified and row_key.difference(covered_fkey_cols):
+            # reject: qualified association
+            return False
+
+        if pure and non_sys_cols.difference(row_key):
+            # reject: impure association
+            return False
+
+        # return (truthy) arity or fkeys
+        if return_fkeys:
+            return covered_fkeys
+        else:
+            return len(covered_fkeys)
+
+    def get_orm_association_class(
+        self,
+        left_cls: Type[Any],
+        right_cls: Type[Any],
+        min_arity=2,
+        max_arity=2,
+        unqualified=True,
+        pure=True,
+        no_overlap=True,
+    ):
+        """
+        Find an association class C by: (1) walking rels on left_cls to a mid class C,
+        (2) verifying C also relates to right_cls. Returns (C, C->left, C->right) or None.
+
+        """
+        for _, left_rel in inspect(left_cls).relationships.items():
+            mid_cls = left_rel.mapper.class_
+            is_assoc = self._is_association(mid_cls, return_fkeys=True)
+            if not is_assoc:
+                continue
+            assoc_local_columns_left = list(is_assoc)[0].local_columns
+            assoc_local_columns_right = list(is_assoc)[1].local_columns
+
+            found_left = found_right = False
+            for r in inspect(left_cls).relationships.values():
+                remote_side = list(r.remote_side)[0]
+                if remote_side in assoc_local_columns_left:
+                    found_left = r
+                if remote_side in assoc_local_columns_right:
+                    found_left = r
+                    # We have left and right backwards from the assocation, so swap them.
+                    assoc_local_columns_left, assoc_local_columns_right = (
+                        assoc_local_columns_right,
+                        assoc_local_columns_left,
+                    )
+            for r in inspect(right_cls).relationships.values():
+                remote_side = list(r.remote_side)[0]
+                if remote_side in assoc_local_columns_right:
+                    found_right = r
+            if found_left != False and found_right != False:
+                return mid_cls, found_left.class_attribute, found_right.class_attribute
         return None
 
     def delete_database(self):
