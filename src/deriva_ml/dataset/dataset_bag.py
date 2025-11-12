@@ -15,11 +15,11 @@ import deriva.core.datapath as datapath
 import pandas as pd
 
 # Local imports
-from deriva.core.ermrest_model import Column, Table
+from deriva.core.ermrest_model import Table
 
 # Deriva imports
 from pydantic import ConfigDict, validate_call
-from sqlalchemy import CompoundSelect, Engine, inspect, select, union_all
+from sqlalchemy import CompoundSelect, Engine, Select, and_, inspect, or_, select, union_all
 from sqlalchemy.orm import RelationshipProperty, Session
 from sqlalchemy.orm.util import AliasedClass
 
@@ -331,7 +331,7 @@ class DatasetBag:
         # Term not found
         raise DerivaMLInvalidTerm(table, term_name)
 
-    def _denormalize(self, include_tables: list[str] | None) -> str:
+    def _denormalize(self, include_tables: list[str] | None) -> Select:
         """
         Generates an SQL statement for denormalizing the dataset based on the tables to include. Processes cycles in
         graph relationships, ensures proper join order, and generates selected columns for denormalization.
@@ -343,10 +343,6 @@ class DatasetBag:
         Returns:
             str: SQL query string that represents the process of denormalization.
         """
-
-        def column_name(col: Column) -> str:
-            return f'"{col.table.name}"."{col.name}"'
-
         # Skip over tables that we don't want to include in the denormalized dataset.
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
         # table.
@@ -354,29 +350,32 @@ class DatasetBag:
         join_tables, tables, denormalized_columns, dataset_rids, dataset_element_tables = (
             self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
         )
-
-        select_args = [
-            # SQLlite will strip out the table name from the column in the select statement, so we need to add
-            # an explicit alias to the column name.
-            f'"{table_name}"."{column_name}" AS "{table_name}.{column_name}"'
+        denormalized_columns = [
+            self.model.get_orm_class_by_name(table_name).__table__.columns[column_name]
             for table_name, column_name in denormalized_columns
         ]
-
         # First table in the table list is the table specified in the method call.
-        normalized_join_tables = [t for t in join_tables]
-        sql_statement = f'SELECT {",".join(select_args)} FROM "{normalized_join_tables[0]}"'
-        for t in normalized_join_tables[1:]:
-            on = tables[t]
-            sql_statement += f' LEFT JOIN "{t}" ON '
-            sql_statement += "OR ".join([f"{column_name(o[0])} = {column_name(o[1])}" for o in on])
+        join_conditions = defaultdict(list)
+        for table in join_tables[1:]:
+            table_class = self.model.get_orm_class_by_name(table)
+            for relationship in inspect(table_class).relationships:
+                if list(relationship.remote_side)[0].table.name in join_tables:
+                    # FK going out
+                    join_conditions[table].append(relationship.primaryjoin)
+        for k, js in join_conditions.items():
+            print(k, [(v.left.table.name, v.right.table.name) for v in js])
 
-        # Select only rows from the datasets you wish to include.
-        dataset_rid_list = ",".join([f'"{self.dataset_rid}"'] + [f'"{b.dataset_rid}"' for b in dataset_rids])
-        sql_statement += f'WHERE  "{"Dataset"}"."RID" IN ({dataset_rid_list})'
+        sql_statement = select(*denormalized_columns)
+        for join_table in join_tables[1:]:
+            table_class = self.model.get_orm_class_by_name(join_table)
+            sql_statement.outerjoin(table_class, onclause=or_(*join_conditions[join_table]))
+            sql_statement = sql_statement.outerjoin(table_class, onclause=or_(*join_conditions[join_table]))
+        dataset_rid_list = [self.dataset_rid] + [b.dataset_rid for b in dataset_rids]
+        dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
 
         # Only include rows that have actual values in them.
-        real_row = [f'"{t}".RID IS NOT NULL ' for t in dataset_element_tables]
-        sql_statement += f" AND ({' OR '.join(real_row)})"
+        real_row = or_(*[self.model.get_orm_class_by_name(t).RID.isnot(None) for t in dataset_element_tables])
+        sql_statement = sql_statement.where(and_(dataset_class.RID.in_(dataset_rid_list)), real_row)
         return sql_statement
 
     def denormalize_as_dataframe(self, include_tables: list[str] | None = None) -> pd.DataFrame:
@@ -400,7 +399,7 @@ class DatasetBag:
         Returns:
             Dataframe containing the denormalized dataset.
         """
-        return pd.read_sql(self._denormalize(include_tables=include_tables), self.database)
+        return pd.read_sql(self._denormalize(include_tables=include_tables), self.engine)
 
     def denormalize_as_dict(self, include_tables: list[str] | None = None) -> Generator[dict[str, Any], None, None]:
         """
@@ -424,11 +423,10 @@ class DatasetBag:
         Returns:
             A generator that returns a dictionary representation of each row in the denormalized dataset.
         """
-        with self.database as dbase:
-            cursor = dbase.execute(self._denormalize(include_tables=include_tables))
-            columns = [desc[0] for desc in cursor.description]
-            for row in cursor:
-                yield dict(zip(columns, row))
+        with Session(self.engine) as session:
+            cursor = session.execute(self._denormalize(include_tables=include_tables))
+            for row in cursor.mappings():
+                yield row
 
 
 # Add annotations after definition to deal with forward reference issues in pydantic
