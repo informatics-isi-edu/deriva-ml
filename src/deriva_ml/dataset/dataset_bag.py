@@ -347,29 +347,36 @@ class DatasetBag:
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
         # table.
 
-        join_tables, tables, denormalized_columns, dataset_rids, dataset_element_tables = (
+        def find_relationship(table, join_condition):
+            side1 = (join_condition[0].table.name, join_condition[0].name)
+            side2 = (join_condition[1].table.name, join_condition[1].name)
+
+            for relationship in inspect(table).relationships:
+                local_columns = list(relationship.local_columns)[0].table.name, list(relationship.local_columns)[0].name
+                remote_side = list(relationship.remote_side)[0].table.name, list(relationship.remote_side)[0].name
+                if local_columns == side1 and remote_side == side2 or local_columns == side2 and remote_side == side1:
+                    return relationship
+            return None
+
+        join_tables, join_conditions, denormalized_columns, dataset_rids, dataset_element_tables = (
             self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
         )
         denormalized_columns = [
             self.model.get_orm_class_by_name(table_name).__table__.columns[column_name]
             for table_name, column_name in denormalized_columns
         ]
-        # First table in the table list is the table specified in the method call.
-        join_conditions = defaultdict(list)
-        for table in join_tables[1:]:
-            table_class = self.model.get_orm_class_by_name(table)
-            for relationship in inspect(table_class).relationships:
-                if list(relationship.remote_side)[0].table.name in join_tables:
-                    # FK going out
-                    join_conditions[table].append(relationship.primaryjoin)
-        for k, js in join_conditions.items():
-            print(k, [(v.left.table.name, v.right.table.name) for v in js])
 
-        sql_statement = select(*denormalized_columns)
-        for join_table in join_tables[1:]:
+        sql_statement = select(*denormalized_columns).select_from(
+            self.model.get_orm_class_for_table(self._dataset_table)
+        )
+        for join_table, on_conditions in join_conditions.items():
             table_class = self.model.get_orm_class_by_name(join_table)
-            sql_statement.outerjoin(table_class, onclause=or_(*join_conditions[join_table]))
-            sql_statement = sql_statement.outerjoin(table_class, onclause=or_(*join_conditions[join_table]))
+            on_clause = [
+                getattr(table_class, r.key)
+                for on_condition in on_conditions
+                if (r := find_relationship(table_class, on_condition))
+            ]
+            sql_statement = sql_statement.outerjoin(table_class, onclause=or_(*on_clause))
         dataset_rid_list = [self.dataset_rid] + [b.dataset_rid for b in dataset_rids]
         dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
 
