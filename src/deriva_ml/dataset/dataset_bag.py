@@ -362,18 +362,21 @@ class DatasetBag:
             self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
         )
         denormalized_columns = [
-            self.model.get_orm_class_by_name(table_name).__table__.columns[column_name]
+            self.model.get_orm_class_by_name(table_name)
+            .__table__.columns[column_name]
+            .label(f"{table_name}.{column_name}")
             for table_name, column_name in denormalized_columns
         ]
 
         sql_statement = select(*denormalized_columns).select_from(
             self.model.get_orm_class_for_table(self._dataset_table)
         )
-        for join_table, on_conditions in join_conditions.items():
-            table_class = self.model.get_orm_class_by_name(join_table)
+
+        for table_name in join_tables[1:]:  # Skip over dataset table
+            table_class = self.model.get_orm_class_by_name(table_name)
             on_clause = [
                 getattr(table_class, r.key)
-                for on_condition in on_conditions
+                for on_condition in join_conditions[table_name]
                 if (r := find_relationship(table_class, on_condition))
             ]
             sql_statement = sql_statement.outerjoin(table_class, onclause=or_(*on_clause))

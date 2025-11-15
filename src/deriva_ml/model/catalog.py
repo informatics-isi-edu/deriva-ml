@@ -388,7 +388,7 @@ class DerivaModel:
             for table_name in join_tables
             if not self.is_association(table_name)  # Don't include association columns in the denormalized view.'
             for c in self.name_to_table(table_name).columns
-            if c.name not in skip_columns
+            if (not include_tables or table_name in include_tables) and (c.name not in skip_columns)
         ]
 
         # List of dataset ids to include in the denormalized view.

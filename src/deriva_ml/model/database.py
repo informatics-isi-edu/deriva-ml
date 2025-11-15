@@ -54,6 +54,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 class ERMRestBoolean(TypeDecorator):
     impl = Boolean
+    cache_ok = True
 
     def process_bind_param(self, value, dialect):
         if value in ("Y", "y", 1, True, "t", "T"):
