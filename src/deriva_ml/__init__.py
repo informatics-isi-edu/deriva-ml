@@ -1,8 +1,6 @@
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 
-from dataset import DatasetBag
-
 # Safe imports - no circular dependencies
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.definitions import (

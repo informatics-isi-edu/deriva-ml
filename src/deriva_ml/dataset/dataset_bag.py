@@ -19,7 +19,7 @@ from deriva.core.ermrest_model import Table
 
 # Deriva imports
 from pydantic import ConfigDict, validate_call
-from sqlalchemy import CompoundSelect, Engine, Select, and_, inspect, or_, select, union_all
+from sqlalchemy import CompoundSelect, Engine, RowMapping, Select, and_, inspect, or_, select, union_all
 from sqlalchemy.orm import RelationshipProperty, Session
 from sqlalchemy.orm.util import AliasedClass
 
@@ -392,8 +392,9 @@ class DatasetBag:
         """
         Denormalize the dataset and return the result as a dataframe.
 
-        This routine will examine the domain schema for the dataset, determine which tables to include and denormalize
-        the dataset values into a single wide table.  The result is returned as a dataframe.
+         This routine will examine the domain schema for the dataset, determine which tables to include and denormalize
+        the dataset values into a single wide table.  The result is returned as a generator that returns a dictionary
+        for each row in the denormalized wide table.
 
         The optional argument include_tables can be used to specify a subset of tables to include in the denormalized
         view.  The tables in this argument can appear anywhere in the dataset schema.  The method will determine which
@@ -411,20 +412,20 @@ class DatasetBag:
         """
         return pd.read_sql(self._denormalize(include_tables=include_tables), self.engine)
 
-    def denormalize_as_dict(self, include_tables: list[str] | None = None) -> Generator[dict[str, Any], None, None]:
+    def denormalize_as_dict(self, include_tables: list[str] | None = None) -> Generator[RowMapping, None, None]:
         """
-        Denormalize the dataset and return the result as a set of dictionarys.
+        Denormalize the dataset and return the result as a set of dictionary's.
 
         This routine will examine the domain schema for the dataset, determine which tables to include and denormalize
-        the dataset values into a single wide table.  The result is returned as a generateor that returns a dictionary
-        for each row in the denormlized wide table.
+        the dataset values into a single wide table.  The result is returned as a generator that returns a dictionary
+        for each row in the denormalized wide table.
 
         The optional argument include_tables can be used to specify a subset of tables to include in the denormalized
         view.  The tables in this argument can appear anywhere in the dataset schema.  The method will determine which
         additional tables are required to complete the denormalization process.  If include_tables is not specified,
         all of the tables in the schema will be included.
 
-        The resulting wide table will include a column for every table needed to complete the denormalization process.
+        The resulting wide table will include a only those column for the tables listed in include_columns.
 
         Args:
             include_tables: List of table names to include in the denormalized dataset. If None, than the entire schema
