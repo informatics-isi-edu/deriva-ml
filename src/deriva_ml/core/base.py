@@ -149,7 +149,6 @@ class DerivaML(Dataset):
             credentials=self.credential,
             session_config=self._get_session_config(),
         )
-
         try:
             if check_auth and server.get_authn_session():
                 pass
@@ -158,7 +157,6 @@ class DerivaML(Dataset):
                 "You are not authorized to access this catalog. "
                 "Please check your credentials and make sure you have logged in."
             )
-
         self.catalog = server.connect_ermrest(catalog_id)
         self.model = DerivaModel(self.catalog.getCatalogModel(), domain_schema=domain_schema)
 
