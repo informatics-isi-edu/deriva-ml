@@ -27,9 +27,6 @@ from deriva_ml.core.exceptions import (
     DerivaMLInvalidTerm,
     DerivaMLTableTypeError,
 )
-from deriva_ml.dataset.aux_classes import DatasetConfig, DatasetConfigList, DatasetSpec, DatasetVersion
-
-from .execution import Execution, ExecutionConfiguration, Workflow
 
 # Type-checking only - avoid circular import at runtime
 if TYPE_CHECKING:
@@ -53,14 +50,6 @@ def __getattr__(name):
 __all__ = [
     "DerivaML",  # Lazy-loaded
     "DerivaMLConfig",
-    "DatasetBag",
-    "DatasetConfig",
-    "DatasetConfigList",
-    "DatasetSpec",
-    "DatasetVersion",
-    "Execution",
-    "ExecutionConfiguration",
-    "Workflow",
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",
