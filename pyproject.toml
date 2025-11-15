@@ -24,6 +24,7 @@ dependencies = [
     "pandas-stubs==2.2.3.250527",
     "pyyaml",
     "hydra_zen",
+    "SQLAlchemy"
 ]
 
 [project.scripts]
@@ -114,6 +115,7 @@ dev = [
     "pytest>=8.4.1",
     "pytest-mock",
     "pytest-coverage>=0.0",
+    "pip-system-certs",
     "ruff"
 ]
 lint = [

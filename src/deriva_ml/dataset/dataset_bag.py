@@ -4,8 +4,6 @@ The module implements the sqllite interface to a set of directories representing
 
 from __future__ import annotations
 
-import sqlite3
-
 # Standard library imports
 from collections import defaultdict
 from copy import copy
@@ -16,15 +14,18 @@ import deriva.core.datapath as datapath
 # Third-party imports
 import pandas as pd
 
-# Deriva imports
-from deriva.core.ermrest_model import Column, Table
-from pydantic import ConfigDict, validate_call
-
 # Local imports
+from deriva.core.ermrest_model import Table
+
+# Deriva imports
+from pydantic import ConfigDict, validate_call
+from sqlalchemy import CompoundSelect, Engine, Select, and_, inspect, or_, select, union_all
+from sqlalchemy.orm import RelationshipProperty, Session
+from sqlalchemy.orm.util import AliasedClass
+
 from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
 from deriva_ml.feature import Feature
-from deriva_ml.model.sql_mapper import SQLMapper
 
 if TYPE_CHECKING:
     from deriva_ml.model.database import DatabaseModel
@@ -64,7 +65,8 @@ class DatasetBag:
             dataset_rid: Optional RID for the dataset.
         """
         self.model = database_model
-        self.database = cast(sqlite3.Connection, self.model.dbase)
+        self.engine = cast(Engine, self.model.engine)
+        self.metadata = self.model.metadata
 
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         if not self.dataset_rid:
@@ -86,54 +88,47 @@ class DatasetBag:
         """
         return self.model.list_tables()
 
-    def _dataset_table_view(self, table: str) -> str:
+    @staticmethod
+    def _find_relationship_attr(source, target):
+        """
+        Return the relationship attribute (InstrumentedAttribute) on `source`
+        that points to `target`. Works with classes or AliasedClass.
+        Raises LookupError if not found.
+        """
+        src_mapper = inspect(source).mapper
+        tgt_mapper = inspect(target).mapper
+
+        # collect relationships on the *class* mapper (not on alias)
+        candidates: list[RelationshipProperty] = [rel for rel in src_mapper.relationships if rel.mapper is tgt_mapper]
+
+        if not candidates:
+            raise LookupError(f"No relationship from {src_mapper.class_.__name__} → {tgt_mapper.class_.__name__}")
+
+        # Prefer MANYTOONE when multiple paths exist (often best for joins)
+        candidates.sort(key=lambda r: r.direction.name != "MANYTOONE")
+        rel = candidates[0]
+
+        # Bind to the actual source (alias or class)
+        return getattr(source, rel.key) if isinstance(source, AliasedClass) else rel.class_attribute
+
+    def _dataset_table_view(self, table: str) -> CompoundSelect[Any]:
         """Return a SQL command that will return all of the elements in the specified table that are associated with
         dataset_rid"""
-
-        table_name = self.model.normalize_table_name(table)
-
-        # Get the names of the columns in the table.
-        with self.database as dbase:
-            select_args = ",".join(
-                [f'"{table_name}"."{c[1]}"' for c in dbase.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
-            )
-
-        # Get the list of datasets in the bag including the dataset itself.
-        datasets = ",".join(
-            [f'"{self.dataset_rid}"'] + [f'"{ds.dataset_rid}"' for ds in self.list_dataset_children(recurse=True)]
-        )
-
-        # Find the paths that terminate in the table we are looking for
-        # Assemble the ON clause by looking at each table pair, and looking up the FK columns that connect them.
-        paths = [
-            (
-                [f'"{self.model.normalize_table_name(t.name)}"' for t in p],
-                [self.model._table_relationship(t1, t2) for t1, t2 in zip(p, p[1:])],
-            )
-            for p in self.model._schema_to_paths()
-            if p[-1].name == table
-        ]
-
-        sql = []
-        dataset_table_name = f'"{self.model.normalize_table_name(self._dataset_table.name)}"'
-
-        def column_name(col: Column) -> str:
-            return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
-
-        for ts, on in paths:
-            tables = " JOIN ".join(ts)
-            on_expression = " and ".join([f"{column_name(left)}={column_name(right)}" for left, right in on])
-            sql.append(
-                f"SELECT {select_args} FROM {tables} "
-                f"{'ON ' + on_expression if on_expression else ''} "
-                f"WHERE {dataset_table_name}.RID IN ({datasets})"
-            )
-            if table_name == self.model.normalize_table_name(self._dataset_table.name):
-                sql.append(
-                    f"SELECT {select_args} FROM {dataset_table_name} WHERE {dataset_table_name}.RID IN ({datasets})"
-                )
-        sql = " UNION ".join(sql) if len(sql) > 1 else sql[0]
-        return sql
+        table_class = self.model.get_orm_class_by_name(table)
+        dataset_table_class = self.model.get_orm_class_by_name(self._dataset_table.name)
+        dataset_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        paths = [[t.name for t in p] for p in self.model._schema_to_paths() if p[-1].name == table]
+        sql_cmds = []
+        for path in paths:
+            path_sql = select(table_class)
+            last_class = self.model.get_orm_class_by_name(path[0])
+            for t in path[1:]:
+                t_class = self.model.get_orm_class_by_name(t)
+                path_sql = path_sql.join(self._find_relationship_attr(last_class, t_class))
+                last_class = t_class
+            path_sql = path_sql.where(dataset_table_class.RID.in_(dataset_rids))
+            sql_cmds.append(path_sql)
+        return union_all(*sql_cmds)
 
     def get_table(self, table: str) -> Generator[tuple, None, None]:
         """Retrieve the contents of the specified table. If schema is not provided as part of the table name,
@@ -146,9 +141,10 @@ class DatasetBag:
           A generator that yields tuples of column values.
 
         """
-        result = self.database.execute(self._dataset_table_view(table))
-        while row := result.fetchone():
-            yield row
+        with Session(self.engine) as session:
+            result = session.execute(self._dataset_table_view(table))
+            for row in result:
+                yield row
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
         """Retrieve the contents of the specified table as a dataframe.
@@ -163,7 +159,7 @@ class DatasetBag:
         Returns:
           A dataframe containing the contents of the specified table.
         """
-        return pd.read_sql(self._dataset_table_view(table), self.database)
+        return pd.read_sql(self._dataset_table_view(table), self.engine)
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
@@ -176,15 +172,12 @@ class DatasetBag:
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
 
-        table_name = self.model.normalize_table_name(table)
-        schema, table = table_name.split(":")
-        with self.database as _dbase:
-            mapper = SQLMapper(self.model, table)
-            result = self.database.execute(self._dataset_table_view(table))
-            while row := result.fetchone():
-                yield mapper.transform_tuple(row)
+        with Session(self.engine) as session:
+            result = session.execute(self._dataset_table_view(table))
+            for row in result.mappings():
+                yield row
 
-    @validate_call
+    # @validate_call
     def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
@@ -198,39 +191,31 @@ class DatasetBag:
         # Look at each of the element types that might be in the _dataset_table and get the list of rid for them from
         # the appropriate association table.
         members = defaultdict(list)
-        for assoc_table in self._dataset_table.find_associations():
-            member_fkey = assoc_table.other_fkeys.pop()
-            if member_fkey.pk_table.name == "Dataset" and member_fkey.foreign_key_columns[0].name != "Nested_Dataset":
-                # Sometimes find_assoc gets confused on Dataset_Dataset.
-                member_fkey = assoc_table.self_fkey
 
-            target_table = member_fkey.pk_table
-            member_table = assoc_table.table
+        dataset_class = self.model.get_orm_class_for_table(self._dataset_table)
+        for element_table in self.model.list_dataset_element_types():
+            element_class = self.model.get_orm_class_for_table(element_table)
 
-            if target_table.schema.name != self.model.domain_schema and not (
-                target_table == self._dataset_table or target_table.name == "File"
-            ):
+            assoc_class, dataset_rel, element_rel = self.model.get_orm_association_class(dataset_class, element_class)
+
+            element_table = inspect(element_class).mapped_table
+            if element_table.schema != self.model.domain_schema and element_table.name not in ["Dataset", "File"]:
                 # Look at domain tables and nested datasets.
                 continue
-            sql_target = self.model.normalize_table_name(target_table.name)
-            sql_member = self.model.normalize_table_name(member_table.name)
-
             # Get the names of the columns that we are going to need for linking
-            member_link = tuple(c.name for c in next(iter(member_fkey.column_map.items())))
-            with self.database as db:
-                col_names = [c[1] for c in db.execute(f'PRAGMA table_info("{sql_target}")').fetchall()]
-                select_cols = ",".join([f'"{sql_target}".{c}' for c in col_names])
+            with Session(self.engine) as session:
                 sql_cmd = (
-                    f'SELECT {select_cols} FROM "{sql_member}" '
-                    f'JOIN "{sql_target}" ON "{sql_member}".{member_link[0]} = "{sql_target}".{member_link[1]} '
-                    f'WHERE "{self.dataset_rid}" = "{sql_member}".Dataset;'
+                    select(element_class)
+                    .join(element_rel)
+                    .where(self.dataset_rid == assoc_class.__table__.c["Dataset"])
                 )
-                mapper = SQLMapper(self.model, sql_target)
-                target_entities = [mapper.transform_tuple(e) for e in db.execute(sql_cmd).fetchall()]
-            members[target_table.name].extend(target_entities)
-            if recurse and (target_table.name == self._dataset_table.name):
+                # Get back the list of ORM entities and convert them to dictionaries.
+                element_entities = session.scalars(sql_cmd).all()
+                element_rows = [{c.key: getattr(obj, c.key) for c in obj.__table__.columns} for obj in element_entities]
+            members[element_table.name].extend(element_rows)
+            if recurse and (element_table.name == self._dataset_table.name):
                 # Get the members for all the nested datasets and add to the member list.
-                nested_datasets = [d["RID"] for d in target_entities]
+                nested_datasets = [d["RID"] for d in element_rows]
                 for ds in nested_datasets:
                     nested_dataset = self.model.get_dataset(ds)
                     for k, v in nested_dataset.list_dataset_members(recurse=recurse).items():
@@ -259,12 +244,10 @@ class DatasetBag:
             Feature values.
         """
         feature = self.model.lookup_feature(table, feature_name)
-        feature_table = self.model.normalize_table_name(feature.feature_table.name)
-
-        with self.database as db:
-            col_names = [c[1] for c in db.execute(f'PRAGMA table_info("{feature_table}")').fetchall()]
-            sql_cmd = f'SELECT * FROM "{feature_table}"'
-            return cast(datapath._ResultSet, [dict(zip(col_names, r)) for r in db.execute(sql_cmd).fetchall()])
+        feature_class = self.model.get_orm_class_for_table(feature.feature_table)
+        with Session(self.engine) as session:
+            sql_cmd = select(feature_class)
+            return cast(datapath._ResultSet, [row for row in session.execute(sql_cmd).mappings()])
 
     def list_dataset_element_types(self) -> list[Table]:
         """
@@ -291,18 +274,18 @@ class DatasetBag:
         Returns:
             List of child dataset bags.
         """
-        ds_table = self.model.normalize_table_name("Dataset")
-        nds_table = self.model.normalize_table_name("Dataset_Dataset")
-        dv_table = self.model.normalize_table_name("Dataset_Version")
-        with self.database as db:
+        ds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset")
+        nds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Dataset")
+        dv_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Version")
+
+        with Session(self.engine) as session:
             sql_cmd = (
-                f'SELECT  "{nds_table}".Nested_Dataset, "{dv_table}".Version '
-                f'FROM "{nds_table}" JOIN "{dv_table}" JOIN "{ds_table}" on '
-                f'"{ds_table}".Version == "{dv_table}".RID AND '
-                f'"{nds_table}".Nested_Dataset == "{ds_table}".RID '
-                f'where "{nds_table}".Dataset == "{self.dataset_rid}"'
+                select(nds_table.Nested_Dataset, dv_table.Version)
+                .join_from(ds_table, nds_table, onclause=ds_table.RID == nds_table.Nested_Dataset)
+                .join_from(ds_table, dv_table, onclause=ds_table.Version == dv_table.RID)
+                .where(nds_table.Dataset == self.dataset_rid)
             )
-            nested = [DatasetBag(self.model, r[0]) for r in db.execute(sql_cmd).fetchall()]
+            nested = [DatasetBag(self.model, r[0]) for r in session.execute(sql_cmd).all()]
 
         result = copy(nested)
         if recurse:
@@ -336,20 +319,19 @@ class DatasetBag:
                 >>> term = ml.lookup_term("tissue_types", "epithelium")
         """
         # Get and validate vocabulary table reference
-        vocab_table = self.model.normalize_table_name(table)
         if not self.model.is_vocabulary(table):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
         # Search for term by name or synonym
-        for term in self.get_table_as_dict(vocab_table):
+        for term in self.get_table_as_dict(table):
             if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
                 term["Synonyms"] = list(term["Synonyms"])
                 return VocabularyTerm.model_validate(term)
 
         # Term not found
-        raise DerivaMLInvalidTerm(vocab_table, term_name)
+        raise DerivaMLInvalidTerm(table, term_name)
 
-    def _denormalize(self, include_tables: list[str] | None) -> str:
+    def _denormalize(self, include_tables: list[str] | None) -> Select:
         """
         Generates an SQL statement for denormalizing the dataset based on the tables to include. Processes cycles in
         graph relationships, ensures proper join order, and generates selected columns for denormalization.
@@ -361,40 +343,49 @@ class DatasetBag:
         Returns:
             str: SQL query string that represents the process of denormalization.
         """
-
-        def column_name(col: Column) -> str:
-            return f'"{self.model.normalize_table_name(col.table.name)}"."{col.name}"'
-
         # Skip over tables that we don't want to include in the denormalized dataset.
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
         # table.
 
-        join_tables, tables, denormalized_columns, dataset_rids, dataset_element_tables = (
+        def find_relationship(table, join_condition):
+            side1 = (join_condition[0].table.name, join_condition[0].name)
+            side2 = (join_condition[1].table.name, join_condition[1].name)
+
+            for relationship in inspect(table).relationships:
+                local_columns = list(relationship.local_columns)[0].table.name, list(relationship.local_columns)[0].name
+                remote_side = list(relationship.remote_side)[0].table.name, list(relationship.remote_side)[0].name
+                if local_columns == side1 and remote_side == side2 or local_columns == side2 and remote_side == side1:
+                    return relationship
+            return None
+
+        join_tables, join_conditions, denormalized_columns, dataset_rids, dataset_element_tables = (
             self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
         )
-
-        select_args = [
-            # SQLlite will strip out the table name from the column in the select statement, so we need to add
-            # an explicit alias to the column name.
-            f'"{self.model.normalize_table_name(table_name)}"."{column_name}" AS "{table_name}.{column_name}"'
+        denormalized_columns = [
+            self.model.get_orm_class_by_name(table_name)
+            .__table__.columns[column_name]
+            .label(f"{table_name}.{column_name}")
             for table_name, column_name in denormalized_columns
         ]
 
-        # First table in the table list is the table specified in the method call.
-        normalized_join_tables = [self.model.normalize_table_name(t) for t in join_tables]
-        sql_statement = f'SELECT {",".join(select_args)} FROM "{normalized_join_tables[0]}"'
-        for t in normalized_join_tables[1:]:
-            on = tables[t]
-            sql_statement += f' LEFT JOIN "{t}" ON '
-            sql_statement += "OR ".join([f"{column_name(o[0])} = {column_name(o[1])}" for o in on])
+        sql_statement = select(*denormalized_columns).select_from(
+            self.model.get_orm_class_for_table(self._dataset_table)
+        )
 
-        # Select only rows from the datasets you wish to include.
-        dataset_rid_list = ",".join([f'"{self.dataset_rid}"'] + [f'"{b.dataset_rid}"' for b in dataset_rids])
-        sql_statement += f'WHERE  "{self.model.normalize_table_name("Dataset")}"."RID" IN ({dataset_rid_list})'
+        for table_name in join_tables[1:]:  # Skip over dataset table
+            table_class = self.model.get_orm_class_by_name(table_name)
+            on_clause = [
+                getattr(table_class, r.key)
+                for on_condition in join_conditions[table_name]
+                if (r := find_relationship(table_class, on_condition))
+            ]
+            sql_statement = sql_statement.outerjoin(table_class, onclause=or_(*on_clause))
+        dataset_rid_list = [self.dataset_rid] + [b.dataset_rid for b in dataset_rids]
+        dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
 
         # Only include rows that have actual values in them.
-        real_row = [f'"{self.model.normalize_table_name(t)}".RID IS NOT NULL ' for t in dataset_element_tables]
-        sql_statement += f" AND ({' OR '.join(real_row)})"
+        real_row = or_(*[self.model.get_orm_class_by_name(t).RID.isnot(None) for t in dataset_element_tables])
+        sql_statement = sql_statement.where(and_(dataset_class.RID.in_(dataset_rid_list)), real_row)
         return sql_statement
 
     def denormalize_as_dataframe(self, include_tables: list[str] | None = None) -> pd.DataFrame:
@@ -418,7 +409,7 @@ class DatasetBag:
         Returns:
             Dataframe containing the denormalized dataset.
         """
-        return pd.read_sql(self._denormalize(include_tables=include_tables), self.database)
+        return pd.read_sql(self._denormalize(include_tables=include_tables), self.engine)
 
     def denormalize_as_dict(self, include_tables: list[str] | None = None) -> Generator[dict[str, Any], None, None]:
         """
@@ -442,11 +433,10 @@ class DatasetBag:
         Returns:
             A generator that returns a dictionary representation of each row in the denormalized dataset.
         """
-        with self.database as dbase:
-            cursor = dbase.execute(self._denormalize(include_tables=include_tables))
-            columns = [desc[0] for desc in cursor.description]
-            for row in cursor:
-                yield dict(zip(columns, row))
+        with Session(self.engine) as session:
+            cursor = session.execute(self._denormalize(include_tables=include_tables))
+            for row in cursor.mappings():
+                yield row
 
 
 # Add annotations after definition to deal with forward reference issues in pydantic

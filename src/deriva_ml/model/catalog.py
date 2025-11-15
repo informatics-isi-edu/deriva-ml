@@ -312,7 +312,7 @@ class DerivaModel:
 
         return [t for a in dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
 
-    def _prepare_wide_table(self, dataset: DatasetLike, dataset_rid: RID, include_tables: list[str] | None) -> tuple:
+    def _prepare_wide_table(self, dataset, dataset_rid: RID, include_tables: list[str] | None) -> tuple:
         """
         Generates details of a wide table from the model
 
@@ -344,7 +344,7 @@ class DerivaModel:
         }
 
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
-        tables = {}
+        join_conditions = {}
         graph = {}
         for path in table_paths:
             for left, right in zip(path[0:], path[1:]):
@@ -380,9 +380,7 @@ class DerivaModel:
                 if join_tables.index(right.name) < join_tables.index(left.name):
                     continue
                 table_relationship = self._table_relationship(left, right)
-                tables.setdefault(self.normalize_table_name(right.name), set()).add(
-                    (table_relationship[0], table_relationship[1])
-                )
+                join_conditions.setdefault(right.name, set()).add((table_relationship[0], table_relationship[1]))
 
         # Get the list of columns that will appear in the final denormalized dataset.
         denormalized_columns = [
@@ -390,12 +388,12 @@ class DerivaModel:
             for table_name in join_tables
             if not self.is_association(table_name)  # Don't include association columns in the denormalized view.'
             for c in self.name_to_table(table_name).columns
-            if c.name not in skip_columns
+            if (not include_tables or table_name in include_tables) and (c.name not in skip_columns)
         ]
 
         # List of dataset ids to include in the denormalized view.
         dataset_rids = dataset.list_dataset_children(recurse=True)
-        return join_tables, tables, denormalized_columns, dataset_rids, dataset_element_tables
+        return join_tables, join_conditions, denormalized_columns, dataset_rids, dataset_element_tables
 
     def _table_relationship(
         self,
