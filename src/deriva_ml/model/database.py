@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Generator, Optional, Type
 from urllib.parse import urlparse
 
+from dateutil import parser
 from deriva.core.ermrest_model import Column as DerivaColumn
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
@@ -342,10 +343,17 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                 asset_indexes = (
                     (column_names.index("Filename"), column_names.index("URL")) if self._is_asset(table) else None
                 )
+                datetime_columns = [i for i, c in enumerate(sql_table.columns) if isinstance(c.type, DateTime)]
+
+                def map_datetime(row: list) -> list:
+                    for i in datetime_columns:
+                        row[i] = parser.parse(row[i])
+                    return row
 
                 with self.engine.begin() as conn:
                     object_table = [
-                        self._localize_asset(o, asset_indexes, asset_map, table == "Dataset") for o in csv_reader
+                        self._localize_asset(map_datetime(o), asset_indexes, asset_map, table == "Dataset")
+                        for o in csv_reader
                     ]
                     conn.execute(
                         sqlite_insert(sql_table).on_conflict_do_nothing(),
