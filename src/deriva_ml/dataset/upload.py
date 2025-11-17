@@ -77,11 +77,11 @@ feature_value_regex = feature_table_dir_regex + f"{SEP}(?P=feature_name)[.](?P<e
 feature_asset_dir_regex = feature_table_dir_regex + f"{SEP}asset{SEP}(?P<asset_table>[-\\w]+)"
 feature_asset_regex = feature_asset_dir_regex + f"{SEP}(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
 
-asset_path_regex = exec_dir_regex + f"{SEP}asset{SEP}(?P<schema>[-\\w]+){SEP}(?P<asset_table>[-\\w]*)"
+asset_path_regex = exec_dir_regex + rf"{SEP}asset{SEP}(?P<schema>[-\w]+){SEP}(?P<asset_table>[-\w]*)"
 
 asset_file_regex = r"(?P<file>[-\w]+)[.](?P<ext>[a-z0-9]*)$"
 
-table_regex = exec_dir_regex + f"{SEP}table{SEP}(?P<schema>[-\\w]+){SEP}(?P<table>[-\\w]+){SEP}(?P=table)[.](csv|json)$"
+table_regex = exec_dir_regex + rf"{SEP}table{SEP}(?P<schema>[-\w]+){SEP}(?P<table>[-\w]+){SEP}(?P=table)[.](csv|json)$"
 
 
 def is_feature_dir(path: Path) -> Optional[re.Match]:
@@ -190,7 +190,9 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
     metadata_columns = model.asset_metadata(asset_table)
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
-    metadata_path = "/".join([rf"(?P<{c}>[-\w]+)" for c in metadata_columns])
+
+    # Be careful here as a metadata value might be a string with can contain special characters.
+    metadata_path = "/".join([rf"(?P<{c}>[-:._ \w]+)" for c in metadata_columns])
     asset_path = f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
@@ -417,7 +419,7 @@ def asset_file_path(
         raise DerivaMLException(f"Metadata {metadata} does not match asset metadata {asset_metadata}")
 
     for m in asset_metadata:
-        path = path / metadata.get(m, "None")
+        path = path / str(metadata.get(m, "None"))
     path.mkdir(parents=True, exist_ok=True)
     return path / file_name
 
