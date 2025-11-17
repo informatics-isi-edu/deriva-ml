@@ -5,6 +5,7 @@ import itertools
 import logging
 import string
 from collections.abc import Iterator, Sequence
+from datetime import datetime
 from numbers import Integral
 from pathlib import Path
 from random import choice, randint, random
@@ -54,7 +55,9 @@ def populate_demo_catalog(ml_instance: DerivaML) -> None:
     )
     with execution.execute() as e:
         for s in ss:
-            image_file = e.asset_file_path("Image", f"test_{s['RID']}.txt", Subject=s["RID"])
+            image_file = e.asset_file_path(
+                "Image", f"test_{s['RID']}.txt", Subject=s["RID"], Acquisition_Time=datetime.now()
+            )
             with image_file.open("w") as f:
                 f.write(f"Hello there {random()}\n")
         execution.upload_execution_outputs()
@@ -343,7 +346,11 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
     )
     with TemporaryDirectory() as tmpdir:
         ml_instance = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
-        ml_instance.create_asset("Image", referenced_tables=[subject_table])
+        ml_instance.create_asset(
+            "Image",
+            column_defs=[Column.define("Acquisition_Time", builtin_types.timestamp)],
+            referenced_tables=[subject_table],
+        )
         catalog_annotation(ml_instance.model)
 
 
