@@ -28,13 +28,14 @@ import requests
 from pydantic import ConfigDict, validate_call
 
 # Deriva imports
-from deriva.core import DEFAULT_SESSION_CONFIG, format_exception, get_credential, urlquote, init_logging
+from deriva.core import DEFAULT_SESSION_CONFIG, format_exception, get_credential, urlquote
 
 import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException, _SchemaWrapper as SchemaWrapper
 from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
+from deriva.core.utils.core_utils import DEFAULT_LOGGER_OVERRIDES
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 
 from deriva_ml.core.exceptions import DerivaMLInvalidTerm
@@ -174,9 +175,13 @@ class DerivaML(Dataset):
         # Set up logging
         self._logger = logging.getLogger("deriva_ml")
         self._logger.setLevel(logging_level)
+        self._logging_level = logging_level
+        self._deriva_logging_level = deriva_logging_level
 
         # Configure deriva logging level
-        init_logging(deriva_logging_level)
+        logger_config = DEFAULT_LOGGER_OVERRIDES
+        # allow for reconfiguration of module-specific logging levels
+        [logging.getLogger(name).setLevel(level) for name, level in logger_config.items()]
         logging.getLogger("bagit").setLevel(deriva_logging_level)
         logging.getLogger("bdbag").setLevel(deriva_logging_level)
 
@@ -1079,7 +1084,12 @@ class DerivaML(Dataset):
         return self._download_dataset_bag(
             dataset=dataset,
             execution_rid=execution_rid,
-            snapshot_catalog=DerivaML(self.host_name, self._version_snapshot(dataset)),
+            snapshot_catalog=DerivaML(
+                self.host_name,
+                self._version_snapshot(dataset),
+                logging_level=self._logging_level,
+                deriva_logging_level=self._deriva_logging_level,
+            ),
         )
 
     def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID):
