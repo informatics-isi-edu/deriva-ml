@@ -67,6 +67,47 @@ class ERMRestBoolean(TypeDecorator):
         raise ValueError(f"Invalid boolean value: {value!r}")
 
 
+class StringToFloat(TypeDecorator):
+    impl = Float
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value == "" or value is None:
+            return None
+        else:
+            return float(value)
+
+class StringToInteger(TypeDecorator):
+    impl = Integer
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value == "" or value is None:
+            return None
+        else:
+            return int(value)
+
+
+class StringToDateTime(TypeDecorator):
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value == "" or value is None:
+            return None
+        else:
+            return parser.parse(value)
+
+class StringToDate(TypeDecorator):
+    impl = Date
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value == "" or value is None:
+            return None
+        else:
+            return parser.parse(value).date()
+
 class DatabaseModelMeta(type):
     """Use metaclass to ensure that there is only one instance of a database model per path"""
 
@@ -179,16 +220,16 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         """Return the SQL type for a Deriva column."""
         return {
             "boolean": ERMRestBoolean,
-            "date": Date,
-            "float4": Float,
-            "float8": Float,
-            "int2": Integer,
-            "int4": Integer,
-            "int8": Integer,
+            "date": StringToDate,
+            "float4": StringToFloat,
+            "float8": StringToFloat,
+            "int2": StringToInteger,
+            "int4": StringToInteger,
+            "int8": StringToInteger,
             "json": JSON,
             "jsonb": JSON,
-            "timestamptz": DateTime,
-            "timestamp": DateTime,
+            "timestamptz": StringToDateTime,
+            "timestamp": StringToDateTime,
         }.get(type.typename, String)
 
     def _load_model(self) -> None:
@@ -343,16 +384,10 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
                 asset_indexes = (
                     (column_names.index("Filename"), column_names.index("URL")) if self._is_asset(table) else None
                 )
-                datetime_columns = [i for i, c in enumerate(sql_table.columns) if isinstance(c.type, DateTime)]
-
-                def map_datetime(row: list) -> list:
-                    for i in datetime_columns:
-                        row[i] = parser.parse(row[i])
-                    return row
 
                 with self.engine.begin() as conn:
                     object_table = [
-                        self._localize_asset(map_datetime(o), asset_indexes, asset_map, table == "Dataset")
+                        self._localize_asset(o, asset_indexes, asset_map, table == "Dataset")
                         for o in csv_reader
                     ]
                     conn.execute(
