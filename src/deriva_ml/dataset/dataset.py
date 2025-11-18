@@ -31,6 +31,7 @@ from graphlib import TopologicalSorter
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
+from urllib.parse import urlparse
 
 import deriva.core.utils.hash_utils as hash_utils
 import requests
@@ -1040,7 +1041,6 @@ class Dataset:
                     envars={"RID": dataset.rid},
                 )
                 minid_page_url = exporter.export()[0]  # Get the MINID launch page
-
             except (
                 DerivaDownloadError,
                 DerivaDownloadConfigurationError,
@@ -1096,7 +1096,8 @@ class Dataset:
 
         # Check or create MINID
         minid_url = version_record.minid
-        if not minid_url:
+        # If we either don't have a MINID, or we have a MINID, but we don't want to use it, generate a new one.
+        if (not minid_url) or (not self._use_minid):
             if not create:
                 raise DerivaMLException(f"Minid for dataset {rid} doesn't exist")
             if self._use_minid:
@@ -1106,7 +1107,6 @@ class Dataset:
         # Return based on MINID usage
         if self._use_minid:
             return self._fetch_minid_metadata(minid_url, dataset.version)
-
         return DatasetMinid(
             dataset_version=dataset.version,
             RID=f"{rid}@{version_record.snapshot}",
@@ -1139,7 +1139,8 @@ class Dataset:
         with TemporaryDirectory() as tmp_dir:
             if self._use_minid:
                 # Get bag from S3
-                archive_path = fetch_single_file(minid.bag_url, output_path=tmp_dir)
+                bag_path = Path(tmp_dir) / Path(urlparse(minid.bag_url).path).name
+                archive_path = fetch_single_file(minid.bag_url, output_path=bag_path)
             else:
                 exporter = DerivaExport(host=self._model.catalog.deriva_server.server, output_dir=tmp_dir)
                 archive_path = exporter.retrieve_file(minid.bag_url)
