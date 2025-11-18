@@ -56,7 +56,11 @@ def populate_demo_catalog(ml_instance: DerivaML) -> None:
     with execution.execute() as e:
         for s in ss:
             image_file = e.asset_file_path(
-                "Image", f"test_{s['RID']}.txt", Subject=s["RID"], Acquisition_Time=datetime.now()
+                "Image",
+                f"test_{s['RID']}.txt",
+                Subject=s["RID"],
+                Acquisition_Time=datetime.now(),
+                Acquisition_Date=datetime.now().date(),
             )
             with image_file.open("w") as f:
                 f.write(f"Hello there {random()}\n")
@@ -348,7 +352,10 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         ml_instance = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
         ml_instance.create_asset(
             "Image",
-            column_defs=[Column.define("Acquisition_Time", builtin_types.timestamp)],
+            column_defs=[
+                Column.define("Acquisition_Time", builtin_types.timestamp),
+                Column.define("Acquisition_Date", builtin_types.date),
+            ],
             referenced_tables=[subject_table],
         )
         catalog_annotation(ml_instance.model)
