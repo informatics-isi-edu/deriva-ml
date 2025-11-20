@@ -391,7 +391,9 @@ class DatasetBag:
             sql_statement = sql_statement.distinct()
         return sql_statement
 
-    def denormalize_as_dataframe(self, include_tables: list[str] | None = None) -> pd.DataFrame:
+    def denormalize_as_dataframe(
+        self, include_tables: list[str] | None = None, allow_duplicates: bool = False
+    ) -> pd.DataFrame:
         """
         Denormalize the dataset and return the result as a dataframe.
 
@@ -413,9 +415,13 @@ class DatasetBag:
         Returns:
             Dataframe containing the denormalized dataset.
         """
-        return pd.read_sql(self._denormalize(include_tables=include_tables), self.engine)
+        return pd.read_sql(
+            self._denormalize(include_tables=include_tables, allow_duplicates=allow_duplicates), self.engine
+        )
 
-    def denormalize_as_dict(self, include_tables: list[str] | None = None) -> Generator[RowMapping, None, None]:
+    def denormalize_as_dict(
+        self, include_tables: list[str] | None = None, allow_duplicates: bool = False
+    ) -> Generator[RowMapping, None, None]:
         """
         Denormalize the dataset and return the result as a set of dictionary's.
 
@@ -433,12 +439,16 @@ class DatasetBag:
         Args:
             include_tables: List of table names to include in the denormalized dataset. If None, than the entire schema
             is used.
+            allow_duplicates: Whether to allow duplicate rows in the denormalized dataset. Default is False.
 
         Returns:
             A generator that returns a dictionary representation of each row in the denormalized dataset.
         """
         with Session(self.engine) as session:
-            cursor = session.execute(self._denormalize(include_tables=include_tables))
+            cursor = session.execute(
+                self._denormalize(include_tables=include_tables, allow_duplicates=allow_duplicates)
+            )
+            yield from cursor.mappings()
             for row in cursor.mappings():
                 yield row
 
