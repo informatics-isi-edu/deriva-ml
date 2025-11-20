@@ -583,7 +583,6 @@ class Execution:
                     asset_rid=status.result["RID"],
                 )
             )
-
         self._update_asset_execution_table(asset_map)
         self.update_status(Status.running, "Updating features...")
 
@@ -805,7 +804,7 @@ class Execution:
         self,
         uploaded_assets: dict[str, list[AssetFilePath]],
         asset_role: str = "Output",
-    ):
+    ) -> None:
         """Add entry to the association table connecting an asset to an execution RID
 
         Args:
@@ -814,6 +813,9 @@ class Execution:
              asset_role: A term or list of terms from the Asset_Role vocabulary.
         """
         # Make sure the asset role is in the controlled vocabulary table.
+        if self._dry_run:
+            # Don't do any updates of we are doing a dry run.
+            return
         self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
 
         pb = self._ml_object.pathBuilder
