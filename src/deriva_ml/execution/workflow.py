@@ -9,6 +9,7 @@ from typing import Any
 import requests
 from pydantic import BaseModel, PrivateAttr, model_validator
 from requests import RequestException
+from setuptools_scm import get_version
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
@@ -128,6 +129,8 @@ class Workflow(BaseModel):
             path, self.is_notebook = Workflow._get_python_script()
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
             self.git_root = Workflow._get_git_root(path)
+
+        self.version: str = get_version()
 
         self._logger = logging.getLogger("deriva_ml")
         return self

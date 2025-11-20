@@ -117,6 +117,7 @@ class DatasetBag:
         table_class = self.model.get_orm_class_by_name(table)
         dataset_table_class = self.model.get_orm_class_by_name(self._dataset_table.name)
         dataset_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        print("dataset_rids", dataset_rids)
         paths = [[t.name for t in p] for p in self.model._schema_to_paths() if p[-1].name == table]
         sql_cmds = []
         for path in paths:
