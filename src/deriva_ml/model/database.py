@@ -495,8 +495,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
         # Get a list of all the dataset_type values associated with this dataset_table.
         datasets = []
-        ds_types = list(self._get_table(atable))
-        for dataset in self._get_table("Dataset"):
+        ds_types = list(self._get_table_contents(atable))
+        for dataset in self._get_table_contents("Dataset"):
             my_types = [t for t in ds_types if t["Dataset"] == dataset["RID"]]
             datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in my_types]})
         return datasets
@@ -505,19 +505,18 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         """Returns a list of all the dataset_table entries associated with a dataset."""
         return self.get_dataset(dataset_rid).list_dataset_members()
 
-    def _get_table(self, table: str) -> Generator[dict[str, Any], None, None]:
+    def _get_table_contents(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.
 
         Args:
-            table: Table to retrieve data from. f schema is not provided as part of the table name,
+            table: Table to retrieve data from. If schema is not provided as part of the table name,
                 the method will attempt to locate the schema for the table.
 
         Returns:
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
-
         with self.engine.connect() as conn:
-            result = conn.execute(select(self.metadata.tables[table]))
+            result = conn.execute(select(self.metadata.tables[self.find_table(table)]))
             for row in result.mappings():
                 yield dict(row)
 
