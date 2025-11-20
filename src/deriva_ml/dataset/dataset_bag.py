@@ -331,7 +331,7 @@ class DatasetBag:
         # Term not found
         raise DerivaMLInvalidTerm(table, term_name)
 
-    def _denormalize(self, include_tables: list[str] | None) -> Select:
+    def _denormalize(self, include_tables: list[str] | None, allow_duplicates: bool = False) -> Select:
         """
         Generates an SQL statement for denormalizing the dataset based on the tables to include. Processes cycles in
         graph relationships, ensures proper join order, and generates selected columns for denormalization.
@@ -339,6 +339,7 @@ class DatasetBag:
         Args:
             include_tables (list[str] | None): List of table names to include in the denormalized dataset. If None,
                 all tables from the dataset will be included.
+            allow_duplicates (bool): Whether to allow duplicate rows in the denormalized dataset. Default is False.
 
         Returns:
             str: SQL query string that represents the process of denormalization.
@@ -386,6 +387,8 @@ class DatasetBag:
         # Only include rows that have actual values in them.
         real_row = or_(*[self.model.get_orm_class_by_name(t).RID.isnot(None) for t in dataset_element_tables])
         sql_statement = sql_statement.where(and_(dataset_class.RID.in_(dataset_rid_list)), real_row)
+        if not allow_duplicates:
+            sql_statement = sql_statement.distinct()
         return sql_statement
 
     def denormalize_as_dataframe(self, include_tables: list[str] | None = None) -> pd.DataFrame:
