@@ -453,7 +453,9 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
     def find_table(self, table_name: str) -> SQLTable:
         """Find a table in the catalog."""
-        return [t for t in self.metadata.tables if t == table_name or t.split(".")[1] == table_name][0]
+        # We will look across ml and domain schema to find a table whose name matches.
+        table = [t for t in self.metadata.tables if t == table_name or t.split(".")[1] == table_name][0]
+        return self.metadata.tables[table]
 
     def list_tables(self) -> list[str]:
         """List the names of the tables in the catalog
@@ -515,8 +517,9 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         Returns:
           A generator producing dictionaries containing the contents of the specified table as name/value pairs.
         """
+
         with self.engine.connect() as conn:
-            result = conn.execute(select(self.metadata.tables[self.find_table(table)]))
+            result = conn.execute(select(self.find_table(table)))
             for row in result.mappings():
                 yield dict(row)
 
@@ -539,7 +542,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             raise DerivaMLException(f"Dataset {dataset_rid} not found")
 
     def get_orm_class_by_name(self, table: str) -> Any | None:
-        sql_table = self.metadata.tables.get(self.find_table(table))
+        sql_table = self.find_table(table)
         if sql_table is None:
             raise DerivaMLException(f"Table {table} not found")
         return self.get_orm_class_for_table(sql_table)
@@ -549,7 +552,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         if isinstance(table, DerivaTable):
             table = self.metadata.tables[f"{table.schema.name}.{table.name}"]
             if isinstance(table, str):
-                table = self.metadata.tables.get(self.find_table(table))
+                table = self.find_table(table)
         for mapper in self.Base.registry.mappers:
             if mapper.persist_selectable is table or table in mapper.tables:
                 return mapper.class_
