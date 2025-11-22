@@ -1,154 +1,94 @@
 from typing import Any, Type
-
+from deriva_ml import RID
 from sqlalchemy import UniqueConstraint, inspect
+from collections import defaultdict
+from graphlib import CycleError, TopologicalSorter
 
-
-def is_association(
-    table_class, min_arity=2, max_arity=2, unqualified=True, pure=True, no_overlap=True, return_fkeys=False
-):
-    """Return (truthy) integer arity if self is a matching association, else False.
-
-    min_arity: minimum number of associated fkeys (default 2)
-    max_arity: maximum number of associated fkeys (default 2) or None
-    unqualified: reject qualified associations when True (default True)
-    pure: reject impure assocations when True (default True)
-    no_overlap: reject overlapping associations when True (default True)
-    return_fkeys: return the set of N associated ForeignKeys if True
-
-    The default behavior with no arguments is to test for pure,
-    unqualified, non-overlapping, binary assocations.
-
-    An association is comprised of several foreign keys which are
-    covered by a non-nullable composite row key. This allows
-    specific combinations of foreign keys to appear at most once.
-
-    The arity of an association is the number of foreign keys
-    being associated. A typical binary association has arity=2.
-
-    An unqualified association contains *only* the foreign key
-    material in its row key. Conversely, a qualified association
-    mixes in other material which means that a specific
-    combination of foreign keys may repeat with different
-    qualifiers.
-
-    A pure association contains *only* row key
-    material. Conversely, an impure association includes
-    additional metadata columns not covered by the row key. Unlike
-    qualifiers, impure metadata merely decorates an association
-    without augmenting its identifying characteristics.
-
-    A non-overlapping association does not share any columns
-    between multiple foreign keys. This means that all
-    combinations of foreign keys are possible. Conversely, an
-    overlapping association shares some columns between multiple
-    foreign keys, potentially limiting the combinations which can
-    be represented in an association row.
-
-    These tests ignore the five ERMrest system columns and any
-    corresponding constraints.
-
+def _prepare_wide_table(self, dataset, dataset_rid: RID, include_tables: list[str]) -> tuple:
     """
-    if min_arity < 2:
-        raise ValueError("An assocation cannot have arity < 2")
-    if max_arity is not None and max_arity < min_arity:
-        raise ValueError("max_arity cannot be less than min_arity")
+    Generates details of a wide table from the model
 
-    rels = list(inspect(table_class).relationships)
-    mapper = inspect(table_class).mapper
+    Args:
+        include_tables (list[str] | None): List of table names to include in the denormalized dataset. If None,
+            all tables from the dataset will be included.
 
-    # TODO: revisit whether there are any other cases we might
-    # care about where system columns are involved?
-    non_sys_cols = {col.name for col in mapper.columns if col.name not in {"RID", "RCT", "RMT", "RCB", "RMB"}}
-    unique_columns = [
-        {c.name for c in constraint.columns}
-        for constraint in inspect(table_class).local_table.constraints
-        if isinstance(constraint, UniqueConstraint)
+    Returns:
+        str: SQL query string that represents the process of denormalization.
+    """
+
+    # Skip over tables that we don't want to include in the denormalized dataset.
+    # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
+    # table.
+    include_tables = set(include_tables)
+    for t in include_tables:
+        # Check to make sure the table is in the catalog.
+        _ = self.name_to_table(t)
+
+    table_paths = [
+        path
+        for path in self._schema_to_paths()
+        if path[-1].name in include_tables and include_tables.intersection({p.name for p in path})
+    ]
+    paths_by_element = defaultdict(list)
+    for p in table_paths:
+        paths_by_element[p[2].name].append(p)
+
+    # Get the names of all of the tables that can be dataset elements.
+    dataset_element_tables = {e.name for e in self.list_dataset_element_types() if e.schema.name == self.domain_schema}
+
+    skip_columns = {"RCT", "RMT", "RCB", "RMB"}
+    join_conditions = {}
+    join_tables = {}
+    for element_table, paths in paths_by_element.items():
+        graph = {}
+        for path in paths:
+            for left, right in zip(path[0:], path[1:]):
+                graph.setdefault(left.name, set()).add(right.name)
+
+        # New lets remove any cycles that we may have in the graph.
+        # We will use a topological sort to find the order in which we need to join the tables.
+        # If we find a cycle, we will remove the table from the graph and splice in an additional ON clause.
+        # We will then repeat the process until there are no cycles.
+        graph_has_cycles = True
+        element_join_tables = []
+        element_join_conditions = {}
+        while graph_has_cycles:
+            try:
+                ts = TopologicalSorter(graph)
+                element_join_tables = list(reversed(list(ts.static_order())))
+                graph_has_cycles = False
+            except CycleError as e:
+                cycle_nodes = e.args[1]
+                if len(cycle_nodes) > 3:
+                    raise DerivaMLException(f"Unexpected cycle found when normalizing dataset {cycle_nodes}")
+                # Remove cycle from graph and splice in additional ON constraint.
+                graph[cycle_nodes[1]].remove(cycle_nodes[0])
+
+    # The Dataset_Version table is a special case as it points to dataset and dataset to version.
+        if "Dataset_Version" in join_tables:
+            element_join_tables.remove("Dataset_Version")
+
+        for path in paths:
+            for left, right in zip(path[0:], path[1:]):
+                if right.name == "Dataset_Version":
+                    # The Dataset_Version table is a special case as it points to dataset and dataset to version.
+                    continue
+                if element_join_tables.index(right.name) < element_join_tables.index(left.name):
+                    continue
+                table_relationship = self._table_relationship(left, right)
+                element_join_conditions.setdefault(right.name, set()).add((table_relationship[0], table_relationship[1]))
+        join_tables[element_table] = element_join_tables
+        join_conditions[element_table] = element_join_conditions
+    # Get the list of columns that will appear in the final denormalized dataset.
+    denormalized_columns = [
+        (table_name, c.name)
+        for table_name in join_tables
+        if not self.is_association(table_name)  # Don't include association columns in the denormalized view.'
+        for c in self.name_to_table(table_name).columns
+        if (not include_tables or table_name in include_tables) and (c.name not in skip_columns)
     ]
 
-    non_sys_key_colsets = {
-        frozenset(unique_column_set)
-        for unique_column_set in unique_columns
-        if unique_column_set.issubset(non_sys_cols) and len(unique_column_set) > 1
-    }
+    # List of dataset ids to include in the denormalized view.
+    dataset_rids = [dataset_rid] + dataset.list_dataset_children(recurse=True)
+    return join_tables, join_conditions, denormalized_columns, dataset_rids, dataset_element_tables
 
-    if not non_sys_key_colsets:
-        # reject: not association
-        return False
-
-    # choose longest compound key (arbitrary choice with ties!)
-    row_key = sorted(non_sys_key_colsets, key=lambda s: len(s), reverse=True)[0]
-    foreign_keys = [constraint for constraint in inspect(table_class).relationships.values()]
-
-    covered_fkeys = {fkey for fkey in foreign_keys if {c.name for c in fkey.local_columns}.issubset(row_key)}
-    covered_fkey_cols = set()
-
-    if len(covered_fkeys) < min_arity:
-        # reject: not enough fkeys in association
-        return False
-    elif max_arity is not None and len(covered_fkeys) > max_arity:
-        # reject: too many fkeys in association
-        return False
-
-    for fkey in covered_fkeys:
-        fkcols = {c.name for c in fkey.local_columns}
-        if no_overlap and fkcols.intersection(covered_fkey_cols):
-            # reject: overlapping fkeys in association
-            return False
-        covered_fkey_cols.update(fkcols)
-
-    if unqualified and row_key.difference(covered_fkey_cols):
-        # reject: qualified association
-        return False
-
-    if pure and non_sys_cols.difference(row_key):
-        # reject: impure association
-        return False
-
-    # return (truthy) arity or fkeys
-    if return_fkeys:
-        return covered_fkeys
-    else:
-        return len(covered_fkeys)
-
-
-def get_orm_association_class(
-    left_cls: Type[Any],
-    right_cls: Type[Any],
-    min_arity=2,
-    max_arity=2,
-    unqualified=True,
-    pure=True,
-    no_overlap=True,
-):
-    """
-    Find an association class C by: (1) walking rels on left_cls to a mid class C,
-    (2) verifying C also relates to right_cls. Returns (C, C->left, C->right) or None.
-
-    """
-    for _, left_rel in inspect(left_cls).relationships.items():
-        mid_cls = left_rel.mapper.class_
-        is_assoc = is_association(mid_cls, return_fkeys=True)
-        if not is_assoc:
-            continue
-        assoc_local_columns_left = list(is_assoc)[0].local_columns
-        assoc_local_columns_right = list(is_assoc)[1].local_columns
-
-        found_left = found_right = False
-        for r in inspect(left_cls).relationships.values():
-            remote_side = list(r.remote_side)[0]
-            if remote_side in assoc_local_columns_left:
-                found_left = r
-            if remote_side in assoc_local_columns_right:
-                found_left = r
-                # We have left and right backwards from the assocation, so swap them.
-                assoc_local_columns_left, assoc_local_columns_right = (
-                    assoc_local_columns_right,
-                    assoc_local_columns_left,
-                )
-        for r in inspect(right_cls).relationships.values():
-            remote_side = list(r.remote_side)[0]
-            if remote_side in assoc_local_columns_right:
-                found_right = r
-        if found_left != False and found_right != False:
-            return mid_cls, found_left, found_right
-    return None

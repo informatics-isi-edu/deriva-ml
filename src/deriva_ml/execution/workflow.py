@@ -130,7 +130,12 @@ class Workflow(BaseModel):
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
             self.git_root = Workflow._get_git_root(path)
 
-        self.version: str = get_version(root=self.git_root)
+        self.version = get_version(
+            root=str(self.git_root or Path.cwd()),
+            search_parent_directories=True,
+            # Optional but recommended: provide a safe fallback when tags are absent
+            fallback_version="0.0",
+        )
 
         self._logger = logging.getLogger("deriva_ml")
         return self

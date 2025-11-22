@@ -17,7 +17,7 @@ dependencies = [
     "regex~=2024.7.24",
     "pydantic>=2.11",
     "semver>3.0.0",
-    "setuptools>=64",
+    "setuptools>=80",
     "setuptools-scm>=8.0",
     "nbstripout",
     "papermill",
@@ -40,10 +40,11 @@ deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
 [project.optional-dependencies]
 
 [build-system]
-requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2", "wheel"]
+requires = ["setuptools>=80", "setuptools_scm[toml]>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
+python-preference = "only-managed"
 
 [tool.uv.sources]
 #bdbag = {git = "https://github.com/fair-research/bdbag", branch = "master" }

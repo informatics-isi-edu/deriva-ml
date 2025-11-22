@@ -19,7 +19,7 @@ from deriva.core.ermrest_model import Table
 
 # Deriva imports
 from pydantic import ConfigDict, validate_call
-from sqlalchemy import CompoundSelect, Engine, RowMapping, Select, and_, inspect, or_, select, union_all
+from sqlalchemy import CompoundSelect, Engine, RowMapping, Select, and_, inspect, select, union
 from sqlalchemy.orm import RelationshipProperty, Session
 from sqlalchemy.orm.util import AliasedClass
 
@@ -332,7 +332,7 @@ class DatasetBag:
         # Term not found
         raise DerivaMLInvalidTerm(table, term_name)
 
-    def _denormalize(self, include_tables: list[str] | None, allow_duplicates: bool = False) -> Select:
+    def _denormalize(self, include_tables: list[str]) -> Select:
         """
         Generates an SQL statement for denormalizing the dataset based on the tables to include. Processes cycles in
         graph relationships, ensures proper join order, and generates selected columns for denormalization.
@@ -340,7 +340,6 @@ class DatasetBag:
         Args:
             include_tables (list[str] | None): List of table names to include in the denormalized dataset. If None,
                 all tables from the dataset will be included.
-            allow_duplicates (bool): Whether to allow duplicate rows in the denormalized dataset. Default is False.
 
         Returns:
             str: SQL query string that represents the process of denormalization.
@@ -360,41 +359,36 @@ class DatasetBag:
                     return relationship
             return None
 
-        join_tables, join_conditions, denormalized_columns, dataset_rids, dataset_element_tables = (
+        join_tables, denormalized_columns = (
             self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
         )
+
         denormalized_columns = [
             self.model.get_orm_class_by_name(table_name)
             .__table__.columns[column_name]
             .label(f"{table_name}.{column_name}")
             for table_name, column_name in denormalized_columns
         ]
+        sql_statements = []
+        for key, (path, join_conditions) in join_tables.items():
+            sql_statement = select(*denormalized_columns).select_from(
+                self.model.get_orm_class_for_table(self._dataset_table)
+            )
+            for table_name in path[1:]:  # Skip over dataset table
+                table_class = self.model.get_orm_class_by_name(table_name)
+                on_clause = [
+                    getattr(table_class, r.key)
+                    for on_condition in join_conditions[table_name]
+                    if (r := find_relationship(table_class, on_condition))
+                ]
+                sql_statement = sql_statement.join(table_class, onclause=and_(*on_clause))
+            dataset_rid_list = [self.dataset_rid] + self.list_dataset_children(recurse=True)
+            dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
+            sql_statement = sql_statement.where(dataset_class.RID.in_(dataset_rid_list))
+            sql_statements.append(sql_statement)
+        return union(*sql_statements)
 
-        sql_statement = select(*denormalized_columns).select_from(
-            self.model.get_orm_class_for_table(self._dataset_table)
-        )
-
-        for table_name in join_tables[1:]:  # Skip over dataset table
-            table_class = self.model.get_orm_class_by_name(table_name)
-            on_clause = [
-                getattr(table_class, r.key)
-                for on_condition in join_conditions[table_name]
-                if (r := find_relationship(table_class, on_condition))
-            ]
-            sql_statement = sql_statement.outerjoin(table_class, onclause=or_(*on_clause))
-        dataset_rid_list = [self.dataset_rid] + [b.dataset_rid for b in dataset_rids]
-        dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
-
-        # Only include rows that have actual values in them.
-        real_row = or_(*[self.model.get_orm_class_by_name(t).RID.isnot(None) for t in dataset_element_tables])
-        sql_statement = sql_statement.where(and_(dataset_class.RID.in_(dataset_rid_list)), real_row)
-        if not allow_duplicates:
-            sql_statement = sql_statement.distinct()
-        return sql_statement
-
-    def denormalize_as_dataframe(
-        self, include_tables: list[str] | None = None, allow_duplicates: bool = False
-    ) -> pd.DataFrame:
+    def denormalize_as_dataframe(self, include_tables: list[str]) -> pd.DataFrame:
         """
         Denormalize the dataset and return the result as a dataframe.
 
@@ -410,19 +404,14 @@ class DatasetBag:
         The resulting wide table will include a column for every table needed to complete the denormalization process.
 
         Args:
-            include_tables: List of table names to include in the denormalized dataset. If None, than the entire schema
-            is used.
+            include_tables: List of table names to include in the denormalized dataset.
 
         Returns:
             Dataframe containing the denormalized dataset.
         """
-        return pd.read_sql(
-            self._denormalize(include_tables=include_tables, allow_duplicates=allow_duplicates), self.engine
-        )
+        return pd.read_sql(self._denormalize(include_tables=include_tables), self.engine)
 
-    def denormalize_as_dict(
-        self, include_tables: list[str] | None = None, allow_duplicates: bool = False
-    ) -> Generator[RowMapping, None, None]:
+    def denormalize_as_dict(self, include_tables: list[str]) -> Generator[RowMapping, None, None]:
         """
         Denormalize the dataset and return the result as a set of dictionary's.
 
@@ -440,14 +429,13 @@ class DatasetBag:
         Args:
             include_tables: List of table names to include in the denormalized dataset. If None, than the entire schema
             is used.
-            allow_duplicates: Whether to allow duplicate rows in the denormalized dataset. Default is False.
 
         Returns:
             A generator that returns a dictionary representation of each row in the denormalized dataset.
         """
         with Session(self.engine) as session:
             cursor = session.execute(
-                self._denormalize(include_tables=include_tables, allow_duplicates=allow_duplicates)
+                self._denormalize(include_tables=include_tables)
             )
             yield from cursor.mappings()
             for row in cursor.mappings():
