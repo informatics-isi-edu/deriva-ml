@@ -129,7 +129,7 @@ class DatasetBag:
                 last_class = t_class
             path_sql = path_sql.where(dataset_table_class.RID.in_(dataset_rids))
             sql_cmds.append(path_sql)
-        return union_all(*sql_cmds)
+        return union(*sql_cmds)
 
     def get_table(self, table: str) -> Generator[tuple, None, None]:
         """Retrieve the contents of the specified table. If schema is not provided as part of the table name,
