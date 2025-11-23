@@ -8,7 +8,6 @@ from hydra_zen import store
 from omegaconf import OmegaConf
 from pydantic import BaseModel, model_validator
 
-from deriva_ml import DerivaML
 from deriva_ml.core.definitions import ML_SCHEMA
 
 
@@ -53,9 +52,6 @@ class DerivaMLConfig(BaseModel):
         # Create a default working directory if none is provided
         working_dir = Path(working_dir) if working_dir else Path.home() / "deriva-ml"
         return working_dir.absolute()
-
-    def instantiate(self) -> DerivaML:
-        return DerivaML(**self.model_dump())
 
 
 OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdir, replace=True)

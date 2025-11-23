@@ -19,7 +19,7 @@ import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any
+from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any, Self
 from urllib.parse import urlsplit
 
 
@@ -103,6 +103,10 @@ class DerivaML(Dataset):
         >>> ml.create_feature('my_table', 'new_feature')
         >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')
     """
+
+    @classmethod
+    def instantiate(cls, config: DerivaMLConfig) -> Self:
+        return cls(**config.model_dump())
 
     def __init__(
         self,
