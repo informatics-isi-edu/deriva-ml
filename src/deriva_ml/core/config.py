@@ -54,7 +54,7 @@ class DerivaMLConfig(BaseModel):
         return working_dir.absolute()
 
     def instantiate(self):
-        return DerivaMLConfig(**self.model_dump())
+        return DerivaML(**self.model_dump())
 
 
 OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdir, replace=True)
