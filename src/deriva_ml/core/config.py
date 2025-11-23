@@ -53,6 +53,9 @@ class DerivaMLConfig(BaseModel):
         working_dir = Path(working_dir) if working_dir else Path.home() / "deriva-ml"
         return working_dir.absolute()
 
+    def instantiate(self):
+        return DerivaMLConfig(**self.model_dump())
+
 
 OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdir, replace=True)
 store(
