@@ -3,7 +3,7 @@ THis module defines the DataSet class with is used to manipulate n
 """
 
 from enum import Enum
-from typing import Any, Optional, SupportsInt
+from typing import Any, Optional, SupportsInt, overload
 
 from hydra_zen import hydrated_dataclass
 from pydantic import (
@@ -43,6 +43,9 @@ class DatasetVersion(Version):
         replace(major, minor, patch): Replace the major and minor versions
     """
 
+    @overload
+    def __init__(self, version: str): ...
+    @overload
     def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0):
         """Initialize a DatasetVersion object.
 
@@ -51,6 +54,21 @@ class DatasetVersion(Version):
             minor: Minor version number.  Used to indicate additional members added, or change in member values.
             patch: Patch number of the dataset.  Used to indicate minor clean-up and edits
         """
+        ...
+
+    def __init__(self, *args):
+        """Initialize a DatasetVersion object.
+
+        Args:
+            major: Major version number. Used to indicate schema changes.
+            minor: Minor version number.  Used to indicate additional members added, or change in member values.
+            patch: Patch number of the dataset.  Used to indicate minor clean-up and edits
+        """
+        if len(args) == 1 and isinstance(args[0], str):
+            v = Version.parse(args[0])
+            major, minor, patch = v.major, v.minor, v.patch
+        else:
+            major, minor, patch = args
         super().__init__(major, minor, patch)
 
     def to_dict(self) -> dict[str, Any]:
@@ -230,10 +248,12 @@ class DatasetConfig:
         description (str): Optional description of the dataset. Defaults to
             an empty string.
     """
+
     rid: str
     version: str
     materialize: bool = True
     description: str = ""
+
 
 class DatasetList(BaseModel):
     """A list of dataset specifications.
@@ -242,25 +262,6 @@ class DatasetList(BaseModel):
         datasets: list[DatasetSpec] A list of dataset specifications
         description: str = "" An optional description of the dataset list
     """
+
     datasets: list[DatasetSpec]
-    description: str = ""
-
-@hydrated_dataclass(DatasetList)
-class DatasetConfigList:
-    """A list of dataset specifications.
-
-    This dataclass is used to represent a list of dataset specifications that can be used by Hydra-Zen to configure
-    an execution of a DerivaML execution.  Each element of the liest is a DatasetConfiguration, which is the Hydra
-    interface to a DatasetSpec.
-
-    The DatasetConfigList can be added to the HydraZen store, to create a dataset configuration.
-
-    Examples:
-        >>> from hydra_zen import store
-        >>> test_dataset  = DatasetConfigList(datasets=[DatasetConfig(rid="4S2", version="1.3.0")])
-        >>>  datasets_store = store(group="datasets")
-        >>> datasets_store(datasets_test, name="test1")
-
-    """
-    datasets: list[DatasetConfig]
     description: str = ""
