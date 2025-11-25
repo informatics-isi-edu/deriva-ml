@@ -230,38 +230,10 @@ class DatasetSpec(BaseModel):
         return version.to_dict()
 
 
+# Interface for hydra-zen
 @hydrated_dataclass(DatasetSpec)
-class DatasetConfig:
-    """Represents the configuration of a dataset.
-
-    This class is used to configure and describe a dataset, providing relevant
-    metadata such as its identifier, version, and description. It also indicates
-    whether the dataset should be materialized.
-
-    This class can be used by Hydra-Zen to configure an execution of a DerivaML execution.
-
-    Attributes:
-        rid (str): Unique identifier of the dataset.
-        version (str): Version of the dataset of the form X.Y.Z, where X, Y, and Z are integers.
-        materialize (bool): Indicates if the dataset should be materialized.
-            Defaults to True.
-        description (str): Optional description of the dataset. Defaults to
-            an empty string.
-    """
-
+class DatasetSpecConfig:
     rid: str
     version: str
     materialize: bool = True
-    description: str = ""
-
-
-class DatasetList(BaseModel):
-    """A list of dataset specifications.
-
-    Attributes:
-        datasets: list[DatasetSpec] A list of dataset specifications
-        description: str = "" An optional description of the dataset list
-    """
-
-    datasets: list[DatasetSpec]
     description: str = ""

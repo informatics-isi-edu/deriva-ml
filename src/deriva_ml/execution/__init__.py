@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 # Safe imports - no circular dependencies
-from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution.execution_configuration import ExecutionConfiguration, AssetRIDConfig
 from deriva_ml.execution.workflow import Workflow
 
 if TYPE_CHECKING:
@@ -22,4 +22,5 @@ __all__ = [
     "Execution",  # Lazy-loaded
     "ExecutionConfiguration",
     "Workflow",
+    "AssetRIDConfig"
 ]

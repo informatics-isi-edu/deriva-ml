@@ -22,15 +22,17 @@ Typical usage example:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import sys
 from pathlib import Path
 from typing import Any
 
+from hydra_zen import builds
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from deriva_ml.core.definitions import RID
-from deriva_ml.dataset.aux_classes import DatasetList, DatasetSpec
+from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.workflow import Workflow
 
 
@@ -64,7 +66,7 @@ class ExecutionConfiguration(BaseModel):
         ... )
     """
 
-    datasets: list[DatasetSpec] | DatasetList = []
+    datasets: list[DatasetSpec] = []
     assets: list[RID] = []
     workflow: RID | Workflow
     description: str = ""
@@ -72,13 +74,13 @@ class ExecutionConfiguration(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @field_validator("datasets", mode="before")
-    @classmethod
-    def validate_datasets(cls, value: Any) -> Any:
-        if isinstance(value, DatasetList):
-            config_list: DatasetList = value
-            value = config_list.datasets
-        return value
+  #  @field_validator("datasets", mode="before")
+  #  @classmethod
+  #  def validate_datasets(cls, value: Any) -> Any:
+  #      if isinstance(value, DatasetList):
+  #          config_list: DatasetList = value
+  #          value = config_list.datasets
+  #      return value
 
     @field_validator("workflow", mode="before")
     @classmethod
@@ -137,3 +139,20 @@ class ExecutionConfiguration(BaseModel):
     #         hs = HatracStore("https", self.host_name, self.credential)
     #         hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
     #         return ExecutionConfiguration.load_configuration(Path(dest_file.name))
+
+
+@dataclass
+class AssetRID(str):
+    rid: str
+    description: str = ""
+
+    def __new__(cls, rid: str, description: str = ""):
+        obj = super().__new__(cls, rid)
+        obj.description = description
+        return obj
+
+AssetRIDConfig = builds(AssetRID, populate_full_signature=True)
+
+
+
+
