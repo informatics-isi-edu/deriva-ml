@@ -1100,7 +1100,7 @@ class Execution:
             description: Description of the files.
 
         Returns:
-            RID: Dataset RID that identifes newly added files. Will be nested to mirror origioanl directory structure
+            RID: Dataset RID that identifies newly added files. Will be nested to mirror original directory structure
             of the files.
 
         Raises:

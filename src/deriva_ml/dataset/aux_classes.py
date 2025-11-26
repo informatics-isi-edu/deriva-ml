@@ -3,7 +3,7 @@ THis module defines the DataSet class with is used to manipulate n
 """
 
 from enum import Enum
-from typing import Any, Optional, SupportsInt, overload
+from typing import Any, Optional, SupportsInt
 
 from hydra_zen import hydrated_dataclass
 from pydantic import (
@@ -43,9 +43,6 @@ class DatasetVersion(Version):
         replace(major, minor, patch): Replace the major and minor versions
     """
 
-    @overload
-    def __init__(self, version: str): ...
-    @overload
     def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0):
         """Initialize a DatasetVersion object.
 
@@ -54,21 +51,6 @@ class DatasetVersion(Version):
             minor: Minor version number.  Used to indicate additional members added, or change in member values.
             patch: Patch number of the dataset.  Used to indicate minor clean-up and edits
         """
-        ...
-
-    def __init__(self, *args):
-        """Initialize a DatasetVersion object.
-
-        Args:
-            major: Major version number. Used to indicate schema changes.
-            minor: Minor version number.  Used to indicate additional members added, or change in member values.
-            patch: Patch number of the dataset.  Used to indicate minor clean-up and edits
-        """
-        if len(args) == 1 and isinstance(args[0], str):
-            v = Version.parse(args[0])
-            major, minor, patch = v.major, v.minor, v.patch
-        else:
-            major, minor, patch = args
         super().__init__(major, minor, patch)
 
     def to_dict(self) -> dict[str, Any]:

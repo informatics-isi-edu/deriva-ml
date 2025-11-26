@@ -6,7 +6,8 @@ from tempfile import TemporaryDirectory
 import pytest
 from deriva.core.datapath import DataPathException
 
-from deriva_ml import DerivaML, DerivaMLInvalidTerm, ExecutionConfiguration, FileSpec, MLVocab
+from deriva_ml import DerivaML, DerivaMLInvalidTerm, FileSpec, MLVocab
+from deriva_ml.execution import ExecutionConfiguration
 
 FILE_COUNT = 5
 
