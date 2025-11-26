@@ -80,13 +80,10 @@ pre_commit_hooks = []
 post_commit_hooks = []
 
 [tool.pytest]
-mock_use_standalone_module = true
-
-[tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 #addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"
-addopts = "-v  --import-mode=importlib"
+addopts = ["-v", "--import-mode=importlib"]
 
 
 [tool.ruff]
