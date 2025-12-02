@@ -254,6 +254,7 @@ class Execution:
 
         # Make sure we have a good workflow.
         if isinstance(self.configuration.workflow, Workflow):
+            self._ml_object.lookup_term(MLVocab.workflow_type, configuration.workflow.workflow_type)
             self.workflow_rid = (
                 self._ml_object.add_workflow(self.configuration.workflow) if not self._dry_run else DRY_RUN_RID
             )

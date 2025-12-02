@@ -10,8 +10,7 @@ import requests
 from pydantic import BaseModel, PrivateAttr, model_validator
 from requests import RequestException
 
-from deriva_ml import DerivaML
-from deriva_ml.core.definitions import RID, MLVocab
+from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 
 try:
@@ -403,7 +402,3 @@ class Workflow(BaseModel):
             root = Path(__file__).resolve().parents[1]
 
         return get_version(root=root)
-
-    def validate_workflow(self, ml_instance: DerivaML) -> None:
-        ml_instance.lookup_term(MLVocab.workflow_type, self.workflow_type)
-        # Create and return a new workflow object
