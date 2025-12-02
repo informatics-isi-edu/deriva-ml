@@ -19,7 +19,8 @@ import logging
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any, Self
+from typing import Dict, Iterable, List, cast, TYPE_CHECKING, Any
+from typing_extensions import Self
 from urllib.parse import urlsplit
 
 

@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Utilities to simplify use of Dervia and Pandas to create reproducable ML pipelines"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "bump-my-version",
     "bdbag",
