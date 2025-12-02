@@ -22,14 +22,13 @@ Typical usage example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from hydra_zen import builds
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
@@ -74,26 +73,13 @@ class ExecutionConfiguration(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-  #  @field_validator("datasets", mode="before")
-  #  @classmethod
-  #  def validate_datasets(cls, value: Any) -> Any:
-  #      if isinstance(value, DatasetList):
-  #          config_list: DatasetList = value
-  #          value = config_list.datasets
-  #      return value
-
-    @field_validator("workflow", mode="before")
-    @classmethod
-    def validate_workflow(cls, value: Any) -> Any:
-        """Validates workflow specification.
-
-        Args:
-            value: Workflow value to validate (RID or Workflow object).
-
-        Returns:
-            RID | Workflow: Validated workflow specification.
-        """
-        return value
+    #  @field_validator("datasets", mode="before")
+    #  @classmethod
+    #  def validate_datasets(cls, value: Any) -> Any:
+    #      if isinstance(value, DatasetList):
+    #          config_list: DatasetList = value
+    #          value = config_list.datasets
+    #      return value
 
     @staticmethod
     def load_configuration(path: Path) -> ExecutionConfiguration:
@@ -151,8 +137,5 @@ class AssetRID(str):
         obj.description = description
         return obj
 
+
 AssetRIDConfig = builds(AssetRID, populate_full_signature=True)
-
-
-
-
