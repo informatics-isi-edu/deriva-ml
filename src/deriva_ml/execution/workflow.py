@@ -9,9 +9,9 @@ from typing import Any
 import requests
 from pydantic import BaseModel, PrivateAttr, model_validator
 from requests import RequestException
-from setuptools_scm import get_version
 
-from deriva_ml.core.definitions import RID
+from deriva_ml import DerivaML
+from deriva_ml.core.definitions import RID, MLVocab
 from deriva_ml.core.exceptions import DerivaMLException
 
 try:
@@ -130,12 +130,7 @@ class Workflow(BaseModel):
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
             self.git_root = Workflow._get_git_root(path)
 
-        self.version = get_version(
-            root=str(self.git_root or Path.cwd()),
-            search_parent_directories=True,
-            # Optional but recommended: provide a safe fallback when tags are absent
-            fallback_version="0.0",
-        )
+        self.version = Workflow.get_dynamic_version(root=str(self.git_root or Path.cwd()))
 
         self._logger = logging.getLogger("deriva_ml")
         return self
@@ -389,3 +384,26 @@ class Workflow(BaseModel):
         sha = result.stdout.strip()
         url = f"{github_url}/blob/{sha}/{executable_path.relative_to(repo_root)}"
         return url, is_dirty
+
+    @staticmethod
+    def get_dynamic_version(root: str | os.PathLike | None = None) -> str:
+        """
+        Return a dynamic version string based on VCS state (setuptools_scm),
+        including dirty/uncommitted changes if configured.
+
+        Works under uv / Python 3.10+ by forcing setuptools to use stdlib distutils.
+        """
+        # Ensure setuptools doesn't try to override stdlib distutils
+        os.environ.setdefault("SETUPTOOLS_USE_DISTUTILS", "stdlib")
+
+        from setuptools_scm import get_version  # imported *after* env var is set
+
+        if root is None:
+            # Adjust this to point at your repo root if needed
+            root = Path(__file__).resolve().parents[1]
+
+        return get_version(root=root)
+
+    def validate_workflow(self, ml_instance: DerivaML) -> None:
+        ml_instance.lookup_term(MLVocab.workflow_type, self.workflow_type)
+        # Create and return a new workflow object
