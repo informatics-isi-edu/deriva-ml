@@ -105,11 +105,15 @@ class DatasetHistory(BaseModel):
     dataset_rid: RID
     version_rid: RID
     execution_rid: Optional[RID] = None
-    description: str = ""
-    minid: Optional[str] = None
-    snapshot: Optional[str] = None
+    description: str | None = ""
+    minid: str | None = None
+    snapshot: str | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("description", mode="after")
+    def _default_description(cls, v) -> str:
+        return v or ""
 
 
 class DatasetMinid(BaseModel):
