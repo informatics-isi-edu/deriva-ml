@@ -216,6 +216,7 @@ class Execution:
         self,
         configuration: ExecutionConfiguration,
         ml_object: DerivaML,
+        workflow: Workflow | RID | None = None,
         reload: RID | None = None,
         dry_run: bool = False,
     ):
@@ -227,6 +228,8 @@ class Execution:
         Args:
             configuration: Settings and parameters for the execution.
             ml_object: DerivaML instance managing the execution.
+            workflow: Optional workflow RID or Workflow object.  If not specified, the workflow RID is taken from
+              the ExecutionConfiguration object
             reload: Optional RID of existing execution to reload.
             dry_run: If True, don't create catalog records or upload results.
 
@@ -253,6 +256,8 @@ class Execution:
         self._dry_run = dry_run
 
         # Make sure we have a good workflow.
+        if workflow:
+            self.configuration.workflow = workflow
         if isinstance(self.configuration.workflow, Workflow):
             self._ml_object.lookup_term(MLVocab.workflow_type, configuration.workflow.workflow_type)
             self.workflow_rid = (

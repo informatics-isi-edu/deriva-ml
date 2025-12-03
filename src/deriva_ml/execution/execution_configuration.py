@@ -26,9 +26,11 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from hydra_zen import builds
-from pydantic import BaseModel, ConfigDict, Field
+from omegaconf import DictConfig
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
@@ -67,7 +69,7 @@ class ExecutionConfiguration(BaseModel):
 
     datasets: list[DatasetSpec] = []
     assets: list[RID] = []
-    workflow: RID | Workflow
+    workflow: RID | Workflow | None = None
     description: str = ""
     argv: list[str] = Field(default_factory=lambda: sys.argv)
 
@@ -80,6 +82,10 @@ class ExecutionConfiguration(BaseModel):
     #          config_list: DatasetList = value
     #          value = config_list.datasets
     #      return value
+    @field_validator("assets", mode="before")
+    @classmethod
+    def validate_assets(cls, value: Any) -> Any:
+        return [v.rid if isinstance(v, DictConfig) or isinstance(v, AssetRID) else v for v in value]
 
     @staticmethod
     def load_configuration(path: Path) -> ExecutionConfiguration:

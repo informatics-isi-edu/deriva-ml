@@ -1439,7 +1439,9 @@ class DerivaML(Dataset):
         # Create and return a new workflow object
         return Workflow(name=name, workflow_type=workflow_type, description=description)
 
-    def create_execution(self, configuration: ExecutionConfiguration, dry_run: bool = False) -> "Execution":
+    def create_execution(self, configuration: ExecutionConfiguration,
+                         workflow: Workflow | RID | None = None,
+                         dry_run: bool = False) -> "Execution":
         """Creates an execution environment.
 
         Given an execution configuration, initialize the local compute environment to prepare for executing an
@@ -1454,6 +1456,7 @@ class DerivaML(Dataset):
 
         Args:
             configuration: ExecutionConfiguration:
+            workflow: Workflow object representing the workflow to execute if not present in the ExecutionConfiguration.
             dry_run: Do not create an execution record or upload results.
 
         Returns:
@@ -1463,7 +1466,7 @@ class DerivaML(Dataset):
         from deriva_ml.execution.execution import Execution
 
         # Create and store an execution instance
-        self._execution = Execution(configuration, self, dry_run=dry_run)
+        self._execution = Execution(configuration, self, workflow = workflow, dry_run=dry_run)
         return self._execution
 
     def restore_execution(self, execution_rid: RID | None = None) -> Execution:
