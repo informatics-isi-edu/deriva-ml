@@ -310,6 +310,7 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
             },
             {"Name": "File", "Description": "A file that is not managed by Hatrac"},
             {"Name": "Input_File", "Description": "A file input to an execution."},
+            {"Name": "Output_File", "Description": "A file output from an execution."},
             {"Name": "Model_File", "Description": "The ML model."},
             {
                 "Name": "Notebook_Output",
