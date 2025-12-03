@@ -1,3 +1,4 @@
+import getpass
 import logging
 from pathlib import Path
 from typing import Any
@@ -49,8 +50,9 @@ class DerivaMLConfig(BaseModel):
 
     @staticmethod
     def compute_workdir(working_dir) -> Path:
-        # Create a default working directory if none is provided
-        working_dir = Path(working_dir) if working_dir else Path.home() / "deriva-ml"
+        # Create a default working directory if none is provided.  If a working directory is provided, we add the
+        # user name to it to ensure that multiple users do not overwrite each other's work.'
+        working_dir = (Path(working_dir) / getpass.getuser() if working_dir else Path.home()) / "deriva-ml"
         return working_dir.absolute()
 
 
