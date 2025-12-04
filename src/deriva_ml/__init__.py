@@ -1,3 +1,5 @@
+# We will be loading get_version from setuptools_scm and it will emit a UserWarning about it being deprecated.
+
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 

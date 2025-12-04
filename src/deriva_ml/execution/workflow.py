@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -392,10 +393,12 @@ class Workflow(BaseModel):
 
         Works under uv / Python 3.10+ by forcing setuptools to use stdlib distutils.
         """
-        # Ensure setuptools doesn't try to override stdlib distutils
-        os.environ.setdefault("SETUPTOOLS_USE_DISTUTILS", "stdlib")
-
-        from setuptools_scm import get_version  # imported *after* env var is set
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            module="_distutils_hack",
+        )
+        from setuptools_scm import get_version
 
         if root is None:
             # Adjust this to point at your repo root if needed
