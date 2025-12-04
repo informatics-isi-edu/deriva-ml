@@ -237,7 +237,7 @@ class Execution:
             DerivaMLException: If initialization fails or configuration is invalid.
         """
 
-        self.asset_paths: list[AssetFilePath] = []
+        self.asset_paths: dict[str, list[AssetFilePath]] = {}
         self.configuration = configuration
         self._ml_object = ml_object
         self._model = ml_object.model
