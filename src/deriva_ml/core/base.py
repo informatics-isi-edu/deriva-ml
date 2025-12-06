@@ -187,6 +187,7 @@ class DerivaML(Dataset):
         logger_config = DEFAULT_LOGGER_OVERRIDES
         # allow for reconfiguration of module-specific logging levels
         [logging.getLogger(name).setLevel(level) for name, level in logger_config.items()]
+        logging.getLogger("root").setLevel(deriva_logging_level)
         logging.getLogger("bagit").setLevel(deriva_logging_level)
         logging.getLogger("bdbag").setLevel(deriva_logging_level)
 
@@ -1439,9 +1440,9 @@ class DerivaML(Dataset):
         # Create and return a new workflow object
         return Workflow(name=name, workflow_type=workflow_type, description=description)
 
-    def create_execution(self, configuration: ExecutionConfiguration,
-                         workflow: Workflow | RID | None = None,
-                         dry_run: bool = False) -> "Execution":
+    def create_execution(
+        self, configuration: ExecutionConfiguration, workflow: Workflow | RID | None = None, dry_run: bool = False
+    ) -> "Execution":
         """Creates an execution environment.
 
         Given an execution configuration, initialize the local compute environment to prepare for executing an
@@ -1466,7 +1467,7 @@ class DerivaML(Dataset):
         from deriva_ml.execution.execution import Execution
 
         # Create and store an execution instance
-        self._execution = Execution(configuration, self, workflow = workflow, dry_run=dry_run)
+        self._execution = Execution(configuration, self, workflow=workflow, dry_run=dry_run)
         return self._execution
 
     def restore_execution(self, execution_rid: RID | None = None) -> Execution:

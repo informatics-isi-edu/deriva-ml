@@ -131,7 +131,6 @@ class Workflow(BaseModel):
             self.git_root = Workflow._get_git_root(path)
 
         self.version = Workflow.get_dynamic_version(root=str(self.git_root or Path.cwd()))
-
         self._logger = logging.getLogger("deriva_ml")
         return self
 
@@ -393,12 +392,19 @@ class Workflow(BaseModel):
 
         Works under uv / Python 3.10+ by forcing setuptools to use stdlib distutils.
         """
+        # 1) Tell setuptools to use stdlib distutils (or no override) to avoid
+        #    the '_distutils_hack' assertion you hit.
+        os.environ.setdefault("SETUPTOOLS_USE_DISTUTILS", "stdlib")
+
         warnings.filterwarnings(
             "ignore",
             category=UserWarning,
             module="_distutils_hack",
         )
-        from setuptools_scm import get_version
+        try:
+            from setuptools_scm import get_version
+        except Exception as e:  # ImportError or anything environment-specific
+            raise RuntimeError(f"setuptools_scm is not available: {e}") from e
 
         if root is None:
             # Adjust this to point at your repo root if needed
