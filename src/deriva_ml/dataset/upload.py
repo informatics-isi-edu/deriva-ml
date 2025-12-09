@@ -295,7 +295,6 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
     # Now upload the files by creating an upload spec and then calling the uploader.
     with TemporaryDirectory() as temp_dir:
         spec_file = Path(temp_dir) / "config.json"
-
         with spec_file.open("w+") as cfile:
             json.dump(bulk_upload_configuration(model), cfile)
         uploader = GenericUploader(

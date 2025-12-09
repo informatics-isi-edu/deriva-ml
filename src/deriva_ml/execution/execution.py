@@ -920,8 +920,11 @@ class Execution:
 
         # Determine if we will need to rename an existing file as the asset.
         file_name = Path(file_name)
-        target_name = Path(rename_file) if file_name.exists() and rename_file else file_name
+        if file_name.name == "_implementations.log":
+            # There is a funny bug with S3 hatrac if we have the leading _ in the filename.
+            file_name = file_name.with_name("-implementations.log")
 
+        target_name = Path(rename_file) if file_name.exists() and rename_file else file_name
         asset_path = asset_file_path(
             prefix=self._working_dir,
             exec_rid=self.execution_rid,
