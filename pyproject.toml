@@ -113,7 +113,6 @@ dev = [
     "pytest>=8.4.1",
     "pytest-mock",
     "pytest-coverage>=0.0",
-    "pip-system-certs",
     "ruff"
 ]
 lint = [
