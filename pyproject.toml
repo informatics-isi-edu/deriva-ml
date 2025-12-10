@@ -14,7 +14,6 @@ dependencies = [
     "deepdiff",
     "nbconvert",
     "pandas",
-    "pip-system-certs",
     "pydantic>=2.11",
     "papermill",
     "pandas-stubs==2.2.3.250527",
