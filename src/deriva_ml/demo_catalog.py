@@ -58,7 +58,7 @@ def populate_demo_catalog(ml_instance: DerivaML) -> None:
     )
     execution = ml_instance.create_execution(ExecutionConfiguration(workflow=workflow))
 
-q    with execution.execute() as e:
+    with execution.execute() as e:
         for s in ss:
             image_file = e.asset_file_path(
                 "Image",
