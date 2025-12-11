@@ -130,7 +130,7 @@ class Workflow(BaseModel):
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
             self.git_root = Workflow._get_git_root(path)
 
-        self.version = Workflow.get_dynamic_version(root=str(self.git_root or Path.cwd()))
+        self.version = self.version or Workflow.get_dynamic_version(root=str(self.git_root or Path.cwd()))
         self._logger = logging.getLogger("deriva_ml")
         return self
 

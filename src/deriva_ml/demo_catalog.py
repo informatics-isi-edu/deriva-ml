@@ -11,7 +11,7 @@ from pathlib import Path
 from random import choice, randint, random
 from tempfile import TemporaryDirectory
 
-from deriva.core import ErmrestCatalog
+from deriva.core import BaseCLI, ErmrestCatalog
 from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
 from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError
@@ -19,7 +19,7 @@ from requests.exceptions import HTTPError
 from deriva_ml import DerivaML, MLVocab
 from deriva_ml.core.definitions import RID, BuiltinTypes, ColumnDefinition
 from deriva_ml.dataset.aux_classes import DatasetVersion
-from deriva_ml.execution.execution import Execution
+from deriva_ml.execution.execution import Execution, Workflow
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.schema import (
     create_ml_catalog,
@@ -48,12 +48,17 @@ def populate_demo_catalog(ml_instance: DerivaML) -> None:
         "Demo Catalog Creation",
         description="A workflow demonstrating how to create a demo catalog.",
     )
-    execution = ml_instance.create_execution(
-        ExecutionConfiguration(
-            workflow=ml_instance.create_workflow(name="Demo Catalog", workflow_type="Demo Catalog Creation")
-        )
+    workflow = Workflow(
+        name="Demo Catalog",
+        workflow_type="Demo Catalog Creation",
+        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/src/deriva_ml/demo_catalog.py",
+        version="1.0.0",
+        checksum="27",
+        git_root=Path(),
     )
-    with execution.execute() as e:
+    execution = ml_instance.create_execution(ExecutionConfiguration(workflow=workflow))
+
+q    with execution.execute() as e:
         for s in ss:
             image_file = e.asset_file_path(
                 "Image",
@@ -386,9 +391,11 @@ def create_demo_catalog(
     test_catalog = create_ml_catalog(hostname, project_name=project_name)
     if on_exit_delete:
         atexit.register(destroy_demo_catalog, test_catalog)
+
     try:
         with TemporaryDirectory() as tmpdir:
             create_domain_schema(test_catalog, domain_schema)
+
             ml_instance = DerivaML(
                 hostname,
                 catalog_id=test_catalog.catalog_id,
@@ -396,7 +403,6 @@ def create_demo_catalog(
                 working_dir=tmpdir,
                 logging_level=logging_level,
             )
-
             if populate or create_features or create_datasets:
                 populate_demo_catalog(ml_instance)
                 if create_features:
@@ -428,3 +434,58 @@ class DemoML(DerivaML):
             working_dir=working_dir,
             use_minid=use_minid,
         )
+
+
+class DerivaMLDemoCatalogCLI(BaseCLI):
+    """Main class to part command line arguments and call model"""
+
+    def __init__(self, description, epilog, **kwargs):
+        BaseCLI.__init__(self, description, epilog, **kwargs)
+        # Optional domain schema name for the demo catalog. Defaults to None if not provided.
+        self.parser.add_argument(
+            "--domain_schema",
+            type=str,
+            default="demo-schema",
+            help="Name of the domain schema to create/use for the demo catalog (default: demo-schema).",
+        )
+
+    @staticmethod
+    def _coerce_number(val: str):
+        """
+        Try to convert a string to int, then float; otherwise return str.
+        """
+        try:
+            return int(val)
+        except ValueError:
+            try:
+                return float(val)
+            except ValueError:
+                return val
+
+    def main(self) -> ErmrestCatalog:
+        """Parse arguments and set up execution environment."""
+        args = self.parse_cli()
+        if not args.host:
+            raise ValueError("Host must be specified.")
+        return create_demo_catalog(args.host, args.domain_schema)
+
+
+def main() -> ErmrestCatalog:
+    """Main entry point for the notebook runner CLI.
+
+    Creates and runs the DerivaMLRunNotebookCLI instance.
+
+    Returns:
+        None. Executes the CLI.
+    """
+    cli = DerivaMLDemoCatalogCLI(description="Create a Deriva ML Sample Catalog", epilog="")
+    return cli.main()
+
+
+if __name__ == "__main__":
+    try:
+        catalog = main()
+        print("Created catalog: {}".format(catalog.catalog_id))
+    except Exception as e:
+        print(e)
+        exit(1)

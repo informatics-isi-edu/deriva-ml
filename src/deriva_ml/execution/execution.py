@@ -348,6 +348,7 @@ class Execution:
 
         """
         # Materialize bdbag
+        print("In initialize execution")
         for dataset in self.configuration.datasets:
             self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
             self.datasets.append(self.download_dataset_bag(dataset))
@@ -384,9 +385,9 @@ class Execution:
                 file_name="configuration.json",
                 asset_types=ExecMetadataType.execution_config.value,
             )
-            with Path(cfile).open("w", encoding="utf-8") as config_file:
-                json.dump(self.configuration.model_dump(), config_file)
 
+            with Path(cfile).open("w", encoding="utf-8") as config_file:
+                json.dump(self.configuration.model_dump(mode="json"), config_file)
             lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
             if lock_file.exists():
                 _ = self.asset_file_path(
