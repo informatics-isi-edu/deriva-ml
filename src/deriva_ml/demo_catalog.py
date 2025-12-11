@@ -3,6 +3,7 @@ from __future__ import annotations
 import atexit
 import itertools
 import logging
+import os
 import string
 from collections.abc import Iterator, Sequence
 from datetime import datetime
@@ -394,6 +395,7 @@ def create_demo_catalog(
 
     try:
         with TemporaryDirectory() as tmpdir:
+            os.chdir(tmpdir)  # Do this so we don't get confused if running from a GitHub repo.
             create_domain_schema(test_catalog, domain_schema)
 
             ml_instance = DerivaML(
