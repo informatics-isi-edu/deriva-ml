@@ -348,7 +348,6 @@ class Execution:
 
         """
         # Materialize bdbag
-        print("In initialize execution")
         for dataset in self.configuration.datasets:
             self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
             self.datasets.append(self.download_dataset_bag(dataset))

@@ -467,10 +467,11 @@ class DerivaMLDemoCatalogCLI(BaseCLI):
         args = self.parse_cli()
         if not args.host:
             raise ValueError("Host must be specified.")
-        return create_demo_catalog(args.host, args.domain_schema)
+        demo_catalog = create_demo_catalog(args.host, args.domain_schema)
+        return demo_catalog
 
 
-def main() -> ErmrestCatalog:
+def main() -> None:
     """Main entry point for the notebook runner CLI.
 
     Creates and runs the DerivaMLRunNotebookCLI instance.
@@ -479,13 +480,14 @@ def main() -> ErmrestCatalog:
         None. Executes the CLI.
     """
     cli = DerivaMLDemoCatalogCLI(description="Create a Deriva ML Sample Catalog", epilog="")
-    return cli.main()
+    catalog = cli.main()
+    print("Created catalog: {}".format(catalog._server_uri))
 
 
 if __name__ == "__main__":
     try:
-        catalog = main()
-        print("Created catalog: {}".format(catalog.catalog_id))
+        main()
     except Exception as e:
+        print("Error creating catalog:")
         print(e)
         exit(1)
