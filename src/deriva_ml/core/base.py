@@ -1400,12 +1400,13 @@ class DerivaML(Dataset):
             # Search for workflow by URL
             url_column = workflow_path.URL
             checksum_column = workflow_path.Checksum
+
             return list(
                 workflow_path.path.filter(
                     (url_column == url_or_checksum) | (checksum_column == url_or_checksum)
                 ).entities()
             )[0]["RID"]
-        except IndexError:
+        except (IndexError, DataPathException):
             return None
 
     def create_workflow(self, name: str, workflow_type: str, description: str = "") -> Workflow:

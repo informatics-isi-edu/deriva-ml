@@ -1,4 +1,5 @@
-import inspect
+from __future__ import annotations
+
 import logging
 import os
 import subprocess
@@ -13,6 +14,7 @@ from requests import RequestException
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.execution.find_caller import _get_calling_module
 
 try:
     from IPython.core.getipython import get_ipython
@@ -124,7 +126,6 @@ class Workflow(BaseModel):
             self.checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
             self.git_root = Workflow._get_git_root(Path(os.environ["DERIVA_ML_NOTEBOOK_PATH"]))
             self.is_notebook = True
-
         if not self.url:
             path, self.is_notebook = Workflow._get_python_script()
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
@@ -313,20 +314,8 @@ class Workflow(BaseModel):
         is_notebook = True
         if not (filename := Workflow._get_notebook_path()):
             is_notebook = False
-            stack = [
-                s.filename
-                for s in inspect.stack()
-                if ("pycharm" not in s.filename) and ("site-packages" not in s.filename)
-            ]
-            # Get the caller's filename, which is two up the stack from here.
-            filename = Path(stack[-1])
-            if not (filename.exists()) or Workflow._in_repl():
-                # Being called from the command line interpreter.
-                filename = Path.cwd() / Path("REPL")
-            # Get the caller's filename, which is two up the stack from here.
-            elif (not filename.exists()) and "PYTEST_CURRENT_TEST" in os.environ:
-                filename = Path.cwd() / Path("pytest")
-        return filename, is_notebook
+            # Resolve the current python model (script/module file) robustly
+        return Path(_get_calling_module()), is_notebook
 
     @staticmethod
     def _github_url(executable_path: Path) -> tuple[str, bool]:
