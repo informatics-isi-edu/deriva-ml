@@ -53,16 +53,18 @@ from deriva_ml.core.definitions import (
 )
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.exceptions import DerivaMLTableTypeError, DerivaMLException
-from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import asset_file_path, execution_rids, table_path
+from deriva_ml.dataset.history import iso_to_snap
 
 # Local imports
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.schema.annotations import asset_annotation
 
 # Optional debug imports
@@ -80,7 +82,7 @@ if TYPE_CHECKING:
 ml: DerivaML
 
 
-class DerivaML(Dataset):
+class DerivaML:
     """Core class for machine learning operations on a Deriva catalog.
 
     This class provides core functionality for managing ML workflows, features, and datasets in a Deriva catalog.
@@ -165,6 +167,7 @@ class DerivaML(Dataset):
             )
         self.catalog = server.connect_ermrest(catalog_id)
         self.model = DerivaModel(self.catalog.getCatalogModel(), domain_schema=domain_schema)
+        self.use_minid = use_minid
 
         # Set up working and cache directories
         self.working_dir = DerivaMLConfig.compute_workdir(working_dir)
@@ -173,9 +176,6 @@ class DerivaML(Dataset):
 
         self.cache_dir = Path(cache_dir) if cache_dir else self.working_dir / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-        # Initialize dataset functionality from the parent class
-        super().__init__(self.model, self.cache_dir, self.working_dir, use_minid=use_minid)
 
         # Set up logging
         self._logger = logging.getLogger("deriva_ml")
@@ -253,6 +253,19 @@ class DerivaML(Dataset):
             }
         )
         return session_config
+
+    def catalog_snapshot(self, version_snapshot: str) -> Self:
+        """Returns a DerivaML instance for a specific snapshot of the catalog."""
+        return DerivaML(
+            self.host_name,
+            version_snapshot,
+            logging_level=self._logging_level,
+            deriva_logging_level=self._deriva_logging_level,
+        )
+
+    @property
+    def _dataset_table(self):
+        return self.model.schemas[self.model.ml_schema].tables["Dataset"]
 
     @property
     def pathBuilder(self) -> SchemaWrapper:
@@ -685,13 +698,13 @@ class DerivaML(Dataset):
             raise DerivaMLException(f"Table {asset_table.name} is not an asset")
 
         # Get path builders for asset and type tables
-        pb = self._model.catalog.getPathBuilder()
+        pb = self.model.catalog.getPathBuilder()
         asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
         (
             asset_type_table,
             _,
             _,
-        ) = self._model.find_association(asset_table, MLVocab.asset_type)
+        ) = self.model.find_association(asset_table, MLVocab.asset_type)
         type_path = pb.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
 
         # Build a list of assets with their types
@@ -1051,6 +1064,118 @@ class DerivaML(Dataset):
         # Fetch and convert all terms to VocabularyTerm objects
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
+    def find_datasets(self, deleted: bool = False) -> Iterable[Dataset]:
+        """Returns a list of currently available datasets.
+
+        Arguments:
+            deleted: If True, included the datasets that have been deleted.
+
+        Returns:
+             list of currently available datasets.
+        """
+        # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
+        pb = self.model.catalog.getPathBuilder()
+        dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
+        associations = list(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations())
+        atable = associations[0].name if associations else None
+        ml_path = pb.schemas[self.ml_schema]
+        atable_path = ml_path.tables[atable]
+
+        if deleted:
+            filtered_path = dataset_path
+        else:
+            filtered_path = dataset_path.filter(
+                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)  # noqa: E711, E712
+            )
+
+        # Get a list of all the dataset_type values associated with this dataset_table.
+        datasets = []
+        for dataset in filtered_path.entities().fetch():
+            ds_types = (
+                atable_path.filter(atable_path.Dataset == dataset["RID"]).attributes(atable_path.Dataset_Type).fetch()
+            )
+            datasets.append(
+                Dataset(
+                    dataset_rid=dataset["RID"],
+                    description=dataset["Description"],
+                    dataset_types=[ds[MLVocab.dataset_type] for ds in ds_types],
+                )
+            )
+        return datasets
+
+    def lookup_dataset(
+        self, dataset: RID | DatasetSpec, version: DatasetVersion | None = None, deleted: bool = False
+    ) -> Dataset:
+        """Looks up a dataset by RID or DatasetSpec.
+
+        Arguments:
+            dataset: Dataset RID or DatasetSpec to look up.
+            version: Dataset version to look up. If None, the latest version is returned or the
+            version specified in the DatasetSpec.
+            deleted: If True, included the datasets that have been deleted.
+        Returns a Dataset object for the specified dataset RID or DatasetSpec.
+
+        """
+        if isinstance(dataset, DatasetSpec):
+            dataset_rid = dataset.rid
+            version = dataset.version if version is None else version
+        else:
+            dataset_rid = dataset
+
+        try:
+            dataset_record = [ds for ds in self.find_datasets(deleted=deleted) if ds.dataset_rid == dataset_rid][0]
+            version = dataset_record.version if version is None else version
+        except IndexError:
+            raise DerivaMLException(f"Dataset {dataset_rid} not found.")
+
+        return Dataset(
+            model=self,
+            dataset_rid=dataset_rid,
+            description=dataset_record.description,
+            dataset_types=dataset_record.dataset_types,
+            version=version,
+        )
+
+    def list_dataset_element_types(self) -> Iterable[Table]:
+        """List the types of entities that can be added to a dataset_table.
+
+        Returns:
+          :return: An iterable of Table objects that can be included as an element of a dataset_table.
+        """
+
+        def domain_table(table: Table) -> bool:
+            return table.schema.name == self.domain_schema or table.name == self._dataset_table.name
+
+        return [t for a in self._dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def add_dataset_element_type(self, element: str | Table) -> Table:
+        """A dataset_table is a heterogeneous collection of objects, each of which comes from a different table. This
+        routine makes it possible to add objects from the specified table to a dataset_table.
+
+        Args:
+            element: Name of the table or table object that is to be added to the dataset_table.
+
+        Returns:
+            The table object that was added to the dataset_table.
+        """
+        # Add table to map
+        element_table = self.model.name_to_table(element)
+        atable_def = Table.define_association([self._dataset_table, element_table])
+        try:
+            table = self.model.schemas[self.model.domain_schema].create_table(atable_def)
+        except ValueError as e:
+            if "already exists" in str(e):
+                table = self.model.name_to_table(atable_def["table_name"])
+            else:
+                raise e
+
+        # self.model = self.catalog.getCatalogModel()
+        CatalogGraph(self).generate_dataset_download_annotations()
+        self._dataset_table.annotations.update(self._generate_dataset_download_annotations())
+        self.model.model.apply()
+        return table
+
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(
         self,
@@ -1186,7 +1311,7 @@ class DerivaML(Dataset):
             self.lookup_term(MLVocab.dataset_type, ds_type)
 
         # Add files to the file table, and collect up the resulting entries by directory name.
-        pb = self._model.catalog.getPathBuilder()
+        pb = self.model.catalog.getPathBuilder()
         file_records = list(
             pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump(by_alias=True) for f in filespec_list])
         )
@@ -1203,11 +1328,11 @@ class DerivaML(Dataset):
             for file_record in file_records
             for file_type in type_map[file_record["MD5"]]
         ]
-        pb.schemas[self._ml_schema].tables[atable].insert(file_type_records)
+        pb.schemas[self.ml_schema].tables[atable].insert(file_type_records)
 
         if execution_rid:
             # Get the name of the association table between file_table and execution.
-            pb.schemas[self._ml_schema].File_Execution.insert(
+            pb.schemas[self.ml_schema].File_Execution.insert(
                 [
                     {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Output"}
                     for file_record in file_records
@@ -1232,11 +1357,52 @@ class DerivaML(Dataset):
                 # Going up one level in directory, so Create nested dataset
                 members = nested_datasets + rids
                 nested_datasets = []
-            self.add_dataset_members(dataset_rid=dataset, members=members, execution_rid=execution_rid)
+            dataset.add_dataset_members(members=members, execution_rid=execution_rid)
             nested_datasets.append(dataset)
             path_length = len(p.parts)
 
         return dataset
+
+    def _bootstrap_versions(self):
+        datasets = [ds["RID"] for ds in self.find_datasets()]
+        ds_version = [
+            {
+                "Dataset": d,
+                "Version": "0.1.0",
+                "Description": "Dataset at the time of conversion to versioned datasets",
+            }
+            for d in datasets
+        ]
+        schema_path = self.model.catalog.getPathBuilder().schemas[self.ml_schema]
+        version_path = schema_path.tables["Dataset_Version"]
+        dataset_path = schema_path.tables["Dataset"]
+        history = list(version_path.insert(ds_version))
+        dataset_versions = [{"RID": h["Dataset"], "Version": h["Version"]} for h in history]
+        dataset_path.update(dataset_versions)
+
+    def _synchronize_dataset_versions(self):
+        datasets = [ds["RID"] for ds in self.find_datasets()]
+        for ds in datasets:
+            self.dataset_version(ds)
+        schema_path = self.model.catalog.getPathBuilder().schemas[self.ml_schema]
+        dataset_version_path = schema_path.tables["Dataset_Version"]
+        # Get the maximum version number for each dataset.
+        versions = {}
+        for v in dataset_version_path.entities().fetch():
+            if v["Version"] > versions.get("Dataset", DatasetVersion(0, 0, 0)):
+                versions[v["Dataset"]] = v
+        dataset_path = schema_path.tables["Dataset"]
+        dataset_path.update([{"RID": dataset, "Version": version["RID"]} for dataset, version in versions.items()])
+
+    def _set_version_snapshot(self):
+        """Update the Snapshot column of the Dataset_Version table to the correct time."""
+        dataset_version_path = (
+            self.model.catalog.getPathBuilder().schemas[self.model.ml_schema].tables["Dataset_Version"]
+        )
+        versions = dataset_version_path.entities().fetch()
+        dataset_version_path.update(
+            [{"RID": h["RID"], "Snapshot": iso_to_snap(h["RCT"])} for h in versions if not h["Snapshot"]]
+        )
 
     def list_files(self, file_types: list[str] | None = None) -> list[dict[str, Any]]:
         """Lists files in the catalog with their metadata.
@@ -1267,7 +1433,7 @@ class DerivaML(Dataset):
         """
 
         asset_type_atable, file_fk, asset_type_fk = self.model.find_association("File", "Asset_Type")
-        ml_path = self.pathBuilder.schemas[self._ml_schema]
+        ml_path = self.pathBuilder.schemas[self.ml_schema]
         file = ml_path.File
         asset_type = ml_path.tables[asset_type_atable.name]
 

@@ -30,7 +30,6 @@ from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
 # Local imports
 from deriva_ml.feature import Feature
-from deriva_ml.protocols.dataset import DatasetLike
 
 try:
     from icecream import ic
@@ -290,6 +289,20 @@ class DerivaModel:
         else:
             self.model.apply()
 
+    def is_dataset_rid(self, rid: RID, deleted: bool = False) -> bool:
+        """Check if a given RID is a dataset RID."""
+        try:
+            rid_info = self.model.catalog.resolve_rid(rid, self.model)
+        except KeyError as _e:
+            raise DerivaMLException(f"Invalid RID {rid}")
+        if rid_info.table.name != "Dataset":
+            return False
+        elif deleted:
+            # Got a dataset rid. Now check to see if its deleted or not.
+            return True
+        else:
+            return not list(rid_info.datapath.entities().fetch())[0]["Deleted"]
+
     def list_dataset_element_types(self) -> list[Table]:
         """
         Lists the data types of elements contained within a dataset.
@@ -312,10 +325,9 @@ class DerivaModel:
 
         return [t for a in dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
 
-    def _prepare_wide_table(self,
-                            dataset,
-                            dataset_rid: RID,
-                            include_tables: list[str]) -> tuple[dict[str, Any], list[tuple]]:
+    def _prepare_wide_table(
+        self, dataset, dataset_rid: RID, include_tables: list[str]
+    ) -> tuple[dict[str, Any], list[tuple]]:
         """
         Generates details of a wide table from the model
 

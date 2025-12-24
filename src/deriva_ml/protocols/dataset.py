@@ -9,6 +9,7 @@ Classes:
     DatasetLike: A protocol that specifies methods required for dataset-like
     objects.
 """
+
 from typing import Protocol, runtime_checkable
 
 from deriva_ml.core.definitions import RID
