@@ -41,7 +41,7 @@ TEST_DATASET_SIZE = 12
 def populate_demo_catalog(execution: Execution) -> None:
     # Delete any vocabularies and features.
     ml_instance = execution._ml_object
-    domain_schema = ml_instance.pathBuilder.schemas[ml_instance.domain_schema]
+    domain_schema = ml_instance.pathBuilder().schemas[ml_instance.domain_schema]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
     for s in ss:
@@ -80,7 +80,7 @@ def create_datasets(
     Create a dataset per `spec`, then add child members (either by slicing
     off pre-generated RIDs or by recursing on nested specs).
     """
-    dataset_rid = client.create_dataset(
+    dataset = client.create_dataset(
         dataset_types=spec.types,
         description=spec.description,
         version=spec.version,
@@ -90,7 +90,7 @@ def create_datasets(
         description=spec.description,
         members={},
         types=spec.types,
-        rid=dataset_rid,
+        rid=dataset.dataset_rid,
         version=spec.version,
     )
     dataset_rids = {}
@@ -117,7 +117,7 @@ def create_datasets(
         if rids:
             dataset_rids[member_type] = rids
             result_spec.member_rids.setdefault(member_type, []).extend(rids)
-    client.add_dataset_members(dataset_rid, dataset_rids, description="Added by create_datasets")
+    dataset.add_dataset_members(dataset_rids, description="Added by create_datasets")
 
     return result_spec
 

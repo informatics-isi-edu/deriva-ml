@@ -277,7 +277,7 @@ class Execution:
             if not self._model.is_asset(self._ml_object.resolve_rid(a).table.name):
                 raise DerivaMLException("Asset specified in execution configuration is not a asset table")
 
-        schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+        schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
         if reload:
             self.execution_rid = reload
             if self.execution_rid == DRY_RUN_RID:
@@ -354,7 +354,7 @@ class Execution:
             self.dataset_rids.append(dataset.rid)
 
         # Update execution info
-        schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+        schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
         if self.dataset_rids and not (reload or self._dry_run):
             schema_path.Dataset_Execution.insert(
                 [{"Dataset": d, "Execution": self.execution_rid} for d in self.dataset_rids]
@@ -496,7 +496,7 @@ class Execution:
         if self._dry_run:
             return
 
-        self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
+        self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
             [
                 {
                     "RID": self.execution_rid,
@@ -545,7 +545,7 @@ class Execution:
 
         self.update_status(Status.completed, "Algorithm execution ended.")
         if not self._dry_run:
-            self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
+            self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
                 [{"RID": self.execution_rid, "Duration": duration}]
             )
 
@@ -629,7 +629,7 @@ class Execution:
         hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
 
         asset_type_table, _col_l, _col_r = self._model.find_association(asset_table, MLVocab.asset_type)
-        type_path = self._ml_object.pathBuilder.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
+        type_path = self._ml_object.pathBuilder().schemas[asset_type_table.schema.name].tables[asset_type_table.name]
         asset_types = [
             asset_type[MLVocab.asset_type.value]
             for asset_type in type_path.filter(type_path.columns[asset_table.name] == asset_rid)
@@ -824,7 +824,7 @@ class Execution:
             return
         self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
 
-        pb = self._ml_object.pathBuilder
+        pb = self._ml_object.pathBuilder()
         for asset_table, asset_list in uploaded_assets.items():
             asset_table_name = asset_table.split("/")[1]  # Peel off the schema from the asset table
             asset_exe, asset_fk, execution_fk = self._model.find_association(asset_table_name, "Execution")
@@ -1034,7 +1034,9 @@ class Execution:
         Returns:
             RID of the newly created dataset.
         """
-        return self._ml_object.create_dataset(dataset_types, description, self.execution_rid, version=version)
+        return self._ml_object.create_dataset(
+            dataset_types=dataset_types, description=description, execution_rid=self.execution_rid, version=version
+        )
 
     def add_dataset_members(
         self,

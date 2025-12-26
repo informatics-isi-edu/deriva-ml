@@ -1,27 +1,26 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import Any, Callable, Iterator
 
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 
-# from deriva_ml import DerivaML
 from deriva_ml.core.constants import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
-
-if TYPE_CHECKING:
-    from deriva_ml import DerivaML
+from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
 
 class CatalogGraph:
-    def __init__(self, ml_instance: DerivaML):
+    def __init__(self, ml_instance: DerivaMLCatalog, use_minid: bool = True):
         self._ml_schema = ml_instance.ml_schema
         self._ml_instance = ml_instance
+        self._use_minid = use_minid
+        self._dataset_table = ml_instance._dataset_table
 
     def _export_annotation(
         self,
-        snapshot_catalog: DerivaML | None = None,
+        snapshot_catalog: DerivaMLCatalog | None = None,
     ) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
 
@@ -53,7 +52,7 @@ class CatalogGraph:
         )
 
     def _export_specification(
-        self, dataset: DatasetSpec, snapshot_catalog: DerivaML | None = None
+        self, dataset: DatasetLike, snapshot_catalog: DerivaMLCatalog | None = None
     ) -> list[dict[str, Any]]:
         """
         Generate a specification for export engine for specific dataset.
@@ -160,7 +159,7 @@ class CatalogGraph:
         return exports
 
     def generate_dataset_download_spec(
-        self, dataset: DatasetSpec, snapshot_catalog: DerivaML | None = None
+        self, dataset: DatasetLike, snapshot_catalog: DerivaMLCatalog | None = None
     ) -> dict[str, Any]:
         """
         Generate a specification for downloading a specific dataset.
@@ -171,8 +170,12 @@ class CatalogGraph:
         """
         s3_target = "s3://eye-ai-shared"
         minid_test = False
+        if snapshot_catalog:
+            catalog = snapshot_catalog.catalog
+            catalog_id = f"{catalog.catalog_id}@{catalog.latest_snapshot().snaptime}"
+        else:
+            catalog_id = self._ml_instance.catalog_id
 
-        catalog_id = self._version_snapshot(dataset)
         post_processors = (
             {
                 "post_processors": [
@@ -330,13 +333,13 @@ class CatalogGraph:
     def _collect_paths(
         self,
         dataset_rid: RID | None = None,
-        snapshot: DerivaML | None = None,
+        snapshot: DerivaMLCatalog | None = None,
         dataset_nesting_depth: int | None = None,
     ) -> set[tuple[Table, ...]]:
         snapshot_catalog = snapshot if snapshot else self
 
-        dataset_table = snapshot_catalog.model.schemas[self._ml_schema].tables["Dataset"]
-        dataset_dataset = snapshot_catalog.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
+        dataset_table = snapshot_catalog._ml_instance.model.schemas[self._ml_schema].tables["Dataset"]
+        dataset_dataset = snapshot_catalog._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
 
         # Figure out what types of elements the dataset contains.
         dataset_associations = [
@@ -344,14 +347,12 @@ class CatalogGraph:
             for a in self._dataset_table.find_associations()
             if a.table.schema.name != self._ml_schema or a.table.name == "Dataset_Dataset"
         ]
+
         if dataset_rid:
             # Get a list of the members of the dataset so we can figure out which tables to query.
+            dataset = snapshot_catalog.lookup_dataset(dataset_rid)
             dataset_elements = [
-                snapshot_catalog.model.name_to_table(e)
-                for e, m in snapshot_catalog.list_dataset_members(
-                    dataset_rid=dataset_rid,  #  limit=1 Limit seems to make things run slow.
-                ).items()
-                if m
+                snapshot_catalog.model.name_to_table(e) for e, m in dataset.list_dataset_members().items() if m
             ]
             included_associations = [
                 a.table for a in dataset_table.find_associations() if a.other_fkeys.pop().pk_table in dataset_elements
@@ -362,7 +363,7 @@ class CatalogGraph:
         # Get the paths through the schema and filter out all the dataset paths not used by this dataset.
         paths = {
             tuple(p)
-            for p in snapshot_catalog._ml_instance._schema_to_paths()
+            for p in snapshot_catalog._ml_instance.model._schema_to_paths()
             if (len(p) == 1)
             or (p[1] not in dataset_associations)  # Tables in the domain schema
             or (p[1] in included_associations)  # Tables that include members of the dataset
@@ -370,7 +371,8 @@ class CatalogGraph:
         # Now get paths for nested datasets
         nested_paths = set()
         if dataset_rid:
-            for c in snapshot_catalog.list_dataset_children(dataset_rid=dataset_rid):
+            dataset = snapshot_catalog.lookup_dataset(dataset_rid)
+            for c in dataset.list_dataset_children():
                 nested_paths |= self._collect_paths(c, snapshot=snapshot_catalog)
         else:
             # Initialize nesting depth if not already provided.
@@ -407,7 +409,7 @@ class CatalogGraph:
     def _table_paths(
         self,
         dataset: DatasetSpec | None = None,
-        snapshot_catalog: DerivaML | None = None,
+        snapshot_catalog: DerivaMLCatalog | None = None,
     ) -> Iterator[tuple[str, str, Table]]:
         paths = self._collect_paths(dataset and dataset.rid, snapshot_catalog)
 
@@ -431,17 +433,17 @@ class CatalogGraph:
         target_tables = [p[-1] for p in paths]
         return zip(src_paths, dest_paths, target_tables)
 
-    def _dataset_nesting_depth(self, dataset_rid: RID | None = None) -> int:
+    def _dataset_nesting_depth(self, dataset: DatasetLike | None = None) -> int:
         """Determine the maximum dataset nesting depth in the current catalog.
 
         Returns:
 
         """
 
-        def children_depth(dataset_rid: RID, nested_datasets: dict[str, list[str]]) -> int:
+        def children_depth(dataset: DatasetLike, nested_datasets: dict[str, list[str]]) -> int:
             """Return the number of nested datasets for the dataset_rid if provided, otherwise in the current catalog"""
             try:
-                children = nested_datasets[dataset_rid]
+                children = nested_datasets[dataset.dataset_rid]
                 return max(map(lambda x: children_depth(x, nested_datasets), children)) + 1 if children else 1
             except KeyError:
                 return 0
@@ -451,12 +453,12 @@ class CatalogGraph:
         dataset_children = (
             [
                 {
-                    "Dataset": dataset_rid,
+                    "Dataset": dataset.dataset_rid,
                     "Nested_Dataset": c,
                 }  # Make uniform with return from datapath
-                for c in self.list_dataset_children(dataset_rid=dataset_rid)
+                for c in dataset.list_dataset_children()
             ]
-            if dataset_rid
+            if dataset
             else pb.entities().fetch()
         )
         nested_dataset = defaultdict(list)
@@ -468,7 +470,7 @@ class CatalogGraph:
         self,
         writer: Callable[[str, str, Table], list[dict[str, Any]]],
         dataset: DatasetSpec | None = None,
-        snapshot_catalog: DerivaML | None = None,
+        snapshot_catalog: DerivaMLCatalog | None = None,
     ) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset_table.  Each element of the dataset_table
         will be placed in its own directory.

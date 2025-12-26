@@ -267,7 +267,6 @@ class DerivaML:
     def _dataset_table(self):
         return self.model.schemas[self.model.ml_schema].tables["Dataset"]
 
-    @property
     def pathBuilder(self) -> SchemaWrapper:
         """Returns catalog path builder for queries.
 
@@ -296,7 +295,7 @@ class DerivaML:
             >>> domain = ml.domain_path
             >>> results = domain.my_table.entities().fetch()
         """
-        return self.pathBuilder.schemas[self.domain_schema]
+        return self.pathBuilder().schemas[self.domain_schema]
 
     def table_path(self, table: str | Table) -> Path:
         """Returns a local filesystem path for table CSV files.
@@ -452,7 +451,7 @@ class DerivaML:
             ...     print(f"{user['Full_Name']} ({user['ID']})")
         """
         # Get the user table path and fetch basic user info
-        user_path = self.pathBuilder.public.ERMrest_Client.path
+        user_path = self.pathBuilder().public.ERMrest_Client.path
         return [{"ID": u["ID"], "Full_Name": u["Full_Name"]} for u in user_path.entities().fetch()]
 
     def resolve_rid(self, rid: RID) -> ResolveRidResult:
@@ -526,7 +525,7 @@ class DerivaML:
             ... )
         """
         # Insert page into www tables with title and content
-        self.pathBuilder.www.tables[self.domain_schema].insert([{"Title": title, "Content": content}])
+        self.pathBuilder().www.tables[self.domain_schema].insert([{"Title": title, "Content": content}])
 
     def create_vocabulary(self, vocab_name: str, comment: str = "", schema: str | None = None) -> Table:
         """Creates a controlled vocabulary table.
@@ -698,7 +697,7 @@ class DerivaML:
             raise DerivaMLException(f"Table {asset_table.name} is not an asset")
 
         # Get path builders for asset and type tables
-        pb = self.model.catalog.getPathBuilder()
+        pb = self.pathBuilder()
         asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
         (
             asset_type_table,
@@ -912,7 +911,7 @@ class DerivaML:
         feature = self.lookup_feature(table, feature_name)
 
         # Build and execute query for feature values
-        pb = self.catalog.getPathBuilder()
+        pb = self.pathBuilder()
         return pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -959,7 +958,7 @@ class DerivaML:
 
         # Get table reference and validate if it is a vocabulary table
         table = self.model.name_to_table(table)
-        pb = self.catalog.getPathBuilder()
+        pb = self.pathBuilder()
         if not (self.model.is_vocabulary(table)):
             raise DerivaMLTableTypeError("vocabulary", table.name)
 
@@ -1022,7 +1021,7 @@ class DerivaML:
 
         # Get schema and table paths
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
-        schema_path = self.catalog.getPathBuilder().schemas[schema_name]
+        schema_path = self.pathBuilder().schemas[schema_name]
 
         # Search for term by name or synonym
         for term in schema_path.tables[table_name].entities().fetch():
@@ -1054,7 +1053,7 @@ class DerivaML:
             ...         print(f"  Synonyms: {', '.join(term.synonyms)}")
         """
         # Get path builder and table reference
-        pb = self.catalog.getPathBuilder()
+        pb = self.pathBuilder()
         table = self.model.name_to_table(table.value if isinstance(table, MLVocab) else table)
 
         # Validate table is a vocabulary table
@@ -1074,7 +1073,7 @@ class DerivaML:
              list of currently available datasets.
         """
         # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
-        pb = self.model.catalog.getPathBuilder()
+        pb = self.pathBuilder()
         dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
         associations = list(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations())
         atable = associations[0].name if associations else None
@@ -1096,12 +1095,24 @@ class DerivaML:
             )
             datasets.append(
                 Dataset(
+                    self,
                     dataset_rid=dataset["RID"],
                     description=dataset["Description"],
                     dataset_types=[ds[MLVocab.dataset_type] for ds in ds_types],
                 )
             )
         return datasets
+
+    def create_dataset(
+        self,
+        execution_rid: RID | None = None,
+        description: str = "",
+        dataset_types: list[str] | None = None,
+        version: DatasetVersion | None = None,
+    ) -> Dataset:
+        return Dataset.create_dataset(
+            self, execution_rid=execution_rid, description=description, dataset_types=dataset_types
+        )
 
     def lookup_dataset(
         self, dataset: RID | DatasetSpec, version: DatasetVersion | None = None, deleted: bool = False
@@ -1129,7 +1140,7 @@ class DerivaML:
             raise DerivaMLException(f"Dataset {dataset_rid} not found.")
 
         return Dataset(
-            model=self,
+            catalog=self,
             dataset_rid=dataset_rid,
             description=dataset_record.description,
             dataset_types=dataset_record.dataset_types,
@@ -1171,8 +1182,8 @@ class DerivaML:
                 raise e
 
         # self.model = self.catalog.getCatalogModel()
-        CatalogGraph(self).generate_dataset_download_annotations()
-        self._dataset_table.annotations.update(self._generate_dataset_download_annotations())
+        annotations = CatalogGraph(self, self.use_minid).generate_dataset_download_annotations()
+        self._dataset_table.annotations.update(annotations)
         self.model.model.apply()
         return table
 
@@ -1210,17 +1221,14 @@ class DerivaML:
                 ...     execution_rid="1-xyz789"
                 ... )
         """
-        if not self._is_dataset_rid(dataset.rid):
+        if not self.model.is_dataset_rid(dataset.rid):
             raise DerivaMLTableTypeError("Dataset", dataset.rid)
-        return self._download_dataset_bag(
-            dataset=dataset,
+        ds = self.lookup_dataset(dataset)
+        return ds.download_dataset_bag(
+            version=dataset.version,
+            materialize=dataset.materialize,
             execution_rid=execution_rid,
-            snapshot_catalog=DerivaML(
-                self.host_name,
-                self._version_snapshot(dataset),
-                logging_level=self._logging_level,
-                deriva_logging_level=self._deriva_logging_level,
-            ),
+            use_minid=self.use_minid,
         )
 
     def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID):
@@ -1238,7 +1246,7 @@ class DerivaML:
 
         """
         self.status = new_status.value
-        self.pathBuilder.schemas[self.ml_schema].Execution.update(
+        self.pathBuilder().schemas[self.ml_schema].Execution.update(
             [
                 {
                     "RID": execution_rid,
@@ -1311,7 +1319,7 @@ class DerivaML:
             self.lookup_term(MLVocab.dataset_type, ds_type)
 
         # Add files to the file table, and collect up the resulting entries by directory name.
-        pb = self.model.catalog.getPathBuilder()
+        pb = self.model.pathBuilder()
         file_records = list(
             pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump(by_alias=True) for f in filespec_list])
         )
@@ -1349,7 +1357,7 @@ class DerivaML:
         dataset = None
         # Start with the longest path so we get subdirectories first.
         for p, rids in sorted(dir_rid_map.items(), key=lambda kv: len(kv[0].parts), reverse=True):
-            dataset = self.create_dataset(
+            dataset = Dataset.create_dataset(
                 dataset_types=dataset_types, execution_rid=execution_rid, description=description
             )
             members = rids
@@ -1364,7 +1372,7 @@ class DerivaML:
         return dataset
 
     def _bootstrap_versions(self):
-        datasets = [ds["RID"] for ds in self.find_datasets()]
+        datasets = [ds.dataset_rid for ds in self.find_datasets()]
         ds_version = [
             {
                 "Dataset": d,
@@ -1373,7 +1381,7 @@ class DerivaML:
             }
             for d in datasets
         ]
-        schema_path = self.model.catalog.getPathBuilder().schemas[self.ml_schema]
+        schema_path = self.pathBuilder().schemas[self.ml_schema]
         version_path = schema_path.tables["Dataset_Version"]
         dataset_path = schema_path.tables["Dataset"]
         history = list(version_path.insert(ds_version))
@@ -1381,10 +1389,10 @@ class DerivaML:
         dataset_path.update(dataset_versions)
 
     def _synchronize_dataset_versions(self):
-        datasets = [ds["RID"] for ds in self.find_datasets()]
+        datasets = [ds.dataset_rid for ds in self.find_datasets()]
         for ds in datasets:
-            self.dataset_version(ds)
-        schema_path = self.model.catalog.getPathBuilder().schemas[self.ml_schema]
+            ds.dataset_version()
+        schema_path = self.pathBuilder().schemas[self.ml_schema]
         dataset_version_path = schema_path.tables["Dataset_Version"]
         # Get the maximum version number for each dataset.
         versions = {}
@@ -1396,9 +1404,7 @@ class DerivaML:
 
     def _set_version_snapshot(self):
         """Update the Snapshot column of the Dataset_Version table to the correct time."""
-        dataset_version_path = (
-            self.model.catalog.getPathBuilder().schemas[self.model.ml_schema].tables["Dataset_Version"]
-        )
+        dataset_version_path = self.pathBuilder().schemas[self.model.ml_schema].tables["Dataset_Version"]
         versions = dataset_version_path.entities().fetch()
         dataset_version_path.update(
             [{"RID": h["RID"], "Snapshot": iso_to_snap(h["RCT"])} for h in versions if not h["Snapshot"]]
@@ -1433,7 +1439,7 @@ class DerivaML:
         """
 
         asset_type_atable, file_fk, asset_type_fk = self.model.find_association("File", "Asset_Type")
-        ml_path = self.pathBuilder.schemas[self.ml_schema]
+        ml_path = self.pathBuilder().schemas[self.ml_schema]
         file = ml_path.File
         asset_type = ml_path.tables[asset_type_atable.name]
 
@@ -1482,7 +1488,7 @@ class DerivaML:
                     print(f"  Source: {w.url}")
         """
         # Get a workflow table path and fetch all workflows
-        workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
+        workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
         return [
             Workflow(
                 name=w["Name"],
@@ -1528,7 +1534,7 @@ class DerivaML:
             return workflow_rid
 
         # Get an ML schema path for the workflow table
-        ml_schema_path = self.pathBuilder.schemas[self.ml_schema]
+        ml_schema_path = self.pathBuilder().schemas[self.ml_schema]
 
         try:
             # Create a workflow record
@@ -1561,7 +1567,7 @@ class DerivaML:
             ...     print(f"Found workflow: {rid}")
         """
         # Get a workflow table path
-        workflow_path = self.pathBuilder.schemas[self.ml_schema].Workflow
+        workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
         try:
             # Search for workflow by URL
             url_column = workflow_path.URL
