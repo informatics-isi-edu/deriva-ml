@@ -3,7 +3,6 @@ from __future__ import annotations
 import atexit
 import itertools
 import logging
-import os
 import string
 import subprocess
 from collections.abc import Iterator, Sequence
@@ -362,7 +361,6 @@ def create_demo_catalog(
 
     try:
         with TemporaryDirectory() as tmpdir:
-            os.chdir(tmpdir)  # Do this so we don't get confused if running from a GitHub repo.
             try:
                 subprocess.run(
                     "git clone https://github.com/informatics-isi-edu/deriva-ml.git",
@@ -370,10 +368,10 @@ def create_demo_catalog(
                     text=True,
                     shell=True,
                     check=True,
+                    cwd=tmpdir,
                 )
             except subprocess.CalledProcessError:
                 raise DerivaMLException("Cannot clone deriva-ml repo from GitHub.")
-            os.chdir("deriva-ml")
 
             create_domain_schema(test_catalog, domain_schema)
 
