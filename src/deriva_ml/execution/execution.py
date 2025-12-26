@@ -35,6 +35,7 @@ from typing import Any, Iterable, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
+from interfaces import DatasetLike
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.base import DerivaML
@@ -49,7 +50,7 @@ from deriva_ml.core.definitions import (
     Status,
 )
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import (
     asset_file_path,
@@ -148,7 +149,7 @@ else:
         """
         Create a new Path object that has additional information related to the use of this path as an asset.
 
-        Attrubytes:
+        Attributes:
             asset_path: Local path to the location of the asset.
             asset_name:  The name of the asset in the catalog (e.g., the asset table name).
             file_name:  Name of the local file that contains the contents of the asset.
@@ -1038,68 +1039,13 @@ class Execution:
             dataset_types=dataset_types, description=description, execution_rid=self.execution_rid, version=version
         )
 
-    def add_dataset_members(
-        self,
-        dataset_rid: RID,
-        members: list[RID] | dict[str, list[RID]],
-        validate: bool = True,
-        description: str = "",
-    ) -> None:
-        """Add additional elements to an existing dataset_table.
-
-        Add new elements to an existing dataset. In addition to adding new members, the minor version number of the
-        dataset is incremented and the description, if provide is applied to that new version.
-
-        The RIDs in the list to not have to be all from the same table, but they must be from a table that has
-        been configured to be a dataset element type.
-
-        Args:
-            dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
-            members: List of RIDs of members to add to the  dataset_table. RID must be to a table type that is a
-                dataset element type (see DerivaML.add_dataset_element_type).
-            validate: Check rid_list to make sure elements are not already in the dataset_table.
-            description: Markdown description of the updated dataset.
-        """
-        return self._ml_object.add_dataset_members(
-            dataset_rid=dataset_rid,
-            members=members,
-            validate=validate,
-            description=description,
-            execution_rid=self.execution_rid,
-        )
-
-    def increment_dataset_version(
-        self, dataset_rid: RID, component: VersionPart, description: str = ""
-    ) -> DatasetVersion:
-        """Increment the version of the specified dataset_table.
-
-        Args:
-          dataset_rid: RID to a dataset_table
-          component: Which version of the dataset_table to increment.
-          dataset_rid: RID of the dataset whose version is to be incremented.
-          component: Major, Minor, or Patch
-          description: Description of the version update of the dataset_table.
-
-        Returns:
-          new semantic version of the dataset_table as a 3-tuple
-
-        Raises:
-          DerivaMLException: if provided RID is not to a dataset_table.
-        """
-        return self._ml_object.increment_dataset_version(
-            dataset_rid=dataset_rid,
-            component=component,
-            description=description,
-            execution_rid=self.execution_rid,
-        )
-
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_files(
         self,
         files: Iterable[FileSpec],
         dataset_types: str | list[str] | None = None,
         description: str = "",
-    ) -> RID:
+    ) -> DatasetLike:
         """Adds files to the catalog with their metadata.
 
         Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
@@ -1111,7 +1057,7 @@ class Execution:
             description: Description of the files.
 
         Returns:
-            RID: Dataset RID that identifies newly added files. Will be nested to mirror original directory structure
+            RID: Dataset  that identifies newly added files. Will be nested to mirror original directory structure
             of the files.
 
         Raises:

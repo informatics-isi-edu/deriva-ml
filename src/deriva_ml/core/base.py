@@ -1263,7 +1263,7 @@ class DerivaML:
         dataset_types: str | list[str] | None = None,
         description: str = "",
         execution_rid: RID | None = None,
-    ) -> RID:
+    ) -> Dataset:
         """Adds files to the catalog with their metadata.
 
         Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
