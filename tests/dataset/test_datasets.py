@@ -51,9 +51,9 @@ class TestDataset:
         assert len(updated) == initial_count + 1
 
         # Find the new dataset
-        new_dataset = next(ds for ds in updated if ds["RID"] == dataset)
-        assert new_dataset["Description"] == "Dataset for testing"
-        assert new_dataset["Dataset_Type"] == ["Testing"]
+        new_dataset = next(ds for ds in updated if ds.dataset_rid == dataset)
+        assert new_dataset.description == "Dataset for testing"
+        assert new_dataset.dataset_types == ["Testing"]
 
     def test_dataset_find(self, dataset_test, tmp_path):
         """Test finding datasets."""
@@ -65,10 +65,10 @@ class TestDataset:
 
         reference_datasets = {ds.rid for ds in dataset_test.list_datasets(dset_description)}
         # Check all of the dataset.
-        assert reference_datasets == {ds["RID"] for ds in ml_instance.find_datasets()}
+        assert reference_datasets == {ds.dataset_rid for ds in ml_instance.find_datasets()}
 
         for ds in ml_instance.find_datasets():
-            dataset_types = ds["Dataset_Type"]
+            dataset_types = ds.dataset_types
             for t in dataset_types:
                 assert ml_instance.lookup_term(MLVocab.dataset_type, t) is not None
 
@@ -78,11 +78,11 @@ class TestDataset:
         )
         # Now look two levels down
         for ds in dset_description.members["Dataset"]:
-            assert set(ds.member_rids["Dataset"]) == set(ml_instance.list_dataset_children(ds.rid))
+            assert set(ds.member_rids["Dataset"]) == set(ds.list_dataset_children())
 
         # Now check recursion
         nested_datasets = reference_datasets - {dset_description.rid}
-        assert nested_datasets == set(ml_instance.list_dataset_children(dset_description.rid, recurse=True))
+        assert nested_datasets == set(dset_description.list_dataset_children(recurse=True))
 
         def check_relationships(description: DatasetDescription):
             """Check relationships between datasets."""

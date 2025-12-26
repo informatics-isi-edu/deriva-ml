@@ -47,7 +47,7 @@ class TestFiles:
     def clean_up(self):
         print("Cleaning up test files....")
         try:
-            self.ml_instance.pathBuilder.schemas[self.ml_instance.ml_schema].tables["File"].delete()
+            self.ml_instance.pathBuilder().schemas[self.ml_instance.ml_schema].tables["File"].delete()
         except DataPathException as e:
             print(type(e))
 
@@ -107,12 +107,12 @@ class TestFile:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
 
             file_dataset = exe.add_files(filespecs)
-            assert file_dataset in [ds["RID"] for ds in ml_instance.find_datasets()]
-            ds = ml_instance.list_dataset_members(file_dataset)
+            assert file_dataset in [ds.dataset_rid for ds in ml_instance.find_datasets()]
+            ds = file_dataset.list_dataset_members(file_dataset)
             assert len(ds["File"]) == 5
             assert len(ds["Dataset"]) == 2
-            for subdir in ml_instance.list_dataset_children(file_dataset):
-                ds = ml_instance.list_dataset_members(subdir)
+            for subdir in file_dataset.list_dataset_children(file_dataset):
+                ds = subdir.list_dataset_members()
                 assert len(ds["File"]) == 5
 
     def test_list_files(self, file_table_setup):
@@ -157,10 +157,10 @@ class TestFile:
             )
             file_dataset = exe.add_files(filespecs)
 
-        assert len(ml_instance.list_dataset_children(file_dataset)) == 2
-        assert len(ml_instance.list_dataset_members(file_dataset)["File"]) == FILE_COUNT
-        for subdir in ml_instance.list_dataset_children(file_dataset):
-            assert len(ml_instance.list_dataset_members(subdir)["File"]) == FILE_COUNT
+        assert len(file_dataset.list_dataset_children()) == 2
+        assert len(file_dataset.list_dataset_members()["File"]) == FILE_COUNT
+        for subdir in file_dataset.list_dataset_children():
+            assert len(subdir.list_dataset_members()["File"]) == FILE_COUNT
 
     def test_file_spec_read_write(self, tmp_path):
         """Test reading and writing FileSpecs to JSONL."""

@@ -12,6 +12,7 @@ from deriva_ml.demo_catalog import (
     create_demo_features,
     populate_demo_catalog,
 )
+from deriva_ml.execution import ExecutionConfiguration
 
 from .test_utils import MLCatalog, MLDatasetCatalog, create_jupyter_kernel, destroy_jupyter_kernel
 
@@ -36,7 +37,10 @@ def populated_catalog(deriva_catalog, tmp_path):
     print("Setting up populated catalog for testing... ", end="")
 
     ml_instance = DerivaML(deriva_catalog.hostname, deriva_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
-    populate_demo_catalog(ml_instance)
+    populate_workflow = ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
+    execution = ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+    with execution.execute() as exe:
+        populate_demo_catalog(exe)
     return ml_instance
 
 
@@ -76,9 +80,12 @@ def notebook_test(deriva_catalog, tmp_path):
 def test_ml_demo_catalog(ml_catalog, tmp_path):
     # reset_demo_catalog(ml_catalog.catalog)
     ml_instance = DerivaML(ml_catalog.hostname, ml_catalog.catalog_id, use_minid=False, working_dir=tmp_path)
-    populate_demo_catalog(ml_instance)
-    create_demo_features(ml_instance)
-    create_demo_datasets(ml_instance)
+    populate_workflow = ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
+    execution = ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+    with execution.execute() as exe:
+        populate_demo_catalog(exe)
+        create_demo_features(exe)
+        create_demo_datasets(exe)
     return ml_instance
 
 

@@ -15,6 +15,7 @@ from deriva_ml.demo_catalog import (
     create_demo_features,
     populate_demo_catalog,
 )
+from deriva_ml.execution import ExecutionConfiguration
 
 
 class MLCatalog:
@@ -92,9 +93,12 @@ class MLDatasetCatalog:
 
         with TemporaryDirectory() as tmpdir:
             ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, use_minid=False, working_dir=tmpdir)
-            populate_demo_catalog(ml_instance)
-            self.dataset_description = create_demo_datasets(ml_instance)
-            create_demo_features(ml_instance)
+            populate_workflow = ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
+            execution = ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+            with execution.execute() as exe:
+                populate_demo_catalog(exe)
+                create_demo_features(exe)
+                self.dataset_description = create_demo_datasets(exe)
 
     def list_datasets(self, dataset_description: DatasetDescription) -> list[DatasetDescription]:
         """Return a set of RIDs whose members are members of the given dataset description."""
@@ -120,7 +124,10 @@ class MLDatasetCatalog:
         self.catalog.reset_demo_catalog()
         with TemporaryDirectory() as tmp_dir:
             ml_instance = DerivaML(self.catalog.hostname, self.catalog.catalog_id, working_dir=tmp_dir, use_minid=False)
-            self.dataset_description: DatasetDescription = create_demo_datasets(ml_instance)
+            populate_workflow = ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
+            execution = ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+            with execution.execute() as exe:
+                self.dataset_description: DatasetDescription = create_demo_datasets(exe)
 
 
 def create_jupyter_kernel(name: str, kernel_dir, display_name: str = None, user: bool = True) -> None:
