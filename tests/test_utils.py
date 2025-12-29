@@ -8,6 +8,7 @@ from ipykernel.kernelspec import install
 from jupyter_client.kernelspec import KernelSpecManager
 
 from deriva_ml import DerivaML
+from deriva_ml.core.definitions import MLVocab
 from deriva_ml.demo_catalog import (
     DatasetDescription,
     create_demo_catalog,
@@ -93,6 +94,11 @@ class MLDatasetCatalog:
 
         with TemporaryDirectory() as tmpdir:
             ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, use_minid=False, working_dir=tmpdir)
+            ml_instance.add_term(
+                MLVocab.workflow_type,
+                "Demo Catalog Creation",
+                description="A Workflow that creates a new catalog and populates it with demo data.",
+            )
             populate_workflow = ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
             execution = ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
             with execution.execute() as exe:

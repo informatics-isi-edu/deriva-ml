@@ -2,16 +2,25 @@
 Tests for dataset functionality.
 """
 
+from pprint import pformat
+
+from icecream import ic
+
 from deriva_ml import (
     BuiltinTypes,
     ColumnDefinition,
-    DatasetSpec,
     DerivaML,
-    ExecutionConfiguration,
     MLVocab,
     TableDefinition,
 )
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.demo_catalog import DatasetDescription
+from deriva_ml.execution.execution import ExecutionConfiguration
+
+ic.configureOutput(
+    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
+)
 
 
 class TestDataset:
@@ -38,16 +47,16 @@ class TestDataset:
         )
 
         # Find existing datasets for reference
-        existing = ml_instance.find_datasets()
+        existing = list(ml_instance.find_datasets())
         initial_count = len(existing)
         ml_instance.add_term(MLVocab.dataset_type, "Testing", description="A test dataset")
 
         # Create a new dataset
-        dataset = ml_instance.create_dataset(description="Dataset for testing", dataset_types="Testing")
+        dataset = ml_instance.create_dataset(description="Dataset for testing", dataset_types=["Testing"])
         assert dataset is not None
 
         # Verify dataset was created
-        updated = ml_instance.find_datasets()
+        updated = list(ml_instance.find_datasets())
         assert len(updated) == initial_count + 1
 
         # Find the new dataset
@@ -62,8 +71,7 @@ class TestDataset:
         catalog_id = dataset_test.catalog.catalog_id
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dset_description = dataset_test.dataset_description
-
-        reference_datasets = {ds.rid for ds in dataset_test.list_datasets(dset_description)}
+        reference_datasets = {ds.dataset.dataset_rid for ds in dataset_test.list_datasets(dset_description)}
         # Check all of the dataset.
         assert reference_datasets == {ds.dataset_rid for ds in ml_instance.find_datasets()}
 
@@ -73,24 +81,26 @@ class TestDataset:
                 assert ml_instance.lookup_term(MLVocab.dataset_type, t) is not None
 
         # Now check top level nesting
-        assert set(dset_description.member_rids["Dataset"]) == set(
-            ml_instance.list_dataset_children(dset_description.rid)
-        )
+        child_rids = set(ds.dataset_rid for ds in dset_description.dataset.list_dataset_children())
+        assert set(dset_description.member_rids["Dataset"]) == child_rids
         # Now look two levels down
-        for ds in dset_description.members["Dataset"]:
-            assert set(ds.member_rids["Dataset"]) == set(ds.list_dataset_children())
+
+        for member_ds in dset_description.members["Dataset"]:
+            child_rids = set(ds.dataset_rid for ds in member_ds.dataset.list_dataset_children())
+            assert set(member_ds.member_rids["Dataset"]) == child_rids
 
         # Now check recursion
-        nested_datasets = reference_datasets - {dset_description.rid}
-        assert nested_datasets == set(dset_description.list_dataset_children(recurse=True))
+        nested_datasets = reference_datasets - {dset_description.dataset.dataset_rid}
+        assert nested_datasets == set(
+            ds.dataset_rid for ds in dset_description.dataset.list_dataset_children(recurse=True)
+        )
 
         def check_relationships(description: DatasetDescription):
             """Check relationships between datasets."""
-            dataset_children = ml_instance.list_dataset_children(description.rid)
-            assert set(description.member_rids.get("Dataset", [])) == set(dataset_children)
-
+            dataset_children = description.dataset.list_dataset_children()
+            assert set(description.member_rids.get("Dataset", [])) == set(ds.dataset_rid for ds in dataset_children)
             for child in dataset_children:
-                assert ml_instance.list_dataset_parents(child)[0] == description.rid
+                assert child.list_dataset_parents()[0].dataset_rid == description.dataset.dataset_rid
             for nested_dataset in description.members.get("Dataset", []):
                 check_relationships(nested_dataset)
 
@@ -126,13 +136,13 @@ class TestDataset:
         dataset_description = dataset_test.dataset_description
         catalog_datasets = ml_instance.find_datasets()
         reference_datasets = dataset_test.list_datasets(dataset_description)
-        assert len(catalog_datasets) == len(reference_datasets)
+        assert len(list(catalog_datasets)) == len(reference_datasets)
 
-        assert ml_instance._dataset_nesting_depth() == 2
+        assert Dataset._dataset_nesting_depth() == 2
 
         for dataset in reference_datasets:
             # See if the list of RIDs in the dataset matches up with what is expected.
-            for member_type, dataset_members in ml_instance.list_dataset_members(dataset.rid).items():
+            for member_type, dataset_members in dataset.list_dataset_members().items():
                 if member_type == "File":
                     continue
                 member_rids = {e["RID"] for e in dataset_members}
@@ -141,7 +151,7 @@ class TestDataset:
         for dataset in reference_datasets:
             reference_members = dataset_test.collect_rids(dataset)
             member_rids = {dataset.rid}
-            for member_type, dataset_members in ml_instance.list_dataset_members(dataset.rid, recurse=True).items():
+            for member_type, dataset_members in dataset.list_dataset_members(recurse=True).items():
                 if member_type == "File":
                     continue
                 member_rids |= {e["RID"] for e in dataset_members}
