@@ -7,7 +7,6 @@ from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 
 from deriva_ml.core.constants import RID
-from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
 
@@ -20,7 +19,6 @@ class CatalogGraph:
 
     def _export_annotation(
         self,
-        snapshot_catalog: DerivaMLCatalog | None = None,
     ) -> list[dict[str, Any]]:
         """Return and output specification for the datasets in the provided model
 
@@ -45,15 +43,9 @@ class CatalogGraph:
                 "source": {"api": "schema", "skip_root_path": True},
                 "destination": {"type": "json", "name": "schema"},
             },
-        ] + self._dataset_specification(
-            self._export_annotation_dataset_element,
-            None,
-            snapshot_catalog=snapshot_catalog,
-        )
+        ] + self._dataset_specification(self._export_annotation_dataset_element, None)
 
-    def _export_specification(
-        self, dataset: DatasetLike, snapshot_catalog: DerivaMLCatalog | None = None
-    ) -> list[dict[str, Any]]:
+    def _export_specification(self, dataset: DatasetLike) -> list[dict[str, Any]]:
         """
         Generate a specification for export engine for specific dataset.
 
@@ -68,7 +60,7 @@ class CatalogGraph:
                 "processor": "json",
                 "processor_params": {"query_path": "/schema", "output_path": "schema"},
             }
-        ] + self._dataset_specification(self._export_specification_dataset_element, dataset, snapshot_catalog)
+        ] + self._dataset_specification(self._export_specification_dataset_element, dataset)
 
     @staticmethod
     def _export_specification_dataset_element(spath: str, dpath: str, table: Table) -> list[dict[str, Any]]:
@@ -158,9 +150,7 @@ class CatalogGraph:
             )
         return exports
 
-    def generate_dataset_download_spec(
-        self, dataset: DatasetLike, snapshot_catalog: DerivaMLCatalog | None = None
-    ) -> dict[str, Any]:
+    def generate_dataset_download_spec(self, dataset: DatasetLike) -> dict[str, Any]:
         """
         Generate a specification for downloading a specific dataset.
 
@@ -170,11 +160,6 @@ class CatalogGraph:
         """
         s3_target = "s3://eye-ai-shared"
         minid_test = False
-        if snapshot_catalog:
-            catalog = snapshot_catalog.catalog
-            catalog_id = f"{catalog.catalog_id}@{catalog.latest_snapshot().snaptime}"
-        else:
-            catalog_id = self._ml_instance.catalog_id
 
         post_processors = (
             {
@@ -212,7 +197,7 @@ class CatalogGraph:
             },
             "catalog": {
                 "host": f"{self._ml_instance.catalog.deriva_server.scheme}://{self._ml_instance.catalog.deriva_server.server}",
-                "catalog_id": catalog_id,
+                "catalog_id": self._ml_instance.catalog_id,
                 "query_processors": [
                     {
                         "processor": "env",
@@ -231,7 +216,7 @@ class CatalogGraph:
                         },
                     },
                 ]
-                + self._export_specification(dataset, snapshot_catalog),
+                + self._export_specification(dataset),
             },
         }
 
@@ -333,13 +318,30 @@ class CatalogGraph:
     def _collect_paths(
         self,
         dataset_rid: RID | None = None,
-        snapshot: DerivaMLCatalog | None = None,
         dataset_nesting_depth: int | None = None,
     ) -> set[tuple[Table, ...]]:
-        snapshot_catalog = snapshot if snapshot else self
+        """
+        Collects all schema paths relevant to a specific dataset, optionally filtered by dataset membership or nesting
+        depth, and returns those paths. The paths represent relationships between tables in the schema and how they can
+        be traversed based on the dataset's structure and context.
 
-        dataset_table = snapshot_catalog._ml_instance.model.schemas[self._ml_schema].tables["Dataset"]
-        dataset_dataset = snapshot_catalog._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
+        Args:
+            dataset_rid:
+                An optional identifier for the specific dataset to filter paths. If provided,
+                only paths traversing elements of this dataset will be included.
+            dataset_nesting_depth:
+                Specifies the depth to which nested datasets should be included. If not provided,
+                a default depth is calculated based on the current instance.
+
+        Returns:
+            set[tuple[Table, ...]]:
+                A set of tuples, where each tuple represents a valid path consisting of
+                Tables. Each path defines how tables are connected and can be navigated
+                through the schema.
+        """
+
+        dataset_table = self._ml_instance.model.schemas[self._ml_schema].tables["Dataset"]
+        dataset_dataset = self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
 
         # Figure out what types of elements the dataset contains.
         dataset_associations = [
@@ -350,9 +352,9 @@ class CatalogGraph:
 
         if dataset_rid:
             # Get a list of the members of the dataset so we can figure out which tables to query.
-            dataset = snapshot_catalog.lookup_dataset(dataset_rid)
+            dataset = self._ml_instance.lookup_dataset(dataset_rid)
             dataset_elements = [
-                snapshot_catalog.model.name_to_table(e) for e, m in dataset.list_dataset_members().items() if m
+                self._ml_instance.model.name_to_table(e) for e, m in dataset.list_dataset_members().items() if m
             ]
             included_associations = [
                 a.table for a in dataset_table.find_associations() if a.other_fkeys.pop().pk_table in dataset_elements
@@ -363,7 +365,7 @@ class CatalogGraph:
         # Get the paths through the schema and filter out all the dataset paths not used by this dataset.
         paths = {
             tuple(p)
-            for p in snapshot_catalog._ml_instance.model._schema_to_paths()
+            for p in self._ml_instance.model._schema_to_paths()
             if (len(p) == 1)
             or (p[1] not in dataset_associations)  # Tables in the domain schema
             or (p[1] in included_associations)  # Tables that include members of the dataset
@@ -371,9 +373,9 @@ class CatalogGraph:
         # Now get paths for nested datasets
         nested_paths = set()
         if dataset_rid:
-            dataset = snapshot_catalog.lookup_dataset(dataset_rid)
+            dataset = self._ml_instance.lookup_dataset(dataset_rid)
             for c in dataset.list_dataset_children():
-                nested_paths |= self._collect_paths(c, snapshot=snapshot_catalog)
+                nested_paths |= self._collect_paths(c.dataset_rid)
         else:
             # Initialize nesting depth if not already provided.
             dataset_nesting_depth = (
@@ -408,10 +410,9 @@ class CatalogGraph:
 
     def _table_paths(
         self,
-        dataset: DatasetSpec | None = None,
-        snapshot_catalog: DerivaMLCatalog | None = None,
+        dataset: DatasetLike | None = None,
     ) -> Iterator[tuple[str, str, Table]]:
-        paths = self._collect_paths(dataset and dataset.rid, snapshot_catalog)
+        paths = self._collect_paths(dataset and dataset.dataset_rid)
 
         def source_path(path: tuple[Table, ...]) -> list[str]:
             """Convert a tuple representing a path into a source path component with FK linkage"""
@@ -469,8 +470,7 @@ class CatalogGraph:
     def _dataset_specification(
         self,
         writer: Callable[[str, str, Table], list[dict[str, Any]]],
-        dataset: DatasetSpec | None = None,
-        snapshot_catalog: DerivaMLCatalog | None = None,
+        dataset: DatasetLike | None = None,
     ) -> list[dict[str, Any]]:
         """Output a download/export specification for a dataset_table.  Each element of the dataset_table
         will be placed in its own directory.
@@ -513,6 +513,6 @@ class CatalogGraph:
             A dataset_table specification.
         """
         element_spec = self._export_vocabulary(writer)
-        for path in self._table_paths(dataset=dataset, snapshot_catalog=snapshot_catalog):
+        for path in self._table_paths(dataset=dataset):
             element_spec.extend(writer(*path))
         return element_spec

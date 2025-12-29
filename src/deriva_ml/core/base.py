@@ -254,6 +254,9 @@ class DerivaML:
         )
         return session_config
 
+    def is_snapshot(self) -> bool:
+        return hasattr(self.catalog, "_snaptime")
+
     def catalog_snapshot(self, version_snapshot: str) -> Self:
         """Returns a DerivaML instance for a specific snapshot of the catalog."""
         return DerivaML(

@@ -22,6 +22,7 @@ Typical usage example:
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 from collections import defaultdict
@@ -29,6 +30,9 @@ from collections import defaultdict
 # Standard library imports
 from graphlib import TopologicalSorter
 from pathlib import Path
+
+# Local imports
+from pprint import pformat
 from tempfile import TemporaryDirectory
 from typing import Any, Iterable, Self
 from urllib.parse import urlparse
@@ -40,6 +44,7 @@ import requests
 # Third-party imports
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
+from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import format_exception
 from deriva.transfer.download.deriva_download import (
     DerivaDownloadAuthenticationError,
@@ -51,11 +56,14 @@ from deriva.transfer.download.deriva_download import (
 from deriva.transfer.download.deriva_export import DerivaExport
 from pydantic import ConfigDict, validate_call
 
-# Local imports
 try:
     from icecream import ic
 
-    ic.configureOutput(includeContext=True)
+    ic.configureOutput(
+        includeContext=True,
+        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
+    )
+
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
@@ -133,7 +141,7 @@ class Dataset:
         self._ml_instance = catalog
         self.description = description
         self._version: DatasetVersion | None = None
-        self._version_snapshot: DerivaMLCatalog | None = None
+        self._version_snapshot: DerivaMLCatalog = self._ml_instance
 
         self.set_version(version)
         self.dataset_types = dataset_types or []
@@ -233,16 +241,32 @@ class Dataset:
         """
         return self._version or self.current_version
 
-    def set_version(self, version: DatasetVersion | str | None) -> None:
+    def set_version(self, version: DatasetVersion | str | None) -> Self:
+        """
+        Sets the version of the dataset. If a version is provided, it will be parsed and
+        saved along with its corresponding snapshot. If no version is provided, the
+        existing version and snapshot will be reset to None.
+
+        Args:
+            version: An instance of DatasetVersion, a string representation of the
+                version, or None. If a string is provided, it will be parsed into a
+                DatasetVersion object. None will reset the version data.
+
+        Returns:
+            A new copy of the current object, with the updated version details applied.
+        """
+        versioned_dataset = copy.copy(self)
+
         if version:
-            self._version = DatasetVersion.parse(version) if isinstance(version, str) else version
-            self._version_snapshot = self._version_snapshot_catalog(version)
+            versioned_dataset._version = DatasetVersion.parse(version) if isinstance(version, str) else version
+            versioned_dataset._version_snapshot = versioned_dataset._version_snapshot_catalog(version)
         else:
-            self._version = None
-            self._version_snapshot = None
+            versioned_dataset._version = None
+            versioned_dataset._version_snapshot = self._ml_instance
+        return versioned_dataset
 
     @property
-    def _dataset_table(self):
+    def _dataset_table(self) -> Table:
         return self._ml_instance.model.schemas[self._ml_instance.ml_schema].tables["Dataset"]
 
     def dataset_history(self) -> list[DatasetHistory]:
@@ -394,16 +418,13 @@ class Dataset:
         dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_members(
-        self, dataset_version: DatasetVersion | str | None = None, recurse: bool = False, limit: int | None = None
-    ) -> dict[str, list[dict[str, Any]]]:
+    def list_dataset_members(self, recurse: bool = False, limit: int | None = None) -> dict[str, list[dict[str, Any]]]:
         """Lists members of a dataset.
 
         Returns a dictionary mapping member types to lists of member records. Can optionally
         recurse through nested datasets and limit the number of results.
 
         Args:
-            dataset_version: Dataset version to list members from. Defaults to the current version.
             recurse: Whether to include members of nested datasets. Defaults to False.
             limit: Maximum number of members to return per type. None for no limit.
 
@@ -424,8 +445,7 @@ class Dataset:
         # the appropriate association table.
         members = defaultdict(list)
 
-        version_catalog = self._version_snapshot_catalog(dataset_version)
-        pb = version_catalog.pathBuilder()
+        pb = self._version_snapshot.pathBuilder()
         for assoc_table in self._dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
             target_table = other_fkey.pk_table
@@ -452,8 +472,9 @@ class Dataset:
             if recurse and target_table == self._dataset_table:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in target_entities]
-                for ds in nested_datasets:
-                    for k, v in ds.list_dataset_members(ds, recurse=recurse).items():
+                for ds_rid in nested_datasets:
+                    ds = self._version_snapshot.lookup_dataset(ds_rid)
+                    for k, v in ds.list_dataset_members(recurse=recurse).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -617,7 +638,7 @@ class Dataset:
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_parents(self, version: DatasetVersion | str | None = None) -> list[Self]:
+    def list_dataset_parents(self) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
 
@@ -629,35 +650,32 @@ class Dataset:
                 f"RID: {self.dataset_rid} does not belong to dataset_table {self._dataset_table.name}"
             )
         # Get association table for nested datasets
-        version_catalog = self._version_snapshot_catalog(version)
-        pb = version_catalog.pathBuilder()
+        pb = self._version_snapshot.pathBuilder()
         atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
         return [
-            self._ml_instance.lookup_dataset(p["Dataset"])
+            self._version_snapshot.lookup_dataset(p["Dataset"])
             for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
         ]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_children(self, version: DatasetVersion | str | None = None, recurse: bool = False) -> list[Self]:
+    def list_dataset_children(self, recurse: bool = False) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs for any nested datasets.
 
         Args:
-            version: Dataset version to list children from. Defaults to the current version.
             recurse: If True, return a list of nested datasets RIDs.
 
         Returns:
           list of nested dataset RIDs.
 
         """
-        version_catalog = self._version_snapshot_catalog(version)
         dataset_dataset_path = (
-            version_catalog.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
+            self._version_snapshot.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
         )
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
         def find_children(rid: RID) -> list[Self]:
             children = [
-                version_catalog.lookup_dataset(child["Nested_Dataset"])
+                self._version_snapshot.lookup_dataset(child["Nested_Dataset"])
                 for child in nested_datasets
                 if child["Dataset"] == rid
             ]
@@ -702,19 +720,22 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(
         self,
+        version: DatasetVersion | str | None = None,
         materialize: bool = True,
-        execution_rid: RID | None = None,
         use_minid: bool = True,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and creates a MINID if needed.
 
-        Downloads a dataset specified by DatasetSpec to the local filesystem. If the dataset doesn't have
-        a MINID (Minimal Viable Identifier), one will be created. The dataset can optionally be associated
-        with an execution record.
+        Downloads a dataset to the local file system.  If the dataset has a version set, that version is used.
+        If the dataset has a version and a version is provided, the version specified in the argument must match..
+        Otherwise, the version to be downloaded must be specified via the version argument.
+        If the dataset doesn't have a MINID (Minimal Viable Identifier), one will be created.
+        The dataset can optionally be associated with an execution record.
+
 
         Args:
+            version: Dataset version to download. If not specified, the version must be set in the dataset.
             materialize: If True, materialize the dataset after downloading.
-            execution_rid: Optional execution RID to associate the download with.
             use_minid: If True, create a MINID for the dataset if one doesn't already exist.
 
         Returns:
@@ -735,37 +756,51 @@ class Dataset:
                 ...     execution_rid="1-xyz789"
                 ... )
         """
-        return self._download_dataset_bag(
+        if isinstance(version, str):
+            version = DatasetVersion.parse(version)
+
+        if not (self._version or version):
+            raise DerivaMLException(
+                "Dataset version not specified.  Version must either be set in the dataset or provided as an argument."
+            )
+
+        if self._version and version and self._version != version:
+            raise DerivaMLException(
+                f"Dataset version specified in dataset ({self._version}) "
+                f"does not match version provided as argument ({version})."
+            )
+
+        # Get Dataset object that corresponds to the version of the dataset.
+        versioned_dataset = self.set_version(version)
+        return versioned_dataset._download_dataset_bag(
             materialize=materialize,
-            execution_rid=execution_rid,
             use_minid=use_minid,
         )
 
     def _download_dataset_bag(
         self,
         materialize: bool,
-        execution_rid: RID | None = None,
         use_minid: bool = True,
     ) -> DatasetBag:
         """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
 
         Args:
-            execution_rid: Execution RID for the dataset.
+            materialize: Download all of the assets in the dataset.
 
         Returns:
             Tuple consisting of the path to the dataset, the RID of the dataset that was downloaded and the MINID
             for the dataset.
         """
         if (
-            execution_rid
-            and execution_rid != DRY_RUN_RID
-            and self._ml_instance.resolve_rid(execution_rid).table.name != "Execution"
+            self.execution_rid
+            and self.execution_rid != DRY_RUN_RID
+            and self._ml_instance.resolve_rid(self.execution_rid).table.name != "Execution"
         ):
-            raise DerivaMLException(f"RID {execution_rid} is not an execution")
+            raise DerivaMLException(f"RID {self.execution_rid} is not an execution")
         minid = self._get_dataset_minid(create=True, use_minid=use_minid)
 
         bag_path = (
-            self._materialize_dataset_bag(minid, execution_rid=execution_rid, use_minid=use_minid)
+            self._materialize_dataset_bag(minid, use_minid=use_minid)
             if materialize
             else self._download_dataset_minid(minid, use_minid)
         )
@@ -786,6 +821,42 @@ class Dataset:
         except StopIteration:
             raise DerivaMLException(f"Dataset version {self._version} not found for dataset {self.dataset_rid}")
         return f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}"
+
+    def _download_dataset_minid(self, minid: DatasetMinid, use_minid: bool) -> Path:
+        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and
+        validate that all the metadata is correct
+
+        Args:
+            minid: The RID of a dataset_table or a minid to an existing bag.
+        Returns:
+            the location of the unpacked and validated dataset_table bag and the RID of the bag and the bag MINID
+        """
+
+        # Check to see if we have an existing idempotent materialization of the desired bag. If so, then reuse
+        # it.  If not, then we need to extract the contents of the archive into our cache directory.
+        bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{minid.checksum}"
+        if bag_dir.exists():
+            self._logger.info(f"Using cached bag for  {minid.dataset_rid} Version:{minid.dataset_version}")
+            return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
+
+        # Either bag hasn't been downloaded yet, or we are not using a Minid, so we don't know the checksum yet.
+        with TemporaryDirectory() as tmp_dir:
+            if use_minid:
+                # Get bag from S3
+                bag_path = Path(tmp_dir) / Path(urlparse(minid.bag_url).path).name
+                archive_path = fetch_single_file(minid.bag_url, output_path=bag_path)
+            else:
+                exporter = DerivaExport(host=self._ml_instance.catalog.deriva_server.server, output_dir=tmp_dir)
+                archive_path = exporter.retrieve_file(minid.bag_url)
+                hashes = hash_utils.compute_file_hashes(archive_path, hashes=["md5", "sha256"])
+                checksum = hashes["sha256"][0]
+                bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{checksum}"
+                if bag_dir.exists():
+                    self._logger.info(f"Using cached bag for  {minid.dataset_rid} Version:{minid.dataset_version}")
+                    return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
+            bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())
+        bdb.validate_bag_structure(bag_path)
+        return Path(bag_path)
 
     def _create_dataset_minid(self, use_minid=True) -> str:
         with TemporaryDirectory() as tmp_dir:
@@ -846,7 +917,7 @@ class Dataset:
         """
 
         # Find dataset version record
-        version_str = str(self._version)
+        version_str = str(self.version)
         history = self.dataset_history()
         try:
             version_record = next(v for v in history if v.dataset_version == version_str)
@@ -861,7 +932,7 @@ class Dataset:
                 raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
             if use_minid:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
-            minid_url = self._create_dataset_minid()
+            minid_url = self._create_dataset_minid(use_minid=use_minid)
 
         # Return based on MINID usage
         if use_minid:
@@ -877,46 +948,9 @@ class Dataset:
         r.raise_for_status()
         return DatasetMinid(dataset_version=self._version, **r.json())
 
-    def _download_dataset_minid(self, minid: DatasetMinid, use_minid: bool) -> Path:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and
-        validate that all the metadata is correct
-
-        Args:
-            minid: The RID of a dataset_table or a minid to an existing bag.
-        Returns:
-            the location of the unpacked and validated dataset_table bag and the RID of the bag and the bag MINID
-        """
-
-        # Check to see if we have an existing idempotent materialization of the desired bag. If so, then reuse
-        # it.  If not, then we need to extract the contents of the archive into our cache directory.
-        bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{minid.checksum}"
-        if bag_dir.exists():
-            self._logger.info(f"Using cached bag for  {minid.dataset_rid} Version:{minid.dataset_version}")
-            return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
-
-        # Either bag hasn't been downloaded yet, or we are not using a Minid, so we don't know the checksum yet.
-        with TemporaryDirectory() as tmp_dir:
-            if use_minid:
-                # Get bag from S3
-                bag_path = Path(tmp_dir) / Path(urlparse(minid.bag_url).path).name
-                archive_path = fetch_single_file(minid.bag_url, output_path=bag_path)
-            else:
-                exporter = DerivaExport(host=self._ml_instance.catalog.deriva_server.server, output_dir=tmp_dir)
-                archive_path = exporter.retrieve_file(minid.bag_url)
-                hashes = hash_utils.compute_file_hashes(archive_path, hashes=["md5", "sha256"])
-                checksum = hashes["sha256"][0]
-                bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{checksum}"
-                if bag_dir.exists():
-                    self._logger.info(f"Using cached bag for  {minid.dataset_rid} Version:{minid.dataset_version}")
-                    return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
-            bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())
-        bdb.validate_bag_structure(bag_path)
-        return Path(bag_path)
-
     def _materialize_dataset_bag(
         self,
         minid: DatasetMinid,
-        execution_rid: RID | None,
         use_minid: bool,
     ) -> Path:
         """Materialize a dataset_table bag into a local directory
@@ -930,11 +964,11 @@ class Dataset:
 
         def update_status(status: Status, msg: str) -> None:
             """Update the current status for this execution in the catalog"""
-            if execution_rid and execution_rid != DRY_RUN_RID:
+            if self.execution_rid and self.execution_rid != DRY_RUN_RID:
                 self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].Execution.update(
                     [
                         {
-                            "RID": execution_rid,
+                            "RID": self.execution_rid,
                             "Status": status.value,
                             "Status_Detail": msg,
                         }
@@ -944,13 +978,13 @@ class Dataset:
 
         def fetch_progress_callback(current, total):
             msg = f"Materializing bag: {current} of {total} file(s) downloaded."
-            if execution_rid:
+            if self.execution_rid:
                 update_status(Status.running, msg)
             return True
 
         def validation_progress_callback(current, total):
             msg = f"Validating bag: {current} of {total} file(s) validated."
-            if execution_rid:
+            if self.execution_rid:
                 update_status(Status.running, msg)
             return True
 

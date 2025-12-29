@@ -13,7 +13,7 @@ Classes:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, Self, runtime_checkable
+from typing import Any, Protocol, Self, runtime_checkable
 
 from deriva.core import ErmrestSnapshot
 from deriva.core.datapath import _SchemaWrapper as SchemaWrapper
@@ -33,14 +33,16 @@ class DatasetLike(Protocol):
     description: str
     _version: DatasetVersion | None
     _version_snapshot: DerivaMLCatalog | None
-    dataset_types: list[str]
+    dataset_types: str | list[str] | None
 
     @property
     def version(self) -> DatasetVersion: ...
 
-    def list_dataset_children(
-        self, version: DatasetVersion | str | None = None, recurse: bool = False
-    ) -> list[Self]: ...
+    def list_dataset_children(self, recurse: bool = False) -> list[Self]: ...
+
+    def list_dataset_members(
+        self, recurse: bool = False, limit: int | None = None
+    ) -> dict[str, list[dict[str, Any]]]: ...
 
 
 @runtime_checkable
@@ -54,11 +56,14 @@ class DerivaMLCatalog(Protocol):
     catalog_id: str | int
 
     def pathBuilder(self) -> SchemaWrapper: ...
+
     def catalog_snapshot(self, version_snapshot: str) -> Self: ...
+
     def resolve_rid(self, rid: RID) -> ResolveRidResult: ...
+
     def lookup_dataset(
         self, dataset: RID | DatasetSpec, version: DatasetVersion | None = None, deleted: bool = False
-    ) -> DatasetLike | None: ...
+    ) -> DatasetLike: ...
 
     @property
     def _dataset_table(self) -> Table: ...

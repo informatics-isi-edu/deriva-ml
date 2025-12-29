@@ -99,51 +99,56 @@ _SYSTEM_MODULE_PREFIXES = (
 # --- Helpers focused on determining the current "python model" (file) ---
 
 
-def _nearest_user_frame() -> Optional[FrameType]:
-    """Return the innermost non-tooling frame from the current stack.
+def _top_user_frame() -> Optional[FrameType]:
+    """Return the outermost (top-level) non-tooling frame from the current stack.
 
-    Unlike _is_system_frame used above, this version intentionally does NOT
-    exclude stdlib or site-packages so that functions inside installed packages
-    are still considered "user" frames per requirement (4).
+    This function traverses the call stack from the current execution point
+    back to the entry point, filtering out known tooling (pytest, IDE helpers,
+    Jupyter internals) and returns the highest-level frame that belongs to
+    user code.
     """
     tooling_prefixes = _SYSTEM_MODULE_PREFIXES
-    # Some IDE/console helpers present frames with module name '__main__', so
-    # module-prefix checks won't catch them. Filter by filename substrings too.
     tooling_filename_parts = (
         "pydevconsole.py",  # PyCharm REPL console
         "/pydev/",  # PyCharm helpers path segment
         "/_pydevd_bundle/",
         "/_pydev_bundle/",
+        "_pytest",
+        "/pycharm/",
     )
+
     f = inspect.currentframe()
-    if f is None:
-        return None
-    f = f.f_back  # caller of _nearest_user_frame
+    last_user_frame = None
+
+    if f is not None:
+        f = f.f_back  # Skip the _top_user_frame itself
+
     while f is not None:
         filename = f.f_code.co_filename or ""
         mod_name = f.f_globals.get("__name__", "") or ""
 
-        # Treat IPython cell as user code
+        # 1. Treat IPython cell as user code
         if _is_pseudo_user_filename(filename):
-            return f
+            last_user_frame = f
+            f = f.f_back
+            continue
 
-        # Skip other pseudo files like <stdin>, <string>, etc., unless __main__
+        # 2. Skip other pseudo files like <stdin>, <string>, etc., unless __main__
         if filename.startswith("<") and filename.endswith(">") and mod_name not in ("__main__", "__mp_main__"):
             f = f.f_back
             continue
 
-        # Skip known tooling frames by module prefix
+        # 3. Skip known tooling frames by module prefix
         if any(mod_name == p or mod_name.startswith(p + ".") for p in tooling_prefixes):
             f = f.f_back
             continue
 
-        # Skip known tooling frames by filename patterns (e.g., pydev console)
+        # 4. Skip known tooling frames by filename patterns
         if any(part in filename for part in tooling_filename_parts):
             f = f.f_back
             continue
 
-        # Skip frames that belong to this helper module itself so we return the
-        # caller outside find_caller.py (e.g., Workflow in your case)
+        # 5. Skip frames that belong to this helper module (find_caller.py)
         try:
             cur = str(Path(filename).resolve())
             this = str(Path(__file__).resolve())
@@ -151,11 +156,14 @@ def _nearest_user_frame() -> Optional[FrameType]:
                 f = f.f_back
                 continue
         except Exception:
-            # If anything odd happens resolving paths, just proceed
             pass
 
-        return f
-    return None
+        # If it passed all filters, it is a user frame.
+        # We record it and keep going back to find an even "higher" one.
+        last_user_frame = f
+        f = f.f_back
+
+    return last_user_frame
 
 
 def _get_notebook_path() -> Optional[str]:
@@ -235,8 +243,12 @@ def _get_calling_module() -> str:
         )
         return any(m in pn for m in tooling_markers)
 
+    f = _top_user_frame()
+    if f is not None:
+        return _norm(f.f_code.co_filename)
     main_mod = sys.modules.get("__main__")
     main_file = getattr(main_mod, "__file__", None)
+
     if isinstance(main_file, str) and main_file:
         if not _is_tooling_script_path(main_file):
             return _norm(main_file)
@@ -245,7 +257,8 @@ def _get_calling_module() -> str:
             return _norm(sys.argv[0])
 
     # 3) Pytest/REPL/IDE: use nearest user frame
-    f = _nearest_user_frame()
+    f = _top_user_frame()
+
     if f is not None:
         return _norm(f.f_code.co_filename)
 

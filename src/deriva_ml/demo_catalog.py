@@ -19,6 +19,7 @@ from requests.exceptions import HTTPError
 
 from deriva_ml import DerivaML, DerivaMLException, MLVocab
 from deriva_ml.core.definitions import RID, BuiltinTypes, ColumnDefinition
+from deriva_ml.dataset import Dataset
 from deriva_ml.dataset.aux_classes import DatasetVersion
 from deriva_ml.execution.execution import Execution, ExecutionConfiguration
 from deriva_ml.schema import (
@@ -65,7 +66,7 @@ class DatasetDescription(BaseModel):
     ]  # Either a list of nested dataset, or then number of elements to add
     member_rids: dict[str, list[RID]] = {}  # The rids of the members of the dataset.
     version: DatasetVersion = DatasetVersion(1, 0, 0)  # The initial version.
-    rid: RID = None  # RID of dataset that was created.
+    dataset: Dataset = None  # RID of dataset that was created.
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -89,7 +90,7 @@ def create_datasets(
         description=spec.description,
         members={},
         types=spec.types,
-        rid=dataset.dataset_rid,
+        dataset=dataset,
         version=spec.version,
     )
     dataset_rids = {}
@@ -100,7 +101,7 @@ def create_datasets(
             for child_spec in nested_specs:
                 child_ds = create_datasets(client, child_spec, member_rids)
                 result_spec.members.setdefault(member_type, []).append(child_ds)
-                rids.append(child_ds.rid)
+                rids.append(child_ds.dataset.dataset_rid)
         elif isinstance(value, Integral):
             count = int(value)
             # take exactly `count` RIDs (or an empty list if count <= 0)
@@ -131,7 +132,7 @@ def dataset_spec() -> DatasetDescription:
     training_dataset = DatasetDescription(
         description="A dataset that is nested",
         members={"Dataset": [dataset, dataset], "Image": 2},
-        types=["Testing"],
+        types=["Training"],
     )
 
     testing_dataset = DatasetDescription(
