@@ -674,17 +674,13 @@ class Dataset:
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
         def find_children(rid: RID) -> list[Self]:
-            children = [
-                self._version_snapshot.lookup_dataset(child["Nested_Dataset"])
-                for child in nested_datasets
-                if child["Dataset"] == rid
-            ]
+            children = [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
             if recurse:
                 for child in children.copy():
                     children.extend(find_children(child))
             return children
 
-        return find_children(self.dataset_rid)
+        return [self._version_snapshot.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
 
     @staticmethod
     def _insert_dataset_versions(
