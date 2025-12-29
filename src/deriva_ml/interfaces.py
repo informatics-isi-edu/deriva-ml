@@ -65,5 +65,13 @@ class DerivaMLCatalog(Protocol):
         self, dataset: RID | DatasetSpec, version: DatasetVersion | None = None, deleted: bool = False
     ) -> DatasetLike: ...
 
+    def create_dataset(
+        self,
+        execution_rid: RID | None,
+        version: DatasetVersion | str | None,
+        description: str,
+        dataset_types: list[str] | None,
+    ) -> DatasetLike: ...
+
     @property
     def _dataset_table(self) -> Table: ...

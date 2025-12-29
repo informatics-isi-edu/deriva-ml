@@ -230,7 +230,13 @@ class Dataset:
             execution_rid=execution_rid,
             description="Initial dataset creation.",
         )
-        dataset = Dataset(catalog=ml_instance, dataset_rid=dataset_rid, description=description, version=version)
+        dataset = Dataset(
+            catalog=ml_instance,
+            dataset_rid=dataset_rid,
+            dataset_types=dataset_types,
+            description=description,
+            version=version,
+        )
         return dataset
 
     @property

@@ -1108,13 +1108,13 @@ class DerivaML:
 
     def create_dataset(
         self,
+        version: DatasetVersion | str | None = None,
         execution_rid: RID | None = None,
         description: str = "",
         dataset_types: list[str] | None = None,
-        version: DatasetVersion | None = None,
     ) -> Dataset:
         return Dataset.create_dataset(
-            self, execution_rid=execution_rid, description=description, dataset_types=dataset_types
+            self, execution_rid=execution_rid, version=version, description=description, dataset_types=dataset_types
         )
 
     def lookup_dataset(

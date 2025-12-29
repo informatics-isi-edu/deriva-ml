@@ -51,6 +51,7 @@ from deriva_ml.core.definitions import (
 )
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
+from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import (
     asset_file_path,
@@ -1021,22 +1022,21 @@ class Execution:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
         self,
-        dataset_types: str | list[str],
-        description: str,
-        version: DatasetVersion | None = None,
-    ) -> RID:
+        dataset_types: str | list[str] | None = None,
+        version: DatasetVersion | str | None = None,
+        description: str = "",
+    ) -> Dataset:
         """Create a new dataset with specified types.
 
         Args:
             dataset_types: param description:
             description: Markdown description of the dataset being created.
-            version: Version to assign to the dataset.  Defaults to 0.1.0
 
         Returns:
             RID of the newly created dataset.
         """
         return self._ml_object.create_dataset(
-            dataset_types=dataset_types, description=description, execution_rid=self.execution_rid, version=version
+            execution_rid=self.execution_rid, version=version, dataset_types=dataset_types, description=description
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
