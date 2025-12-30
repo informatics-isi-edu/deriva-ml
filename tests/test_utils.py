@@ -117,7 +117,7 @@ class MLDatasetCatalog:
 
     def collect_rids(self, description: DatasetDescription) -> set[str]:
         """Collect rids for a dataset and its nested datasets."""
-        rids = {description.rid}
+        rids = {description.dataset.dataset_rid}
         for member_type, member_descriptor in description.members.items():
             rids |= set(description.member_rids.get(member_type, []))
             if member_type == "Dataset":

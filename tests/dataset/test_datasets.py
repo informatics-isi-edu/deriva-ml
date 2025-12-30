@@ -14,7 +14,7 @@ from deriva_ml import (
     TableDefinition,
 )
 from deriva_ml.dataset.aux_classes import DatasetSpec
-from deriva_ml.dataset.dataset import Dataset
+from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.demo_catalog import DatasetDescription
 from deriva_ml.execution.execution import ExecutionConfiguration
 
@@ -60,7 +60,7 @@ class TestDataset:
         assert len(updated) == initial_count + 1
 
         # Find the new dataset
-        new_dataset = next(ds for ds in updated if ds.dataset_rid == dataset)
+        new_dataset = next(ds for ds in updated if ds.dataset_rid == dataset.dataset_rid)
         assert new_dataset.description == "Dataset for testing"
         assert new_dataset.dataset_types == ["Testing"]
 
@@ -138,11 +138,11 @@ class TestDataset:
         reference_datasets = dataset_test.list_datasets(dataset_description)
         assert len(list(catalog_datasets)) == len(reference_datasets)
 
-        assert Dataset._dataset_nesting_depth() == 2
+        assert CatalogGraph(ml_instance=ml_instance)._dataset_nesting_depth() == 2
 
         for dataset in reference_datasets:
             # See if the list of RIDs in the dataset matches up with what is expected.
-            for member_type, dataset_members in dataset.list_dataset_members().items():
+            for member_type, dataset_members in dataset.dataset.list_dataset_members().items():
                 if member_type == "File":
                     continue
                 member_rids = {e["RID"] for e in dataset_members}
@@ -150,8 +150,8 @@ class TestDataset:
 
         for dataset in reference_datasets:
             reference_members = dataset_test.collect_rids(dataset)
-            member_rids = {dataset.rid}
-            for member_type, dataset_members in dataset.list_dataset_members(recurse=True).items():
+            member_rids = {dataset.dataset.dataset_rid}
+            for member_type, dataset_members in dataset.dataset.list_dataset_members(recurse=True).items():
                 if member_type == "File":
                     continue
                 member_rids |= {e["RID"] for e in dataset_members}
@@ -188,7 +188,7 @@ class TestDataset:
             ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)
         )
 
-        dataset_rid = manual_execution.create_dataset(dataset_types=["TestSet"], description="A dataset")
-        manual_execution.add_dataset_members(dataset_rid, test_rids)
-        history = ml_instance.dataset_history(dataset_rid=dataset_rid)
+        dataset = manual_execution.create_dataset(dataset_types=["TestSet"], description="A dataset")
+        dataset.add_dataset_members(test_rids)
+        history = dataset.dataset_history()
         assert manual_execution.execution_rid == history[0].execution_rid

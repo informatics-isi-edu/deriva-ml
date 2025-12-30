@@ -1,27 +1,36 @@
 from pathlib import Path
+from pprint import pformat
+
+from icecream import ic
 
 # Local imports
-from deriva_ml import DatasetSpec, DerivaML, MLVocab, TableDefinition, VersionPart
+from deriva_ml import DerivaML, MLVocab, TableDefinition
+from deriva_ml.dataset.aux_classes import DatasetSpec, VersionPart
+from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.demo_catalog import DatasetDescription
 from tests.test_utils import MLDatasetCatalog
 
+ic.configureOutput(
+    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
+)
+
 
 class TestDatasetDownload:
-    def list_datasets(self, dataset_description: DatasetDescription) -> set[str]:
+    def list_datasets(self, dataset_description: DatasetDescription) -> set[Dataset]:
         nested_datasets = {
             ds
             for dset_member in dataset_description.members.get("Dataset", [])
             for ds in self.list_datasets(dset_member)
         }
-        return {dataset_description.rid} | nested_datasets
+        return {dataset_description.dataset} | nested_datasets
 
     def compare_datasets(
         self, ml_instance: DerivaML, dataset: MLDatasetCatalog, dataset_spec: DatasetSpec, recurse=False
     ):
         reference_datasets = self.list_datasets(dataset.dataset_description)
 
-        snapshot_catalog = DerivaML(ml_instance.host_name, ml_instance._version_snapshot(dataset_spec))
-        bag = ml_instance.download_dataset_bag(dataset_spec)
+        versioned_dataset = ml_instance.lookup_dataset(dataset=dataset_spec.rid, version=dataset_spec.version)
+        bag = versioned_dataset.download_dataset_bag(use_minid=False)
 
         # Check to see if all of the files have been downloaded.
         files = [Path(r["Filename"]) for r in bag.get_table_as_dict("Image")]
@@ -34,7 +43,7 @@ class TestDatasetDownload:
         # Now look at each dataset to see if they line up.
         for dataset_rid in reference_datasets:
             dataset_bag = bag.model.get_dataset(dataset_rid)
-            catalog_elements = snapshot_catalog.list_dataset_members(dataset_rid, recurse=recurse)
+            catalog_elements = versioned_dataset.list_dataset_members(dataset_rid, recurse=recurse)
             bag_elements = dataset_bag.list_dataset_members(recurse=recurse)
             assert len(catalog_elements) == len(bag_elements)
 
@@ -53,13 +62,12 @@ class TestDatasetDownload:
     def test_bag_dataset_find(self, dataset_test, tmp_path):
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
-        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
-        current_version = ml_instance.dataset_version(dataset_description.rid)
-        dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
-        bag = ml_instance.download_dataset_bag(dataset_spec)
+        current_version = dataset_description.dataset.current_version
+        versioned_dataset = dataset_description.dataset.set_version(current_version)
+        bag = versioned_dataset.download_dataset_bag(use_minid=False)
 
-        reference_datasets = {ds.rid for ds in dataset_test.list_datasets(dataset_description)}
+        reference_datasets = {ds.dataset_rid for ds in dataset_test.list_datasets(dataset_description)}
         assert reference_datasets == {ds["RID"] for ds in bag.model.find_datasets()}
 
         for ds in bag.model.find_datasets():
@@ -69,19 +77,19 @@ class TestDatasetDownload:
 
         # Now check top level nesting
         assert set(dataset_description.member_rids["Dataset"]) == set(
-            ml_instance.list_dataset_children(dataset_description.rid)
+            dataset_description.dataset.list_dataset_children()
         )
         # Now look two levels down
         for ds in dataset_description.members["Dataset"]:
-            assert set(ds.member_rids["Dataset"]) == set(ml_instance.list_dataset_children(ds.rid))
+            assert set(ds.member_rids["Dataset"]) == set(ds.list_dataset_children())
 
         def check_relationships(description: DatasetDescription):
             """Check relationships between datasets."""
-            dataset_children = ml_instance.list_dataset_children(description.rid)
+            dataset_children = description.dataset.list_dataset_children()
             assert set(description.member_rids.get("Dataset", [])) == set(dataset_children)
 
             for child in dataset_children:
-                assert ml_instance.list_dataset_parents(child)[0] == description.rid
+                assert child.list_dataset_parents()[0] == description.dataset.dataset_rid
             for nested_dataset in description.members.get("Dataset", []):
                 check_relationships(nested_dataset)
 
@@ -93,7 +101,7 @@ class TestDatasetDownload:
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
 
-        current_version = ml_instance.dataset_version(dataset_description.rid)
+        current_version = dataset_description.dataset.current_version
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
 
         self.compare_datasets(ml_instance, dataset_test, dataset_spec)
@@ -105,7 +113,7 @@ class TestDatasetDownload:
         dataset_description = dataset_test.dataset_description
         reference_datasets = dataset_test.list_datasets(dataset_description)
 
-        current_version = ml_instance.dataset_version(dataset_description.rid)
+        current_version = dataset_description.dataset.current_version
         dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
 
@@ -125,21 +133,21 @@ class TestDatasetDownload:
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
 
-        current_version = ml_instance.dataset_version(dataset_description.rid)
+        current_version = dataset_description.dataset.current_version
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         self.compare_datasets(ml_instance, dataset_test, current_spec)
 
-        pb = ml_instance.pathBuilder
+        pb = ml_instance.pathBuilder()
         subjects = [s["RID"] for s in pb.schemas[ml_instance.domain_schema].tables["Subject"].path.entities().fetch()]
 
-        ml_instance.add_dataset_members(dataset_description.rid, subjects[-2:])
-        new_version = ml_instance.dataset_version(dataset_description.rid)
+        dataset_description.dataset.add_dataset_members(subjects[-2:])
+        new_version = dataset_description.dataset.current_version
         new_spec = DatasetSpec(rid=dataset_description.rid, version=new_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
         new_bag = ml_instance.download_dataset_bag(new_spec)
-        print([m["RID"] for m in ml_instance.list_dataset_members(dataset_description.rid)["Subject"]])
-        subjects_current = list(current_bag.get_table_as_dict("Subject"))
-        subjects_new = list(new_bag.get_table_as_dict("Subject"))
+        print([m["RID"] for m in dataset_description.dataset.list_dataset_members()["Subject"]])
+        _subjects_current = list(current_bag.get_table_as_dict("Subject"))
+        _subjects_new = list(new_bag.get_table_as_dict("Subject"))
 
         # Make sure that there is a difference between to old and new catalogs.
         #    assert len(subjects_new) == len(subjects_current) + 2
@@ -153,7 +161,7 @@ class TestDatasetDownload:
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
 
-        current_version = ml_instance.dataset_version(dataset_description.rid)
+        current_version = dataset_description.dataset.current_version
         current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
         ml_instance.create_table(
             TableDefinition(
@@ -161,9 +169,7 @@ class TestDatasetDownload:
                 column_defs=[],
             )
         )
-        new_version = ml_instance.increment_dataset_version(
-            dataset_rid=dataset_description.rid, component=VersionPart.minor
-        )
+        new_version = dataset_description.dataset.increment_dataset_version(component=VersionPart.minor)
         new_spec = DatasetSpec(rid=dataset_description.rid, version=new_version)
 
         current_bag = ml_instance.download_dataset_bag(current_spec)
