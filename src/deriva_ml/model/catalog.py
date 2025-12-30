@@ -478,7 +478,8 @@ class DerivaModel:
             return paths
 
         for child in find_arcs(root):
-            if child.name in {"Dataset_Execution", "Dataset_Dataset", "Execution"}:
+            #        if child.name in {"Dataset_Execution", "Dataset_Dataset", "Execution"}:
+            if child.name in {"Dataset_Dataset", "Execution"}:
                 continue
             if child == parent:
                 # Don't loop back via referred_by

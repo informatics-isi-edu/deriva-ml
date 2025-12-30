@@ -265,6 +265,8 @@ class Dataset:
 
         if version:
             versioned_dataset._version = DatasetVersion.parse(version) if isinstance(version, str) else version
+            if version not in [h.dataset_version for h in self.dataset_history()]:
+                raise DerivaMLException(f"Version {version} not found in dataset history.")
             versioned_dataset._version_snapshot = versioned_dataset._version_snapshot_catalog(version)
         else:
             versioned_dataset._version = None
@@ -729,8 +731,8 @@ class Dataset:
         """Downloads a dataset to the local filesystem and creates a MINID if needed.
 
         Downloads a dataset to the local file system.  If the dataset has a version set, that version is used.
-        If the dataset has a version and a version is provided, the version specified in the argument must match..
-        Otherwise, the version to be downloaded must be specified via the version argument.
+        If the dataset has a version and a version is provided, the version specified takes precedence.
+
         If the dataset doesn't have a MINID (Minimal Viable Identifier), one will be created.
         The dataset can optionally be associated with an execution record.
 
@@ -766,14 +768,11 @@ class Dataset:
                 "Dataset version not specified.  Version must either be set in the dataset or provided as an argument."
             )
 
-        if self._version and version and self._version != version:
-            raise DerivaMLException(
-                f"Dataset version specified in dataset ({self._version}) "
-                f"does not match version provided as argument ({version})."
-            )
-
-        # Get Dataset object that corresponds to the version of the dataset.
-        versioned_dataset = self.set_version(version)
+        if version:
+            # Get Dataset object that corresponds to the version of the dataset.
+            versioned_dataset = self.set_version(version)
+        else:
+            versioned_dataset = self
         return versioned_dataset._download_dataset_bag(
             materialize=materialize,
             use_minid=use_minid,

@@ -37,7 +37,7 @@ from sqlalchemy import Table as SQLTable
 from sqlalchemy import UniqueConstraint as SQLUniqueConstraint
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import backref, configure_mappers, foreign, relationship
+from sqlalchemy.orm import Session, backref, configure_mappers, foreign, relationship
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import TypeDecorator
 
@@ -77,6 +77,7 @@ class StringToFloat(TypeDecorator):
         else:
             return float(value)
 
+
 class StringToInteger(TypeDecorator):
     impl = Integer
     cache_ok = True
@@ -98,6 +99,7 @@ class StringToDateTime(TypeDecorator):
         else:
             return parser.parse(value)
 
+
 class StringToDate(TypeDecorator):
     impl = Date
     cache_ok = True
@@ -107,6 +109,7 @@ class StringToDate(TypeDecorator):
             return None
         else:
             return parser.parse(value).date()
+
 
 class DatabaseModelMeta(type):
     """Use metaclass to ensure that there is only one instance of a database model per path"""
@@ -387,8 +390,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
                 with self.engine.begin() as conn:
                     object_table = [
-                        self._localize_asset(o, asset_indexes, asset_map, table == "Dataset")
-                        for o in csv_reader
+                        self._localize_asset(o, asset_indexes, asset_map, table == "Dataset") for o in csv_reader
                     ]
                     conn.execute(
                         sqlite_insert(sql_table).on_conflict_do_nothing(),
@@ -477,9 +479,11 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         Returns:
             DatasetBag object for the specified dataset.
         """
-        if dataset_rid and dataset_rid not in self.bag_rids:
+        if not dataset_rid:
+            dataset_rid = self.dataset_rid
+        elif dataset_rid not in self.bag_rids:
             raise DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
-        return DatasetBag(self, dataset_rid or self.dataset_rid)
+        return [ds for ds in self.find_datasets() if ds.dataset_rid == dataset_rid][0]
 
     def dataset_version(self, dataset_rid: Optional[RID] = None) -> DatasetVersion:
         """Return the version of the specified dataset."""
@@ -500,7 +504,16 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         ds_types = list(self._get_table_contents(atable))
         for dataset in self._get_table_contents("Dataset"):
             my_types = [t for t in ds_types if t["Dataset"] == dataset["RID"]]
-            datasets.append(dataset | {MLVocab.dataset_type: [ds[MLVocab.dataset_type] for ds in my_types]})
+
+            datasets.append(
+                DatasetBag(
+                    self,
+                    dataset_rid=dataset["RID"],
+                    description=dataset["Description"],
+                    execution_rid=self._get_dataset_execution(dataset["RID"])["Execution"],
+                    dataset_types=[ds[MLVocab.dataset_type] for ds in my_types],
+                )
+            )
         return datasets
 
     def list_dataset_members(self, dataset_rid: RID) -> dict[str, Any]:
@@ -522,6 +535,22 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             result = conn.execute(select(self.find_table(table)))
             for row in result.mappings():
                 yield dict(row)
+
+    def _get_dataset_execution(self, dataset_rid: str) -> dict[str, Any] | None:
+        """Retrieve the execution record for the specified RID, if it exists.
+        contents of the specified table as a dictionary.
+
+        Args:
+            rid: RID for which we want to find the execution record.
+
+        Returns:
+          Row of the execution table that points to the specified RID, if it exists. Otherwise, None..
+        """
+        dataset_execution_table = self.find_table("Dataset_Execution")
+        cmd = select(dataset_execution_table).where(dataset_execution_table.columns.Dataset == dataset_rid)
+        with Session(self.engine) as session:
+            result = session.execute(cmd).mappings().one_or_none()
+            return dict(result) if result else None
 
     @staticmethod
     def rid_lookup(dataset_rid: RID) -> list[tuple[DatasetVersion, "DatabaseModel"]]:

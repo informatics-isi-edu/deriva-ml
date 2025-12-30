@@ -9,6 +9,18 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
+try:
+    from pprint import pformat
+
+    from icecream import ic
+
+    ic.configureOutput(
+        includeContext=True,
+        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
+    )
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 class CatalogGraph:
     def __init__(self, ml_instance: DerivaMLCatalog, use_minid: bool = True):
@@ -360,7 +372,7 @@ class CatalogGraph:
                 a.table for a in dataset_table.find_associations() if a.other_fkeys.pop().pk_table in dataset_elements
             ]
         else:
-            included_associations = dataset_associations
+            included_associations = [a.table for a in dataset_associations]
 
         # Get the paths through the schema and filter out all the dataset paths not used by this dataset.
         paths = {
@@ -441,10 +453,10 @@ class CatalogGraph:
 
         """
 
-        def children_depth(dataset: DatasetLike, nested_datasets: dict[str, list[str]]) -> int:
+        def children_depth(dataset: RID, nested_datasets: dict[str, list[str]]) -> int:
             """Return the number of nested datasets for the dataset_rid if provided, otherwise in the current catalog"""
             try:
-                children = nested_datasets[dataset.dataset_rid]
+                children = nested_datasets[dataset]
                 return max(map(lambda x: children_depth(x, nested_datasets), children)) + 1 if children else 1
             except KeyError:
                 return 0

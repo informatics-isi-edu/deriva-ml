@@ -56,7 +56,14 @@ class DatasetBag:
         domain_schema (str): Name of the domain schema
     """
 
-    def __init__(self, database_model: DatabaseModel, dataset_rid: RID | None = None) -> None:
+    def __init__(
+        self,
+        database_model: DatabaseModel,
+        dataset_rid: RID | None = None,
+        dataset_types: str | list[str] | None = None,
+        description: str = "",
+        execution_rid: RID | None = None,
+    ):
         """
         Initialize a DatasetBag instance.
 
@@ -69,6 +76,10 @@ class DatasetBag:
         self.metadata = self.model.metadata
 
         self.dataset_rid = dataset_rid or self.model.dataset_rid
+        self.dataset_types = dataset_types
+        self.description = description
+        self.execution_rid = execution_rid or self.model.execution_rid
+
         if not self.dataset_rid:
             raise DerivaMLException("No dataset RID provided")
 
@@ -359,9 +370,7 @@ class DatasetBag:
                     return relationship
             return None
 
-        join_tables, denormalized_columns = (
-            self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
-        )
+        join_tables, denormalized_columns = self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
 
         denormalized_columns = [
             self.model.get_orm_class_by_name(table_name)
@@ -434,9 +443,7 @@ class DatasetBag:
             A generator that returns a dictionary representation of each row in the denormalized dataset.
         """
         with Session(self.engine) as session:
-            cursor = session.execute(
-                self._denormalize(include_tables=include_tables)
-            )
+            cursor = session.execute(self._denormalize(include_tables=include_tables))
             yield from cursor.mappings()
             for row in cursor.mappings():
                 yield row
