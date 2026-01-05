@@ -21,7 +21,7 @@ from deriva.core.ermrest_catalog import ErmrestCatalog, ResolveRidResult
 from deriva.core.ermrest_model import Table
 
 from deriva_ml.core.definitions import RID
-from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
+from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
 
 
@@ -38,12 +38,17 @@ class DatasetLike(Protocol):
     @property
     def version(self) -> DatasetVersion: ...
 
+    def current_version(self) -> DatasetVersion: ...
+
     def list_dataset_children(self, recurse: bool = False) -> list[Self]: ...
+
+    def list_dataset_parents(self, recurse: bool = False) -> list[Self]: ...
 
     def list_dataset_members(
         self, recurse: bool = False, limit: int | None = None
     ) -> dict[str, list[dict[str, Any]]]: ...
 
+    def dataset_history(self) -> list[DatasetHistory]: ...
 
 @runtime_checkable
 class DerivaMLCatalog(Protocol):

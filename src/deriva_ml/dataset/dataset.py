@@ -143,7 +143,7 @@ class Dataset:
         self._version: DatasetVersion | None = None
         self._version_snapshot: DerivaMLCatalog = self._ml_instance
 
-        self.set_version(version)
+        self._set_version(version)
         self.dataset_types = dataset_types or []
 
     def __repr__(self) -> str:
@@ -262,16 +262,32 @@ class Dataset:
             A new copy of the current object, with the updated version details applied.
         """
         versioned_dataset = copy.copy(self)
+        versioned_dataset._set_version(version)
+        return versioned_dataset
 
+    def _set_version(self, version: DatasetVersion | str | None) -> Self:
+        """
+        Sets the version of the dataset. If a version is provided, it will be parsed and
+        saved along with its corresponding snapshot. If no version is provided, the
+        existing version and snapshot will be reset to None.
+
+        Args:
+            version: An instance of DatasetVersion, a string representation of the
+                version, or None. If a string is provided, it will be parsed into a
+                DatasetVersion object. None will reset the version data.
+
+        Returns:
+            A new copy of the current object, with the updated version details applied.
+        """
         if version:
-            versioned_dataset._version = DatasetVersion.parse(version) if isinstance(version, str) else version
+            self._version = DatasetVersion.parse(version) if isinstance(version, str) else version
             if version not in [h.dataset_version for h in self.dataset_history()]:
                 raise DerivaMLException(f"Version {version} not found in dataset history.")
-            versioned_dataset._version_snapshot = versioned_dataset._version_snapshot_catalog(version)
+            self._version_snapshot = self._version_snapshot_catalog(version)
         else:
-            versioned_dataset._version = None
-            versioned_dataset._version_snapshot = self._ml_instance
-        return versioned_dataset
+            self._version = None
+            self._version_snapshot = self._ml_instance
+        return self
 
     @property
     def _dataset_table(self) -> Table:
@@ -402,28 +418,6 @@ class Dataset:
             self._ml_instance, version_update_list, description=description, execution_rid=execution_rid
         )
         return next((d.version for d in version_update_list if d.rid == self.dataset_rid))
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def delete_dataset(self, dataset_rid: RID, recurse: bool = False) -> None:
-        """Delete a dataset_table from the catalog.
-
-        Args:
-            dataset_rid: RID of the dataset_table to delete.
-            recurse: If True, delete the dataset_table along with any nested datasets. (Default value = False)
-        """
-        # Get association table entries for this dataset_table
-        # Delete association table entries
-        if not self._ml_instance.model.is_dataset_rid(dataset_rid):
-            raise DerivaMLException("Dataset_rid is not a dataset.")
-
-        if parents := self.list_dataset_parents():
-            raise DerivaMLException(f'Dataset_rid "{dataset_rid}" is in a nested dataset: {parents}.')
-
-        pb = self._ml_instance.pathBuilder()
-        dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
-
-        rid_list = [dataset_rid] + (self.list_dataset_children() if recurse else [])
-        dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_members(self, recurse: bool = False, limit: int | None = None) -> dict[str, list[dict[str, Any]]]:
@@ -646,24 +640,27 @@ class Dataset:
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_parents(self) -> list[Self]:
+    def list_dataset_parents(self, recurse: bool = False) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
 
+        Args:
+            recurse: If True, recursively return all ancestor datasets.
+
         Returns:
-            RID of the parent dataset_table.
+            List of parent datasets.
         """
-        if not self._ml_instance.model.is_dataset_rid(self.dataset_rid):
-            raise DerivaMLException(
-                f"RID: {self.dataset_rid} does not belong to dataset_table {self._dataset_table.name}"
-            )
         # Get association table for nested datasets
         pb = self._version_snapshot.pathBuilder()
         atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
-        return [
+        parents = [
             self._version_snapshot.lookup_dataset(p["Dataset"])
             for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
         ]
+        if recurse:
+            for parent in parents.copy():
+                parents.extend(parent.list_dataset_parents(recurse=True))
+        return parents
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_children(self, recurse: bool = False) -> list[Self]:
@@ -821,7 +818,8 @@ class Dataset:
             version_record = next(h for h in self.dataset_history() if h.dataset_version == self._version)
         except StopIteration:
             raise DerivaMLException(f"Dataset version {self._version} not found for dataset {self.dataset_rid}")
-        return f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}"
+        return f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}" if version_record.snapshot else \
+            self._ml_instance.catalog.catalog_id
 
     def _download_dataset_minid(self, minid: DatasetMinid, use_minid: bool) -> Path:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and

@@ -7,7 +7,7 @@ from __future__ import annotations
 # Standard library imports
 from collections import defaultdict
 from copy import copy
-from typing import TYPE_CHECKING, Any, Generator, Iterable, cast
+from typing import TYPE_CHECKING, Any, Generator, Iterable, Self, cast
 
 import deriva.core.datapath as datapath
 
@@ -78,7 +78,7 @@ class DatasetBag:
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         self.dataset_types = dataset_types
         self.description = description
-        self.execution_rid = execution_rid or self.model.execution_rid
+        self.execution_rid = execution_rid or self.model._get_dataset_execution(self.dataset_rid)
 
         if not self.dataset_rid:
             raise DerivaMLException("No dataset RID provided")
@@ -306,6 +306,28 @@ class DatasetBag:
         return result
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def list_dataset_parents(self, recurse: bool = False) -> list[Self]:
+        """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
+        nested dataset.
+
+        Args:
+            recurse: If True, recursively return all ancestor datasets.
+
+        Returns:
+            List of parent dataset bags.
+        """
+        nds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Dataset")
+
+        with Session(self.engine) as session:
+            sql_cmd = select(nds_table.Dataset).where(nds_table.Nested_Dataset == self.dataset_rid)
+            parents = [DatasetBag(self.model, r[0]) for r in session.execute(sql_cmd).all()]
+
+        if recurse:
+            for parent in parents.copy():
+                parents.extend(parent.list_dataset_parents(recurse=True))
+        return parents
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
         """Finds a term in a vocabulary table.
 
@@ -336,6 +358,7 @@ class DatasetBag:
 
         # Search for term by name or synonym
         for term in self.get_table_as_dict(table):
+            term = dict(term)
             if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
                 term["Synonyms"] = list(term["Synonyms"])
                 return VocabularyTerm.model_validate(term)

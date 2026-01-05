@@ -1150,6 +1150,29 @@ class DerivaML:
             version=version,
         )
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def delete_dataset(self, dataset: Dataset, recurse: bool = False) -> None:
+        """Delete a dataset_table from the catalog.
+
+        Args:
+            dataset: RID of the dataset_table to delete.
+            recurse: If True, delete the dataset_table along with any nested datasets. (Default value = False)
+        """
+        # Get association table entries for this dataset_table
+        # Delete association table entries
+        dataset_rid = dataset.dataset_rid
+        if not self.model.is_dataset_rid(dataset.dataset_rid):
+            raise DerivaMLException("Dataset_rid is not a dataset.")
+
+        if parents := dataset.list_dataset_parents():
+            raise DerivaMLException(f'Dataset "{dataset}" is in a nested dataset: {parents}.')
+
+        pb = self.pathBuilder()
+        dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
+
+        rid_list = [dataset_rid] + (dataset.list_dataset_children() if recurse else [])
+        dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
+
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of entities that can be added to a dataset_table.
 

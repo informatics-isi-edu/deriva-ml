@@ -35,7 +35,6 @@ from typing import Any, Iterable, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
-from interfaces import DatasetLike
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.base import DerivaML
@@ -69,6 +68,7 @@ from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
+from deriva_ml.interfaces import DatasetLike
 
 # Keep pycharm from complaining about undefined references in docstrings.
 execution: Execution
