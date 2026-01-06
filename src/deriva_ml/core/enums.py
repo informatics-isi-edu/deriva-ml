@@ -7,7 +7,7 @@ Classes:
     BaseStrEnum: Base class for string-based enums.
     UploadState: States for file upload operations.
     Status: Execution status values.
-    BuiltinTypes: ERMrest built-in data types.
+    BuiltinTypes: ERMRest built-in data types.
     MLVocab: Controlled vocabulary types.
     MLAsset: Asset type identifiers.
     ExecMetadataType: Execution metadata type identifiers.
@@ -86,9 +86,9 @@ class Status(BaseStrEnum):
 
 
 class BuiltinTypes(Enum):
-    """ERMrest built-in data types.
+    """ERMRest built-in data types.
 
-    Maps ERMrest's built-in data types to their type names. These types are used for defining
+    Maps ERMRest's built-in data types to their type names. These types are used for defining
     column types in tables and for type validation.
 
     Attributes:

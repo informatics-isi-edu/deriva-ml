@@ -20,7 +20,7 @@ from deriva.core.datapath import _SchemaWrapper as SchemaWrapper
 from deriva.core.ermrest_catalog import ErmrestCatalog, ResolveRidResult
 from deriva.core.ermrest_model import Table
 
-from deriva_ml.core.definitions import RID
+from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
 
@@ -31,24 +31,21 @@ class DatasetLike(Protocol):
     execution_rid: RID | None
     _ml_instance: DerivaMLCatalog
     description: str
-    _version: DatasetVersion | None
-    _version_snapshot: DerivaMLCatalog | None
     dataset_types: str | list[str] | None
 
     @property
-    def version(self) -> DatasetVersion: ...
-
     def current_version(self) -> DatasetVersion: ...
 
-    def list_dataset_children(self, recurse: bool = False) -> list[Self]: ...
+    def list_dataset_children(self, version: DatasetVersion | str | None, recurse: bool = False) -> list[Self]: ...
 
-    def list_dataset_parents(self, recurse: bool = False) -> list[Self]: ...
+    def list_dataset_parents(self, version: DatasetVersion | str | None, recurse: bool = False) -> list[Self]: ...
 
     def list_dataset_members(
-        self, recurse: bool = False, limit: int | None = None
+        self, version: DatasetVersion | str | None, recurse: bool = False, limit: int | None = None
     ) -> dict[str, list[dict[str, Any]]]: ...
 
     def dataset_history(self) -> list[DatasetHistory]: ...
+
 
 @runtime_checkable
 class DerivaMLCatalog(Protocol):
@@ -69,6 +66,8 @@ class DerivaMLCatalog(Protocol):
     def lookup_dataset(
         self, dataset: RID | DatasetSpec, version: DatasetVersion | None = None, deleted: bool = False
     ) -> DatasetLike: ...
+
+    def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm: ...
 
     def create_dataset(
         self,

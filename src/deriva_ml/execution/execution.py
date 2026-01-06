@@ -1031,6 +1031,7 @@ class Execution:
         Args:
             dataset_types: param description:
             description: Markdown description of the dataset being created.
+            version: Dataset version. Defaults to 0.1.0.
 
         Returns:
             RID of the newly created dataset.

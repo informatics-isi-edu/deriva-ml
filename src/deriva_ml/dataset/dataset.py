@@ -22,7 +22,6 @@ Typical usage example:
 
 from __future__ import annotations
 
-import copy
 import json
 import logging
 from collections import defaultdict
@@ -72,6 +71,7 @@ from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     MLVocab,
     Status,
+    VocabularyTerm,
 )
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import (
@@ -106,7 +106,6 @@ class Dataset:
         dataset_types: str | list[str] | None = None,
         description: str = "",
         execution_rid: RID | None = None,
-        version: DatasetVersion | str | None = None,
     ):
         """Creates a new dataset in the catalog.
 
@@ -120,7 +119,6 @@ class Dataset:
             dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
             description: Description of the dataset's purpose and contents.
             execution_rid: Optional execution RID to associate with dataset creation.
-            version: Optional initial version number. Defaults to 0.1.0.
 
         Returns:
             RID: Resource Identifier of the newly created dataset.
@@ -140,14 +138,17 @@ class Dataset:
         self.execution_rid = execution_rid
         self._ml_instance = catalog
         self.description = description
-        self._version: DatasetVersion | None = None
-        self._version_snapshot: DerivaMLCatalog = self._ml_instance
 
-        self._set_version(version)
-        self.dataset_types = dataset_types or []
+        # Normalize dataset_types to always be a list of strings
+        if dataset_types is None:
+            self.dataset_types: list[str] = []
+        elif isinstance(dataset_types, str):
+            self.dataset_types: list[str] = [dataset_types]
+        else:
+            self.dataset_types: list[str] = dataset_types
 
     def __repr__(self) -> str:
-        return f"<Dataset rid='{self.dataset_rid}', version='{self.version}', types={self.dataset_types}>"
+        return f"<Dataset rid='{self.dataset_rid}', version='{self.current_version}', types={self.dataset_types}>"
 
     def __hash__(self) -> int:
         """Hash based on dataset RID for use in sets and as dict keys."""
@@ -195,23 +196,13 @@ class Dataset:
         """
 
         version = version or DatasetVersion(0, 1, 0)
-        dataset_types = dataset_types or []
 
-        type_path = ml_instance.pathBuilder().schemas[ml_instance.ml_schema].tables[MLVocab.dataset_type.value]
-        defined_types = list(type_path.entities().fetch())
-
-        def check_dataset_type(dtype: str) -> bool:
-            for term in defined_types:
-                if dtype == term["Name"] or (term["Synonyms"] and ds_type in term["Synonyms"]):
-                    return True
-            return False
+        # Validate dataset types
+        ds_types = [dataset_types] if isinstance(dataset_types, str) else dataset_types
+        dataset_types = [ml_instance.lookup_term(MLVocab.dataset_type, t) for t in ds_types]
 
         # Create the entry for the new dataset_table and get its RID.
-        ds_types = [dataset_types] if isinstance(dataset_types, str) else dataset_types
         pb = ml_instance.pathBuilder()
-        for ds_type in ds_types:
-            if not check_dataset_type(ds_type):
-                raise DerivaMLException("Dataset type must be a vocabulary term.")
         dataset_table_path = pb.schemas[ml_instance._dataset_table.schema.name].tables[ml_instance._dataset_table.name]
         dataset_rid = dataset_table_path.insert(
             [
@@ -222,14 +213,6 @@ class Dataset:
             ]
         )[0]["RID"]
 
-        # Get the name of the association table between dataset_table and dataset_type.
-        associations = list(
-            ml_instance.model.schemas[ml_instance.ml_schema].tables[MLVocab.dataset_type].find_associations()
-        )
-        atable = associations[0].name if associations else None
-        pb.schemas[ml_instance.ml_schema].tables[atable].insert(
-            [{MLVocab.dataset_type: ds_type, "Dataset": dataset_rid} for ds_type in ds_types]
-        )
         if execution_rid is not None:
             pb.schemas[ml_instance.model.ml_schema].Dataset_Execution.insert(
                 [{"Dataset": dataset_rid, "Execution": execution_rid}]
@@ -243,61 +226,53 @@ class Dataset:
         dataset = Dataset(
             catalog=ml_instance,
             dataset_rid=dataset_rid,
-            dataset_types=dataset_types,
             description=description,
-            version=version,
         )
+        # Set the version after creation
+        dataset._version = version
+        dataset.add_dataset_types(dataset_types)
         return dataset
 
-    @property
-    def version(self) -> DatasetVersion:
-        """
-        If version is set, return it. Otherwise, return the most recent version of the dataset.
-        Returns:
-        """
-        return self._version or self.current_version
-
-    def set_version(self, version: DatasetVersion | str | None) -> Self:
-        """
-        Sets the version of the dataset. If a version is provided, it will be parsed and
-        saved along with its corresponding snapshot. If no version is provided, the
-        existing version and snapshot will be reset to None.
+    def add_dataset_types(self, dataset_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
+        """Adds one or more dataset types to an existing dataset.
 
         Args:
-            version: An instance of DatasetVersion, a string representation of the
-                version, or None. If a string is provided, it will be parsed into a
-                DatasetVersion object. None will reset the version data.
-
-        Returns:
-            A new copy of the current object, with the updated version details applied.
+            dataset_types: Single term or list of terms. Can be strings (term names) or VocabularyTerm objects.
         """
-        versioned_dataset = copy.copy(self)
-        versioned_dataset._set_version(version)
-        return versioned_dataset
 
-    def _set_version(self, version: DatasetVersion | str | None) -> Self:
-        """
-        Sets the version of the dataset. If a version is provided, it will be parsed and
-        saved along with its corresponding snapshot. If no version is provided, the
-        existing version and snapshot will be reset to None.
+        # Normalize input to a list
+        types_to_add = [dataset_types] if not isinstance(dataset_types, list) else dataset_types
 
-        Args:
-            version: An instance of DatasetVersion, a string representation of the
-                version, or None. If a string is provided, it will be parsed into a
-                DatasetVersion object. None will reset the version data.
+        # Convert all to VocabularyTerm objects and collect new ones to insert
+        new_terms = []
+        for term in types_to_add:
+            # If it's already a VocabularyTerm, use it; otherwise look it up by name
+            if isinstance(term, VocabularyTerm):
+                vocab_term = term
+            else:
+                vocab_term = self._ml_instance.lookup_term(MLVocab.dataset_type, term)
 
-        Returns:
-            A new copy of the current object, with the updated version details applied.
-        """
-        if version:
-            self._version = DatasetVersion.parse(version) if isinstance(version, str) else version
-            if version not in [h.dataset_version for h in self.dataset_history()]:
-                raise DerivaMLException(f"Version {version} not found in dataset history.")
-            self._version_snapshot = self._version_snapshot_catalog(version)
-        else:
-            self._version = None
-            self._version_snapshot = self._ml_instance
-        return self
+            # Check if this term is already associated with the dataset
+            # Store as string names in self.dataset_types for consistency with __init__
+            term_name = vocab_term.name
+            if term_name not in self.dataset_types:
+                new_terms.append(vocab_term)
+                # dataset_types is always a list now
+                self.dataset_types.append(term_name)
+
+        # Only insert if there are new terms to add
+        if new_terms:
+            # Get the name of the association table between dataset_table and dataset_type.
+            associations = list(
+                self._ml_instance.model.schemas[self._ml_instance.ml_schema]
+                .tables[MLVocab.dataset_type]
+                .find_associations()
+            )
+            pb = self._ml_instance.pathBuilder()
+            atable = associations[0].name if associations else None
+            pb.schemas[self._ml_instance.ml_schema].tables[atable].insert(
+                [{MLVocab.dataset_type: term.name, "Dataset": self.dataset_rid} for term in new_terms]
+            )
 
     @property
     def _dataset_table(self) -> Table:
@@ -444,7 +419,7 @@ class Dataset:
         version_update_list = [
             DatasetSpec(
                 rid=ds.dataset_rid,
-                version=ds.version.increment_version(component),
+                version=ds.current_version.increment_version(component),
             )
             for ds in related_datasets
         ]
@@ -454,13 +429,16 @@ class Dataset:
         return next((d.version for d in version_update_list if d.rid == self.dataset_rid))
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_members(self, recurse: bool = False, limit: int | None = None) -> dict[str, list[dict[str, Any]]]:
+    def list_dataset_members(self, version: DatasetVersion | str | None = None,
+                             recurse: bool = False,
+                             limit: int | None = None) -> dict[str, list[dict[str, Any]]]:
         """Lists members of a dataset.
 
         Returns a dictionary mapping member types to lists of member records. Can optionally
         recurse through nested datasets and limit the number of results.
 
         Args:
+            version: Dataset version to list members from. Defaults to the current version.
             recurse: Whether to include members of nested datasets. Defaults to False.
             limit: Maximum number of members to return per type. None for no limit.
 
@@ -480,8 +458,8 @@ class Dataset:
         # Look at each of the element types that might be in the dataset_table and get the list of rid for them from
         # the appropriate association table.
         members = defaultdict(list)
-
-        pb = self._version_snapshot.pathBuilder()
+        version_snapshot_catalog = self._version_snapshot_catalog(version)
+        pb = version_snapshot_catalog.pathBuilder()
         for assoc_table in self._dataset_table.find_associations():
             other_fkey = assoc_table.other_fkeys.pop()
             target_table = other_fkey.pk_table
@@ -509,8 +487,8 @@ class Dataset:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in target_entities]
                 for ds_rid in nested_datasets:
-                    ds = self._version_snapshot.lookup_dataset(ds_rid)
-                    for k, v in ds.list_dataset_members(recurse=recurse).items():
+                    ds = version_snapshot_catalog.lookup_dataset(ds_rid)
+                    for k, v in ds.list_dataset_members(version, recurse=recurse).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -674,41 +652,50 @@ class Dataset:
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_parents(self, recurse: bool = False) -> list[Self]:
+    def list_dataset_parents(self,
+                             version: DatasetVersion | str | None = None,
+                             recurse: bool = False) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
 
         Args:
+            version: Dataset version to list parents from. Defaults to the current version.
             recurse: If True, recursively return all ancestor datasets.
 
         Returns:
             List of parent datasets.
         """
         # Get association table for nested datasets
-        pb = self._version_snapshot.pathBuilder()
+        version_snapshot_catalog = self._version_snapshot_catalog(version)
+        pb = version_snapshot_catalog.pathBuilder()
         atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
         parents = [
-            self._version_snapshot.lookup_dataset(p["Dataset"])
+            version_snapshot_catalog.lookup_dataset(p["Dataset"])
             for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
         ]
         if recurse:
             for parent in parents.copy():
-                parents.extend(parent.list_dataset_parents(recurse=True))
+                parents.extend(parent.list_dataset_parents(version, recurse=True))
         return parents
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_children(self, recurse: bool = False) -> list[Self]:
+    def list_dataset_children(self,
+                              version: DatasetVersion | str | None = None,
+                              recurse: bool = False) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs for any nested datasets.
 
         Args:
+            version: Dataset version to list children from. Defaults to the current version.
             recurse: If True, return a list of nested datasets RIDs.
 
         Returns:
           list of nested dataset RIDs.
 
         """
+        version = DatasetVersion.parse(version) if isinstance(version, str) else version
+        version_snapshot_catalog = self._version_snapshot_catalog(version)
         dataset_dataset_path = (
-            self._version_snapshot.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
+           version_snapshot_catalog.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
         )
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
@@ -719,7 +706,7 @@ class Dataset:
                     children.extend(find_children(child))
             return children
 
-        return [self._version_snapshot.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
+        return [version_snapshot_catalog.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
 
     def _list_dataset_parents_current(self) -> list[Self]:
         """Return parent datasets using current catalog state (not version snapshot).
@@ -738,7 +725,9 @@ class Dataset:
 
         Used by _build_dataset_graph_1 to find all related datasets for version updates.
         """
-        dataset_dataset_path = self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
+        dataset_dataset_path = (
+            self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
+        )
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
         def find_children(rid: RID) -> list[RID]:
@@ -780,7 +769,7 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(
         self,
-        version: DatasetVersion | str | None = None,
+        version: DatasetVersion | str,
         materialize: bool = True,
         use_minid: bool = True,
     ) -> DatasetBag:
@@ -819,42 +808,13 @@ class Dataset:
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
 
-        if not (self._version or version):
-            raise DerivaMLException(
-                "Dataset version not specified.  Version must either be set in the dataset or provided as an argument."
-            )
-
-        if version:
-            # Get Dataset object that corresponds to the version of the dataset.
-            versioned_dataset = self.set_version(version)
-        else:
-            versioned_dataset = self
-        return versioned_dataset._download_dataset_bag(
-            materialize=materialize,
-            use_minid=use_minid,
-        )
-
-    def _download_dataset_bag(
-        self,
-        materialize: bool,
-        use_minid: bool = True,
-    ) -> DatasetBag:
-        """Download a dataset onto the local file system.  Create a MINID for the dataset if one doesn't already exist.
-
-        Args:
-            materialize: Download all of the assets in the dataset.
-
-        Returns:
-            Tuple consisting of the path to the dataset, the RID of the dataset that was downloaded and the MINID
-            for the dataset.
-        """
         if (
             self.execution_rid
             and self.execution_rid != DRY_RUN_RID
             and self._ml_instance.resolve_rid(self.execution_rid).table.name != "Execution"
         ):
             raise DerivaMLException(f"RID {self.execution_rid} is not an execution")
-        minid = self._get_dataset_minid(create=True, use_minid=use_minid)
+        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid)
 
         bag_path = (
             self._materialize_dataset_bag(minid, use_minid=use_minid)
@@ -867,18 +827,23 @@ class Dataset:
         if isinstance(dataset_version, str) and str:
             dataset_version = DatasetVersion.parse(dataset_version)
         if dataset_version:
-            return self._ml_instance.catalog_snapshot(self._version_snapshot_catalog_id())
+            return self._ml_instance.catalog_snapshot(self._version_snapshot_catalog_id(dataset_version))
         else:
             return self._ml_instance
 
-    def _version_snapshot_catalog_id(self) -> str:
+    def _version_snapshot_catalog_id(self, version: DatasetVersion | str) -> str:
         """Return a catalog with snapshot for the specified dataset version"""
+
+        version = str(version)
         try:
-            version_record = next(h for h in self.dataset_history() if h.dataset_version == self._version)
+            version_record = next(h for h in self.dataset_history() if h.dataset_version == version)
         except StopIteration:
-            raise DerivaMLException(f"Dataset version {self._version} not found for dataset {self.dataset_rid}")
-        return f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}" if version_record.snapshot else \
-            self._ml_instance.catalog.catalog_id
+            raise DerivaMLException(f"Dataset version {version} not found for dataset {self.dataset_rid}")
+        return (
+            f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}"
+            if version_record.snapshot
+            else self._ml_instance.catalog.catalog_id
+        )
 
     def _download_dataset_minid(self, minid: DatasetMinid, use_minid: bool) -> Path:
         """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and
@@ -916,7 +881,7 @@ class Dataset:
         bdb.validate_bag_structure(bag_path)
         return Path(bag_path)
 
-    def _create_dataset_minid(self, use_minid=True) -> str:
+    def _create_dataset_minid(self, version: DatasetVersion, use_minid=True) -> str:
         with TemporaryDirectory() as tmp_dir:
             # Generate a download specification file for the current catalog schema. By default, this spec
             # will generate a minid and place the bag into S3 storage.
@@ -930,7 +895,7 @@ class Dataset:
                     % (
                         "minid" if use_minid else "bag",
                         self.dataset_rid,
-                        str(self._version),
+                        str(version),
                     )
                 )
                 # Generate the bag and put into S3 storage.
@@ -956,12 +921,13 @@ class Dataset:
                 version_path = (
                     self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
                 )
-                version_rid = [h for h in self.dataset_history() if h.dataset_version == self._version][0].version_rid
+                version_rid = [h for h in self.dataset_history() if h.dataset_version == version][0].version_rid
                 version_path.update([{"RID": version_rid, "Minid": minid_page_url}])
         return minid_page_url
 
     def _get_dataset_minid(
         self,
+        version: DatasetVersion,
         create: bool,
         use_minid: bool,
     ) -> DatasetMinid | None:
@@ -975,7 +941,7 @@ class Dataset:
         """
 
         # Find dataset version record
-        version_str = str(self.version)
+        version_str = str(version)
         history = self.dataset_history()
         try:
             version_record = next(v for v in history if v.dataset_version == version_str)
@@ -990,21 +956,21 @@ class Dataset:
                 raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
             if use_minid:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
-            minid_url = self._create_dataset_minid(use_minid=use_minid)
+            minid_url = self._create_dataset_minid(version, use_minid=use_minid)
 
         # Return based on MINID usage
         if use_minid:
-            return self._fetch_minid_metadata(minid_url)
+            return self._fetch_minid_metadata(version, minid_url)
         return DatasetMinid(
-            dataset_version=self._version,
+            dataset_version=version,
             RID=f"{self.dataset_rid}@{version_record.snapshot}",
             location=minid_url,
         )
 
-    def _fetch_minid_metadata(self, url: str) -> DatasetMinid:
+    def _fetch_minid_metadata(self, version: DatasetVersion, url: str) -> DatasetMinid:
         r = requests.get(url, headers={"accept": "application/json"})
         r.raise_for_status()
-        return DatasetMinid(dataset_version=self._version, **r.json())
+        return DatasetMinid(dataset_version=version, **r.json())
 
     def _materialize_dataset_bag(
         self,

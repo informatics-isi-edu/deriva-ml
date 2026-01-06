@@ -85,11 +85,12 @@ def create_datasets(
     Create a dataset per `spec`, then add child members (either by slicing
     off pre-generated RIDs or by recursing on nested specs).
     """
+    # Create unpinned dataset.
     dataset = client.create_dataset(
         dataset_types=spec.types,
         description=spec.description,
         version=spec.version,
-    )
+    ).set_version(version=None)
 
     result_spec = DatasetDescription(
         description=spec.description,

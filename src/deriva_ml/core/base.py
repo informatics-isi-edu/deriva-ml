@@ -1142,13 +1142,16 @@ class DerivaML:
         except IndexError:
             raise DerivaMLException(f"Dataset {dataset_rid} not found.")
 
-        return Dataset(
+        dataset = Dataset(
             catalog=self,
             dataset_rid=dataset_rid,
             description=dataset_record.description,
             dataset_types=dataset_record.dataset_types,
-            version=version,
         )
+        # Set version after creation if specified
+        if version:
+            dataset._version = version
+        return dataset
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def delete_dataset(self, dataset: Dataset, recurse: bool = False) -> None:
