@@ -149,6 +149,16 @@ class Dataset:
     def __repr__(self) -> str:
         return f"<Dataset rid='{self.dataset_rid}', version='{self.version}', types={self.dataset_types}>"
 
+    def __hash__(self) -> int:
+        """Hash based on dataset RID for use in sets and as dict keys."""
+        return hash(self.dataset_rid)
+
+    def __eq__(self, other: object) -> bool:
+        """Two Dataset objects are equal if they have the same RID."""
+        if not isinstance(other, Dataset):
+            return NotImplemented
+        return self.dataset_rid == other.dataset_rid
+
     @staticmethod
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
@@ -356,21 +366,45 @@ class Dataset:
             return max(versions) if versions else DatasetVersion(0, 1, 0)
 
     def _build_dataset_graph(self) -> Iterable[Dataset]:
+        """Build a dependency graph of all related datasets and return in topological order.
+
+        Returns datasets in an order where children come before parents, ensuring
+        that when versions are incremented, all related datasets are updated together.
+        """
         ts: TopologicalSorter = TopologicalSorter()
         self._build_dataset_graph_1(ts, set())
         return ts.static_order()
 
-    def _build_dataset_graph_1(self, ts: TopologicalSorter, visited) -> None:
-        """Use topological sort to return bottom up list of nested datasets"""
-        if self.dataset_rid not in visited:
-            ts.add(self)
-            visited.add(self.dataset_rid)
-            children = self.list_dataset_children()
-            parents = self.list_dataset_parents()
-            for parent in parents:
-                parent._build_dataset_graph_1(ts, visited)
-            for child in children:
-                child._build_dataset_graph_1(ts, visited)
+    def _build_dataset_graph_1(self, ts: TopologicalSorter, visited: set[str]) -> None:
+        """Recursively build the dataset dependency graph.
+
+        Uses topological sort where parents depend on their children, ensuring
+        children are processed before parents in the resulting order.
+
+        Args:
+            ts: TopologicalSorter instance to add nodes and dependencies to.
+            visited: Set of already-visited dataset RIDs to avoid cycles.
+        """
+        if self.dataset_rid in visited:
+            return
+
+        visited.add(self.dataset_rid)
+        # Use current catalog state for graph traversal, not version snapshot.
+        # Parent/child relationships need to reflect current state for version updates.
+        children = self._list_dataset_children_current()
+        parents = self._list_dataset_parents_current()
+
+        # Add this node with its children as dependencies.
+        # This means: self depends on children, so children will be ordered before self.
+        ts.add(self, *children)
+
+        # Recursively process children
+        for child in children:
+            child._build_dataset_graph_1(ts, visited)
+
+        # Recursively process parents (they will depend on this node)
+        for parent in parents:
+            parent._build_dataset_graph_1(ts, visited)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def increment_dataset_version(
@@ -686,6 +720,31 @@ class Dataset:
             return children
 
         return [self._version_snapshot.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
+
+    def _list_dataset_parents_current(self) -> list[Self]:
+        """Return parent datasets using current catalog state (not version snapshot).
+
+        Used by _build_dataset_graph_1 to find all related datasets for version updates.
+        """
+        pb = self._ml_instance.pathBuilder()
+        atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
+        return [
+            self._ml_instance.lookup_dataset(p["Dataset"])
+            for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
+        ]
+
+    def _list_dataset_children_current(self) -> list[Self]:
+        """Return child datasets using current catalog state (not version snapshot).
+
+        Used by _build_dataset_graph_1 to find all related datasets for version updates.
+        """
+        dataset_dataset_path = self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
+        nested_datasets = list(dataset_dataset_path.entities().fetch())
+
+        def find_children(rid: RID) -> list[RID]:
+            return [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
+
+        return [self._ml_instance.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
 
     @staticmethod
     def _insert_dataset_versions(
