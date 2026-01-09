@@ -178,7 +178,7 @@ class DatasetBag:
         """Retrieve the contents of the specified table as a dictionary.
 
         Args:
-            table: Table to retrieve data from. f schema is not provided as part of the table name,
+            table: Table to retrieve data from. If schema is not provided as part of the table name,
                 the method will attempt to locate the schema for the table.
 
         Returns:
@@ -188,7 +188,7 @@ class DatasetBag:
         with Session(self.engine) as session:
             result = session.execute(self._dataset_table_view(table))
             for row in result.mappings():
-                yield row
+                yield dict(row)
 
     def dataset_history(self) -> list[DatasetHistory]:
         """Retrieves the version history of a dataset.
