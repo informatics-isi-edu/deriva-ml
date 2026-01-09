@@ -1580,18 +1580,12 @@ class DerivaML:
         """
         # Get a workflow table path
         workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
-        try:
-            # Search for workflow by URL
-            url_column = workflow_path.URL
-            checksum_column = workflow_path.Checksum
+        workflow_rid = None
+        for w in workflow_path.path.entities().fetch():
+            if w['URL'] == url_or_checksum or w['Checksum'] == url_or_checksum:
+                workflow_rid = w['RID']
 
-            return list(
-                workflow_path.path.filter(
-                    (url_column == url_or_checksum) | (checksum_column == url_or_checksum)
-                ).entities()
-            )[0]["RID"]
-        except (IndexError, DataPathException):
-            return None
+        return workflow_rid
 
     def create_workflow(self, name: str, workflow_type: str, description: str = "") -> Workflow:
         """Creates a new workflow definition.
