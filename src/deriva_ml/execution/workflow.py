@@ -128,7 +128,6 @@ class Workflow(BaseModel):
             self.is_notebook = True
         if not self.url:
             path, self.is_notebook = Workflow._get_python_script()
-            print("Path is", path)
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
             self.git_root = Workflow._get_git_root(path)
 
