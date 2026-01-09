@@ -25,6 +25,7 @@ from sqlalchemy.orm.util import AliasedClass
 
 from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
+from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature
 
 if TYPE_CHECKING:
@@ -49,11 +50,10 @@ class DatasetBag:
 
     Attributes:
         dataset_rid (RID): RID for the specified dataset
-        version: The version of the dataset
+        current_version: The version of the dataset
         model (DatabaseModel): The Database model that has all the catalog metadata associated with this dataset.
             database:
-        dbase (sqlite3.Connection): connection to the sqlite database holding table values
-        domain_schema (str): Name of the domain schema
+        engine (sqlite3.Connection): connection to the sqlite database holding table values
     """
 
     def __init__(
@@ -85,11 +85,12 @@ class DatasetBag:
 
         self.model.rid_lookup(self.dataset_rid)  # Check to make sure that this dataset is in the bag.
 
-        self.version = self.model.dataset_version(self.dataset_rid)
+        self.current_version = self.model.dataset_version(self.dataset_rid)
         self._dataset_table = self.model.dataset_table
 
     def __repr__(self) -> str:
-        return f"<deriva_ml.DatasetBag object {self.dataset_rid} at {hex(id(self))}>"
+        return (f"<deriva_ml.Dataset object at {hex(id(self))}: rid='{self.dataset_rid}', "
+                f"version='{self.current_version}', types={self.dataset_types}>")
 
     def list_tables(self) -> list[str]:
         """List the names of the tables in the catalog
@@ -189,16 +190,64 @@ class DatasetBag:
             for row in result.mappings():
                 yield row
 
+    def dataset_history(self) -> list[DatasetHistory]:
+        """Retrieves the version history of a dataset.
+
+        Returns a chronological list of dataset versions, including their version numbers,
+        creation times, and associated metadata.
+
+        Returns:
+            list[DatasetHistory]: List of history entries, each containing:
+                - dataset_version: Version number (major.minor.patch)
+                - minid: Minimal Viable Identifier
+                - snapshot: Catalog snapshot time
+                - dataset_rid: Dataset Resource Identifier
+                - version_rid: Version Resource Identifier
+                - description: Version description
+                - execution_rid: Associated execution RID
+
+        Raises:
+            DerivaMLException: If dataset_rid is not a valid dataset RID.
+
+        Example:
+            >>> history = ml.dataset_history("1-abc123")
+            >>> for entry in history:
+            ...     print(f"Version {entry.dataset_version}: {entry.description}")
+        """
+        return [
+            DatasetHistory(
+                dataset_version=DatasetVersion.parse(v["Version"]),
+                minid=v["Minid"],
+                snapshot=v["Snapshot"],
+                dataset_rid=self.dataset_rid,
+                version_rid=v["RID"],
+                description=v["Description"],
+                execution_rid=v["Execution"],
+            )
+            for v in self.get_table_as_dict("Dataset_Version") if v["Dataset"] == self.dataset_rid
+        ]
+
     # @validate_call
-    def list_dataset_members(self, recurse: bool = False) -> dict[str, list[dict[str, Any]]]:
+    def list_dataset_members(
+        self, recurse: bool = False, _visited: set[RID] | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
         Args:
            recurse: Whether to include nested datasets.
+           _visited: Internal parameter to track visited datasets and prevent infinite recursion.
 
         Returns:
             Dictionary of entities associated with the dataset.
         """
+        # Initialize visited set for recursion guard
+        if _visited is None:
+            _visited = set()
+
+        # Prevent infinite recursion by checking if we've already visited this dataset
+        if self.dataset_rid in _visited:
+            return {}
+        _visited.add(self.dataset_rid)
 
         # Look at each of the element types that might be in the _dataset_table and get the list of rid for them from
         # the appropriate association table.
@@ -229,8 +278,8 @@ class DatasetBag:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in element_rows]
                 for ds in nested_datasets:
-                    nested_dataset = self.model.get_dataset(ds)
-                    for k, v in nested_dataset.list_dataset_members(recurse=recurse).items():
+                    nested_dataset = self.model.lookup_dataset(ds)
+                    for k, v in nested_dataset.list_dataset_members(recurse=recurse, _visited=_visited).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -277,15 +326,27 @@ class DatasetBag:
         """
         return self.model.list_dataset_element_types()
 
-    def list_dataset_children(self, recurse: bool = False) -> list[DatasetBag]:
+    def list_dataset_children(
+        self, recurse: bool = False, _visited: set[RID] | None = None
+    ) -> list[DatasetBag]:
         """Get nested datasets.
 
         Args:
             recurse: Whether to include children of children.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
 
         Returns:
             List of child dataset bags.
         """
+        # Initialize visited set for recursion guard
+        if _visited is None:
+            _visited = set()
+
+        # Prevent infinite recursion by checking if we've already visited this dataset
+        if self.dataset_rid in _visited:
+            return []
+        _visited.add(self.dataset_rid)
+
         ds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset")
         nds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Dataset")
         dv_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Version")
@@ -302,20 +363,32 @@ class DatasetBag:
         result = copy(nested)
         if recurse:
             for child in nested:
-                result.extend(child.list_dataset_children(recurse))
+                result.extend(child.list_dataset_children(recurse=recurse, _visited=_visited))
         return result
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_parents(self, recurse: bool = False) -> list[Self]:
+    def list_dataset_parents(
+        self, recurse: bool = False, _visited: set[RID] | None = None
+    ) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
 
         Args:
             recurse: If True, recursively return all ancestor datasets.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
 
         Returns:
             List of parent dataset bags.
         """
+        # Initialize visited set for recursion guard
+        if _visited is None:
+            _visited = set()
+
+        # Prevent infinite recursion by checking if we've already visited this dataset
+        if self.dataset_rid in _visited:
+            return []
+        _visited.add(self.dataset_rid)
+
         nds_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Dataset")
 
         with Session(self.engine) as session:
@@ -324,7 +397,7 @@ class DatasetBag:
 
         if recurse:
             for parent in parents.copy():
-                parents.extend(parent.list_dataset_parents(recurse=True))
+                parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited))
         return parents
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -414,7 +487,7 @@ class DatasetBag:
                     if (r := find_relationship(table_class, on_condition))
                 ]
                 sql_statement = sql_statement.join(table_class, onclause=and_(*on_clause))
-            dataset_rid_list = [self.dataset_rid] + self.list_dataset_children(recurse=True)
+            dataset_rid_list = [self.dataset_rid] + [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
             dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
             sql_statement = sql_statement.where(dataset_class.RID.in_(dataset_rid_list))
             sql_statements.append(sql_statement)

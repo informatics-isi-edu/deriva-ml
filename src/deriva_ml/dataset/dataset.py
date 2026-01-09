@@ -148,7 +148,8 @@ class Dataset:
             self.dataset_types: list[str] = dataset_types
 
     def __repr__(self) -> str:
-        return f"<Dataset rid='{self.dataset_rid}', version='{self.current_version}', types={self.dataset_types}>"
+        return (f"<deriva_ml.Dataset object at {hex(id(self))}: rid='{self.dataset_rid}', "
+                f"version='{self.current_version}', types={self.dataset_types}>")
 
     def __hash__(self) -> int:
         """Hash based on dataset RID for use in sets and as dict keys."""
@@ -228,8 +229,7 @@ class Dataset:
             dataset_rid=dataset_rid,
             description=description,
         )
-        # Set the version after creation
-        dataset._version = version
+
         dataset.add_dataset_types(dataset_types)
         return dataset
 
@@ -431,7 +431,8 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_members(self, version: DatasetVersion | str | None = None,
                              recurse: bool = False,
-                             limit: int | None = None) -> dict[str, list[dict[str, Any]]]:
+                             limit: int | None = None,
+                             _visited: set[RID] | None = None) -> dict[str, list[dict[str, Any]]]:
         """Lists members of a dataset.
 
         Returns a dictionary mapping member types to lists of member records. Can optionally
@@ -441,6 +442,7 @@ class Dataset:
             version: Dataset version to list members from. Defaults to the current version.
             recurse: Whether to include members of nested datasets. Defaults to False.
             limit: Maximum number of members to return per type. None for no limit.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
 
         Returns:
             dict[str, list[dict[str, Any]]]: Dictionary mapping member types to lists of members.
@@ -454,6 +456,14 @@ class Dataset:
             >>> for type_name, records in members.items():
             ...     print(f"{type_name}: {len(records)} records")
         """
+        # Initialize visited set for recursion guard
+        if _visited is None:
+            _visited = set()
+
+        # Prevent infinite recursion by checking if we've already visited this dataset
+        if self.dataset_rid in _visited:
+            return {}
+        _visited.add(self.dataset_rid)
 
         # Look at each of the element types that might be in the dataset_table and get the list of rid for them from
         # the appropriate association table.
@@ -488,7 +498,7 @@ class Dataset:
                 nested_datasets = [d["RID"] for d in target_entities]
                 for ds_rid in nested_datasets:
                     ds = version_snapshot_catalog.lookup_dataset(ds_rid)
-                    for k, v in ds.list_dataset_members(version, recurse=recurse).items():
+                    for k, v in ds.list_dataset_members(version=version, recurse=recurse, _visited=_visited).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -654,17 +664,28 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_parents(self,
                              version: DatasetVersion | str | None = None,
-                             recurse: bool = False) -> list[Self]:
+                             recurse: bool = False,
+                             _visited: set[RID] | None = None) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
 
         Args:
             version: Dataset version to list parents from. Defaults to the current version.
             recurse: If True, recursively return all ancestor datasets.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
 
         Returns:
             List of parent datasets.
         """
+        # Initialize visited set for recursion guard
+        if _visited is None:
+            _visited = set()
+
+        # Prevent infinite recursion by checking if we've already visited this dataset
+        if self.dataset_rid in _visited:
+            return []
+        _visited.add(self.dataset_rid)
+
         # Get association table for nested datasets
         version_snapshot_catalog = self._version_snapshot_catalog(version)
         pb = version_snapshot_catalog.pathBuilder()
@@ -675,23 +696,29 @@ class Dataset:
         ]
         if recurse:
             for parent in parents.copy():
-                parents.extend(parent.list_dataset_parents(version, recurse=True))
+                parents.extend(parent.list_dataset_parents(version, recurse=True, _visited=_visited))
         return parents
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_children(self,
                               version: DatasetVersion | str | None = None,
-                              recurse: bool = False) -> list[Self]:
+                              recurse: bool = False,
+                              _visited: set[RID] | None = None) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs for any nested datasets.
 
         Args:
             version: Dataset version to list children from. Defaults to the current version.
             recurse: If True, return a list of nested datasets RIDs.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
 
         Returns:
           list of nested dataset RIDs.
 
         """
+        # Initialize visited set for recursion guard
+        if _visited is None:
+            _visited = set()
+
         version = DatasetVersion.parse(version) if isinstance(version, str) else version
         version_snapshot_catalog = self._version_snapshot_catalog(version)
         dataset_dataset_path = (
@@ -699,7 +726,12 @@ class Dataset:
         )
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
-        def find_children(rid: RID) -> list[Self]:
+        def find_children(rid: RID) -> list[RID]:
+            # Prevent infinite recursion by checking if we've already visited this dataset
+            if rid in _visited:
+                return []
+            _visited.add(rid)
+
             children = [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
             if recurse:
                 for child in children.copy():
@@ -802,18 +834,11 @@ class Dataset:
             Download with execution tracking:
                 >>> bag = ml.download_dataset_bag(
                 ...     dataset=DatasetSpec(rid="1-abc123", materialize=True),
-                ...     execution_rid="1-xyz789"
                 ... )
         """
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
 
-        if (
-            self.execution_rid
-            and self.execution_rid != DRY_RUN_RID
-            and self._ml_instance.resolve_rid(self.execution_rid).table.name != "Execution"
-        ):
-            raise DerivaMLException(f"RID {self.execution_rid} is not an execution")
         minid = self._get_dataset_minid(version, create=True, use_minid=use_minid)
 
         bag_path = (
@@ -821,7 +846,7 @@ class Dataset:
             if materialize
             else self._download_dataset_minid(minid, use_minid)
         )
-        return DatabaseModel(minid, bag_path, self._ml_instance.working_dir).get_dataset()
+        return DatabaseModel(minid, bag_path, self._ml_instance.working_dir).lookup_dataset(self.dataset_rid)
 
     def _version_snapshot_catalog(self, dataset_version: DatasetVersion | str | None) -> DerivaMLCatalog:
         if isinstance(dataset_version, str) and str:
@@ -886,8 +911,9 @@ class Dataset:
             # Generate a download specification file for the current catalog schema. By default, this spec
             # will generate a minid and place the bag into S3 storage.
             spec_file = Path(tmp_dir) / "download_spec.json"
+            version_snapshot_catalog = self._version_snapshot_catalog(version)
             with spec_file.open("w", encoding="utf-8") as ds:
-                downloader = CatalogGraph(self._ml_instance, use_minid=use_minid)
+                downloader = CatalogGraph(version_snapshot_catalog, use_minid=use_minid)
                 json.dump(downloader.generate_dataset_download_spec(self), ds)
             try:
                 self._logger.info(

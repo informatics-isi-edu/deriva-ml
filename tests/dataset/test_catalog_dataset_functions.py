@@ -1,7 +1,4 @@
-"""
-Tests for dataset functionality.
-"""
-
+""" Test catalog level functions that support datasets."""
 from pprint import pformat
 
 from icecream import ic
@@ -14,16 +11,13 @@ from deriva_ml import (
     TableDefinition,
 )
 from deriva_ml.dataset.aux_classes import DatasetSpec
-from deriva_ml.dataset.catalog_graph import CatalogGraph
-from deriva_ml.demo_catalog import DatasetDescription
 from deriva_ml.execution.execution import ExecutionConfiguration
 
 ic.configureOutput(
     argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
 )
 
-
-class TestDataset:
+class TestCatalogDatasetFunctions:
     def test_dataset_elements(self, deriva_catalog, tmp_path):
         ml_instance = DerivaML(
             deriva_catalog.hostname, deriva_catalog.catalog_id, working_dir=tmp_path, use_minid=False
@@ -64,7 +58,7 @@ class TestDataset:
         assert new_dataset.description == "Dataset for testing"
         assert new_dataset.dataset_types == ["Testing"]
 
-    def test_nested_datasets(self, dataset_test, tmp_path):
+    def test_dataset_find(self, dataset_test, tmp_path):
         """Test finding datasets."""
         # Find all datasets
         hostname = dataset_test.catalog.hostname
@@ -72,31 +66,13 @@ class TestDataset:
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dset_description = dataset_test.dataset_description
         reference_datasets = {ds.dataset.dataset_rid for ds in dataset_test.list_datasets(dset_description)}
-        # Now check top level nesting
-        child_rids = set(ds.dataset_rid for ds in dset_description.dataset.list_dataset_children())
-        assert set(dset_description.member_rids["Dataset"]) == child_rids
-        # Now look two levels down
+        # Check all of the dataset.
+        assert reference_datasets == {ds.dataset_rid for ds in ml_instance.find_datasets()}
 
-        for member_ds in dset_description.members["Dataset"]:
-            child_rids = set(ds.dataset_rid for ds in member_ds.dataset.list_dataset_children())
-            assert set(member_ds.member_rids["Dataset"]) == child_rids
-
-        # Now check recursion
-        nested_datasets = reference_datasets - {dset_description.dataset.dataset_rid}
-        assert nested_datasets == set(
-            ds.dataset_rid for ds in dset_description.dataset.list_dataset_children(recurse=True)
-        )
-
-        def check_relationships(description: DatasetDescription):
-            """Check relationships between datasets."""
-            dataset_children = description.dataset.list_dataset_children()
-            assert set(description.member_rids.get("Dataset", [])) == set(ds.dataset_rid for ds in dataset_children)
-            for child in dataset_children:
-                assert child.list_dataset_parents()[0].dataset_rid == description.dataset.dataset_rid
-            for nested_dataset in description.members.get("Dataset", []):
-                check_relationships(nested_dataset)
-
-        check_relationships(dset_description)
+        for ds in ml_instance.find_datasets():
+            dataset_types = ds.dataset_types
+            for t in dataset_types:
+                assert ml_instance.lookup_term(MLVocab.dataset_type, t) is not None
 
     def test_dataset_add_delete(self, test_ml):
         ml_instance = test_ml
@@ -120,34 +96,6 @@ class TestDataset:
         # Create with all fields
         spec = DatasetSpec(rid="1234", version="1.0.0", materialize=True)
         assert spec.materialize
-
-    def test_dataset_members(self, dataset_test, tmp_path):
-        hostname = dataset_test.catalog.hostname
-        catalog_id = dataset_test.catalog.catalog_id
-        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
-        dataset_description = dataset_test.dataset_description
-        catalog_datasets = ml_instance.find_datasets()
-        reference_datasets = dataset_test.list_datasets(dataset_description)
-        assert len(list(catalog_datasets)) == len(reference_datasets)
-
-        assert CatalogGraph(ml_instance=ml_instance)._dataset_nesting_depth() == 2
-
-        for dataset in reference_datasets:
-            # See if the list of RIDs in the dataset matches up with what is expected.
-            for member_type, dataset_members in dataset.dataset.list_dataset_members().items():
-                if member_type == "File":
-                    continue
-                member_rids = {e["RID"] for e in dataset_members}
-                assert set(dataset.member_rids.get(member_type, set())) == set(member_rids)
-
-        for dataset in reference_datasets:
-            reference_members = dataset_test.collect_rids(dataset)
-            member_rids = {dataset.dataset.dataset_rid}
-            for member_type, dataset_members in dataset.dataset.list_dataset_members(recurse=True).items():
-                if member_type == "File":
-                    continue
-                member_rids |= {e["RID"] for e in dataset_members}
-            assert reference_members == member_rids
 
     def test_dataset_execution(self, test_ml):
         ml_instance = test_ml

@@ -1117,14 +1117,12 @@ class DerivaML:
             self, execution_rid=execution_rid, version=version, description=description, dataset_types=dataset_types
         )
 
-    def lookup_dataset(
-        self, dataset: RID | DatasetSpec, version: DatasetVersion | None = None, deleted: bool = False
+    def lookup_dataset(self, dataset: RID | DatasetSpec, deleted: bool = False
     ) -> Dataset:
         """Looks up a dataset by RID or DatasetSpec.
 
         Arguments:
             dataset: Dataset RID or DatasetSpec to look up.
-            version: Dataset version to look up. If None, the latest version is returned or the
             version specified in the DatasetSpec.
             deleted: If True, included the datasets that have been deleted.
         Returns a Dataset object for the specified dataset RID or DatasetSpec.
@@ -1132,26 +1130,13 @@ class DerivaML:
         """
         if isinstance(dataset, DatasetSpec):
             dataset_rid = dataset.rid
-            version = dataset.version if version is None else version
         else:
             dataset_rid = dataset
 
         try:
-            dataset_record = [ds for ds in self.find_datasets(deleted=deleted) if ds.dataset_rid == dataset_rid][0]
-            version = dataset_record.version if version is None else version
+            return [ds for ds in self.find_datasets(deleted=deleted) if ds.dataset_rid == dataset_rid][0]
         except IndexError:
             raise DerivaMLException(f"Dataset {dataset_rid} not found.")
-
-        dataset = Dataset(
-            catalog=self,
-            dataset_rid=dataset_rid,
-            description=dataset_record.description,
-            dataset_types=dataset_record.dataset_types,
-        )
-        # Set version after creation if specified
-        if version:
-            dataset._version = version
-        return dataset
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def delete_dataset(self, dataset: Dataset, recurse: bool = False) -> None:
@@ -1220,7 +1205,6 @@ class DerivaML:
     def download_dataset_bag(
         self,
         dataset: DatasetSpec,
-        execution_rid: RID | None = None,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and creates a MINID if needed.
 
@@ -1256,7 +1240,6 @@ class DerivaML:
         return ds.download_dataset_bag(
             version=dataset.version,
             materialize=dataset.materialize,
-            execution_rid=execution_rid,
             use_minid=self.use_minid,
         )
 

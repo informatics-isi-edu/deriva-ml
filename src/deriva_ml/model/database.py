@@ -37,7 +37,7 @@ from sqlalchemy import Table as SQLTable
 from sqlalchemy import UniqueConstraint as SQLUniqueConstraint
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import Session, backref, configure_mappers, foreign, relationship
+from sqlalchemy.orm import Session, backref, foreign, relationship
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import TypeDecorator
 
@@ -114,15 +114,16 @@ class StringToDate(TypeDecorator):
 class DatabaseModelMeta(type):
     """Use metaclass to ensure that there is only one instance of a database model per path"""
 
-    _paths_loaded: dict[Path, "DatabaseModel"] = {}
+    _paths_loaded: dict[str, "DatabaseModel"] = {}
 
     def __call__(cls, *args, **kwargs):
         logger = logging.getLogger("deriva_ml")
         bag_path: Path = args[1]
-        if bag_path.as_posix() not in cls._paths_loaded:
+        cache_key = bag_path.as_posix()
+        if cache_key not in cls._paths_loaded:
             logger.info(f"Loading {bag_path}")
-            cls._paths_loaded[bag_path] = super().__call__(*args, **kwargs)
-        return cls._paths_loaded[bag_path]
+            cls._paths_loaded[cache_key] = super().__call__(*args, **kwargs)
+        return cls._paths_loaded[cache_key]
 
 
 class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
@@ -176,6 +177,8 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         self.engine = create_engine(f"sqlite:///{(self.dbase_path / 'main.db').resolve()}", future=True)
         self.metadata = MetaData()
         self.Base = automap_base(metadata=self.metadata)
+        # Generate a unique prefix for ORM class names to prevent sharing between instances
+        self._class_prefix = f"_{id(self)}_"
 
         # Attach event listener for *this instance's* engine
         event.listen(self.engine, "connect", self._attach_schemas)
@@ -311,11 +314,16 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
             backref_name = constraint.name.replace("_fkey", "_collection")
             return backref_name or (referred_cls.__name__.lower() + "_collection")
 
+        def classname_for_table(_base, tablename, table):
+            # Use instance-unique prefix to prevent ORM class sharing between DatabaseModel instances
+            return self._class_prefix + tablename.replace(".", "_").replace("-", "_")
+
         # Now build ORM mappings for the tables.
         self.Base.prepare(
             self.engine,
             name_for_scalar_relationship=name_for_scalar_relationship,
             name_for_collection_relationship=name_for_collection_relationship,
+            classname_for_table=classname_for_table,
             reflect=True,
         )
 
@@ -337,17 +345,27 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
                     relationship_attr = guess_attr_name(foreign_key_column_name)
                     backref_attr = fk.name[1].replace("_fkey", "_collection")
-                    setattr(
-                        table_class,
-                        relationship_attr,
-                        relationship(
-                            referenced_class,
-                            foreign_keys=[foreign_key_column],
-                            primaryjoin=foreign(foreign_key_column) == referenced_column,
-                            backref=backref(backref_attr, viewonly=True),
-                            viewonly=True,  # set False for write behavior, but best with proper FKs
-                        ),
+
+                    # Check if a proper relationship already exists (not just any attribute)
+                    existing_attr = getattr(table_class, relationship_attr, None)
+                    from sqlalchemy.orm import RelationshipProperty
+                    from sqlalchemy.orm.attributes import InstrumentedAttribute
+                    is_relationship = (
+                        isinstance(existing_attr, InstrumentedAttribute) and
+                        isinstance(existing_attr.property, RelationshipProperty)
                     )
+                    if not is_relationship:
+                        setattr(
+                            table_class,
+                            relationship_attr,
+                            relationship(
+                                referenced_class,
+                                foreign_keys=[foreign_key_column],
+                                primaryjoin=foreign(foreign_key_column) == referenced_column,
+                                backref=backref(backref_attr, viewonly=True),
+                                viewonly=True,
+                            ),
+                        )
 
         # Reflect won't pick up the second FK in the dataset_dataset table.  We need to do it manually
         # dataset_dataset_class = self.get_orm_class_by_name("deriva-ml.Dataset_Dataset")
@@ -361,7 +379,31 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         #         viewonly=True,  # keep it read-only unless you truly want writes
         #         overlaps="Dataset,dataset_dataset_collection",  # optional: silence overlap warnings
         #     )
-        configure_mappers()
+        # Use instance-specific registry.configure() instead of global configure_mappers()
+        # to avoid cross-contamination between DatabaseModel instances
+        self.Base.registry.configure()
+
+    def dispose(self) -> None:
+        """Dispose of SQLAlchemy resources to prevent state leakage between instances.
+
+        This should be called when the DatabaseModel is no longer needed, especially
+        in test scenarios where multiple DatabaseModel instances may be created.
+        """
+        # Dispose the registry to clear all mappers for this Base
+        self.Base.registry.dispose()
+        # Dispose the engine to close all connections
+        self.engine.dispose()
+        # Remove from the metaclass cache
+        cache_key = self.bag_path.as_posix()
+        if cache_key in DatabaseModelMeta._paths_loaded:
+            del DatabaseModelMeta._paths_loaded[cache_key]
+        # Remove from the RID map
+        for rid in list(DatabaseModel._rid_map.keys()):
+            DatabaseModel._rid_map[rid] = [
+                (v, m) for v, m in DatabaseModel._rid_map[rid] if m is not self
+            ]
+            if not DatabaseModel._rid_map[rid]:
+                del DatabaseModel._rid_map[rid]
 
     def _load_database(self) -> None:
         """Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.
@@ -456,7 +498,10 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
     def find_table(self, table_name: str) -> SQLTable:
         """Find a table in the catalog."""
         # We will look across ml and domain schema to find a table whose name matches.
-        table = [t for t in self.metadata.tables if t == table_name or t.split(".")[1] == table_name][0]
+        try:
+            table = [t for t in self.metadata.tables if t == table_name or t.split(".")[1] == table_name][0]
+        except IndexError:
+            raise DerivaMLException(f"Table {table_name} not found in catalog.")
         return self.metadata.tables[table]
 
     def list_tables(self) -> list[str]:
@@ -469,7 +514,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
         tables.sort()
         return tables
 
-    def get_dataset(self, dataset_rid: Optional[RID] = None) -> DatasetBag:
+    def lookup_dataset(self, dataset_rid: Optional[RID] = None) -> DatasetBag:
         """Get a dataset, or nested dataset from the bag database
 
         Args:
@@ -518,7 +563,7 @@ class DatabaseModel(DerivaModel, metaclass=DatabaseModelMeta):
 
     def list_dataset_members(self, dataset_rid: RID) -> dict[str, Any]:
         """Returns a list of all the dataset_table entries associated with a dataset."""
-        return self.get_dataset(dataset_rid).list_dataset_members()
+        return self.lookup_dataset(dataset_rid).list_dataset_members()
 
     def _get_table_contents(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve the contents of the specified table as a dictionary.

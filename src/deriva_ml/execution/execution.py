@@ -473,7 +473,7 @@ class Execution:
             >>> bag = execution.download_dataset_bag(spec)
             >>> print(f"Downloaded to {bag.path}")
         """
-        return self._ml_object.download_dataset_bag(dataset, execution_rid=self.execution_rid)
+        return self._ml_object.download_dataset_bag(dataset)
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:

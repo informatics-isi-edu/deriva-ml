@@ -90,7 +90,7 @@ def create_datasets(
         dataset_types=spec.types,
         description=spec.description,
         version=spec.version,
-    ).set_version(version=None)
+    )
 
     result_spec = DatasetDescription(
         description=spec.description,

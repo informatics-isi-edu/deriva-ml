@@ -7,15 +7,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from deriva_ml import (
-    DatasetSpec,
     DerivaML,
     ExecAssetType,
-    ExecutionConfiguration,
     MLAsset,
 )
 from deriva_ml import (
     MLVocab as vc,
 )
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.execution.execution import ExecutionConfiguration
 
 
 class TestWorkflow:
@@ -26,7 +26,7 @@ class TestWorkflow:
         print("Running workflow-test.py ...")
         workflow_script = Path(__file__).parent / "workflow-test.py"
 
-        workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
+        workflow_table = ml_instance.pathBuilder().schemas[ml_instance.ml_schema].Workflow
         workflows = list(workflow_table.entities().fetch())
         assert 0 == len(workflows)
         result = subprocess.run(
@@ -72,7 +72,7 @@ class TestWorkflow:
         notebook_path = Path(__file__).parent / "workflow-test.ipynb"  # directory where this test lives
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
-        workflow_table = ml_instance.pathBuilder.schemas[ml_instance.ml_schema].Workflow
+        workflow_table = ml_instance.pathBuilder().schemas[ml_instance.ml_schema].Workflow
         workflows = list(workflow_table.entities().fetch())
         assert 0 == len(workflows)
 
@@ -124,7 +124,7 @@ class TestExecution:
         manual_execution.upload_execution_outputs()
         assert "Completed" == ml_instance.retrieve_rid(manual_execution.execution_rid)["Status"]
 
-        pb = ml_instance.pathBuilder.schemas[ml_instance.ml_schema]
+        pb = ml_instance.pathBuilder().schemas[ml_instance.ml_schema]
         execution_metadata_execution = pb.Execution_Metadata_Execution
         execution_metadata = pb.Execution_Metadata
         metadata_path = execution_metadata_execution.path
@@ -163,7 +163,7 @@ class TestExecution:
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
 
-        dataset_rid = dataset_test.dataset_description.rid
+        dataset_rid = dataset_test.dataset_description.dataset.dataset_rid
 
         # Create a workflow
         api_workflow = ml_instance.create_workflow(
@@ -210,7 +210,7 @@ class TestExecution:
         uploaded_assets = manual_execution.upload_execution_outputs()
         assert 1 == len(uploaded_assets["deriva-ml/Execution_Asset"])
 
-        pb = ml_instance.pathBuilder.schemas[ml_instance.ml_schema]
+        pb = ml_instance.pathBuilder().schemas[ml_instance.ml_schema]
         execution_asset_execution = pb.Execution_Asset_Execution
         execution_asset = pb.Execution_Asset
         asset_path = execution_asset_execution.path
