@@ -14,7 +14,7 @@ from deriva_ml.demo_catalog import (
     populate_demo_catalog,
 )
 from deriva_ml.execution import ExecutionConfiguration
-from deriva_ml.model.database import DatabaseModel, DatabaseModelMeta
+from deriva_ml.model.database import DatabaseModel
 
 from .test_utils import MLCatalog, MLDatasetCatalog, create_jupyter_kernel, destroy_jupyter_kernel
 
@@ -112,33 +112,5 @@ def log_start():
     yield
     print("\n--- Ending test ---")
 
-@pytest.fixture(autouse=True)
-def clear_database_model_caches():
-    """Fixture to ensure clean DatabaseModel state between tests.
-
-    This is critical for preventing state leakage that can cause infinite recursion
-    or other nondeterministic behavior when tests share cached DatabaseModel instances.
-    """
-    # Dispose all existing DatabaseModel instances before test starts
-    for model in list(DatabaseModelMeta._paths_loaded.values()):
-        try:
-            model.dispose()
-        except Exception:
-            pass  # Ignore errors during cleanup
-
-    # Clear all caches before test
-    DatabaseModelMeta._paths_loaded.clear()
-    DatabaseModel._rid_map.clear()
-
-    yield
-
-    # Dispose all DatabaseModel instances to clean up SQLAlchemy state after test
-    for model in list(DatabaseModelMeta._paths_loaded.values()):
-        try:
-            model.dispose()
-        except Exception:
-            pass  # Ignore errors during cleanup
-
-    # Clear caches after test to ensure no state leaks to next test
-    DatabaseModelMeta._paths_loaded.clear()
-    DatabaseModel._rid_map.clear()
+# Note: DatabaseModel singleton pattern was removed, so no cache clearing needed.
+# Each test now gets a fresh DatabaseModel instance when needed.

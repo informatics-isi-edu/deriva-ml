@@ -3,6 +3,7 @@ from pprint import pformat
 from deriva.core.datapath import Any
 
 from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 from tests.test_utils import DatasetDescription, DerivaML, MLDatasetCatalog
 
 try:
@@ -39,6 +40,7 @@ class TestDataBaseModel:
         reference_datasets = self.list_datasets(dataset.dataset_description)
         snapshot_catalog = dataset.dataset_description.dataset._version_snapshot_catalog(dataset_spec.version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
+        db_catalog = DerivaMLDatabase(bag.model)
 
         pb = snapshot_catalog.pathBuilder()
         ds = pb.schemas[snapshot_catalog.ml_schema].tables["Dataset"]
@@ -51,7 +53,7 @@ class TestDataBaseModel:
         # Check to make sure that all of the datasets are present.
         assert {r for r in bag.model.bag_rids.keys()} == {r for r in reference_datasets}
         for dataset_rid in reference_datasets:
-            dataset_bag = bag.model.lookup_dataset(dataset_rid)
+            dataset_bag = db_catalog.lookup_dataset(dataset_rid)
             dset = ml_instance.lookup_dataset(dataset_rid)
             dataset_rids = tuple([ds.dataset_rid for ds in dset.list_dataset_children(recurse=True)] + [dataset_rid])
             bag_rids = [b.dataset_rid for b in dataset_bag.list_dataset_children(recurse=True)] + [
@@ -73,13 +75,23 @@ class TestDataBaseModel:
             subjects = list(subject_path.entities().fetch()) + list(subject_path_1.entities().fetch())
             images = list(image_path.entities().fetch()) + list(image_path_1.entities().fetch())
 
+            # Get RIDs from catalog results
+            catalog_dataset_rids = {d["RID"] for d in datasets}
+            catalog_subject_rids = {s["RID"] for s in subjects}
+            catalog_image_rids = {i["RID"] for i in images}
+
             catalog_dataset = set([self.make_frozen(d) for d in datasets])
             catalog_subject = set([self.make_frozen(s) for s in subjects])
             catalog_image = set([self.make_frozen(i) for i in images])
-            ic(list(dataset_bag.get_table_as_dict("Dataset")))
-            dataset_table = set([self.make_frozen(d) for d in dataset_bag.get_table_as_dict("Dataset")])
-            subject_table = set([self.make_frozen(s) for s in dataset_bag.get_table_as_dict("Subject")])
-            image_table = set([self.make_frozen(i) for i in dataset_bag.get_table_as_dict("Image")])
+
+            # Get bag data filtered to RIDs that appear in the catalog results
+            # This verifies the bag contains the same data for those specific records
+            all_bag_datasets = list(db_catalog.get_table_as_dict("Dataset"))
+            all_bag_subjects = list(db_catalog.get_table_as_dict("Subject"))
+            all_bag_images = list(db_catalog.get_table_as_dict("Image"))
+            dataset_table = set([self.make_frozen(d) for d in all_bag_datasets if d["RID"] in catalog_dataset_rids])
+            subject_table = set([self.make_frozen(s) for s in all_bag_subjects if s["RID"] in catalog_subject_rids])
+            image_table = set([self.make_frozen(i) for i in all_bag_images if i["RID"] in catalog_image_rids])
 
             assert len(catalog_dataset) == len(dataset_table)
             assert len(catalog_subject) == len(subject_table)
@@ -127,8 +139,10 @@ class TestDataBaseModel:
         new_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=new_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
         new_bag = ml_instance.download_dataset_bag(new_spec)
-        subjects_current = list(current_bag.get_table_as_dict("Subject"))
-        subjects_new = list(new_bag.get_table_as_dict("Subject"))
+        current_db_catalog = DerivaMLDatabase(current_bag.model)
+        new_db_catalog = DerivaMLDatabase(new_bag.model)
+        subjects_current = list(current_db_catalog.get_table_as_dict("Subject"))
+        subjects_new = list(new_db_catalog.get_table_as_dict("Subject"))
 
         # Make sure that there is a difference between to old and new catalogs.
         print(new_subjects)

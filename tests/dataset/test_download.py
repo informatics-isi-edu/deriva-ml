@@ -8,6 +8,7 @@ from deriva_ml import DerivaML, MLVocab, TableDefinition
 from deriva_ml.dataset.aux_classes import DatasetSpec, VersionPart
 from deriva_ml.dataset.dataset import Dataset, DatasetBag
 from deriva_ml.demo_catalog import DatasetDescription
+from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 from tests.test_utils import MLDatasetCatalog
 
 ic.configureOutput(
@@ -31,7 +32,9 @@ class TestDatasetDownload:
         versioned_dataset = ml_instance.lookup_dataset(dataset=dataset_spec.rid)
         bag = versioned_dataset.download_dataset_bag(version=dataset_spec.version, use_minid=False)
         # Check to see if all of the files have been downloaded.
-        files = [Path(r["Filename"]) for r in bag.get_table_as_dict("Image")]
+        # Use list_dataset_members to get dataset-scoped data
+        members = bag.list_dataset_members()
+        files = [Path(r["Filename"]) for r in members.get("Image", [])]
         for f in files:
             assert f.exists()
         # Check to make sure that all of the datasets are present.
@@ -39,9 +42,10 @@ class TestDatasetDownload:
 
         # Now look at each dataset to see if they line up.
         ic("checking elements")
+        db_catalog = DerivaMLDatabase(bag.model)
         # Sort reference_datasets by RID to ensure deterministic iteration order
         for ds in sorted(reference_datasets, key=lambda d: d.dataset_rid):
-            dataset_bag = bag.model.lookup_dataset(ds.dataset_rid)  # Get nested bag from the dataset.
+            dataset_bag = db_catalog.lookup_dataset(ds.dataset_rid)  # Get nested bag from the dataset.
             snapshot_ds = ml_instance.lookup_dataset(dataset=ds.dataset_rid)
             catalog_elements = snapshot_ds.list_dataset_members(version=dataset_spec.version, recurse=recurse)
             del catalog_elements["File"]  # Files is not in the bag.
@@ -71,13 +75,16 @@ class TestDatasetDownload:
         current_version = dataset.current_version
         bag = dataset.download_dataset_bag(current_version, use_minid=False)
         reference_datasets = {ds.dataset.dataset_rid for ds in dataset_test.list_datasets(dataset_description)}
-        bag_datasets = {ds.dataset_rid for ds in bag.model.find_datasets()}
+
+        # Use DerivaMLDatabase for catalog-level operations
+        db_catalog = DerivaMLDatabase(bag.model)
+        bag_datasets = {ds.dataset_rid for ds in db_catalog.find_datasets()}
         assert reference_datasets == bag_datasets
 
-        for ds in bag.model.find_datasets():
+        for ds in db_catalog.find_datasets():
             dataset_types = ds.dataset_types
             for t in dataset_types:
-                assert bag.lookup_term(MLVocab.dataset_type, t) is not None
+                assert db_catalog.lookup_term(MLVocab.dataset_type, t) is not None
 
         # Now check top level nesting
         assert set(dataset_description.member_rids["Dataset"]) == set(
@@ -85,7 +92,7 @@ class TestDatasetDownload:
         )
         # Now look two levels down
         for ds in dataset_description.members["Dataset"]:
-            bag_child = bag.model.lookup_dataset(ds.dataset.dataset_rid)
+            bag_child = db_catalog.lookup_dataset(ds.dataset.dataset_rid)
             assert set(ds.member_rids["Dataset"]) == set(c.dataset_rid for c in
                                                          bag_child.list_dataset_children())
 
@@ -96,7 +103,7 @@ class TestDatasetDownload:
             for child in bg.list_dataset_children():
                 assert child.list_dataset_parents()[0].dataset_rid == bg.dataset_rid
             for nested_dataset in description.members.get("Dataset", []):
-                nested_bag = bg.model.lookup_dataset(nested_dataset.dataset.dataset_rid)
+                nested_bag = db_catalog.lookup_dataset(nested_dataset.dataset.dataset_rid)
                 check_relationships(nested_dataset, nested_bag)
 
         check_relationships(dataset_description, bag)
@@ -121,11 +128,12 @@ class TestDatasetDownload:
         current_version = dataset_description.dataset.current_version
         dataset_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
+        db_catalog = DerivaMLDatabase(bag.model)
 
         for dataset in reference_datasets:
             reference_members = dataset_test.collect_rids(dataset)
             member_rids = {dataset.dataset.dataset_rid}
-            dataset_bag = bag.model.lookup_dataset(dataset.dataset.dataset_rid)
+            dataset_bag = db_catalog.lookup_dataset(dataset.dataset.dataset_rid)
             for member_type, dataset_members in dataset_bag.list_dataset_members(recurse=True).items():
                 if member_type == "File":
                     continue
@@ -153,8 +161,9 @@ class TestDatasetDownload:
         current_bag = dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset.download_dataset_bag(new_version, use_minid=False)
         print([m["RID"] for m in dataset_description.dataset.list_dataset_members()["Subject"]])
-        subjects_current = list(current_bag.get_table_as_dict("Subject"))
-        subjects_new = list(new_bag.get_table_as_dict("Subject"))
+        # Use list_dataset_members to get dataset-scoped data
+        subjects_current = current_bag.list_dataset_members().get("Subject", [])
+        subjects_new = new_bag.list_dataset_members().get("Subject", [])
 
         # Make sure that there is a difference between to old and new catalogs.
         assert len(subjects_new) == len(subjects_current) + 2

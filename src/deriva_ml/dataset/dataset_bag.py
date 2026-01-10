@@ -1,5 +1,32 @@
-"""
-The module implements the sqllite interface to a set of directories representing a dataset bag.
+"""SQLite-backed dataset access for downloaded BDBags.
+
+This module provides the DatasetBag class, which allows querying and navigating
+downloaded dataset bags using SQLite. When a dataset is downloaded from a Deriva
+catalog, it is stored as a BDBag (Big Data Bag) containing:
+
+- CSV files with table data
+- Asset files (images, documents, etc.)
+- A schema.json describing the catalog structure
+- A fetch.txt manifest of referenced files
+
+The DatasetBag class provides a read-only interface to this data, mirroring
+the Dataset class API where possible. This allows code to work uniformly
+with both live catalog datasets and downloaded bags.
+
+Key concepts:
+- DatasetBag wraps a single dataset within a downloaded bag
+- A bag may contain multiple datasets (nested/hierarchical)
+- All operations are read-only (bags are immutable snapshots)
+- Queries use SQLite via SQLAlchemy ORM
+- Table-level access (get_table_as_dict, lookup_term) is on the catalog (DerivaMLDatabase)
+
+Typical usage:
+    >>> # Download a dataset from a catalog
+    >>> bag = ml.download_dataset_bag(dataset_spec)
+    >>> # List dataset members by type
+    >>> members = bag.list_dataset_members(recurse=True)
+    >>> for image in members.get("Image", []):
+    ...     print(image["Filename"])
 """
 
 from __future__ import annotations
@@ -23,13 +50,14 @@ from sqlalchemy import CompoundSelect, Engine, RowMapping, Select, and_, inspect
 from sqlalchemy.orm import RelationshipProperty, Session
 from sqlalchemy.orm.util import AliasedClass
 
-from deriva_ml.core.definitions import RID, VocabularyTerm
-from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
+from deriva_ml.core.definitions import RID
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature
 
 if TYPE_CHECKING:
     from deriva_ml.model.database import DatabaseModel
+    from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 try:
     from icecream import ic
@@ -38,48 +66,89 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 class DatasetBag:
-    """
-    DatasetBag is a class that manages a materialized bag.  It is created from a locally materialized
-    BDBag for a dataset_table, which is created either by DerivaML.create_execution, or directly by
-    calling DerivaML.download_dataset.
+    """Read-only interface to a downloaded dataset bag.
 
-    A general a bag may contain multiple datasets, if the dataset is nested. The DatasetBag is used to
-    represent only one of the datasets in the bag.
+    DatasetBag manages access to a materialized BDBag (Big Data Bag) that contains
+    a snapshot of dataset data from a Deriva catalog. It provides methods for:
 
-    All the metadata associated with the dataset is stored in a SQLLite database that can be queried using SQL.
+    - Listing dataset members and their attributes
+    - Navigating dataset relationships (parents, children)
+    - Accessing feature values
+    - Denormalizing data across related tables
+
+    A bag may contain multiple datasets when nested datasets are involved. Each
+    DatasetBag instance represents a single dataset within the bag - use
+    list_dataset_children() to navigate to nested datasets.
+
+    For catalog-level operations like querying arbitrary tables or looking up
+    vocabulary terms, use the DerivaMLDatabase class instead.
+
+    The class implements the DatasetLike protocol, providing the same read interface
+    as the Dataset class. This allows code to work with both live catalogs and
+    downloaded bags interchangeably.
 
     Attributes:
-        dataset_rid (RID): RID for the specified dataset
-        current_version: The version of the dataset
-        model (DatabaseModel): The Database model that has all the catalog metadata associated with this dataset.
-            database:
-        engine (sqlite3.Connection): connection to the sqlite database holding table values
+        dataset_rid (RID): The unique Resource Identifier for this dataset.
+        dataset_types (list[str]): List of vocabulary terms describing the dataset type.
+        description (str): Human-readable description of the dataset.
+        execution_rid (RID | None): RID of the execution that created this dataset.
+        model (DatabaseModel): The DatabaseModel providing SQLite access to bag data.
+        engine (Engine): SQLAlchemy engine for database queries.
+        metadata (MetaData): SQLAlchemy metadata with table definitions.
+
+    Example:
+        >>> # Download a dataset
+        >>> bag = dataset.download_dataset_bag(version="1.0.0")
+        >>> # List members by type
+        >>> members = bag.list_dataset_members()
+        >>> for image in members.get("Image", []):
+        ...     print(f"File: {image['Filename']}")
+        >>> # Navigate to nested datasets
+        >>> for child in bag.list_dataset_children():
+        ...     print(f"Nested: {child.dataset_rid}")
     """
 
     def __init__(
         self,
-        database_model: DatabaseModel,
+        catalog: "DerivaMLDatabase",
         dataset_rid: RID | None = None,
         dataset_types: str | list[str] | None = None,
         description: str = "",
         execution_rid: RID | None = None,
     ):
-        """
-        Initialize a DatasetBag instance.
+        """Initialize a DatasetBag instance for a dataset within a downloaded bag.
+
+        This mirrors the Dataset class initialization pattern, where both classes
+        take a catalog-like object as their first argument for consistency.
 
         Args:
-            database_model: Database version of the bag.
-            dataset_rid: Optional RID for the dataset.
+            catalog: The DerivaMLDatabase instance providing access to the bag's data.
+                This implements the DerivaMLCatalog protocol.
+            dataset_rid: The RID of the dataset to wrap. If None, uses the primary
+                dataset RID from the bag.
+            dataset_types: One or more dataset type terms. Can be a single string
+                or list of strings.
+            description: Human-readable description of the dataset.
+            execution_rid: RID of the execution that created this dataset. If None,
+                will be looked up from the database.
+
+        Raises:
+            DerivaMLException: If no dataset_rid is provided and none can be
+                determined from the bag, or if the RID doesn't exist in the bag.
         """
-        self.model = database_model
+        # Store reference to the catalog and extract the underlying model
+        self._catalog = catalog
+        self.model = catalog.model
         self.engine = cast(Engine, self.model.engine)
         self.metadata = self.model.metadata
 
+        # Use provided RID or fall back to the bag's primary dataset
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         self.description = description
         self.execution_rid = execution_rid or self.model._get_dataset_execution(self.dataset_rid)
 
-        # Normalize dataset_types to always be a list of strings (like Dataset class)
+        # Normalize dataset_types to always be a list of strings for consistency
+        # with the Dataset class interface
         if dataset_types is None:
             self.dataset_types: list[str] = []
         elif isinstance(dataset_types, str):
@@ -90,43 +159,67 @@ class DatasetBag:
         if not self.dataset_rid:
             raise DerivaMLException("No dataset RID provided")
 
-        self.model.rid_lookup(self.dataset_rid)  # Check to make sure that this dataset is in the bag.
+        # Validate that this dataset exists in the bag
+        self.model.rid_lookup(self.dataset_rid)
 
+        # Cache the version and dataset table reference
         self._current_version = self.model.dataset_version(self.dataset_rid)
         self._dataset_table = self.model.dataset_table
 
     def __repr__(self) -> str:
+        """Return a string representation of the DatasetBag for debugging."""
         return (f"<deriva_ml.DatasetBag object at {hex(id(self))}: rid='{self.dataset_rid}', "
                 f"version='{self.current_version}', types={self.dataset_types}>")
 
     @property
     def current_version(self) -> DatasetVersion:
-        """Get the current version of the dataset.
+        """Get the version of the dataset at the time the bag was downloaded.
 
-        For a DatasetBag, this is the version at which the bag was downloaded.
-        Unlike Dataset, this cannot change since bags are immutable snapshots.
+        For a DatasetBag, this is the version that was current when the bag was
+        created. Unlike the live Dataset class, this value is immutable since
+        bags are read-only snapshots.
+
+        Returns:
+            DatasetVersion: The semantic version (major.minor.patch) of this dataset.
         """
         return self._current_version
 
     def list_tables(self) -> list[str]:
-        """List the names of the tables in the catalog
+        """List all tables available in the bag's SQLite database.
+
+        Returns the fully-qualified names of all tables (e.g., "domain.Image",
+        "deriva-ml.Dataset") that were exported in this bag.
 
         Returns:
-            A list of table names.  These names are all qualified with the Deriva schema name.
+            list[str]: Table names in "schema.table" format, sorted alphabetically.
         """
         return self.model.list_tables()
 
     @staticmethod
     def _find_relationship_attr(source, target):
-        """
-        Return the relationship attribute (InstrumentedAttribute) on `source`
-        that points to `target`. Works with classes or AliasedClass.
-        Raises LookupError if not found.
+        """Find the SQLAlchemy relationship attribute connecting two ORM classes.
+
+        Searches for a relationship on `source` that points to `target`, which is
+        needed to construct proper JOIN clauses in SQL queries.
+
+        Args:
+            source: Source ORM class or AliasedClass.
+            target: Target ORM class or AliasedClass.
+
+        Returns:
+            InstrumentedAttribute: The relationship attribute on source pointing to target.
+
+        Raises:
+            LookupError: If no relationship exists between the two classes.
+
+        Note:
+            When multiple relationships exist, prefers MANYTOONE direction as this
+            is typically the more natural join direction for denormalization.
         """
         src_mapper = inspect(source).mapper
         tgt_mapper = inspect(target).mapper
 
-        # collect relationships on the *class* mapper (not on alias)
+        # Collect all relationships on the source mapper that point to target
         candidates: list[RelationshipProperty] = [rel for rel in src_mapper.relationships if rel.mapper is tgt_mapper]
 
         if not candidates:
@@ -136,75 +229,49 @@ class DatasetBag:
         candidates.sort(key=lambda r: r.direction.name != "MANYTOONE")
         rel = candidates[0]
 
-        # Bind to the actual source (alias or class)
+        # Return the bound attribute (handles AliasedClass properly)
         return getattr(source, rel.key) if isinstance(source, AliasedClass) else rel.class_attribute
 
     def _dataset_table_view(self, table: str) -> CompoundSelect[Any]:
-        """Return a SQL command that will return all of the elements in the specified table that are associated with
-        dataset_rid"""
+        """Build a SQL query for all rows in a table that belong to this dataset.
+
+        Creates a UNION of queries that traverse all possible paths from the
+        Dataset table to the target table, filtering by this dataset's RID
+        (and any nested dataset RIDs).
+
+        This is necessary because table data may be linked to datasets through
+        different relationship paths (e.g., Image might be linked directly to
+        Dataset or through an intermediate Subject table).
+
+        Args:
+            table: Name of the table to query.
+
+        Returns:
+            CompoundSelect: A SQLAlchemy UNION query selecting all matching rows.
+        """
         table_class = self.model.get_orm_class_by_name(table)
         dataset_table_class = self.model.get_orm_class_by_name(self._dataset_table.name)
+
+        # Include this dataset and all nested datasets in the query
         dataset_rids = [self.dataset_rid] + [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
 
+        # Find all paths from Dataset to the target table
         paths = [[t.name for t in p] for p in self.model._schema_to_paths() if p[-1].name == table]
+
+        # Build a SELECT query for each path and UNION them together
         sql_cmds = []
         for path in paths:
             path_sql = select(table_class)
             last_class = self.model.get_orm_class_by_name(path[0])
+            # Join through each table in the path
             for t in path[1:]:
                 t_class = self.model.get_orm_class_by_name(t)
                 path_sql = path_sql.join(self._find_relationship_attr(last_class, t_class))
                 last_class = t_class
+            # Filter to only rows belonging to our dataset(s)
             path_sql = path_sql.where(dataset_table_class.RID.in_(dataset_rids))
             sql_cmds.append(path_sql)
         return union(*sql_cmds)
-
-    def get_table(self, table: str) -> Generator[tuple, None, None]:
-        """Retrieve the contents of the specified table. If schema is not provided as part of the table name,
-        the method will attempt to locate the schema for the table.
-
-        Args:
-            table: return: A generator that yields tuples of column values.
-
-        Returns:
-          A generator that yields tuples of column values.
-
-        """
-        with Session(self.engine) as session:
-            result = session.execute(self._dataset_table_view(table))
-            for row in result:
-                yield row
-
-    def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
-        """Retrieve the contents of the specified table as a dataframe.
-
-
-        If schema is not provided as part of the table name,
-        the method will attempt to locate the schema for the table.
-
-        Args:
-            table: Table to retrieve data from.
-
-        Returns:
-          A dataframe containing the contents of the specified table.
-        """
-        return pd.read_sql(self._dataset_table_view(table), self.engine)
-
-    def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
-        """Retrieve the contents of the specified table as a dictionary.
-
-        Args:
-            table: Table to retrieve data from. If schema is not provided as part of the table name,
-                the method will attempt to locate the schema for the table.
-
-        Returns:
-          A generator producing dictionaries containing the contents of the specified table as name/value pairs.
-        """
-
-        with Session(self.engine) as session:
-            result = session.execute(self._dataset_table_view(table))
-            for row in result.mappings():
-                yield dict(row)
 
     def dataset_history(self) -> list[DatasetHistory]:
         """Retrieves the version history of a dataset.
@@ -230,6 +297,7 @@ class DatasetBag:
             >>> for entry in history:
             ...     print(f"Version {entry.dataset_version}: {entry.description}")
         """
+        # Query Dataset_Version table directly via the model
         return [
             DatasetHistory(
                 dataset_version=DatasetVersion.parse(v["Version"]),
@@ -240,7 +308,8 @@ class DatasetBag:
                 description=v["Description"],
                 execution_rid=v["Execution"],
             )
-            for v in self.get_table_as_dict("Dataset_Version") if v["Dataset"] == self.dataset_rid
+            for v in self.model._get_table_contents("Dataset_Version")
+            if v["Dataset"] == self.dataset_rid
         ]
 
     def list_dataset_members(
@@ -282,13 +351,24 @@ class DatasetBag:
             if element_table.schema != self.model.domain_schema and element_table.name not in ["Dataset", "File"]:
                 # Look at domain tables and nested datasets.
                 continue
+
             # Get the names of the columns that we are going to need for linking
             with Session(self.engine) as session:
-                sql_cmd = (
-                    select(element_class)
-                    .join(element_rel)
-                    .where(self.dataset_rid == assoc_class.__table__.c["Dataset"])
-                )
+                # For Dataset_Dataset, use Nested_Dataset column to find nested datasets
+                # (similar to how the live catalog does it in Dataset.list_dataset_members)
+                if element_table.name == "Dataset":
+                    sql_cmd = (
+                        select(element_class)
+                        .join(assoc_class, element_class.RID == assoc_class.__table__.c["Nested_Dataset"])
+                        .where(self.dataset_rid == assoc_class.__table__.c["Dataset"])
+                    )
+                else:
+                    # For other tables, use the original join via element_rel
+                    sql_cmd = (
+                        select(element_class)
+                        .join(element_rel)
+                        .where(self.dataset_rid == assoc_class.__table__.c["Dataset"])
+                    )
                 if limit is not None:
                     sql_cmd = sql_cmd.limit(limit)
                 # Get back the list of ORM entities and convert them to dictionaries.
@@ -299,7 +379,7 @@ class DatasetBag:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in element_rows]
                 for ds in nested_datasets:
-                    nested_dataset = self.model.lookup_dataset(ds)
+                    nested_dataset = self._catalog.lookup_dataset(ds)
                     for k, v in nested_dataset.list_dataset_members(recurse=recurse, limit=limit, _visited=_visited).items():
                         members[k].extend(v)
         return dict(members)
@@ -331,9 +411,8 @@ class DatasetBag:
             sql_cmd = select(feature_class)
             return cast(datapath._ResultSet, [row for row in session.execute(sql_cmd).mappings()])
 
-    def list_dataset_element_types(self) -> list[Table]:
-        """
-        Lists the data types of elements contained within a dataset.
+    def list_dataset_element_types(self) -> Iterable[Table]:
+        """List the types of elements that can be contained in datasets.
 
         This method analyzes the dataset and identifies the data types for all
         elements within it. It is useful for understanding the structure and
@@ -349,7 +428,7 @@ class DatasetBag:
 
     def list_dataset_children(
         self, recurse: bool = False, _visited: set[RID] | None = None
-    ) -> list[DatasetBag]:
+    ) -> list[Self]:
         """Get nested datasets.
 
         Args:
@@ -379,7 +458,7 @@ class DatasetBag:
                 .join_from(ds_table, dv_table, onclause=ds_table.Version == dv_table.RID)
                 .where(nds_table.Dataset == self.dataset_rid)
             )
-            nested = [DatasetBag(self.model, r[0]) for r in session.execute(sql_cmd).all()]
+            nested = [DatasetBag(self._catalog, r[0]) for r in session.execute(sql_cmd).all()]
 
         result = copy(nested)
         if recurse:
@@ -387,7 +466,6 @@ class DatasetBag:
                 result.extend(child.list_dataset_children(recurse=recurse, _visited=_visited))
         return result
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_parents(
         self, recurse: bool = False, _visited: set[RID] | None = None
     ) -> list[Self]:
@@ -414,63 +492,36 @@ class DatasetBag:
 
         with Session(self.engine) as session:
             sql_cmd = select(nds_table.Dataset).where(nds_table.Nested_Dataset == self.dataset_rid)
-            parents = [DatasetBag(self.model, r[0]) for r in session.execute(sql_cmd).all()]
+            parents = [DatasetBag(self._catalog, r[0]) for r in session.execute(sql_cmd).all()]
 
         if recurse:
             for parent in parents.copy():
                 parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited))
         return parents
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
-        """Finds a term in a vocabulary table.
-
-        Searches for a term in the specified vocabulary table, matching either the primary name
-        or any of its synonyms.
-
-        Args:
-            table: Vocabulary table to search in (name or Table object).
-            term_name: Name or synonym of the term to find.
-
-        Returns:
-            VocabularyTerm: The matching vocabulary term.
-
-        Raises:
-            DerivaMLVocabularyException: If the table is not a vocabulary table, or term is not found.
-
-        Examples:
-            Look up by primary name:
-                >>> term = ml.lookup_term("tissue_types", "epithelial")
-                >>> print(term.description)
-
-            Look up by synonym:
-                >>> term = ml.lookup_term("tissue_types", "epithelium")
-        """
-        # Get and validate vocabulary table reference
-        if not self.model.is_vocabulary(table):
-            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
-
-        # Search for term by name or synonym
-        for term in self.get_table_as_dict(table):
-            term = dict(term)
-            if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
-                term["Synonyms"] = list(term["Synonyms"])
-                return VocabularyTerm.model_validate(term)
-
-        # Term not found
-        raise DerivaMLInvalidTerm(table, term_name)
-
     def _denormalize(self, include_tables: list[str]) -> Select:
-        """
-        Generates an SQL statement for denormalizing the dataset based on the tables to include. Processes cycles in
-        graph relationships, ensures proper join order, and generates selected columns for denormalization.
+        """Build a SQL query that joins multiple tables into a denormalized view.
+
+        This method creates a "wide table" by joining related tables together,
+        producing a single query that returns columns from all specified tables.
+        This is useful for machine learning pipelines that need flat data.
+
+        The method:
+        1. Analyzes the schema to find join paths between tables
+        2. Determines the correct join order based on foreign key relationships
+        3. Builds SELECT statements with properly aliased columns
+        4. Creates a UNION if multiple paths exist to the same tables
 
         Args:
-            include_tables (list[str] | None): List of table names to include in the denormalized dataset. If None,
-                all tables from the dataset will be included.
+            include_tables: List of table names to include in the output. Additional
+                tables may be included if they're needed to join the requested tables.
 
         Returns:
-            str: SQL query string that represents the process of denormalization.
+            Select: A SQLAlchemy query that produces the denormalized result.
+
+        Note:
+            Column names in the result are prefixed with the table name to avoid
+            collisions (e.g., "Image.Filename", "Subject.RID").
         """
         # Skip over tables that we don't want to include in the denormalized dataset.
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
@@ -515,49 +566,48 @@ class DatasetBag:
         return union(*sql_statements)
 
     def denormalize_as_dataframe(self, include_tables: list[str]) -> pd.DataFrame:
-        """
-        Denormalize the dataset and return the result as a dataframe.
+        """Denormalize the dataset into a single wide DataFrame.
 
-         This routine will examine the domain schema for the dataset, determine which tables to include and denormalize
-        the dataset values into a single wide table.  The result is returned as a generator that returns a dictionary
-        for each row in the denormalized wide table.
+        Joins related tables together to produce a "flat" view of the data,
+        with columns from multiple tables combined into a single DataFrame.
+        This is particularly useful for machine learning workflows that require
+        tabular data with all features in one table.
 
-        The optional argument include_tables can be used to specify a subset of tables to include in the denormalized
-        view.  The tables in this argument can appear anywhere in the dataset schema.  The method will determine which
-        additional tables are required to complete the denormalization process.  If include_tables is not specified,
-        all of the tables in the schema will be included.
-
-        The resulting wide table will include a column for every table needed to complete the denormalization process.
+        Column names are prefixed with the source table name to avoid collisions
+        (e.g., "Image.Filename", "Subject.RID").
 
         Args:
-            include_tables: List of table names to include in the denormalized dataset.
+            include_tables: List of table names to include in the output. Tables
+                are joined based on their foreign key relationships.
 
         Returns:
-            Dataframe containing the denormalized dataset.
+            pd.DataFrame: Wide table with columns from all included tables.
+
+        Example:
+            >>> df = bag.denormalize_as_dataframe(["Image", "Diagnosis"])
+            >>> # df has columns like "Image.Filename", "Diagnosis.Name", etc.
         """
         return pd.read_sql(self._denormalize(include_tables=include_tables), self.engine)
 
     def denormalize_as_dict(self, include_tables: list[str]) -> Generator[RowMapping, None, None]:
-        """
-        Denormalize the dataset and return the result as a set of dictionary's.
+        """Denormalize the dataset and yield rows as dictionaries.
 
-        This routine will examine the domain schema for the dataset, determine which tables to include and denormalize
-        the dataset values into a single wide table.  The result is returned as a generator that returns a dictionary
-        for each row in the denormalized wide table.
+        Like denormalize_as_dataframe(), but returns a generator of dictionaries
+        instead of a DataFrame. Useful for processing large datasets without
+        loading everything into memory.
 
-        The optional argument include_tables can be used to specify a subset of tables to include in the denormalized
-        view.  The tables in this argument can appear anywhere in the dataset schema.  The method will determine which
-        additional tables are required to complete the denormalization process.  If include_tables is not specified,
-        all of the tables in the schema will be included.
-
-        The resulting wide table will include a only those column for the tables listed in include_columns.
+        Column names are prefixed with the source table name to avoid collisions
+        (e.g., "Image.Filename", "Subject.RID").
 
         Args:
-            include_tables: List of table names to include in the denormalized dataset. If None, than the entire schema
-            is used.
+            include_tables: List of table names to include in the output.
 
-        Returns:
-            A generator that returns a dictionary representation of each row in the denormalized dataset.
+        Yields:
+            RowMapping: Dictionary-like objects with "table.column" keys.
+
+        Example:
+            >>> for row in bag.denormalize_as_dict(["Image", "Diagnosis"]):
+            ...     print(row["Image.Filename"], row["Diagnosis.Name"])
         """
         with Session(self.engine) as session:
             cursor = session.execute(self._denormalize(include_tables=include_tables))
@@ -566,9 +616,5 @@ class DatasetBag:
                 yield row
 
 
-# Add annotations after definition to deal with forward reference issues in pydantic
-
-DatasetBag.list_dataset_children = validate_call(
-    config=ConfigDict(arbitrary_types_allowed=True),
-    validate_return=True,
-)(DatasetBag.list_dataset_children)
+# Note: validate_call decorators with Self return types were removed because
+# Pydantic doesn't support typing.Self in validate_call contexts.

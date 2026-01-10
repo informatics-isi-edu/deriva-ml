@@ -42,6 +42,15 @@ class DatasetLike(Protocol):
     (downloaded bag). It defines the common read interface for accessing dataset
     metadata, members, and relationships.
 
+    The protocol defines the minimal interface that both implementations support.
+    Dataset extends this with optional `version` parameters on some methods to
+    support querying historical versions. DatasetBag doesn't need version parameters
+    since bags are immutable snapshots of a specific version.
+
+    Note on `_visited` parameters: Both implementations use `_visited` internally
+    for recursion guards, but this is not part of the protocol as it's an
+    implementation detail.
+
     Attributes:
         dataset_rid: Resource Identifier for the dataset.
         execution_rid: Optional execution RID associated with the dataset.
@@ -53,7 +62,7 @@ class DatasetLike(Protocol):
     dataset_rid: RID
     execution_rid: RID | None
     description: str
-    dataset_types: list[str] | None
+    dataset_types: list[str]
 
     @property
     def current_version(self) -> DatasetVersion:
@@ -71,7 +80,10 @@ class DatasetLike(Protocol):
             recurse: Whether to recursively include children of children.
 
         Returns:
-            List of child datasets.
+            List of child datasets (Dataset or DatasetBag depending on implementation).
+
+        Note:
+            Dataset also accepts a `version` parameter to query historical versions.
         """
         ...
 
@@ -82,7 +94,10 @@ class DatasetLike(Protocol):
             recurse: Whether to recursively include parents of parents.
 
         Returns:
-            List of parent datasets.
+            List of parent datasets (Dataset or DatasetBag depending on implementation).
+
+        Note:
+            Dataset also accepts a `version` parameter to query historical versions.
         """
         ...
 
@@ -97,14 +112,17 @@ class DatasetLike(Protocol):
 
         Returns:
             Dictionary mapping member types to lists of member records.
+
+        Note:
+            Dataset also accepts a `version` parameter to query historical versions.
         """
         ...
 
-    def list_dataset_element_types(self) -> list[Table]:
+    def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of elements that can be contained in this dataset.
 
         Returns:
-            List of Table objects representing element types.
+            Iterable of Table objects representing element types.
         """
         ...
 

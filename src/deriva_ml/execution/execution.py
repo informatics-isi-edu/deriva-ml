@@ -69,6 +69,7 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.interfaces import DatasetLike
+from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 # Keep pycharm from complaining about undefined references in docstrings.
 execution: Execution
@@ -447,6 +448,54 @@ class Execution:
 
         """
         return asset_root(self._working_dir, self.execution_rid)
+
+    @property
+    def database_catalog(self) -> DerivaMLDatabase | None:
+        """Get a catalog-like interface for downloaded datasets.
+
+        Returns a DerivaMLDatabase that implements the DerivaMLCatalog
+        protocol, allowing the same code to work with both live catalogs
+        and downloaded bags.
+
+        This is useful for writing code that can operate on either a live
+        catalog (via DerivaML) or on downloaded bags (via DerivaMLDatabase).
+
+        Returns:
+            DerivaMLDatabase wrapping the primary downloaded dataset's model,
+            or None if no datasets have been downloaded.
+
+        Example:
+            >>> with ml.create_execution(config) as exe:
+            ...     if exe.database_catalog:
+            ...         db = exe.database_catalog
+            ...         # Use same interface as DerivaML
+            ...         dataset = db.lookup_dataset("4HM")
+            ...         term = db.lookup_term("Diagnosis", "cancer")
+            ...     else:
+            ...         # No datasets downloaded, use live catalog
+            ...         pass
+        """
+        if not self.datasets:
+            return None
+        # Use the first dataset's model as the primary
+        return DerivaMLDatabase(self.datasets[0].model)
+
+    @property
+    def catalog(self) -> "DerivaML":
+        """Get the live catalog (DerivaML) instance for this execution.
+
+        This provides access to the live catalog for operations that require
+        catalog connectivity, such as creating new datasets or uploading results.
+
+        Returns:
+            DerivaML: The live catalog instance.
+
+        Example:
+            >>> with ml.create_execution(config) as exe:
+            ...     # Use live catalog for write operations
+            ...     new_dataset = exe.catalog.create_dataset(...)
+        """
+        return self._ml_object
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:

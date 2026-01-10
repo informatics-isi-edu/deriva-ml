@@ -95,9 +95,35 @@ class Dataset:
     The Dataset class provides functionality for creating, modifying, and tracking datasets
     in a Deriva catalog. It handles versioning, relationships between datasets, and data export.
 
-    Attributes:
-        _ml_instance (DerivaModel): Catalog model instance.
+    A Dataset is a versioned collection of related data elements. Each dataset:
+    - Has a unique RID (Resource Identifier) within the catalog
+    - Maintains a version history using semantic versioning (major.minor.patch)
+    - Can contain nested datasets, forming a hierarchy
+    - Can be exported as a BDBag for offline use or sharing
 
+    The class implements the DatasetLike protocol, allowing code to work uniformly
+    with both live catalog datasets and downloaded DatasetBag objects.
+
+    Attributes:
+        dataset_rid (RID): The unique Resource Identifier for this dataset.
+        dataset_types (list[str]): List of vocabulary terms describing the dataset type.
+        description (str): Human-readable description of the dataset.
+        execution_rid (RID | None): Optional RID of the execution that created this dataset.
+        _ml_instance (DerivaMLCatalog): Reference to the catalog containing this dataset.
+
+    Example:
+        >>> # Create a new dataset
+        >>> dataset = Dataset.create_dataset(
+        ...     ml_instance=ml,
+        ...     dataset_types=["training_data"],
+        ...     description="Image classification training set"
+        ... )
+        >>> # Add members to the dataset
+        >>> dataset.add_dataset_members(members=["1-abc", "1-def"])
+        >>> # Increment version after changes
+        >>> new_version = dataset.increment_dataset_version(VersionPart.minor, "Added samples")
+        >>> # Download for offline use
+        >>> bag = dataset.download_dataset_bag(version=new_version)
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -109,31 +135,22 @@ class Dataset:
         description: str = "",
         execution_rid: RID | None = None,
     ):
-        """Creates a new dataset in the catalog.
+        """Initialize a Dataset object from an existing dataset in the catalog.
 
-        Creates a dataset with specified types and description. The dataset can be associated
-        with an execution and initialized with a specific version.
-
-        If no version is specified, the current version of the dataset in the current catalog snapshot is used.
-        If a version is specified, the dataset is initialized with that version.
+        This constructor wraps an existing dataset record. To create a new dataset
+        in the catalog, use the static method Dataset.create_dataset() instead.
 
         Args:
+            catalog: The DerivaMLCatalog instance containing this dataset.
+            dataset_rid: The RID of the existing dataset record.
             dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
-            description: Description of the dataset's purpose and contents.
-            execution_rid: Optional execution RID to associate with dataset creation.
-
-        Returns:
-            RID: Resource Identifier of the newly created dataset.
-
-        Raises:
-            DerivaMLException: If dataset_types are invalid or creation fails.
+                Can be a single string or list of strings.
+            description: Human-readable description of the dataset's purpose and contents.
+            execution_rid: Optional execution RID that created or is associated with this dataset.
 
         Example:
-            >>> rid = ml.create_dataset(
-            ...     dataset_types=["experiment", "raw_data"],
-            ...     description="RNA sequencing experiment data",
-            ...     version=DatasetVersion(1, 0, 0)
-            ... )
+            >>> # Wrap an existing dataset
+            >>> dataset = Dataset(catalog=ml, dataset_rid="4HM", dataset_types=["training"])
         """
         self._logger = logging.getLogger("deriva_ml")
         self.dataset_rid = dataset_rid
@@ -141,7 +158,8 @@ class Dataset:
         self._ml_instance = catalog
         self.description = description
 
-        # Normalize dataset_types to always be a list of strings
+        # Normalize dataset_types to always be a list of strings for consistent handling
+        # throughout the class. Accepts None, single string, or list of strings as input.
         if dataset_types is None:
             self.dataset_types: list[str] = []
         elif isinstance(dataset_types, str):
@@ -150,15 +168,31 @@ class Dataset:
             self.dataset_types: list[str] = dataset_types
 
     def __repr__(self) -> str:
+        """Return a string representation of the Dataset for debugging."""
         return (f"<deriva_ml.Dataset object at {hex(id(self))}: rid='{self.dataset_rid}', "
                 f"version='{self.current_version}', types={self.dataset_types}>")
 
     def __hash__(self) -> int:
-        """Hash based on dataset RID for use in sets and as dict keys."""
+        """Return hash based on dataset RID for use in sets and as dict keys.
+
+        This allows Dataset objects to be stored in sets and used as dictionary keys.
+        Two Dataset objects with the same RID will hash to the same value.
+        """
         return hash(self.dataset_rid)
 
     def __eq__(self, other: object) -> bool:
-        """Two Dataset objects are equal if they have the same RID."""
+        """Check equality based on dataset RID.
+
+        Two Dataset objects are considered equal if they reference the same
+        dataset RID, regardless of other attributes like version or types.
+
+        Args:
+            other: Object to compare with.
+
+        Returns:
+            True if other is a Dataset with the same RID, False otherwise.
+            Returns NotImplemented for non-Dataset objects.
+        """
         if not isinstance(other, Dataset):
             return NotImplemented
         return self.dataset_rid == other.dataset_rid
@@ -278,11 +312,17 @@ class Dataset:
 
     @property
     def _dataset_table(self) -> Table:
+        """Get the Dataset table from the catalog schema.
+
+        Returns:
+            Table: The Deriva Table object for the Dataset table in the ML schema.
+        """
         return self._ml_instance.model.schemas[self._ml_instance.ml_schema].tables["Dataset"]
 
     # ==================== Read Interface Methods ====================
     # These methods implement the DatasetLike protocol for read operations.
     # They delegate to the catalog instance for actual data retrieval.
+    # This allows Dataset and DatasetBag to share a common interface.
 
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of elements that can be contained in this dataset.
@@ -368,8 +408,21 @@ class Dataset:
     def _build_dataset_graph(self) -> Iterable[Dataset]:
         """Build a dependency graph of all related datasets and return in topological order.
 
-        Returns datasets in an order where children come before parents, ensuring
-        that when versions are incremented, all related datasets are updated together.
+        This method is used when incrementing dataset versions. Because datasets can be
+        nested (parent-child relationships), changing the version of one dataset may
+        require updating related datasets.
+
+        The topological sort ensures that children are processed before parents,
+        so version updates propagate correctly through the hierarchy.
+
+        Returns:
+            Iterable[Dataset]: Datasets in topological order (children before parents).
+
+        Example:
+            If dataset A contains nested dataset B, which contains C:
+            A -> B -> C
+            The returned order would be [C, B, A], ensuring C's version is
+            updated before B's, and B's before A's.
         """
         ts: TopologicalSorter = TopologicalSorter()
         self._build_dataset_graph_1(ts, set())
@@ -799,10 +852,27 @@ class Dataset:
         description: str | None = "",
         execution_rid: RID | None = None,
     ) -> None:
-        schema_path = ml_instance.pathBuilder().schemas[ml_instance.ml_schema]
-        # determine snapshot after changes were made
+        """Insert new version records for a list of datasets.
 
-        # Construct version records for insert
+        This internal method creates Dataset_Version records in the catalog for
+        each dataset in the list. It also captures a catalog snapshot timestamp
+        to associate with these versions.
+
+        The version record links:
+        - The dataset RID to its new version number
+        - An optional description of what changed
+        - An optional execution that triggered the version change
+        - The catalog snapshot time for reproducibility
+
+        Args:
+            ml_instance: The catalog instance to insert versions into.
+            dataset_list: List of DatasetSpec objects containing RID and version info.
+            description: Optional description of the version change.
+            execution_rid: Optional execution RID to associate with the version.
+        """
+        schema_path = ml_instance.pathBuilder().schemas[ml_instance.ml_schema]
+
+        # Insert version records for all datasets in the list
         version_records = schema_path.tables["Dataset_Version"].insert(
             [
                 {
@@ -815,12 +885,17 @@ class Dataset:
             ]
         )
         version_records = list(version_records)
+
+        # Capture the current catalog snapshot timestamp. This allows us to
+        # recreate the exact state of the catalog when this version was created.
         snap = ml_instance.catalog.get("/").json()["snaptime"]
+
+        # Update version records with the snapshot timestamp
         schema_path.tables["Dataset_Version"].update(
             [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
         )
 
-        # And update the dataset records.
+        # Update each dataset's current version pointer to the new version record
         schema_path.tables["Dataset"].update([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records])
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -871,9 +946,25 @@ class Dataset:
             if materialize
             else self._download_dataset_minid(minid, use_minid)
         )
-        return DatabaseModel(minid, bag_path, self._ml_instance.working_dir).lookup_dataset(self.dataset_rid)
+        from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+        db_model = DatabaseModel(minid, bag_path, self._ml_instance.working_dir)
+        return DerivaMLDatabase(db_model).lookup_dataset(self.dataset_rid)
 
     def _version_snapshot_catalog(self, dataset_version: DatasetVersion | str | None) -> DerivaMLCatalog:
+        """Get a catalog instance bound to a specific version's snapshot.
+
+        Dataset versions are associated with catalog snapshots, which represent
+        the exact state of the catalog at the time the version was created.
+        This method returns a catalog instance that queries against that snapshot,
+        ensuring reproducible access to historical data.
+
+        Args:
+            dataset_version: The version to get a snapshot for, or None to use
+                the current catalog state.
+
+        Returns:
+            DerivaMLCatalog: Either a snapshot-bound catalog or the current catalog.
+        """
         if isinstance(dataset_version, str) and str:
             dataset_version = DatasetVersion.parse(dataset_version)
         if dataset_version:
@@ -882,8 +973,21 @@ class Dataset:
             return self._ml_instance
 
     def _version_snapshot_catalog_id(self, version: DatasetVersion | str) -> str:
-        """Return a catalog with snapshot for the specified dataset version"""
+        """Get the catalog ID with snapshot suffix for a specific version.
 
+        Constructs a catalog identifier in the format "catalog_id@snapshot_time"
+        that can be used to access the catalog state at the time the version
+        was created.
+
+        Args:
+            version: The dataset version to get the snapshot for.
+
+        Returns:
+            str: Catalog ID with snapshot suffix (e.g., "1@2023-01-15T10:30:00").
+
+        Raises:
+            DerivaMLException: If the specified version doesn't exist.
+        """
         version = str(version)
         try:
             version_record = next(h for h in self.dataset_history() if h.dataset_version == version)
@@ -896,13 +1000,23 @@ class Dataset:
         )
 
     def _download_dataset_minid(self, minid: DatasetMinid, use_minid: bool) -> Path:
-        """Given a RID to a dataset_table, or a MINID to an existing bag, download the bag file, extract it, and
-        validate that all the metadata is correct
+        """Download and extract a dataset bag from a MINID or direct URL.
+
+        This method handles the download of a BDBag archive, either from S3 storage
+        (if using MINIDs) or directly from the catalog server. Downloaded bags are
+        cached by checksum to avoid redundant downloads.
 
         Args:
-            minid: The RID of a dataset_table or a minid to an existing bag.
+            minid: DatasetMinid containing the bag URL and metadata.
+            use_minid: If True, download from S3 using the MINID URL.
+                If False, download directly from the catalog server.
+
         Returns:
-            the location of the unpacked and validated dataset_table bag and the RID of the bag and the bag MINID
+            Path: The path to the extracted and validated bag directory.
+
+        Note:
+            Bags are cached in the cache_dir with the naming convention:
+            "{dataset_rid}_{checksum}/Dataset_{dataset_rid}"
         """
 
         # Check to see if we have an existing idempotent materialization of the desired bag. If so, then reuse
@@ -932,6 +1046,21 @@ class Dataset:
         return Path(bag_path)
 
     def _create_dataset_minid(self, version: DatasetVersion, use_minid=True) -> str:
+        """Create a new MINID (Minimal Viable Identifier) for the dataset.
+
+        This method generates a BDBag export of the dataset and optionally
+        registers it with a MINID service for persistent identification.
+        The bag is uploaded to S3 storage when using MINIDs.
+
+        Args:
+            version: The dataset version to create a MINID for.
+            use_minid: If True, register with MINID service and upload to S3.
+                If False, just generate the bag and return a local URL.
+
+        Returns:
+            str: URL to the MINID landing page (if use_minid=True) or
+                the direct bag download URL.
+        """
         with TemporaryDirectory() as tmp_dir:
             # Generate a download specification file for the current catalog schema. By default, this spec
             # will generate a minid and place the bag into S3 storage.
@@ -982,13 +1111,24 @@ class Dataset:
         create: bool,
         use_minid: bool,
     ) -> DatasetMinid | None:
-        """Return a MINID for the specified dataset. If no version is specified, use the latest.
+        """Get or create a MINID for the specified dataset version.
+
+        This method retrieves the MINID associated with a specific dataset version,
+        optionally creating one if it doesn't exist.
 
         Args:
-            create: Create a new MINID if one doesn't already exist.
+            version: The dataset version to get the MINID for.
+            create: If True, create a new MINID if one doesn't already exist.
+                If False, raise an exception if no MINID exists.
+            use_minid: If True, use the MINID service for persistent identification.
+                If False, generate a direct download URL without MINID registration.
 
         Returns:
-            New or existing MINID for the dataset.
+            DatasetMinid: Object containing the MINID URL, checksum, and metadata.
+
+        Raises:
+            DerivaMLException: If the version doesn't exist, or if create=False
+                and no MINID exists.
         """
 
         # Find dataset version record
@@ -1019,6 +1159,18 @@ class Dataset:
         )
 
     def _fetch_minid_metadata(self, version: DatasetVersion, url: str) -> DatasetMinid:
+        """Fetch MINID metadata from the MINID service.
+
+        Args:
+            version: The dataset version associated with this MINID.
+            url: The MINID landing page URL.
+
+        Returns:
+            DatasetMinid: Parsed metadata including bag URL, checksum, and identifiers.
+
+        Raises:
+            requests.HTTPError: If the MINID service request fails.
+        """
         r = requests.get(url, headers={"accept": "application/json"})
         r.raise_for_status()
         return DatasetMinid(dataset_version=version, **r.json())
@@ -1028,13 +1180,25 @@ class Dataset:
         minid: DatasetMinid,
         use_minid: bool,
     ) -> Path:
-        """Materialize a dataset_table bag into a local directory
+        """Materialize a dataset bag by downloading all referenced files.
+
+        This method downloads a BDBag and then "materializes" it by fetching
+        all files referenced in the bag's fetch.txt manifest. This includes
+        data files, assets, and any other content referenced by the bag.
+
+        Progress is reported through callbacks that update the execution status
+        if this download is associated with an execution.
 
         Args:
-            minid: A MINID to an existing bag or a RID of the dataset_table that should be downloaded.
+            minid: DatasetMinid containing the bag URL and metadata.
+            use_minid: If True, download from S3 using the MINID URL.
 
         Returns:
-            A tuple containing the path to the bag, the RID of the bag, and the MINID to the bag.
+            Path: The path to the fully materialized bag directory.
+
+        Note:
+            Materialization status is cached via a 'validated_check.txt' marker
+            file to avoid re-downloading already-materialized bags.
         """
 
         def update_status(status: Status, msg: str) -> None:
