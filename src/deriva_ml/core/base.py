@@ -1331,7 +1331,7 @@ class DerivaML:
             self.lookup_term(MLVocab.dataset_type, ds_type)
 
         # Add files to the file table, and collect up the resulting entries by directory name.
-        pb = self.model.pathBuilder()
+        pb = self.pathBuilder()
         file_records = list(
             pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump(by_alias=True) for f in filespec_list])
         )
@@ -1370,12 +1370,12 @@ class DerivaML:
         # Start with the longest path so we get subdirectories first.
         for p, rids in sorted(dir_rid_map.items(), key=lambda kv: len(kv[0].parts), reverse=True):
             dataset = Dataset.create_dataset(
-                dataset_types=dataset_types, execution_rid=execution_rid, description=description
+                self, dataset_types=dataset_types, execution_rid=execution_rid, description=description
             )
             members = rids
             if len(p.parts) < path_length:
                 # Going up one level in directory, so Create nested dataset
-                members = nested_datasets + rids
+                members = [m.dataset_rid for m in nested_datasets] + rids
                 nested_datasets = []
             dataset.add_dataset_members(members=members, execution_rid=execution_rid)
             nested_datasets.append(dataset)
@@ -1402,8 +1402,6 @@ class DerivaML:
 
     def _synchronize_dataset_versions(self):
         datasets = [ds.dataset_rid for ds in self.find_datasets()]
-        for ds in datasets:
-            ds.dataset_version()
         schema_path = self.pathBuilder().schemas[self.ml_schema]
         dataset_version_path = schema_path.tables["Dataset_Version"]
         # Get the maximum version number for each dataset.
