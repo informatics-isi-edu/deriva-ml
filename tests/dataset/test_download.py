@@ -137,8 +137,9 @@ class TestDatasetDownload:
         catalog_id = dataset_test.catalog.catalog_id
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
+        dataset = dataset_description.dataset
 
-        current_version = dataset_description.dataset.current_version
+        current_version = dataset.current_version
         current_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         self.compare_datasets(ml_instance, dataset_test, current_spec)
 
@@ -147,18 +148,16 @@ class TestDatasetDownload:
 
         dataset_description.dataset.add_dataset_members(subjects[-2:])
         new_version = dataset_description.dataset.current_version
-        new_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=new_version)
-        current_bag = ml_instance.download_dataset_bag(current_spec)
-        new_bag = ml_instance.download_dataset_bag(new_spec)
+        assert new_version == current_version.increment_version(VersionPart.minor)
+
+        current_bag = dataset.download_dataset_bag(current_version, use_minid=False)
+        new_bag = dataset.download_dataset_bag(new_version, use_minid=False)
         print([m["RID"] for m in dataset_description.dataset.list_dataset_members()["Subject"]])
-        _subjects_current = list(current_bag.get_table_as_dict("Subject"))
-        _subjects_new = list(new_bag.get_table_as_dict("Subject"))
+        subjects_current = list(current_bag.get_table_as_dict("Subject"))
+        subjects_new = list(new_bag.get_table_as_dict("Subject"))
 
         # Make sure that there is a difference between to old and new catalogs.
-        #    assert len(subjects_new) == len(subjects_current) + 2
-
-        self.compare_datasets(ml_instance, dataset_test, current_spec)
-        self.compare_datasets(ml_instance, dataset_test, new_spec)
+        assert len(subjects_new) == len(subjects_current) + 2
 
     def test_dataset_download_schemas(self, dataset_test, tmp_path):
         hostname = dataset_test.catalog.hostname

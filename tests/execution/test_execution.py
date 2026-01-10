@@ -4,6 +4,7 @@ Tests for the execution module.
 
 import subprocess
 from pathlib import Path
+from pprint import pformat
 from tempfile import TemporaryDirectory
 
 from deriva_ml import (
@@ -17,13 +18,25 @@ from deriva_ml import (
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution import ExecutionConfiguration
 
+try:
+    from icecream import ic
+
+    ic.configureOutput(
+        includeContext=True,
+        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
+    )
+
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 class TestWorkflow:
     def test_workflow_creation_script(self, test_ml):
         ml_instance = test_ml
         ml_instance.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
         ml_instance.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
-        print("Running workflow-test.py ...")
+
+
         workflow_script = Path(__file__).parent / "workflow-test.py"
 
         workflow_table = ml_instance.pathBuilder().schemas[ml_instance.ml_schema].Workflow
@@ -42,12 +55,15 @@ class TestWorkflow:
         print(result.stdout)
         print(result.stderr)
         workflows = list(workflow_table.entities().fetch())
+        ic(workflows)
         assert 1 == len(workflows)
         workflow_rid = workflows[0]["RID"]
         workflow_url = workflows[0]["URL"]
-
+        ic(workflow_rid)
+        ic(workflow_url)
         workflow_rid = ml_instance.lookup_workflow(workflow_url)
-        print(f"Workflow url: {workflow_url}")
+        ic(workflow_url)
+        ic(workflow_rid)
         assert workflow_url.endswith("workflow-test.py")
 
         # Make sure that workflow is not duplicated if created again.
@@ -61,8 +77,6 @@ class TestWorkflow:
             capture_output=True,
             text=True,
         )
-        print(result.stdout)
-        print(result.stderr)
         new_workflow = result.stdout.strip()
         assert new_workflow == workflow_rid
 
@@ -93,7 +107,9 @@ class TestWorkflow:
             capture_output=True,
             text=True,
         )
+
         workflows = list(workflow_table.entities().fetch())
+
         assert 1 == len(workflows)
         workflow_rid = workflows[0]["RID"]
         workflow_url = workflows[0]["URL"]
@@ -178,7 +194,7 @@ class TestExecution:
             datasets=[
                 DatasetSpec(
                     rid=dataset_rid,
-                    version=ml_instance.dataset_version(dataset_rid),
+                    version=dataset_test.dataset_description.dataset.current_version,
                 ),
             ],
             assets=[model_rid],

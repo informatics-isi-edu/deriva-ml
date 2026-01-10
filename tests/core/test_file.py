@@ -1,5 +1,6 @@
 import string
 from pathlib import Path
+from pprint import pformat
 from random import choice, choices
 from tempfile import TemporaryDirectory
 
@@ -8,6 +9,12 @@ from deriva.core.datapath import DataPathException
 
 from deriva_ml import DerivaML, DerivaMLInvalidTerm, FileSpec, MLVocab
 from deriva_ml.execution import ExecutionConfiguration
+
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 FILE_COUNT = 5
 
@@ -107,11 +114,12 @@ class TestFile:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
 
             file_dataset = exe.add_files(filespecs)
-            assert file_dataset in [ds.dataset_rid for ds in ml_instance.find_datasets()]
-            ds = file_dataset.list_dataset_members(file_dataset)
+            ic(file_dataset)
+            assert file_dataset.dataset_rid in [ds.dataset_rid for ds in ml_instance.find_datasets()]
+            ds = file_dataset.list_dataset_members()
             assert len(ds["File"]) == 5
             assert len(ds["Dataset"]) == 2
-            for subdir in file_dataset.list_dataset_children(file_dataset):
+            for subdir in file_dataset.list_dataset_children():
                 ds = subdir.list_dataset_members()
                 assert len(ds["File"]) == 5
 
