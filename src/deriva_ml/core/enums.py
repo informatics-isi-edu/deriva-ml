@@ -147,16 +147,18 @@ class BuiltinTypes(Enum):
 
 
 class MLVocab(BaseStrEnum):
-    """Controlled vocabulary type identifiers.
+    """Controlled vocabulary table identifiers.
 
-    Defines the names of controlled vocabulary tables used in DerivaML for various types
-    of entities and attributes.
+    Defines the names of controlled vocabulary tables used in DerivaML. These tables
+    store standardized terms with descriptions and synonyms for consistent data
+    classification across the catalog.
 
     Attributes:
-        dataset_type (str): Dataset classification vocabulary.
-        workflow_type (str): Workflow classification vocabulary.
-        asset_type (str): Asset classification vocabulary.
-        asset_role (str): Asset role classification vocabulary.
+        dataset_type (str): Dataset classification vocabulary (e.g., "Training", "Test").
+        workflow_type (str): Workflow classification vocabulary (e.g., "Python", "Notebook").
+        asset_type (str): Asset/file type classification vocabulary (e.g., "Image", "CSV").
+        asset_role (str): Asset role vocabulary for execution relationships (e.g., "Input", "Output").
+        feature_name (str): Feature name vocabulary for ML feature definitions.
     """
 
     dataset_type = "Dataset_Type"
@@ -181,6 +183,22 @@ class MLAsset(BaseStrEnum):
 
 
 class MLTable(BaseStrEnum):
+    """Core ML schema table identifiers.
+
+    Defines the names of the core tables in the deriva-ml schema. These tables
+    form the backbone of the ML workflow tracking system.
+
+    Attributes:
+        dataset (str): Dataset table for versioned data collections.
+        workflow (str): Workflow table for computational pipeline definitions.
+        file (str): File table for tracking individual files.
+        asset (str): Asset table for domain-specific file types.
+        execution (str): Execution table for workflow run tracking.
+        dataset_version (str): Dataset_Version table for version history.
+        execution_metadata (str): Execution_Metadata table for run metadata.
+        execution_asset (str): Execution_Asset table for run outputs.
+    """
+
     dataset = "Dataset"
     workflow = "Workflow"
     file = "File"
@@ -208,12 +226,14 @@ class ExecMetadataType(BaseStrEnum):
 class ExecAssetType(BaseStrEnum):
     """Execution asset type identifiers.
 
-    Defines the types of assets that can be produced during an execution.
+    Defines the types of assets that can be produced or consumed during an execution.
+    These types are used to categorize files associated with workflow runs.
 
     Attributes:
-        input_file (str): Input file used by the execution.
+        input_file (str): Input file consumed by the execution.
         output_file (str): Output file produced by the execution.
         notebook_output (str): Jupyter notebook output from the execution.
+        model_file (str): Machine learning model file (e.g., .pkl, .h5, .pt).
     """
 
     input_file = "Input_File"
