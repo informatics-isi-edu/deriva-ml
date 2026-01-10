@@ -33,7 +33,7 @@ from pathlib import Path
 # Local imports
 from pprint import pformat
 from tempfile import TemporaryDirectory
-from typing import Any, Iterable, Self
+from typing import Any, Generator, Iterable, Self
 from urllib.parse import urlparse
 
 # Deriva imports
@@ -41,6 +41,7 @@ import deriva.core.utils.hash_utils as hash_utils
 import requests
 
 # Third-party imports
+import pandas as pd
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
 from deriva.core.ermrest_model import Table
@@ -83,6 +84,7 @@ from deriva_ml.dataset.aux_classes import (
 )
 from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
 
@@ -277,6 +279,29 @@ class Dataset:
     @property
     def _dataset_table(self) -> Table:
         return self._ml_instance.model.schemas[self._ml_instance.ml_schema].tables["Dataset"]
+
+    # ==================== Read Interface Methods ====================
+    # These methods implement the DatasetLike protocol for read operations.
+    # They delegate to the catalog instance for actual data retrieval.
+
+    def list_dataset_element_types(self) -> Iterable[Table]:
+        """List the types of elements that can be contained in this dataset.
+
+        Returns:
+            Iterable of Table objects representing element types.
+        """
+        return self._ml_instance.list_dataset_element_types()
+
+    def find_features(self, table: str | Table) -> Iterable[Feature]:
+        """Find features associated with a table.
+
+        Args:
+            table: Table to find features for.
+
+        Returns:
+            Iterable of Feature objects.
+        """
+        return self._ml_instance.find_features(table)
 
     def dataset_history(self) -> list[DatasetHistory]:
         """Retrieves the version history of a dataset.

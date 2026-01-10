@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 
 
 # Third-party imports
+import pandas as pd
 import requests
 from pydantic import ConfigDict, validate_call
 
@@ -1065,6 +1066,34 @@ class DerivaML:
 
         # Fetch and convert all terms to VocabularyTerm objects
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
+
+    def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
+        """Get table contents as a pandas DataFrame.
+
+        Retrieves all contents of a table from the catalog.
+
+        Args:
+            table: Name of the table to retrieve.
+
+        Returns:
+            DataFrame containing all table contents.
+        """
+        return pd.DataFrame(list(self.get_table_as_dict(table)))
+
+    def get_table_as_dict(self, table: str) -> Iterable[dict[str, Any]]:
+        """Get table contents as dictionaries.
+
+        Retrieves all contents of a table from the catalog.
+
+        Args:
+            table: Name of the table to retrieve.
+
+        Returns:
+            Iterable yielding dictionaries for each row.
+        """
+        table_obj = self.model.name_to_table(table)
+        pb = self.pathBuilder()
+        yield from pb.schemas[table_obj.schema.name].tables[table_obj.name].entities().fetch()
 
     def find_datasets(self, deleted: bool = False) -> Iterable[Dataset]:
         """Returns a list of currently available datasets.

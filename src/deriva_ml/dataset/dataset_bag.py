@@ -76,21 +76,37 @@ class DatasetBag:
         self.metadata = self.model.metadata
 
         self.dataset_rid = dataset_rid or self.model.dataset_rid
-        self.dataset_types = dataset_types
         self.description = description
         self.execution_rid = execution_rid or self.model._get_dataset_execution(self.dataset_rid)
+
+        # Normalize dataset_types to always be a list of strings (like Dataset class)
+        if dataset_types is None:
+            self.dataset_types: list[str] = []
+        elif isinstance(dataset_types, str):
+            self.dataset_types: list[str] = [dataset_types]
+        else:
+            self.dataset_types: list[str] = list(dataset_types)
 
         if not self.dataset_rid:
             raise DerivaMLException("No dataset RID provided")
 
         self.model.rid_lookup(self.dataset_rid)  # Check to make sure that this dataset is in the bag.
 
-        self.current_version = self.model.dataset_version(self.dataset_rid)
+        self._current_version = self.model.dataset_version(self.dataset_rid)
         self._dataset_table = self.model.dataset_table
 
     def __repr__(self) -> str:
-        return (f"<deriva_ml.Dataset object at {hex(id(self))}: rid='{self.dataset_rid}', "
+        return (f"<deriva_ml.DatasetBag object at {hex(id(self))}: rid='{self.dataset_rid}', "
                 f"version='{self.current_version}', types={self.dataset_types}>")
+
+    @property
+    def current_version(self) -> DatasetVersion:
+        """Get the current version of the dataset.
+
+        For a DatasetBag, this is the version at which the bag was downloaded.
+        Unlike Dataset, this cannot change since bags are immutable snapshots.
+        """
+        return self._current_version
 
     def list_tables(self) -> list[str]:
         """List the names of the tables in the catalog
@@ -227,18 +243,21 @@ class DatasetBag:
             for v in self.get_table_as_dict("Dataset_Version") if v["Dataset"] == self.dataset_rid
         ]
 
-    # @validate_call
     def list_dataset_members(
-        self, recurse: bool = False, _visited: set[RID] | None = None
+        self,
+        recurse: bool = False,
+        limit: int | None = None,
+        _visited: set[RID] | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
         Args:
-           recurse: Whether to include nested datasets.
-           _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            recurse: Whether to include members of nested datasets.
+            limit: Maximum number of members to return per type. None for no limit.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
 
         Returns:
-            Dictionary of entities associated with the dataset.
+            Dictionary mapping member types to lists of member records.
         """
         # Initialize visited set for recursion guard
         if _visited is None:
@@ -270,6 +289,8 @@ class DatasetBag:
                     .join(element_rel)
                     .where(self.dataset_rid == assoc_class.__table__.c["Dataset"])
                 )
+                if limit is not None:
+                    sql_cmd = sql_cmd.limit(limit)
                 # Get back the list of ORM entities and convert them to dictionaries.
                 element_entities = session.scalars(sql_cmd).all()
                 element_rows = [{c.key: getattr(obj, c.key) for c in obj.__table__.columns} for obj in element_entities]
@@ -279,7 +300,7 @@ class DatasetBag:
                 nested_datasets = [d["RID"] for d in element_rows]
                 for ds in nested_datasets:
                     nested_dataset = self.model.lookup_dataset(ds)
-                    for k, v in nested_dataset.list_dataset_members(recurse=recurse, _visited=_visited).items():
+                    for k, v in nested_dataset.list_dataset_members(recurse=recurse, limit=limit, _visited=_visited).items():
                         members[k].extend(v)
         return dict(members)
 
