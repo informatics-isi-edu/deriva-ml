@@ -57,7 +57,6 @@ from deriva_ml.core.exceptions import DerivaMLTableTypeError, DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.interfaces import DatasetLike
 from deriva_ml.dataset.upload import asset_file_path, execution_rids, table_path
 from deriva_ml.dataset.history import iso_to_snap
 
@@ -1105,7 +1104,7 @@ class DerivaML:
         pb = self.pathBuilder()
         yield from pb.schemas[table_obj.schema.name].tables[table_obj.name].entities().fetch()
 
-    def find_datasets(self, deleted: bool = False) -> Iterable[DatasetLike]:
+    def find_datasets(self, deleted: bool = False) -> Iterable[Dataset]:
         """Returns a list of currently available datasets.
 
         Arguments:
@@ -1151,13 +1150,13 @@ class DerivaML:
         execution_rid: RID | None = None,
         description: str = "",
         dataset_types: list[str] | None = None,
-    ) -> DatasetLike:
+    ) -> Dataset:
         return Dataset.create_dataset(
             self, execution_rid=execution_rid, version=version, description=description, dataset_types=dataset_types
         )
 
     def lookup_dataset(self, dataset: RID | DatasetSpec, deleted: bool = False
-    ) -> DatasetLike:
+    ) -> Dataset:
         """Looks up a dataset by RID or DatasetSpec.
 
         Arguments:
