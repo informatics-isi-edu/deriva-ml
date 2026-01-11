@@ -66,6 +66,7 @@ from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.model.catalog import DerivaModel
 from deriva_ml.dataset.catalog_graph import CatalogGraph
+from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.schema.annotations import asset_annotation
 
 # Optional debug imports
@@ -83,7 +84,7 @@ if TYPE_CHECKING:
 ml: DerivaML
 
 
-class DerivaML:
+class DerivaML(DerivaMLCatalog):
     """Core class for machine learning operations on a Deriva catalog.
 
     This class provides core functionality for managing ML workflows, features, and datasets in a Deriva catalog.
