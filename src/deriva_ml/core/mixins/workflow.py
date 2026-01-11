@@ -7,16 +7,13 @@ and creating workflows.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any, Callable
 
 from deriva.core import format_exception
 
-from deriva_ml.core.definitions import RID, MLVocab
+from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.workflow import Workflow
-
-if TYPE_CHECKING:
-    from deriva_ml.core.definitions import VocabularyTerm
 
 
 class WorkflowMixin:
@@ -34,10 +31,10 @@ class WorkflowMixin:
         create_workflow: Create a new workflow definition
     """
 
-    # Type hints for IDE support - actual attributes from host class
+    # Type hints for IDE support - actual attributes/methods from host class
     ml_schema: str
-    # pathBuilder() is provided by PathBuilderMixin via multiple inheritance
-    # lookup_term() is provided by VocabularyMixin via multiple inheritance
+    pathBuilder: Callable[[], Any]
+    lookup_term: Callable[[str, str], VocabularyTerm]
 
     def list_workflows(self) -> list[Workflow]:
         """Lists all workflows in the catalog.

@@ -7,9 +7,8 @@ controlled vocabulary tables.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
-import pandas as pd
 from deriva.core.datapath import DataPathException
 from deriva.core.ermrest_model import Table
 from pydantic import ConfigDict, validate_call
@@ -38,9 +37,9 @@ class VocabularyMixin:
         list_vocabulary_terms: List all terms in a vocabulary table
     """
 
-    # Type hints for IDE support - actual attributes from host class
+    # Type hints for IDE support - actual attributes/methods from host class
     model: "DerivaModel"
-    # pathBuilder() is provided by PathBuilderMixin via multiple inheritance
+    pathBuilder: Callable[[], Any]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_term(
