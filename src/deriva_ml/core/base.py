@@ -25,17 +25,15 @@ from urllib.parse import urlsplit
 
 
 # Third-party imports
-import pandas as pd
 import requests
 from pydantic import ConfigDict, validate_call
 
 # Deriva imports
-from deriva.core import DEFAULT_SESSION_CONFIG, format_exception, get_credential, urlquote
+from deriva.core import DEFAULT_SESSION_CONFIG, get_credential, urlquote
 
 import deriva.core.datapath as datapath
-from deriva.core.datapath import DataPathException, _SchemaWrapper as SchemaWrapper
 from deriva.core.deriva_server import DerivaServer
-from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot, ResolveRidResult
+from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.core_utils import DEFAULT_LOGGER_OVERRIDES
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
@@ -50,14 +48,13 @@ from deriva_ml.core.definitions import (
     MLTable,
     Status,
     TableDefinition,
-    VocabularyTerm,
 )
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.exceptions import DerivaMLTableTypeError, DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.dataset.upload import asset_file_path, execution_rids, table_path
+from deriva_ml.dataset.upload import asset_file_path, execution_rids
 from deriva_ml.dataset.history import iso_to_snap
 
 # Local imports
@@ -68,6 +65,12 @@ from deriva_ml.model.catalog import DerivaModel
 from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.schema.annotations import asset_annotation
+from deriva_ml.core.mixins import (
+    VocabularyMixin,
+    RidResolutionMixin,
+    PathBuilderMixin,
+    WorkflowMixin,
+)
 
 # Optional debug imports
 try:
@@ -84,7 +87,13 @@ if TYPE_CHECKING:
 ml: DerivaML
 
 
-class DerivaML(DerivaMLCatalog):
+class DerivaML(
+    PathBuilderMixin,
+    RidResolutionMixin,
+    VocabularyMixin,
+    WorkflowMixin,
+    DerivaMLCatalog,
+):
     """Core class for machine learning operations on a Deriva catalog.
 
     This class provides core functionality for managing ML workflows, features, and datasets in a Deriva catalog.
@@ -281,57 +290,7 @@ class DerivaML(DerivaMLCatalog):
     def _dataset_table(self) -> Table:
         return self.model.schemas[self.model.ml_schema].tables["Dataset"]
 
-    def pathBuilder(self) -> SchemaWrapper:
-        """Returns catalog path builder for queries.
-
-        The path builder provides a fluent interface for constructing complex queries against the catalog.
-        This is a core component used by many other methods to interact with the catalog.
-
-        Returns:
-            datapath._CatalogWrapper: A new instance of the catalog path builder.
-
-        Example:
-            >>> path = ml.pathBuilder.schemas['my_schema'].tables['my_table']
-            >>> results = path.entities().fetch()
-        """
-        return self.catalog.getPathBuilder()
-
-    @property
-    def domain_path(self) -> datapath.DataPath:
-        """Returns path builder for domain schema.
-
-        Provides a convenient way to access tables and construct queries within the domain-specific schema.
-
-        Returns:
-            datapath._CatalogWrapper: Path builder object scoped to the domain schema.
-
-        Example:
-            >>> domain = ml.domain_path
-            >>> results = domain.my_table.entities().fetch()
-        """
-        return self.pathBuilder().schemas[self.domain_schema]
-
-    def table_path(self, table: str | Table) -> Path:
-        """Returns a local filesystem path for table CSV files.
-
-        Generates a standardized path where CSV files should be placed when preparing to upload data to a table.
-        The path follows the project's directory structure conventions.
-
-        Args:
-            table: Name of the table or Table object to get the path for.
-
-        Returns:
-            Path: Filesystem path where the CSV file should be placed.
-
-        Example:
-            >>> path = ml.table_path("experiment_results")
-            >>> df.to_csv(path) # Save data for upload
-        """
-        return table_path(
-            self.working_dir,
-            schema=self.domain_schema,
-            table=self.model.name_to_table(table).name,
-        )
+    # pathBuilder, domain_path, table_path moved to PathBuilderMixin
 
     def download_dir(self, cached: bool = False) -> Path:
         """Returns the appropriate download directory.
@@ -468,56 +427,7 @@ class DerivaML(DerivaMLCatalog):
         user_path = self.pathBuilder().public.ERMrest_Client.path
         return [{"ID": u["ID"], "Full_Name": u["Full_Name"]} for u in user_path.entities().fetch()]
 
-    def resolve_rid(self, rid: RID) -> ResolveRidResult:
-        """Resolves RID to catalog location.
-
-        Looks up a RID and returns information about where it exists in the catalog, including schema,
-        table, and column metadata.
-
-        Args:
-            rid: Resource Identifier to resolve.
-
-        Returns:
-            ResolveRidResult: Named tuple containing:
-                - schema: Schema name
-                - table: Table name
-                - columns: Column definitions
-                - datapath: Path builder for accessing the entity
-
-        Raises:
-            DerivaMLException: If RID doesn't exist in catalog.
-
-        Examples:
-            >>> result = ml.resolve_rid("1-abc123")
-            >>> print(f"Found in {result.schema}.{result.table}")
-            >>> data = result.datapath.entities().fetch()
-        """
-        try:
-            # Attempt to resolve RID using catalog model
-            return self.catalog.resolve_rid(rid, self.model.model)
-        except KeyError as _e:
-            raise DerivaMLException(f"Invalid RID {rid}")
-
-    def retrieve_rid(self, rid: RID) -> dict[str, Any]:
-        """Retrieves complete record for RID.
-
-        Fetches all column values for the entity identified by the RID.
-
-        Args:
-            rid: Resource Identifier of the record to retrieve.
-
-        Returns:
-            dict[str, Any]: Dictionary containing all column values for the entity.
-
-        Raises:
-            DerivaMLException: If the RID doesn't exist in the catalog.
-
-        Example:
-            >>> record = ml.retrieve_rid("1-abc123")
-            >>> print(f"Name: {record['name']}, Created: {record['creation_date']}")
-        """
-        # Resolve RID and fetch the first (only) matching record
-        return self.resolve_rid(rid).datapath.entities().fetch()[0]
+    # resolve_rid, retrieve_rid moved to RidResolutionMixin
 
     def add_page(self, title: str, content: str) -> None:
         """Adds page to web interface.
@@ -928,182 +838,8 @@ class DerivaML(DerivaMLCatalog):
         pb = self.pathBuilder()
         return pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def add_term(
-        self,
-        table: str | Table,
-        term_name: str,
-        description: str,
-        synonyms: list[str] | None = None,
-        exists_ok: bool = True,
-    ) -> VocabularyTerm:
-        """Adds a term to a vocabulary table.
-
-        Creates a new standardized term with description and optional synonyms in a vocabulary table.
-        Can either create a new term or return an existing one if it already exists.
-
-        Args:
-            table: Vocabulary table to add term to (name or Table object).
-            term_name: Primary name of the term (must be unique within vocabulary).
-            description: Explanation of term's meaning and usage.
-            synonyms: Alternative names for the term.
-            exists_ok: If True, return the existing term if found. If False, raise error.
-
-        Returns:
-            VocabularyTerm: Object representing the created or existing term.
-
-        Raises:
-            DerivaMLException: If a term exists and exists_ok=False, or if the table is not a vocabulary table.
-
-        Examples:
-            Add a new tissue type:
-                >>> term = ml.add_term(
-                ...     table="tissue_types",
-                ...     term_name="epithelial",
-                ...     description="Epithelial tissue type",
-                ...     synonyms=["epithelium"]
-                ... )
-
-            Attempt to add an existing term:
-                >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)
-        """
-        # Initialize an empty synonyms list if None
-        synonyms = synonyms or []
-
-        # Get table reference and validate if it is a vocabulary table
-        table = self.model.name_to_table(table)
-        pb = self.pathBuilder()
-        if not (self.model.is_vocabulary(table)):
-            raise DerivaMLTableTypeError("vocabulary", table.name)
-
-        # Get schema and table names for path building
-        schema_name = table.schema.name
-        table_name = table.name
-
-        try:
-            # Attempt to insert a new term
-            term_id = VocabularyTerm.model_validate(
-                pb.schemas[schema_name]
-                .tables[table_name]
-                .insert(
-                    [
-                        {
-                            "Name": term_name,
-                            "Description": description,
-                            "Synonyms": synonyms,
-                        }
-                    ],
-                    defaults={"ID", "URI"},
-                )[0]
-            )
-        except DataPathException:
-            # Term exists - look it up or raise an error
-            term_id = self.lookup_term(table, term_name)
-            if not exists_ok:
-                raise DerivaMLInvalidTerm(table.name, term_name, msg="term already exists")
-        return term_id
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
-        """Finds a term in a vocabulary table.
-
-        Searches for a term in the specified vocabulary table, matching either the primary name
-        or any of its synonyms.
-
-        Args:
-            table: Vocabulary table to search in (name or Table object).
-            term_name: Name or synonym of the term to find.
-
-        Returns:
-            VocabularyTerm: The matching vocabulary term.
-
-        Raises:
-            DerivaMLVocabularyException: If the table is not a vocabulary table, or term is not found.
-
-        Examples:
-            Look up by primary name:
-                >>> term = ml.lookup_term("tissue_types", "epithelial")
-                >>> print(term.description)
-
-            Look up by synonym:
-                >>> term = ml.lookup_term("tissue_types", "epithelium")
-        """
-        # Get and validate vocabulary table reference
-        vocab_table = self.model.name_to_table(table)
-        if not self.model.is_vocabulary(vocab_table):
-            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
-
-        # Get schema and table paths
-        schema_name, table_name = vocab_table.schema.name, vocab_table.name
-        schema_path = self.pathBuilder().schemas[schema_name]
-
-        # Search for term by name or synonym
-        for term in schema_path.tables[table_name].entities().fetch():
-            if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
-                return VocabularyTerm.model_validate(term)
-
-        # Term not found
-        raise DerivaMLInvalidTerm(table_name, term_name)
-
-    def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
-        """Lists all terms in a vocabulary table.
-
-        Retrieves all terms, their descriptions, and synonyms from a controlled vocabulary table.
-
-        Args:
-            table: Vocabulary table to list terms from (name or Table object).
-
-        Returns:
-            list[VocabularyTerm]: List of vocabulary terms with their metadata.
-
-        Raises:
-            DerivaMLException: If table doesn't exist or is not a vocabulary table.
-
-        Examples:
-            >>> terms = ml.list_vocabulary_terms("tissue_types")
-            >>> for term in terms:
-            ...     print(f"{term.name}: {term.description}")
-            ...     if term.synonyms:
-            ...         print(f"  Synonyms: {', '.join(term.synonyms)}")
-        """
-        # Get path builder and table reference
-        pb = self.pathBuilder()
-        table = self.model.name_to_table(table.value if isinstance(table, MLVocab) else table)
-
-        # Validate table is a vocabulary table
-        if not (self.model.is_vocabulary(table)):
-            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
-
-        # Fetch and convert all terms to VocabularyTerm objects
-        return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
-
-    def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
-        """Get table contents as a pandas DataFrame.
-
-        Retrieves all contents of a table from the catalog.
-
-        Args:
-            table: Name of the table to retrieve.
-
-        Returns:
-            DataFrame containing all table contents.
-        """
-        return pd.DataFrame(list(self.get_table_as_dict(table)))
-
-    def get_table_as_dict(self, table: str) -> Iterable[dict[str, Any]]:
-        """Get table contents as dictionaries.
-
-        Retrieves all contents of a table from the catalog.
-
-        Args:
-            table: Name of the table to retrieve.
-
-        Returns:
-            Iterable yielding dictionaries for each row.
-        """
-        table_obj = self.model.name_to_table(table)
-        pb = self.pathBuilder()
-        yield from pb.schemas[table_obj.schema.name].tables[table_obj.name].entities().fetch()
+    # add_term, lookup_term, list_vocabulary_terms moved to VocabularyMixin
+    # get_table_as_dataframe, get_table_as_dict moved to PathBuilderMixin
 
     def find_datasets(self, deleted: bool = False) -> Iterable[Dataset]:
         """Returns a list of currently available datasets.
@@ -1513,147 +1249,7 @@ class DerivaML(DerivaMLCatalog):
         # Now get rid of the File_Type key and return the result
         return [(f, f.pop("Asset_Type"))[0] for f in file_map.values()]
 
-    def list_workflows(self) -> list[Workflow]:
-        """Lists all workflows in the catalog.
-
-        Retrieves all workflow definitions, including their names, URLs, types, versions,
-        and descriptions.
-
-        Returns:
-            list[Workflow]: List of workflow objects, each containing:
-                - name: Workflow name
-                - url: Source code URL
-                - workflow_type: Type of workflow
-                - version: Version identifier
-                - description: Workflow description
-                - rid: Resource identifier
-                - checksum: Source code checksum
-
-        Examples:
-            >>> workflows = ml.list_workflows()
-            >>> for w in workflows:
-                    print(f"{w.name} (v{w.version}): {w.description}")
-                    print(f"  Source: {w.url}")
-        """
-        # Get a workflow table path and fetch all workflows
-        workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
-        return [
-            Workflow(
-                name=w["Name"],
-                url=w["URL"],
-                workflow_type=w["Workflow_Type"],
-                version=w["Version"],
-                description=w["Description"],
-                rid=w["RID"],
-                checksum=w["Checksum"],
-            )
-            for w in workflow_path.entities().fetch()
-        ]
-
-    def add_workflow(self, workflow: Workflow) -> RID:
-        """Adds a workflow to the catalog.
-
-        Registers a new workflow in the catalog or returns the RID of an existing workflow with the same
-        URL or checksum.
-
-        Each workflow represents a specific computational process or analysis pipeline.
-
-        Args:
-            workflow: Workflow object containing name, URL, type, version, and description.
-
-        Returns:
-            RID: Resource Identifier of the added or existing workflow.
-
-        Raises:
-            DerivaMLException: If workflow insertion fails or required fields are missing.
-
-        Examples:
-            >>> workflow = Workflow(
-            ...     name="Gene Analysis",
-            ...     url="https://github.com/org/repo/workflows/gene_analysis.py",
-            ...     workflow_type="python_script",
-            ...     version="1.0.0",
-            ...     description="Analyzes gene expression patterns"
-            ... )
-            >>> workflow_rid = ml.add_workflow(workflow)
-        """
-        # Check if a workflow already exists by URL
-        if workflow_rid := self.lookup_workflow(workflow.checksum or workflow.url):
-            return workflow_rid
-
-        # Get an ML schema path for the workflow table
-        ml_schema_path = self.pathBuilder().schemas[self.ml_schema]
-
-        try:
-            # Create a workflow record
-            workflow_record = {
-                "URL": workflow.url,
-                "Name": workflow.name,
-                "Description": workflow.description,
-                "Checksum": workflow.checksum,
-                "Version": workflow.version,
-                MLVocab.workflow_type: self.lookup_term(MLVocab.workflow_type, workflow.workflow_type).name,
-            }
-            # Insert a workflow and get its RID
-            workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]["RID"]
-        except Exception as e:
-            error = format_exception(e)
-            raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
-        return workflow_rid
-
-    def lookup_workflow(self, url_or_checksum: str) -> RID | None:
-        """Finds a workflow by URL.
-
-        Args:
-            url_or_checksum: URL or checksum of the workflow.
-        Returns:
-            RID: Resource Identifier of the workflow if found, None otherwise.
-
-        Example:
-            >>> rid = ml.lookup_workflow("https://github.com/org/repo/workflow.py")
-            >>> if rid:
-            ...     print(f"Found workflow: {rid}")
-        """
-        # Get a workflow table path
-        workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
-        workflow_rid = None
-        for w in workflow_path.path.entities().fetch():
-            if w['URL'] == url_or_checksum or w['Checksum'] == url_or_checksum:
-                workflow_rid = w['RID']
-
-        return workflow_rid
-
-    def create_workflow(self, name: str, workflow_type: str, description: str = "") -> Workflow:
-        """Creates a new workflow definition.
-
-        Creates a Workflow object that represents a computational process or analysis pipeline. The workflow type
-        must be a term from the controlled vocabulary. This method is typically used to define new analysis
-        workflows before execution.
-
-        Args:
-            name: Name of the workflow.
-            workflow_type: Type of workflow (must exist in workflow_type vocabulary).
-            description: Description of what the workflow does.
-
-        Returns:
-            Workflow: New workflow object ready for registration.
-
-        Raises:
-            DerivaMLException: If workflow_type is not in the vocabulary.
-
-        Examples:
-            >>> workflow = ml.create_workflow(
-            ...     name="RNA Analysis",
-            ...     workflow_type="python_notebook",
-            ...     description="RNA sequence analysis pipeline"
-            ... )
-            >>> rid = ml.add_workflow(workflow)
-        """
-        # Validate workflow type exists in vocabulary
-        self.lookup_term(MLVocab.workflow_type, workflow_type)
-
-        # Create and return a new workflow object
-        return Workflow(name=name, workflow_type=workflow_type, description=description)
+    # list_workflows, add_workflow, lookup_workflow, create_workflow moved to WorkflowMixin
 
     def create_execution(
         self, configuration: ExecutionConfiguration, workflow: Workflow | RID | None = None, dry_run: bool = False
