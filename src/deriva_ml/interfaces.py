@@ -41,11 +41,11 @@ from deriva.core.ermrest_catalog import ErmrestCatalog, ResolveRidResult
 from deriva.core.ermrest_model import Table
 
 from deriva_ml.core.definitions import RID, VocabularyTerm
-from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion
 from deriva_ml.feature import Feature
 from deriva_ml.model.catalog import DerivaModel
 
 if TYPE_CHECKING:
+    from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion
     from deriva_ml.dataset.dataset import Dataset
 
 
