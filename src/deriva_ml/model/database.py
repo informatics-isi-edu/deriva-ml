@@ -324,9 +324,9 @@ class DatabaseModel(DerivaModel):
                     existing_attr = getattr(table_class, relationship_attr, None)
                     from sqlalchemy.orm import RelationshipProperty
                     from sqlalchemy.orm.attributes import InstrumentedAttribute
-                    is_relationship = (
-                        isinstance(existing_attr, InstrumentedAttribute) and
-                        isinstance(existing_attr.property, RelationshipProperty)
+
+                    is_relationship = isinstance(existing_attr, InstrumentedAttribute) and isinstance(
+                        existing_attr.property, RelationshipProperty
                     )
                     if not is_relationship:
                         setattr(
@@ -362,11 +362,56 @@ class DatabaseModel(DerivaModel):
 
         This should be called when the DatabaseModel is no longer needed, especially
         in test scenarios where multiple DatabaseModel instances may be created.
+
+        After calling dispose(), the instance should not be used further.
         """
+        if hasattr(self, "_disposed") and self._disposed:
+            return  # Already disposed
+
         # Dispose the registry to clear all mappers for this Base
-        self.Base.registry.dispose()
+        if hasattr(self, "Base"):
+            self.Base.registry.dispose()
         # Dispose the engine to close all connections
-        self.engine.dispose()
+        if hasattr(self, "engine"):
+            self.engine.dispose()
+
+        self._disposed = True
+
+    def __del__(self) -> None:
+        """Cleanup resources when the instance is garbage collected.
+
+        This ensures that database connections are properly closed even if
+        dispose() is not explicitly called. However, explicit dispose() calls
+        are preferred for deterministic cleanup.
+        """
+        self.dispose()
+
+    def __enter__(self) -> "DatabaseModel":
+        """Enter context manager protocol.
+
+        Returns:
+            self: The DatabaseModel instance for use within the context.
+
+        Example:
+            >>> with DatabaseModel(minid, bag_path, dbase_path) as db:
+            ...     tables = db.list_tables()
+            ...     # db is automatically disposed when exiting the context
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Exit context manager protocol, disposing resources.
+
+        Args:
+            exc_type: Exception type if an exception was raised.
+            exc_val: Exception value if an exception was raised.
+            exc_tb: Exception traceback if an exception was raised.
+
+        Returns:
+            False to propagate any exceptions.
+        """
+        self.dispose()
+        return False
 
     def _load_database(self) -> None:
         """Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.

@@ -195,6 +195,25 @@ class DatasetBag:
         """
         return self.model.list_tables()
 
+    def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
+        """Get table contents as dictionaries.
+
+        Convenience method that delegates to the underlying catalog. This provides
+        access to all rows in a table, not just those belonging to this dataset.
+        For dataset-filtered results, use list_dataset_members() instead.
+
+        Args:
+            table: Name of the table to retrieve (e.g., "Subject", "Image").
+
+        Yields:
+            dict: Dictionary for each row in the table.
+
+        Example:
+            >>> for subject in bag.get_table_as_dict("Subject"):
+            ...     print(subject["Name"])
+        """
+        return self._catalog.get_table_as_dict(table)
+
     @staticmethod
     def _find_relationship_attr(source, target):
         """Find the SQLAlchemy relationship attribute connecting two ORM classes.

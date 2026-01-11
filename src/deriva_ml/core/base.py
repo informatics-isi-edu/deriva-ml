@@ -108,6 +108,15 @@ class DerivaML:
         >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')
     """
 
+    # Class-level type annotations for DerivaMLCatalog protocol compliance
+    ml_schema: str
+    domain_schema: str
+    model: DerivaModel
+    cache_dir: Path
+    working_dir: Path
+    catalog: ErmrestCatalog
+    catalog_id: str | int
+
     @classmethod
     def instantiate(cls, config: DerivaMLConfig) -> Self:
         return cls(**config.model_dump())

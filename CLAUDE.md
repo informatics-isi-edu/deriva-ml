@@ -99,3 +99,67 @@ The library uses two schemas:
 - **Domain schema**: Application-specific tables created by users
 
 Controlled vocabularies: Dataset_Type, Asset_Type, Workflow_Type, Asset_Role, Feature_Name
+
+## Exception Hierarchy
+
+DerivaML uses a structured exception hierarchy for error handling:
+
+```
+DerivaMLException (base class)
+├── DerivaMLConfigurationError (configuration/initialization)
+│   ├── DerivaMLSchemaError (schema structure issues)
+│   └── DerivaMLAuthenticationError (auth failures)
+├── DerivaMLDataError (data access/validation)
+│   ├── DerivaMLNotFoundError (entity not found)
+│   │   ├── DerivaMLDatasetNotFound
+│   │   ├── DerivaMLTableNotFound
+│   │   └── DerivaMLInvalidTerm
+│   ├── DerivaMLTableTypeError (wrong table type)
+│   ├── DerivaMLValidationError (validation failures)
+│   └── DerivaMLCycleError (relationship cycles)
+├── DerivaMLExecutionError (execution lifecycle)
+│   ├── DerivaMLWorkflowError
+│   └── DerivaMLUploadError
+└── DerivaMLReadOnlyError (writes on read-only)
+```
+
+Import from: `from deriva_ml.core.exceptions import ...`
+
+## Protocol Hierarchy
+
+The library uses protocols for type-safe polymorphism:
+
+**Dataset Protocols:**
+- `DatasetLike`: Read-only operations (Dataset and DatasetBag)
+- `WritableDataset`: Write operations (Dataset only)
+
+**Catalog Protocols:**
+- `DerivaMLCatalogReader`: Read-only catalog operations
+- `DerivaMLCatalog`: Full catalog operations with writes
+
+Import from: `from deriva_ml.interfaces import ...`
+
+## Shared Utilities
+
+**Validation** (`deriva_ml.core.validation`):
+- `VALIDATION_CONFIG`: Standard ConfigDict for `@validate_call`
+- `STRICT_VALIDATION_CONFIG`: ConfigDict that forbids extra fields
+
+**Logging** (`deriva_ml.core.logging_config`):
+- `get_logger(name)`: Get a deriva_ml logger
+- `configure_logging(level)`: Configure logging for all components
+- `LoggerMixin`: Mixin providing `_logger` attribute
+
+## Future Decomposition
+
+The `DerivaML` class (~1700 lines) handles multiple concerns. Future refactoring could extract:
+- `VocabularyManager`: Term and vocabulary CRUD
+- `FeatureManager`: Feature definition and values
+- `WorkflowManager`: Workflow tracking and Git integration
+- `DatasetManager`: Dataset creation and lookup
+- `AssetManager`: Asset table operations
+
+Similarly, `Execution` (~1100 lines) could be decomposed into:
+- `DatasetDownloader`: Dataset materialization
+- `AssetUploader`: Result upload and cataloging
+- `StatusTracker`: Execution status management

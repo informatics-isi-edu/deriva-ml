@@ -93,90 +93,55 @@ except ImportError:
         return s
 
 
-# Platform-specific base class
-if sys.version_info >= (3, 12):
+class AssetFilePath(Path):
+    """Extended Path class for managing asset files.
 
-    class AssetFilePath(Path):
-        """Extended Path class for managing asset files.
+    Represents a file path with additional metadata about its role as an asset in the catalog.
+    This class extends the standard Path class to include information about the asset's
+    catalog representation and type.
 
-        Represents a file path with additional metadata about its role as an asset in the catalog.
-        This class extends the standard Path class to include information about the asset's
-        catalog representation and type.
+    Attributes:
+        asset_name (str): Name of the asset in the catalog (e.g., asset table name).
+        file_name (str): Name of the local file containing the asset.
+        asset_metadata (dict[str, Any]): Additional columns beyond URL, Length, and checksum.
+        asset_types (list[str]): Terms from the Asset_Type controlled vocabulary.
+        asset_rid (RID | None): Resource Identifier if uploaded to an asset table.
 
-        Attributes:
-            asset_name (str): Name of the asset in the catalog (e.g., asset table name).
-            file_name (str): Name of the local file containing the asset.
-            asset_metadata (dict[str, Any]): Additional columns beyond URL, Length, and checksum.
-            asset_types (list[str]): Terms from the Asset_Type controlled vocabulary.
-            asset_rid (RID | None): Resource Identifier if uploaded to an asset table.
+    Example:
+        >>> path = AssetFilePath(
+        ...     "/path/to/file.txt",
+        ...     asset_name="analysis_output",
+        ...     file_name="results.txt",
+        ...     asset_metadata={"version": "1.0"},
+        ...     asset_types=["text", "results"]
+        ... )
+    """
 
-        Example:
-            >>> path = AssetFilePath(
-            ...     "/path/to/file.txt",
-            ...     asset_name="analysis_output",
-            ...     file_name="results.txt",
-            ...     asset_metadata={"version": "1.0"},
-            ...     asset_types=["text", "results"]
-            ... )
+    def __init__(
+        self,
+        asset_path: str | Path,
+        asset_name: str,
+        file_name: str,
+        asset_metadata: dict[str, Any],
+        asset_types: list[str] | str,
+        asset_rid: RID | None = None,
+    ):
+        """Initializes an AssetFilePath instance.
+
+        Args:
+            asset_path: Local path to the asset file.
+            asset_name: Name of the asset in the catalog.
+            file_name: Name of the local file.
+            asset_metadata: Additional metadata columns.
+            asset_types: One or more asset type terms.
+            asset_rid: Optional Resource Identifier if already in catalog.
         """
-
-        def __init__(
-            self,
-            asset_path: str | Path,
-            asset_name: str,
-            file_name: str,
-            asset_metadata: dict[str, Any],
-            asset_types: list[str] | str,
-            asset_rid: RID | None = None,
-        ):
-            """Initializes an AssetFilePath instance.
-
-            Args:
-                asset_path: Local path to the asset file.
-                asset_name: Name of the asset in the catalog.
-                file_name: Name of the local file.
-                asset_metadata: Additional metadata columns.
-                asset_types: One or more asset type terms.
-                asset_rid: Optional Resource Identifier if already in catalog.
-            """
-            super().__init__(asset_path)
-            self.asset_name = asset_name
-            self.file_name = file_name
-            self.asset_metadata = asset_metadata
-            self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
-            self.asset_rid = asset_rid
-else:
-
-    class AssetFilePath(type(Path())):
-        """
-        Create a new Path object that has additional information related to the use of this path as an asset.
-
-        Attributes:
-            asset_path: Local path to the location of the asset.
-            asset_name:  The name of the asset in the catalog (e.g., the asset table name).
-            file_name:  Name of the local file that contains the contents of the asset.
-            asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
-            asset_types:  A list of terms from the Asset_Type controlled vocabulary.
-            asset_rid:  The RID of the asset if it has been uploaded into an asset table
-        """
-
-        def __new__(
-            cls,
-            asset_path: str | Path,
-            asset_name: str,
-            file_name: str,
-            asset_metadata: dict[str, Any],
-            asset_types: list[str] | str,
-            asset_rid: RID | None = None,
-        ):
-            # Only pass the path to the base Path class
-            obj = super().__new__(cls, asset_path)
-            obj.asset_name = asset_name
-            obj.file_name = file_name
-            obj.asset_metadata = asset_metadata
-            obj.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
-            obj.asset_rid = asset_rid
-            return obj
+        super().__init__(asset_path)
+        self.asset_name = asset_name
+        self.file_name = file_name
+        self.asset_metadata = asset_metadata
+        self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
+        self.asset_rid = asset_rid
 
 
 class Execution:

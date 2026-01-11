@@ -71,6 +71,29 @@ from deriva_ml.core.ermrest import (
 # From filespec.py: File metadata and specification handling
 from deriva_ml.core.filespec import FileSpec
 
+# =============================================================================
+# Re-exported Exceptions
+# =============================================================================
+# From exceptions.py: Exception hierarchy for DerivaML errors
+from deriva_ml.core.exceptions import (
+    DerivaMLAuthenticationError,
+    DerivaMLConfigurationError,
+    DerivaMLCycleError,
+    DerivaMLDataError,
+    DerivaMLDatasetNotFound,
+    DerivaMLException,
+    DerivaMLExecutionError,
+    DerivaMLInvalidTerm,
+    DerivaMLNotFoundError,
+    DerivaMLReadOnlyError,
+    DerivaMLSchemaError,
+    DerivaMLTableNotFound,
+    DerivaMLTableTypeError,
+    DerivaMLUploadError,
+    DerivaMLValidationError,
+    DerivaMLWorkflowError,
+)
+
 __all__ = [
     # Constants
     "ML_SCHEMA",
@@ -99,4 +122,21 @@ __all__ = [
     "KeyDefinition",
     "ForeignKeyDefinition",
     "TableDefinition",
+    # Exceptions
+    "DerivaMLException",
+    "DerivaMLConfigurationError",
+    "DerivaMLSchemaError",
+    "DerivaMLAuthenticationError",
+    "DerivaMLDataError",
+    "DerivaMLNotFoundError",
+    "DerivaMLDatasetNotFound",
+    "DerivaMLTableNotFound",
+    "DerivaMLInvalidTerm",
+    "DerivaMLTableTypeError",
+    "DerivaMLValidationError",
+    "DerivaMLCycleError",
+    "DerivaMLExecutionError",
+    "DerivaMLWorkflowError",
+    "DerivaMLUploadError",
+    "DerivaMLReadOnlyError",
 ]

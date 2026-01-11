@@ -2,7 +2,9 @@
 Tests for the execution module.
 """
 
+import os
 import subprocess
+import sys
 from pathlib import Path
 from pprint import pformat
 from tempfile import TemporaryDirectory
@@ -42,15 +44,21 @@ class TestWorkflow:
         workflow_table = ml_instance.pathBuilder().schemas[ml_instance.ml_schema].Workflow
         workflows = list(workflow_table.entities().fetch())
         assert 0 == len(workflows)
+        # Ensure subprocess has proper environment for distutils via setuptools
+        # This is needed because Python 3.12+ removed distutils from stdlib
+        env = os.environ.copy()
+        env["SETUPTOOLS_USE_DISTUTILS"] = "local"
+
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 workflow_script.as_posix(),
                 ml_instance.catalog.deriva_server.server,
                 ml_instance.catalog_id,
             ],
             capture_output=True,
             text=True,
+            env=env,
         )
         print(result.stdout)
         print(result.stderr)
@@ -69,13 +77,14 @@ class TestWorkflow:
         # Make sure that workflow is not duplicated if created again.
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 workflow_script.as_posix(),
                 ml_instance.catalog.deriva_server.server,
                 ml_instance.catalog_id,
             ],
             capture_output=True,
             text=True,
+            env=env,
         )
         new_workflow = result.stdout.strip()
         assert new_workflow == workflow_rid
@@ -92,6 +101,11 @@ class TestWorkflow:
 
         print("Running notebook...")
 
+        # Ensure subprocess has proper environment for distutils via setuptools
+        # This is needed because Python 3.12+ removed distutils from stdlib
+        env = os.environ.copy()
+        env["SETUPTOOLS_USE_DISTUTILS"] = "local"
+
         result = subprocess.run(
             [
                 "deriva-ml-run-notebook",
@@ -106,6 +120,7 @@ class TestWorkflow:
             ],
             capture_output=True,
             text=True,
+            env=env,
         )
 
         workflows = list(workflow_table.entities().fetch())
