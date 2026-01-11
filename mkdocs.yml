@@ -53,13 +53,21 @@ nav:
       - Features: 'Notebooks/DerivaML Features.ipynb'
       - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
   - Library Documentation:
-      - DerivaML: code-docs/deriva_ml_base.md
-      - DatasetBag Auxiliary Classes: code-docs/dataset_aux_classes.md
-      - DatasetBag: code-docs/dataset_bag.md
-      - Helper Classes: code-docs/deriva_definitions.md
-      - DerivaModel: code-docs/deriva_model.md
-      - Execution: code-docs/execution.md
-      - ExecutionConfiguration: code-docs/execution_configuration.md
-      - Feature: code-docs/feature.md
-      - Upload: code-docs/upload.md
+      - Core Classes:
+          - DerivaML: code-docs/deriva_ml_base.md
+          - DerivaModel: code-docs/deriva_model.md
+      - Datasets:
+          - Dataset: code-docs/dataset.md
+          - DatasetBag: code-docs/dataset_bag.md
+          - Dataset Auxiliary Classes: code-docs/dataset_aux_classes.md
+      - Execution:
+          - Execution: code-docs/execution.md
+          - ExecutionConfiguration: code-docs/execution_configuration.md
+          - Workflow: code-docs/workflow.md
+      - Features:
+          - Feature: code-docs/feature.md
+      - Utilities:
+          - Definitions & Types: code-docs/deriva_definitions.md
+          - Exceptions: code-docs/exceptions.md
+          - Upload: code-docs/upload.md
   - Release Notes: release-notes.md

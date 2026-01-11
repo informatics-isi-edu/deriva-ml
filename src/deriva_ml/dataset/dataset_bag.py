@@ -32,9 +32,12 @@ Typical usage:
 from __future__ import annotations
 
 # Standard library imports
+import logging
+import shutil
 from collections import defaultdict
 from copy import copy
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Self, cast
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Self, cast
 
 import deriva.core.datapath as datapath
 
@@ -631,6 +634,300 @@ class DatasetBag:
             yield from cursor.mappings()
             for row in cursor.mappings():
                 yield row
+
+
+    # =========================================================================
+    # Asset Restructuring Methods
+    # =========================================================================
+
+    def _build_dataset_type_path_map(
+        self,
+        type_selector: Callable[[list[str]], str] | None = None,
+    ) -> dict[RID, list[str]]:
+        """Build a mapping from dataset RID to its type path in the hierarchy.
+
+        Recursively traverses nested datasets to create a mapping where each
+        dataset RID maps to its hierarchical type path (e.g., ["complete", "training"]).
+
+        Args:
+            type_selector: Function to select type when dataset has multiple types.
+                Receives list of type names, returns selected type name.
+                Defaults to selecting first type or "unknown" if no types.
+
+        Returns:
+            Dictionary mapping dataset RID to list of type names from root to leaf.
+            e.g., {"4-ABC": ["complete", "training"], "4-DEF": ["complete", "testing"]}
+        """
+        if type_selector is None:
+            type_selector = lambda types: types[0] if types else "unknown"
+
+        type_paths: dict[RID, list[str]] = {}
+
+        def traverse(dataset: DatasetBag, parent_path: list[str], visited: set[RID]) -> None:
+            if dataset.dataset_rid in visited:
+                return
+            visited.add(dataset.dataset_rid)
+
+            current_type = type_selector(dataset.dataset_types)
+            current_path = parent_path + [current_type]
+            type_paths[dataset.dataset_rid] = current_path
+
+            for child in dataset.list_dataset_children():
+                traverse(child, current_path, visited)
+
+        traverse(self, [], set())
+        return type_paths
+
+    def _get_asset_dataset_mapping(self, asset_table: str) -> dict[RID, RID]:
+        """Map asset RIDs to their containing dataset RID.
+
+        For each asset in the specified table, determines which dataset directly
+        contains it (not considering nesting - just direct membership).
+
+        Args:
+            asset_table: Name of the asset table (e.g., "Image")
+
+        Returns:
+            Dictionary mapping asset RID to the dataset RID that contains it.
+        """
+        asset_to_dataset: dict[RID, RID] = {}
+
+        def collect_from_dataset(dataset: DatasetBag, visited: set[RID]) -> None:
+            if dataset.dataset_rid in visited:
+                return
+            visited.add(dataset.dataset_rid)
+
+            members = dataset.list_dataset_members(recurse=False)
+            for asset in members.get(asset_table, []):
+                asset_to_dataset[asset["RID"]] = dataset.dataset_rid
+
+            for child in dataset.list_dataset_children():
+                collect_from_dataset(child, visited)
+
+        collect_from_dataset(self, set())
+        return asset_to_dataset
+
+    def _load_feature_values_cache(
+        self,
+        asset_table: str,
+        group_keys: list[str],
+    ) -> dict[str, dict[RID, Any]]:
+        """Load feature values into a cache for efficient lookup.
+
+        Pre-loads feature values for any group_keys that are feature names,
+        organizing them by target entity RID for fast lookup.
+
+        Args:
+            asset_table: The asset table name to find features for.
+            group_keys: List of potential feature names to cache.
+
+        Returns:
+            Dictionary mapping feature_name -> {target_rid -> feature_value}
+            Only includes entries for keys that are actually features.
+        """
+        cache: dict[str, dict[RID, Any]] = {}
+        logger = logging.getLogger("deriva_ml")
+
+        # Find all features on tables that this asset table references
+        asset_table_obj = self.model.name_to_table(asset_table)
+
+        # Check features on the asset table itself
+        for feature in self.find_features(asset_table):
+            if feature.feature_name in group_keys:
+                cache[feature.feature_name] = {}
+                try:
+                    feature_values = self.list_feature_values(asset_table, feature.feature_name)
+                    for fv in feature_values:
+                        target_col = asset_table
+                        if target_col in fv:
+                            # Get the value - prefer term columns, then value columns
+                            value = None
+                            term_cols = [c.name for c in feature.term_columns]
+                            value_cols = [c.name for c in feature.value_columns]
+                            if term_cols and term_cols[0] in fv:
+                                value = fv[term_cols[0]]
+                            elif value_cols and value_cols[0] in fv:
+                                value = fv[value_cols[0]]
+                            if value is not None:
+                                cache[feature.feature_name][fv[target_col]] = value
+                except Exception as e:
+                    logger.warning(f"Could not load feature {feature.feature_name}: {e}")
+
+        # Also check features on referenced tables (via foreign keys)
+        for fk in asset_table_obj.foreign_keys:
+            target_table = fk.pk_table
+            for feature in self.find_features(target_table):
+                if feature.feature_name in group_keys:
+                    cache[feature.feature_name] = {}
+                    try:
+                        feature_values = self.list_feature_values(target_table.name, feature.feature_name)
+                        for fv in feature_values:
+                            target_col = target_table.name
+                            if target_col in fv:
+                                value = None
+                                term_cols = [c.name for c in feature.term_columns]
+                                value_cols = [c.name for c in feature.value_columns]
+                                if term_cols and term_cols[0] in fv:
+                                    value = fv[term_cols[0]]
+                                elif value_cols and value_cols[0] in fv:
+                                    value = fv[value_cols[0]]
+                                if value is not None:
+                                    cache[feature.feature_name][fv[target_col]] = value
+                    except Exception as e:
+                        logger.warning(f"Could not load feature {feature.feature_name}: {e}")
+
+        return cache
+
+    def _resolve_grouping_value(
+        self,
+        asset: dict[str, Any],
+        group_key: str,
+        feature_cache: dict[str, dict[RID, Any]],
+    ) -> str:
+        """Resolve a grouping value for an asset.
+
+        First checks if group_key is a direct column on the asset record,
+        then checks if it's a feature name in the feature cache.
+
+        Args:
+            asset: The asset record dictionary.
+            group_key: Column name or feature name to group by.
+            feature_cache: Pre-loaded feature values keyed by feature name -> target RID -> value.
+
+        Returns:
+            The resolved value as a string, or "unknown" if not found or None.
+        """
+        # First check if it's a direct column on the asset table
+        if group_key in asset:
+            value = asset[group_key]
+            if value is not None:
+                return str(value)
+            return "unknown"
+
+        # Check if it's a feature name
+        if group_key in feature_cache:
+            feature_values = feature_cache[group_key]
+            # Check each column in the asset that might be a FK to the feature target
+            for column_name, column_value in asset.items():
+                if column_value and column_value in feature_values:
+                    return str(feature_values[column_value])
+            # Also check if the asset's own RID is in the feature values
+            if asset.get("RID") in feature_values:
+                return str(feature_values[asset["RID"]])
+
+        return "unknown"
+
+    def restructure_assets(
+        self,
+        asset_table: str,
+        output_dir: Path | str,
+        group_by: list[str] | None = None,
+        use_symlinks: bool = True,
+        type_selector: Callable[[list[str]], str] | None = None,
+    ) -> Path:
+        """Restructure downloaded assets into a directory hierarchy.
+
+        Creates a directory structure organizing assets by dataset types and
+        grouping values (columns or features). This is useful for ML workflows
+        that expect data organized in conventional folder structures.
+
+        Args:
+            asset_table: Name of the asset table (e.g., "Image").
+            output_dir: Base directory for restructured assets.
+            group_by: Column names or feature names to group by. These create
+                additional subdirectory levels after the dataset type path.
+            use_symlinks: If True (default), create symlinks to original files.
+                If False, copy files. Symlinks save disk space but require
+                the original bag to remain in place.
+            type_selector: Function to select type when dataset has multiple types.
+                Receives list of type names, returns selected type name.
+                Defaults to selecting first type or "unknown" if no types.
+
+        Returns:
+            Path to the output directory.
+
+        Raises:
+            DerivaMLException: If asset_table is not found in the dataset.
+
+        Example:
+            >>> bag.restructure_assets(
+            ...     asset_table="Image",
+            ...     output_dir=Path("./ml_data"),
+            ...     group_by=["label", "Quality"],
+            ...     use_symlinks=True,
+            ... )
+            # Creates:
+            # ./ml_data/complete/training/gotit/Good/image1.jpg
+            # ./ml_data/complete/training/gotit/Bad/image2.jpg
+            # ./ml_data/complete/testing/dontgotit/Good/image3.jpg
+        """
+        logger = logging.getLogger("deriva_ml")
+        group_by = group_by or []
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Step 1: Build dataset type path map
+        type_path_map = self._build_dataset_type_path_map(type_selector)
+
+        # Step 2: Get asset-to-dataset mapping
+        asset_dataset_map = self._get_asset_dataset_mapping(asset_table)
+
+        # Step 3: Load feature values cache for relevant features
+        feature_cache = self._load_feature_values_cache(asset_table, group_by)
+
+        # Step 4: Get all assets
+        members = self.list_dataset_members(recurse=True)
+        assets = members.get(asset_table, [])
+
+        if not assets:
+            logger.warning(f"No assets found in table '{asset_table}'")
+            return output_dir
+
+        # Step 5: Process each asset
+        for asset in assets:
+            # Get source file path
+            filename = asset.get("Filename")
+            if not filename:
+                logger.warning(f"Asset {asset.get('RID')} has no Filename")
+                continue
+
+            source_path = Path(filename)
+            if not source_path.exists():
+                logger.warning(f"Asset file not found: {source_path}")
+                continue
+
+            # Get dataset type path
+            dataset_rid = asset_dataset_map.get(asset["RID"])
+            type_path = type_path_map.get(dataset_rid, ["unknown"])
+
+            # Resolve grouping values
+            group_path = []
+            for key in group_by:
+                value = self._resolve_grouping_value(asset, key, feature_cache)
+                group_path.append(value)
+
+            # Build target directory
+            target_dir = output_dir.joinpath(*type_path, *group_path)
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create link or copy
+            target_path = target_dir / source_path.name
+
+            # Handle existing files
+            if target_path.exists() or target_path.is_symlink():
+                target_path.unlink()
+
+            if use_symlinks:
+                try:
+                    target_path.symlink_to(source_path.resolve())
+                except OSError as e:
+                    # Fall back to copy on platforms that don't support symlinks
+                    logger.warning(f"Symlink failed, falling back to copy: {e}")
+                    shutil.copy2(source_path, target_path)
+            else:
+                shutil.copy2(source_path, target_path)
+
+        return output_dir
 
 
 # Note: validate_call decorators with Self return types were removed because

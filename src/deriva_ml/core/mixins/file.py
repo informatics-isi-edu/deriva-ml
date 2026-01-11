@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable
 from urllib.parse import urlsplit
 
 import deriva.core.datapath as datapath
-from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import RID, FileSpec, MLTable, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLInvalidTerm, DerivaMLTableTypeError
