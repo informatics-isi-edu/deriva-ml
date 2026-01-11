@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable
 
 import pandas as pd
 from deriva.core.ermrest_model import Table
-from sqlalchemy.orm import Session
 
 from deriva_ml.core.definitions import RID, VocabularyTerm, MLVocab
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm

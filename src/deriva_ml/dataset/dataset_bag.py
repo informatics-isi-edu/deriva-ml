@@ -55,7 +55,6 @@ from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature
 
 if TYPE_CHECKING:
-    from deriva_ml.model.database import DatabaseModel
     from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 try:

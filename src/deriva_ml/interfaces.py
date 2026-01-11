@@ -32,7 +32,7 @@ Classes:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Generator, Iterable, Protocol, Self, runtime_checkable
+from typing import Any, Iterable, Protocol, Self, runtime_checkable
 
 import pandas as pd
 from deriva.core import ErmrestSnapshot

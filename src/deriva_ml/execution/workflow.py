@@ -311,10 +311,7 @@ class Workflow(BaseModel):
     @staticmethod
     def _get_python_script() -> tuple[Path, bool]:
         """Return the path to the currently executing script"""
-        is_notebook = True
-        if not (filename := Workflow._get_notebook_path()):
-            is_notebook = False
-            # Resolve the current python model (script/module file) robustly
+        is_notebook = Workflow._get_notebook_path() is not None
         return Path(_get_calling_module()), is_notebook
 
     @staticmethod

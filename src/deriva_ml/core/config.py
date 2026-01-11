@@ -92,7 +92,7 @@ class DerivaMLConfig(BaseModel):
     check_auth: bool = True
 
     @model_validator(mode="after")
-    def init_working_dir(self):
+    def init_working_dir(self) -> "DerivaMLConfig":
         """Initialize working directory after model validation.
 
         Sets up the working directory path, computing a default if not specified.
@@ -109,7 +109,7 @@ class DerivaMLConfig(BaseModel):
         return self
 
     @staticmethod
-    def compute_workdir(working_dir) -> Path:
+    def compute_workdir(working_dir: str | Path | None) -> Path:
         """Compute the effective working directory path.
 
         Creates a standardized working directory path. If a base directory is provided,

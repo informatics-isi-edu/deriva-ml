@@ -136,7 +136,7 @@ class ColumnDefinition(BaseModel):
             return value
 
     @model_serializer()
-    def serialize_column_definition(self):
+    def serialize_column_definition(self) -> dict:
         return em.Column.define(
             self.name,
             builtin_types[self.type.value],
@@ -174,7 +174,7 @@ class KeyDefinition(BaseModel):
     annotations: dict = Field(default_factory=dict)
 
     @model_serializer()
-    def serialize_key_definition(self):
+    def serialize_key_definition(self) -> dict:
         return em.Key.define(
             colnames=self.colnames,
             constraint_names=self.constraint_names,
@@ -224,7 +224,7 @@ class ForeignKeyDefinition(BaseModel):
     annotations: dict[str, Any] = Field(default_factory=dict)
 
     @model_serializer()
-    def serialize_fk_definition(self):
+    def serialize_fk_definition(self) -> dict:
         return em.ForeignKey.define(
             fk_colnames=self.colnames,
             pk_sname=self.pk_sname,
@@ -275,7 +275,7 @@ class TableDefinition(BaseModel):
     annotations: dict = Field(default_factory=dict)
 
     @model_serializer()
-    def serialize_table_definition(self):
+    def serialize_table_definition(self) -> dict:
         return em.Table.define(
             tname=self.name,
             column_defs=[c.model_dump() for c in self.column_defs],

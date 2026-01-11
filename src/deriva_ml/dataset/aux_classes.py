@@ -54,7 +54,7 @@ class DatasetVersion(Version):
         replace(major, minor, patch): Replace the major and minor versions
     """
 
-    def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0):
+    def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0) -> None:
         """Initialize a DatasetVersion object.
 
         Args:
@@ -83,7 +83,7 @@ class DatasetVersion(Version):
         return self.major, self.minor, self.patch
 
     @classmethod
-    def parse(cls, version: str, optional_minor_an_path=False) -> "DatasetVersion":
+    def parse(cls, version: str, optional_minor_an_path: bool = False) -> "DatasetVersion":
         v = Version.parse(version)
         return DatasetVersion(v.major, v.minor, v.patch)
 
@@ -124,11 +124,11 @@ class DatasetHistory(BaseModel):
 
     @field_validator("execution_rid", mode="before")
     @classmethod
-    def _default_execution_rid(cls, v: Any) -> str:
+    def _default_execution_rid(cls, v: str | None) -> str | None:
         return None if v == "" else v
 
     @field_validator("description", mode="after")
-    def _default_description(cls, v) -> str:
+    def _default_description(cls, v: str | None) -> str:
         return v or ""
 
 
@@ -169,7 +169,7 @@ class DatasetMinid(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def insert_metadata(cls, data: Any) -> Any:
+    def insert_metadata(cls, data: dict) -> dict:
         if isinstance(data, dict):
             if "metadata" in data:
                 data = data | data["metadata"]

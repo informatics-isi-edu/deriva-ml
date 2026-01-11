@@ -296,7 +296,8 @@ class Execution:
             for hydra_asset in hydra_runtime_output_dir.rglob("*"):
                 if hydra_asset.is_dir():
                     continue
-                asset = self.asset_file_path(
+                # Register file for upload (side effect); result intentionally unused
+                self.asset_file_path(
                     asset_name=MLAsset.execution_metadata,
                     file_name=hydra_runtime_output_dir / hydra_asset,
                     rename_file=f"hydra-{timestamp}-{hydra_asset.name}",

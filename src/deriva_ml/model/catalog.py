@@ -356,11 +356,6 @@ class DerivaModel:
         for p in table_paths:
             paths_by_element[p[2].name].append(p)
 
-        # Get the names of all of the tables that can be dataset elements.
-        dataset_element_tables = {
-            e.name for e in self.list_dataset_element_types() if e.schema.name == self.domain_schema
-        }
-
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
         element_tables = {}
         for element_table, paths in paths_by_element.items():

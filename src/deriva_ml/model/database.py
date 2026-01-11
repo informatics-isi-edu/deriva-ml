@@ -56,7 +56,7 @@ class ERMRestBoolean(TypeDecorator):
     impl = Boolean
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: Any, dialect: Any) -> bool | None:
         if value in ("Y", "y", 1, True, "t", "T"):
             return True
         elif value in ("N", "n", 0, False, "f", "F"):
@@ -70,7 +70,7 @@ class StringToFloat(TypeDecorator):
     impl = Float
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: Any, dialect: Any) -> float | None:
         if value == "" or value is None:
             return None
         else:
@@ -81,7 +81,7 @@ class StringToInteger(TypeDecorator):
     impl = Integer
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: Any, dialect: Any) -> int | None:
         if value == "" or value is None:
             return None
         else:
@@ -92,7 +92,7 @@ class StringToDateTime(TypeDecorator):
     impl = DateTime
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
         if value == "" or value is None:
             return None
         else:
@@ -103,7 +103,7 @@ class StringToDate(TypeDecorator):
     impl = Date
     cache_ok = True
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
         if value == "" or value is None:
             return None
         else:

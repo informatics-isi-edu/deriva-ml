@@ -56,7 +56,7 @@ class DerivaMLException(Exception):
         DerivaMLException: Failed to connect to catalog
     """
 
-    def __init__(self, msg: str = ""):
+    def __init__(self, msg: str = "") -> None:
         super().__init__(msg)
         self._msg = msg
 
@@ -149,7 +149,7 @@ class DerivaMLDatasetNotFound(DerivaMLNotFoundError):
         DerivaMLDatasetNotFound: Dataset 1-ABC not found
     """
 
-    def __init__(self, dataset_rid: str, msg: str = "Dataset not found"):
+    def __init__(self, dataset_rid: str, msg: str = "Dataset not found") -> None:
         super().__init__(f"{msg}: {dataset_rid}")
         self.dataset_rid = dataset_rid
 
@@ -169,7 +169,7 @@ class DerivaMLTableNotFound(DerivaMLNotFoundError):
         DerivaMLTableNotFound: Table not found: MyTable
     """
 
-    def __init__(self, table_name: str, msg: str = "Table not found"):
+    def __init__(self, table_name: str, msg: str = "Table not found") -> None:
         super().__init__(f"{msg}: {table_name}")
         self.table_name = table_name
 
@@ -190,7 +190,7 @@ class DerivaMLInvalidTerm(DerivaMLNotFoundError):
         DerivaMLInvalidTerm: Invalid term unknown_condition in vocabulary Diagnosis: Term doesn't exist.
     """
 
-    def __init__(self, vocabulary: str, term: str, msg: str = "Term doesn't exist"):
+    def __init__(self, vocabulary: str, term: str, msg: str = "Term doesn't exist") -> None:
         super().__init__(f"Invalid term {term} in vocabulary {vocabulary}: {msg}.")
         self.vocabulary = vocabulary
         self.term = term
@@ -211,7 +211,7 @@ class DerivaMLTableTypeError(DerivaMLDataError):
         DerivaMLTableTypeError: Table 1-ABC123 is not of type Dataset.
     """
 
-    def __init__(self, table_type: str, table: str):
+    def __init__(self, table_type: str, table: str) -> None:
         super().__init__(f"Table {table} is not of type {table_type}.")
         self.table_type = table_type
         self.table = table
@@ -244,7 +244,7 @@ class DerivaMLCycleError(DerivaMLDataError):
         >>> raise DerivaMLCycleError(["Dataset1", "Dataset2", "Dataset1"])
     """
 
-    def __init__(self, cycle_nodes: list[str], msg: str = "Cycle detected"):
+    def __init__(self, cycle_nodes: list[str], msg: str = "Cycle detected") -> None:
         super().__init__(f"{msg}: {cycle_nodes}")
         self.cycle_nodes = cycle_nodes
 

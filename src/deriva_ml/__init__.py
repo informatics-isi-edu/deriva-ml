@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 
 # Lazy import function for runtime usage
-def __getattr__(name):
+def __getattr__(name: str) -> type:
     """Lazy import to avoid circular dependencies."""
     if name == "DerivaML":
         from deriva_ml.core.base import DerivaML

@@ -132,12 +132,12 @@ class DerivaML:
         working_dir: str | Path | None = None,
         hydra_runtime_output_dir: str | Path | None = None,
         ml_schema: str = ML_SCHEMA,
-        logging_level=logging.WARNING,
-        deriva_logging_level=logging.WARNING,
-        credential=None,
+        logging_level: int = logging.WARNING,
+        deriva_logging_level: int = logging.WARNING,
+        credential: dict | None = None,
         use_minid: bool = True,
         check_auth: bool = True,
-    ):
+    ) -> None:
         """Initializes a DerivaML instance.
 
         This method will connect to a catalog and initialize local configuration for the ML execution.
@@ -223,7 +223,7 @@ class DerivaML:
         deriva_logger = logging.getLogger("deriva")
         deriva_logger.setLevel(logging_level)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup method to handle incomplete executions."""
         try:
             # Mark execution as aborted if not completed
@@ -233,7 +233,7 @@ class DerivaML:
             pass
 
     @staticmethod
-    def _get_session_config():
+    def _get_session_config() -> dict:
         """Returns customized HTTP session configuration.
 
         Configures retry behavior and connection settings for HTTP requests to the Deriva server. Settings include:
@@ -782,7 +782,7 @@ class DerivaML:
         metadata = metadata or []
         optional = optional or []
 
-        def normalize_metadata(m: Key | Table | ColumnDefinition | str):
+        def normalize_metadata(m: Key | Table | ColumnDefinition | str) -> Key | Table | dict:
             """Helper function to normalize metadata references."""
             if isinstance(m, str):
                 return self.model.name_to_table(m)
@@ -1282,7 +1282,7 @@ class DerivaML:
             use_minid=self.use_minid,
         )
 
-    def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID):
+    def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID) -> None:
         """Update the status of an execution in the catalog.
 
         Args:
@@ -1422,7 +1422,7 @@ class DerivaML:
 
         return dataset
 
-    def _bootstrap_versions(self):
+    def _bootstrap_versions(self) -> None:
         datasets = [ds.dataset_rid for ds in self.find_datasets()]
         ds_version = [
             {
@@ -1439,8 +1439,7 @@ class DerivaML:
         dataset_versions = [{"RID": h["Dataset"], "Version": h["Version"]} for h in history]
         dataset_path.update(dataset_versions)
 
-    def _synchronize_dataset_versions(self):
-        datasets = [ds.dataset_rid for ds in self.find_datasets()]
+    def _synchronize_dataset_versions(self) -> None:
         schema_path = self.pathBuilder().schemas[self.ml_schema]
         dataset_version_path = schema_path.tables["Dataset_Version"]
         # Get the maximum version number for each dataset.
@@ -1451,7 +1450,7 @@ class DerivaML:
         dataset_path = schema_path.tables["Dataset"]
         dataset_path.update([{"RID": dataset, "Version": version["RID"]} for dataset, version in versions.items()])
 
-    def _set_version_snapshot(self):
+    def _set_version_snapshot(self) -> None:
         """Update the Snapshot column of the Dataset_Version table to the correct time."""
         dataset_version_path = self.pathBuilder().schemas[self.model.ml_schema].tables["Dataset_Version"]
         versions = dataset_version_path.entities().fetch()
