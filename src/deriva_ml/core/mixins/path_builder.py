@@ -9,8 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
 
-import pandas as pd
 import deriva.core.datapath as datapath
+import pandas as pd
 from deriva.core.datapath import _SchemaWrapper as SchemaWrapper
 from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot
 from deriva.core.ermrest_model import Table
