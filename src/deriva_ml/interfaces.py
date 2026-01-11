@@ -32,7 +32,7 @@ Classes:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable, Protocol, Self, runtime_checkable
+from typing import TYPE_CHECKING, Any, Iterable, Protocol, Self, runtime_checkable
 
 import pandas as pd
 from deriva.core import ErmrestSnapshot
@@ -44,6 +44,9 @@ from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion
 from deriva_ml.feature import Feature
 from deriva_ml.model.catalog import DerivaModel
+
+if TYPE_CHECKING:
+    from deriva_ml.dataset.dataset import Dataset
 
 
 @runtime_checkable
@@ -359,13 +362,36 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
         """
         ...
 
+    def lookup_dataset(self, dataset: RID | DatasetSpec, deleted: bool = False) -> "Dataset":
+        """Look up a dataset by RID or specification.
+
+        Args:
+            dataset: RID or DatasetSpec identifying the dataset.
+            deleted: Whether to include deleted datasets.
+
+        Returns:
+            The dataset.
+        """
+        ...
+
+    def find_datasets(self, deleted: bool = False) -> Iterable["Dataset"]:
+        """Find all datasets in the catalog.
+
+        Args:
+            deleted: Whether to include deleted datasets.
+
+        Returns:
+            Iterable of all datasets.
+        """
+        ...
+
     def create_dataset(
         self,
         version: DatasetVersion | str | None = None,
         execution_rid: RID | None = None,
         description: str = "",
         dataset_types: list[str] | None = None,
-    ) -> DatasetLike:
+    ) -> "Dataset":
         """Create a new dataset in the catalog.
 
         Args:
