@@ -35,7 +35,7 @@ from deriva.core import DEFAULT_SESSION_CONFIG, format_exception, get_credential
 import deriva.core.datapath as datapath
 from deriva.core.datapath import DataPathException, _SchemaWrapper as SchemaWrapper
 from deriva.core.deriva_server import DerivaServer
-from deriva.core.ermrest_catalog import ResolveRidResult
+from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot, ResolveRidResult
 from deriva.core.ermrest_model import Key, Table
 from deriva.core.utils.core_utils import DEFAULT_LOGGER_OVERRIDES
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
@@ -57,6 +57,7 @@ from deriva_ml.core.exceptions import DerivaMLTableTypeError, DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.interfaces import DatasetLike
 from deriva_ml.dataset.upload import asset_file_path, execution_rids, table_path
 from deriva_ml.dataset.history import iso_to_snap
 
@@ -114,7 +115,7 @@ class DerivaML:
     model: DerivaModel
     cache_dir: Path
     working_dir: Path
-    catalog: ErmrestCatalog
+    catalog: ErmrestCatalog | ErmrestSnapshot
     catalog_id: str | int
 
     @classmethod
@@ -277,7 +278,7 @@ class DerivaML:
         )
 
     @property
-    def _dataset_table(self):
+    def _dataset_table(self) -> Table:
         return self.model.schemas[self.model.ml_schema].tables["Dataset"]
 
     def pathBuilder(self) -> SchemaWrapper:
@@ -1104,7 +1105,7 @@ class DerivaML:
         pb = self.pathBuilder()
         yield from pb.schemas[table_obj.schema.name].tables[table_obj.name].entities().fetch()
 
-    def find_datasets(self, deleted: bool = False) -> Iterable[Dataset]:
+    def find_datasets(self, deleted: bool = False) -> Iterable[DatasetLike]:
         """Returns a list of currently available datasets.
 
         Arguments:
@@ -1150,13 +1151,13 @@ class DerivaML:
         execution_rid: RID | None = None,
         description: str = "",
         dataset_types: list[str] | None = None,
-    ) -> Dataset:
+    ) -> DatasetLike:
         return Dataset.create_dataset(
             self, execution_rid=execution_rid, version=version, description=description, dataset_types=dataset_types
         )
 
     def lookup_dataset(self, dataset: RID | DatasetSpec, deleted: bool = False
-    ) -> Dataset:
+    ) -> DatasetLike:
         """Looks up a dataset by RID or DatasetSpec.
 
         Arguments:

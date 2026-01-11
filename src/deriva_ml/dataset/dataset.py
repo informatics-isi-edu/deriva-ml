@@ -33,15 +33,14 @@ from pathlib import Path
 # Local imports
 from pprint import pformat
 from tempfile import TemporaryDirectory
-from typing import Any, Generator, Iterable, Self
+from typing import Any, Iterable, Self
 from urllib.parse import urlparse
 
 # Deriva imports
 import deriva.core.utils.hash_utils as hash_utils
-import requests
 
 # Third-party imports
-import pandas as pd
+import requests
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
 from deriva.core.ermrest_model import Table

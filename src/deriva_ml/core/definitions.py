@@ -66,12 +66,6 @@ from deriva_ml.core.ermrest import (
 )
 
 # =============================================================================
-# Re-exported Utilities
-# =============================================================================
-# From filespec.py: File metadata and specification handling
-from deriva_ml.core.filespec import FileSpec
-
-# =============================================================================
 # Re-exported Exceptions
 # =============================================================================
 # From exceptions.py: Exception hierarchy for DerivaML errors
@@ -93,6 +87,12 @@ from deriva_ml.core.exceptions import (
     DerivaMLValidationError,
     DerivaMLWorkflowError,
 )
+
+# =============================================================================
+# Re-exported Utilities
+# =============================================================================
+# From filespec.py: File metadata and specification handling
+from deriva_ml.core.filespec import FileSpec
 
 __all__ = [
     # Constants
