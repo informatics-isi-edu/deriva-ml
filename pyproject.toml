@@ -24,7 +24,8 @@ dependencies = [
     "setuptools-scm>=8.0",
     "nbstripout",
     "hydra_zen",
-    "SQLAlchemy"
+    "SQLAlchemy",
+    "torchvision"
 ]
 
 [project.scripts]
@@ -37,6 +38,7 @@ bump-version = "deriva_ml.bump_version:main"
 create-demo-catalog = "deriva_ml.demo_catalog:main"
 
 deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
+load-cifar10 = "deriva_ml.scripts.load_cifar10:main"
 
 [project.optional-dependencies]
 
