@@ -412,6 +412,221 @@ class DerivaML(
 
     # resolve_rid, retrieve_rid moved to RidResolutionMixin
 
+    def apply_catalog_annotations(
+        self,
+        navbar_brand_text: str = "ML Data Browser",
+        head_title: str = "Catalog ML",
+    ) -> None:
+        """Apply catalog-level annotations including the navigation bar and display settings.
+
+        This method configures the Chaise web interface for the catalog. Chaise is Deriva's
+        web-based data browser that provides a user-friendly interface for exploring and
+        managing catalog data. This method sets up annotations that control how Chaise
+        displays and organizes the catalog.
+
+        **Navigation Bar Structure**:
+        The method creates a navigation bar with the following menus:
+        - **User Info**: Links to Users, Groups, and RID Lease tables
+        - **Deriva-ML**: Core ML tables (Workflow, Execution, Dataset, Dataset_Version, etc.)
+        - **WWW**: Web content tables (Page, File)
+        - **{Domain Schema}**: All domain-specific tables (excludes vocabularies and associations)
+        - **Vocabulary**: All controlled vocabulary tables from both ML and domain schemas
+        - **Assets**: All asset tables from both ML and domain schemas
+        - **Catalog Registry**: Link to the ermrest registry
+        - **Documentation**: Links to ML notebook instructions and Deriva-ML docs
+
+        **Display Settings**:
+        - Underscores in table/column names displayed as spaces
+        - System columns (RID) shown in compact and entry views
+        - Default table set to Dataset
+        - Faceting and record deletion enabled
+        - Export configurations available to all users
+
+        **Bulk Upload Configuration**:
+        Configures upload patterns for asset tables, enabling drag-and-drop file uploads
+        through the Chaise interface.
+
+        Call this after creating the domain schema and all tables to initialize the catalog's
+        web interface. The navigation menus are dynamically built based on the current schema
+        structure, automatically organizing tables into appropriate categories.
+
+        Args:
+            navbar_brand_text: Text displayed in the navigation bar brand area.
+            head_title: Title displayed in the browser tab.
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> # After creating domain schema and tables...
+            >>> ml.apply_catalog_annotations()
+            >>> # Or with custom branding:
+            >>> ml.apply_catalog_annotations("My Project Browser", "My ML Project")
+        """
+        from deriva.core.utils.core_utils import tag as deriva_tags
+        from deriva_ml.dataset.upload import bulk_upload_configuration
+
+        catalog_id = self.model.catalog.catalog_id
+        ml_schema = self.ml_schema
+
+        catalog_annotation = {
+            deriva_tags.display: {"name_style": {"underline_space": True}},
+            deriva_tags.chaise_config: {
+                "headTitle": head_title,
+                "navbarBrandText": navbar_brand_text,
+                "systemColumnsDisplayEntry": ["RID"],
+                "systemColumnsDisplayCompact": ["RID"],
+                "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
+                "deleteRecord": True,
+                "showFaceting": True,
+                "shareCiteAcls": True,
+                "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
+                "resolverImplicitCatalog": False,
+                "navbarMenu": {
+                    "newTab": False,
+                    "children": [
+                        {
+                            "name": "User Info",
+                            "children": [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Client",
+                                    "name": "Users",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Group",
+                                    "name": "Groups",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_RID_Lease",
+                                    "name": "ERMrest RID Lease",
+                                },
+                            ],
+                        },
+                        {  # All the primary tables in deriva-ml schema.
+                            "name": "Deriva-ML",
+                            "children": [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Workflow",
+                                    "name": "Workflow",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution",
+                                    "name": "Execution",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Metadata",
+                                    "name": "Execution Metadata",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Asset",
+                                    "name": "Execution Asset",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset",
+                                    "name": "Dataset",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset_Version",
+                                    "name": "Dataset Version",
+                                },
+                            ],
+                        },
+                        {  # All the primary tables in deriva-ml schema.
+                            "name": "WWW",
+                            "children": [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/WWW:Page",
+                                    "name": "Page",
+                                },
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/WWW:File",
+                                    "name": "File",
+                                },
+                            ],
+                        },
+                        {
+                            "name": self.domain_schema,
+                            "children": [
+                                {
+                                    "name": tname,
+                                    "url": f"/chaise/recordset/#{catalog_id}/{self.domain_schema}:{tname}",
+                                }
+                                for tname in self.model.schemas[self.domain_schema].tables
+                                # Don't include controlled vocabularies, association tables, or feature tables.
+                                if not (
+                                    self.model.is_vocabulary(tname)
+                                    or self.model.is_association(tname, pure=False, max_arity=3)
+                                )
+                            ],
+                        },
+                        {  # Vocabulary menu which will list all the controlled vocabularies in deriva-ml and domain.
+                            "name": "Vocabulary",
+                            "children": [{"name": f"{ml_schema} Vocabularies", "header": True}]
+                            + [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
+                                    "name": tname,
+                                }
+                                for tname in self.model.schemas[ml_schema].tables
+                                if self.model.is_vocabulary(tname)
+                            ]
+                            + [
+                                {
+                                    "name": f"{self.domain_schema} Vocabularies",
+                                    "header": True,
+                                }
+                            ]
+                            + [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{self.domain_schema}:{tname}",
+                                    "name": tname,
+                                }
+                                for tname in self.model.schemas[self.domain_schema].tables
+                                if self.model.is_vocabulary(tname)
+                            ],
+                        },
+                        {  # List of all of the asset tables in deriva-ml and domain schemas.
+                            "name": "Assets",
+                            "children": [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
+                                    "name": tname,
+                                }
+                                for tname in self.model.schemas[ml_schema].tables
+                                if self.model.is_asset(tname)
+                            ]
+                            + [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{self.domain_schema}:{tname}",
+                                    "name": tname,
+                                }
+                                for tname in self.model.schemas[self.domain_schema].tables
+                                if self.model.is_asset(tname)
+                            ],
+                        },
+                        {
+                            "url": "/chaise/recordset/#0/ermrest:registry@sort(RID)",
+                            "name": "Catalog Registry",
+                        },
+                        {
+                            "name": "Documentation",
+                            "children": [
+                                {
+                                    "url": "https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/ml_workflow_instruction.md",
+                                    "name": "ML Notebook Instruction",
+                                },
+                                {
+                                    "url": "https://informatics-isi-edu.github.io/deriva-ml/",
+                                    "name": "Deriva-ML Documentation",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+            deriva_tags.bulk_upload: bulk_upload_configuration(model=self.model),
+        }
+        self.model.annotations.update(catalog_annotation)
+        self.model.apply()
+
     def add_page(self, title: str, content: str) -> None:
         """Adds page to web interface.
 

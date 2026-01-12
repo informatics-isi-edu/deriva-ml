@@ -25,7 +25,6 @@ from deriva_ml.execution.execution import Execution, ExecutionConfiguration
 from deriva_ml.schema import (
     create_ml_catalog,
 )
-from deriva_ml.schema.annotations import catalog_annotation
 
 try:
     from pprint import pformat
@@ -338,7 +337,7 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
             ],
             referenced_tables=[subject_table],
         )
-        catalog_annotation(ml_instance.model)
+        ml_instance.apply_catalog_annotations()
 
 
 def destroy_demo_catalog(catalog):
