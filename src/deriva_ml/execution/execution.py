@@ -28,6 +28,7 @@ import logging
 import os
 import shutil
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -747,8 +748,6 @@ class Execution:
         Args:
             folder_path: Path to the folder to clean
         """
-        import time
-
         MAX_RETRIES = 3
         RETRY_DELAY = 1  # seconds
 
