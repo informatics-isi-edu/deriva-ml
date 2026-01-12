@@ -135,6 +135,7 @@ class DerivaModel:
                                 "comment": "description",
                                 "is_vocabulary": bool,
                                 "is_asset": bool,
+                                "is_association": bool,
                                 "columns": [...],
                                 "foreign_keys": [...],
                                 "features": [...]
@@ -198,6 +199,7 @@ class DerivaModel:
                     "comment": table.comment or "",
                     "is_vocabulary": self.is_vocabulary(table),
                     "is_asset": self.is_asset(table),
+                    "is_association": bool(self.is_association(table)),
                     "columns": columns,
                     "foreign_keys": foreign_keys,
                 }
