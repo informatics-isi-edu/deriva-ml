@@ -1,3 +1,10 @@
+# type: ignore[arg-type, call-arg]
+"""Demo catalog utilities for DerivaML testing and examples.
+
+This module creates demo catalogs with sample data for testing. It uses
+dynamically created Pydantic models for features, which cannot be statically
+typed - hence the type ignore above.
+"""
 from __future__ import annotations
 
 import atexit
