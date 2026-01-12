@@ -59,6 +59,12 @@ uv run mkdocs serve
 - Nested dataset support
 - Version history tracking via catalog snapshots
 
+**DatasetBag** (`src/deriva_ml/dataset/dataset_bag.py`): Downloaded dataset representation:
+- Provides same interface as Dataset via `DatasetLike` protocol
+- Works with local BDBag directories (no catalog connection needed)
+- Supports nested dataset traversal and member listing
+- Use `restructure_assets()` to reorganize files by dataset type/features
+
 **ExecutionConfiguration** (`src/deriva_ml/execution/execution_configuration.py`): Pydantic model for execution setup:
 - Dataset specifications with version and materialization options
 - Input asset RIDs
@@ -163,3 +169,41 @@ Similarly, `Execution` (~1100 lines) could be decomposed into:
 - `DatasetDownloader`: Dataset materialization
 - `AssetUploader`: Result upload and cataloging
 - `StatusTracker`: Execution status management
+
+## Hydra-zen Configuration
+
+DerivaML integrates with hydra-zen for reproducible configuration. Key config classes:
+
+**DerivaMLConfig** (`deriva_ml.core.config`): Main connection configuration
+```python
+from deriva_ml import DerivaMLConfig
+config = DerivaMLConfig(hostname="example.org", catalog_id="42")
+ml = DerivaML.instantiate(config)
+```
+
+**DatasetSpecConfig** (`deriva_ml.dataset`): Dataset specification for executions
+```python
+from deriva_ml.dataset import DatasetSpecConfig
+spec = DatasetSpecConfig(rid="XXXX", version="1.0.0", materialize=True)
+```
+
+**AssetRIDConfig** (`deriva_ml.execution`): Input asset specification
+```python
+from deriva_ml.execution import AssetRIDConfig
+asset = AssetRIDConfig(rid="YYYY", description="Pretrained weights")
+```
+
+**ExecutionConfiguration** (`deriva_ml.execution`): Full execution setup
+```python
+from deriva_ml.execution import ExecutionConfiguration
+config = ExecutionConfiguration(
+    datasets=[DatasetSpecConfig(rid="DATA", version="1.0.0")],
+    assets=["WGTS"],
+    description="Training run"
+)
+```
+
+Use `builds()` with `populate_full_signature=True` for hydra-zen integration.
+Use `zen_partial=True` for model functions that receive execution context at runtime.
+
+See `docs/user-guide/hydra-zen-configuration.md` for complete documentation.

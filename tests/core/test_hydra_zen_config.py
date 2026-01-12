@@ -282,3 +282,255 @@ class TestHydraZenIntegration:
         result = instantiate(conf)
 
         assert result.path == Path("/some/path")
+
+
+class TestDatasetSpecConfig:
+    """Test hydra-zen configuration for DatasetSpec using DatasetSpecConfig."""
+
+    def test_dataset_spec_config_basic(self):
+        """Test basic DatasetSpecConfig usage."""
+        from deriva_ml.dataset import DatasetSpecConfig
+
+        # Create a dataset spec config
+        spec = DatasetSpecConfig(rid="1ABC", version="1.0.0")
+
+        assert spec.rid == "1ABC"
+        assert spec.version == "1.0.0"
+        assert spec.materialize is True  # Default
+
+    def test_dataset_spec_config_with_materialize_false(self):
+        """Test DatasetSpecConfig with materialize=False."""
+        from deriva_ml.dataset import DatasetSpecConfig
+
+        spec = DatasetSpecConfig(
+            rid="2DEF",
+            version="2.1.0",
+            materialize=False,
+            description="Metadata only dataset"
+        )
+
+        assert spec.rid == "2DEF"
+        assert spec.version == "2.1.0"
+        assert spec.materialize is False
+        assert spec.description == "Metadata only dataset"
+
+    def test_dataset_spec_config_instantiate(self):
+        """Test that DatasetSpecConfig instantiates to DatasetSpec."""
+        from deriva_ml.dataset import DatasetSpecConfig, DatasetSpec
+
+        config = DatasetSpecConfig(
+            rid="3GHI",
+            version="1.2.3",
+            materialize=True,
+        )
+
+        # Instantiate using hydra-zen
+        spec = instantiate(config)
+
+        assert isinstance(spec, DatasetSpec)
+        assert spec.rid == "3GHI"
+        assert str(spec.version) == "1.2.3"
+        assert spec.materialize is True
+
+    def test_dataset_spec_list_config(self):
+        """Test creating a list of dataset specs for execution configuration."""
+        from deriva_ml.dataset import DatasetSpecConfig
+
+        # Create a list of dataset specs (typical pattern for execution configs)
+        datasets = [
+            DatasetSpecConfig(rid="1ABC", version="1.0.0"),
+            DatasetSpecConfig(rid="2DEF", version="2.0.0", materialize=False),
+            DatasetSpecConfig(rid="3GHI", version="1.1.0", description="Testing"),
+        ]
+
+        assert len(datasets) == 3
+        assert datasets[0].rid == "1ABC"
+        assert datasets[1].materialize is False
+        assert datasets[2].description == "Testing"
+
+
+class TestAssetRIDConfig:
+    """Test hydra-zen configuration for asset RIDs."""
+
+    def test_asset_rid_config_basic(self):
+        """Test basic AssetRIDConfig usage."""
+        from deriva_ml.execution import AssetRIDConfig
+
+        asset = AssetRIDConfig(rid="WXYZ")
+
+        # AssetRIDConfig creates an AssetRID config
+        assert asset.rid == "WXYZ"
+
+    def test_asset_rid_config_with_description(self):
+        """Test AssetRIDConfig with description."""
+        from deriva_ml.execution import AssetRIDConfig
+
+        asset = AssetRIDConfig(rid="ABCD", description="Model weights file")
+
+        assert asset.rid == "ABCD"
+        assert asset.description == "Model weights file"
+
+    def test_asset_rid_list_config(self):
+        """Test creating a list of asset RIDs for execution configuration."""
+        from deriva_ml.execution import AssetRIDConfig
+
+        # Create a list of asset RIDs (typical pattern for execution configs)
+        assets = [
+            AssetRIDConfig(rid="1ABC"),
+            AssetRIDConfig(rid="2DEF", description="Pretrained weights"),
+            AssetRIDConfig(rid="3GHI", description="Config file"),
+        ]
+
+        assert len(assets) == 3
+        assert assets[1].description == "Pretrained weights"
+
+
+class TestWorkflowConfig:
+    """Test hydra-zen configuration for Workflow."""
+
+    def test_workflow_builds_config(self):
+        """Test creating a Workflow config with builds()."""
+        from deriva_ml.execution import Workflow
+
+        # Build a workflow config (without auto-detecting script info)
+        WorkflowConf = builds(
+            Workflow,
+            name="Test Workflow",
+            workflow_type="Test Type",
+            description="A test workflow",
+            url="https://github.com/test/repo/test.py",
+            checksum="abc123",
+            populate_full_signature=True,
+        )
+
+        assert WorkflowConf.name == "Test Workflow"
+        assert WorkflowConf.workflow_type == "Test Type"
+
+
+class TestHydraStorePatterns:
+    """Test common hydra-zen store patterns for DerivaML."""
+
+    def test_store_multiple_configs(self):
+        """Test storing multiple environment configurations."""
+        from hydra_zen import store
+
+        DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
+
+        # Create a local store (not affecting global state)
+        # Pattern: store configs for different environments
+        dev_config = DerivaMLConf(
+            hostname="dev.example.org",
+            catalog_id="1",
+            use_minid=False,
+        )
+
+        staging_config = DerivaMLConf(
+            hostname="staging.example.org",
+            catalog_id="10",
+            use_minid=True,
+        )
+
+        prod_config = DerivaMLConf(
+            hostname="prod.example.org",
+            catalog_id="100",
+            use_minid=True,
+        )
+
+        # Verify different configs have expected values
+        assert dev_config.hostname == "dev.example.org"
+        assert dev_config.use_minid is False
+
+        assert staging_config.catalog_id == "10"
+
+        assert prod_config.hostname == "prod.example.org"
+        assert prod_config.catalog_id == "100"
+
+    def test_store_dataset_collections(self):
+        """Test storing collections of datasets for different experiments."""
+        from deriva_ml.dataset import DatasetSpecConfig
+
+        # Pattern: create named dataset collections
+        training_datasets = [
+            DatasetSpecConfig(rid="TRNA", version="1.0.0"),
+            DatasetSpecConfig(rid="TRNB", version="1.0.0"),
+        ]
+
+        validation_datasets = [
+            DatasetSpecConfig(rid="VALA", version="1.0.0", materialize=False),
+        ]
+
+        full_datasets = training_datasets + validation_datasets
+
+        assert len(training_datasets) == 2
+        assert len(validation_datasets) == 1
+        assert len(full_datasets) == 3
+
+    def test_execution_config_with_all_components(self):
+        """Test composing a full execution config with datasets and assets."""
+        from deriva_ml.execution import ExecutionConfiguration, AssetRIDConfig
+        from deriva_ml.dataset import DatasetSpecConfig
+
+        ExecConf = builds(ExecutionConfiguration, populate_full_signature=True)
+        DatasetConf = builds(DatasetSpec, populate_full_signature=True)
+
+        # Create the full execution configuration
+        exec_conf = ExecConf(
+            description="Full ML training run",
+            datasets=[
+                DatasetConf(rid="DATA", version="1.0.0", materialize=True),
+            ],
+            assets=["MODL", "CNFG"],  # Asset RIDs
+        )
+
+        assert exec_conf.description == "Full ML training run"
+        assert len(exec_conf.datasets) == 1
+        assert len(exec_conf.assets) == 2
+
+
+class TestWorkingDirectoryIntegration:
+    """Test that working directory is correctly propagated to Hydra."""
+
+    def test_working_dir_resolver_with_custom_path(self, tmp_path):
+        """Test the compute_workdir resolver with custom paths."""
+        custom_base = tmp_path / "ml_workspace"
+
+        # Resolve using the OmegaConf resolver
+        cfg = OmegaConf.create({
+            "base_path": str(custom_base),
+            "resolved_path": "${compute_workdir:${base_path}}"
+        })
+        resolved = OmegaConf.to_container(cfg, resolve=True)
+
+        expected = custom_base / getpass.getuser() / "deriva-ml"
+        assert Path(resolved["resolved_path"]) == expected.absolute()
+
+    def test_working_dir_in_full_config(self, tmp_path):
+        """Test working directory in a full DerivaML config."""
+        DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
+
+        work_dir = tmp_path / "experiment_outputs"
+
+        conf = DerivaMLConf(
+            hostname="test.example.org",
+            working_dir=str(work_dir),
+            check_auth=False,
+        )
+
+        # Verify the config has the working dir
+        assert conf.working_dir == str(work_dir)
+
+        # Test compute_workdir directly
+        computed = DerivaMLConfig.compute_workdir(work_dir)
+        assert computed == (work_dir / getpass.getuser() / "deriva-ml").absolute()
+
+    def test_hydra_output_dir_structure(self, tmp_path):
+        """Test that Hydra output directory follows expected structure."""
+        # The expected structure is:
+        # {working_dir}/{username}/deriva-ml/hydra/{timestamp}/
+
+        work_dir = tmp_path / "test_work"
+        computed = DerivaMLConfig.compute_workdir(work_dir)
+
+        # Verify the path structure
+        assert "deriva-ml" in str(computed)
+        assert getpass.getuser() in str(computed)

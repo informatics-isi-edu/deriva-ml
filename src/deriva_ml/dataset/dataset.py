@@ -33,13 +33,14 @@ from pathlib import Path
 # Local imports
 from pprint import pformat
 from tempfile import TemporaryDirectory
-from typing import Any, Iterable, Self
+from typing import Any, Generator, Iterable, Self
 from urllib.parse import urlparse
 
 # Deriva imports
 import deriva.core.utils.hash_utils as hash_utils
 
 # Third-party imports
+import pandas as pd
 import requests
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
@@ -506,20 +507,25 @@ class Dataset:
         return next((d.version for d in version_update_list if d.rid == self.dataset_rid))
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_members(self, version: DatasetVersion | str | None = None,
-                             recurse: bool = False,
-                             limit: int | None = None,
-                             _visited: set[RID] | None = None) -> dict[str, list[dict[str, Any]]]:
+    def list_dataset_members(
+        self,
+        recurse: bool = False,
+        limit: int | None = None,
+        _visited: set[RID] | None = None,
+        version: DatasetVersion | str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, list[dict[str, Any]]]:
         """Lists members of a dataset.
 
         Returns a dictionary mapping member types to lists of member records. Can optionally
         recurse through nested datasets and limit the number of results.
 
         Args:
-            version: Dataset version to list members from. Defaults to the current version.
             recurse: Whether to include members of nested datasets. Defaults to False.
             limit: Maximum number of members to return per type. None for no limit.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list members from. Defaults to the current version.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
             dict[str, list[dict[str, Any]]]: Dictionary mapping member types to lists of members.
@@ -578,6 +584,170 @@ class Dataset:
                     for k, v in ds.list_dataset_members(version=version, recurse=recurse, _visited=_visited).items():
                         members[k].extend(v)
         return dict(members)
+
+    def _denormalize_datapath(
+        self,
+        include_tables: list[str],
+        version: DatasetVersion | str | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
+        """Denormalize dataset members by joining related tables.
+
+        This method creates a "wide table" view by joining related tables together using
+        the Deriva datapath API, producing rows that contain columns from all specified
+        tables. The result has outer join semantics - rows from tables without FK
+        relationships are included with NULL values for unrelated columns.
+
+        The method:
+        1. Gets the list of dataset members for each included table
+        2. For each member in the first table, follows foreign key relationships to
+           get related records from other tables
+        3. Tables without FK connections to the first table are included with NULLs
+        4. Includes nested dataset members recursively
+
+        Args:
+            include_tables: List of table names to include in the output.
+            version: Dataset version to query. Defaults to current version.
+
+        Yields:
+            dict[str, Any]: Rows with column names prefixed by table name (e.g., "Image_Filename").
+                Unrelated tables have NULL values for their columns.
+
+        Note:
+            Column names in the result are prefixed with the table name to avoid
+            collisions (e.g., "Image_Filename", "Subject_RID").
+        """
+        # Skip system columns in output
+        skip_columns = {"RCT", "RMT", "RCB", "RMB"}
+
+        # Get all members for the included tables (recursively includes nested datasets)
+        members = self.list_dataset_members(version=version, recurse=True)
+
+        # Build a lookup of columns for each table
+        table_columns: dict[str, list[str]] = {}
+        for table_name in include_tables:
+            table = self._ml_instance.model.name_to_table(table_name)
+            table_columns[table_name] = [
+                c.name for c in table.columns if c.name not in skip_columns
+            ]
+
+        # Find the primary table (first non-empty table in include_tables)
+        primary_table = None
+        for table_name in include_tables:
+            if table_name in members and members[table_name]:
+                primary_table = table_name
+                break
+
+        if primary_table is None:
+            # No data at all
+            return
+
+        primary_table_obj = self._ml_instance.model.name_to_table(primary_table)
+
+        for member in members[primary_table]:
+            # Build the row with all columns from all tables
+            row: dict[str, Any] = {}
+
+            # Add primary table columns
+            for col_name in table_columns[primary_table]:
+                prefixed_name = f"{primary_table}_{col_name}"
+                row[prefixed_name] = member.get(col_name)
+
+            # For each other table, try to join or add NULL values
+            for other_table_name in include_tables:
+                if other_table_name == primary_table:
+                    continue
+
+                other_table = self._ml_instance.model.name_to_table(other_table_name)
+                other_cols = table_columns[other_table_name]
+
+                # Initialize all columns to None (outer join behavior)
+                for col_name in other_cols:
+                    prefixed_name = f"{other_table_name}_{col_name}"
+                    row[prefixed_name] = None
+
+                # Try to find FK relationship and join
+                if other_table_name in members:
+                    try:
+                        relationship = self._ml_instance.model._table_relationship(
+                            primary_table_obj, other_table
+                        )
+                        fk_col, pk_col = relationship
+
+                        # Look up the related record
+                        fk_value = member.get(fk_col.name)
+                        if fk_value:
+                            for other_member in members.get(other_table_name, []):
+                                if other_member.get(pk_col.name) == fk_value:
+                                    for col_name in other_cols:
+                                        prefixed_name = f"{other_table_name}_{col_name}"
+                                        row[prefixed_name] = other_member.get(col_name)
+                                    break
+                    except DerivaMLException:
+                        # No FK relationship - columns remain NULL (outer join)
+                        pass
+
+            yield row
+
+    def denormalize_as_dataframe(
+        self,
+        include_tables: list[str],
+        version: DatasetVersion | str | None = None,
+        **kwargs: Any,
+    ) -> pd.DataFrame:
+        """Denormalize the dataset into a single wide DataFrame.
+
+        Joins related tables together to produce a "flat" view of the data,
+        with columns from multiple tables combined into a single DataFrame.
+        This is particularly useful for machine learning workflows that require
+        tabular data with all features in one table.
+
+        Column names are prefixed with the source table name using underscores
+        to avoid collisions (e.g., "Image_Filename", "Subject_RID").
+
+        Args:
+            include_tables: List of table names to include in the output. Tables
+                are joined based on their foreign key relationships.
+            version: Dataset version to query. Defaults to current version.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
+
+        Returns:
+            pd.DataFrame: Wide table with columns from all included tables.
+
+        Example:
+            >>> df = dataset.denormalize_as_dataframe(["Image", "Diagnosis"])
+            >>> # df has columns like "Image_Filename", "Diagnosis_Name", etc.
+        """
+        rows = list(self._denormalize_datapath(include_tables, version))
+        return pd.DataFrame(rows)
+
+    def denormalize_as_dict(
+        self,
+        include_tables: list[str],
+        version: DatasetVersion | str | None = None,
+        **kwargs: Any,
+    ) -> Generator[dict[str, Any], None, None]:
+        """Denormalize the dataset and yield rows as dictionaries.
+
+        Like denormalize_as_dataframe(), but returns a generator of dictionaries
+        instead of a DataFrame. Useful for processing large datasets without
+        loading everything into memory.
+
+        Column names are prefixed with the source table name using underscores
+        to avoid collisions (e.g., "Image_Filename", "Subject_RID").
+
+        Args:
+            include_tables: List of table names to include in the output.
+            version: Dataset version to query. Defaults to current version.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
+
+        Yields:
+            dict[str, Any]: Dictionary with "table_column" keys.
+
+        Example:
+            >>> for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
+            ...     print(row["Image_Filename"], row["Diagnosis_Name"])
+        """
+        yield from self._denormalize_datapath(include_tables, version)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_members(
@@ -739,17 +909,21 @@ class Dataset:
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_parents(self,
-                             version: DatasetVersion | str | None = None,
-                             recurse: bool = False,
-                             _visited: set[RID] | None = None) -> list[Self]:
+    def list_dataset_parents(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: DatasetVersion | str | None = None,
+        **kwargs: Any,
+    ) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
 
         Args:
-            version: Dataset version to list parents from. Defaults to the current version.
             recurse: If True, recursively return all ancestor datasets.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list parents from. Defaults to the current version.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
             List of parent datasets.
@@ -773,20 +947,24 @@ class Dataset:
         ]
         if recurse:
             for parent in parents.copy():
-                parents.extend(parent.list_dataset_parents(version, recurse=True, _visited=_visited))
+                parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited, version=version))
         return parents
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_dataset_children(self,
-                              version: DatasetVersion | str | None = None,
-                              recurse: bool = False,
-                              _visited: set[RID] | None = None) -> list[Self]:
+    def list_dataset_children(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: DatasetVersion | str | None = None,
+        **kwargs: Any,
+    ) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs for any nested datasets.
 
         Args:
-            version: Dataset version to list children from. Defaults to the current version.
             recurse: If True, return a list of nested datasets RIDs.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list children from. Defaults to the current version.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
           list of nested dataset RIDs.

@@ -111,6 +111,46 @@ class DerivaML(
 
     @classmethod
     def instantiate(cls, config: DerivaMLConfig) -> Self:
+        """Create a DerivaML instance from a configuration object.
+
+        This method is the preferred way to instantiate DerivaML when using hydra-zen
+        for configuration management. It accepts a DerivaMLConfig (Pydantic model) and
+        unpacks it to create the instance.
+
+        This pattern allows hydra-zen's `instantiate()` to work with DerivaML:
+
+        Example with hydra-zen:
+            >>> from hydra_zen import builds, instantiate
+            >>> from deriva_ml import DerivaML
+            >>> from deriva_ml.core.config import DerivaMLConfig
+            >>>
+            >>> # Create a structured config using hydra-zen
+            >>> DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
+            >>>
+            >>> # Configure for your environment
+            >>> conf = DerivaMLConf(
+            ...     hostname='deriva.example.org',
+            ...     catalog_id='42',
+            ...     domain_schema='my_domain',
+            ... )
+            >>>
+            >>> # Instantiate the config to get a DerivaMLConfig object
+            >>> config = instantiate(conf)
+            >>>
+            >>> # Create the DerivaML instance
+            >>> ml = DerivaML.instantiate(config)
+
+        Args:
+            config: A DerivaMLConfig object containing all configuration parameters.
+
+        Returns:
+            A new DerivaML instance configured according to the config object.
+
+        Note:
+            The DerivaMLConfig class integrates with Hydra's configuration system
+            and registers custom resolvers for computing working directories.
+            See `deriva_ml.core.config` for details on configuration options.
+        """
         return cls(**config.model_dump())
 
     def __init__(

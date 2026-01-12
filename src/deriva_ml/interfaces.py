@@ -32,7 +32,7 @@ Classes:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, Protocol, Self, runtime_checkable
+from typing import TYPE_CHECKING, Any, Generator, Iterable, Protocol, Self, runtime_checkable
 
 import pandas as pd
 from deriva.core import ErmrestSnapshot
@@ -88,46 +88,77 @@ class DatasetLike(Protocol):
         """Get the version history of the dataset."""
         ...
 
-    def list_dataset_children(self, recurse: bool = False) -> list[Self]:
+    def list_dataset_children(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
+    ) -> list[Self]:
         """Get nested child datasets.
 
         Args:
             recurse: Whether to recursively include children of children.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list children from (Dataset only, ignored by DatasetBag).
+            **kwargs: Additional implementation-specific arguments.
 
         Returns:
             List of child datasets (Dataset or DatasetBag depending on implementation).
 
         Note:
-            Dataset also accepts a `version` parameter to query historical versions.
+            Both Dataset and DatasetBag have `recurse` as the first parameter.
+            Dataset uses the `version` parameter to query historical versions.
         """
         ...
 
-    def list_dataset_parents(self, recurse: bool = False) -> list[Self]:
+    def list_dataset_parents(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
+    ) -> list[Self]:
         """Get parent datasets that contain this dataset.
 
         Args:
             recurse: Whether to recursively include parents of parents.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list parents from (Dataset only, ignored by DatasetBag).
+            **kwargs: Additional implementation-specific arguments.
 
         Returns:
             List of parent datasets (Dataset or DatasetBag depending on implementation).
 
         Note:
-            Dataset also accepts a `version` parameter to query historical versions.
+            Both Dataset and DatasetBag have `recurse` as the first parameter.
+            Dataset uses the `version` parameter to query historical versions.
         """
         ...
 
-    def list_dataset_members(self, recurse: bool = False, limit: int | None = None) -> dict[str, list[dict[str, Any]]]:
+    def list_dataset_members(
+        self,
+        recurse: bool = False,
+        limit: int | None = None,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
+    ) -> dict[str, list[dict[str, Any]]]:
         """List members of the dataset.
 
         Args:
             recurse: Whether to include members of nested datasets.
             limit: Maximum number of members per type. None for no limit.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list members from (Dataset only, ignored by DatasetBag).
+            **kwargs: Additional implementation-specific arguments.
 
         Returns:
             Dictionary mapping member types to lists of member records.
 
         Note:
-            Dataset also accepts a `version` parameter to query historical versions.
+            Both Dataset and DatasetBag have `recurse` as the first parameter.
+            Dataset uses the `version` parameter to query historical versions.
         """
         ...
 
@@ -147,6 +178,68 @@ class DatasetLike(Protocol):
 
         Returns:
             Iterable of Feature objects.
+        """
+        ...
+
+    def denormalize_as_dataframe(
+        self,
+        include_tables: list[str],
+        version: Any = None,
+        **kwargs: Any,
+    ) -> pd.DataFrame:
+        """Denormalize the dataset into a single wide DataFrame.
+
+        Joins related tables together to produce a "flat" view of the data,
+        with columns from multiple tables combined into a single DataFrame.
+        This is useful for ML workflows that require tabular data.
+
+        The result has outer join semantics - tables without FK relationships
+        are included with NULL values for unrelated columns.
+
+        Args:
+            include_tables: List of table names to include in the output.
+                Tables are joined based on their foreign key relationships.
+            version: Dataset version to query (Dataset only, ignored by DatasetBag).
+            **kwargs: Additional implementation-specific arguments.
+
+        Returns:
+            pd.DataFrame: Wide table with columns from all included tables.
+                Column names are prefixed with the source table name.
+
+        Note:
+            Column naming conventions differ between implementations:
+            - Dataset (catalog): Uses underscore separator (e.g., "Image_Filename")
+            - DatasetBag (bag): Uses dot separator (e.g., "Image.Filename")
+        """
+        ...
+
+    def denormalize_as_dict(
+        self,
+        include_tables: list[str],
+        version: Any = None,
+        **kwargs: Any,
+    ) -> Generator[dict[str, Any], None, None]:
+        """Denormalize the dataset and yield rows as dictionaries.
+
+        Like denormalize_as_dataframe(), but returns a generator of dictionaries
+        instead of a DataFrame. Useful for processing large datasets without
+        loading everything into memory.
+
+        The result has outer join semantics - tables without FK relationships
+        are included with NULL values for unrelated columns.
+
+        Args:
+            include_tables: List of table names to include in the output.
+            version: Dataset version to query (Dataset only, ignored by DatasetBag).
+            **kwargs: Additional implementation-specific arguments.
+
+        Yields:
+            dict[str, Any]: Dictionary with column keys prefixed by table name.
+
+        Note:
+            Column naming conventions differ between implementations:
+            - Dataset (catalog): Uses underscore separator (e.g., "Image_Filename")
+            - DatasetBag (bag): Uses dot separator (e.g., "Image.Filename")
         """
         ...
 
@@ -296,6 +389,25 @@ class DerivaMLCatalogReader(Protocol):
 
         Returns:
             Iterable of dictionaries for each row.
+        """
+        ...
+
+    def list_dataset_element_types(self) -> Iterable[Table]:
+        """List the types of elements that can be contained in datasets.
+
+        Returns:
+            Iterable of Table objects representing element types.
+        """
+        ...
+
+    def find_features(self, table: str | Table) -> Iterable[Feature]:
+        """Find features associated with a table.
+
+        Args:
+            table: Table to find features for.
+
+        Returns:
+            Iterable of Feature objects.
         """
         ...
 

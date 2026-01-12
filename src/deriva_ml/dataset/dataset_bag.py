@@ -337,6 +337,8 @@ class DatasetBag:
         recurse: bool = False,
         limit: int | None = None,
         _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
     ) -> dict[str, list[dict[str, Any]]]:
         """Return a list of entities associated with a specific dataset.
 
@@ -344,6 +346,8 @@ class DatasetBag:
             recurse: Whether to include members of nested datasets.
             limit: Maximum number of members to return per type. None for no limit.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Ignored (bags are immutable snapshots).
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
             Dictionary mapping member types to lists of member records.
@@ -447,13 +451,19 @@ class DatasetBag:
         return self.model.list_dataset_element_types()
 
     def list_dataset_children(
-        self, recurse: bool = False, _visited: set[RID] | None = None
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
     ) -> list[Self]:
         """Get nested datasets.
 
         Args:
             recurse: Whether to include children of children.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Ignored (bags are immutable snapshots).
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
             List of child dataset bags.
@@ -487,7 +497,11 @@ class DatasetBag:
         return result
 
     def list_dataset_parents(
-        self, recurse: bool = False, _visited: set[RID] | None = None
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
     ) -> list[Self]:
         """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
         nested dataset.
@@ -495,6 +509,8 @@ class DatasetBag:
         Args:
             recurse: If True, recursively return all ancestor datasets.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Ignored (bags are immutable snapshots).
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
             List of parent dataset bags.
@@ -585,7 +601,113 @@ class DatasetBag:
             sql_statements.append(sql_statement)
         return union(*sql_statements)
 
-    def denormalize_as_dataframe(self, include_tables: list[str]) -> pd.DataFrame:
+    def _denormalize_from_members(
+        self,
+        include_tables: list[str],
+    ) -> Generator[dict[str, Any], None, None]:
+        """Denormalize dataset members by joining related tables.
+
+        This method creates a "wide table" view by joining related tables together,
+        using list_dataset_members() as the data source. This ensures consistency
+        with the catalog-based denormalize implementation. The result has outer join
+        semantics - tables without FK relationships are included with NULL values.
+
+        The method:
+        1. Gets the list of dataset members for each included table via list_dataset_members
+        2. For each member in the first table, follows foreign key relationships to
+           get related records from other tables
+        3. Tables without FK connections to the first table are included with NULLs
+        4. Includes nested dataset members recursively
+
+        Args:
+            include_tables: List of table names to include in the output.
+
+        Yields:
+            dict[str, Any]: Rows with column names prefixed by table name (e.g., "Image.Filename").
+                Unrelated tables have NULL values for their columns.
+
+        Note:
+            Column names in the result are prefixed with the table name to avoid
+            collisions (e.g., "Image.Filename", "Subject.RID").
+        """
+        # Skip system columns in output
+        skip_columns = {"RCT", "RMT", "RCB", "RMB"}
+
+        # Get all members for the included tables (recursively includes nested datasets)
+        members = self.list_dataset_members(recurse=True)
+
+        # Build a lookup of columns for each table
+        table_columns: dict[str, list[str]] = {}
+        for table_name in include_tables:
+            table = self.model.name_to_table(table_name)
+            table_columns[table_name] = [
+                c.name for c in table.columns if c.name not in skip_columns
+            ]
+
+        # Find the primary table (first non-empty table in include_tables)
+        primary_table = None
+        for table_name in include_tables:
+            if table_name in members and members[table_name]:
+                primary_table = table_name
+                break
+
+        if primary_table is None:
+            # No data at all
+            return
+
+        primary_table_obj = self.model.name_to_table(primary_table)
+
+        for member in members[primary_table]:
+            # Build the row with all columns from all tables
+            row: dict[str, Any] = {}
+
+            # Add primary table columns
+            for col_name in table_columns[primary_table]:
+                prefixed_name = f"{primary_table}.{col_name}"
+                row[prefixed_name] = member.get(col_name)
+
+            # For each other table, try to join or add NULL values
+            for other_table_name in include_tables:
+                if other_table_name == primary_table:
+                    continue
+
+                other_table = self.model.name_to_table(other_table_name)
+                other_cols = table_columns[other_table_name]
+
+                # Initialize all columns to None (outer join behavior)
+                for col_name in other_cols:
+                    prefixed_name = f"{other_table_name}.{col_name}"
+                    row[prefixed_name] = None
+
+                # Try to find FK relationship and join
+                if other_table_name in members:
+                    try:
+                        relationship = self.model._table_relationship(
+                            primary_table_obj, other_table
+                        )
+                        fk_col, pk_col = relationship
+
+                        # Look up the related record
+                        fk_value = member.get(fk_col.name)
+                        if fk_value:
+                            for other_member in members.get(other_table_name, []):
+                                if other_member.get(pk_col.name) == fk_value:
+                                    for col_name in other_cols:
+                                        prefixed_name = f"{other_table_name}.{col_name}"
+                                        row[prefixed_name] = other_member.get(col_name)
+                                    break
+                    except DerivaMLException:
+                        # No FK relationship - columns remain NULL (outer join)
+                        pass
+
+            yield row
+
+    def denormalize_as_dataframe(
+        self,
+        include_tables: list[str],
+        version: Any = None,
+        **kwargs: Any,
+    ) -> pd.DataFrame:
         """Denormalize the dataset into a single wide DataFrame.
 
         Joins related tables together to produce a "flat" view of the data,
@@ -599,6 +721,8 @@ class DatasetBag:
         Args:
             include_tables: List of table names to include in the output. Tables
                 are joined based on their foreign key relationships.
+            version: Ignored (bags are immutable snapshots).
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
             pd.DataFrame: Wide table with columns from all included tables.
@@ -607,9 +731,15 @@ class DatasetBag:
             >>> df = bag.denormalize_as_dataframe(["Image", "Diagnosis"])
             >>> # df has columns like "Image.Filename", "Diagnosis.Name", etc.
         """
-        return pd.read_sql(self._denormalize(include_tables=include_tables), self.engine)
+        rows = list(self._denormalize_from_members(include_tables=include_tables))
+        return pd.DataFrame(rows)
 
-    def denormalize_as_dict(self, include_tables: list[str]) -> Generator[RowMapping, None, None]:
+    def denormalize_as_dict(
+        self,
+        include_tables: list[str],
+        version: Any = None,
+        **kwargs: Any,
+    ) -> Generator[dict[str, Any], None, None]:
         """Denormalize the dataset and yield rows as dictionaries.
 
         Like denormalize_as_dataframe(), but returns a generator of dictionaries
@@ -621,19 +751,17 @@ class DatasetBag:
 
         Args:
             include_tables: List of table names to include in the output.
+            version: Ignored (bags are immutable snapshots).
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Yields:
-            RowMapping: Dictionary-like objects with "table.column" keys.
+            dict[str, Any]: Dictionary with "table.column" keys.
 
         Example:
             >>> for row in bag.denormalize_as_dict(["Image", "Diagnosis"]):
             ...     print(row["Image.Filename"], row["Diagnosis.Name"])
         """
-        with Session(self.engine) as session:
-            cursor = session.execute(self._denormalize(include_tables=include_tables))
-            yield from cursor.mappings()
-            for row in cursor.mappings():
-                yield row
+        yield from self._denormalize_from_members(include_tables=include_tables)
 
 
     # =========================================================================
