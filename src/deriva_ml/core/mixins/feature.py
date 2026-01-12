@@ -62,6 +62,16 @@ class FeatureMixin:
         A feature represents a measurable property or characteristic that can be associated with records in the target
         table. Features can include vocabulary terms, asset references, and additional metadata.
 
+        **Side Effects**:
+        This method dynamically creates:
+        1. A new association table in the domain schema to store feature values
+        2. A Pydantic model class (subclass of FeatureRecord) for creating validated feature instances
+
+        The returned Pydantic model class provides type-safe construction of feature records with
+        automatic validation of values against the feature's definition (vocabulary terms, asset
+        references, etc.). Use this class to create feature instances that can be inserted into
+        the catalog.
+
         Args:
             target_table: Table to associate the feature with (name or Table object).
             feature_name: Unique name for the feature within the target table.
@@ -72,19 +82,28 @@ class FeatureMixin:
             comment: Description of the feature's purpose and usage.
 
         Returns:
-            type[FeatureRecord]: Feature class for creating validated instances.
+            type[FeatureRecord]: A dynamically generated Pydantic model class for creating
+                validated feature instances. The class has fields corresponding to the feature's
+                terms, assets, and metadata columns.
 
         Raises:
             DerivaMLException: If a feature definition is invalid or conflicts with existing features.
 
         Examples:
             Create a feature with confidence score:
-                >>> feature_class = ml.create_feature(
-                ...     target_table="samples",
-                ...     feature_name="expression_level",
-                ...     terms=["expression_values"],
+                >>> DiagnosisFeature = ml.create_feature(
+                ...     target_table="Image",
+                ...     feature_name="Diagnosis",
+                ...     terms=["Diagnosis_Type"],
                 ...     metadata=[ColumnDefinition(name="confidence", type=BuiltinTypes.float4)],
-                ...     comment="Gene expression measurement"
+                ...     comment="Clinical diagnosis label"
+                ... )
+                >>> # Use the returned class to create validated feature instances
+                >>> record = DiagnosisFeature(
+                ...     Image="1-ABC",  # Target record RID
+                ...     Diagnosis_Type="Normal",  # Vocabulary term
+                ...     confidence=0.95,
+                ...     Execution="2-XYZ"  # Execution that produced this value
                 ... )
         """
         # Initialize empty collections if None provided
