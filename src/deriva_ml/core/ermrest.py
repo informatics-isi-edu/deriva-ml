@@ -47,7 +47,6 @@ class FileUploadState(BaseModel):
         state (UploadState): Current state of the upload (success, failed, etc.).
         status (str): Detailed status message.
         result (Any): Upload result data, if any.
-        rid (RID | None): Resource identifier of the uploaded file, if successful.
     """
     state: UploadState
     status: str

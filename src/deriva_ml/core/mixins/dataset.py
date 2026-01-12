@@ -17,7 +17,6 @@ from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 
 if TYPE_CHECKING:
-    from deriva_ml.dataset.catalog_graph import CatalogGraph
     from deriva_ml.dataset.dataset import Dataset
     from deriva_ml.dataset.dataset_bag import DatasetBag
     from deriva_ml.model.catalog import DerivaModel

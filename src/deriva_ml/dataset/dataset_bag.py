@@ -48,7 +48,7 @@ import pandas as pd
 from deriva.core.ermrest_model import Table
 
 # Deriva imports
-from sqlalchemy import CompoundSelect, Engine, RowMapping, Select, and_, inspect, select, union
+from sqlalchemy import CompoundSelect, Engine, Select, and_, inspect, select, union
 from sqlalchemy.orm import RelationshipProperty, Session
 from sqlalchemy.orm.util import AliasedClass
 

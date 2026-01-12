@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from pprint import pformat
 from typing import Any, Callable, Iterator
 
 from deriva.core.ermrest_model import Table
@@ -10,7 +11,6 @@ from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
 try:
-    from pprint import pformat
 
     from icecream import ic
 

@@ -50,8 +50,7 @@ class ExecutionConfiguration(BaseModel):
             - materialize: Whether to extract dataset contents
         assets (list[RID]): Resource Identifiers of required input assets.
         workflow (RID | Workflow): Workflow definition or its Resource Identifier.
-        parameters (dict[str, Any] | Path): Execution parameters, either as:
-            - Dictionary of parameter values
+=            - Dictionary of parameter values
             - Path to JSON file containing parameters
         description (str): Description of execution purpose (supports Markdown).
         argv (list[str]): Command line arguments used to start execution.
