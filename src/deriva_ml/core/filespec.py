@@ -33,7 +33,7 @@ from typing import Callable, Generator
 from urllib.parse import urlparse
 
 import deriva.core.utils.hash_utils as hash_utils
-from pydantic import BaseModel, Field, conlist, field_validator, validate_call
+from pydantic import BaseModel, Field, field_validator, validate_call
 
 
 class FileSpec(BaseModel):
@@ -64,11 +64,13 @@ class FileSpec(BaseModel):
         ... )
     """
 
-    url: str = Field(alias="URL", validation_alias="url")
-    md5: str = Field(alias="MD5", validation_alias="md5")
-    length: int = Field(alias="Length", validation_alias="length")
-    description: str | None = Field(default="", alias="Description", validation_alias="description")
-    file_types: conlist(str) | None = []
+    model_config = {"populate_by_name": True}
+
+    url: str = Field(alias="URL")
+    md5: str = Field(alias="MD5")
+    length: int = Field(alias="Length")
+    description: str | None = Field(default="", alias="Description")
+    file_types: list[str] | None = Field(default_factory=list)
 
     @field_validator("url")
     @classmethod
@@ -181,5 +183,5 @@ class FileSpec(BaseModel):
 # Workaround for Pydantic's validate_call decorator not working directly with
 # classmethods that have forward references. We extract the underlying function,
 # wrap it with validate_call, and re-create the classmethod.
-_raw = FileSpec.create_filespecs.__func__
-FileSpec.create_filespecs = classmethod(validate_call(_raw))
+_raw = FileSpec.create_filespecs.__func__  # type: ignore[attr-defined]
+FileSpec.create_filespecs = classmethod(validate_call(_raw))  # type: ignore[arg-type]
