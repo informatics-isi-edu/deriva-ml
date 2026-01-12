@@ -28,12 +28,13 @@ from deriva.core import DEFAULT_SESSION_CONFIG, get_credential, urlquote
 from deriva.core.deriva_server import DerivaServer
 from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot
 from deriva.core.ermrest_model import Table
-from deriva.core.utils.core_utils import DEFAULT_LOGGER_OVERRIDES
+from deriva.core.utils.core_utils import DEFAULT_LOGGER_OVERRIDES, tag as deriva_tags
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 
 from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.core.mixins import (
     VocabularyMixin,
@@ -461,9 +462,6 @@ class DerivaML(
             >>> # Or with custom branding:
             >>> ml.apply_catalog_annotations("My Project Browser", "My ML Project")
         """
-        from deriva.core.utils.core_utils import tag as deriva_tags
-        from deriva_ml.dataset.upload import bulk_upload_configuration
-
         catalog_id = self.model.catalog.catalog_id
         ml_schema = self.ml_schema
 
