@@ -1060,7 +1060,7 @@ class Execution:
         files: Iterable[FileSpec],
         dataset_types: str | list[str] | None = None,
         description: str = "",
-    ) -> DatasetLike:
+    ) -> "Dataset":
         """Adds files to the catalog with their metadata.
 
         Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
