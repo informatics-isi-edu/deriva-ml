@@ -1,8 +1,8 @@
 """Configuration management for DerivaML.
 
 This module provides the DerivaMLConfig class for managing DerivaML instance
-configuration. It integrates with Hydra for configuration management and supports
-both programmatic and file-based configuration.
+configuration. It integrates with hydra-zen for configuration management and supports
+both programmatic and structured configuration.
 
 The configuration handles:
     - Server connection settings (hostname, catalog_id, credentials)
@@ -11,9 +11,10 @@ The configuration handles:
     - Logging levels for both DerivaML and underlying Deriva libraries
     - Feature toggles (use_minid, check_auth)
 
-Integration with Hydra:
+Integration with hydra-zen:
     The module registers a custom resolver for computing working directories
     and configures Hydra's output directory structure for reproducible runs.
+    Use hydra-zen's `builds()` and `store` to create composable configurations.
 
 Example:
     Programmatic configuration:
@@ -24,13 +25,30 @@ Example:
         ... )
         >>> ml = DerivaML.instantiate(config)
 
-    With Hydra (in a YAML config file):
-        ```yaml
-        deriva_ml:
-          hostname: deriva.example.org
-          catalog_id: my_catalog
-          working_dir: /path/to/work
-        ```
+    With hydra-zen:
+        >>> from hydra_zen import builds, instantiate, store, zen
+        >>> from deriva_ml import DerivaML
+        >>> from deriva_ml.core.config import DerivaMLConfig
+        >>>
+        >>> # Create a structured config for DerivaML
+        >>> DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
+        >>>
+        >>> # Store configurations for different environments
+        >>> store(DerivaMLConf(
+        ...     hostname='dev.example.org',
+        ...     catalog_id='1',
+        ... ), name='dev')
+        >>>
+        >>> store(DerivaMLConf(
+        ...     hostname='prod.example.org',
+        ...     catalog_id='52',
+        ... ), name='prod')
+        >>>
+        >>> # Use with Hydra's @hydra.main or zen() wrapper
+        >>> @zen(DerivaMLConf)
+        ... def my_task(cfg: DerivaMLConfig):
+        ...     ml = DerivaML.instantiate(cfg)
+        ...     # ... do work with ml instance
 """
 
 import getpass
