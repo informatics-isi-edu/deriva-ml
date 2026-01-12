@@ -112,6 +112,104 @@ class DerivaModel:
         """Return the chaise configuration."""
         return self.model.chaise_config
 
+    def get_schema_description(self, include_system_columns: bool = False) -> dict[str, Any]:
+        """Return a JSON description of the catalog schema structure.
+
+        Provides a structured representation of the domain and ML schemas including
+        tables, columns, foreign keys, and relationships. Useful for understanding
+        the data model structure programmatically.
+
+        Args:
+            include_system_columns: If True, include RID, RCT, RMT, RCB, RMB columns.
+                Default False to reduce output size.
+
+        Returns:
+            Dictionary with schema structure:
+            {
+                "domain_schema": "schema_name",
+                "ml_schema": "deriva-ml",
+                "schemas": {
+                    "schema_name": {
+                        "tables": {
+                            "TableName": {
+                                "comment": "description",
+                                "is_vocabulary": bool,
+                                "is_asset": bool,
+                                "columns": [...],
+                                "foreign_keys": [...],
+                                "features": [...]
+                            }
+                        }
+                    }
+                }
+            }
+        """
+        system_columns = {"RID", "RCT", "RMT", "RCB", "RMB"}
+        result = {
+            "domain_schema": self.domain_schema,
+            "ml_schema": self.ml_schema,
+            "schemas": {},
+        }
+
+        for schema_name in [self.domain_schema, self.ml_schema]:
+            schema = self.model.schemas.get(schema_name)
+            if not schema:
+                continue
+
+            schema_info = {"tables": {}}
+
+            for table_name, table in schema.tables.items():
+                # Get columns
+                columns = []
+                for col in table.columns:
+                    if not include_system_columns and col.name in system_columns:
+                        continue
+                    columns.append({
+                        "name": col.name,
+                        "type": str(col.type.typename),
+                        "nullok": col.nullok,
+                        "comment": col.comment or "",
+                    })
+
+                # Get foreign keys
+                foreign_keys = []
+                for fk in table.foreign_keys:
+                    fk_cols = [c.name for c in fk.foreign_key_columns]
+                    ref_cols = [c.name for c in fk.referenced_columns]
+                    foreign_keys.append({
+                        "columns": fk_cols,
+                        "referenced_table": f"{fk.pk_table.schema.name}.{fk.pk_table.name}",
+                        "referenced_columns": ref_cols,
+                    })
+
+                # Get features if this is a domain table
+                features = []
+                if schema_name == self.domain_schema:
+                    try:
+                        for f in self.find_features(table):
+                            features.append({
+                                "name": f.feature_name,
+                                "feature_table": f.feature_table.name,
+                            })
+                    except Exception:
+                        pass  # Table may not support features
+
+                table_info = {
+                    "comment": table.comment or "",
+                    "is_vocabulary": self.is_vocabulary(table),
+                    "is_asset": self.is_asset(table),
+                    "columns": columns,
+                    "foreign_keys": foreign_keys,
+                }
+                if features:
+                    table_info["features"] = features
+
+                schema_info["tables"][table_name] = table_info
+
+            result["schemas"][schema_name] = schema_info
+
+        return result
+
     def __getattr__(self, name: str) -> Any:
         # Called only if `name` is not found in Manager.  Delegate attributes to model class.
         return getattr(self.model, name)
