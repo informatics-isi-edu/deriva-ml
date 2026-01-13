@@ -414,6 +414,40 @@ class TestExecutionAssets:
             )
             assert "Model_File" in downloaded.asset_types
 
+    def test_upload_progress_callback(self, basic_execution):
+        """Test that upload progress callback is invoked during upload."""
+        from deriva_ml import UploadProgress
+
+        progress_updates = []
+
+        def progress_callback(progress: UploadProgress) -> None:
+            progress_updates.append({
+                "file_name": progress.file_name,
+                "phase": progress.phase,
+                "message": progress.message,
+                "percent_complete": progress.percent_complete,
+            })
+
+        with basic_execution.execute() as execution:
+            # Create multiple assets to ensure we get progress updates
+            create_test_asset(execution, "file1.txt", "Content 1")
+            create_test_asset(execution, "file2.txt", "Content 2")
+
+        # Upload with progress callback
+        uploaded = basic_execution.upload_execution_outputs(progress_callback=progress_callback)
+
+        # Verify callback was invoked
+        assert len(progress_updates) > 0, "Progress callback should have been invoked"
+
+        # Verify we got updates with expected fields
+        for update in progress_updates:
+            assert "phase" in update
+            assert "message" in update
+
+        # Verify assets were still uploaded correctly
+        assert "deriva-ml/Execution_Asset" in uploaded
+        assert len(uploaded["deriva-ml/Execution_Asset"]) == 2
+
 
 # =============================================================================
 # TestExecutionDatasets - Dataset Operations Tests

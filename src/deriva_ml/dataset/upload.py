@@ -299,30 +299,60 @@ def upload_directory(
     if not directory.is_dir():
         raise DerivaMLException("Directory does not exist")
 
+    # Track upload progress across files
+    # status_callback is called twice per file: once before upload starts, once after it completes
+    upload_state = {"completed_files": 0, "total_files": 0, "status_calls": 0}
+
+    # Count total files to upload
+    for root, dirs, files in os.walk(directory):
+        upload_state["total_files"] += len(files)
+
     # Create wrapper callbacks for GenericUploader if a progress callback was provided
-    def file_callback(current: dict, total: dict) -> bool:
-        """Callback for per-file progress updates from GenericUploader."""
+    def file_callback(**kwargs) -> bool:
+        """Callback for per-chunk progress updates from GenericUploader.
+
+        The deriva GenericUploader passes kwargs with: completed, total, file_path, host, job_info.
+        Note: This callback is only invoked for large files (> 25MB) that use chunked uploads.
+        Small files are uploaded in a single request and this callback won't be called.
+        """
         if progress_callback is not None:
+            file_path = kwargs.get("file_path", "")
+            completed_chunks = kwargs.get("completed", 0)
+            total_chunks = kwargs.get("total", 0)
+
             progress = UploadProgress(
-                file_path=current.get("target_file", ""),
-                file_name=Path(current.get("target_file", "")).name if current.get("target_file") else "",
-                bytes_completed=current.get("completed", 0),
-                bytes_total=current.get("total", 0),
-                percent_complete=(current.get("completed", 0) / current.get("total", 1) * 100)
-                if current.get("total", 0) > 0
-                else 0,
-                phase="uploading",
-                message=f"Uploading file {current.get('completed_files', 0) + 1} of {total.get('total_files', 0)}",
+                file_path=file_path,
+                file_name=Path(file_path).name if file_path else "",
+                bytes_completed=completed_chunks,
+                bytes_total=total_chunks,
+                percent_complete=(completed_chunks / total_chunks * 100) if total_chunks > 0 else 0,
+                phase="uploading_chunks",
+                message=f"Uploading large file: chunk {completed_chunks} of {total_chunks}",
             )
             progress_callback(progress)
         return True  # Continue upload
 
-    def status_callback(status: str, message: str = "") -> None:
-        """Callback for status updates from GenericUploader."""
+    def status_callback() -> None:
+        """Callback for per-file status updates from GenericUploader.
+
+        GenericUploader calls this twice per file: once before upload starts (odd calls)
+        and once after upload completes (even calls). We use even calls to track completed files.
+        """
         if progress_callback is not None:
+            upload_state["status_calls"] += 1
+
+            # Even calls indicate file completion (after upload)
+            if upload_state["status_calls"] % 2 == 0:
+                upload_state["completed_files"] += 1
+
+            # Report progress with current file count
+            current_file = (upload_state["status_calls"] + 1) // 2  # 1-indexed current file
             progress = UploadProgress(
-                phase=status,
-                message=message,
+                phase="uploading",
+                message=f"Uploading file {current_file} of {upload_state['total_files']}",
+                percent_complete=(upload_state["completed_files"] / upload_state["total_files"] * 100)
+                if upload_state["total_files"] > 0
+                else 0,
             )
             progress_callback(progress)
 
