@@ -62,6 +62,8 @@ from deriva_ml.core.ermrest import (
     ForeignKeyDefinition,
     KeyDefinition,
     TableDefinition,
+    UploadCallback,
+    UploadProgress,
     VocabularyTerm,
 )
 
@@ -122,6 +124,8 @@ __all__ = [
     "KeyDefinition",
     "ForeignKeyDefinition",
     "TableDefinition",
+    "UploadProgress",
+    "UploadCallback",
     # Exceptions
     "DerivaMLException",
     "DerivaMLConfigurationError",

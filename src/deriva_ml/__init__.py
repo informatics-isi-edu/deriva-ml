@@ -20,6 +20,8 @@ from deriva_ml.core.definitions import (
     MLAsset,
     MLVocab,
     TableDefinition,
+    UploadCallback,
+    UploadProgress,
     UploadState,
 )
 from deriva_ml.core.exceptions import (
@@ -69,6 +71,8 @@ __all__ = [
     "MLAsset",
     "MLVocab",
     "TableDefinition",
+    "UploadCallback",
+    "UploadProgress",
     "UploadState",
 ]
 

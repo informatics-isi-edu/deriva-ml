@@ -18,7 +18,14 @@ Typical usage example:
     >>> with ml.create_execution(config) as execution:
     ...     execution.download_dataset_bag(dataset_spec)
     ...     # Run analysis
-    ...     execution.upload_execution_outputs()
+    ...     path = execution.asset_file_path("Model", "model.pt")
+    ...     # Write model to path...
+    ...
+    >>> # IMPORTANT: Upload AFTER the context manager exits
+    >>> execution.upload_execution_outputs()
+
+The context manager handles start/stop timing automatically. The upload_execution_outputs()
+call must happen AFTER exiting the context manager to ensure proper status tracking.
 """
 
 from __future__ import annotations
@@ -32,7 +39,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, Callable, Iterable, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
@@ -48,6 +55,7 @@ from deriva_ml.core.definitions import (
     MLAsset,
     MLVocab,
     Status,
+    UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
@@ -69,7 +77,6 @@ from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
-from deriva_ml.interfaces import DatasetLike
 from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 # Keep pycharm from complaining about undefined references in docstrings.
@@ -170,14 +177,21 @@ class Execution:
         stop_time (datetime | None): When execution completed.
 
     Example:
-        >>> config = ExecutionConfiguration(
-        ...     workflow="analysis",
-        ...     description="Process samples",
-        ... )
-        >>> with ml.create_execution(config) as execution:
-        ...     execution.download_dataset_bag(dataset_spec)
-        ...     # Run analysis
-        ...     execution.upload_execution_outputs()
+        The context manager handles start/stop timing. Upload must be called AFTER
+        the context manager exits::
+
+            >>> config = ExecutionConfiguration(
+            ...     workflow="analysis",
+            ...     description="Process samples",
+            ... )
+            >>> with ml.create_execution(config) as execution:
+            ...     bag = execution.download_dataset_bag(dataset_spec)
+            ...     # Run analysis using bag.path
+            ...     output_path = execution.asset_file_path("Model", "model.pt")
+            ...     # Write results to output_path
+            ...
+            >>> # IMPORTANT: Call upload AFTER exiting the context manager
+            >>> execution.upload_execution_outputs()
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -567,12 +581,18 @@ class Execution:
                 [{"RID": self.execution_rid, "Duration": duration}]
             )
 
-    def _upload_execution_dirs(self) -> dict[str, list[AssetFilePath]]:
+    def _upload_execution_dirs(
+        self, progress_callback: Callable[[UploadProgress], None] | None = None
+    ) -> dict[str, list[AssetFilePath]]:
         """Upload execution assets at _working_dir/Execution_asset.
 
         This routine uploads the contents of the
         Execution_Asset directory and then updates the execution_asset table in the ML schema to have references
         to these newly uploaded files.
+
+        Args:
+            progress_callback: Optional callback function to receive upload progress updates.
+                Called with UploadProgress objects containing file information and progress.
 
         Returns:
           dict: Results of the upload operation.
@@ -583,7 +603,7 @@ class Execution:
 
         try:
             self.update_status(Status.running, "Uploading execution files...")
-            results = upload_directory(self._model, self._asset_root)
+            results = upload_directory(self._model, self._asset_root, progress_callback=progress_callback)
         except RuntimeError as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
@@ -708,15 +728,24 @@ class Execution:
         results = upload_directory(self._model, assets_dir)
         return {path_to_asset(p): r for p, r in results.items()}
 
-    def upload_execution_outputs(self, clean_folder: bool = True) -> dict[str, list[AssetFilePath]]:
+    def upload_execution_outputs(
+        self, clean_folder: bool = True, progress_callback: Callable[[UploadProgress], None] | None = None
+    ) -> dict[str, list[AssetFilePath]]:
         """Uploads all outputs from the execution to the catalog.
 
         Scans the execution's output directories for assets, features, and other results,
         then uploads them to the catalog. Can optionally clean up the output folders
         after successful upload.
 
+        IMPORTANT: This method must be called AFTER exiting the context manager, not inside it.
+        The context manager handles execution timing (start/stop), while this method handles
+        the separate upload step.
+
         Args:
             clean_folder: Whether to delete output folders after upload. Defaults to True.
+            progress_callback: Optional callback function to receive upload progress updates.
+                Called with UploadProgress objects containing file name, bytes uploaded,
+                total bytes, percent complete, phase, and status message.
 
         Returns:
             dict[str, list[AssetFilePath]]: Mapping of asset types to their file paths.
@@ -725,14 +754,20 @@ class Execution:
             DerivaMLException: If upload fails or outputs are invalid.
 
         Example:
-            >>> outputs = execution.upload_execution_outputs()
-            >>> for type_name, paths in outputs.items():
-            ...     print(f"{type_name}: {len(paths)} files")
+            >>> with ml.create_execution(config) as execution:
+            ...     # Do ML work, register output files with asset_file_path()
+            ...     path = execution.asset_file_path("Model", "model.pt")
+            ...     # Write to path...
+            ...
+            >>> # Upload AFTER the context manager exits
+            >>> def my_callback(progress):
+            ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
+            >>> outputs = execution.upload_execution_outputs(progress_callback=my_callback)
         """
         if self._dry_run:
             return {}
         try:
-            self.uploaded_assets = self._upload_execution_dirs()
+            self.uploaded_assets = self._upload_execution_dirs(progress_callback=progress_callback)
             self.update_status(Status.completed, "Successfully end the execution.")
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)

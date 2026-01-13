@@ -39,7 +39,7 @@ import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import regex as re
 from deriva.core import urlquote
@@ -53,6 +53,7 @@ from deriva_ml.core.definitions import (
     RID,
     DerivaSystemColumns,
     FileUploadState,
+    UploadProgress,
     UploadState,
 )
 from deriva_ml.core.exceptions import DerivaMLException
@@ -274,13 +275,19 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, FileUploadState] | None:
+def upload_directory(
+    model: DerivaModel,
+    directory: Path | str,
+    progress_callback: Callable[[UploadProgress], None] | None = None,
+) -> dict[Any, FileUploadState] | None:
     """Upload assets from a directory. This routine assumes that the current upload specification includes a
     configuration for the specified directory.  Every asset in the specified directory is uploaded
 
     Args:
         model: Model to upload assets to.
         directory: Directory containing the assets and tables to upload.
+        progress_callback: Optional callback function to receive upload progress updates.
+            Called with UploadProgress objects containing file information and progress.
 
     Returns:
         Results of the upload operation.
@@ -291,6 +298,33 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
     directory = Path(directory)
     if not directory.is_dir():
         raise DerivaMLException("Directory does not exist")
+
+    # Create wrapper callbacks for GenericUploader if a progress callback was provided
+    def file_callback(current: dict, total: dict) -> bool:
+        """Callback for per-file progress updates from GenericUploader."""
+        if progress_callback is not None:
+            progress = UploadProgress(
+                file_path=current.get("target_file", ""),
+                file_name=Path(current.get("target_file", "")).name if current.get("target_file") else "",
+                bytes_completed=current.get("completed", 0),
+                bytes_total=current.get("total", 0),
+                percent_complete=(current.get("completed", 0) / current.get("total", 1) * 100)
+                if current.get("total", 0) > 0
+                else 0,
+                phase="uploading",
+                message=f"Uploading file {current.get('completed_files', 0) + 1} of {total.get('total_files', 0)}",
+            )
+            progress_callback(progress)
+        return True  # Continue upload
+
+    def status_callback(status: str, message: str = "") -> None:
+        """Callback for status updates from GenericUploader."""
+        if progress_callback is not None:
+            progress = UploadProgress(
+                phase=status,
+                message=message,
+            )
+            progress_callback(progress)
 
     # Now upload the files by creating an upload spec and then calling the uploader.
     with TemporaryDirectory() as temp_dir:
@@ -314,7 +348,10 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
                     status=result["Status"],
                     result=result["Result"],
                 )
-                for path, result in uploader.uploadFiles().items()
+                for path, result in uploader.uploadFiles(
+                    file_callback=file_callback if progress_callback else None,
+                    status_callback=status_callback if progress_callback else None,
+                ).items()
             }
         finally:
             uploader.cleanup()

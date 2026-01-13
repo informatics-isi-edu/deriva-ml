@@ -15,7 +15,8 @@ Classes:
 from __future__ import annotations
 
 import warnings
-from typing import Any, Iterable
+from dataclasses import dataclass
+from typing import Any, Iterable, Protocol
 
 import deriva.core.ermrest_model as em
 from deriva.core.ermrest_model import builtin_types
@@ -56,6 +57,53 @@ class FileUploadState(BaseModel):
     @property
     def rid(self) -> RID | None:
         return self.result and self.result["RID"]
+
+
+@dataclass
+class UploadProgress:
+    """Progress information for file uploads.
+
+    This dataclass is passed to upload callbacks to report progress during
+    file upload operations.
+
+    Attributes:
+        file_path: Path to the file being uploaded.
+        file_name: Name of the file being uploaded.
+        bytes_completed: Number of bytes uploaded so far.
+        bytes_total: Total number of bytes to upload.
+        percent_complete: Percentage of upload completed (0-100).
+        phase: Current phase of the upload operation.
+        message: Human-readable status message.
+    """
+    file_path: str = ""
+    file_name: str = ""
+    bytes_completed: int = 0
+    bytes_total: int = 0
+    percent_complete: float = 0.0
+    phase: str = ""
+    message: str = ""
+
+
+class UploadCallback(Protocol):
+    """Protocol for upload progress callbacks.
+
+    Implement this protocol to receive progress updates during file uploads.
+    The callback is invoked with an UploadProgress object containing current
+    upload state information.
+
+    Example:
+        >>> def my_callback(progress: UploadProgress) -> None:
+        ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
+        ...
+        >>> execution.upload_execution_outputs(progress_callback=my_callback)
+    """
+    def __call__(self, progress: UploadProgress) -> None:
+        """Called with upload progress information.
+
+        Args:
+            progress: Current upload progress state.
+        """
+        ...
 
 
 class VocabularyTerm(BaseModel):
