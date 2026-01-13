@@ -31,9 +31,10 @@ from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import DEFAULT_LOGGER_OVERRIDES, tag as deriva_tags
 from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
 
-from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition
 from deriva_ml.core.config import DerivaMLConfig
+from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
 from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.core.mixins import (
@@ -214,26 +215,25 @@ class DerivaML(
         self.use_minid = use_minid
 
         # Set up working and cache directories
-        self.working_dir = DerivaMLConfig.compute_workdir(working_dir)
+        self.working_dir = DerivaMLConfig.compute_workdir(working_dir, catalog_id)
         self.working_dir.mkdir(parents=True, exist_ok=True)
         self.hydra_runtime_output_dir = hydra_runtime_output_dir
 
         self.cache_dir = Path(cache_dir) if cache_dir else self.working_dir / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Set up logging
-        self._logger = logging.getLogger("deriva_ml")
-        self._logger.setLevel(logging_level)
+        # Set up logging using centralized configuration
+        # This configures deriva_ml, Hydra, and deriva-py loggers without
+        # affecting the root logger or calling basicConfig()
+        self._logger = configure_logging(
+            level=logging_level,
+            deriva_level=deriva_logging_level,
+        )
         self._logging_level = logging_level
         self._deriva_logging_level = deriva_logging_level
 
-        # Configure deriva logging level
-        logger_config = DEFAULT_LOGGER_OVERRIDES
-        # allow for reconfiguration of module-specific logging levels
-        [logging.getLogger(name).setLevel(level) for name, level in logger_config.items()]
-        logging.getLogger("root").setLevel(deriva_logging_level)
-        logging.getLogger("bagit").setLevel(deriva_logging_level)
-        logging.getLogger("bdbag").setLevel(deriva_logging_level)
+        # Apply deriva's default logger overrides for fine-grained control
+        apply_logger_overrides(DEFAULT_LOGGER_OVERRIDES)
 
         # Store instance configuration
         self.host_name = hostname
@@ -245,16 +245,6 @@ class DerivaML(
         self.project_name = project_name or self.domain_schema
         self.start_time = datetime.now()
         self.status = Status.pending.value
-
-        # Configure logging format
-        logging.basicConfig(
-            level=logging_level,
-            format="%(asctime)s - %(name)s.%(levelname)s - %(message)s",
-        )
-
-        # Set Deriva library logging level
-        deriva_logger = logging.getLogger("deriva")
-        deriva_logger.setLevel(logging_level)
 
     def __del__(self) -> None:
         """Cleanup method to handle incomplete executions."""

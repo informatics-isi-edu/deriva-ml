@@ -33,7 +33,7 @@ from deriva_ml.core.definitions import (
     UploadState,
 )
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm, DerivaMLTableTypeError
-from deriva_ml.core.logging_config import LoggerMixin, configure_logging, get_logger
+from deriva_ml.core.logging_config import LoggerMixin, configure_logging, get_logger, is_hydra_initialized
 from deriva_ml.core.validation import DERIVA_ML_CONFIG, STRICT_VALIDATION_CONFIG, VALIDATION_CONFIG
 
 __all__ = [
@@ -63,5 +63,6 @@ __all__ = [
     # Logging
     "get_logger",
     "configure_logging",
+    "is_hydra_initialized",
     "LoggerMixin",
 ]

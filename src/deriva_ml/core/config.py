@@ -122,33 +122,39 @@ class DerivaMLConfig(BaseModel):
         Returns:
             Self: The configuration instance with initialized paths.
         """
-        self.working_dir = DerivaMLConfig.compute_workdir(self.working_dir)
+        self.working_dir = DerivaMLConfig.compute_workdir(self.working_dir, self.catalog_id)
         self.hydra_runtime_output_dir = Path(HydraConfig.get().runtime.output_dir)
         return self
 
     @staticmethod
-    def compute_workdir(working_dir: str | Path | None) -> Path:
+    def compute_workdir(working_dir: str | Path | None, catalog_id: str | int | None = None) -> Path:
         """Compute the effective working directory path.
 
         Creates a standardized working directory path. If a base directory is provided,
         appends the current username to prevent conflicts between users. If no directory
-        is provided, uses the user's home directory.
+        is provided, uses ~/.deriva/deriva-ml. The catalog_id is appended to
+        separate data from different catalogs.
 
         Args:
             working_dir: Base working directory path, or None for default.
+            catalog_id: Catalog identifier to include in the path. If None, no
+                       catalog subdirectory is created.
 
         Returns:
             Path: Absolute path to the working directory.
 
         Example:
-            >>> DerivaMLConfig.compute_workdir('/shared/data')
-            PosixPath('/shared/data/username/deriva-ml')
-            >>> DerivaMLConfig.compute_workdir(None)
-            PosixPath('/home/username/deriva-ml')
+            >>> DerivaMLConfig.compute_workdir('/shared/data', '52')
+            PosixPath('/shared/data/username/deriva-ml/52')
+            >>> DerivaMLConfig.compute_workdir(None, 1)
+            PosixPath('/home/username/.deriva/deriva-ml/1')
         """
-        # Append username to provided path, or use home directory as base
-        working_dir = (Path(working_dir) / getpass.getuser() if working_dir else Path.home()) / "deriva-ml"
-        return working_dir.absolute()
+        # Append username to provided path, or use ~/.deriva as base
+        base_dir = (Path(working_dir) / getpass.getuser() if working_dir else Path.home() / ".deriva") / "deriva-ml"
+        # Append catalog_id if provided
+        if catalog_id is not None:
+            base_dir = base_dir / str(catalog_id)
+        return base_dir.absolute()
 
 
 # =============================================================================
@@ -156,14 +162,14 @@ class DerivaMLConfig(BaseModel):
 # =============================================================================
 
 # Register custom resolver for computing working directories in Hydra configs
-# This allows ${compute_workdir:${some.path}} syntax in YAML configuration files
+# This allows ${compute_workdir:${working_dir},${catalog_id}} syntax in YAML configuration files
 OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdir, replace=True)
 
 # Configure Hydra's output directory structure for reproducible runs
 # Outputs are organized by timestamp under the computed working directory
 store(
     HydraConf(
-        run=RunDir("${compute_workdir:${deriva_ml.working_dir}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"),
+        run=RunDir("${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"),
         output_subdir="hydra-config",
     ),
     group="hydra",

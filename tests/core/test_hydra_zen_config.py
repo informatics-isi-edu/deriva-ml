@@ -74,27 +74,34 @@ class TestHydraZenDerivaMLConfig:
     def test_compute_workdir_with_custom_path(self, tmp_path):
         """Test that compute_workdir correctly handles custom paths."""
         custom_base = tmp_path / "custom_work"
-        result = DerivaMLConfig.compute_workdir(custom_base)
+        result = DerivaMLConfig.compute_workdir(custom_base, "42")
 
-        # Should append username and deriva-ml
-        expected = custom_base / getpass.getuser() / "deriva-ml"
+        # Should append username, deriva-ml, and catalog_id
+        expected = custom_base / getpass.getuser() / "deriva-ml" / "42"
         assert result == expected.absolute()
 
     def test_compute_workdir_with_none(self):
-        """Test that compute_workdir uses home directory when None."""
+        """Test that compute_workdir uses ~/.deriva/deriva-ml when None."""
+        result = DerivaMLConfig.compute_workdir(None, "1")
+
+        expected = Path.home() / ".deriva" / "deriva-ml" / "1"
+        assert result == expected.absolute()
+
+    def test_compute_workdir_without_catalog_id(self):
+        """Test that compute_workdir works without catalog_id."""
         result = DerivaMLConfig.compute_workdir(None)
 
-        expected = Path.home() / "deriva-ml"
+        expected = Path.home() / ".deriva" / "deriva-ml"
         assert result == expected.absolute()
 
     def test_omegaconf_resolver_registered(self):
         """Test that the compute_workdir resolver is registered with OmegaConf."""
         # The resolver should be registered when the module is imported
-        # Test it by creating a config that uses the resolver
-        cfg = OmegaConf.create({"path": "${compute_workdir:null}"})
+        # Test it by creating a config that uses the resolver with two args
+        cfg = OmegaConf.create({"path": "${compute_workdir:null,52}"})
         resolved = OmegaConf.to_container(cfg, resolve=True)
 
-        expected = Path.home() / "deriva-ml"
+        expected = Path.home() / ".deriva" / "deriva-ml" / "52"
         assert Path(resolved["path"]) == expected.absolute()
 
     def test_working_dir_used_in_hydra_config(self, tmp_path):
@@ -104,13 +111,14 @@ class TestHydraZenDerivaMLConfig:
 
         conf = DerivaMLConf(
             hostname="test.example.org",
+            catalog_id="99",
             working_dir=str(tmp_path / "work"),
             check_auth=False,
         )
 
-        # The compute_workdir resolver should use this path
-        computed = DerivaMLConfig.compute_workdir(tmp_path / "work")
-        assert computed == (tmp_path / "work" / getpass.getuser() / "deriva-ml").absolute()
+        # The compute_workdir resolver should use this path with catalog_id
+        computed = DerivaMLConfig.compute_workdir(tmp_path / "work", "99")
+        assert computed == (tmp_path / "work" / getpass.getuser() / "deriva-ml" / "99").absolute()
 
     def test_config_composition_with_store(self):
         """Test that configs can be composed using hydra-zen store."""
@@ -503,17 +511,18 @@ class TestWorkingDirectoryIntegration:
     """Test that working directory is correctly propagated to Hydra."""
 
     def test_working_dir_resolver_with_custom_path(self, tmp_path):
-        """Test the compute_workdir resolver with custom paths."""
+        """Test the compute_workdir resolver with custom paths and catalog_id."""
         custom_base = tmp_path / "ml_workspace"
 
-        # Resolve using the OmegaConf resolver
+        # Resolve using the OmegaConf resolver with two arguments
         cfg = OmegaConf.create({
             "base_path": str(custom_base),
-            "resolved_path": "${compute_workdir:${base_path}}"
+            "catalog_id": "42",
+            "resolved_path": "${compute_workdir:${base_path},${catalog_id}}"
         })
         resolved = OmegaConf.to_container(cfg, resolve=True)
 
-        expected = custom_base / getpass.getuser() / "deriva-ml"
+        expected = custom_base / getpass.getuser() / "deriva-ml" / "42"
         assert Path(resolved["resolved_path"]) == expected.absolute()
 
     def test_working_dir_in_full_config(self, tmp_path):
@@ -524,6 +533,7 @@ class TestWorkingDirectoryIntegration:
 
         conf = DerivaMLConf(
             hostname="test.example.org",
+            catalog_id="77",
             working_dir=str(work_dir),
             check_auth=False,
         )
@@ -531,18 +541,19 @@ class TestWorkingDirectoryIntegration:
         # Verify the config has the working dir
         assert conf.working_dir == str(work_dir)
 
-        # Test compute_workdir directly
-        computed = DerivaMLConfig.compute_workdir(work_dir)
-        assert computed == (work_dir / getpass.getuser() / "deriva-ml").absolute()
+        # Test compute_workdir directly with catalog_id
+        computed = DerivaMLConfig.compute_workdir(work_dir, "77")
+        assert computed == (work_dir / getpass.getuser() / "deriva-ml" / "77").absolute()
 
     def test_hydra_output_dir_structure(self, tmp_path):
         """Test that Hydra output directory follows expected structure."""
         # The expected structure is:
-        # {working_dir}/{username}/deriva-ml/hydra/{timestamp}/
+        # {working_dir}/{username}/deriva-ml/{catalog_id}/hydra/{timestamp}/
 
         work_dir = tmp_path / "test_work"
-        computed = DerivaMLConfig.compute_workdir(work_dir)
+        computed = DerivaMLConfig.compute_workdir(work_dir, "123")
 
         # Verify the path structure
         assert "deriva-ml" in str(computed)
         assert getpass.getuser() in str(computed)
+        assert "123" in str(computed)
