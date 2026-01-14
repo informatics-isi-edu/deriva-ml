@@ -153,24 +153,52 @@ class FeatureMixin:
         return self.feature_record_class(target_table, feature_name)
 
     def feature_record_class(self, table: str | Table, feature_name: str) -> type[FeatureRecord]:
-        """Returns a pydantic model class for feature records.
+        """Returns a dynamically generated Pydantic model class for creating feature records.
 
-        Creates a typed interface for creating new instances of the specified feature. The returned class includes
-        validation and type checking based on the feature's definition.
+        Each feature has a unique set of columns based on its definition (terms, assets, metadata).
+        This method returns a Pydantic class with fields corresponding to those columns, providing:
+
+        - **Type validation**: Values are validated against expected types (str, int, float, Path)
+        - **Required field checking**: Non-nullable columns must be provided
+        - **Default values**: Feature_Name is pre-filled with the feature's name
+
+        **Field types in the generated class:**
+        - `{TargetTable}` (str): Required. RID of the target record (e.g., Image RID)
+        - `Execution` (str, optional): RID of the execution for provenance tracking
+        - `Feature_Name` (str): Pre-filled with the feature name
+        - Term columns (str): Accept vocabulary term names
+        - Asset columns (str | Path): Accept asset RIDs or file paths
+        - Value columns: Accept values matching the column type (int, float, str)
+
+        Use `lookup_feature()` to inspect the feature's structure and see what columns
+        are available.
 
         Args:
             table: The table containing the feature, either as name or Table object.
             feature_name: Name of the feature to create a record class for.
 
         Returns:
-            type[FeatureRecord]: A pydantic model class for creating validated feature records.
+            type[FeatureRecord]: A Pydantic model class for creating validated feature records.
+                The class name follows the pattern `{TargetTable}Feature{FeatureName}`.
 
         Raises:
             DerivaMLException: If the feature doesn't exist or the table is invalid.
 
         Example:
-            >>> ExpressionFeature = ml.feature_record_class("samples", "expression_level")
-            >>> feature = ExpressionFeature(value="high", confidence=0.95)
+            >>> # Get the dynamically generated class
+            >>> DiagnosisFeature = ml.feature_record_class("Image", "Diagnosis")
+            >>>
+            >>> # Create a validated feature record
+            >>> record = DiagnosisFeature(
+            ...     Image="1-ABC",           # Target record RID
+            ...     Diagnosis_Type="Normal", # Vocabulary term
+            ...     confidence=0.95,         # Metadata column
+            ...     Execution="2-XYZ"        # Provenance
+            ... )
+            >>>
+            >>> # Convert to dict for insertion
+            >>> record.model_dump()
+            {'Image': '1-ABC', 'Diagnosis_Type': 'Normal', 'confidence': 0.95, ...}
         """
         # Look up a feature and return its record class
         return self.lookup_feature(table, feature_name).feature_record_class()
