@@ -19,6 +19,50 @@ How It Works
 2. If a tag exists, uses bump-my-version to increment the specified component
 3. Pushes the new tag and any commits to the remote repository
 
+Dynamic Versioning with setuptools_scm
+--------------------------------------
+This project uses **setuptools_scm** to derive the package version dynamically
+from git tags. This means there is no hardcoded version string in the source
+code - the version is always determined from the most recent git tag.
+
+**How it works:**
+
+1. When the package is built or installed, setuptools_scm reads the git history
+2. It finds the most recent tag matching the semver pattern (e.g., ``v1.2.3``)
+3. The version is derived from that tag, with additional metadata for commits
+   since the tag
+
+**Version formats:**
+
+- **At a tag**: If HEAD is exactly at tag ``v1.2.3``, version is ``1.2.3``
+- **After a tag**: If there are commits after the tag, version includes distance
+  and commit hash, e.g., ``1.2.3.post2+g1234abc`` (2 commits after v1.2.3)
+- **Dirty working tree**: Adds ``.dirty`` suffix if uncommitted changes exist
+
+**Configuration in pyproject.toml**::
+
+    [project]
+    dynamic = ["version"]  # Version is not hardcoded
+
+    [build-system]
+    requires = ["setuptools>=80", "setuptools_scm[toml]>=8", "wheel"]
+
+    [tool.setuptools_scm]
+    version_scheme = "post-release"  # Use .postN for commits after a tag
+
+**Accessing the version at runtime**::
+
+    from importlib.metadata import version
+    __version__ = version("deriva_ml")  # e.g., "1.2.3" or "1.2.3.post2+g1234abc"
+
+**Why this approach:**
+
+- Single source of truth: The git tag IS the version
+- No manual version updates in source files
+- Automatic dev versions between releases
+- Works seamlessly with CI/CD pipelines
+- Released versions are always clean (e.g., ``1.2.3``)
+
 Requirements
 ------------
 - git: Version control system
@@ -33,7 +77,7 @@ The tool can be configured via environment variables:
 - **PREFIX**: Tag prefix (default: "v")
 
 The bump-my-version tool should be configured in pyproject.toml with the
-appropriate version locations and tag format.
+appropriate version locations and tag format (see ``[tool.bumpversion]`` section).
 
 Usage
 -----
@@ -91,6 +135,7 @@ See Also
 --------
 - Semantic Versioning: https://semver.org/
 - bump-my-version: https://github.com/callowayproject/bump-my-version
+- setuptools_scm: https://github.com/pypa/setuptools_scm
 """
 
 from __future__ import annotations
