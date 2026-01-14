@@ -58,20 +58,20 @@ class FileMixin:
     def add_files(
         self,
         files: Iterable[FileSpec],
+        execution_rid: RID,
         dataset_types: str | list[str] | None = None,
         description: str = "",
-        execution_rid: RID | None = None,
     ) -> "Dataset":
         """Adds files to the catalog with their metadata.
 
         Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
-        specified file types. Optionally links files to an execution record.
+        specified file types. Links files to the specified execution record for provenance tracking.
 
         Args:
             files: File specifications containing MD5 checksum, length, and URL.
+            execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
             description: Description of the files.
-            execution_rid: Optional execution RID to associate files with.
 
         Returns:
             Dataset: Dataset that represents the newly added files.
@@ -80,21 +80,15 @@ class FileMixin:
             DerivaMLException: If file_types are invalid or execution_rid is not an execution record.
 
         Examples:
-            Add a single file type:
-                >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]
-                >>> dataset = ml.add_files(files, dataset_types="text")
-
-            Add multiple file types:
-                >>> dataset = ml.add_files(
-                ...     files=[FileSpec(url="image.png", md5="def456", length=2000)],
-                ...     dataset_types=["image", "png"],
-                ...     execution_rid="1-xyz789"
-                ... )
+            Add files via an execution:
+                >>> with ml.create_execution(config) as exe:
+                ...     files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]
+                ...     dataset = exe.add_files(files, dataset_types="text")
         """
         # Import here to avoid circular imports
         from deriva_ml.dataset.dataset import Dataset
 
-        if execution_rid and self.resolve_rid(execution_rid).table.name != "Execution":
+        if self.resolve_rid(execution_rid).table.name != "Execution":
             raise DerivaMLTableTypeError("Execution", execution_rid)
 
         filespec_list = list(files)
@@ -139,14 +133,13 @@ class FileMixin:
         ]
         pb.schemas[self.ml_schema].tables[atable].insert(file_type_records)
 
-        if execution_rid:
-            # Get the name of the association table between file_table and execution.
-            pb.schemas[self.ml_schema].File_Execution.insert(
-                [
-                    {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Output"}
-                    for file_record in file_records
-                ]
-            )
+        # Link files to the execution for provenance tracking.
+        pb.schemas[self.ml_schema].File_Execution.insert(
+            [
+                {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Output"}
+                for file_record in file_records
+            ]
+        )
 
         # Now create datasets to capture the original directory structure of the files.
         dir_rid_map = defaultdict(list)

@@ -1,12 +1,7 @@
 """Tests for DatasetBag.restructure_assets() method."""
 
-from pathlib import Path
 
 import pytest
-
-from deriva_ml.dataset.aux_classes import DatasetSpec
-from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 
 class TestRestructureAssets:

@@ -7,15 +7,14 @@ for Hydra output files.
 
 import getpass
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 from hydra_zen import builds, instantiate, just, make_config
 from omegaconf import OmegaConf
 
 from deriva_ml.core.config import DerivaMLConfig
-from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 
 
 class TestHydraZenDerivaMLConfig:
@@ -324,7 +323,7 @@ class TestDatasetSpecConfig:
 
     def test_dataset_spec_config_instantiate(self):
         """Test that DatasetSpecConfig instantiates to DatasetSpec."""
-        from deriva_ml.dataset import DatasetSpecConfig, DatasetSpec
+        from deriva_ml.dataset import DatasetSpec, DatasetSpecConfig
 
         config = DatasetSpecConfig(
             rid="3GHI",
@@ -432,7 +431,6 @@ class TestHydraStorePatterns:
 
     def test_store_multiple_configs(self):
         """Test storing multiple environment configurations."""
-        from hydra_zen import store
 
         DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
 
@@ -488,7 +486,6 @@ class TestHydraStorePatterns:
     def test_execution_config_with_all_components(self):
         """Test composing a full execution config with datasets and assets."""
         from deriva_ml.execution import ExecutionConfiguration
-        from deriva_ml.dataset import DatasetSpecConfig
 
         ExecConf = builds(ExecutionConfiguration, populate_full_signature=True)
         DatasetConf = builds(DatasetSpec, populate_full_signature=True)

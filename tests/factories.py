@@ -32,7 +32,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from deriva_ml.core.definitions import MLVocab, RID
+from deriva_ml.core.definitions import RID, MLVocab
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 
@@ -49,23 +49,22 @@ if TYPE_CHECKING:
 
 
 def make_dataset(
-    ml: DerivaML,
+    execution: "Execution",
     description: str = "Test Dataset",
     dataset_types: list[str] | None = None,
-    execution_rid: RID | None = None,
     version: DatasetVersion | str | None = None,
     ensure_types: bool = True,
-) -> Dataset:
+) -> "Dataset":
     """Create a Dataset for testing.
 
     This factory creates a dataset with sensible defaults, automatically
-    ensuring that any required vocabulary terms exist.
+    ensuring that any required vocabulary terms exist. Datasets are always
+    created via an execution for provenance tracking.
 
     Args:
-        ml: DerivaML instance to create the dataset in.
+        execution: Execution instance to create the dataset in.
         description: Dataset description. Defaults to "Test Dataset".
         dataset_types: List of dataset type terms. Defaults to ["Testing"].
-        execution_rid: Optional execution to associate with the dataset.
         version: Initial version. Defaults to None (uses catalog default).
         ensure_types: If True, automatically add missing dataset type terms
                      to the vocabulary. Defaults to True.
@@ -74,11 +73,13 @@ def make_dataset(
         The created Dataset object.
 
     Example:
-        >>> dataset = make_dataset(ml)
-        >>> dataset = make_dataset(ml, description="Training data", dataset_types=["Training"])
+        >>> with ml.create_execution(config) as exe:
+        ...     dataset = make_dataset(exe, description="Training data")
     """
     if dataset_types is None:
         dataset_types = ["Testing"]
+
+    ml = execution._ml_object
 
     # Ensure vocabulary terms exist
     if ensure_types:
@@ -92,10 +93,9 @@ def make_dataset(
                     description=f"Test dataset type: {dtype}",
                 )
 
-    return ml.create_dataset(
+    return execution.create_dataset(
         description=description,
         dataset_types=dataset_types,
-        execution_rid=execution_rid,
         version=version,
     )
 

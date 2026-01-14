@@ -16,15 +16,15 @@ Mixins:
     FileMixin: File management (add, list files)
 """
 
-from deriva_ml.core.mixins.vocabulary import VocabularyMixin
-from deriva_ml.core.mixins.rid_resolution import RidResolutionMixin
-from deriva_ml.core.mixins.path_builder import PathBuilderMixin
-from deriva_ml.core.mixins.workflow import WorkflowMixin
-from deriva_ml.core.mixins.feature import FeatureMixin
-from deriva_ml.core.mixins.dataset import DatasetMixin
 from deriva_ml.core.mixins.asset import AssetMixin
+from deriva_ml.core.mixins.dataset import DatasetMixin
 from deriva_ml.core.mixins.execution import ExecutionMixin
+from deriva_ml.core.mixins.feature import FeatureMixin
 from deriva_ml.core.mixins.file import FileMixin
+from deriva_ml.core.mixins.path_builder import PathBuilderMixin
+from deriva_ml.core.mixins.rid_resolution import RidResolutionMixin
+from deriva_ml.core.mixins.vocabulary import VocabularyMixin
+from deriva_ml.core.mixins.workflow import WorkflowMixin
 
 __all__ = [
     "VocabularyMixin",

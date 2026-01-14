@@ -51,7 +51,7 @@ from deriva_ml.execution import ExecutionConfiguration
 from deriva_ml.schema import create_ml_catalog
 
 if TYPE_CHECKING:
-    from deriva_ml.execution import Execution
+    pass
 
 
 class CatalogState(Enum):

@@ -28,7 +28,6 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution import Execution, ExecutionConfiguration
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

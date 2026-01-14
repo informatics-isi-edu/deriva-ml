@@ -2,8 +2,8 @@ from pprint import pformat
 
 from icecream import ic
 
-from deriva_ml import DerivaML
 from deriva_ml.dataset.aux_classes import DatasetVersion, VersionPart
+from deriva_ml.execution.execution import ExecutionConfiguration
 
 ic.configureOutput(
     argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
@@ -13,7 +13,19 @@ class TestDatasetVersion:
     def test_dataset_version_simple(self, test_ml):
         ml_instance = test_ml
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-        dataset = ml_instance.create_dataset(
+        ml_instance.add_term("Workflow_Type", "Manual Workflow", description="A manual workflow")
+
+        # Create a workflow and execution for dataset creation
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for testing",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
+
+        dataset = execution.create_dataset(
             dataset_types=type_rid.name,
             description="A New Dataset",
             version=DatasetVersion(1, 0, 0),
@@ -22,12 +34,24 @@ class TestDatasetVersion:
         assert "1.0.0" == str(v0)
         v1 = dataset.increment_dataset_version(component=VersionPart.minor)
         assert "1.1.0" == str(v1)
-        assert  "1.1.0" == dataset.current_version
+        assert "1.1.0" == dataset.current_version
 
     def test_dataset_version_history(self, test_ml):
         ml_instance = test_ml
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-        dataset = ml_instance.create_dataset(
+        ml_instance.add_term("Workflow_Type", "Manual Workflow", description="A manual workflow")
+
+        # Create a workflow and execution for dataset creation
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for testing",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
+
+        dataset = execution.create_dataset(
             dataset_types=type_rid.name,
             description="A New Dataset",
             version=DatasetVersion(1, 0, 0),

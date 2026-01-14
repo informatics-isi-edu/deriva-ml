@@ -432,14 +432,11 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
         catalog_id: Catalog identifier or name.
 
     Example:
-        >>> def create_analysis_dataset(catalog: DerivaMLCatalog):
-        ...     dataset = catalog.create_dataset(
-        ...         execution_rid=None,
-        ...         version="1.0.0",
-        ...         description="Analysis results",
-        ...         dataset_types=["Analysis"],
-        ...     )
-        ...     return dataset
+        >>> def process_data(catalog: DerivaMLCatalog):
+        ...     datasets = list(catalog.find_datasets())
+        ...     for ds in datasets:
+        ...         print(ds.description)
+        ...     return datasets
     """
 
     catalog: ErmrestCatalog | ErmrestSnapshot
@@ -515,26 +512,6 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
 
         Returns:
             Iterable of all datasets.
-        """
-        ...
-
-    def create_dataset(
-        self,
-        version: DatasetVersion | str | None = None,
-        execution_rid: RID | None = None,
-        description: str = "",
-        dataset_types: list[str] | None = None,
-    ) -> "Dataset":
-        """Create a new dataset in the catalog.
-
-        Args:
-            version: Initial version string or DatasetVersion. Defaults to None.
-            execution_rid: Optional execution to associate with the dataset.
-            description: Description of the dataset. Defaults to empty string.
-            dataset_types: List of dataset type terms from vocabulary.
-
-        Returns:
-            The newly created dataset.
         """
         ...
 

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable
 import pandas as pd
 from deriva.core.ermrest_model import Table
 
-from deriva_ml.core.definitions import RID, VocabularyTerm, MLVocab
+from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset_bag import DatasetBag

@@ -23,25 +23,15 @@ Configuration:
 from __future__ import annotations
 
 import os
-from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 import pytest
-from deriva.core.datapath import DataPathException
 
 from deriva_ml import DerivaML
-from deriva_ml.core.definitions import MLVocab
-from deriva_ml.demo_catalog import (
-    create_demo_datasets,
-    create_demo_features,
-    populate_demo_catalog,
-)
-from deriva_ml.execution import ExecutionConfiguration
 
 from .catalog_manager import CatalogManager, CatalogState
 from .test_utils import (
     MLCatalog,
-    MLDatasetCatalog,
     create_jupyter_kernel,
     destroy_jupyter_kernel,
 )

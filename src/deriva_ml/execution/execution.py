@@ -466,15 +466,15 @@ class Execution:
         """Get the live catalog (DerivaML) instance for this execution.
 
         This provides access to the live catalog for operations that require
-        catalog connectivity, such as creating new datasets or uploading results.
+        catalog connectivity, such as looking up datasets or other read operations.
 
         Returns:
             DerivaML: The live catalog instance.
 
         Example:
             >>> with ml.create_execution(config) as exe:
-            ...     # Use live catalog for write operations
-            ...     new_dataset = exe.catalog.create_dataset(...)
+            ...     # Use live catalog for lookups
+            ...     existing_dataset = exe.catalog.lookup_dataset("1-ABC")
         """
         return self._ml_object
 
@@ -1077,16 +1077,22 @@ class Execution:
     ) -> Dataset:
         """Create a new dataset with specified types.
 
+        Creates a dataset associated with this execution for provenance tracking.
+
         Args:
-            dataset_types: param description:
+            dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
             description: Markdown description of the dataset being created.
             version: Dataset version. Defaults to 0.1.0.
 
         Returns:
-            RID of the newly created dataset.
+            The newly created Dataset.
         """
-        return self._ml_object.create_dataset(
-            execution_rid=self.execution_rid, version=version, dataset_types=dataset_types, description=description
+        return Dataset.create_dataset(
+            ml_instance=self._ml_object,
+            execution_rid=self.execution_rid,
+            dataset_types=dataset_types,
+            version=version,
+            description=description,
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -1126,8 +1132,8 @@ class Execution:
         """
         return self._ml_object.add_files(
             files=files,
-            dataset_types=dataset_types,
             execution_rid=self.execution_rid,
+            dataset_types=dataset_types,
             description=description,
         )
 

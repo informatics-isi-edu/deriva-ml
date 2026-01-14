@@ -14,7 +14,7 @@ from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import RID, MLVocab
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
-from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
+from deriva_ml.dataset.aux_classes import DatasetSpec
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset import Dataset
@@ -97,35 +97,6 @@ class DatasetMixin:
                 )
             )
         return datasets
-
-    def create_dataset(
-        self,
-        version: DatasetVersion | str | None = None,
-        execution_rid: RID | None = None,
-        description: str = "",
-        dataset_types: list[str] | None = None,
-    ) -> "Dataset":
-        """Create a new dataset in the catalog.
-
-        Args:
-            version: Initial version string or DatasetVersion. Defaults to None.
-            execution_rid: Optional execution to associate with the dataset.
-            description: Description of the dataset. Defaults to empty string.
-            dataset_types: List of dataset type terms from vocabulary.
-
-        Returns:
-            The newly created dataset.
-        """
-        # Import here to avoid circular imports
-        from deriva_ml.dataset.dataset import Dataset
-
-        return Dataset.create_dataset(
-            self,  # type: ignore[arg-type]
-            execution_rid=execution_rid,
-            version=version,
-            description=description,
-            dataset_types=dataset_types,
-        )
 
     def lookup_dataset(self, dataset: RID | DatasetSpec, deleted: bool = False) -> "Dataset":
         """Looks up a dataset by RID or DatasetSpec.

@@ -1,6 +1,5 @@
 import string
 from pathlib import Path
-from pprint import pformat
 from random import choice, choices
 from tempfile import TemporaryDirectory
 

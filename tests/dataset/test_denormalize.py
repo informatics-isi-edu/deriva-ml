@@ -19,8 +19,7 @@ import pytest
 from icecream import ic
 
 from deriva_ml import DerivaML
-from deriva_ml.dataset.aux_classes import DatasetSpec
-from deriva_ml.demo_catalog import DatasetDescription
+from deriva_ml.execution.execution import ExecutionConfiguration
 
 ic.configureOutput(
     argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
@@ -581,7 +580,6 @@ class TestDenormalizeSqlGeneration:
         When multiple paths exist through the schema to reach the same tables,
         the results should be UNIONed together.
         """
-        from sqlalchemy.sql.selectable import CompoundSelect
 
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
@@ -677,9 +675,20 @@ class TestCatalogDenormalize:
         An empty dataset should return an empty DataFrame without errors.
         """
         ml_instance = test_ml
+        ml_instance.add_term("Workflow_Type", "Manual Workflow", description="A manual workflow")
+
+        # Create a workflow and execution for dataset creation
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for testing",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
 
         # Create an empty dataset (empty list for dataset_types)
-        dataset = ml_instance.create_dataset(
+        dataset = execution.create_dataset(
             description="Empty test dataset",
             dataset_types=[],
         )

@@ -14,10 +14,16 @@ DerivaML class instances.
 
 Typical usage example:
     >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-    >>> dataset_rid = ml.create_dataset('experiment', 'Experimental data')
-    >>> ml.add_dataset_members(dataset_rid=dataset_rid, members=['1-abc123', '1-def456'])
-    >>> ml.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor,
-    ...     description='Added new samples')
+    >>> with ml.create_execution(config) as exe:
+    ...     dataset = exe.create_dataset(
+    ...         dataset_types=['experiment'],
+    ...         description='Experimental data'
+    ...     )
+    ...     dataset.add_dataset_members(members=['1-abc123', '1-def456'])
+    ...     dataset.increment_version(
+    ...         component=VersionPart.minor,
+    ...         description='Added new samples'
+    ...     )
 """
 
 from __future__ import annotations
@@ -112,16 +118,16 @@ class Dataset:
         _ml_instance (DerivaMLCatalog): Reference to the catalog containing this dataset.
 
     Example:
-        >>> # Create a new dataset
-        >>> dataset = Dataset.create_dataset(
-        ...     ml_instance=ml,
-        ...     dataset_types=["training_data"],
-        ...     description="Image classification training set"
-        ... )
-        >>> # Add members to the dataset
-        >>> dataset.add_dataset_members(members=["1-abc", "1-def"])
-        >>> # Increment version after changes
-        >>> new_version = dataset.increment_dataset_version(VersionPart.minor, "Added samples")
+        >>> # Create a new dataset via an execution
+        >>> with ml.create_execution(config) as exe:
+        ...     dataset = exe.create_dataset(
+        ...         dataset_types=["training_data"],
+        ...         description="Image classification training set"
+        ...     )
+        ...     # Add members to the dataset
+        ...     dataset.add_dataset_members(members=["1-abc", "1-def"])
+        ...     # Increment version after changes
+        ...     new_version = dataset.increment_version(VersionPart.minor, "Added samples")
         >>> # Download for offline use
         >>> bag = dataset.download_dataset_bag(version=new_version)
     """
@@ -201,35 +207,36 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
         ml_instance: DerivaMLCatalog,
+        execution_rid: RID,
         dataset_types: str | list[str] | None = None,
         description: str = "",
-        execution_rid: RID | None = None,
         version: DatasetVersion | None = None,
     ) -> Self:
         """Creates a new dataset in the catalog.
 
-        Creates a dataset with specified types and description. The dataset can be associated
-        with an execution and initialized with a specific version.
+        Creates a dataset with specified types and description. The dataset must be
+        associated with an execution for provenance tracking.
 
         Args:
             ml_instance: DerivaMLCatalog instance.
+            execution_rid: Execution RID to associate with dataset creation (required).
             dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
             description: Description of the dataset's purpose and contents.
-            execution_rid: Optional execution RID to associate with dataset creation.
             version: Optional initial version number. Defaults to 0.1.0.
 
         Returns:
-            RID: Resource Identifier of the newly created dataset.
+            Dataset: The newly created dataset.
 
         Raises:
             DerivaMLException: If dataset_types are invalid or creation fails.
 
         Example:
-            >>> rid = ml.create_dataset(
-            ...     dataset_types=["experiment", "raw_data"],
-            ...     description="RNA sequencing experiment data",
-            ...     version=DatasetVersion(1, 0, 0)
-            ... )
+            >>> with ml.create_execution(config) as exe:
+            ...     dataset = exe.create_dataset(
+            ...         dataset_types=["experiment", "raw_data"],
+            ...         description="RNA sequencing experiment data",
+            ...         version=DatasetVersion(1, 0, 0)
+            ...     )
         """
 
         version = version or DatasetVersion(0, 1, 0)
@@ -250,10 +257,9 @@ class Dataset:
             ]
         )[0]["RID"]
 
-        if execution_rid is not None:
-            pb.schemas[ml_instance.model.ml_schema].Dataset_Execution.insert(
-                [{"Dataset": dataset_rid, "Execution": execution_rid}]
-            )
+        pb.schemas[ml_instance.model.ml_schema].Dataset_Execution.insert(
+            [{"Dataset": dataset_rid, "Execution": execution_rid}]
+        )
         Dataset._insert_dataset_versions(
             ml_instance=ml_instance,
             dataset_list=[DatasetSpec(rid=dataset_rid, version=version)],

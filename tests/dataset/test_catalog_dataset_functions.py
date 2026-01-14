@@ -44,9 +44,20 @@ class TestCatalogDatasetFunctions:
         existing = list(ml_instance.find_datasets())
         initial_count = len(existing)
         ml_instance.add_term(MLVocab.dataset_type, "Testing", description="A test dataset")
+        ml_instance.add_term(MLVocab.workflow_type, "Manual Workflow", description="A manual workflow")
 
-        # Create a new dataset
-        dataset = ml_instance.create_dataset(description="Dataset for testing", dataset_types=["Testing"])
+        # Create a workflow and execution for dataset creation
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for testing dataset creation",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
+
+        # Create a new dataset via execution
+        dataset = execution.create_dataset(description="Dataset for testing", dataset_types=["Testing"])
         assert dataset is not None
 
         # Verify dataset was created
@@ -77,9 +88,21 @@ class TestCatalogDatasetFunctions:
     def test_dataset_add_delete(self, test_ml):
         ml_instance = test_ml
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-        dataset = ml_instance.create_dataset(dataset_types=type_rid.name, description="A Dataset")
+        ml_instance.add_term(MLVocab.workflow_type, "Manual Workflow", description="A manual workflow")
+
+        # Create a workflow and execution for dataset creation
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for testing",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
+
+        dataset = execution.create_dataset(dataset_types=type_rid.name, description="A Dataset")
         datasets = list(ml_instance.find_datasets())
-        assert dataset.dataset_rid  in [d.dataset_rid for d in datasets]
+        assert dataset.dataset_rid in [d.dataset_rid for d in datasets]
 
         ml_instance.delete_dataset(dataset)
         assert len(ml_instance.find_datasets()) == 0

@@ -3,8 +3,9 @@
 These tests verify that the factory functions in tests/factories.py work correctly.
 """
 
-import pytest
 
+from deriva_ml import DerivaML, MLVocab
+from deriva_ml.dataset.aux_classes import DatasetVersion
 from tests.factories import (
     assert_dataset_has_members,
     assert_dataset_version,
@@ -19,8 +20,6 @@ from tests.factories import (
     make_vocabulary_term,
     make_workflow,
 )
-from deriva_ml import DerivaML, MLVocab
-from deriva_ml.dataset.aux_classes import DatasetVersion
 
 
 class TestDatasetFactories:
