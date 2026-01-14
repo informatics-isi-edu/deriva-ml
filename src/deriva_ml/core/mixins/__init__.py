@@ -14,8 +14,10 @@ Mixins:
     AssetMixin: Asset management (create, list assets)
     ExecutionMixin: Execution management (create, restore, update status)
     FileMixin: File management (add, list files)
+    AnnotationMixin: Annotation management (display, visible-columns, etc.)
 """
 
+from deriva_ml.core.mixins.annotation import AnnotationMixin
 from deriva_ml.core.mixins.asset import AssetMixin
 from deriva_ml.core.mixins.dataset import DatasetMixin
 from deriva_ml.core.mixins.execution import ExecutionMixin
@@ -27,6 +29,7 @@ from deriva_ml.core.mixins.vocabulary import VocabularyMixin
 from deriva_ml.core.mixins.workflow import WorkflowMixin
 
 __all__ = [
+    "AnnotationMixin",
     "VocabularyMixin",
     "RidResolutionMixin",
     "PathBuilderMixin",

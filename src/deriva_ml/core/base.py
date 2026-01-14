@@ -38,6 +38,7 @@ from deriva_ml.core.logging_config import apply_logger_overrides, configure_logg
 from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.core.mixins import (
+    AnnotationMixin,
     VocabularyMixin,
     RidResolutionMixin,
     PathBuilderMixin,
@@ -75,6 +76,7 @@ class DerivaML(
     AssetMixin,
     ExecutionMixin,
     FileMixin,
+    AnnotationMixin,
     DerivaMLCatalog,
 ):
     """Core class for machine learning operations on a Deriva catalog.

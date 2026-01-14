@@ -30,7 +30,7 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 from deriva_ml.core.definitions import RID, MLVocab
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
@@ -42,6 +42,9 @@ if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.workflow import Workflow
 
+# Type alias for functions that accept either DerivaML or Execution
+MLContext = Union["DerivaML", "Execution"]
+
 
 # =============================================================================
 # Dataset Factories
@@ -49,7 +52,7 @@ if TYPE_CHECKING:
 
 
 def make_dataset(
-    execution: "Execution",
+    context: MLContext,
     description: str = "Test Dataset",
     dataset_types: list[str] | None = None,
     version: DatasetVersion | str | None = None,
@@ -58,11 +61,12 @@ def make_dataset(
     """Create a Dataset for testing.
 
     This factory creates a dataset with sensible defaults, automatically
-    ensuring that any required vocabulary terms exist. Datasets are always
-    created via an execution for provenance tracking.
+    ensuring that any required vocabulary terms exist.
 
     Args:
-        execution: Execution instance to create the dataset in.
+        context: Either a DerivaML instance or an Execution instance.
+            If DerivaML, auto-creates a test execution for provenance.
+            If Execution, uses the provided execution for provenance.
         description: Dataset description. Defaults to "Test Dataset".
         dataset_types: List of dataset type terms. Defaults to ["Testing"].
         version: Initial version. Defaults to None (uses catalog default).
@@ -73,13 +77,26 @@ def make_dataset(
         The created Dataset object.
 
     Example:
+        >>> # Using DerivaML directly (auto-creates execution)
+        >>> dataset = make_dataset(ml, description="Test dataset")
+        >>>
+        >>> # Using Execution for explicit provenance
         >>> with ml.create_execution(config) as exe:
         ...     dataset = make_dataset(exe, description="Training data")
     """
     if dataset_types is None:
         dataset_types = ["Testing"]
 
-    ml = execution._ml_object
+    # Determine if context is DerivaML or Execution
+    # Execution has _ml_object attribute, DerivaML does not
+    if hasattr(context, "_ml_object"):
+        # It's an Execution
+        ml = context._ml_object
+        execution = context
+    else:
+        # It's a DerivaML instance - create a test execution
+        ml = context
+        execution = make_execution(ml)
 
     # Ensure vocabulary terms exist
     if ensure_types:
