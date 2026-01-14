@@ -759,29 +759,58 @@ class Dataset:
     ) -> None:
         """Adds members to a dataset.
 
-        Associates one or more records with a dataset. Can optionally validate member types
-        and create a new dataset version to track the changes.
+        Associates one or more records with a dataset. Members can be provided in two forms:
+
+        **List of RIDs (simpler but slower):**
+        When `members` is a list of RIDs, each RID is resolved to determine which table
+        it belongs to. This uses batch RID resolution for efficiency, but still requires
+        querying the catalog to identify each RID's table.
+
+        **Dictionary by table name (faster, recommended for large datasets):**
+        When `members` is a dict mapping table names to lists of RIDs, no RID resolution
+        is needed. The RIDs are inserted directly into the dataset. Use this form when
+        you already know which table each RID belongs to.
+
+        **Important:** Members can only be added from tables that have been registered as
+        dataset element types. Use :meth:`DerivaML.add_dataset_element_type` to register
+        a table before adding its records to datasets.
+
+        Adding members automatically increments the dataset's minor version.
 
         Args:
-            members: List of RIDs to add as dataset members. Can be organized into a dictionary that indicates the
-                table that the member rids belong to.
-            validate: Whether to validate member types. Defaults to True.
+            members: Either:
+                - list[RID]: List of RIDs to add. Each RID will be resolved to find its table.
+                - dict[str, list[RID]]: Mapping of table names to RID lists. Skips resolution.
+            validate: Whether to validate that members don't already exist. Defaults to True.
             description: Optional description of the member additions.
             execution_rid: Optional execution RID to associate with changes.
 
         Raises:
             DerivaMLException: If:
-                - dataset_rid is invalid
-                - members are invalid or of wrong type
-                - adding members would create a cycle
-                - validation fails
+                - Any RID is invalid or cannot be resolved
+                - Any RID belongs to a table that isn't registered as a dataset element type
+                - Adding members would create a cycle (for nested datasets)
+                - Validation finds duplicate members (when validate=True)
 
-        Example:
-            >>> ml.add_dataset_members(
-            ...     dataset_rid="1-abc123",
-            ...     members=["1-def456", "1-ghi789"],
-            ...     description="Added sample data"
-            ... )
+        See Also:
+            :meth:`DerivaML.add_dataset_element_type`: Register a table as a dataset element type.
+            :meth:`DerivaML.list_dataset_element_types`: List registered dataset element types.
+
+        Examples:
+            Using a list of RIDs (simpler):
+                >>> dataset.add_dataset_members(
+                ...     members=["1-ABC", "1-DEF", "1-GHI"],
+                ...     description="Added sample images"
+                ... )
+
+            Using a dict by table name (faster for large datasets):
+                >>> dataset.add_dataset_members(
+                ...     members={
+                ...         "Image": ["1-ABC", "1-DEF"],
+                ...         "Subject": ["2-XYZ"]
+                ...     },
+                ...     description="Added images and subjects"
+                ... )
         """
         description = description or "Updated dataset via add_dataset_members"
 
@@ -807,26 +836,33 @@ class Dataset:
 
         # Now go through every rid to be added to the data set and sort them based on what association table entries
         # need to be made.
-        dataset_elements = {}
-        association_map = {
-            a.other_fkeys.pop().pk_table.name: a.table.name for a in self._dataset_table.find_associations()
-        }
+        dataset_elements: dict[str, list[RID]] = {}
+
+        # Build map of valid element tables to their association tables
+        associations = list(self._dataset_table.find_associations())
+        association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in associations}
 
         # Get a list of all the object types that can be linked to a dataset_table.
         if type(members) is list:
             members = set(members)
-            for m in members:
-                try:
-                    rid_info = self._ml_instance.resolve_rid(m)
-                except KeyError:
-                    raise DerivaMLException(f"Invalid RID: {m}")
-                if rid_info.table.name not in association_map:
-                    raise DerivaMLException(f"RID table: {rid_info.table.name} not part of dataset_table")
+
+            # Get candidate tables for batch resolution (only tables that can be dataset elements)
+            candidate_tables = [
+                self._ml_instance.model.name_to_table(table_name) for table_name in association_map.keys()
+            ]
+
+            # Batch resolve all RIDs at once instead of one-by-one
+            rid_results = self._ml_instance.resolve_rids(members, candidate_tables=candidate_tables)
+
+            # Group by table and validate
+            for rid, rid_info in rid_results.items():
+                if rid_info.table_name not in association_map:
+                    raise DerivaMLException(f"RID table: {rid_info.table_name} not part of dataset_table")
                 if rid_info.table == self._dataset_table and check_dataset_cycle(rid_info.rid):
                     raise DerivaMLException("Creating cycle of datasets is not allowed")
-                dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
+                dataset_elements.setdefault(rid_info.table_name, []).append(rid_info.rid)
         else:
-            dataset_elements = {t: set(ms) for t, ms in members.items()}
+            dataset_elements = {t: list(set(ms)) for t, ms in members.items()}
         # Now make the entries into the association tables.
         pb = self._ml_instance.pathBuilder()
         for table, elements in dataset_elements.items():

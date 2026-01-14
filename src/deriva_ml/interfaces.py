@@ -41,6 +41,7 @@ from deriva.core.ermrest_catalog import ErmrestCatalog, ResolveRidResult
 from deriva.core.ermrest_model import Table
 
 from deriva_ml.core.definitions import RID, VocabularyTerm
+from deriva_ml.core.mixins.rid_resolution import BatchRidResult
 from deriva_ml.feature import Feature
 from deriva_ml.model.catalog import DerivaModel
 
@@ -471,6 +472,26 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
 
         Returns:
             Information about the RID's location in the catalog.
+        """
+        ...
+
+    def resolve_rids(
+        self,
+        rids: set[RID] | list[RID],
+        candidate_tables: list[Table] | None = None,
+    ) -> dict[RID, BatchRidResult]:
+        """Batch resolve multiple RIDs efficiently.
+
+        Resolves multiple RIDs in batched queries, significantly faster than
+        calling resolve_rid() for each RID individually.
+
+        Args:
+            rids: Set or list of RIDs to resolve.
+            candidate_tables: Optional list of Table objects to search in.
+                If not provided, searches all tables in domain and ML schemas.
+
+        Returns:
+            Mapping from each resolved RID to its BatchRidResult.
         """
         ...
 
