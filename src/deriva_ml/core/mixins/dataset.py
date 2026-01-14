@@ -131,7 +131,9 @@ class DatasetMixin:
         pb = self.pathBuilder()
         dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
 
-        rid_list = [dataset_rid] + (dataset.list_dataset_children() if recurse else [])
+        # list_dataset_children returns Dataset objects, so extract their RIDs
+        child_rids = [ds.dataset_rid for ds in dataset.list_dataset_children()] if recurse else []
+        rid_list = [dataset_rid] + child_rids
         dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
 
     def list_dataset_element_types(self) -> Iterable[Table]:
