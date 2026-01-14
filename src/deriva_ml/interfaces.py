@@ -355,16 +355,20 @@ class WritableDataset(DatasetLike, Protocol):
     def download_dataset_bag(
         self,
         version: DatasetVersion | str | None = None,
-        use_minid: bool = True,
+        use_minid: bool = False,
     ) -> Any:
         """Download the dataset as a BDBag.
 
         Args:
             version: Optional version to download. Defaults to current version.
-            use_minid: Whether to use MINID for dataset identification.
+            use_minid: If True, upload the bag to S3 and create a MINID.
+                Requires s3_bucket to be configured on the catalog. Defaults to False.
 
         Returns:
             DatasetBag containing the downloaded data.
+
+        Raises:
+            DerivaMLException: If use_minid=True but s3_bucket is not configured.
         """
         ...
 

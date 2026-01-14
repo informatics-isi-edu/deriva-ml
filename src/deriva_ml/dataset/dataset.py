@@ -1251,41 +1251,46 @@ class Dataset:
         self,
         version: DatasetVersion | str,
         materialize: bool = True,
-        use_minid: bool = True,
+        use_minid: bool = False,
     ) -> DatasetBag:
-        """Downloads a dataset to the local filesystem and creates a MINID if needed.
+        """Downloads a dataset to the local filesystem and optionally creates a MINID.
 
-        Downloads a dataset to the local file system.  If the dataset has a version set, that version is used.
+        Downloads a dataset to the local file system. If the dataset has a version set, that version is used.
         If the dataset has a version and a version is provided, the version specified takes precedence.
-
-        If the dataset doesn't have a MINID (Minimal Viable Identifier), one will be created.
-        The dataset can optionally be associated with an execution record.
-
 
         Args:
             version: Dataset version to download. If not specified, the version must be set in the dataset.
             materialize: If True, materialize the dataset after downloading.
-            use_minid: If True, create a MINID for the dataset if one doesn't already exist.
+            use_minid: If True, upload the bag to S3 and create a MINID for the dataset.
+                Requires s3_bucket to be configured on the catalog. Defaults to False.
 
         Returns:
             DatasetBag: Object containing:
                 - path: Local filesystem path to downloaded dataset
                 - rid: Dataset's Resource Identifier
-                - minid: Dataset's Minimal Viable Identifier
+                - minid: Dataset's Minimal Viable Identifier (if use_minid=True)
+
+        Raises:
+            DerivaMLException: If use_minid=True but s3_bucket is not configured on the catalog.
 
         Examples:
-            Download with default options:
-                >>> spec = DatasetSpec(rid="1-abc123")
-                >>> bag = ml.download_dataset_bag(dataset=spec)
+            Download without MINID (default):
+                >>> bag = dataset.download_dataset_bag(version="1.0.0")
                 >>> print(f"Downloaded to {bag.path}")
 
-            Download with execution tracking:
-                >>> bag = ml.download_dataset_bag(
-                ...     dataset=DatasetSpec(rid="1-abc123", materialize=True),
-                ... )
+            Download with MINID (requires s3_bucket configured):
+                >>> # Catalog must be created with s3_bucket="s3://my-bucket"
+                >>> bag = dataset.download_dataset_bag(version="1.0.0", use_minid=True)
         """
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
+
+        # Validate use_minid requires s3_bucket configuration
+        if use_minid and not self._ml_instance.s3_bucket:
+            raise DerivaMLException(
+                "Cannot use use_minid=True without s3_bucket configured. "
+                "Configure s3_bucket when creating the DerivaML instance to enable MINID support."
+            )
 
         minid = self._get_dataset_minid(version, create=True, use_minid=use_minid)
 

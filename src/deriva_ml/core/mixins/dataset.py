@@ -183,11 +183,11 @@ class DatasetMixin:
         self,
         dataset: DatasetSpec,
     ) -> "DatasetBag":
-        """Downloads a dataset to the local filesystem and creates a MINID if needed.
+        """Downloads a dataset to the local filesystem.
 
-        Downloads a dataset specified by DatasetSpec to the local filesystem. If the dataset doesn't have
-        a MINID (Minimal Viable Identifier), one will be created. The dataset can optionally be associated
-        with an execution record.
+        Downloads a dataset specified by DatasetSpec to the local filesystem. If the catalog
+        has s3_bucket configured and use_minid is enabled, the bag will be uploaded to S3
+        and registered with the MINID service.
 
         Args:
             dataset: Specification of the dataset to download, including version and materialization options.
@@ -196,19 +196,17 @@ class DatasetMixin:
             DatasetBag: Object containing:
                 - path: Local filesystem path to downloaded dataset
                 - rid: Dataset's Resource Identifier
-                - minid: Dataset's Minimal Viable Identifier
+                - minid: Dataset's Minimal Viable Identifier (if MINID enabled)
+
+        Note:
+            MINID support requires s3_bucket to be configured when creating the DerivaML instance.
+            The catalog's use_minid setting controls whether MINIDs are created.
 
         Examples:
             Download with default options:
                 >>> spec = DatasetSpec(rid="1-abc123")
                 >>> bag = ml.download_dataset_bag(dataset=spec)
                 >>> print(f"Downloaded to {bag.path}")
-
-            Download with execution tracking:
-                >>> bag = ml.download_dataset_bag(
-                ...     dataset=DatasetSpec(rid="1-abc123", materialize=True),
-                ...     execution_rid="1-xyz789"
-                ... )
         """
         if not self.model.is_dataset_rid(dataset.rid):
             raise DerivaMLTableTypeError("Dataset", dataset.rid)
