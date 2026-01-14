@@ -90,7 +90,7 @@ def is_feature_dir(path: Path) -> Optional[re.Match]:
     return re.match(feature_table_dir_regex + "$", path.as_posix())
 
 
-def normalize_asset_dir(path: str) -> Optional[tuple[str, str]]:
+def normalize_asset_dir(path: str | Path) -> Optional[tuple[str, str]]:
     """Parse a path to an asset file and return the asset table name and file name.
 
     Args:
@@ -414,7 +414,7 @@ def upload_asset(model: DerivaModel, file: Path | str, table: Table, **kwargs: A
         server=model.catalog.deriva_server.server,
         credentials=model.catalog.deriva_server.credentials,
     )
-    md5_hashes = hash_utils.compute_file_hashes(file, ["md5"])["md5"]
+    md5_hashes = hash_utils.compute_file_hashes(file, frozenset(["md5"]))["md5"]
     sanitized_filename = urlquote(re.sub("[^a-zA-Z0-9_.-]", "_", md5_hashes[0] + "." + file_name))
     hatrac_path = f"{hatrac_path}{sanitized_filename}"
 
