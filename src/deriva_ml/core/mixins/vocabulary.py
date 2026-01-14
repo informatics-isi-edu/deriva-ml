@@ -24,6 +24,11 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+# Type alias for the vocabulary cache structure
+# Maps (schema_name, table_name) -> {term_name -> VocabularyTerm, synonym -> VocabularyTerm}
+VocabCache = dict[tuple[str, str], dict[str, VocabularyTerm]]
+
+
 class VocabularyMixin:
     """Mixin providing vocabulary/term management operations.
 
@@ -35,11 +40,61 @@ class VocabularyMixin:
         add_term: Add a new term to a vocabulary table
         lookup_term: Find a term by name or synonym
         list_vocabulary_terms: List all terms in a vocabulary table
+        clear_vocabulary_cache: Clear the vocabulary term cache
     """
 
     # Type hints for IDE support - actual attributes/methods from host class
     model: "DerivaModel"
     pathBuilder: Callable[[], Any]
+
+    # Vocabulary term cache: maps (schema, table) -> {name_or_synonym -> VocabularyTerm}
+    _vocab_cache: VocabCache
+
+    def _get_vocab_cache(self) -> VocabCache:
+        """Get the vocabulary cache, initializing if needed."""
+        if not hasattr(self, "_vocab_cache"):
+            self._vocab_cache = {}
+        return self._vocab_cache
+
+    def clear_vocabulary_cache(self, table: str | Table | None = None) -> None:
+        """Clear the vocabulary term cache.
+
+        Args:
+            table: If provided, only clear cache for this specific vocabulary table.
+                   If None, clear the entire cache.
+        """
+        cache = self._get_vocab_cache()
+        if table is None:
+            cache.clear()
+        else:
+            vocab_table = self.model.name_to_table(table)
+            cache_key = (vocab_table.schema.name, vocab_table.name)
+            cache.pop(cache_key, None)
+
+    def _populate_vocab_cache(self, schema_name: str, table_name: str) -> dict[str, VocabularyTerm]:
+        """Fetch all terms from a vocabulary table and populate the cache.
+
+        Returns:
+            Dictionary mapping term names and synonyms to VocabularyTerm objects.
+        """
+        cache = self._get_vocab_cache()
+        cache_key = (schema_name, table_name)
+
+        # Fetch all terms from the server
+        schema_path = self.pathBuilder().schemas[schema_name]
+        term_lookup: dict[str, VocabularyTerm] = {}
+
+        for term_data in schema_path.tables[table_name].entities().fetch():
+            term = VocabularyTerm.model_validate(term_data)
+            # Index by primary name
+            term_lookup[term.name] = term
+            # Also index by each synonym
+            if term.synonyms:
+                for synonym in term.synonyms:
+                    term_lookup[synonym] = term
+
+        cache[cache_key] = term_lookup
+        return term_lookup
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_term(
@@ -109,6 +164,8 @@ class VocabularyMixin:
                     defaults={"ID", "URI"},
                 )[0]
             )
+            # Invalidate cache for this vocabulary since we added a new term
+            self.clear_vocabulary_cache(table)
         except DataPathException:
             # Term exists - look it up or raise an error
             term_id = self.lookup_term(table, term_name)
@@ -121,7 +178,8 @@ class VocabularyMixin:
         """Finds a term in a vocabulary table.
 
         Searches for a term in the specified vocabulary table, matching either the primary name
-        or any of its synonyms.
+        or any of its synonyms. Results are cached for performance - subsequent lookups in the
+        same vocabulary table are served from cache.
 
         Args:
             table: Vocabulary table to search in (name or Table object).
@@ -146,17 +204,72 @@ class VocabularyMixin:
         if not self.model.is_vocabulary(vocab_table):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
-        # Get schema and table paths
+        # Get schema and table names
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
-        schema_path = self.pathBuilder().schemas[schema_name]
+        cache_key = (schema_name, table_name)
 
-        # Search for term by name or synonym
-        for term in schema_path.tables[table_name].entities().fetch():
-            if term_name == term["Name"] or (term["Synonyms"] and term_name in term["Synonyms"]):
-                return VocabularyTerm.model_validate(term)
+        # Check cache first
+        cache = self._get_vocab_cache()
+        if cache_key in cache:
+            term_lookup = cache[cache_key]
+            if term_name in term_lookup:
+                return term_lookup[term_name]
+            # Term not in cache - might be newly added, try server-side lookup
+        else:
+            # Vocabulary not cached yet - try server-side lookup first for single term
+            term = self._server_lookup_term(schema_name, table_name, term_name)
+            if term is not None:
+                # Found it - populate the full cache for future lookups
+                self._populate_vocab_cache(schema_name, table_name)
+                return term
+            # Not found by name - need to check synonyms, populate cache
+            term_lookup = self._populate_vocab_cache(schema_name, table_name)
+            if term_name in term_lookup:
+                return term_lookup[term_name]
+            raise DerivaMLInvalidTerm(table_name, term_name)
+
+        # Term not in cache - try server-side lookup (might be newly added)
+        term = self._server_lookup_term(schema_name, table_name, term_name)
+        if term is not None:
+            # Add to cache
+            cache[cache_key][term_name] = term
+            if term.synonyms:
+                for synonym in term.synonyms:
+                    cache[cache_key][synonym] = term
+            return term
+
+        # Still not found - refresh cache and try one more time
+        term_lookup = self._populate_vocab_cache(schema_name, table_name)
+        if term_name in term_lookup:
+            return term_lookup[term_name]
 
         # Term not found
         raise DerivaMLInvalidTerm(table_name, term_name)
+
+    def _server_lookup_term(
+        self, schema_name: str, table_name: str, term_name: str
+    ) -> VocabularyTerm | None:
+        """Look up a term by name using server-side filtering.
+
+        This performs a targeted server query for a specific term name.
+        Does NOT check synonyms (that requires client-side filtering).
+
+        Args:
+            schema_name: Schema containing the vocabulary table.
+            table_name: Vocabulary table name.
+            term_name: Primary name of the term to find.
+
+        Returns:
+            VocabularyTerm if found by exact name match, None otherwise.
+        """
+        schema_path = self.pathBuilder().schemas[schema_name]
+        table_path = schema_path.tables[table_name]
+
+        # Server-side filter by Name
+        results = list(table_path.filter(table_path.Name == term_name).entities().fetch())
+        if results:
+            return VocabularyTerm.model_validate(results[0])
+        return None
 
     def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
         """Lists all terms in a vocabulary table.
