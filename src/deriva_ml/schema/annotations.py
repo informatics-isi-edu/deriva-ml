@@ -248,7 +248,6 @@ def asset_annotation(asset_table: Table):
 
 
 def generate_annotation(model: Model, schema: str) -> dict:
-    catalog_id = model.catalog.catalog_id
     workflow_annotation = {
         deriva_tags.visible_columns: {
             "*": [

@@ -1,10 +1,17 @@
+# type: ignore[arg-type, call-arg]
+"""Demo catalog utilities for DerivaML testing and examples.
+
+This module creates demo catalogs with sample data for testing. It uses
+dynamically created Pydantic models for features, which cannot be statically
+typed - hence the type ignore above.
+"""
 from __future__ import annotations
 
 import atexit
 import itertools
 import logging
-import os
 import string
+import subprocess
 from collections.abc import Iterator, Sequence
 from datetime import datetime
 from numbers import Integral
@@ -17,20 +24,24 @@ from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
 from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError
 
-from deriva_ml import DerivaML, MLVocab
+from deriva_ml import DerivaML, DerivaMLException, MLVocab
 from deriva_ml.core.definitions import RID, BuiltinTypes, ColumnDefinition
+from deriva_ml.dataset import Dataset
 from deriva_ml.dataset.aux_classes import DatasetVersion
-from deriva_ml.execution.execution import Execution, Workflow
-from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution.execution import Execution, ExecutionConfiguration
 from deriva_ml.schema import (
     create_ml_catalog,
 )
-from deriva_ml.schema.annotations import catalog_annotation
 
 try:
+    from pprint import pformat
+
     from icecream import ic
 
-    ic.configureOutput(includeContext=True)
+    ic.configureOutput(
+        includeContext=True,
+        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
+    )
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
@@ -38,39 +49,24 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 TEST_DATASET_SIZE = 12
 
 
-def populate_demo_catalog(ml_instance: DerivaML) -> None:
+def populate_demo_catalog(execution: Execution) -> None:
     # Delete any vocabularies and features.
-    domain_schema = ml_instance.pathBuilder.schemas[ml_instance.domain_schema]
+    ml_instance = execution._ml_object
+    domain_schema = ml_instance.pathBuilder().schemas[ml_instance.domain_schema]
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
+    for s in ss:
+        image_file = execution.asset_file_path(
+            "Image",
+            f"test_{s['RID']}.txt",
+            Subject=s["RID"],
+            Acquisition_Time=datetime.now(),
+            Acquisition_Date=datetime.now().date(),
+        )
+        with image_file.open("w") as f:
+            f.write(f"Hello there {random()}\n")
 
-    ml_instance.add_term(
-        MLVocab.workflow_type,
-        "Demo Catalog Creation",
-        description="A workflow demonstrating how to create a demo catalog.",
-    )
-    workflow = Workflow(
-        name="Demo Catalog",
-        workflow_type="Demo Catalog Creation",
-        url="https://github.com/informatics-isi-edu/deriva-ml/blob/main/src/deriva_ml/demo_catalog.py",
-        version="1.0.0",
-        checksum="27",
-        git_root=Path(),
-    )
-    execution = ml_instance.create_execution(ExecutionConfiguration(workflow=workflow))
-
-    with execution.execute() as e:
-        for s in ss:
-            image_file = e.asset_file_path(
-                "Image",
-                f"test_{s['RID']}.txt",
-                Subject=s["RID"],
-                Acquisition_Time=datetime.now(),
-                Acquisition_Date=datetime.now().date(),
-            )
-            with image_file.open("w") as f:
-                f.write(f"Hello there {random()}\n")
-        execution.upload_execution_outputs()
+    execution.upload_execution_outputs()
 
 
 class DatasetDescription(BaseModel):
@@ -81,7 +77,7 @@ class DatasetDescription(BaseModel):
     ]  # Either a list of nested dataset, or then number of elements to add
     member_rids: dict[str, list[RID]] = {}  # The rids of the members of the dataset.
     version: DatasetVersion = DatasetVersion(1, 0, 0)  # The initial version.
-    rid: RID = None  # RID of dataset that was created.
+    dataset: Dataset = None  # RID of dataset that was created.
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -95,7 +91,8 @@ def create_datasets(
     Create a dataset per `spec`, then add child members (either by slicing
     off pre-generated RIDs or by recursing on nested specs).
     """
-    dataset_rid = client.create_dataset(
+    # Create unpinned dataset.
+    dataset = client.create_dataset(
         dataset_types=spec.types,
         description=spec.description,
         version=spec.version,
@@ -105,9 +102,10 @@ def create_datasets(
         description=spec.description,
         members={},
         types=spec.types,
-        rid=dataset_rid,
+        dataset=dataset,
         version=spec.version,
     )
+
     dataset_rids = {}
     for member_type, value in spec.members.items():
         if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
@@ -116,7 +114,7 @@ def create_datasets(
             for child_spec in nested_specs:
                 child_ds = create_datasets(client, child_spec, member_rids)
                 result_spec.members.setdefault(member_type, []).append(child_ds)
-                rids.append(child_ds.rid)
+                rids.append(child_ds.dataset.dataset_rid)
         elif isinstance(value, Integral):
             count = int(value)
             # take exactly `count` RIDs (or an empty list if count <= 0)
@@ -132,7 +130,7 @@ def create_datasets(
         if rids:
             dataset_rids[member_type] = rids
             result_spec.member_rids.setdefault(member_type, []).extend(rids)
-    client.add_dataset_members(dataset_rid, dataset_rids, description="Added by create_datasets")
+    dataset.add_dataset_members(dataset_rids, description="Added by create_datasets")
 
     return result_spec
 
@@ -147,7 +145,7 @@ def dataset_spec() -> DatasetDescription:
     training_dataset = DatasetDescription(
         description="A dataset that is nested",
         members={"Dataset": [dataset, dataset], "Image": 2},
-        types=["Testing"],
+        types=["Training"],
     )
 
     testing_dataset = DatasetDescription(
@@ -164,38 +162,35 @@ def dataset_spec() -> DatasetDescription:
     return double_nested_dataset
 
 
-def create_demo_datasets(ml_instance: DerivaML) -> DatasetDescription:
+def create_demo_datasets(execution: Execution) -> DatasetDescription:
     """Create datasets from a populated catalog."""
+    ml_instance = execution._ml_object
     ml_instance.add_dataset_element_type("Subject")
     ml_instance.add_dataset_element_type("Image")
 
-    _type_rid = ml_instance.add_term("Dataset_Type", "Complete", synonyms=["Whole"], description="A test")
-    _training_rid = ml_instance.add_term("Dataset_Type", "Training", synonyms=["Train"], description="A training set")
-    _testing_rid = ml_instance.add_term("Dataset_Type", "Testing", description="A testing set")
+    _type_rid = ml_instance.add_term(
+        "Dataset_Type", "Complete", synonyms=["Whole", "complete", "whole"], description="A test"
+    )
+    _training_rid = ml_instance.add_term(
+        "Dataset_Type", "Training", synonyms=["Train", "train", "training"], description="A training set"
+    )
+    _testing_rid = ml_instance.add_term(
+        "Dataset_Type", "Testing", synonyms=["Test", "test", "testing"], description="A testing set"
+    )
 
     table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
+
     table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Image"]
     image_rids = [i["RID"] for i in table_path.entities().fetch()]
 
-    ml_instance.add_term(
-        MLVocab.workflow_type,
-        "Create Dataset Workflow",
-        description="A Workflow that creates a new dataset.",
-    )
-    dataset_workflow = ml_instance.create_workflow(name="API Workflow", workflow_type="Create Dataset Workflow")
-
-    dataset_execution = ml_instance.create_execution(
-        ExecutionConfiguration(workflow=dataset_workflow, description="Create Dataset")
-    )
-
-    with dataset_execution.execute() as exe:
-        spec = dataset_spec()
-        dataset = create_datasets(exe, spec, {"Subject": iter(subject_rids), "Image": iter(image_rids)})
+    spec = dataset_spec()
+    dataset = create_datasets(execution, spec, {"Subject": iter(subject_rids), "Image": iter(image_rids)})
     return dataset
 
 
-def create_demo_features(ml_instance: DerivaML) -> None:
+def create_demo_features(execution: Execution) -> None:
+    ml_instance = execution._ml_object
     ml_instance.create_vocabulary("SubjectHealth", "A vocab")
     ml_instance.add_term(
         "SubjectHealth",
@@ -228,24 +223,12 @@ def create_demo_features(ml_instance: DerivaML) -> None:
 
     # Get the workflow for this notebook
 
-    ml_instance.add_term(
-        MLVocab.workflow_type,
-        "Feature Notebook Workflow",
-        description="A Workflow that uses Deriva ML API",
-    )
-    ml_instance.add_term(MLVocab.asset_type, "API_Model", description="Model for our Notebook workflow")
-    notebook_workflow = ml_instance.create_workflow(name="API Workflow", workflow_type="Feature Notebook Workflow")
-
-    feature_execution = ml_instance.create_execution(
-        ExecutionConfiguration(workflow=notebook_workflow, description="Our Sample Workflow instance")
-    )
-
     subject_rids = [i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()]
     image_rids = [i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()]
     _subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
-            Execution=feature_execution.execution_rid,
+            Execution=execution.execution_rid,
             SubjectHealth=choice(["Well", "Sick"]),
             Scale=randint(1, 10),
         )
@@ -255,7 +238,7 @@ def create_demo_features(ml_instance: DerivaML) -> None:
     # Create a new set of images.  For fun, lets wrap this in an execution so we get status updates
     bounding_box_files = []
     for i in range(10):
-        bounding_box_file = feature_execution.asset_file_path("BoundingBox", f"box{i}.txt")
+        bounding_box_file = execution.asset_file_path("BoundingBox", f"box{i}.txt")
         with bounding_box_file.open("w") as fp:
             fp.write(f"Hi there {i}")
         bounding_box_files.append(bounding_box_file)
@@ -285,12 +268,9 @@ def create_demo_features(ml_instance: DerivaML) -> None:
         for subject_rid in subject_rids
     ]
 
-    with feature_execution.execute() as execution:
-        execution.add_features(image_bounding_box_feature_list)
-        execution.add_features(image_quality_feature_list)
-        execution.add_features(subject_feature_list)
-
-    feature_execution.upload_execution_outputs()
+    execution.add_features(image_bounding_box_feature_list)
+    execution.add_features(image_quality_feature_list)
+    execution.add_features(subject_feature_list)
 
 
 def create_demo_files(ml_instance: DerivaML):
@@ -364,7 +344,7 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
             ],
             referenced_tables=[subject_table],
         )
-        catalog_annotation(ml_instance.model)
+        ml_instance.apply_catalog_annotations()
 
 
 def destroy_demo_catalog(catalog):
@@ -395,27 +375,51 @@ def create_demo_catalog(
 
     try:
         with TemporaryDirectory() as tmpdir:
-            os.chdir(tmpdir)  # Do this so we don't get confused if running from a GitHub repo.
+            try:
+                subprocess.run(
+                    "git clone https://github.com/informatics-isi-edu/deriva-ml.git",
+                    capture_output=True,
+                    text=True,
+                    shell=True,
+                    check=True,
+                    cwd=tmpdir,
+                )
+            except subprocess.CalledProcessError:
+                raise DerivaMLException("Cannot clone deriva-ml repo from GitHub.")
+
             create_domain_schema(test_catalog, domain_schema)
 
-            ml_instance = DerivaML(
-                hostname,
-                catalog_id=test_catalog.catalog_id,
-                domain_schema=domain_schema,
-                working_dir=tmpdir,
-                logging_level=logging_level,
-            )
             if populate or create_features or create_datasets:
-                populate_demo_catalog(ml_instance)
-                if create_features:
-                    create_demo_features(ml_instance)
-                if create_datasets:
-                    create_demo_datasets(ml_instance)
+                ml_instance = DerivaML(
+                    hostname,
+                    catalog_id=test_catalog.catalog_id,
+                    domain_schema=domain_schema,
+                    working_dir=tmpdir,
+                    logging_level=logging_level,
+                )
+                ml_instance.add_term(
+                    MLVocab.workflow_type,
+                    "Demo Catalog Creation",
+                    description="A Workflow that creates a new catalog and populates it with demo data.",
+                )
+                populate_workflow = ml_instance.create_workflow(
+                    name="Demo Creation", workflow_type="Demo Catalog Creation"
+                )
+                execution = ml_instance.create_execution(
+                    workflow=populate_workflow, configuration=ExecutionConfiguration()
+                )
+                with execution.execute() as exe:
+                    populate_demo_catalog(exe)
+                    if create_features:
+                        create_demo_features(exe)
+                    if create_datasets:
+                        create_demo_datasets(exe)
+                execution.upload_execution_outputs()
 
-    except Exception:
+    except Exception as e:
         # on failure, delete catalog and re-raise exception
         test_catalog.delete_ermrest_catalog(really=True)
-        raise
+        raise e
     return test_catalog
 
 

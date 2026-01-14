@@ -1,5 +1,6 @@
 import string
 from pathlib import Path
+from pprint import pformat
 from random import choice, choices
 from tempfile import TemporaryDirectory
 
@@ -8,6 +9,12 @@ from deriva.core.datapath import DataPathException
 
 from deriva_ml import DerivaML, DerivaMLInvalidTerm, FileSpec, MLVocab
 from deriva_ml.execution import ExecutionConfiguration
+
+try:
+    from icecream import ic
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 
 FILE_COUNT = 5
 
@@ -47,7 +54,7 @@ class TestFiles:
     def clean_up(self):
         print("Cleaning up test files....")
         try:
-            self.ml_instance.pathBuilder.schemas[self.ml_instance.ml_schema].tables["File"].delete()
+            self.ml_instance.pathBuilder().schemas[self.ml_instance.ml_schema].tables["File"].delete()
         except DataPathException as e:
             print(type(e))
 
@@ -107,12 +114,13 @@ class TestFile:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory", file_types=use_extension)
 
             file_dataset = exe.add_files(filespecs)
-            assert file_dataset in [ds["RID"] for ds in ml_instance.find_datasets()]
-            ds = ml_instance.list_dataset_members(file_dataset)
+            ic(file_dataset)
+            assert file_dataset.dataset_rid in [ds.dataset_rid for ds in ml_instance.find_datasets()]
+            ds = file_dataset.list_dataset_members()
             assert len(ds["File"]) == 5
             assert len(ds["Dataset"]) == 2
-            for subdir in ml_instance.list_dataset_children(file_dataset):
-                ds = ml_instance.list_dataset_members(subdir)
+            for subdir in file_dataset.list_dataset_children():
+                ds = subdir.list_dataset_members()
                 assert len(ds["File"]) == 5
 
     def test_list_files(self, file_table_setup):
@@ -157,10 +165,10 @@ class TestFile:
             )
             file_dataset = exe.add_files(filespecs)
 
-        assert len(ml_instance.list_dataset_children(file_dataset)) == 2
-        assert len(ml_instance.list_dataset_members(file_dataset)["File"]) == FILE_COUNT
-        for subdir in ml_instance.list_dataset_children(file_dataset):
-            assert len(ml_instance.list_dataset_members(subdir)["File"]) == FILE_COUNT
+        assert len(file_dataset.list_dataset_children()) == 2
+        assert len(file_dataset.list_dataset_members()["File"]) == FILE_COUNT
+        for subdir in file_dataset.list_dataset_children():
+            assert len(subdir.list_dataset_members()["File"]) == FILE_COUNT
 
     def test_file_spec_read_write(self, tmp_path):
         """Test reading and writing FileSpecs to JSONL."""

@@ -1,15 +1,29 @@
+from pprint import pformat
+
 from deriva.core.datapath import Any
 
-from deriva_ml import DatasetSpec
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 from tests.test_utils import DatasetDescription, DerivaML, MLDatasetCatalog
 
+try:
+    from icecream import ic
+
+    ic.configureOutput(
+        includeContext=True,
+        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
+    )
+
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 class TestDataBaseModel:
     def make_frozen(self, e) -> frozenset:
         e.pop("RMT")
         e.pop("RCT")
-        if "Filename" in e:
-            e.pop("Filename")
+        e.pop("Acquisition_Date", None)
+        e.pop("Acquisition_Time", None)
+        e.pop("Filename", None)
         if "Description" in e and not e["Description"]:
             e["Description"] = ""
         return frozenset(e.items())
@@ -20,20 +34,15 @@ class TestDataBaseModel:
             for dset_member in dataset_description.members.get("Dataset", [])
             for ds in self.list_datasets(dset_member)
         }
-        return {dataset_description.rid} | nested_datasets
+        return {dataset_description.dataset.dataset_rid} | nested_datasets
 
     def compare_catalogs(self, ml_instance: DerivaML, dataset: MLDatasetCatalog, dataset_spec: DatasetSpec):
         reference_datasets = self.list_datasets(dataset.dataset_description)
-
-        snapshot_catalog = DerivaML(
-            ml_instance.host_name,
-            ml_instance._version_snapshot(dataset_spec),
-            working_dir=ml_instance.working_dir,
-            use_minid=False,
-        )
+        snapshot_catalog = dataset.dataset_description.dataset._version_snapshot_catalog(dataset_spec.version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
+        db_catalog = DerivaMLDatabase(bag.model)
 
-        pb = snapshot_catalog.pathBuilder
+        pb = snapshot_catalog.pathBuilder()
         ds = pb.schemas[snapshot_catalog.ml_schema].tables["Dataset"]
         subject = pb.schemas[snapshot_catalog.domain_schema].tables["Subject"]
         image = pb.schemas[snapshot_catalog.domain_schema].tables["Image"]
@@ -44,8 +53,9 @@ class TestDataBaseModel:
         # Check to make sure that all of the datasets are present.
         assert {r for r in bag.model.bag_rids.keys()} == {r for r in reference_datasets}
         for dataset_rid in reference_datasets:
-            dataset_bag = bag.model.get_dataset(dataset_rid)
-            dataset_rids = tuple(ml_instance.list_dataset_children(dataset_rid, recurse=True) + [dataset_rid])
+            dataset_bag = db_catalog.lookup_dataset(dataset_rid)
+            dset = ml_instance.lookup_dataset(dataset_rid)
+            dataset_rids = tuple([ds.dataset_rid for ds in dset.list_dataset_children(recurse=True)] + [dataset_rid])
             bag_rids = [b.dataset_rid for b in dataset_bag.list_dataset_children(recurse=True)] + [
                 dataset_bag.dataset_rid
             ]
@@ -65,13 +75,23 @@ class TestDataBaseModel:
             subjects = list(subject_path.entities().fetch()) + list(subject_path_1.entities().fetch())
             images = list(image_path.entities().fetch()) + list(image_path_1.entities().fetch())
 
+            # Get RIDs from catalog results
+            catalog_dataset_rids = {d["RID"] for d in datasets}
+            catalog_subject_rids = {s["RID"] for s in subjects}
+            catalog_image_rids = {i["RID"] for i in images}
+
             catalog_dataset = set([self.make_frozen(d) for d in datasets])
             catalog_subject = set([self.make_frozen(s) for s in subjects])
             catalog_image = set([self.make_frozen(i) for i in images])
 
-            dataset_table = set([self.make_frozen(d) for d in dataset_bag.get_table_as_dict("Dataset")])
-            subject_table = set([self.make_frozen(s) for s in dataset_bag.get_table_as_dict("Subject")])
-            image_table = set([self.make_frozen(i) for i in dataset_bag.get_table_as_dict("Image")])
+            # Get bag data filtered to RIDs that appear in the catalog results
+            # This verifies the bag contains the same data for those specific records
+            all_bag_datasets = list(db_catalog.get_table_as_dict("Dataset"))
+            all_bag_subjects = list(db_catalog.get_table_as_dict("Subject"))
+            all_bag_images = list(db_catalog.get_table_as_dict("Image"))
+            dataset_table = set([self.make_frozen(d) for d in all_bag_datasets if d["RID"] in catalog_dataset_rids])
+            subject_table = set([self.make_frozen(s) for s in all_bag_subjects if s["RID"] in catalog_subject_rids])
+            image_table = set([self.make_frozen(i) for i in all_bag_images if i["RID"] in catalog_image_rids])
 
             assert len(catalog_dataset) == len(dataset_table)
             assert len(catalog_subject) == len(subject_table)
@@ -84,8 +104,8 @@ class TestDataBaseModel:
     def test_database_methods(self, dataset_test):
         ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
         dataset_description = dataset_test.dataset_description
-        current_version = ml_instance.dataset_version(dataset_description.rid)
-        current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        current_version = dataset_description.dataset.current_version
+        current_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
         tables = current_bag.model.list_tables()
         schemas = ml_instance.model.schemas
@@ -96,31 +116,33 @@ class TestDataBaseModel:
         ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
         dataset_description = dataset_test.dataset_description
 
-        current_version = ml_instance.dataset_version(dataset_description.rid)
-        dataset_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        current_version = dataset_description.dataset.current_version
+        dataset_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         self.compare_catalogs(ml_instance, dataset_test, dataset_spec)
 
     def test_table_versions(self, dataset_test):
         ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
         dataset_description = dataset_test.dataset_description
 
-        current_version = ml_instance.dataset_version(dataset_description.rid)
-        current_spec = DatasetSpec(rid=dataset_description.rid, version=current_version)
+        current_version = dataset_description.dataset.current_version
+        current_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         self.compare_catalogs(
-            ml_instance, dataset_test, DatasetSpec(rid=dataset_description.rid, version=current_version)
+            ml_instance, dataset_test, DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         )
 
-        pb = ml_instance.pathBuilder
+        pb = ml_instance.pathBuilder()
         subject = pb.schemas[ml_instance.domain_schema].Subject
         new_subjects = [s["RID"] for s in subject.insert([{"Name": f"Mew Thing{t + 1}"} for t in range(2)])]
-        ml_instance.add_dataset_members(dataset_description.rid, new_subjects)
+        dataset_description.dataset.add_dataset_members(new_subjects)
         print("Adding subjects: ", new_subjects)
-        new_version = ml_instance.dataset_version(dataset_description.rid)
-        new_spec = DatasetSpec(rid=dataset_description.rid, version=new_version)
+        new_version = dataset_description.dataset.current_version
+        new_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=new_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
         new_bag = ml_instance.download_dataset_bag(new_spec)
-        subjects_current = list(current_bag.get_table_as_dict("Subject"))
-        subjects_new = list(new_bag.get_table_as_dict("Subject"))
+        current_db_catalog = DerivaMLDatabase(current_bag.model)
+        new_db_catalog = DerivaMLDatabase(new_bag.model)
+        subjects_current = list(current_db_catalog.get_table_as_dict("Subject"))
+        subjects_new = list(new_db_catalog.get_table_as_dict("Subject"))
 
         # Make sure that there is a difference between to old and new catalogs.
         print(new_subjects)

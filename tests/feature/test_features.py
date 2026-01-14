@@ -8,12 +8,12 @@ from pydantic import ValidationError
 from deriva_ml import (
     BuiltinTypes,
     ColumnDefinition,
-    DatasetSpec,
     DerivaML,
     DerivaMLException,
-    ExecutionConfiguration,
 )
 from deriva_ml import MLVocab as vc
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.execution import ExecutionConfiguration
 from deriva_ml.feature import FeatureRecord
 
 
@@ -160,7 +160,7 @@ class TestFeatures:
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
         )
-        subject_table = ml_instance.pathBuilder.schemas[ml_instance.domain_schema].tables["Subject"]
+        subject_table = ml_instance.pathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
         subject_rids = [s["RID"] for s in subject_table.path.entities().fetch()]
 
         assert "Health" in [f.feature_name for f in ml_instance.model.find_features("Subject")]
@@ -188,17 +188,18 @@ class TestFeatures:
         features = list(ml_instance.list_feature_values("Subject", "Health"))
         assert len(features) == 1
 
-        ImageBoundingboxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
-        ImageQualtiyFeature = ml_instance.feature_record_class("Image", "Quality")
+        _ImageBoundingboxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
+        _ImageQualtiyFeature = ml_instance.feature_record_class("Image", "Quality")
 
     def test_download_feature(self, dataset_test, tmp_path):
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
         )
-        dataset_rid = dataset_test.dataset_description.rid
+        dataset_rid = dataset_test.dataset_description.dataset.dataset_rid
 
         bag = ml_instance.download_dataset_bag(
-            DatasetSpec(rid=dataset_rid, version=ml_instance.dataset_version(dataset_rid))
+            DatasetSpec(rid=dataset_rid,
+                        version=dataset_test.dataset_description.dataset.current_version)
         )
 
         # Get the lists of all of the rinds in the datasets....datasets....

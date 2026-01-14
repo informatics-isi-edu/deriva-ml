@@ -28,7 +28,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from hydra_zen import builds
 from omegaconf import DictConfig
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -50,8 +49,7 @@ class ExecutionConfiguration(BaseModel):
             - materialize: Whether to extract dataset contents
         assets (list[RID]): Resource Identifiers of required input assets.
         workflow (RID | Workflow): Workflow definition or its Resource Identifier.
-        parameters (dict[str, Any] | Path): Execution parameters, either as:
-            - Dictionary of parameter values
+=            - Dictionary of parameter values
             - Path to JSON file containing parameters
         description (str): Description of execution purpose (supports Markdown).
         argv (list[str]): Command line arguments used to start execution.
@@ -135,6 +133,21 @@ class ExecutionConfiguration(BaseModel):
 
 @dataclass
 class AssetRID(str):
+    """A string subclass representing an asset Resource ID with optional description.
+
+    AssetRID extends str so it can be used directly wherever a string RID is expected,
+    while optionally carrying a description for documentation purposes.
+
+    Attributes:
+        rid: The Resource ID string identifying the asset in Deriva.
+        description: Optional human-readable description of the asset.
+
+    Example:
+        >>> asset = AssetRID("3RA", "Pretrained model weights")
+        >>> print(asset)  # "3RA"
+        >>> print(asset.description)  # "Pretrained model weights"
+    """
+
     rid: str
     description: str = ""
 
@@ -142,6 +155,3 @@ class AssetRID(str):
         obj = super().__new__(cls, rid)
         obj.description = description
         return obj
-
-
-AssetRIDConfig = builds(AssetRID, populate_full_signature=True)

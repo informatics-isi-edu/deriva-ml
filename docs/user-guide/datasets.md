@@ -1,112 +1,402 @@
-#  Datasets
+# Datasets
 
-When working with ML models, it is often convenient to collect various input data into named, identifiable collections: A dataset
-DerivaML provides a very flexible set of mechanisms for creating and manipulating datasets.
+When working with ML models, it is often convenient to collect various input data into named, identifiable collections called datasets. DerivaML provides a flexible set of mechanisms for creating and manipulating datasets.
 
-A dataset is a collection of objects that appear within a DerivaML catalog. Datasets can be heterogeneous, containing 
-sets of different object types. Its possible that you can have an object referenced twice, for example a collection of 
-subjects of a study and a collection of observations.
-DerivaML sorts out these repeated references and makes it possible to view them from all of the possible paths.  
-DerivaML datasets allow reproducible grouping of objects to be provided to ML code
+A dataset is a versioned collection of objects within a DerivaML catalog. Datasets can be heterogeneous, containing sets of different object types. It's possible to have an object referenced in multiple ways - for example, a collection of subjects and a collection of observations that reference those subjects. DerivaML manages these relationships and makes it possible to view them from all paths.
 
-As with any other object in DerivaML, each dataset is identified by its *Resource Identifier* or RID.
-In addition, a dataset may have one or more dataset types, and also a version
+As with any other object in DerivaML, each dataset is identified by its *Resource Identifier* (RID). In addition, a dataset may have one or more dataset types and a version.
 
 ## Dataset Types
 
-Dataset types are assigned from a controlled vocabulary called `MLVocab.dataset_type`. You can define new dataset types
-as you need:
-```
-from deriva_ml import MLVocab
-ml_instance.add_term(MLVocab.dataset_type, "DemoSet", description="A test dataset_table")
-```
-When you create a dataset, you can provide as many dataset types as required to streamline organizing and discovering
-them in your code.
+Dataset types are assigned from a controlled vocabulary called `Dataset_Type`. You can define new dataset types as needed:
 
+```python
+from deriva_ml import MLVocab
+
+ml.add_term(MLVocab.dataset_type, "TrainingSet", description="Dataset for model training")
+ml.add_term(MLVocab.dataset_type, "ValidationSet", description="Dataset for model validation")
+```
+
+When you create a dataset, you can provide as many dataset types as required to streamline organizing and discovering them in your code.
 
 ## Creating Datasets
 
-Its important to know how a dataset was created, so the most common way to create a dataset is within an execution:
-```aiignore
-# Now lets create model configuration for our program.
-api_workflow = Workflow(
-    name="API Workflow",
-    workflow_type="Create Dataset Notebook"
+The most common way to create a dataset is within an execution, which provides provenance tracking:
+
+```python
+from deriva_ml import DerivaML, ExecutionConfiguration, Workflow
+
+# Connect to the catalog
+ml = DerivaML("deriva.example.org", "my_catalog")
+
+# Create a workflow
+workflow = ml.create_workflow(
+    name="Data Preparation Workflow",
+    workflow_type="Data Processing",
+    description="Prepares training and validation datasets"
 )
 
-dataset_execution = ml_instance.create_execution(
-    ExecutionConfiguration(
-        workflow=api_workflow,
-        description="Our Sample Workflow instance")
+# Create an execution
+config = ExecutionConfiguration(
+    workflow=workflow,
+    description="Create datasets for experiment"
 )
+execution = ml.create_execution(config)
 
-subject_dataset = dataset_execution.create_dataset(
-    dataset_types=['DemoSet', 'Subject'], 
-    description="A subject dataset_table")
-image_dataset = dataset_execution.create_dataset(
-    dataset_types=['DemoSet', 'Image'], description="A image training dataset_table")
+# Create datasets within the execution
+with execution.execute():
+    training_dataset = execution.create_dataset(
+        dataset_types=["TrainingSet", "Image"],
+        description="Training images for classification model"
+    )
+
+    validation_dataset = execution.create_dataset(
+        dataset_types=["ValidationSet", "Image"],
+        description="Validation images for model evaluation"
+    )
 ```
 
-## Dataset element types
+You can also create datasets directly through the DerivaML instance:
 
-In DerivaML, a dataet may consist of many different types of objects. 
-In general, any element of a domain model may be included in a dataset. 
-Howerver, tts important to know how a 
-Datasets can contain elements from the domain model. or other datasets.
+```python
+dataset = ml.create_dataset(
+    dataset_types=["ExperimentData"],
+    description="Raw experimental data"
+)
+```
 
-## Adding members to a dataset
-Dataset members, type and description.
+## Dataset Element Types
+
+A dataset may consist of many different types of objects. In general, any element from the domain model may be included in a dataset. To see what element types are available:
+
+```python
+# List available element types
+element_types = dataset.list_dataset_element_types()
+for table in element_types:
+    print(table.name)
+```
+
+To add a new element type that can be included in datasets:
+
+```python
+# Add Subject table as a valid dataset element type
+ml.add_dataset_element_type("Subject")
+```
+
+## Adding Members to a Dataset
+
+Once you have a dataset, you can add members using their RIDs:
+
+```python
+# Add individual members by RID
+dataset.add_dataset_members(members=["1-abc123", "1-def456", "1-ghi789"])
+
+# Add members with execution tracking
+dataset.add_dataset_members(
+    members=subject_rids,
+    execution_rid=execution.execution_rid
+)
+```
+
+## Listing Dataset Members
+
+To see what's in a dataset:
+
+```python
+# List all members of current version
+members = dataset.list_dataset_members()
+for member in members:
+    print(f"Table: {member['table']}, RID: {member['rid']}")
+
+# List members of a specific version
+members_v1 = dataset.list_dataset_members(version="1.0.0")
+```
 
 ## Nested Datasets
-Listing datasets
-Adding new element types to the dataset
 
-Adding members to a dataset
+Datasets can contain other datasets, forming hierarchies:
 
-Listing members of a dataset
+```python
+# Create a parent dataset
+parent_dataset = ml.create_dataset(
+    dataset_types=["ExperimentCollection"],
+    description="Collection of experiment datasets"
+)
 
-# Dataset Versioning
+# Add child datasets as members
+parent_dataset.add_dataset_members(
+    members=[training_dataset.dataset_rid, validation_dataset.dataset_rid]
+)
 
-Every dataset is assigned a version number which will change over the lifetime of the dataset.
-DerivaML uses semantic versioning to differntiate between versions of the dataset over time. 
-A semantic version consists of three parts. Each part is an integer seperated by a dot:`major.minor.patch`. 0  The major part will change when there is a schema change to any object included in the dataset.  The minor part will change when new elements are added to a dataset, and the patch parch changes for minor alterations, such as adding or changing a comment or data cleaning.
+# List child datasets
+children = parent_dataset.list_dataset_children()
 
-DerivaML will automatically assign an initial version of `0.1.0` when a dataaset is first created, and increment the
-minor part of the version number whenever new elements are added. 
-It is up to the DerivaML user to otherwise increment the dataset version.
+# List parent datasets
+parents = training_dataset.list_dataset_parents()
+```
 
-The version of a dataset can be incremented by the method: [`DerivaML.increment_version()`][deriva_ml.dataset.Dataset.increment_dataset_version]
-The current version of a dataset can be returned: [`DerivaML.dataset_version()`][deriva_ml.dataset.Dataset.dataset_version], as can the version history of a dataset: [`DerivaML.dataset_history`][deriva_ml.dataset.Dataset.dataset_history].
+## Dataset Versioning
 
-Dataset versions must be specified when a dataset is downloaded to a compute platform for processing by ML code.
-It is important to know that the values in the dataset are the values that were in place at the time the dataset was created.  This is true for the current dataset as well.  If you want to use the current values in a catalog, you must create a new dataset as part of the execution configuration. This is easily accomplished using the `increment_version` method.
+Every dataset is assigned a version number using semantic versioning (`major.minor.patch`):
 
-## Assets
+- **Major**: Changes when there is a schema change to any object in the dataset
+- **Minor**: Changes when new elements are added to a dataset
+- **Patch**: Changes for minor alterations, such as adding comments or data cleaning
 
-A core function of datasets is to help orginize collections of files or *assets* that are stored in the catalog. 
-The actual contents of all of the assets are stored in the DerivaML object store, which is call Hatrac.  As far as the object store is concerned, each asset is just a blob of bits, which are characterized by a versioned URL, a length and a checksum.
+DerivaML automatically assigns version `0.1.0` when a dataset is first created and increments the minor part whenever new elements are added.
 
-Within the DerivaML catalog, assets are represented by an *asset table.*  Each different asset type is stored in a different table, and the entry includes the URL to the object, the length, checksum and other general metadata, along with any additional asset type specific metadata that might have been defined.
+### Working with Versions
 
-## Downloaded Datasets and Assets
+```python
+# Get current version
+current = dataset.current_version
+print(f"Current version: {current}")  # e.g., "1.2.3"
 
-While it is possible to retrieve the assets associated with a dataset directly from the catalog, if your computation requres access to many assets, its typically much more effective to download the asset along with all the other elements of the dataset into the local compute environment.  
-For this reason, creating a new execution using [`DerivaML.create_execution`][deriva_ml.DerivaML.create_execution] will automatically download all of the datasets listed in the `datasets` component of an [`ExecutionConfiguration`][deriva_ml.execution.execution_configuration.ExecutionConfiguration].
+# Get version history
+history = dataset.dataset_history()
+for entry in history:
+    print(f"Version {entry.version}: {entry.description} at {entry.timestamp}")
 
-Once downloaded, the dataset is represented by a [`Dataset_Bag`][deriva_ml.dataset.dataset_bag.DatasetBag] object. 
+# Increment version
+from deriva_ml.dataset.aux_classes import VersionPart
 
-Every asset in a dataset is recorded in an asset table, which has its location on the local file system, along with other metadata.
-Asset tables can be retrieved from the dataset_bag via the get_table_as_?() method.
+new_version = dataset.increment_dataset_version(
+    component=VersionPart.minor,
+    description="Added new training samples"
+)
+```
 
-The interface will ensure that all assets of the same type are in the same directory, and that directory will be named by the asset type.
+### Version Snapshots
 
-It is unwise to use the name of the asset file for anything. Rather, you should figure out what asset you want via the metadata that connects that asset to more interesting things.
+Each version is tied to a catalog snapshot, ensuring that the values in the dataset are the values that were present when the version was created. This provides reproducibility for ML experiments.
 
-If you need to reorganize assets in an application-specific way, using symbolic links is probably the most efficient thing to do with respect to time and disk space. 
+```python
+# Get a dataset bound to a specific version
+versioned_dataset = dataset.set_version("1.0.0")
+
+# Access members at that version
+members = versioned_dataset.list_dataset_members()
+```
 
 ## Downloading Datasets
 
-Datasets are automatically downloaded as part of creating a new execution.  
-Downloading datasets for the ML code.  Caching
+Datasets can be downloaded as BDBag archives for offline use or sharing:
 
-MINIDs
+```python
+from deriva_ml.dataset.aux_classes import DatasetSpec
+
+# Download the current version
+bag = dataset.download_dataset_bag()
+
+# Download a specific version
+bag = dataset.download_dataset_bag(version="1.0.0")
+
+# Download with materialization (fetches all referenced files)
+bag = dataset.download_dataset_bag(materialize=True)
+```
+
+### Automatic Download in Executions
+
+When creating an execution with dataset specifications, datasets are automatically downloaded:
+
+```python
+config = ExecutionConfiguration(
+    datasets=[
+        DatasetSpec(rid="1-abc123", version="1.0.0"),
+        DatasetSpec(rid="1-def456", materialize=True),
+    ],
+    workflow=workflow,
+    description="Process datasets"
+)
+
+execution = ml.create_execution(config)
+
+with execution.execute() as exe:
+    # Access downloaded datasets
+    for dataset in exe.datasets:
+        print(f"Dataset {dataset.dataset_rid} available at {dataset.path}")
+```
+
+## Working with DatasetBag
+
+Once downloaded, a dataset is represented as a [`DatasetBag`][deriva_ml.dataset.dataset_bag.DatasetBag] object:
+
+```python
+# Access dataset metadata
+print(f"RID: {bag.dataset_rid}")
+print(f"Version: {bag.version}")
+
+# Get tables as DataFrames
+subjects_df = bag.get_table_as_dataframe("Subject")
+images_df = bag.get_table_as_dataframe("Image")
+
+# Access the local path
+print(f"Dataset path: {bag.path}")
+```
+
+## Assets in Datasets
+
+Assets are files stored in the DerivaML object store (Hatrac). Each asset is characterized by:
+
+- A versioned URL
+- Length (file size)
+- MD5 checksum
+- Asset type (from the `Asset_Type` vocabulary)
+
+### Accessing Assets
+
+```python
+# Get asset table from a downloaded dataset bag
+assets = bag.get_table_as_dataframe("Image")
+
+# Assets have a local path after materialization
+for _, asset in assets.iterrows():
+    local_path = asset["Filename"]
+    print(f"Asset: {local_path}")
+```
+
+### Asset Organization
+
+When datasets are materialized:
+
+- All assets of the same type are placed in the same directory
+- The directory is named by the asset type
+- Use metadata to identify specific assets rather than relying on filenames
+
+If you need to reorganize assets for your application, using symbolic links is efficient for both time and disk space.
+
+### Restructuring Assets for ML Workflows
+
+Many ML frameworks expect training data organized in a specific directory structure (e.g., `train/class1/`, `train/class2/`). The `restructure_assets()` method reorganizes downloaded assets into a hierarchical directory structure based on dataset types and metadata or feature values.
+
+```python
+from pathlib import Path
+
+# Download a dataset with nested structure
+bag = dataset.download_dataset_bag()
+
+# Restructure images by dataset type and a label column/feature
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./ml_data"),
+    group_by=["label"],
+)
+```
+
+This creates a directory structure like:
+
+```
+ml_data/
+  Complete/           # Parent dataset type
+    Training/         # Nested dataset type
+      positive/       # Label value
+        image1.jpg
+        image2.jpg
+      negative/
+        image3.jpg
+    Testing/
+      positive/
+        image4.jpg
+      negative/
+        image5.jpg
+```
+
+#### Grouping Options
+
+The `group_by` parameter accepts column names from the asset table or feature names:
+
+```python
+# Group by a column in the asset table
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./by_subject"),
+    group_by=["Subject"],  # Foreign key column
+)
+
+# Group by a feature attached to the asset
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./by_quality"),
+    group_by=["Quality"],  # Feature name
+)
+
+# Multiple grouping levels
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./multi_level"),
+    group_by=["Subject", "Quality"],  # Creates Subject/Quality/file structure
+)
+```
+
+#### Symlinks vs Copies
+
+By default, `restructure_assets()` creates symbolic links to save disk space:
+
+```python
+# Default: create symlinks (efficient, but requires original bag to remain)
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./linked"),
+    use_symlinks=True,  # Default
+)
+
+# Create copies instead (uses more disk space, but independent of original)
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./copied"),
+    use_symlinks=False,
+)
+```
+
+#### Custom Type Selection
+
+When a dataset has multiple types, you can control which type is used for the directory name:
+
+```python
+# Use a custom function to select the type
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./custom"),
+    group_by=["label"],
+    type_selector=lambda types: types[-1] if types else "unknown",
+)
+```
+
+#### Handling Missing Values
+
+When a grouping value is missing or `None`, assets are placed in an `unknown` folder:
+
+```
+ml_data/
+  Training/
+    positive/
+      image1.jpg
+    unknown/          # Assets with missing label values
+      image2.jpg
+```
+
+## Finding Datasets
+
+To discover datasets in the catalog:
+
+```python
+# List all datasets
+all_datasets = ml.find_datasets()
+for ds in all_datasets:
+    print(f"{ds.dataset_rid}: {ds.description} (v{ds.current_version})")
+
+# Look up a specific dataset
+dataset = ml.lookup_dataset("1-abc123")
+```
+
+## Deleting Datasets
+
+Datasets can be soft-deleted (marked as deleted but retained in the catalog):
+
+```python
+# Delete a single dataset
+ml.delete_dataset(dataset)
+
+# Delete a dataset and all nested datasets
+ml.delete_dataset(dataset, recurse=True)
+```

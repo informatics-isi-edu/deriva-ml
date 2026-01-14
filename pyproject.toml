@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Utilities to simplify use of Dervia and Pandas to create reproducable ML pipelines"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "bump-my-version",
     "bdbag",
@@ -16,9 +16,9 @@ dependencies = [
     "pandas",
     "pydantic>=2.11",
     "papermill",
-    "pandas-stubs==2.2.3.250527",
+    "pandas-stubs",
     "pyyaml",
-    "regex~=2024.7.24",
+    "regex",
     "semver>3.0.0",
     "setuptools>=80",
     "setuptools-scm>=8.0",
@@ -88,7 +88,7 @@ addopts = ["-v", "--import-mode=importlib"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py312"
 lint.select = ["E", "F", "I", "PTH"]
 lint.ignore = []
 
@@ -115,7 +115,8 @@ dev = [
     "pytest>=8.4.1",
     "pytest-mock",
     "pytest-coverage>=0.0",
-    "ruff"
+    "ruff",
+    "pyright>=1.1.408",
 ]
 lint = [
     "ruff>=0.12.0",

@@ -45,21 +45,31 @@ nav:
       - Installing deriva-ml: user-guide/install.md
       - Identifying things in deriva-ml: user-guide/identifiers.md
       - Datasets: user-guide/datasets.md
-      - Using DerivaML with Jupiter Notebooks: user-guide/notebooks.md
+      - Features: user-guide/features.md
+      - File Assets: user-guide/file-assets.md
       - Configuring an Execution: user-guide/execution-configuration.md
+      - Using DerivaML with Jupiter Notebooks: user-guide/notebooks.md
   - Sample Notebooks:
       - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
       - Execution: 'Notebooks/DerivaML Execution.ipynb'
       - Features: 'Notebooks/DerivaML Features.ipynb'
       - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
   - Library Documentation:
-      - DerivaML: code-docs/deriva_ml_base.md
-      - DatasetBag Auxiliary Classes: code-docs/dataset_aux_classes.md
-      - DatasetBag: code-docs/dataset_bag.md
-      - Helper Classes: code-docs/deriva_definitions.md
-      - DerivaModel: code-docs/deriva_model.md
-      - Execution: code-docs/execution.md
-      - ExecutionConfiguration: code-docs/execution_configuration.md
-      - Feature: code-docs/feature.md
-      - Upload: code-docs/upload.md
+      - Core Classes:
+          - DerivaML: code-docs/deriva_ml_base.md
+          - DerivaModel: code-docs/deriva_model.md
+      - Datasets:
+          - Dataset: code-docs/dataset.md
+          - DatasetBag: code-docs/dataset_bag.md
+          - Dataset Auxiliary Classes: code-docs/dataset_aux_classes.md
+      - Execution:
+          - Execution: code-docs/execution.md
+          - ExecutionConfiguration: code-docs/execution_configuration.md
+          - Workflow: code-docs/workflow.md
+      - Features:
+          - Feature: code-docs/feature.md
+      - Utilities:
+          - Definitions & Types: code-docs/deriva_definitions.md
+          - Exceptions: code-docs/exceptions.md
+          - Upload: code-docs/upload.md
   - Release Notes: release-notes.md

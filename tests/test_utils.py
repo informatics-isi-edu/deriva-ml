@@ -8,6 +8,7 @@ from ipykernel.kernelspec import install
 from jupyter_client.kernelspec import KernelSpecManager
 
 from deriva_ml import DerivaML
+from deriva_ml.core.definitions import MLVocab
 from deriva_ml.demo_catalog import (
     DatasetDescription,
     create_demo_catalog,
@@ -15,6 +16,7 @@ from deriva_ml.demo_catalog import (
     create_demo_features,
     populate_demo_catalog,
 )
+from deriva_ml.execution import ExecutionConfiguration
 
 
 class MLCatalog:
@@ -90,11 +92,30 @@ class MLDatasetCatalog:
         self.features = features
         self.catalog = catalog
 
-        with TemporaryDirectory() as tmpdir:
-            ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, use_minid=False, working_dir=tmpdir)
-            populate_demo_catalog(ml_instance)
-            self.dataset_description = create_demo_datasets(ml_instance)
-            create_demo_features(ml_instance)
+        # Create a persistent temporary directory that lasts for the lifetime of this object
+        # This is important because Dataset objects retain a reference to the ml_instance,
+        # which references the working_dir. If we used a context manager, the directory
+        # would be deleted before the tests could use the Dataset objects.
+        self._tmpdir = TemporaryDirectory()
+        tmpdir = self._tmpdir.name
+
+        self.ml_instance = DerivaML(catalog.hostname, catalog.catalog_id, use_minid=False, working_dir=tmpdir)
+        self.ml_instance.add_term(
+            MLVocab.workflow_type,
+            "Demo Catalog Creation",
+            description="A Workflow that creates a new catalog and populates it with demo data.",
+        )
+        populate_workflow = self.ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
+        execution = self.ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+        with execution.execute() as exe:
+            populate_demo_catalog(exe)
+            create_demo_features(exe)
+            self.dataset_description = create_demo_datasets(exe)
+
+    def cleanup(self):
+        """Clean up the temporary directory."""
+        if hasattr(self, '_tmpdir'):
+            self._tmpdir.cleanup()
 
     def list_datasets(self, dataset_description: DatasetDescription) -> list[DatasetDescription]:
         """Return a set of RIDs whose members are members of the given dataset description."""
@@ -107,7 +128,7 @@ class MLDatasetCatalog:
 
     def collect_rids(self, description: DatasetDescription) -> set[str]:
         """Collect rids for a dataset and its nested datasets."""
-        rids = {description.rid}
+        rids = {description.dataset.dataset_rid}
         for member_type, member_descriptor in description.members.items():
             rids |= set(description.member_rids.get(member_type, []))
             if member_type == "Dataset":
@@ -118,9 +139,11 @@ class MLDatasetCatalog:
     def reset_catalog(self):
         """Reset the demo catalog to a clean state."""
         self.catalog.reset_demo_catalog()
-        with TemporaryDirectory() as tmp_dir:
-            ml_instance = DerivaML(self.catalog.hostname, self.catalog.catalog_id, working_dir=tmp_dir, use_minid=False)
-            self.dataset_description: DatasetDescription = create_demo_datasets(ml_instance)
+        # Reuse the existing ml_instance and its working directory
+        populate_workflow = self.ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
+        execution = self.ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+        with execution.execute() as exe:
+            self.dataset_description: DatasetDescription = create_demo_datasets(exe)
 
 
 def create_jupyter_kernel(name: str, kernel_dir, display_name: str = None, user: bool = True) -> None:

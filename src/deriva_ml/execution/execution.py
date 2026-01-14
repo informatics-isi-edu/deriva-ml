@@ -18,7 +18,14 @@ Typical usage example:
     >>> with ml.create_execution(config) as execution:
     ...     execution.download_dataset_bag(dataset_spec)
     ...     # Run analysis
-    ...     execution.upload_execution_outputs()
+    ...     path = execution.asset_file_path("Model", "model.pt")
+    ...     # Write model to path...
+    ...
+    >>> # IMPORTANT: Upload AFTER the context manager exits
+    >>> execution.upload_execution_outputs()
+
+The context manager handles start/stop timing automatically. The upload_execution_outputs()
+call must happen AFTER exiting the context manager to ensure proper status tracking.
 """
 
 from __future__ import annotations
@@ -28,10 +35,11 @@ import logging
 import os
 import shutil
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, Callable, Iterable, List
 
 from deriva.core import format_exception
 from deriva.core.hatrac_store import HatracStore
@@ -47,9 +55,11 @@ from deriva_ml.core.definitions import (
     MLAsset,
     MLVocab,
     Status,
+    UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion, VersionPart
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
+from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import (
     asset_file_path,
@@ -67,6 +77,7 @@ from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
+from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 # Keep pycharm from complaining about undefined references in docstrings.
 execution: Execution
@@ -90,90 +101,55 @@ except ImportError:
         return s
 
 
-# Platform-specific base class
-if sys.version_info >= (3, 12):
+class AssetFilePath(Path):
+    """Extended Path class for managing asset files.
 
-    class AssetFilePath(Path):
-        """Extended Path class for managing asset files.
+    Represents a file path with additional metadata about its role as an asset in the catalog.
+    This class extends the standard Path class to include information about the asset's
+    catalog representation and type.
 
-        Represents a file path with additional metadata about its role as an asset in the catalog.
-        This class extends the standard Path class to include information about the asset's
-        catalog representation and type.
+    Attributes:
+        asset_name (str): Name of the asset in the catalog (e.g., asset table name).
+        file_name (str): Name of the local file containing the asset.
+        asset_metadata (dict[str, Any]): Additional columns beyond URL, Length, and checksum.
+        asset_types (list[str]): Terms from the Asset_Type controlled vocabulary.
+        asset_rid (RID | None): Resource Identifier if uploaded to an asset table.
 
-        Attributes:
-            asset_name (str): Name of the asset in the catalog (e.g., asset table name).
-            file_name (str): Name of the local file containing the asset.
-            asset_metadata (dict[str, Any]): Additional columns beyond URL, Length, and checksum.
-            asset_types (list[str]): Terms from the Asset_Type controlled vocabulary.
-            asset_rid (RID | None): Resource Identifier if uploaded to an asset table.
+    Example:
+        >>> path = AssetFilePath(
+        ...     "/path/to/file.txt",
+        ...     asset_name="analysis_output",
+        ...     file_name="results.txt",
+        ...     asset_metadata={"version": "1.0"},
+        ...     asset_types=["text", "results"]
+        ... )
+    """
 
-        Example:
-            >>> path = AssetFilePath(
-            ...     "/path/to/file.txt",
-            ...     asset_name="analysis_output",
-            ...     file_name="results.txt",
-            ...     asset_metadata={"version": "1.0"},
-            ...     asset_types=["text", "results"]
-            ... )
+    def __init__(
+        self,
+        asset_path: str | Path,
+        asset_name: str,
+        file_name: str,
+        asset_metadata: dict[str, Any],
+        asset_types: list[str] | str,
+        asset_rid: RID | None = None,
+    ):
+        """Initializes an AssetFilePath instance.
+
+        Args:
+            asset_path: Local path to the asset file.
+            asset_name: Name of the asset in the catalog.
+            file_name: Name of the local file.
+            asset_metadata: Additional metadata columns.
+            asset_types: One or more asset type terms.
+            asset_rid: Optional Resource Identifier if already in catalog.
         """
-
-        def __init__(
-            self,
-            asset_path: str | Path,
-            asset_name: str,
-            file_name: str,
-            asset_metadata: dict[str, Any],
-            asset_types: list[str] | str,
-            asset_rid: RID | None = None,
-        ):
-            """Initializes an AssetFilePath instance.
-
-            Args:
-                asset_path: Local path to the asset file.
-                asset_name: Name of the asset in the catalog.
-                file_name: Name of the local file.
-                asset_metadata: Additional metadata columns.
-                asset_types: One or more asset type terms.
-                asset_rid: Optional Resource Identifier if already in catalog.
-            """
-            super().__init__(asset_path)
-            self.asset_name = asset_name
-            self.file_name = file_name
-            self.asset_metadata = asset_metadata
-            self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
-            self.asset_rid = asset_rid
-else:
-
-    class AssetFilePath(type(Path())):
-        """
-        Create a new Path object that has additional information related to the use of this path as an asset.
-
-        Attrubytes:
-            asset_path: Local path to the location of the asset.
-            asset_name:  The name of the asset in the catalog (e.g., the asset table name).
-            file_name:  Name of the local file that contains the contents of the asset.
-            asset_metadata: Any additional columns associated with this asset beyond the URL, Length, and checksum.
-            asset_types:  A list of terms from the Asset_Type controlled vocabulary.
-            asset_rid:  The RID of the asset if it has been uploaded into an asset table
-        """
-
-        def __new__(
-            cls,
-            asset_path: str | Path,
-            asset_name: str,
-            file_name: str,
-            asset_metadata: dict[str, Any],
-            asset_types: list[str] | str,
-            asset_rid: RID | None = None,
-        ):
-            # Only pass the path to the base Path class
-            obj = super().__new__(cls, asset_path)
-            obj.asset_name = asset_name
-            obj.file_name = file_name
-            obj.asset_metadata = asset_metadata
-            obj.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
-            obj.asset_rid = asset_rid
-            return obj
+        super().__init__(asset_path)
+        self.asset_name = asset_name
+        self.file_name = file_name
+        self.asset_metadata = asset_metadata
+        self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
+        self.asset_rid = asset_rid
 
 
 class Execution:
@@ -201,14 +177,21 @@ class Execution:
         stop_time (datetime | None): When execution completed.
 
     Example:
-        >>> config = ExecutionConfiguration(
-        ...     workflow="analysis",
-        ...     description="Process samples",
-        ... )
-        >>> with ml.create_execution(config) as execution:
-        ...     execution.download_dataset_bag(dataset_spec)
-        ...     # Run analysis
-        ...     execution.upload_execution_outputs()
+        The context manager handles start/stop timing. Upload must be called AFTER
+        the context manager exits::
+
+            >>> config = ExecutionConfiguration(
+            ...     workflow="analysis",
+            ...     description="Process samples",
+            ... )
+            >>> with ml.create_execution(config) as execution:
+            ...     bag = execution.download_dataset_bag(dataset_spec)
+            ...     # Run analysis using bag.path
+            ...     output_path = execution.asset_file_path("Model", "model.pt")
+            ...     # Write results to output_path
+            ...
+            >>> # IMPORTANT: Call upload AFTER exiting the context manager
+            >>> execution.upload_execution_outputs()
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -277,7 +260,7 @@ class Execution:
             if not self._model.is_asset(self._ml_object.resolve_rid(a).table.name):
                 raise DerivaMLException("Asset specified in execution configuration is not a asset table")
 
-        schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+        schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
         if reload:
             self.execution_rid = reload
             if self.execution_rid == DRY_RUN_RID:
@@ -328,7 +311,8 @@ class Execution:
             for hydra_asset in hydra_runtime_output_dir.rglob("*"):
                 if hydra_asset.is_dir():
                     continue
-                asset = self.asset_file_path(
+                # Register file for upload (side effect); result intentionally unused
+                self.asset_file_path(
                     asset_name=MLAsset.execution_metadata,
                     file_name=hydra_runtime_output_dir / hydra_asset,
                     rename_file=f"hydra-{timestamp}-{hydra_asset.name}",
@@ -354,7 +338,7 @@ class Execution:
             self.dataset_rids.append(dataset.rid)
 
         # Update execution info
-        schema_path = self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema]
+        schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
         if self.dataset_rids and not (reload or self._dry_run):
             schema_path.Dataset_Execution.insert(
                 [{"Dataset": d, "Execution": self.execution_rid} for d in self.dataset_rids]
@@ -446,6 +430,54 @@ class Execution:
         """
         return asset_root(self._working_dir, self.execution_rid)
 
+    @property
+    def database_catalog(self) -> DerivaMLDatabase | None:
+        """Get a catalog-like interface for downloaded datasets.
+
+        Returns a DerivaMLDatabase that implements the DerivaMLCatalog
+        protocol, allowing the same code to work with both live catalogs
+        and downloaded bags.
+
+        This is useful for writing code that can operate on either a live
+        catalog (via DerivaML) or on downloaded bags (via DerivaMLDatabase).
+
+        Returns:
+            DerivaMLDatabase wrapping the primary downloaded dataset's model,
+            or None if no datasets have been downloaded.
+
+        Example:
+            >>> with ml.create_execution(config) as exe:
+            ...     if exe.database_catalog:
+            ...         db = exe.database_catalog
+            ...         # Use same interface as DerivaML
+            ...         dataset = db.lookup_dataset("4HM")
+            ...         term = db.lookup_term("Diagnosis", "cancer")
+            ...     else:
+            ...         # No datasets downloaded, use live catalog
+            ...         pass
+        """
+        if not self.datasets:
+            return None
+        # Use the first dataset's model as the primary
+        return DerivaMLDatabase(self.datasets[0].model)
+
+    @property
+    def catalog(self) -> "DerivaML":
+        """Get the live catalog (DerivaML) instance for this execution.
+
+        This provides access to the live catalog for operations that require
+        catalog connectivity, such as creating new datasets or uploading results.
+
+        Returns:
+            DerivaML: The live catalog instance.
+
+        Example:
+            >>> with ml.create_execution(config) as exe:
+            ...     # Use live catalog for write operations
+            ...     new_dataset = exe.catalog.create_dataset(...)
+        """
+        return self._ml_object
+
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
         """Downloads and materializes a dataset for use in the execution.
@@ -471,7 +503,7 @@ class Execution:
             >>> bag = execution.download_dataset_bag(spec)
             >>> print(f"Downloaded to {bag.path}")
         """
-        return self._ml_object.download_dataset_bag(dataset, execution_rid=self.execution_rid)
+        return self._ml_object.download_dataset_bag(dataset)
 
     @validate_call
     def update_status(self, status: Status, msg: str) -> None:
@@ -496,7 +528,7 @@ class Execution:
         if self._dry_run:
             return
 
-        self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
+        self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
             [
                 {
                     "RID": self.execution_rid,
@@ -545,16 +577,22 @@ class Execution:
 
         self.update_status(Status.completed, "Algorithm execution ended.")
         if not self._dry_run:
-            self._ml_object.pathBuilder.schemas[self._ml_object.ml_schema].Execution.update(
+            self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
                 [{"RID": self.execution_rid, "Duration": duration}]
             )
 
-    def _upload_execution_dirs(self) -> dict[str, list[AssetFilePath]]:
+    def _upload_execution_dirs(
+        self, progress_callback: Callable[[UploadProgress], None] | None = None
+    ) -> dict[str, list[AssetFilePath]]:
         """Upload execution assets at _working_dir/Execution_asset.
 
         This routine uploads the contents of the
         Execution_Asset directory and then updates the execution_asset table in the ML schema to have references
         to these newly uploaded files.
+
+        Args:
+            progress_callback: Optional callback function to receive upload progress updates.
+                Called with UploadProgress objects containing file information and progress.
 
         Returns:
           dict: Results of the upload operation.
@@ -565,7 +603,7 @@ class Execution:
 
         try:
             self.update_status(Status.running, "Uploading execution files...")
-            results = upload_directory(self._model, self._asset_root)
+            results = upload_directory(self._model, self._asset_root, progress_callback=progress_callback)
         except RuntimeError as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
@@ -629,7 +667,7 @@ class Execution:
         hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
 
         asset_type_table, _col_l, _col_r = self._model.find_association(asset_table, MLVocab.asset_type)
-        type_path = self._ml_object.pathBuilder.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
+        type_path = self._ml_object.pathBuilder().schemas[asset_type_table.schema.name].tables[asset_type_table.name]
         asset_types = [
             asset_type[MLVocab.asset_type.value]
             for asset_type in type_path.filter(type_path.columns[asset_table.name] == asset_rid)
@@ -690,15 +728,24 @@ class Execution:
         results = upload_directory(self._model, assets_dir)
         return {path_to_asset(p): r for p, r in results.items()}
 
-    def upload_execution_outputs(self, clean_folder: bool = True) -> dict[str, list[AssetFilePath]]:
+    def upload_execution_outputs(
+        self, clean_folder: bool = True, progress_callback: Callable[[UploadProgress], None] | None = None
+    ) -> dict[str, list[AssetFilePath]]:
         """Uploads all outputs from the execution to the catalog.
 
         Scans the execution's output directories for assets, features, and other results,
         then uploads them to the catalog. Can optionally clean up the output folders
         after successful upload.
 
+        IMPORTANT: This method must be called AFTER exiting the context manager, not inside it.
+        The context manager handles execution timing (start/stop), while this method handles
+        the separate upload step.
+
         Args:
             clean_folder: Whether to delete output folders after upload. Defaults to True.
+            progress_callback: Optional callback function to receive upload progress updates.
+                Called with UploadProgress objects containing file name, bytes uploaded,
+                total bytes, percent complete, phase, and status message.
 
         Returns:
             dict[str, list[AssetFilePath]]: Mapping of asset types to their file paths.
@@ -707,14 +754,20 @@ class Execution:
             DerivaMLException: If upload fails or outputs are invalid.
 
         Example:
-            >>> outputs = execution.upload_execution_outputs()
-            >>> for type_name, paths in outputs.items():
-            ...     print(f"{type_name}: {len(paths)} files")
+            >>> with ml.create_execution(config) as execution:
+            ...     # Do ML work, register output files with asset_file_path()
+            ...     path = execution.asset_file_path("Model", "model.pt")
+            ...     # Write to path...
+            ...
+            >>> # Upload AFTER the context manager exits
+            >>> def my_callback(progress):
+            ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
+            >>> outputs = execution.upload_execution_outputs(progress_callback=my_callback)
         """
         if self._dry_run:
             return {}
         try:
-            self.uploaded_assets = self._upload_execution_dirs()
+            self.uploaded_assets = self._upload_execution_dirs(progress_callback=progress_callback)
             self.update_status(Status.completed, "Successfully end the execution.")
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)
@@ -730,8 +783,6 @@ class Execution:
         Args:
             folder_path: Path to the folder to clean
         """
-        import time
-
         MAX_RETRIES = 3
         RETRY_DELAY = 1  # seconds
 
@@ -824,7 +875,7 @@ class Execution:
             return
         self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
 
-        pb = self._ml_object.pathBuilder
+        pb = self._ml_object.pathBuilder()
         for asset_table, asset_list in uploaded_assets.items():
             asset_table_name = asset_table.split("/")[1]  # Peel off the schema from the asset table
             asset_exe, asset_fk, execution_fk = self._model.find_association(asset_table_name, "Execution")
@@ -1020,75 +1071,22 @@ class Execution:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
         self,
-        dataset_types: str | list[str],
-        description: str,
-        version: DatasetVersion | None = None,
-    ) -> RID:
+        dataset_types: str | list[str] | None = None,
+        version: DatasetVersion | str | None = None,
+        description: str = "",
+    ) -> Dataset:
         """Create a new dataset with specified types.
 
         Args:
             dataset_types: param description:
             description: Markdown description of the dataset being created.
-            version: Version to assign to the dataset.  Defaults to 0.1.0
+            version: Dataset version. Defaults to 0.1.0.
 
         Returns:
             RID of the newly created dataset.
         """
-        return self._ml_object.create_dataset(dataset_types, description, self.execution_rid, version=version)
-
-    def add_dataset_members(
-        self,
-        dataset_rid: RID,
-        members: list[RID] | dict[str, list[RID]],
-        validate: bool = True,
-        description: str = "",
-    ) -> None:
-        """Add additional elements to an existing dataset_table.
-
-        Add new elements to an existing dataset. In addition to adding new members, the minor version number of the
-        dataset is incremented and the description, if provide is applied to that new version.
-
-        The RIDs in the list to not have to be all from the same table, but they must be from a table that has
-        been configured to be a dataset element type.
-
-        Args:
-            dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
-            members: List of RIDs of members to add to the  dataset_table. RID must be to a table type that is a
-                dataset element type (see DerivaML.add_dataset_element_type).
-            validate: Check rid_list to make sure elements are not already in the dataset_table.
-            description: Markdown description of the updated dataset.
-        """
-        return self._ml_object.add_dataset_members(
-            dataset_rid=dataset_rid,
-            members=members,
-            validate=validate,
-            description=description,
-            execution_rid=self.execution_rid,
-        )
-
-    def increment_dataset_version(
-        self, dataset_rid: RID, component: VersionPart, description: str = ""
-    ) -> DatasetVersion:
-        """Increment the version of the specified dataset_table.
-
-        Args:
-          dataset_rid: RID to a dataset_table
-          component: Which version of the dataset_table to increment.
-          dataset_rid: RID of the dataset whose version is to be incremented.
-          component: Major, Minor, or Patch
-          description: Description of the version update of the dataset_table.
-
-        Returns:
-          new semantic version of the dataset_table as a 3-tuple
-
-        Raises:
-          DerivaMLException: if provided RID is not to a dataset_table.
-        """
-        return self._ml_object.increment_dataset_version(
-            dataset_rid=dataset_rid,
-            component=component,
-            description=description,
-            execution_rid=self.execution_rid,
+        return self._ml_object.create_dataset(
+            execution_rid=self.execution_rid, version=version, dataset_types=dataset_types, description=description
         )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -1097,7 +1095,7 @@ class Execution:
         files: Iterable[FileSpec],
         dataset_types: str | list[str] | None = None,
         description: str = "",
-    ) -> RID:
+    ) -> "Dataset":
         """Adds files to the catalog with their metadata.
 
         Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
@@ -1109,7 +1107,7 @@ class Execution:
             description: Description of the files.
 
         Returns:
-            RID: Dataset RID that identifies newly added files. Will be nested to mirror original directory structure
+            RID: Dataset  that identifies newly added files. Will be nested to mirror original directory structure
             of the files.
 
         Raises:

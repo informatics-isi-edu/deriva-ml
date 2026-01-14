@@ -12,7 +12,8 @@ from deriva.core import BaseCLI
 from jupyter_client.kernelspec import KernelSpecManager
 from nbconvert import MarkdownExporter
 
-from deriva_ml import DerivaML, ExecAssetType, Execution, ExecutionConfiguration, MLAsset, Workflow
+from deriva_ml import DerivaML, ExecAssetType, MLAsset
+from deriva_ml.execution import Execution, ExecutionConfiguration, Workflow
 
 
 class DerivaMLRunNotebookCLI(BaseCLI):
@@ -29,6 +30,13 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             type=Path,
             default=None,
             help="JSON or YAML file with parameter values to inject into the notebook.",
+        )
+
+        self.parser.add_argument(
+            "--catalog",
+            type=str,
+            default="1",
+            help="Catalog number or identifier"
         )
 
         self.parser.add_argument(
@@ -83,6 +91,8 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         # args.parameter is now a list of [KEY, VALUE] lists
         # e.g. [['timeout', '30'], ['name', 'Alice'], ...]
         parameters = {key: self._coerce_number(val) for key, val in args.parameter}
+        parameters['host'] = args.host
+        parameters['catalog'] = args.catalog
 
         if parameter_file:
             with parameter_file.open("r") as f:
@@ -152,6 +162,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
             execution_rid_path = Path(tmpdirname) / "execution_rid.json"
             os.environ["DERIVA_ML_SAVE_EXECUTION_RID"] = execution_rid_path.as_posix()
+
             pm.execute_notebook(
                 input_path=notebook_file,
                 output_path=notebook_output,

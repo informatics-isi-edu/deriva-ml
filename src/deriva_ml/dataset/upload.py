@@ -39,7 +39,7 @@ import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import regex as re
 from deriva.core import urlquote
@@ -53,6 +53,7 @@ from deriva_ml.core.definitions import (
     RID,
     DerivaSystemColumns,
     FileUploadState,
+    UploadProgress,
     UploadState,
 )
 from deriva_ml.core.exceptions import DerivaMLException
@@ -89,7 +90,7 @@ def is_feature_dir(path: Path) -> Optional[re.Match]:
     return re.match(feature_table_dir_regex + "$", path.as_posix())
 
 
-def normalize_asset_dir(path: str) -> Optional[tuple[str, str]]:
+def normalize_asset_dir(path: str | Path) -> Optional[tuple[str, str]]:
     """Parse a path to an asset file and return the asset table name and file name.
 
     Args:
@@ -274,13 +275,19 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, FileUploadState] | None:
+def upload_directory(
+    model: DerivaModel,
+    directory: Path | str,
+    progress_callback: Callable[[UploadProgress], None] | None = None,
+) -> dict[Any, FileUploadState] | None:
     """Upload assets from a directory. This routine assumes that the current upload specification includes a
     configuration for the specified directory.  Every asset in the specified directory is uploaded
 
     Args:
         model: Model to upload assets to.
         directory: Directory containing the assets and tables to upload.
+        progress_callback: Optional callback function to receive upload progress updates.
+            Called with UploadProgress objects containing file information and progress.
 
     Returns:
         Results of the upload operation.
@@ -291,6 +298,63 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
     directory = Path(directory)
     if not directory.is_dir():
         raise DerivaMLException("Directory does not exist")
+
+    # Track upload progress across files
+    # status_callback is called twice per file: once before upload starts, once after it completes
+    upload_state = {"completed_files": 0, "total_files": 0, "status_calls": 0}
+
+    # Count total files to upload
+    for root, dirs, files in os.walk(directory):
+        upload_state["total_files"] += len(files)
+
+    # Create wrapper callbacks for GenericUploader if a progress callback was provided
+    def file_callback(**kwargs) -> bool:
+        """Callback for per-chunk progress updates from GenericUploader.
+
+        The deriva GenericUploader passes kwargs with: completed, total, file_path, host, job_info.
+        Note: This callback is only invoked for large files (> 25MB) that use chunked uploads.
+        Small files are uploaded in a single request and this callback won't be called.
+        """
+        if progress_callback is not None:
+            file_path = kwargs.get("file_path", "")
+            completed_chunks = kwargs.get("completed", 0)
+            total_chunks = kwargs.get("total", 0)
+
+            progress = UploadProgress(
+                file_path=file_path,
+                file_name=Path(file_path).name if file_path else "",
+                bytes_completed=completed_chunks,
+                bytes_total=total_chunks,
+                percent_complete=(completed_chunks / total_chunks * 100) if total_chunks > 0 else 0,
+                phase="uploading_chunks",
+                message=f"Uploading large file: chunk {completed_chunks} of {total_chunks}",
+            )
+            progress_callback(progress)
+        return True  # Continue upload
+
+    def status_callback() -> None:
+        """Callback for per-file status updates from GenericUploader.
+
+        GenericUploader calls this twice per file: once before upload starts (odd calls)
+        and once after upload completes (even calls). We use even calls to track completed files.
+        """
+        if progress_callback is not None:
+            upload_state["status_calls"] += 1
+
+            # Even calls indicate file completion (after upload)
+            if upload_state["status_calls"] % 2 == 0:
+                upload_state["completed_files"] += 1
+
+            # Report progress with current file count
+            current_file = (upload_state["status_calls"] + 1) // 2  # 1-indexed current file
+            progress = UploadProgress(
+                phase="uploading",
+                message=f"Uploading file {current_file} of {upload_state['total_files']}",
+                percent_complete=(upload_state["completed_files"] / upload_state["total_files"] * 100)
+                if upload_state["total_files"] > 0
+                else 0,
+            )
+            progress_callback(progress)
 
     # Now upload the files by creating an upload spec and then calling the uploader.
     with TemporaryDirectory() as temp_dir:
@@ -314,7 +378,10 @@ def upload_directory(model: DerivaModel, directory: Path | str) -> dict[Any, Fil
                     status=result["Status"],
                     result=result["Result"],
                 )
-                for path, result in uploader.uploadFiles().items()
+                for path, result in uploader.uploadFiles(
+                    file_callback=file_callback if progress_callback else None,
+                    status_callback=status_callback if progress_callback else None,
+                ).items()
             }
         finally:
             uploader.cleanup()
@@ -347,7 +414,7 @@ def upload_asset(model: DerivaModel, file: Path | str, table: Table, **kwargs: A
         server=model.catalog.deriva_server.server,
         credentials=model.catalog.deriva_server.credentials,
     )
-    md5_hashes = hash_utils.compute_file_hashes(file, ["md5"])["md5"]
+    md5_hashes = hash_utils.compute_file_hashes(file, frozenset(["md5"]))["md5"]
     sanitized_filename = urlquote(re.sub("[^a-zA-Z0-9_.-]", "_", md5_hashes[0] + "." + file_name))
     hatrac_path = f"{hatrac_path}{sanitized_filename}"
 

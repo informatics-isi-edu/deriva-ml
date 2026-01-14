@@ -3,6 +3,7 @@ THis module defines the DataSet class with is used to manipulate n
 """
 
 from enum import Enum
+from pprint import pformat
 from typing import Any, Optional, SupportsInt
 
 from hydra_zen import hydrated_dataclass
@@ -19,6 +20,16 @@ from pydantic import (
 from semver import Version
 
 from deriva_ml.core.definitions import RID
+
+try:
+    from icecream import ic
+
+    ic.configureOutput(
+        includeContext=True,
+        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
+    )
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class VersionPart(Enum):
@@ -43,7 +54,7 @@ class DatasetVersion(Version):
         replace(major, minor, patch): Replace the major and minor versions
     """
 
-    def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0):
+    def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0) -> None:
         """Initialize a DatasetVersion object.
 
         Args:
@@ -72,7 +83,7 @@ class DatasetVersion(Version):
         return self.major, self.minor, self.patch
 
     @classmethod
-    def parse(cls, version: str, optional_minor_an_path=False) -> "DatasetVersion":
+    def parse(cls, version: str, optional_minor_an_path: bool = False) -> "DatasetVersion":
         v = Version.parse(version)
         return DatasetVersion(v.major, v.minor, v.patch)
 
@@ -111,8 +122,13 @@ class DatasetHistory(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    @field_validator("execution_rid", mode="before")
+    @classmethod
+    def _default_execution_rid(cls, v: str | None) -> str | None:
+        return None if v == "" else v
+
     @field_validator("description", mode="after")
-    def _default_description(cls, v) -> str:
+    def _default_description(cls, v: str | None) -> str:
         return v or ""
 
 
@@ -153,7 +169,7 @@ class DatasetMinid(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def insert_metadata(cls, data: Any) -> Any:
+    def insert_metadata(cls, data: dict) -> dict:
         if isinstance(data, dict):
             if "metadata" in data:
                 data = data | data["metadata"]

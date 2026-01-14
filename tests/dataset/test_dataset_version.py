@@ -1,59 +1,63 @@
-from deriva_ml import (
-    DatasetVersion,
-    DerivaML,
-    VersionPart,
-)
+from pprint import pformat
 
+from icecream import ic
+
+from deriva_ml import DerivaML
+from deriva_ml.dataset.aux_classes import DatasetVersion, VersionPart
+
+ic.configureOutput(
+    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
+)
 
 class TestDatasetVersion:
     def test_dataset_version_simple(self, test_ml):
         ml_instance = test_ml
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-        dataset_rid = ml_instance.create_dataset(
-            type_rid.name,
+        dataset = ml_instance.create_dataset(
+            dataset_types=type_rid.name,
             description="A New Dataset",
             version=DatasetVersion(1, 0, 0),
         )
-        v0 = ml_instance.dataset_version(dataset_rid)
+        v0 = dataset.current_version
         assert "1.0.0" == str(v0)
-        v1 = ml_instance.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor)
+        v1 = dataset.increment_dataset_version(component=VersionPart.minor)
         assert "1.1.0" == str(v1)
+        assert  "1.1.0" == dataset.current_version
 
     def test_dataset_version_history(self, test_ml):
         ml_instance = test_ml
         type_rid = ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-        dataset_rid = ml_instance.create_dataset(
-            type_rid.name,
+        dataset = ml_instance.create_dataset(
+            dataset_types=type_rid.name,
             description="A New Dataset",
             version=DatasetVersion(1, 0, 0),
         )
-        assert 1 == len(ml_instance.dataset_history(dataset_rid))
-        v1 = ml_instance.increment_dataset_version(dataset_rid=dataset_rid, component=VersionPart.minor)
-        assert 2 == len(ml_instance.dataset_history(dataset_rid))
+        assert 1 == len(dataset.dataset_history())
+        v1 = dataset.increment_dataset_version(component=VersionPart.minor)
+        assert 2 == len(dataset.dataset_history())
 
     def test_dataset_version(self, dataset_test, tmp_path):
-        hostname = dataset_test.catalog.hostname
-        catalog_id = dataset_test.catalog.catalog_id
-        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
-
-        nested_datasets = dataset_description.member_rids.get("Dataset", [])
+        ml_instance = dataset_description.dataset._ml_instance
+        nested_datasets = [ml_instance.lookup_dataset(ds) for ds in dataset_description.member_rids.get("Dataset", [])]
         datasets = [
-            dataset
+            ml_instance.lookup_dataset(dataset)
             for nested_description in dataset_description.members.get("Dataset", [])
             for dataset in nested_description.member_rids.get("Dataset", [])
         ]
+        ic(datasets)
         _versions = {
-            "d0": ml_instance.dataset_version(dataset_description.rid),
-            "d1": [ml_instance.dataset_version(v) for v in nested_datasets],
-            "d2": [ml_instance.dataset_version(v) for v in datasets],
+            "d0": dataset_description.dataset.current_version,
+            "d1": [ds.current_version for ds in nested_datasets],
+            "d2": [ds.current_version for ds in datasets],
         }
-        ml_instance.increment_dataset_version(nested_datasets[0], VersionPart.major)
+        nested_datasets[0].increment_dataset_version(VersionPart.major)
         new_versions = {
-            "d0": ml_instance.dataset_version(dataset_description.rid),
-            "d1": [ml_instance.dataset_version(v) for v in nested_datasets],
-            "d2": [ml_instance.dataset_version(v) for v in datasets],
+            "d0": dataset_description.dataset.current_version,
+            "d1": [ds.current_version for ds in nested_datasets],
+            "d2": [ds.current_version for ds in datasets],
         }
-
+        ic(_versions)
+        ic(new_versions)
         assert new_versions["d0"].major == 2
         assert new_versions["d2"][0].major == 2

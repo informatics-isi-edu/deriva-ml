@@ -30,7 +30,6 @@ from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
 # Local imports
 from deriva_ml.feature import Feature
-from deriva_ml.protocols.dataset import DatasetLike
 
 try:
     from icecream import ic
@@ -112,6 +111,106 @@ class DerivaModel:
     def chaise_config(self) -> dict[str, Any]:
         """Return the chaise configuration."""
         return self.model.chaise_config
+
+    def get_schema_description(self, include_system_columns: bool = False) -> dict[str, Any]:
+        """Return a JSON description of the catalog schema structure.
+
+        Provides a structured representation of the domain and ML schemas including
+        tables, columns, foreign keys, and relationships. Useful for understanding
+        the data model structure programmatically.
+
+        Args:
+            include_system_columns: If True, include RID, RCT, RMT, RCB, RMB columns.
+                Default False to reduce output size.
+
+        Returns:
+            Dictionary with schema structure:
+            {
+                "domain_schema": "schema_name",
+                "ml_schema": "deriva-ml",
+                "schemas": {
+                    "schema_name": {
+                        "tables": {
+                            "TableName": {
+                                "comment": "description",
+                                "is_vocabulary": bool,
+                                "is_asset": bool,
+                                "is_association": bool,
+                                "columns": [...],
+                                "foreign_keys": [...],
+                                "features": [...]
+                            }
+                        }
+                    }
+                }
+            }
+        """
+        system_columns = {"RID", "RCT", "RMT", "RCB", "RMB"}
+        result = {
+            "domain_schema": self.domain_schema,
+            "ml_schema": self.ml_schema,
+            "schemas": {},
+        }
+
+        for schema_name in [self.domain_schema, self.ml_schema]:
+            schema = self.model.schemas.get(schema_name)
+            if not schema:
+                continue
+
+            schema_info = {"tables": {}}
+
+            for table_name, table in schema.tables.items():
+                # Get columns
+                columns = []
+                for col in table.columns:
+                    if not include_system_columns and col.name in system_columns:
+                        continue
+                    columns.append({
+                        "name": col.name,
+                        "type": str(col.type.typename),
+                        "nullok": col.nullok,
+                        "comment": col.comment or "",
+                    })
+
+                # Get foreign keys
+                foreign_keys = []
+                for fk in table.foreign_keys:
+                    fk_cols = [c.name for c in fk.foreign_key_columns]
+                    ref_cols = [c.name for c in fk.referenced_columns]
+                    foreign_keys.append({
+                        "columns": fk_cols,
+                        "referenced_table": f"{fk.pk_table.schema.name}.{fk.pk_table.name}",
+                        "referenced_columns": ref_cols,
+                    })
+
+                # Get features if this is a domain table
+                features = []
+                if schema_name == self.domain_schema:
+                    try:
+                        for f in self.find_features(table):
+                            features.append({
+                                "name": f.feature_name,
+                                "feature_table": f.feature_table.name,
+                            })
+                    except Exception:
+                        pass  # Table may not support features
+
+                table_info = {
+                    "comment": table.comment or "",
+                    "is_vocabulary": self.is_vocabulary(table),
+                    "is_asset": self.is_asset(table),
+                    "is_association": bool(self.is_association(table)),
+                    "columns": columns,
+                    "foreign_keys": foreign_keys,
+                }
+                if features:
+                    table_info["features"] = features
+
+                schema_info["tables"][table_name] = table_info
+
+            result["schemas"][schema_name] = schema_info
+
+        return result
 
     def __getattr__(self, name: str) -> Any:
         # Called only if `name` is not found in Manager.  Delegate attributes to model class.
@@ -290,6 +389,20 @@ class DerivaModel:
         else:
             self.model.apply()
 
+    def is_dataset_rid(self, rid: RID, deleted: bool = False) -> bool:
+        """Check if a given RID is a dataset RID."""
+        try:
+            rid_info = self.model.catalog.resolve_rid(rid, self.model)
+        except KeyError as _e:
+            raise DerivaMLException(f"Invalid RID {rid}")
+        if rid_info.table.name != "Dataset":
+            return False
+        elif deleted:
+            # Got a dataset rid. Now check to see if its deleted or not.
+            return True
+        else:
+            return not list(rid_info.datapath.entities().fetch())[0]["Deleted"]
+
     def list_dataset_element_types(self) -> list[Table]:
         """
         Lists the data types of elements contained within a dataset.
@@ -312,10 +425,9 @@ class DerivaModel:
 
         return [t for a in dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
 
-    def _prepare_wide_table(self,
-                            dataset,
-                            dataset_rid: RID,
-                            include_tables: list[str]) -> tuple[dict[str, Any], list[tuple]]:
+    def _prepare_wide_table(
+        self, dataset, dataset_rid: RID, include_tables: list[str]
+    ) -> tuple[dict[str, Any], list[tuple]]:
         """
         Generates details of a wide table from the model
 
@@ -343,11 +455,6 @@ class DerivaModel:
         paths_by_element = defaultdict(list)
         for p in table_paths:
             paths_by_element[p[2].name].append(p)
-
-        # Get the names of all of the tables that can be dataset elements.
-        dataset_element_tables = {
-            e.name for e in self.list_dataset_element_types() if e.schema.name == self.domain_schema
-        }
 
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
         element_tables = {}
@@ -466,7 +573,8 @@ class DerivaModel:
             return paths
 
         for child in find_arcs(root):
-            if child.name in {"Dataset_Execution", "Dataset_Dataset", "Execution"}:
+            #        if child.name in {"Dataset_Execution", "Dataset_Dataset", "Execution"}:
+            if child.name in {"Dataset_Dataset", "Execution"}:
                 continue
             if child == parent:
                 # Don't loop back via referred_by

@@ -20,6 +20,8 @@ from deriva_ml.core.definitions import (
     MLAsset,
     MLVocab,
     TableDefinition,
+    UploadCallback,
+    UploadProgress,
     UploadState,
 )
 from deriva_ml.core.exceptions import (
@@ -34,7 +36,7 @@ if TYPE_CHECKING:
 
 
 # Lazy import function for runtime usage
-def __getattr__(name):
+def __getattr__(name: str) -> type:
     """Lazy import to avoid circular dependencies."""
     if name == "DerivaML":
         from deriva_ml.core.base import DerivaML
@@ -69,6 +71,8 @@ __all__ = [
     "MLAsset",
     "MLVocab",
     "TableDefinition",
+    "UploadCallback",
+    "UploadProgress",
     "UploadState",
 ]
 

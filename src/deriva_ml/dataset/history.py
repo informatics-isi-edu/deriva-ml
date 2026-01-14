@@ -1,15 +1,25 @@
 import base64
 import struct
 from datetime import datetime
+from typing import Any
 
 from dateutil.parser import isoparse
 from deriva.core import urlquote
+from deriva.core.deriva_server import DerivaServer
 
 
 # -- ==============================================================================================
-def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=None):
+def get_record_history(
+    server: DerivaServer,
+    cid: str | int,
+    sname: str,
+    tname: str,
+    kvals: list[str],
+    kcols: list[str] | None = None,
+    snap: str | None = None,
+) -> dict[str, dict[str, Any]]:
     """Get the history of a record from the catalog.
-    
+
     Args:
         server: The server instance.
         cid: The catalog ID.
@@ -18,13 +28,16 @@ def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=Non
         kvals: The key values to look up.
         kcols: The key columns. Defaults to ["RID"].
         snap: Optional snapshot ID.
-        
+
     Returns:
         The history data for the record.
-        
+
     Raises:
         ValueError: If more than one row is returned.
     """
+    if kcols is None:
+        kcols = ["RID"]
+
     parts = {
         "cid": urlquote(cid),
         "sname": urlquote(sname),
@@ -46,7 +59,7 @@ def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=Non
     path = "/ermrest/catalog/%(cid)s@%(snap)s/entity/%(sname)s:%(tname)s/%(filter)s"
 
     rows_found = []
-    snap2rows = {}
+    snap2rows: dict[str, dict[str, Any]] = {}
     while True:
         url = path % parts
         # sys.stderr.write("%s\n" % url)
@@ -67,12 +80,12 @@ def get_record_history(server, cid, sname, tname, kvals, kcols=["RID"], snap=Non
 
 
 # -- --------------------------------------------------------------------------------------
-def datetime_epoch_us(dt):
+def datetime_epoch_us(dt: datetime) -> int:
     """Convert datetime to epoch microseconds.
-    
+
     Args:
         dt: The datetime object to convert.
-        
+
     Returns:
         The epoch time in microseconds.
     """
@@ -84,12 +97,12 @@ def datetime_epoch_us(dt):
 #
 
 
-def iso_to_snap(iso_datetime):
+def iso_to_snap(iso_datetime: str) -> int:
     """Convert ISO datetime string to snapshot format.
-    
+
     Args:
         iso_datetime: The ISO datetime string.
-        
+
     Returns:
         The snapshot timestamp.
     """
@@ -97,12 +110,12 @@ def iso_to_snap(iso_datetime):
 
 
 # -- --------------------------------------------------------------------------------------
-def urlb32_encode(i):
+def urlb32_encode(i: int) -> str:
     """Encode an integer to URL-safe base32.
-    
+
     Args:
         i: The integer to encode.
-        
+
     Returns:
         The URL-safe base32 encoded string.
     """
