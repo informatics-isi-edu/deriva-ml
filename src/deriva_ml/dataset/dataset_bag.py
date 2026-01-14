@@ -708,28 +708,60 @@ class DatasetBag:
         version: Any = None,
         **kwargs: Any,
     ) -> pd.DataFrame:
-        """Denormalize the dataset into a single wide DataFrame.
+        """Denormalize the dataset bag into a single wide table (DataFrame).
 
-        Joins related tables together to produce a "flat" view of the data,
-        with columns from multiple tables combined into a single DataFrame.
-        This is particularly useful for machine learning workflows that require
-        tabular data with all features in one table.
+        Denormalization transforms normalized relational data into a single "wide table"
+        (also called a "flat table" or "denormalized table") by joining related tables
+        together. This produces a DataFrame where each row contains all related information
+        from multiple source tables, with columns from each table combined side-by-side.
 
-        Column names are prefixed with the source table name to avoid collisions
-        (e.g., "Image.Filename", "Subject.RID").
+        Wide tables are the standard input format for most machine learning frameworks,
+        which expect all features for a single observation to be in one row. This method
+        bridges the gap between normalized database schemas and ML-ready tabular data.
+
+        **How it works:**
+
+        Tables are joined based on their foreign key relationships stored in the bag's
+        schema. For example, if Image has a foreign key to Subject, denormalizing
+        ["Subject", "Image"] produces rows where each image appears with its subject's
+        metadata.
+
+        **Column naming:**
+
+        Column names are prefixed with the source table name using dots to avoid
+        collisions (e.g., "Image.Filename", "Subject.RID"). This differs from the
+        live Dataset class which uses underscores.
 
         Args:
             include_tables: List of table names to include in the output. Tables
                 are joined based on their foreign key relationships.
-            version: Ignored (bags are immutable snapshots).
+                Order doesn't matter - the join order is determined automatically.
+            version: Ignored (bags are immutable snapshots of a specific version).
             **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
             pd.DataFrame: Wide table with columns from all included tables.
 
         Example:
-            >>> df = bag.denormalize_as_dataframe(["Image", "Diagnosis"])
-            >>> # df has columns like "Image.Filename", "Diagnosis.Name", etc.
+            Create a training dataset from a downloaded bag::
+
+                >>> # Download and materialize the dataset
+                >>> bag = ml.download_dataset_bag(spec, materialize=True)
+
+                >>> # Denormalize into a wide table
+                >>> df = bag.denormalize_as_dataframe(["Image", "Diagnosis"])
+                >>> print(df.columns.tolist())
+                ['Image.RID', 'Image.Filename', 'Image.URL', 'Diagnosis.RID',
+                 'Diagnosis.Label', 'Diagnosis.Confidence']
+
+                >>> # Access local file paths for images
+                >>> for _, row in df.iterrows():
+                ...     local_path = bag.get_asset_path("Image", row["Image.RID"])
+                ...     label = row["Diagnosis.Label"]
+                ...     # Train on local_path with label
+
+        See Also:
+            denormalize_as_dict: Generator version for memory-efficient processing.
         """
         rows = list(self._denormalize_from_members(include_tables=include_tables))
         return pd.DataFrame(rows)
@@ -740,26 +772,57 @@ class DatasetBag:
         version: Any = None,
         **kwargs: Any,
     ) -> Generator[dict[str, Any], None, None]:
-        """Denormalize the dataset and yield rows as dictionaries.
+        """Denormalize the dataset bag and yield rows as dictionaries.
 
-        Like denormalize_as_dataframe(), but returns a generator of dictionaries
-        instead of a DataFrame. Useful for processing large datasets without
-        loading everything into memory.
+        This is a memory-efficient alternative to denormalize_as_dataframe() that
+        yields one row at a time as a dictionary instead of loading all data into
+        a DataFrame. Use this when processing large datasets that may not fit in
+        memory, or when you want to process rows incrementally.
 
-        Column names are prefixed with the source table name to avoid collisions
-        (e.g., "Image.Filename", "Subject.RID").
+        Like denormalize_as_dataframe(), this produces a "wide table" representation
+        where each yielded dictionary contains all columns from the joined tables.
+        See denormalize_as_dataframe() for detailed explanation of how denormalization
+        works.
+
+        **Column naming:**
+
+        Column names are prefixed with the source table name using dots to avoid
+        collisions (e.g., "Image.Filename", "Subject.RID"). This differs from the
+        live Dataset class which uses underscores.
 
         Args:
             include_tables: List of table names to include in the output.
-            version: Ignored (bags are immutable snapshots).
+                Tables are joined based on their foreign key relationships.
+            version: Ignored (bags are immutable snapshots of a specific version).
             **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Yields:
-            dict[str, Any]: Dictionary with "table.column" keys.
+            dict[str, Any]: Dictionary representing one row of the wide table.
+                Keys are column names in "Table.Column" format.
 
         Example:
-            >>> for row in bag.denormalize_as_dict(["Image", "Diagnosis"]):
-            ...     print(row["Image.Filename"], row["Diagnosis.Name"])
+            Stream through a large dataset for training::
+
+                >>> bag = ml.download_dataset_bag(spec, materialize=True)
+                >>> for row in bag.denormalize_as_dict(["Image", "Diagnosis"]):
+                ...     # Get local file path for this image
+                ...     local_path = bag.get_asset_path("Image", row["Image.RID"])
+                ...     label = row["Diagnosis.Label"]
+                ...     # Process image and label...
+
+            Build a PyTorch dataset efficiently::
+
+                >>> class BagDataset(torch.utils.data.IterableDataset):
+                ...     def __init__(self, bag, tables):
+                ...         self.bag = bag
+                ...         self.tables = tables
+                ...     def __iter__(self):
+                ...         for row in self.bag.denormalize_as_dict(self.tables):
+                ...             img_path = self.bag.get_asset_path("Image", row["Image.RID"])
+                ...             yield load_image(img_path), row["Diagnosis.Label"]
+
+        See Also:
+            denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
         yield from self._denormalize_from_members(include_tables=include_tables)
 

@@ -188,18 +188,36 @@ class DatasetLike(Protocol):
         version: Any = None,
         **kwargs: Any,
     ) -> pd.DataFrame:
-        """Denormalize the dataset into a single wide DataFrame.
+        """Denormalize the dataset into a single wide table (DataFrame).
 
-        Joins related tables together to produce a "flat" view of the data,
-        with columns from multiple tables combined into a single DataFrame.
-        This is useful for ML workflows that require tabular data.
+        Denormalization transforms normalized relational data into a single "wide table"
+        (also called a "flat table" or "denormalized table") by joining related tables
+        together. This produces a DataFrame where each row contains all related information
+        from multiple source tables, with columns from each table combined side-by-side.
 
-        The result has outer join semantics - tables without FK relationships
-        are included with NULL values for unrelated columns.
+        Wide tables are the standard input format for most machine learning frameworks,
+        which expect all features for a single observation to be in one row. This method
+        bridges the gap between normalized database schemas and ML-ready tabular data.
+
+        **How it works:**
+
+        Tables are joined based on their foreign key relationships. For example, if
+        Image has a foreign key to Subject, and Diagnosis has a foreign key to Image,
+        then denormalizing ["Subject", "Image", "Diagnosis"] produces rows where each
+        image appears with its subject's metadata and any associated diagnoses.
+
+        The result uses outer join semantics - if a table has no FK relationship to
+        others, its rows are included with NULL values for unrelated columns.
+
+        **Column naming:**
+
+        To avoid column name collisions (e.g., multiple tables having "RID" or "Name"),
+        all column names are prefixed with their source table name.
 
         Args:
             include_tables: List of table names to include in the output.
                 Tables are joined based on their foreign key relationships.
+                Order doesn't matter - the join order is determined automatically.
             version: Dataset version to query (Dataset only, ignored by DatasetBag).
             **kwargs: Additional implementation-specific arguments.
 
@@ -209,8 +227,32 @@ class DatasetLike(Protocol):
 
         Note:
             Column naming conventions differ between implementations:
+
             - Dataset (catalog): Uses underscore separator (e.g., "Image_Filename")
             - DatasetBag (bag): Uses dot separator (e.g., "Image.Filename")
+
+        Example:
+            Suppose you have a dataset with Images linked to Subjects, and each
+            Image has a Diagnosis label::
+
+                # Normalized schema:
+                # Subject: RID, Name, Age
+                # Image: RID, Filename, Subject (FK)
+                # Diagnosis: RID, Image (FK), Label
+
+                # Denormalize into a wide table for ML
+                df = dataset.denormalize_as_dataframe(["Subject", "Image", "Diagnosis"])
+
+                # Result has columns like:
+                # Subject_RID, Subject_Name, Subject_Age,
+                # Image_RID, Image_Filename, Image_Subject,
+                # Diagnosis_RID, Diagnosis_Image, Diagnosis_Label
+
+                # Each row represents one Image with its Subject info and Diagnosis
+                # Ready for use with sklearn, pandas, or other ML tools
+
+        See Also:
+            denormalize_as_dict: Generator version for memory-efficient processing.
         """
         ...
 
@@ -222,25 +264,46 @@ class DatasetLike(Protocol):
     ) -> Generator[dict[str, Any], None, None]:
         """Denormalize the dataset and yield rows as dictionaries.
 
-        Like denormalize_as_dataframe(), but returns a generator of dictionaries
-        instead of a DataFrame. Useful for processing large datasets without
-        loading everything into memory.
+        This is a memory-efficient alternative to denormalize_as_dataframe() that
+        yields one row at a time as a dictionary instead of loading all data into
+        a DataFrame. Use this when processing large datasets that may not fit in
+        memory, or when you want to process rows incrementally.
 
-        The result has outer join semantics - tables without FK relationships
-        are included with NULL values for unrelated columns.
+        Like denormalize_as_dataframe(), this produces a "wide table" representation
+        where each yielded dictionary contains all columns from the joined tables.
+        See denormalize_as_dataframe() for detailed explanation of how denormalization
+        works.
 
         Args:
             include_tables: List of table names to include in the output.
+                Tables are joined based on their foreign key relationships.
             version: Dataset version to query (Dataset only, ignored by DatasetBag).
             **kwargs: Additional implementation-specific arguments.
 
         Yields:
-            dict[str, Any]: Dictionary with column keys prefixed by table name.
+            dict[str, Any]: Dictionary representing one row of the wide table.
+                Keys are column names prefixed by table name.
 
         Note:
             Column naming conventions differ between implementations:
+
             - Dataset (catalog): Uses underscore separator (e.g., "Image_Filename")
             - DatasetBag (bag): Uses dot separator (e.g., "Image.Filename")
+
+        Example:
+            Process a large dataset without loading everything into memory::
+
+                # Stream through rows one at a time
+                for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
+                    image_path = row["Image_Filename"]
+                    label = row["Diagnosis_Label"]
+                    # Process each image-label pair...
+
+                # Or convert to list if you need random access
+                rows = list(dataset.denormalize_as_dict(["Image", "Diagnosis"]))
+
+        See Also:
+            denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
         ...
 
