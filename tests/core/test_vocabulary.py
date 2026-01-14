@@ -105,3 +105,105 @@ class TestVocabulary:
         term1_again = ml_instance.lookup_term("CV_Cache", "Term1")
         assert term1_again.name == "Term1"
         assert cache_key in ml_instance._get_vocab_cache()
+
+    def test_add_synonym(self, test_ml):
+        """Test adding synonyms to an existing term."""
+        ml_instance = test_ml
+        ml_instance.create_vocabulary("CV_Syn", "Test synonyms")
+
+        # Add a term without synonyms
+        ml_instance.add_term("CV_Syn", "MainTerm", description="A term")
+        term = ml_instance.lookup_term("CV_Syn", "MainTerm")
+        assert term.synonyms == [] or term.synonyms is None
+
+        # Add a synonym
+        updated_term = ml_instance.add_synonym("CV_Syn", "MainTerm", "Alias1")
+        assert "Alias1" in updated_term.synonyms
+
+        # Verify lookup by synonym works
+        found_term = ml_instance.lookup_term("CV_Syn", "Alias1")
+        assert found_term.name == "MainTerm"
+
+        # Add another synonym
+        updated_term = ml_instance.add_synonym("CV_Syn", "MainTerm", "Alias2")
+        assert "Alias1" in updated_term.synonyms
+        assert "Alias2" in updated_term.synonyms
+
+        # Adding existing synonym should be a no-op
+        updated_term = ml_instance.add_synonym("CV_Syn", "MainTerm", "Alias1")
+        assert updated_term.synonyms.count("Alias1") == 1
+
+    def test_remove_synonym(self, test_ml):
+        """Test removing synonyms from an existing term."""
+        ml_instance = test_ml
+        ml_instance.create_vocabulary("CV_RemSyn", "Test remove synonyms")
+
+        # Add a term with synonyms
+        ml_instance.add_term("CV_RemSyn", "MainTerm", description="A term", synonyms=["Alias1", "Alias2"])
+        term = ml_instance.lookup_term("CV_RemSyn", "MainTerm")
+        assert "Alias1" in term.synonyms
+        assert "Alias2" in term.synonyms
+
+        # Remove a synonym
+        updated_term = ml_instance.remove_synonym("CV_RemSyn", "MainTerm", "Alias1")
+        assert "Alias1" not in updated_term.synonyms
+        assert "Alias2" in updated_term.synonyms
+
+        # Verify lookup by removed synonym no longer works
+        with pytest.raises(DerivaMLInvalidTerm):
+            ml_instance.lookup_term("CV_RemSyn", "Alias1")
+
+        # Lookup by remaining synonym should still work
+        found_term = ml_instance.lookup_term("CV_RemSyn", "Alias2")
+        assert found_term.name == "MainTerm"
+
+        # Removing non-existent synonym should be a no-op
+        updated_term = ml_instance.remove_synonym("CV_RemSyn", "MainTerm", "NonExistent")
+        assert "Alias2" in updated_term.synonyms
+
+    def test_delete_term_unused(self, test_ml):
+        """Test deleting an unused term."""
+        ml_instance = test_ml
+        ml_instance.create_vocabulary("CV_Del", "Test delete")
+
+        # Add a term
+        ml_instance.add_term("CV_Del", "ToDelete", description="A term to delete")
+        assert ml_instance.lookup_term("CV_Del", "ToDelete").name == "ToDelete"
+
+        # Delete the term
+        ml_instance.delete_term("CV_Del", "ToDelete")
+
+        # Verify it's gone
+        with pytest.raises(DerivaMLInvalidTerm):
+            ml_instance.lookup_term("CV_Del", "ToDelete")
+
+    def test_delete_term_in_use(self, test_ml):
+        """Test that deleting a term in use raises an exception."""
+        ml_instance = test_ml
+        from deriva_ml import MLVocab
+        from deriva_ml.execution.execution import ExecutionConfiguration
+
+        # Add workflow and dataset types for the execution
+        ml_instance.add_term(MLVocab.workflow_type, "TestWorkflow", description="Test workflow")
+        ml_instance.add_term(MLVocab.dataset_type, "InUseType", description="A type that will be in use")
+
+        # Create an execution and dataset using this type
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="TestWorkflow",
+            description="Test workflow",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
+        dataset = execution.create_dataset(dataset_types=["InUseType"], description="Test dataset")
+
+        # Verify the type is associated with the dataset
+        assert "InUseType" in dataset.dataset_types
+
+        # Attempt to delete the term should fail
+        with pytest.raises(DerivaMLException) as exc_info:
+            ml_instance.delete_term(MLVocab.dataset_type, "InUseType")
+
+        assert "referenced by" in str(exc_info.value)
+        assert "InUseType" in str(exc_info.value)

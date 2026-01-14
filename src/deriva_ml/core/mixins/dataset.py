@@ -67,13 +67,9 @@ class DatasetMixin:
         # Import here to avoid circular imports
         from deriva_ml.dataset.dataset import Dataset
 
-        # Get datapath to all the tables we will need: Dataset, DatasetType and the association table.
+        # Get datapath to the Dataset table
         pb = self.pathBuilder()
         dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
-        associations = list(self.model.schemas[self.ml_schema].tables[MLVocab.dataset_type].find_associations())
-        atable = associations[0].name if associations else None
-        ml_path = pb.schemas[self.ml_schema]
-        atable_path = ml_path.tables[atable]
 
         if deleted:
             filtered_path = dataset_path
@@ -82,18 +78,14 @@ class DatasetMixin:
                 (dataset_path.Deleted == False) | (dataset_path.Deleted == None)  # noqa: E711, E712
             )
 
-        # Get a list of all the dataset_type values associated with this dataset_table.
+        # Create Dataset objects - dataset_types is now a property that fetches from catalog
         datasets = []
         for dataset in filtered_path.entities().fetch():
-            ds_types = (
-                atable_path.filter(atable_path.Dataset == dataset["RID"]).attributes(atable_path.Dataset_Type).fetch()
-            )
             datasets.append(
                 Dataset(
                     self,  # type: ignore[arg-type]
                     dataset_rid=dataset["RID"],
                     description=dataset["Description"],
-                    dataset_types=[ds[MLVocab.dataset_type] for ds in ds_types],
                 )
             )
         return datasets

@@ -155,3 +155,49 @@ class TestCatalogDatasetFunctions:
         dataset.add_dataset_members(test_rids)
         history = dataset.dataset_history()
         assert manual_execution.execution_rid == history[0].execution_rid
+
+    def test_dataset_type_manipulation(self, test_ml):
+        """Test adding and removing dataset types."""
+        ml_instance = test_ml
+        ml_instance.add_term("Dataset_Type", "TypeA", description="Type A")
+        ml_instance.add_term("Dataset_Type", "TypeB", description="Type B")
+        ml_instance.add_term("Dataset_Type", "TypeC", description="Type C")
+        ml_instance.add_term(MLVocab.workflow_type, "Manual Workflow", description="A manual workflow")
+
+        # Create a workflow and execution for dataset creation
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for testing",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
+
+        # Create dataset with one type
+        dataset = execution.create_dataset(dataset_types=["TypeA"], description="Test dataset")
+        assert dataset.dataset_types == ["TypeA"]
+
+        # Add another type
+        dataset.add_dataset_type("TypeB")
+        assert set(dataset.dataset_types) == {"TypeA", "TypeB"}
+
+        # Adding same type again should be a no-op
+        dataset.add_dataset_type("TypeA")
+        assert set(dataset.dataset_types) == {"TypeA", "TypeB"}
+
+        # Add multiple types at once (one new, one existing)
+        dataset.add_dataset_types(["TypeB", "TypeC"])
+        assert set(dataset.dataset_types) == {"TypeA", "TypeB", "TypeC"}
+
+        # Remove a type
+        dataset.remove_dataset_type("TypeB")
+        assert set(dataset.dataset_types) == {"TypeA", "TypeC"}
+
+        # Remove same type again should be a no-op
+        dataset.remove_dataset_type("TypeB")
+        assert set(dataset.dataset_types) == {"TypeA", "TypeC"}
+
+        # Verify changes persist when looking up the dataset again
+        dataset2 = ml_instance.lookup_dataset(dataset.dataset_rid)
+        assert set(dataset2.dataset_types) == {"TypeA", "TypeC"}

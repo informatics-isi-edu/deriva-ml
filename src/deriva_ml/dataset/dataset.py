@@ -137,7 +137,6 @@ class Dataset:
         self,
         catalog: DerivaMLCatalog,
         dataset_rid: RID,
-        dataset_types: str | list[str] | None = None,
         description: str = "",
         execution_rid: RID | None = None,
     ):
@@ -149,29 +148,18 @@ class Dataset:
         Args:
             catalog: The DerivaMLCatalog instance containing this dataset.
             dataset_rid: The RID of the existing dataset record.
-            dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
-                Can be a single string or list of strings.
             description: Human-readable description of the dataset's purpose and contents.
             execution_rid: Optional execution RID that created or is associated with this dataset.
 
         Example:
             >>> # Wrap an existing dataset
-            >>> dataset = Dataset(catalog=ml, dataset_rid="4HM", dataset_types=["training"])
+            >>> dataset = Dataset(catalog=ml, dataset_rid="4HM")
         """
         self._logger = logging.getLogger("deriva_ml")
         self.dataset_rid = dataset_rid
         self.execution_rid = execution_rid
         self._ml_instance = catalog
         self.description = description
-
-        # Normalize dataset_types to always be a list of strings for consistent handling
-        # throughout the class. Accepts None, single string, or list of strings as input.
-        if dataset_types is None:
-            self.dataset_types: list[str] = []
-        elif isinstance(dataset_types, str):
-            self.dataset_types: list[str] = [dataset_types]
-        else:
-            self.dataset_types: list[str] = dataset_types
 
     def __repr__(self) -> str:
         """Return a string representation of the Dataset for debugging."""
@@ -202,6 +190,41 @@ class Dataset:
         if not isinstance(other, Dataset):
             return NotImplemented
         return self.dataset_rid == other.dataset_rid
+
+    def _get_dataset_type_association_table(self) -> tuple[str, Any]:
+        """Get the association table for dataset types.
+
+        Returns:
+            Tuple of (table_name, table_path) for the Dataset-Dataset_Type association table.
+        """
+        associations = list(
+            self._ml_instance.model.schemas[self._ml_instance.ml_schema]
+            .tables[MLVocab.dataset_type]
+            .find_associations()
+        )
+        atable_name = associations[0].name if associations else None
+        pb = self._ml_instance.pathBuilder()
+        atable_path = pb.schemas[self._ml_instance.ml_schema].tables[atable_name]
+        return atable_name, atable_path
+
+    @property
+    def dataset_types(self) -> list[str]:
+        """Get the dataset types from the catalog.
+
+        This property fetches the current dataset types directly from the catalog,
+        ensuring consistency when multiple Dataset instances reference the same
+        dataset or when types are modified externally.
+
+        Returns:
+            List of dataset type term names from the Dataset_Type vocabulary.
+        """
+        _, atable_path = self._get_dataset_type_association_table()
+        ds_types = (
+            atable_path.filter(atable_path.Dataset == self.dataset_rid)
+            .attributes(atable_path.Dataset_Type)
+            .fetch()
+        )
+        return [ds[MLVocab.dataset_type] for ds in ds_types]
 
     @staticmethod
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -275,46 +298,90 @@ class Dataset:
         dataset.add_dataset_types(dataset_types)
         return dataset
 
-    def add_dataset_types(self, dataset_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
-        """Adds one or more dataset types to an existing dataset.
+    def add_dataset_type(self, dataset_type: str | VocabularyTerm) -> None:
+        """Add a dataset type to this dataset.
+
+        Adds a type term to this dataset if it's not already present. The term must
+        exist in the Dataset_Type vocabulary.
 
         Args:
-            dataset_types: Single term or list of terms. Can be strings (term names) or VocabularyTerm objects.
-        """
+            dataset_type: Term name (string) or VocabularyTerm object from Dataset_Type vocabulary.
 
+        Raises:
+            DerivaMLInvalidTerm: If the term doesn't exist in the Dataset_Type vocabulary.
+
+        Example:
+            >>> dataset.add_dataset_type("Training")
+            >>> dataset.add_dataset_type("Validation")
+        """
+        # Convert to VocabularyTerm if needed (validates the term exists)
+        if isinstance(dataset_type, VocabularyTerm):
+            vocab_term = dataset_type
+        else:
+            vocab_term = self._ml_instance.lookup_term(MLVocab.dataset_type, dataset_type)
+
+        # Check if already present
+        if vocab_term.name in self.dataset_types:
+            return
+
+        # Insert into association table
+        _, atable_path = self._get_dataset_type_association_table()
+        atable_path.insert([{MLVocab.dataset_type: vocab_term.name, "Dataset": self.dataset_rid}])
+
+    def remove_dataset_type(self, dataset_type: str | VocabularyTerm) -> None:
+        """Remove a dataset type from this dataset.
+
+        Removes a type term from this dataset if it's currently associated. The term
+        must exist in the Dataset_Type vocabulary.
+
+        Args:
+            dataset_type: Term name (string) or VocabularyTerm object from Dataset_Type vocabulary.
+
+        Raises:
+            DerivaMLInvalidTerm: If the term doesn't exist in the Dataset_Type vocabulary.
+
+        Example:
+            >>> dataset.remove_dataset_type("Training")
+        """
+        # Convert to VocabularyTerm if needed (validates the term exists)
+        if isinstance(dataset_type, VocabularyTerm):
+            vocab_term = dataset_type
+        else:
+            vocab_term = self._ml_instance.lookup_term(MLVocab.dataset_type, dataset_type)
+
+        # Check if present
+        if vocab_term.name not in self.dataset_types:
+            return
+
+        # Delete from association table
+        _, atable_path = self._get_dataset_type_association_table()
+        atable_path.filter(
+            (atable_path.Dataset == self.dataset_rid) & (atable_path.Dataset_Type == vocab_term.name)
+        ).delete()
+
+    def add_dataset_types(self, dataset_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
+        """Add one or more dataset types to this dataset.
+
+        Convenience method for adding multiple types at once. Each term must exist
+        in the Dataset_Type vocabulary. Types that are already associated with the
+        dataset are silently skipped.
+
+        Args:
+            dataset_types: Single term or list of terms. Can be strings (term names)
+                or VocabularyTerm objects.
+
+        Raises:
+            DerivaMLInvalidTerm: If any term doesn't exist in the Dataset_Type vocabulary.
+
+        Example:
+            >>> dataset.add_dataset_types(["Training", "Image"])
+            >>> dataset.add_dataset_types("Testing")
+        """
         # Normalize input to a list
         types_to_add = [dataset_types] if not isinstance(dataset_types, list) else dataset_types
 
-        # Convert all to VocabularyTerm objects and collect new ones to insert
-        new_terms = []
         for term in types_to_add:
-            # If it's already a VocabularyTerm, use it; otherwise look it up by name
-            if isinstance(term, VocabularyTerm):
-                vocab_term = term
-            else:
-                vocab_term = self._ml_instance.lookup_term(MLVocab.dataset_type, term)
-
-            # Check if this term is already associated with the dataset
-            # Store as string names in self.dataset_types for consistency with __init__
-            term_name = vocab_term.name
-            if term_name not in self.dataset_types:
-                new_terms.append(vocab_term)
-                # dataset_types is always a list now
-                self.dataset_types.append(term_name)
-
-        # Only insert if there are new terms to add
-        if new_terms:
-            # Get the name of the association table between dataset_table and dataset_type.
-            associations = list(
-                self._ml_instance.model.schemas[self._ml_instance.ml_schema]
-                .tables[MLVocab.dataset_type]
-                .find_associations()
-            )
-            pb = self._ml_instance.pathBuilder()
-            atable = associations[0].name if associations else None
-            pb.schemas[self._ml_instance.ml_schema].tables[atable].insert(
-                [{MLVocab.dataset_type: term.name, "Dataset": self.dataset_rid} for term in new_terms]
-            )
+            self.add_dataset_type(term)
 
     @property
     def _dataset_table(self) -> Table:

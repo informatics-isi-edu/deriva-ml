@@ -302,3 +302,132 @@ class VocabularyMixin:
 
         # Fetch and convert all terms to VocabularyTerm objects
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def add_synonym(self, table: str | Table, term_name: str, synonym: str) -> VocabularyTerm:
+        """Add a synonym to an existing vocabulary term.
+
+        Adds an alternative name that can be used to look up this term. The term
+        must already exist in the vocabulary table.
+
+        Args:
+            table: Vocabulary table containing the term (name or Table object).
+            term_name: Primary name of the term to add synonym to.
+            synonym: Alternative name to add.
+
+        Returns:
+            VocabularyTerm: Updated term with the new synonym.
+
+        Raises:
+            DerivaMLInvalidTerm: If the term doesn't exist in the vocabulary.
+            DerivaMLException: If the synonym already exists for this term.
+
+        Example:
+            >>> ml.add_synonym("tissue_types", "epithelial", "epithelium")
+        """
+        # Look up the term (validates table and term existence)
+        term = self.lookup_term(table, term_name)
+
+        # Check if synonym already exists
+        current_synonyms = term.synonyms or []
+        if synonym in current_synonyms:
+            return term  # Already exists, no-op
+
+        # Build updated synonyms list
+        new_synonyms = current_synonyms + [synonym]
+
+        # Update the term in the catalog
+        vocab_table = self.model.name_to_table(table)
+        pb = self.pathBuilder()
+        table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
+        table_path.update([{"RID": term.rid, "Synonyms": new_synonyms}])
+
+        # Invalidate cache and return updated term
+        self.clear_vocabulary_cache(table)
+        return self.lookup_term(table, term_name)
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def remove_synonym(self, table: str | Table, term_name: str, synonym: str) -> VocabularyTerm:
+        """Remove a synonym from an existing vocabulary term.
+
+        Removes an alternative name from the term. The term must already exist
+        in the vocabulary table.
+
+        Args:
+            table: Vocabulary table containing the term (name or Table object).
+            term_name: Primary name of the term to remove synonym from.
+            synonym: Alternative name to remove.
+
+        Returns:
+            VocabularyTerm: Updated term with the synonym removed.
+
+        Raises:
+            DerivaMLInvalidTerm: If the term doesn't exist in the vocabulary.
+
+        Example:
+            >>> ml.remove_synonym("tissue_types", "epithelial", "epithelium")
+        """
+        # Look up the term (validates table and term existence)
+        term = self.lookup_term(table, term_name)
+
+        # Check if synonym exists
+        current_synonyms = term.synonyms or []
+        if synonym not in current_synonyms:
+            return term  # Doesn't exist, no-op
+
+        # Build updated synonyms list
+        new_synonyms = [s for s in current_synonyms if s != synonym]
+
+        # Update the term in the catalog
+        vocab_table = self.model.name_to_table(table)
+        pb = self.pathBuilder()
+        table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
+        table_path.update([{"RID": term.rid, "Synonyms": new_synonyms}])
+
+        # Invalidate cache and return updated term
+        self.clear_vocabulary_cache(table)
+        return self.lookup_term(table, term_name)
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def delete_term(self, table: str | Table, term_name: str) -> None:
+        """Delete a term from a vocabulary table.
+
+        Removes a term from the vocabulary. The term must not be in use by any
+        records in the catalog (e.g., no datasets using this dataset type, no
+        assets using this asset type).
+
+        Args:
+            table: Vocabulary table containing the term (name or Table object).
+            term_name: Primary name of the term to delete.
+
+        Raises:
+            DerivaMLInvalidTerm: If the term doesn't exist in the vocabulary.
+            DerivaMLException: If the term is currently in use by other records.
+
+        Example:
+            >>> ml.delete_term("Dataset_Type", "Obsolete_Type")
+        """
+        # Look up the term (validates table and term existence)
+        term = self.lookup_term(table, term_name)
+        vocab_table = self.model.name_to_table(table)
+
+        # Check if the term is in use by examining association tables
+        associations = list(vocab_table.find_associations())
+        pb = self.pathBuilder()
+
+        for assoc in associations:
+            assoc_path = pb.schemas[assoc.schema.name].tables[assoc.name]
+            # Check if any rows reference this term
+            count = len(list(assoc_path.filter(getattr(assoc_path, vocab_table.name) == term.name).entities().fetch()))
+            if count > 0:
+                raise DerivaMLException(
+                    f"Cannot delete term '{term_name}' from {vocab_table.name}: "
+                    f"it is referenced by {count} record(s) in {assoc.name}"
+                )
+
+        # No references found - safe to delete
+        table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
+        table_path.filter(table_path.RID == term.rid).delete()
+
+        # Invalidate cache
+        self.clear_vocabulary_cache(table)
