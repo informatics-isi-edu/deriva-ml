@@ -29,6 +29,7 @@ class DatasetMixin:
         - model: DerivaModel instance
         - ml_schema: str - name of the ML schema
         - domain_schema: str - name of the domain schema
+        - s3_bucket: str | None - S3 bucket URL for dataset storage
         - use_minid: bool - whether to use MINIDs
         - pathBuilder(): method returning catalog path builder
         - _dataset_table: property returning the Dataset table
@@ -47,6 +48,7 @@ class DatasetMixin:
     model: "DerivaModel"
     ml_schema: str
     domain_schema: str
+    s3_bucket: str | None
     use_minid: bool
     pathBuilder: Callable[[], Any]
 
@@ -172,7 +174,7 @@ class DatasetMixin:
                 raise e
 
         # self.model = self.catalog.getCatalogModel()
-        annotations = CatalogGraph(self, self.use_minid).generate_dataset_download_annotations()  # type: ignore[arg-type]
+        annotations = CatalogGraph(self, s3_bucket=self.s3_bucket, use_minid=self.use_minid).generate_dataset_download_annotations()  # type: ignore[arg-type]
         self._dataset_table.annotations.update(annotations)
         self.model.model.apply()
         return table

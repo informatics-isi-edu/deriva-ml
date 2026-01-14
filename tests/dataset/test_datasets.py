@@ -153,7 +153,7 @@ class TestDataset:
         reference_datasets = dataset_test.list_datasets(dataset_description)
         assert len(list(catalog_datasets)) == len(reference_datasets)
 
-        assert CatalogGraph(ml_instance=ml_instance)._dataset_nesting_depth() == 2
+        assert CatalogGraph(ml_instance=ml_instance, s3_bucket=ml_instance.s3_bucket)._dataset_nesting_depth() == 2
 
         for dataset in reference_datasets:
             # See if the list of RIDs in the dataset matches up with what is expected.

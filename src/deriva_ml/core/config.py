@@ -83,7 +83,11 @@ class DerivaMLConfig(BaseModel):
         logging_level: Logging level for DerivaML. Defaults to WARNING.
         deriva_logging_level: Logging level for Deriva libraries. Defaults to WARNING.
         credential: Authentication credentials. If None, retrieved automatically.
-        use_minid: Whether to use MINID service for dataset bags. Defaults to True.
+        s3_bucket: S3 bucket URL for dataset bag storage (e.g., 's3://my-bucket').
+            If provided, enables MINID creation and S3 upload for dataset exports.
+            If None, MINID functionality is disabled regardless of use_minid setting.
+        use_minid: Whether to use MINID service for dataset bags. Only effective when
+            s3_bucket is configured. Defaults to True when s3_bucket is set, False otherwise.
         check_auth: Whether to verify authentication on connection. Defaults to True.
 
     Example:
@@ -106,15 +110,20 @@ class DerivaMLConfig(BaseModel):
     logging_level: Any = logging.WARNING
     deriva_logging_level: Any = logging.WARNING
     credential: Any = None
-    use_minid: bool = True
+    s3_bucket: str | None = None
+    use_minid: bool | None = None  # None means "auto" - True if s3_bucket is set
     check_auth: bool = True
 
     @model_validator(mode="after")
     def init_working_dir(self) -> "DerivaMLConfig":
-        """Initialize working directory after model validation.
+        """Initialize working directory and resolve use_minid after model validation.
 
         Sets up the working directory path, computing a default if not specified.
         Also captures Hydra's runtime output directory for logging and outputs.
+
+        Resolves the use_minid flag based on s3_bucket configuration:
+        - If use_minid is explicitly set, use that value (but it only takes effect if s3_bucket is set)
+        - If use_minid is None (auto), set it to True if s3_bucket is configured, False otherwise
 
         This validator runs after all field validation and ensures the working
         directory is available for Hydra configuration resolution.
@@ -124,6 +133,15 @@ class DerivaMLConfig(BaseModel):
         """
         self.working_dir = DerivaMLConfig.compute_workdir(self.working_dir, self.catalog_id)
         self.hydra_runtime_output_dir = Path(HydraConfig.get().runtime.output_dir)
+
+        # Resolve use_minid based on s3_bucket configuration
+        if self.use_minid is None:
+            # Auto mode: enable MINID if s3_bucket is configured
+            self.use_minid = self.s3_bucket is not None
+        elif self.use_minid and self.s3_bucket is None:
+            # User requested MINID but no S3 bucket configured - disable MINID
+            self.use_minid = False
+
         return self
 
     @staticmethod

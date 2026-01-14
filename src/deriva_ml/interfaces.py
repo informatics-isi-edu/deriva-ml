@@ -493,6 +493,8 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
     Attributes:
         catalog: The underlying ERMrest catalog connection.
         catalog_id: Catalog identifier or name.
+        s3_bucket: S3 bucket URL for dataset storage, or None if not configured.
+        use_minid: Whether MINID service is enabled for this catalog.
 
     Example:
         >>> def process_data(catalog: DerivaMLCatalog):
@@ -504,6 +506,8 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
 
     catalog: ErmrestCatalog | ErmrestSnapshot
     catalog_id: str | int
+    s3_bucket: str | None
+    use_minid: bool
 
     def pathBuilder(self) -> SchemaWrapper:
         """Get a path builder for constructing catalog queries.

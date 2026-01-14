@@ -1415,7 +1415,11 @@ class Dataset:
             spec_file = Path(tmp_dir) / "download_spec.json"
             version_snapshot_catalog = self._version_snapshot_catalog(version)
             with spec_file.open("w", encoding="utf-8") as ds:
-                downloader = CatalogGraph(version_snapshot_catalog, use_minid=use_minid)
+                downloader = CatalogGraph(
+                    version_snapshot_catalog,
+                    s3_bucket=self._ml_instance.s3_bucket,
+                    use_minid=use_minid,
+                )
                 json.dump(downloader.generate_dataset_download_spec(self), ds)
             try:
                 self._logger.info(

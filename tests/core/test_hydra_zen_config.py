@@ -46,7 +46,10 @@ class TestHydraZenDerivaMLConfig:
         # Check defaults are preserved
         assert conf.catalog_id == 1
         assert conf.ml_schema == "deriva-ml"
-        assert conf.use_minid is True
+        # use_minid defaults to None (auto mode) - it will resolve to True/False
+        # based on s3_bucket when the config is instantiated
+        assert conf.use_minid is None
+        assert conf.s3_bucket is None
         assert conf.check_auth is True
 
     def test_instantiate_creates_pydantic_model(self):

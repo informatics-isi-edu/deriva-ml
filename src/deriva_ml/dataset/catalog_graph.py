@@ -23,10 +23,30 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 class CatalogGraph:
-    def __init__(self, ml_instance: DerivaMLCatalog, use_minid: bool = True):
+    """Generates export specifications and annotations for dataset downloads.
+
+    This class creates the configuration needed for Deriva's export processor to
+    download datasets as BDBags, optionally with S3 upload and MINID registration.
+
+    Args:
+        ml_instance: The DerivaML catalog instance.
+        s3_bucket: S3 bucket URL for dataset bag storage (e.g., 's3://my-bucket').
+            Required for MINID functionality. If None, MINID features are disabled.
+        use_minid: Whether to use MINID service for persistent identification.
+            Only effective when s3_bucket is provided.
+    """
+
+    def __init__(
+        self,
+        ml_instance: DerivaMLCatalog,
+        s3_bucket: str | None = None,
+        use_minid: bool = True,
+    ):
         self._ml_schema = ml_instance.ml_schema
         self._ml_instance = ml_instance
-        self._use_minid = use_minid
+        self._s3_bucket = s3_bucket
+        # MINID only works if S3 bucket is configured
+        self._use_minid = use_minid and s3_bucket is not None
         self._dataset_table = ml_instance._dataset_table
 
     def _export_annotation(
@@ -163,24 +183,30 @@ class CatalogGraph:
         return exports
 
     def generate_dataset_download_spec(self, dataset: DatasetLike) -> dict[str, Any]:
-        """
-        Generate a specification for downloading a specific dataset.
+        """Generate a specification for downloading a specific dataset.
 
-        This routine creates a download specification that can be used by the Deriva export processor to download
-        a specific dataset as a MINID.
+        This routine creates a download specification that can be used by the Deriva
+        export processor to download a specific dataset as a BDBag. If s3_bucket is
+        configured and use_minid is True, the bag will be uploaded to S3 and
+        registered with the MINID service.
+
+        Args:
+            dataset: The dataset to generate the download spec for.
+
         Returns:
+            A download specification dictionary for the Deriva export processor.
         """
-        s3_target = "s3://eye-ai-shared"
         minid_test = False
 
-        post_processors = (
-            {
+        post_processors: dict[str, Any] = {}
+        if self._use_minid and self._s3_bucket:
+            post_processors = {
                 "post_processors": [
                     {
                         "processor": "cloud_upload",
                         "processor_params": {
                             "acl": "public-read",
-                            "target_url": s3_target,
+                            "target_url": self._s3_bucket,
                         },
                     },
                     {
@@ -195,9 +221,6 @@ class CatalogGraph:
                     },
                 ]
             }
-            if self._use_minid
-            else {}
-        )
         return post_processors | {
             "env": {"RID": "{RID}"},
             "bag": {
@@ -233,8 +256,20 @@ class CatalogGraph:
         }
 
     def generate_dataset_download_annotations(self) -> dict[str, Any]:
-        post_processors = (
-            {
+        """Generate export annotations for the Dataset table.
+
+        These annotations configure Chaise's export functionality for datasets.
+        If s3_bucket is configured and use_minid is True, includes post-processors
+        for S3 upload and MINID registration.
+
+        Returns:
+            A dictionary of annotations to apply to the Dataset table.
+        """
+        post_processors: dict[str, Any] = {}
+        if self._use_minid and self._s3_bucket:
+            # Ensure the S3 bucket URL ends with a trailing slash for the annotation
+            s3_url = self._s3_bucket if self._s3_bucket.endswith("/") else f"{self._s3_bucket}/"
+            post_processors = {
                 "type": "BAG",
                 "outputs": [{"fragment_key": "dataset_export_outputs"}],
                 "displayname": "BDBag to Cloud",
@@ -244,7 +279,7 @@ class CatalogGraph:
                         "processor": "cloud_upload",
                         "processor_params": {
                             "acl": "public-read",
-                            "target_url": "s3://eye-ai-shared/",
+                            "target_url": s3_url,
                         },
                     },
                     {
@@ -259,9 +294,6 @@ class CatalogGraph:
                     },
                 ],
             }
-            if self._use_minid
-            else {}
-        )
         return {
             deriva_tags.export_fragment_definitions: {"dataset_export_outputs": self._export_annotation()},
             deriva_tags.visible_foreign_keys: self._dataset_visible_fkeys(),
