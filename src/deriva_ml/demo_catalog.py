@@ -191,7 +191,8 @@ def create_demo_datasets(execution: Execution) -> DatasetDescription:
 
 def create_demo_features(execution: Execution) -> None:
     ml_instance = execution._ml_object
-    ml_instance.create_vocabulary("SubjectHealth", "A vocab")
+    # Use update_navbar=False for batch creation, then call apply_catalog_annotations() once at the end
+    ml_instance.create_vocabulary("SubjectHealth", "A vocab", update_navbar=False)
     ml_instance.add_term(
         "SubjectHealth",
         "Sick",
@@ -202,10 +203,12 @@ def create_demo_features(execution: Execution) -> None:
         "Well",
         description="The subject self reports that they feel well",
     )
-    ml_instance.create_vocabulary("ImageQuality", "Controlled vocabulary for image quality")
+    ml_instance.create_vocabulary("ImageQuality", "Controlled vocabulary for image quality", update_navbar=False)
     ml_instance.add_term("ImageQuality", "Good", description="The image is good")
     ml_instance.add_term("ImageQuality", "Bad", description="The image is bad")
-    box_asset = ml_instance.create_asset("BoundingBox", comment="A file that contains a cropped version of a image")
+    box_asset = ml_instance.create_asset(
+        "BoundingBox", comment="A file that contains a cropped version of a image", update_navbar=False
+    )
 
     ml_instance.create_feature(
         "Subject",
@@ -213,9 +216,13 @@ def create_demo_features(execution: Execution) -> None:
         terms=["SubjectHealth"],
         metadata=[ColumnDefinition(name="Scale", type=BuiltinTypes.int2, nullok=True)],
         optional=["Scale"],
+        update_navbar=False,
     )
-    ml_instance.create_feature("Image", "BoundingBox", assets=[box_asset])
-    ml_instance.create_feature("Image", "Quality", terms=["ImageQuality"])
+    ml_instance.create_feature("Image", "BoundingBox", assets=[box_asset], update_navbar=False)
+    ml_instance.create_feature("Image", "Quality", terms=["ImageQuality"], update_navbar=False)
+
+    # Update navbar once after all tables are created
+    ml_instance.apply_catalog_annotations()
 
     ImageQualityFeature = ml_instance.feature_record_class("Image", "Quality")
     ImageBoundingboxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
@@ -336,6 +343,7 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
     )
     with TemporaryDirectory() as tmpdir:
         ml_instance = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
+        # Use update_navbar=False since we call apply_catalog_annotations() explicitly at the end
         ml_instance.create_asset(
             "Image",
             column_defs=[
@@ -343,6 +351,7 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
                 Column.define("Acquisition_Date", builtin_types.date),
             ],
             referenced_tables=[subject_table],
+            update_navbar=False,
         )
         ml_instance.apply_catalog_annotations()
 

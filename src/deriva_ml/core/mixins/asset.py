@@ -28,6 +28,7 @@ class AssetMixin:
         - domain_schema: str - name of the domain schema
         - pathBuilder(): method returning catalog path builder
         - add_term(): method for adding vocabulary terms (from VocabularyMixin)
+        - apply_catalog_annotations(): method to update navbar (from DerivaML base class)
 
     Methods:
         create_asset: Create a new asset table
@@ -40,6 +41,7 @@ class AssetMixin:
     domain_schema: str
     pathBuilder: Callable[[], Any]
     add_term: Callable[..., VocabularyTerm]
+    apply_catalog_annotations: Callable[[], None]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_asset(
@@ -50,6 +52,7 @@ class AssetMixin:
         referenced_tables: Iterable[Table] | None = None,
         comment: str = "",
         schema: str | None = None,
+        update_navbar: bool = True,
     ) -> Table:
         """Creates an asset table.
 
@@ -60,6 +63,9 @@ class AssetMixin:
             referenced_tables: Iterable of Table objects to which asset should provide foreign-key references to.
             comment: Description of the asset table. (Default value = '')
             schema: Schema in which to create the asset table.  Defaults to domain_schema.
+            update_navbar: If True (default), automatically updates the navigation bar to include
+                the new asset table. Set to False during batch asset creation to avoid redundant
+                updates, then call apply_catalog_annotations() once at the end.
 
         Returns:
             Table object for the asset table.
@@ -114,6 +120,11 @@ class AssetMixin:
 
         # Add asset annotations
         asset_annotation(asset_table)
+
+        # Update navbar to include the new asset table
+        if update_navbar:
+            self.apply_catalog_annotations()
+
         return asset_table
 
     def list_assets(self, asset_table: Table | str) -> list[dict[str, Any]]:

@@ -31,6 +31,7 @@ class FeatureMixin:
         - domain_schema: str - name of the domain schema
         - pathBuilder(): method returning catalog path builder
         - add_term(): method for adding vocabulary terms (from VocabularyMixin)
+        - apply_catalog_annotations(): method to update navbar (from DerivaML base class)
 
     Methods:
         create_feature: Create a new feature definition
@@ -47,6 +48,7 @@ class FeatureMixin:
     domain_schema: str
     pathBuilder: Callable[[], Any]
     add_term: Callable[..., VocabularyTerm]
+    apply_catalog_annotations: Callable[[], None]
 
     def create_feature(
         self,
@@ -57,6 +59,7 @@ class FeatureMixin:
         metadata: list[ColumnDefinition | Table | Key | str] | None = None,
         optional: list[str] | None = None,
         comment: str = "",
+        update_navbar: bool = True,
     ) -> type[FeatureRecord]:
         """Creates a new feature definition.
 
@@ -81,6 +84,9 @@ class FeatureMixin:
             metadata: Optional columns, tables, or keys to include in a feature definition.
             optional: Column names that are not required when creating feature instances.
             comment: Description of the feature's purpose and usage.
+            update_navbar: If True (default), automatically updates the navigation bar to include
+                the new feature table. Set to False during batch feature creation to avoid
+                redundant updates, then call apply_catalog_annotations() once at the end.
 
         Returns:
             type[FeatureRecord]: A dynamically generated Pydantic model class for creating
@@ -149,6 +155,10 @@ class FeatureMixin:
         for c in optional:
             atable.columns[c].alter(nullok=True)
         atable.columns["Feature_Name"].alter(default=feature_name_term.name)
+
+        # Update navbar to include the new feature table
+        if update_navbar:
+            self.apply_catalog_annotations()
 
         # Return feature record class for creating instances
         return self.feature_record_class(target_table, feature_name)

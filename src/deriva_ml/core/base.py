@@ -481,6 +481,7 @@ class DerivaML(
         - **{Domain Schema}**: All domain-specific tables (excludes vocabularies and associations)
         - **Vocabulary**: All controlled vocabulary tables from both ML and domain schemas
         - **Assets**: All asset tables from both ML and domain schemas
+        - **Features**: All feature tables with entries named "TableName:FeatureName"
         - **Catalog Registry**: Link to the ermrest registry
         - **Documentation**: Links to ML notebook instructions and Deriva-ML docs
 
@@ -648,6 +649,16 @@ class DerivaML(
                                 if self.model.is_asset(tname)
                             ],
                         },
+                        {  # List of all feature tables in the catalog.
+                            "name": "Features",
+                            "children": [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{f.feature_table.schema.name}:{f.feature_table.name}",
+                                    "name": f"{f.target_table.name}:{f.feature_name}",
+                                }
+                                for f in self.model.find_features()
+                            ],
+                        },
                         {
                             "url": "/chaise/recordset/#0/ermrest:registry@sort(RID)",
                             "name": "Catalog Registry",
@@ -695,7 +706,9 @@ class DerivaML(
         # Insert page into www tables with title and content
         self.pathBuilder().www.tables[self.domain_schema].insert([{"Title": title, "Content": content}])
 
-    def create_vocabulary(self, vocab_name: str, comment: str = "", schema: str | None = None) -> Table:
+    def create_vocabulary(
+        self, vocab_name: str, comment: str = "", schema: str | None = None, update_navbar: bool = True
+    ) -> Table:
         """Creates a controlled vocabulary table.
 
         A controlled vocabulary table maintains a list of standardized terms and their definitions. Each term can have
@@ -705,6 +718,9 @@ class DerivaML(
             vocab_name: Name for the new vocabulary table. Must be a valid SQL identifier.
             comment: Description of the vocabulary's purpose and usage. Defaults to empty string.
             schema: Schema name to create the table in. If None, uses domain_schema.
+            update_navbar: If True (default), automatically updates the navigation bar to include
+                the new vocabulary table. Set to False during batch table creation to avoid
+                redundant updates, then call apply_catalog_annotations() once at the end.
 
         Returns:
             Table: ERMRest table object representing the newly created vocabulary table.
@@ -720,6 +736,12 @@ class DerivaML(
                 ...     comment="Standard tissue classifications",
                 ...     schema="bio_schema"
                 ... )
+
+            Create multiple vocabularies without updating navbar until the end:
+
+                >>> ml.create_vocabulary("Species", update_navbar=False)
+                >>> ml.create_vocabulary("Tissue_Type", update_navbar=False)
+                >>> ml.apply_catalog_annotations()  # Update navbar once
         """
         # Use domain schema if none specified
         schema = schema or self.domain_schema
@@ -731,16 +753,40 @@ class DerivaML(
             )
         except ValueError:
             raise DerivaMLException(f"Table {vocab_name} already exist")
+
+        # Update navbar to include the new vocabulary table
+        if update_navbar:
+            self.apply_catalog_annotations()
+
         return vocab_table
 
-    def create_table(self, table: TableDefinition) -> Table:
-        """Creates a new table in the catalog.
+    def create_table(self, table: TableDefinition, update_navbar: bool = True) -> Table:
+        """Creates a new table in the domain schema.
 
-        Creates a table using the provided TableDefinition object, which specifies the table structure including
-        columns, keys, and foreign key relationships.
+        Creates a table using the provided TableDefinition object, which specifies the table structure
+        including columns, keys, and foreign key relationships. The table is created in the domain
+        schema associated with this DerivaML instance.
+
+        **Required Classes**:
+        Import the following classes from deriva_ml to define tables:
+
+        - ``TableDefinition``: Defines the complete table structure
+        - ``ColumnDefinition``: Defines individual columns with types and constraints
+        - ``KeyDefinition``: Defines unique key constraints (optional)
+        - ``ForeignKeyDefinition``: Defines foreign key relationships to other tables (optional)
+        - ``BuiltinTypes``: Enum of available column data types
+
+        **Available Column Types** (BuiltinTypes enum):
+        ``text``, ``int2``, ``int4``, ``int8``, ``float4``, ``float8``, ``boolean``,
+        ``date``, ``timestamp``, ``timestamptz``, ``json``, ``jsonb``, ``markdown``,
+        ``ermrest_uri``, ``ermrest_rid``, ``ermrest_rcb``, ``ermrest_rmb``,
+        ``ermrest_rct``, ``ermrest_rmt``
 
         Args:
             table: A TableDefinition object containing the complete specification of the table to create.
+            update_navbar: If True (default), automatically updates the navigation bar to include
+                the new table. Set to False during batch table creation to avoid redundant updates,
+                then call apply_catalog_annotations() once at the end.
 
         Returns:
             Table: The newly created ERMRest table object.
@@ -748,19 +794,89 @@ class DerivaML(
         Raises:
             DerivaMLException: If table creation fails or the definition is invalid.
 
-        Example:
+        Examples:
+            **Simple table with basic columns**:
 
-            >>> table_def = TableDefinition(
-            ...     name="experiments",
-            ...     column_definitions=[
-            ...         ColumnDefinition(name="name", type=BuiltinTypes.text),
-            ...         ColumnDefinition(name="date", type=BuiltinTypes.date)
-            ...     ]
-            ... )
-            >>> new_table = ml.create_table(table_def)
+                >>> from deriva_ml import TableDefinition, ColumnDefinition, BuiltinTypes
+                >>>
+                >>> table_def = TableDefinition(
+                ...     name="Experiment",
+                ...     column_defs=[
+                ...         ColumnDefinition(name="Name", type=BuiltinTypes.text, nullok=False),
+                ...         ColumnDefinition(name="Date", type=BuiltinTypes.date),
+                ...         ColumnDefinition(name="Description", type=BuiltinTypes.markdown),
+                ...         ColumnDefinition(name="Score", type=BuiltinTypes.float4),
+                ...     ],
+                ...     comment="Records of experimental runs"
+                ... )
+                >>> experiment_table = ml.create_table(table_def)
+
+            **Table with foreign key to another table**:
+
+                >>> from deriva_ml import (
+                ...     TableDefinition, ColumnDefinition, ForeignKeyDefinition, BuiltinTypes
+                ... )
+                >>>
+                >>> # Create a Sample table that references Subject
+                >>> sample_def = TableDefinition(
+                ...     name="Sample",
+                ...     column_defs=[
+                ...         ColumnDefinition(name="Name", type=BuiltinTypes.text, nullok=False),
+                ...         ColumnDefinition(name="Subject", type=BuiltinTypes.text, nullok=False),
+                ...         ColumnDefinition(name="Collection_Date", type=BuiltinTypes.date),
+                ...     ],
+                ...     fkey_defs=[
+                ...         ForeignKeyDefinition(
+                ...             colnames=["Subject"],
+                ...             pk_sname=ml.domain_schema,  # Schema of referenced table
+                ...             pk_tname="Subject",          # Name of referenced table
+                ...             pk_colnames=["RID"],         # Column(s) in referenced table
+                ...             on_delete="CASCADE",         # Delete samples when subject deleted
+                ...         )
+                ...     ],
+                ...     comment="Biological samples collected from subjects"
+                ... )
+                >>> sample_table = ml.create_table(sample_def)
+
+            **Table with unique key constraint**:
+
+                >>> from deriva_ml import (
+                ...     TableDefinition, ColumnDefinition, KeyDefinition, BuiltinTypes
+                ... )
+                >>>
+                >>> protocol_def = TableDefinition(
+                ...     name="Protocol",
+                ...     column_defs=[
+                ...         ColumnDefinition(name="Name", type=BuiltinTypes.text, nullok=False),
+                ...         ColumnDefinition(name="Version", type=BuiltinTypes.text, nullok=False),
+                ...         ColumnDefinition(name="Description", type=BuiltinTypes.markdown),
+                ...     ],
+                ...     key_defs=[
+                ...         KeyDefinition(
+                ...             colnames=["Name", "Version"],
+                ...             constraint_names=[["myschema", "Protocol_Name_Version_key"]],
+                ...             comment="Each protocol name+version must be unique"
+                ...         )
+                ...     ],
+                ...     comment="Experimental protocols with versioning"
+                ... )
+                >>> protocol_table = ml.create_table(protocol_def)
+
+            **Batch creation without navbar updates**:
+
+                >>> ml.create_table(table1_def, update_navbar=False)
+                >>> ml.create_table(table2_def, update_navbar=False)
+                >>> ml.create_table(table3_def, update_navbar=False)
+                >>> ml.apply_catalog_annotations()  # Update navbar once at the end
         """
         # Create table in domain schema using provided definition
-        return self.model.schemas[self.domain_schema].create_table(table.model_dump())
+        new_table = self.model.schemas[self.domain_schema].create_table(table.model_dump())
+
+        # Update navbar to include the new table
+        if update_navbar:
+            self.apply_catalog_annotations()
+
+        return new_table
 
 
     # Methods moved to mixins:
