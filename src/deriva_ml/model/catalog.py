@@ -323,17 +323,19 @@ class DerivaModel:
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def find_features(self, table: TableInput) -> Iterable[Feature]:
-        """List the names of the features in the specified table.
+    def find_features(self, table: TableInput | None = None) -> Iterable[Feature]:
+        """List features in the catalog.
+
+        If a table is specified, returns only features for that table.
+        If no table is specified, returns all features across all tables in the catalog.
 
         Args:
-            table: The table to find features for.
-            table: Table | str:
+            table: Optional table to find features for. If None, returns all features
+                in the catalog.
 
         Returns:
-            An iterable of FeatureResult instances that describe the current features in the table.
+            An iterable of Feature instances describing the features.
         """
-        table = self.name_to_table(table)
 
         def is_feature(a: FindAssociationResult) -> bool:
             """Check if association represents a feature.
@@ -349,9 +351,24 @@ class DerivaModel:
                 a.self_fkey.foreign_key_columns[0].name,
             }.issubset({c.name for c in a.table.columns})
 
-        return [
-            Feature(a, self) for a in table.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
-        ]
+        def find_table_features(t: Table) -> list[Feature]:
+            """Find all features for a single table."""
+            return [
+                Feature(a, self) for a in t.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
+            ]
+
+        if table is not None:
+            # Find features for a specific table
+            return find_table_features(self.name_to_table(table))
+        else:
+            # Find all features across all domain and ML schema tables
+            features: list[Feature] = []
+            for schema_name in [self.domain_schema, self.ml_schema]:
+                schema = self.model.schemas.get(schema_name)
+                if schema:
+                    for t in schema.tables.values():
+                        features.extend(find_table_features(t))
+            return features
 
     def lookup_feature(self, table: TableInput, feature_name: str) -> Feature:
         """Lookup the named feature associated with the provided table.

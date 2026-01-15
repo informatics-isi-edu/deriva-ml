@@ -37,6 +37,7 @@ class FeatureMixin:
         feature_record_class: Get pydantic model class for feature records
         delete_feature: Remove a feature definition
         lookup_feature: Retrieve a Feature object
+        list_features: List all features, optionally filtered by table
         list_feature_values: Get all values for a feature
     """
 
@@ -255,6 +256,31 @@ class FeatureMixin:
             'expression_level'
         """
         return self.model.lookup_feature(table, feature_name)
+
+    def list_features(self, table: str | Table | None = None) -> list[Feature]:
+        """List features in the catalog.
+
+        If a table is specified, returns only features for that table.
+        If no table is specified, returns all features across all tables in the catalog.
+
+        Args:
+            table: Optional table to find features for. If None, returns all features
+                in the catalog.
+
+        Returns:
+            A list of Feature instances describing the features.
+
+        Examples:
+            List all features in the catalog:
+                >>> all_features = ml.list_features()
+                >>> for f in all_features:
+                ...     print(f"{f.target_table.name}.{f.feature_name}")
+
+            List features for a specific table:
+                >>> image_features = ml.list_features("Image")
+                >>> print([f.feature_name for f in image_features])
+        """
+        return list(self.model.find_features(table))
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_feature_values(self, table: Table | str, feature_name: str) -> datapath._ResultSet:
