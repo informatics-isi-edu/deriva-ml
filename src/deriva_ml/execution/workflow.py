@@ -102,6 +102,13 @@ class Workflow(BaseModel):
         The behavior can be configured using environment variables:
             - DERIVA_ML_WORKFLOW_URL: Override the detected workflow URL
             - DERIVA_ML_WORKFLOW_CHECKSUM: Override the computed checksum
+            - DERIVAML_MCP_IN_DOCKER: Set to "true" to use Docker metadata instead of git
+
+        Docker environment variables (used when DERIVAML_MCP_IN_DOCKER=true):
+            - DERIVAML_MCP_VERSION: Semantic version of the Docker image
+            - DERIVAML_MCP_GIT_COMMIT: Git commit hash at build time
+            - DERIVAML_MCP_IMAGE_DIGEST: Docker image digest (unique identifier)
+            - DERIVAML_MCP_IMAGE_NAME: Docker image name (e.g., ghcr.io/org/repo)
 
         Args:
 
@@ -109,7 +116,7 @@ class Workflow(BaseModel):
             Workflow: New workflow instance with detected Git information.
 
         Raises:
-            DerivaMLException: If not in a Git repository or detection fails.
+            DerivaMLException: If not in a Git repository or detection fails (non-Docker).
 
         Example:
             >>> workflow = Workflow.create_workflow(
@@ -118,21 +125,55 @@ class Workflow(BaseModel):
             ...     description="Process sample data"
             ... )
         """
-        """Initializes logging for the workflow."""
+        self._logger = logging.getLogger("deriva_ml")
 
-        # Check to see if execution file info is being passed in by calling program.
+        # Check if running in Docker container (no git repo available)
+        if os.environ.get("DERIVAML_MCP_IN_DOCKER", "").lower() == "true":
+            # Use Docker image metadata for provenance
+            self.version = self.version or os.environ.get("DERIVAML_MCP_VERSION", "")
+
+            # Use image digest as checksum (unique identifier for the container)
+            # Fall back to git commit if digest not available
+            self.checksum = self.checksum or (
+                os.environ.get("DERIVAML_MCP_IMAGE_DIGEST", "")
+                or os.environ.get("DERIVAML_MCP_GIT_COMMIT", "")
+            )
+
+            # Build URL pointing to the Docker image or source repo
+            if not self.url:
+                image_name = os.environ.get(
+                    "DERIVAML_MCP_IMAGE_NAME",
+                    "ghcr.io/informatics-isi-edu/deriva-ml-mcp",
+                )
+                image_digest = os.environ.get("DERIVAML_MCP_IMAGE_DIGEST", "")
+                if image_digest:
+                    # URL format: image@sha256:digest
+                    self.url = f"{image_name}@{image_digest}"
+                else:
+                    # Fall back to source repo with git commit
+                    source_url = "https://github.com/informatics-isi-edu/deriva-ml-mcp"
+                    git_commit = os.environ.get("DERIVAML_MCP_GIT_COMMIT", "")
+                    self.url = f"{source_url}/commit/{git_commit}" if git_commit else source_url
+
+            return self
+
+        # Check to see if execution file info is being passed in by calling program (notebook runner)
         if "DERIVA_ML_WORKFLOW_URL" in os.environ:
             self.url = os.environ["DERIVA_ML_WORKFLOW_URL"]
-            self.checksum = os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"]
-            self.git_root = Workflow._get_git_root(Path(os.environ["DERIVA_ML_NOTEBOOK_PATH"]))
+            self.checksum = os.environ.get("DERIVA_ML_WORKFLOW_CHECKSUM", "")
+            notebook_path = os.environ.get("DERIVA_ML_NOTEBOOK_PATH")
+            if notebook_path:
+                self.git_root = Workflow._get_git_root(Path(notebook_path))
             self.is_notebook = True
+            return self
+
+        # Standard git detection for local development
         if not self.url:
             path, self.is_notebook = Workflow._get_python_script()
             self.url, self.checksum = Workflow.get_url_and_checksum(path)
             self.git_root = Workflow._get_git_root(path)
 
         self.version = self.version or Workflow.get_dynamic_version(root=str(self.git_root or Path.cwd()))
-        self._logger = logging.getLogger("deriva_ml")
         return self
 
     @staticmethod
