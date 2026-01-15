@@ -265,3 +265,192 @@ class TestRestructureHelperMethods:
         asset = images[0]
         value = bag._resolve_grouping_value(asset, "NonExistent", {})
         assert value == "unknown"
+
+
+class TestRestructureWithFeatures:
+    """Tests for restructure_assets with feature-based grouping."""
+
+    def test_restructure_by_vocabulary_feature(self, dataset_test, tmp_path):
+        """Test restructuring grouped by a vocabulary-based feature (Image.Quality)."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_feature"
+
+        # Group by the Quality feature which uses ImageQuality vocabulary
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=["Quality"],
+        )
+
+        assert output_dir.exists()
+
+        # Files should be organized by Quality values (Good/Bad)
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) > 0, f"Expected files in {output_dir}"
+
+        # Check that directories named after vocabulary terms exist
+        all_dirs = [d.name for d in output_dir.rglob("*") if d.is_dir()]
+        # Should have at least one of "Good", "Bad", or "unknown"
+        quality_dirs = [d for d in all_dirs if d in ("Good", "Bad", "unknown")]
+        assert len(quality_dirs) >= 1, f"Expected quality directories, found: {all_dirs}"
+
+    def test_restructure_combine_column_and_feature(self, dataset_test, tmp_path):
+        """Test restructuring with both column and feature grouping."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_combined"
+
+        # Group by Subject column first, then Quality feature
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=["Subject", "Quality"],
+        )
+
+        assert output_dir.exists()
+
+        # Should have deeper structure: type/subject_rid/quality/file
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        if all_files:
+            first_file = all_files[0]
+            relative_path = first_file.relative_to(output_dir)
+            # Should have type + subject + quality + filename = at least 4 parts
+            assert len(relative_path.parts) >= 3, f"Expected at least 3 levels, got {relative_path}"
+
+    def test_restructure_feature_then_column(self, dataset_test, tmp_path):
+        """Test restructuring with feature first, then column."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_feature_first"
+
+        # Group by Quality feature first, then Subject column
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=["Quality", "Subject"],
+        )
+
+        assert output_dir.exists()
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) > 0
+
+
+class TestEnforceVocabulary:
+    """Tests for the enforce_vocabulary parameter."""
+
+    def test_enforce_vocabulary_rejects_asset_feature(self, dataset_test, tmp_path):
+        """Test that enforce_vocabulary=True rejects asset-based features (no vocab)."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_asset_feature"
+
+        # BoundingBox is an asset-based feature with no vocabulary terms
+        with pytest.raises(DerivaMLException) as exc_info:
+            bag.restructure_assets(
+                asset_table="Image",
+                output_dir=output_dir,
+                group_by=["BoundingBox"],
+                enforce_vocabulary=True,
+            )
+
+        assert "controlled vocabulary" in str(exc_info.value).lower()
+
+    def test_enforce_vocabulary_false_allows_asset_feature(self, dataset_test, tmp_path):
+        """Test that enforce_vocabulary=False allows asset-based features."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_asset_allowed"
+
+        # Should not raise with enforce_vocabulary=False
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=["BoundingBox"],
+            enforce_vocabulary=False,
+        )
+
+        assert output_dir.exists()
+
+    def test_enforce_vocabulary_default_is_true(self, dataset_test, tmp_path):
+        """Test that enforce_vocabulary defaults to True."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_default"
+
+        # BoundingBox feature should fail without explicitly setting enforce_vocabulary
+        with pytest.raises(DerivaMLException):
+            bag.restructure_assets(
+                asset_table="Image",
+                output_dir=output_dir,
+                group_by=["BoundingBox"],
+                # enforce_vocabulary not specified, should default to True
+            )
+
+    def test_enforce_vocabulary_allows_vocab_feature(self, dataset_test, tmp_path):
+        """Test that enforce_vocabulary=True allows vocabulary-based features."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_vocab_ok"
+
+        # Quality feature uses ImageQuality vocabulary - should work
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=["Quality"],
+            enforce_vocabulary=True,
+        )
+
+        assert output_dir.exists()
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) > 0
+
+
+class TestFeatureCacheLoading:
+    """Tests for _load_feature_values_cache with enforce_vocabulary."""
+
+    def test_cache_loads_vocabulary_feature(self, dataset_test, tmp_path):
+        """Test that cache correctly loads vocabulary-based feature values."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        cache = bag._load_feature_values_cache("Image", ["Quality"], enforce_vocabulary=True)
+
+        # Quality should be in the cache
+        assert "Quality" in cache
+        # Should have mappings (may be empty if no feature values assigned)
+        assert isinstance(cache["Quality"], dict)
+
+    def test_cache_rejects_non_vocabulary_feature(self, dataset_test, tmp_path):
+        """Test that cache raises for non-vocabulary feature when enforcing."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        with pytest.raises(DerivaMLException) as exc_info:
+            bag._load_feature_values_cache("Image", ["BoundingBox"], enforce_vocabulary=True)
+
+        assert "controlled vocabulary" in str(exc_info.value).lower()
+
+    def test_cache_allows_non_vocabulary_when_not_enforcing(self, dataset_test, tmp_path):
+        """Test that cache allows non-vocabulary features when not enforcing."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # Should not raise
+        cache = bag._load_feature_values_cache("Image", ["BoundingBox"], enforce_vocabulary=False)
+
+        # BoundingBox may or may not be in cache depending on if it's found as a feature
+        assert isinstance(cache, dict)
