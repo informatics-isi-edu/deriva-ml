@@ -746,3 +746,103 @@ class TestExecutionIntegration:
 
         status = get_execution_status(ml, execution.execution_rid)
         assert status == "Completed"
+
+
+# =============================================================================
+# TestWorkflowDocker - Docker Environment Tests
+# =============================================================================
+
+
+class TestWorkflowDocker:
+    """Tests for workflow creation in Docker environments (no git repo)."""
+
+    def test_workflow_docker_environment(self, monkeypatch):
+        """Test workflow creation with Docker environment variables."""
+        from deriva_ml.execution.workflow import Workflow
+
+        # Set Docker environment variables
+        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
+        monkeypatch.setenv("DERIVAML_MCP_VERSION", "1.2.3")
+        monkeypatch.setenv("DERIVAML_MCP_GIT_COMMIT", "abc123def")
+        monkeypatch.setenv("DERIVAML_MCP_IMAGE_NAME", "ghcr.io/test/image")
+        # Clear image digest to test git commit fallback
+        monkeypatch.delenv("DERIVAML_MCP_IMAGE_DIGEST", raising=False)
+
+        # Create workflow - should not fail even without git
+        workflow = Workflow(
+            name="Docker Test Workflow",
+            workflow_type="Test",
+            description="Test workflow in Docker",
+        )
+
+        assert workflow.version == "1.2.3"
+        assert workflow.checksum == "abc123def"
+        # Without image digest, URL falls back to source repo with git commit
+        assert "abc123def" in workflow.url
+        assert "deriva-ml-mcp" in workflow.url
+
+    def test_workflow_docker_with_image_digest(self, monkeypatch):
+        """Test workflow with Docker image digest as checksum."""
+        from deriva_ml.execution.workflow import Workflow
+
+        # Set Docker environment with image digest
+        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
+        monkeypatch.setenv("DERIVAML_MCP_VERSION", "2.0.0")
+        monkeypatch.setenv("DERIVAML_MCP_GIT_COMMIT", "abc123")
+        monkeypatch.setenv("DERIVAML_MCP_IMAGE_DIGEST", "sha256:deadbeef123456")
+        monkeypatch.setenv("DERIVAML_MCP_IMAGE_NAME", "ghcr.io/org/repo")
+
+        workflow = Workflow(
+            name="Digest Test",
+            workflow_type="Test",
+        )
+
+        # Image digest should be used as checksum (takes precedence over git commit)
+        assert workflow.checksum == "sha256:deadbeef123456"
+        # URL should use digest format
+        assert workflow.url == "ghcr.io/org/repo@sha256:deadbeef123456"
+
+    def test_workflow_docker_minimal_env(self, monkeypatch):
+        """Test workflow with minimal Docker environment (only IN_DOCKER set)."""
+        from deriva_ml.execution.workflow import Workflow
+
+        # Only set the Docker flag, no other env vars
+        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
+        # Clear any existing env vars
+        monkeypatch.delenv("DERIVAML_MCP_VERSION", raising=False)
+        monkeypatch.delenv("DERIVAML_MCP_GIT_COMMIT", raising=False)
+        monkeypatch.delenv("DERIVAML_MCP_IMAGE_DIGEST", raising=False)
+
+        workflow = Workflow(
+            name="Minimal Docker Test",
+            workflow_type="Test",
+        )
+
+        # Should still create workflow without failing
+        assert workflow.name == "Minimal Docker Test"
+        assert workflow.version == ""
+        assert workflow.checksum == ""
+        # URL should fall back to default source URL
+        assert "deriva-ml-mcp" in workflow.url
+
+    def test_workflow_docker_explicit_values_preserved(self, monkeypatch):
+        """Test that explicitly provided values are preserved in Docker mode."""
+        from deriva_ml.execution.workflow import Workflow
+
+        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
+        monkeypatch.setenv("DERIVAML_MCP_VERSION", "env-version")
+        monkeypatch.setenv("DERIVAML_MCP_GIT_COMMIT", "env-commit")
+
+        # Provide explicit values
+        workflow = Workflow(
+            name="Explicit Values Test",
+            workflow_type="Test",
+            version="explicit-version",
+            url="https://example.com/workflow",
+            checksum="explicit-checksum",
+        )
+
+        # Explicit values should be preserved, not overwritten by env vars
+        assert workflow.version == "explicit-version"
+        assert workflow.url == "https://example.com/workflow"
+        assert workflow.checksum == "explicit-checksum"
