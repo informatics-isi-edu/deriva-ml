@@ -902,6 +902,7 @@ class DatasetBag:
         self,
         asset_table: str,
         group_keys: list[str],
+        enforce_vocabulary: bool = True,
     ) -> dict[str, dict[RID, Any]]:
         """Load feature values into a cache for efficient lookup.
 
@@ -911,13 +912,75 @@ class DatasetBag:
         Args:
             asset_table: The asset table name to find features for.
             group_keys: List of potential feature names to cache.
+            enforce_vocabulary: If True (default), only allow features with
+                controlled vocabulary term columns and raise an error if an
+                asset has multiple values. If False, allow any feature type
+                and use the first value found when multiple exist.
 
         Returns:
             Dictionary mapping feature_name -> {target_rid -> feature_value}
             Only includes entries for keys that are actually features.
+
+        Raises:
+            DerivaMLException: If enforce_vocabulary is True and:
+                - A feature has no term columns (not vocabulary-based), or
+                - An asset has multiple different vocabulary term values for the same feature.
         """
+        from deriva_ml.core.exceptions import DerivaMLException
+
         cache: dict[str, dict[RID, Any]] = {}
         logger = logging.getLogger("deriva_ml")
+
+        def process_feature(feat: Any, table_name: str) -> None:
+            """Process a single feature and add its values to the cache."""
+            term_cols = [c.name for c in feat.term_columns]
+            value_cols = [c.name for c in feat.value_columns]
+
+            if enforce_vocabulary:
+                # Only allow features with vocabulary term columns
+                if not term_cols:
+                    raise DerivaMLException(
+                        f"Feature '{feat.feature_name}' on table '{table_name}' has no "
+                        f"controlled vocabulary term columns. Only vocabulary-based features "
+                        f"can be used for grouping when enforce_vocabulary=True. "
+                        f"Set enforce_vocabulary=False to allow non-vocabulary features."
+                    )
+
+            cache[feat.feature_name] = {}
+            feature_values = self.list_feature_values(table_name, feat.feature_name)
+
+            for fv in feature_values:
+                target_col = table_name
+                if target_col not in fv:
+                    continue
+
+                target_rid = fv[target_col]
+
+                # Get the value - prefer term columns, then value columns
+                value = None
+                if term_cols and term_cols[0] in fv:
+                    value = fv[term_cols[0]]
+                elif not enforce_vocabulary and value_cols and value_cols[0] in fv:
+                    value = fv[value_cols[0]]
+
+                if value is None:
+                    continue
+
+                # Check for multiple values for the same target
+                if target_rid in cache[feat.feature_name]:
+                    existing_value = cache[feat.feature_name][target_rid]
+                    if existing_value != value:
+                        if enforce_vocabulary:
+                            raise DerivaMLException(
+                                f"Asset '{target_rid}' has multiple different values for "
+                                f"feature '{feat.feature_name}': '{existing_value}' and '{value}'. "
+                                f"Each asset must have at most one vocabulary term value per feature "
+                                f"when enforce_vocabulary=True. Set enforce_vocabulary=False to use "
+                                f"the first value found."
+                            )
+                        # If not enforcing, keep the first value (already in cache)
+                else:
+                    cache[feat.feature_name][target_rid] = value
 
         # Find all features on tables that this asset table references
         asset_table_obj = self.model.name_to_table(asset_table)
@@ -925,22 +988,10 @@ class DatasetBag:
         # Check features on the asset table itself
         for feature in self.find_features(asset_table):
             if feature.feature_name in group_keys:
-                cache[feature.feature_name] = {}
                 try:
-                    feature_values = self.list_feature_values(asset_table, feature.feature_name)
-                    for fv in feature_values:
-                        target_col = asset_table
-                        if target_col in fv:
-                            # Get the value - prefer term columns, then value columns
-                            value = None
-                            term_cols = [c.name for c in feature.term_columns]
-                            value_cols = [c.name for c in feature.value_columns]
-                            if term_cols and term_cols[0] in fv:
-                                value = fv[term_cols[0]]
-                            elif value_cols and value_cols[0] in fv:
-                                value = fv[value_cols[0]]
-                            if value is not None:
-                                cache[feature.feature_name][fv[target_col]] = value
+                    process_feature(feature, asset_table)
+                except DerivaMLException:
+                    raise
                 except Exception as e:
                     logger.warning(f"Could not load feature {feature.feature_name}: {e}")
 
@@ -949,21 +1000,10 @@ class DatasetBag:
             target_table = fk.pk_table
             for feature in self.find_features(target_table):
                 if feature.feature_name in group_keys:
-                    cache[feature.feature_name] = {}
                     try:
-                        feature_values = self.list_feature_values(target_table.name, feature.feature_name)
-                        for fv in feature_values:
-                            target_col = target_table.name
-                            if target_col in fv:
-                                value = None
-                                term_cols = [c.name for c in feature.term_columns]
-                                value_cols = [c.name for c in feature.value_columns]
-                                if term_cols and term_cols[0] in fv:
-                                    value = fv[term_cols[0]]
-                                elif value_cols and value_cols[0] in fv:
-                                    value = fv[value_cols[0]]
-                                if value is not None:
-                                    cache[feature.feature_name][fv[target_col]] = value
+                        process_feature(feature, target_table.name)
+                    except DerivaMLException:
+                        raise
                     except Exception as e:
                         logger.warning(f"Could not load feature {feature.feature_name}: {e}")
 
@@ -1015,42 +1055,95 @@ class DatasetBag:
         group_by: list[str] | None = None,
         use_symlinks: bool = True,
         type_selector: Callable[[list[str]], str] | None = None,
+        enforce_vocabulary: bool = True,
     ) -> Path:
         """Restructure downloaded assets into a directory hierarchy.
 
         Creates a directory structure organizing assets by dataset types and
-        grouping values (columns or features). This is useful for ML workflows
-        that expect data organized in conventional folder structures.
+        grouping values. This is useful for ML workflows that expect data
+        organized in conventional folder structures (e.g., PyTorch ImageFolder).
 
         Args:
             asset_table: Name of the asset table (e.g., "Image").
             output_dir: Base directory for restructured assets.
-            group_by: Column names or feature names to group by. These create
-                additional subdirectory levels after the dataset type path.
+            group_by: Names to group assets by. Each name creates a subdirectory
+                level after the dataset type path. Names can be:
+
+                - **Column names**: Direct columns on the asset table. The column
+                  value becomes the subdirectory name.
+                - **Feature names**: Features defined on the asset table (or tables
+                  it references via foreign keys). The feature's vocabulary term
+                  value becomes the subdirectory name.
+
+                Column names are checked first, then feature names. If a value
+                is not found, "unknown" is used as the subdirectory name.
+
             use_symlinks: If True (default), create symlinks to original files.
                 If False, copy files. Symlinks save disk space but require
                 the original bag to remain in place.
             type_selector: Function to select type when dataset has multiple types.
                 Receives list of type names, returns selected type name.
                 Defaults to selecting first type or "unknown" if no types.
+            enforce_vocabulary: If True (default), only allow features that have
+                controlled vocabulary term columns, and raise an error if an asset
+                has multiple different values for the same feature. This ensures
+                clean, unambiguous directory structures. If False, allow any feature
+                type and use the first value found when multiple values exist.
 
         Returns:
             Path to the output directory.
 
         Raises:
-            DerivaMLException: If asset_table is not found in the dataset.
+            DerivaMLException: If asset_table is not found in the dataset, or if
+                enforce_vocabulary is True and a feature is not vocabulary-based
+                or has multiple values for an asset.
 
-        Example:
-            >>> bag.restructure_assets(
-            ...     asset_table="Image",
-            ...     output_dir=Path("./ml_data"),
-            ...     group_by=["label", "Quality"],
-            ...     use_symlinks=True,
-            ... )
-            # Creates:
-            # ./ml_data/complete/training/gotit/Good/image1.jpg
-            # ./ml_data/complete/training/gotit/Bad/image2.jpg
-            # ./ml_data/complete/testing/dontgotit/Good/image3.jpg
+        Examples:
+            Group by a column on the asset table::
+
+                # If Image table has a "label" column with values like "cat", "dog"
+                bag.restructure_assets(
+                    asset_table="Image",
+                    output_dir="./ml_data",
+                    group_by=["label"],
+                )
+                # Creates:
+                # ./ml_data/training/cat/image1.jpg
+                # ./ml_data/training/dog/image2.jpg
+                # ./ml_data/testing/cat/image3.jpg
+
+            Group by a feature's vocabulary term value::
+
+                # If Image has a "Diagnosis" feature with vocabulary terms "Normal", "Abnormal"
+                bag.restructure_assets(
+                    asset_table="Image",
+                    output_dir="./ml_data",
+                    group_by=["Diagnosis"],
+                )
+                # Creates:
+                # ./ml_data/training/Normal/image1.jpg
+                # ./ml_data/training/Abnormal/image2.jpg
+
+            Combine column and feature grouping::
+
+                # Group first by a column, then by a feature
+                bag.restructure_assets(
+                    asset_table="Image",
+                    output_dir="./ml_data",
+                    group_by=["modality", "Diagnosis"],
+                )
+                # Creates:
+                # ./ml_data/training/MRI/Normal/image1.jpg
+                # ./ml_data/training/CT/Abnormal/image2.jpg
+
+            Allow non-vocabulary features (use with caution)::
+
+                bag.restructure_assets(
+                    asset_table="Image",
+                    output_dir="./ml_data",
+                    group_by=["score_bucket"],
+                    enforce_vocabulary=False,  # Allow numeric/text features
+                )
         """
         logger = logging.getLogger("deriva_ml")
         group_by = group_by or []
@@ -1064,7 +1157,7 @@ class DatasetBag:
         asset_dataset_map = self._get_asset_dataset_mapping(asset_table)
 
         # Step 3: Load feature values cache for relevant features
-        feature_cache = self._load_feature_values_cache(asset_table, group_by)
+        feature_cache = self._load_feature_values_cache(asset_table, group_by, enforce_vocabulary)
 
         # Step 4: Get all assets
         members = self.list_dataset_members(recurse=True)
