@@ -140,26 +140,26 @@ class TestFeatures:
         with pytest.raises(DerivaMLException):
             ml_instance.lookup_feature("Subject", "SubjectHealth1")
 
-    def test_list_features(self, dataset_test, tmp_path):
-        """Test list_features with and without table argument."""
+    def test_find_features(self, dataset_test, tmp_path):
+        """Test find_features with and without table argument."""
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
         )
 
-        # Test listing features for a specific table
-        subject_features = ml_instance.list_features("Subject")
+        # Test finding features for a specific table
+        subject_features = ml_instance.find_features("Subject")
         assert "Health" in [f.feature_name for f in subject_features]
         # All returned features should be for Subject table
         assert all(f.target_table.name == "Subject" for f in subject_features)
 
-        image_features = ml_instance.list_features("Image")
+        image_features = ml_instance.find_features("Image")
         assert "BoundingBox" in [f.feature_name for f in image_features]
         assert "Quality" in [f.feature_name for f in image_features]
         # All returned features should be for Image table
         assert all(f.target_table.name == "Image" for f in image_features)
 
-        # Test listing all features (no table argument)
-        all_features = ml_instance.list_features()
+        # Test finding all features (no table argument)
+        all_features = ml_instance.find_features()
         all_feature_names = [f.feature_name for f in all_features]
         # Should include features from both tables
         assert "Health" in all_feature_names

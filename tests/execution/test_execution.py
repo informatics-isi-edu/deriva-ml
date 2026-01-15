@@ -230,7 +230,7 @@ class TestWorkflow:
         assert workflow_rid is not None
 
         # Verify it's in the catalog
-        workflows = list(ml.list_workflows())
+        workflows = list(ml.find_workflows())
         assert len(workflows) >= 1
         # Verify our workflow RID is in the catalog
         assert workflow_rid in [w.rid for w in workflows]

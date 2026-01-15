@@ -25,7 +25,7 @@ class WorkflowMixin:
         - lookup_term(): method for vocabulary term lookup (from VocabularyMixin)
 
     Methods:
-        list_workflows: List all workflows in the catalog
+        find_workflows: Find all workflows in the catalog
         add_workflow: Add a workflow to the catalog
         lookup_workflow: Find a workflow by URL or checksum
         create_workflow: Create a new workflow definition
@@ -36,11 +36,11 @@ class WorkflowMixin:
     pathBuilder: Callable[[], Any]
     lookup_term: Callable[[str, str], VocabularyTerm]
 
-    def list_workflows(self) -> list[Workflow]:
-        """Lists all workflows in the catalog.
+    def find_workflows(self) -> list[Workflow]:
+        """Find all workflows in the catalog.
 
-        Retrieves all workflow definitions, including their names, URLs, types, versions,
-        and descriptions.
+        Catalog-level operation to find all workflow definitions, including their
+        names, URLs, types, versions, and descriptions.
 
         Returns:
             list[Workflow]: List of workflow objects, each containing:
@@ -53,7 +53,7 @@ class WorkflowMixin:
                 - checksum: Source code checksum
 
         Examples:
-            >>> workflows = ml.list_workflows()
+            >>> workflows = ml.find_workflows()
             >>> for w in workflows:
                     print(f"{w.name} (v{w.version}): {w.description}")
                     print(f"  Source: {w.url}")
