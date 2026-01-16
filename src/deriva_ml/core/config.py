@@ -56,7 +56,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from hydra.conf import HydraConf, RunDir
+from hydra.conf import HydraConf, RunDir, SweepDir
 from hydra.core.hydra_config import HydraConfig
 from hydra_zen import store
 from omegaconf import OmegaConf
@@ -188,9 +188,14 @@ OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdi
 
 # Configure Hydra's output directory structure for reproducible runs
 # Outputs are organized by timestamp under the computed working directory
+# For multirun/sweep, outputs go to a sweep subdirectory with job number subfolders
 store(
     HydraConf(
         run=RunDir("${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"),
+        sweep=SweepDir(
+            dir="${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id}}/hydra-sweep/${now:%Y-%m-%d_%H-%M-%S}",
+            subdir="${hydra.job.num}",
+        ),
         output_subdir="hydra-config",
     ),
     group="hydra",
