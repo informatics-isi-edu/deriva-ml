@@ -238,3 +238,68 @@ class TestDatasetDownload:
 
         # Final verification that we checked multiple datasets
         assert datasets_checked > 1, f"Expected to check multiple datasets, only checked {datasets_checked}"
+
+    def test_list_dataset_children_preserves_types(self, dataset_test, tmp_path):
+        """Test that list_dataset_children() returns datasets with proper types and metadata.
+
+        This specifically tests that child datasets returned by list_dataset_children()
+        have their dataset_types, descriptions, and other metadata populated correctly
+        from the bag data, not just empty defaults.
+        """
+        dataset_description = dataset_test.dataset_description
+        dataset = dataset_description.dataset
+
+        # Get children from catalog for reference
+        catalog_children = dataset.list_dataset_children()
+        if not catalog_children:
+            # Skip if no children to test
+            return
+
+        # Download the bag
+        current_version = dataset.current_version
+        bag = dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Get children via list_dataset_children() - this is what we're testing
+        bag_children = bag.list_dataset_children()
+
+        assert len(bag_children) == len(catalog_children), (
+            f"Child count mismatch: catalog={len(catalog_children)}, bag={len(bag_children)}"
+        )
+
+        # Build lookup maps by RID
+        catalog_by_rid = {c.dataset_rid: c for c in catalog_children}
+        bag_by_rid = {c.dataset_rid: c for c in bag_children}
+
+        assert set(catalog_by_rid.keys()) == set(bag_by_rid.keys()), "Child RIDs don't match"
+
+        # Verify each child has proper metadata
+        for rid, catalog_child in catalog_by_rid.items():
+            bag_child = bag_by_rid[rid]
+
+            # Check dataset_types match
+            assert set(catalog_child.dataset_types) == set(bag_child.dataset_types), (
+                f"Dataset types mismatch for child {rid}: "
+                f"catalog={catalog_child.dataset_types}, bag={bag_child.dataset_types}"
+            )
+
+            # Check description is populated (not empty)
+            assert bag_child.description == catalog_child.description, (
+                f"Description mismatch for child {rid}: "
+                f"catalog={catalog_child.description!r}, bag={bag_child.description!r}"
+            )
+
+        # Also test recursive children if there are nested datasets
+        bag_children_recursive = bag.list_dataset_children(recurse=True)
+        catalog_children_recursive = dataset.list_dataset_children(recurse=True)
+
+        for bag_child in bag_children_recursive:
+            # Every child should have dataset_types populated (may be empty list, but should match catalog)
+            catalog_child = next(
+                (c for c in catalog_children_recursive if c.dataset_rid == bag_child.dataset_rid),
+                None
+            )
+            assert catalog_child is not None, f"Child {bag_child.dataset_rid} not found in catalog"
+            assert set(bag_child.dataset_types) == set(catalog_child.dataset_types), (
+                f"Recursive child {bag_child.dataset_rid} types mismatch: "
+                f"catalog={catalog_child.dataset_types}, bag={bag_child.dataset_types}"
+            )

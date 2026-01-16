@@ -488,7 +488,7 @@ class DatasetBag:
                 .join_from(ds_table, dv_table, onclause=ds_table.Version == dv_table.RID)
                 .where(nds_table.Dataset == self.dataset_rid)
             )
-            nested = [DatasetBag(self._catalog, r[0]) for r in session.execute(sql_cmd).all()]
+            nested = [self._catalog.lookup_dataset(r[0]) for r in session.execute(sql_cmd).all()]
 
         result = copy(nested)
         if recurse:
@@ -528,7 +528,7 @@ class DatasetBag:
 
         with Session(self.engine) as session:
             sql_cmd = select(nds_table.Dataset).where(nds_table.Nested_Dataset == self.dataset_rid)
-            parents = [DatasetBag(self._catalog, r[0]) for r in session.execute(sql_cmd).all()]
+            parents = [self._catalog.lookup_dataset(r[0]) for r in session.execute(sql_cmd).all()]
 
         if recurse:
             for parent in parents.copy():
