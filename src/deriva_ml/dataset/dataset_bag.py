@@ -92,7 +92,7 @@ class DatasetBag:
         dataset_rid (RID): The unique Resource Identifier for this dataset.
         dataset_types (list[str]): List of vocabulary terms describing the dataset type.
         description (str): Human-readable description of the dataset.
-        execution_rid (RID | None): RID of the execution that created this dataset.
+        execution_rid (RID | None): RID of an execution associated with this dataset (informational).
         model (DatabaseModel): The DatabaseModel providing SQLite access to bag data.
         engine (Engine): SQLAlchemy engine for database queries.
         metadata (MetaData): SQLAlchemy metadata with table definitions.
@@ -130,8 +130,8 @@ class DatasetBag:
             dataset_types: One or more dataset type terms. Can be a single string
                 or list of strings.
             description: Human-readable description of the dataset.
-            execution_rid: RID of the execution that created this dataset. If None,
-                will be looked up from the database.
+            execution_rid: RID of an execution associated with this dataset. If None,
+                will be looked up from the database (returns first association found).
 
         Raises:
             DerivaMLException: If no dataset_rid is provided and none can be

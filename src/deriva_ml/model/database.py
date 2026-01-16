@@ -549,19 +549,21 @@ class DatabaseModel(DerivaModel):
                 yield dict(row)
 
     def _get_dataset_execution(self, dataset_rid: str) -> dict[str, Any] | None:
-        """Retrieve the execution record for the specified RID, if it exists.
-        contents of the specified table as a dictionary.
+        """Retrieve an execution record associated with the specified dataset, if one exists.
+
+        Queries the Dataset_Execution association table which tracks datasets used as
+        inputs to executions. Returns the first (typically oldest) association found.
+        This is used as informational metadata on DatasetBag.
 
         Args:
-            rid: RID for which we want to find the execution record.
+            dataset_rid: Dataset RID for which to find an associated execution.
 
         Returns:
-          Row of the execution table that points to the specified RID, if it exists. Otherwise, None..
+            The first Dataset_Execution row for this dataset, or None if no association exists.
         """
         dataset_execution_table = self.find_table("Dataset_Execution")
         cmd = select(dataset_execution_table).where(dataset_execution_table.columns.Dataset == dataset_rid)
         with Session(self.engine) as session:
-            # A dataset may be used by multiple executions; return the first one (oldest)
             result = session.execute(cmd).mappings().first()
             return dict(result) if result else None
 
