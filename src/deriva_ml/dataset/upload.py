@@ -42,11 +42,22 @@ from tempfile import TemporaryDirectory
 from typing import Any, Callable, Optional
 
 import regex as re
-from deriva.core import urlquote
-from deriva.core.ermrest_model import Table
-from deriva.core.hatrac_store import HatracStore
-from deriva.core.utils import hash_utils, mime_utils
-from deriva.transfer.upload.deriva_upload import GenericUploader
+
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_deriva_core = importlib.import_module("deriva.core")
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+_hatrac_store = importlib.import_module("deriva.core.hatrac_store")
+_hash_utils = importlib.import_module("deriva.core.utils.hash_utils")
+_mime_utils = importlib.import_module("deriva.core.utils.mime_utils")
+_deriva_upload = importlib.import_module("deriva.transfer.upload.deriva_upload")
+
+urlquote = _deriva_core.urlquote
+Table = _ermrest_model.Table
+HatracStore = _hatrac_store.HatracStore
+hash_utils = _hash_utils
+mime_utils = _mime_utils
+GenericUploader = _deriva_upload.GenericUploader
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import (

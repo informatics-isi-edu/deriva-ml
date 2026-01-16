@@ -16,7 +16,10 @@ Classes:
 
 from enum import Enum
 
-from deriva.core.ermrest_model import builtin_types
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+builtin_types = _ermrest_model.builtin_types
 
 
 class BaseStrEnum(str, Enum):

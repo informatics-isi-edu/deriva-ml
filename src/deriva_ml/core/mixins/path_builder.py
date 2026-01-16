@@ -9,11 +9,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
 
-import deriva.core.datapath as datapath
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+datapath = importlib.import_module("deriva.core.datapath")
+_ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+
+SchemaWrapper = datapath._SchemaWrapper
+ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
+ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
+Table = _ermrest_model.Table
+
 import pandas as pd
-from deriva.core.datapath import _SchemaWrapper as SchemaWrapper
-from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot
-from deriva.core.ermrest_model import Table
 
 from deriva_ml.dataset.upload import table_path as _table_path
 

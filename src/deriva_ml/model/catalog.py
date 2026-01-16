@@ -12,10 +12,17 @@ from collections import Counter, defaultdict
 from graphlib import CycleError, TopologicalSorter
 from typing import Any, Callable, Final, Iterable, NewType, TypeAlias
 
-from deriva.core.ermrest_catalog import ErmrestCatalog
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 
-# Deriva imports
-from deriva.core.ermrest_model import Column, FindAssociationResult, Model, Schema, Table
+ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
+Column = _ermrest_model.Column
+FindAssociationResult = _ermrest_model.FindAssociationResult
+Model = _ermrest_model.Model
+Schema = _ermrest_model.Schema
+Table = _ermrest_model.Table
 
 # Third-party imports
 from pydantic import ConfigDict, validate_call

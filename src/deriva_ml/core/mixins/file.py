@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 from urllib.parse import urlsplit
 
-import deriva.core.datapath as datapath
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+datapath = importlib.import_module("deriva.core.datapath")
 
 from deriva_ml.core.definitions import RID, FileSpec, MLTable, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLInvalidTerm, DerivaMLTableTypeError

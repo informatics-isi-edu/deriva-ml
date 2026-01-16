@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
-from deriva.core.ermrest_model import Table
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+Table = _ermrest_model.Table
+
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import ColumnDefinition, MLVocab, VocabularyTerm

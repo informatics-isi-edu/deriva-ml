@@ -35,10 +35,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generator, Iterable, Protocol, Self, runtime_checkable
 
 import pandas as pd
-from deriva.core import ErmrestSnapshot
-from deriva.core.datapath import _SchemaWrapper as SchemaWrapper
-from deriva.core.ermrest_catalog import ErmrestCatalog, ResolveRidResult
-from deriva.core.ermrest_model import Table
+
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_deriva_core = importlib.import_module("deriva.core")
+_datapath = importlib.import_module("deriva.core.datapath")
+_ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+
+ErmrestSnapshot = _deriva_core.ErmrestSnapshot
+SchemaWrapper = _datapath._SchemaWrapper
+ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
+ResolveRidResult = _ermrest_catalog.ResolveRidResult
+Table = _ermrest_model.Table
 
 from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.core.mixins.rid_resolution import BatchRidResult

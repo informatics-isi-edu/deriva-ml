@@ -9,9 +9,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from deriva.core.datapath import Any as AnyQuantifier
-from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot, ResolveRidResult
-from deriva.core.ermrest_model import Table
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_datapath = importlib.import_module("deriva.core.datapath")
+_ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+
+AnyQuantifier = _datapath.Any
+ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
+ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
+ResolveRidResult = _ermrest_catalog.ResolveRidResult
+Table = _ermrest_model.Table
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException

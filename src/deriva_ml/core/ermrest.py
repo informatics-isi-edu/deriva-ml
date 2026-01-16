@@ -18,8 +18,11 @@ import warnings
 from dataclasses import dataclass
 from typing import Any, Iterable, Protocol
 
-import deriva.core.ermrest_model as em
-from deriva.core.ermrest_model import builtin_types
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+em = importlib.import_module("deriva.core.ermrest_model")
+builtin_types = em.builtin_types
+
 from pydantic import (
     BaseModel,
     Field,

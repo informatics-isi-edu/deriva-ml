@@ -16,7 +16,12 @@ from pathlib import Path
 from types import UnionType
 from typing import TYPE_CHECKING, ClassVar, Optional, Type
 
-from deriva.core.ermrest_model import Column, FindAssociationResult
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+Column = _ermrest_model.Column
+FindAssociationResult = _ermrest_model.FindAssociationResult
+
 from pydantic import BaseModel, create_model
 
 if TYPE_CHECKING:

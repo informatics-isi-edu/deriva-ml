@@ -10,8 +10,13 @@ from __future__ import annotations
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable
 
-import deriva.core.datapath as datapath
-from deriva.core.ermrest_model import Key, Table
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+datapath = importlib.import_module("deriva.core.datapath")
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+Key = _ermrest_model.Key
+Table = _ermrest_model.Table
+
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import ColumnDefinition, VocabularyTerm

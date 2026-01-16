@@ -16,7 +16,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable
 
-from deriva.core.ermrest_model import Column, Table
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+Column = _ermrest_model.Column
+Table = _ermrest_model.Table
+
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.exceptions import DerivaMLException

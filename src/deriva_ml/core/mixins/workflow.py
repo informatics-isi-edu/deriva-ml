@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from deriva.core import format_exception
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_deriva_core = importlib.import_module("deriva.core")
+format_exception = _deriva_core.format_exception
 
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
