@@ -20,7 +20,7 @@ Typical usage example:
     ...         description='Experimental data'
     ...     )
     ...     dataset.add_dataset_members(members=['1-abc123', '1-def456'])
-    ...     dataset.increment_version(
+    ...     dataset.increment_dataset_version(
     ...         component=VersionPart.minor,
     ...         description='Added new samples'
     ...     )
@@ -127,7 +127,7 @@ class Dataset:
         ...     # Add members to the dataset
         ...     dataset.add_dataset_members(members=["1-abc", "1-def"])
         ...     # Increment version after changes
-        ...     new_version = dataset.increment_version(VersionPart.minor, "Added samples")
+        ...     new_version = dataset.increment_dataset_version(VersionPart.minor, "Added samples")
         >>> # Download for offline use
         >>> bag = dataset.download_dataset_bag(version=new_version)
     """
