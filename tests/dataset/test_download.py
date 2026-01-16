@@ -189,3 +189,33 @@ class TestDatasetDownload:
 
         assert "NewTable" in new_bag.model.schemas[ml_instance.domain_schema].tables
         assert "NewTable" not in current_bag.model.schemas[ml_instance.domain_schema].tables
+
+    def test_dataset_types_preserved_in_bag(self, dataset_test, tmp_path):
+        """Test that dataset types in downloaded bag match the original catalog dataset types."""
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+        dataset_description = dataset_test.dataset_description
+
+        # Get reference datasets with their types from the catalog
+        reference_datasets = self.list_datasets(dataset_description)
+
+        # Download the bag
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Use DerivaMLDatabase to access datasets in the bag
+        db_catalog = DerivaMLDatabase(bag.model)
+
+        # Check that dataset types match for all datasets in the hierarchy
+        for catalog_dataset in reference_datasets:
+            catalog_types = set(catalog_dataset.dataset_types)
+
+            # Look up the same dataset in the downloaded bag
+            bag_dataset = db_catalog.lookup_dataset(catalog_dataset.dataset_rid)
+            bag_types = set(bag_dataset.dataset_types)
+
+            assert catalog_types == bag_types, (
+                f"Dataset types mismatch for dataset {catalog_dataset.dataset_rid}: "
+                f"catalog={catalog_types}, bag={bag_types}"
+            )
