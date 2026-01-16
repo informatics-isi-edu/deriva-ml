@@ -341,11 +341,18 @@ class WritableDataset(DatasetLike, Protocol):
         """
         ...
 
-    def increment_dataset_version(self, component: Any) -> DatasetVersion:
+    def increment_dataset_version(
+        self,
+        component: Any,
+        description: str | None = "",
+        execution_rid: RID | None = None,
+    ) -> DatasetVersion:
         """Increment the dataset version.
 
         Args:
             component: Which version component to increment (major, minor, patch).
+            description: Optional description of the changes in this version.
+            execution_rid: Optional execution RID to associate with this version.
 
         Returns:
             The new version after incrementing.

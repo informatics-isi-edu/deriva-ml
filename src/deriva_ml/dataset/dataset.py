@@ -1073,7 +1073,6 @@ class Dataset:
                     )
                     entity.delete()
         self.increment_dataset_version(
-            dataset_rid,
             VersionPart.minor,
             description=description,
             execution_rid=execution_rid,
