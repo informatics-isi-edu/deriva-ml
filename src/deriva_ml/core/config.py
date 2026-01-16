@@ -89,6 +89,9 @@ class DerivaMLConfig(BaseModel):
         use_minid: Whether to use MINID service for dataset bags. Only effective when
             s3_bucket is configured. Defaults to True when s3_bucket is set, False otherwise.
         check_auth: Whether to verify authentication on connection. Defaults to True.
+        clean_execution_dir: Whether to automatically clean execution working directories
+            after successful upload. Defaults to True. Set to False to retain local copies
+            of execution outputs for debugging or manual inspection.
 
     Example:
         >>> config = DerivaMLConfig(
@@ -113,6 +116,7 @@ class DerivaMLConfig(BaseModel):
     s3_bucket: str | None = None
     use_minid: bool | None = None  # None means "auto" - True if s3_bucket is set
     check_auth: bool = True
+    clean_execution_dir: bool = True
 
     @model_validator(mode="after")
     def init_working_dir(self) -> "DerivaMLConfig":

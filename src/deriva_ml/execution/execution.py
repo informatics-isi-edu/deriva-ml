@@ -729,7 +729,7 @@ class Execution:
         return {path_to_asset(p): r for p, r in results.items()}
 
     def upload_execution_outputs(
-        self, clean_folder: bool = True, progress_callback: Callable[[UploadProgress], None] | None = None
+        self, clean_folder: bool | None = None, progress_callback: Callable[[UploadProgress], None] | None = None
     ) -> dict[str, list[AssetFilePath]]:
         """Uploads all outputs from the execution to the catalog.
 
@@ -742,7 +742,9 @@ class Execution:
         the separate upload step.
 
         Args:
-            clean_folder: Whether to delete output folders after upload. Defaults to True.
+            clean_folder: Whether to delete output folders after upload. If None (default),
+                uses the DerivaML instance's clean_execution_dir setting. Pass True/False
+                to override for this specific execution.
             progress_callback: Optional callback function to receive upload progress updates.
                 Called with UploadProgress objects containing file name, bytes uploaded,
                 total bytes, percent complete, phase, and status message.
@@ -763,9 +765,17 @@ class Execution:
             >>> def my_callback(progress):
             ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
             >>> outputs = execution.upload_execution_outputs(progress_callback=my_callback)
+            >>>
+            >>> # Override cleanup setting for this execution
+            >>> outputs = execution.upload_execution_outputs(clean_folder=False)  # Keep files
         """
         if self._dry_run:
             return {}
+
+        # Use DerivaML instance setting if not explicitly provided
+        if clean_folder is None:
+            clean_folder = getattr(self._ml_object, 'clean_execution_dir', True)
+
         try:
             self.uploaded_assets = self._upload_execution_dirs(progress_callback=progress_callback)
             self.update_status(Status.completed, "Successfully end the execution.")
@@ -777,11 +787,16 @@ class Execution:
             self.update_status(Status.failed, error)
             raise e
 
-    def _clean_folder_contents(self, folder_path: Path):
-        """Clean up folder contents with Windows-compatible error handling.
+    def _clean_folder_contents(self, folder_path: Path, remove_folder: bool = True):
+        """Clean up folder contents and optionally the folder itself.
+
+        Removes all files and subdirectories within the specified folder.
+        Uses retry logic for Windows compatibility where files may be temporarily locked.
 
         Args:
-            folder_path: Path to the folder to clean
+            folder_path: Path to the folder to clean.
+            remove_folder: If True (default), also remove the folder itself after
+                cleaning its contents. If False, only remove contents.
         """
         MAX_RETRIES = 3
         RETRY_DELAY = 1  # seconds
@@ -796,20 +811,26 @@ class Execution:
                     return True
                 except (OSError, PermissionError) as e:
                     if attempt == MAX_RETRIES - 1:
-                        self.update_status(Status.failed, format_exception(e))
+                        logging.warning(f"Failed to remove {path}: {e}")
                         return False
                     time.sleep(RETRY_DELAY)
             return False
 
         try:
+            # First remove all contents
             with os.scandir(folder_path) as entries:
                 for entry in entries:
                     if entry.is_dir() and not entry.is_symlink():
                         remove_with_retry(Path(entry.path), is_dir=True)
                     else:
                         remove_with_retry(Path(entry.path))
+
+            # Then remove the folder itself if requested
+            if remove_folder:
+                remove_with_retry(folder_path, is_dir=True)
+
         except OSError as e:
-            self.update_status(Status.failed, format_exception(e))
+            logging.warning(f"Failed to clean folder {folder_path}: {e}")
 
     def _update_feature_table(
         self,
