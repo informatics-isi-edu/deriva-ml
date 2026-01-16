@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.execution.runner import run_model, create_model_config, reset_multirun_state
+from deriva_ml.execution.model_protocol import DerivaMLModel
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
@@ -27,4 +28,5 @@ __all__ = [
     "run_model",
     "create_model_config",
     "reset_multirun_state",
+    "DerivaMLModel",
 ]

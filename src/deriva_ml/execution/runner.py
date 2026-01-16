@@ -4,34 +4,140 @@ Deriva ML Model Runner
 
 Generic model runner for executing ML workflows within DerivaML execution contexts.
 
-This module provides `run_model`, a reusable function for running ML models with:
-- Automatic execution context creation and management
-- Multirun/sweep support with parent-child execution nesting
-- Hydra configuration integration
-- Support for DerivaML subclasses (e.g., EyeAI, GUDMAP)
+This module provides the infrastructure to run ML models with full provenance tracking,
+configuration management via Hydra, and support for parameter sweeps.
 
-Usage
------
-In your project's main script:
+Key Features
+------------
+- **Automatic execution context**: Creates execution records in the catalog
+- **Multirun/sweep support**: Parent-child execution nesting for parameter sweeps
+- **Hydra configuration**: Composable configs with command-line overrides
+- **Subclass support**: Works with DerivaML subclasses (EyeAI, GUDMAP, etc.)
+- **Provenance tracking**: Links inputs, outputs, and configuration
 
-    from deriva_ml.execution.runner import run_model, create_model_config
+Model Protocol
+--------------
+Models must follow this signature pattern to work with run_model:
+
+    def my_model(
+        param1: int = 10,
+        param2: float = 0.01,
+        # ... other model parameters ...
+        ml_instance: DerivaML = None,  # Injected at runtime
+        execution: Execution = None,   # Injected at runtime
+    ) -> None:
+        '''Train/run the model within the execution context.'''
+        # Access input datasets
+        for dataset in execution.datasets:
+            bag = execution.download_dataset_bag(dataset)
+            # ... process data ...
+
+        # Register output files
+        model_path = execution.asset_file_path("Model", "model.pt")
+        torch.save(model.state_dict(), model_path)
+
+        metrics_path = execution.asset_file_path("Execution_Metadata", "metrics.json")
+        with open(metrics_path, "w") as f:
+            json.dump({"accuracy": 0.95}, f)
+
+The `ml_instance` and `execution` parameters are injected by run_model at runtime.
+All other parameters are configured via Hydra.
+
+Quick Start
+-----------
+1. Create your model function following the protocol above.
+
+2. Create a hydra-zen configuration for your model:
+
+    from hydra_zen import builds, store
+
+    # Wrap model with builds() and zen_partial=True for deferred execution
+    MyModelConfig = builds(my_model, param1=10, param2=0.01, zen_partial=True)
+    store(MyModelConfig, group="model_config", name="default_model")
+
+3. Set up the main runner script:
+
     from deriva_ml import DerivaML
-    from hydra_zen import zen, store
+    from deriva_ml.execution import run_model, create_model_config
+    from hydra_zen import store, zen
 
-    # Create the hydra-zen configuration
-    model_config = create_model_config(DerivaML)  # or your subclass
-    store(model_config, name="deriva_model")
+    # Create the main config (uses DerivaML by default)
+    deriva_model = create_model_config(DerivaML)
+    store(deriva_model, name="deriva_model")
 
-    # Add your configs...
+    # Load your config modules
     store.add_to_hydra_store()
 
-    # Run
-    zen(run_model).hydra_main(config_name="deriva_model", version_base="1.3")
+    # Launch
+    if __name__ == "__main__":
+        zen(run_model).hydra_main(config_name="deriva_model", version_base="1.3")
 
-For subclasses like EyeAI:
+4. Run from command line:
+
+    python my_runner.py                           # Run with defaults
+    python my_runner.py model_config.param1=20    # Override parameter
+    python my_runner.py dry_run=true              # Test without catalog writes
+    python my_runner.py --multirun model_config.param1=10,20,30  # Parameter sweep
+
+Domain Subclasses
+-----------------
+For domain-specific classes like EyeAI:
 
     from eye_ai import EyeAI
-    model_config = create_model_config(EyeAI)
+
+    # Create config with EyeAI instead of DerivaML
+    deriva_model = create_model_config(EyeAI, description="EyeAI analysis")
+
+    # Your model receives an EyeAI instance:
+    def my_eyeai_model(
+        ...,
+        ml_instance: EyeAI = None,  # Now an EyeAI instance
+        execution: Execution = None,
+    ):
+        # Access EyeAI-specific methods
+        ml_instance.some_eyeai_method()
+
+Multirun Parameter Sweeps
+-------------------------
+When using Hydra's multirun mode (--multirun or -m), run_model automatically:
+
+1. Creates a parent execution to group all sweep jobs
+2. Links each child execution to the parent with sequence ordering
+3. Records sweep configuration in the parent's description
+
+Example sweep:
+
+    python my_runner.py --multirun model_config.learning_rate=0.001,0.01,0.1
+
+This creates:
+- Parent execution: "Multirun sweep: ..." (contains sweep metadata)
+- Child 0: learning_rate=0.001 (sequence=0)
+- Child 1: learning_rate=0.01 (sequence=1)
+- Child 2: learning_rate=0.1 (sequence=2)
+
+Query nested executions via the catalog or MCP tools:
+- list_nested_executions(parent_rid)
+- list_parent_executions(child_rid)
+
+Configuration Groups
+--------------------
+The default hydra_defaults in create_model_config() expect these config groups:
+
+- deriva_ml: Connection settings (hostname, catalog_id, credentials)
+- datasets: Dataset specifications (RIDs, versions)
+- assets: Asset RIDs (model weights, etc.)
+- workflow: Workflow definition (name, type, description)
+- model_config: Model parameters (your model's config)
+
+Each group should have at least a "default_*" entry. Override at runtime:
+
+    python my_runner.py deriva_ml=production datasets=full_training
+
+See Also
+--------
+- DerivaMLModel protocol: defines the expected model signature
+- ExecutionConfiguration: bundles inputs for an execution
+- Execution: context manager for execution lifecycle
 """
 
 from __future__ import annotations
