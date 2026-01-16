@@ -303,3 +303,115 @@ class TestDatasetDownload:
                 f"Recursive child {bag_child.dataset_rid} types mismatch: "
                 f"catalog={catalog_child.dataset_types}, bag={bag_child.dataset_types}"
             )
+
+    def test_list_dataset_parents_preserves_metadata(self, dataset_test, tmp_path):
+        """Test that list_dataset_parents() returns datasets with proper metadata.
+
+        Bug reference: Commit aef2db5 fixed this by using lookup_dataset()
+        instead of directly constructing DatasetBag objects.
+        """
+        dataset_description = dataset_test.dataset_description
+        dataset = dataset_description.dataset
+
+        # Download the bag
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # Find a child dataset that has a parent
+        children = bag.list_dataset_children()
+        if not children:
+            return  # Skip if no children
+
+        child = children[0]
+        child_catalog = dataset_test.ml_instance.lookup_dataset(child.dataset_rid)
+
+        # Get parents from the bag via list_dataset_parents
+        bag_parents = child.list_dataset_parents()
+        catalog_parents = child_catalog.list_dataset_parents()
+
+        assert len(bag_parents) == len(catalog_parents), (
+            f"Parent count mismatch: bag={len(bag_parents)}, catalog={len(catalog_parents)}"
+        )
+
+        if bag_parents:
+            bag_parent = bag_parents[0]
+            catalog_parent = catalog_parents[0]
+
+            # Verify dataset_types are preserved (not empty or default)
+            assert set(bag_parent.dataset_types) == set(catalog_parent.dataset_types), (
+                f"Parent types mismatch: bag={bag_parent.dataset_types}, "
+                f"catalog={catalog_parent.dataset_types}"
+            )
+
+            # Verify description is preserved
+            assert bag_parent.description == catalog_parent.description, (
+                f"Parent description mismatch: bag={bag_parent.description!r}, "
+                f"catalog={catalog_parent.description!r}"
+            )
+
+            # Verify RID matches
+            assert bag_parent.dataset_rid == catalog_parent.dataset_rid
+
+
+class TestDatabasePathCaching:
+    """Tests for SQLite database path caching behavior."""
+
+    def test_database_path_uses_bag_checksum(self, dataset_test, tmp_path):
+        """Test that the SQLite database path includes the bag checksum.
+
+        Bug reference: Commit 5a1e8b5 fixed this by using the bag cache
+        directory name (which includes checksum) instead of just version_rid.
+        This ensures that when a bag is regenerated with new content,
+        a new database is created instead of using a stale cached one.
+        """
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # The database path should include the bag cache directory name
+        dbase_path = bag.model.dbase_path
+
+        # Path should exist and be a directory
+        assert dbase_path.exists(), f"Database path does not exist: {dbase_path}"
+
+        # The path should be inside a cache directory named with the bag identifier
+        # which includes a checksum component (e.g., "RID_checksum...")
+        cache_dir_name = dbase_path.name
+
+        # Cache dir should be longer than just a short RID (3-4 chars)
+        # because it includes the checksum
+        assert len(cache_dir_name) > 10, (
+            f"Cache dir name '{cache_dir_name}' seems too short to include checksum. "
+            "Database path may be using version_rid instead of bag checksum."
+        )
+
+    def test_different_bag_versions_use_different_databases(self, dataset_test, tmp_path):
+        """Test that different bag versions create separate database caches.
+
+        This verifies that version changes result in new database paths,
+        preventing stale data issues.
+        """
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+
+        dataset = dataset_test.dataset_description.dataset
+        current_version = dataset.current_version
+
+        # Download the current version
+        bag1 = dataset.download_dataset_bag(version=current_version, use_minid=False)
+        dbase_path1 = bag1.model.dbase_path
+
+        # Increment version (this creates a new version in the catalog)
+        new_version = dataset.increment_dataset_version(
+            component=VersionPart.minor,
+            description="Test version increment"
+        )
+
+        # Download the new version
+        bag2 = dataset.download_dataset_bag(version=new_version, use_minid=False)
+        dbase_path2 = bag2.model.dbase_path
+
+        # The database paths should be different
+        assert dbase_path1 != dbase_path2, (
+            f"Database paths should differ for different versions: "
+            f"v{current_version} path={dbase_path1}, v{new_version} path={dbase_path2}"
+        )

@@ -454,3 +454,130 @@ class TestFeatureCacheLoading:
 
         # BoundingBox may or may not be in cache depending on if it's found as a feature
         assert isinstance(cache, dict)
+
+
+class TestListFeatureValuesReturnType:
+    """Tests for list_feature_values return type correctness."""
+
+    def test_list_feature_values_returns_dictionaries(self, dataset_test, tmp_path):
+        """Test that list_feature_values returns dictionaries with column names.
+
+        This test verifies that feature values are returned as dicts with
+        column names as keys, not SQLAlchemy ORM objects that require
+        attribute access and may cause lazy loading issues.
+
+        Bug reference: Commit 5a1e8b5 fixed this issue where ORM objects
+        were returned instead of dicts, breaking restructure_assets.
+        """
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # Get feature values from the bag
+        feature_values = bag.list_feature_values("Image", "Quality")
+
+        # Should return a list
+        assert isinstance(feature_values, list)
+
+        if feature_values:
+            # Each item should be a dict, not an ORM object
+            first_value = feature_values[0]
+            assert isinstance(first_value, dict), (
+                f"Expected dict, got {type(first_value).__name__}. "
+                "list_feature_values may be returning ORM objects instead of dicts."
+            )
+
+            # Should have column names as keys (not numeric indices)
+            # Feature table should have at least Image and the feature value column
+            assert "Image" in first_value, (
+                f"Expected 'Image' key in feature value dict, "
+                f"got keys: {list(first_value.keys())}"
+            )
+
+            # Should NOT have ORM-specific attributes
+            assert not hasattr(first_value, "_mapping"), (
+                "Feature value has _mapping attribute - likely an ORM object, not a dict"
+            )
+            assert not hasattr(first_value, "_fields"), (
+                "Feature value has _fields attribute - likely a Row object, not a dict"
+            )
+
+    def test_list_feature_values_columns_accessible_by_name(self, dataset_test, tmp_path):
+        """Test that feature value columns can be accessed by name as dict keys."""
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        feature_values = bag.list_feature_values("Image", "Quality")
+
+        if feature_values:
+            for fv in feature_values:
+                # Access as dict key should work without errors
+                image_rid = fv.get("Image")
+                assert image_rid is not None or "Image" in fv, (
+                    "Cannot access 'Image' column from feature value"
+                )
+
+                # The vocabulary term column should also be accessible
+                # Quality feature uses ImageQuality vocabulary
+                quality_value = fv.get("ImageQuality")
+                # Value may be None, but key should exist
+                assert "ImageQuality" in fv or quality_value is not None
+
+
+class TestFeatureTablesInBagExport:
+    """Tests for feature tables being included in dataset bag exports."""
+
+    def test_feature_tables_present_in_bag_schema(self, dataset_test, tmp_path):
+        """Test that feature association tables are included in downloaded bags.
+
+        Bug reference: Commit 45078d4 fixed this by explicitly adding feature
+        tables to the export path list.
+        """
+        from deriva_ml import DerivaML
+
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # Check that the feature table is present in the bag's schema
+        domain_schema = ml_instance.domain_schema
+        bag_tables = set(bag.model.schemas[domain_schema].tables.keys())
+
+        # The feature table name follows pattern: {target_table}{feature_name}
+        # e.g., ImageQuality for the Quality feature on Image table
+        feature_table_name = "ImageQuality"
+        assert feature_table_name in bag_tables, (
+            f"Feature table {feature_table_name} not found in bag. "
+            f"Available domain tables: {sorted(bag_tables)}"
+        )
+
+    def test_restructure_can_use_feature_from_bag(self, dataset_test, tmp_path):
+        """Test that restructure_assets can group by features from downloaded bags.
+
+        This is an integration test that verifies the full workflow:
+        1. Download dataset bag
+        2. Feature tables are included
+        3. restructure_assets can successfully group by feature values
+        """
+        dataset = dataset_test.dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_by_feature"
+
+        # This should work because feature tables are exported with the bag
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=["Quality"],
+        )
+
+        assert output_dir.exists()
+
+        # Files should be organized by Quality values
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) > 0, (
+            "No files created by restructure_assets - "
+            "feature table data may not have been exported properly"
+        )
