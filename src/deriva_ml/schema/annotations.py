@@ -286,8 +286,24 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 "Status_Detail",
             ]
         },
-        "tag:isrd.isi.edu,2016:visible-foreign-keys": {
+        deriva_tags.visible_foreign_keys: {
             "detailed": [
+                {
+                    "source": [
+                        {"inbound": [schema, "Execution_Execution_Nested_Execution_fkey"]},
+                        {"outbound": [schema, "Execution_Execution_Execution_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Parent Executions",
+                },
+                {
+                    "source": [
+                        {"inbound": [schema, "Execution_Execution_Execution_fkey"]},
+                        {"outbound": [schema, "Execution_Execution_Nested_Execution_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Child Executions",
+                },
                 {
                     "source": [
                         {"inbound": [schema, "Dataset_Execution_Execution_fkey"]},
