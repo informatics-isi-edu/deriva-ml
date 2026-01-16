@@ -1,5 +1,10 @@
 # We will be loading get_version from setuptools_scm and it will emit a UserWarning about it being deprecated.
 
+# IMPORTANT: Import deriva package first to prevent shadowing by local 'deriva.py' files.
+# This ensures 'deriva' is cached in sys.modules before any other imports that might
+# add directories containing a 'deriva.py' file to sys.path.
+import deriva.core  # noqa: F401
+
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 

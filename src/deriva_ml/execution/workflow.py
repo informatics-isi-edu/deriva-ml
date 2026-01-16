@@ -302,7 +302,21 @@ class Workflow(BaseModel):
         except RuntimeError:
             return None, None
 
-        kernel_id = connection_file.split("-", 1)[1].split(".")[0]
+        # Extract kernel ID from connection filename.
+        # Standard Jupyter format: "kernel-<kernel_id>.json"
+        # PyCharm/other formats may vary: "<kernel_id>.json" or other patterns
+        kernel_id = None
+        if connection_file.startswith("kernel-") and "-" in connection_file:
+            # Standard format: kernel-<uuid>.json
+            parts = connection_file.split("-", 1)
+            if len(parts) > 1:
+                kernel_id = parts[1].rsplit(".", 1)[0]
+        else:
+            # Fallback: assume filename (without extension) is the kernel ID
+            kernel_id = connection_file.rsplit(".", 1)[0]
+
+        if not kernel_id:
+            return None, None
 
         # Look through the running server sessions to find the matching kernel ID
         for server in get_servers():

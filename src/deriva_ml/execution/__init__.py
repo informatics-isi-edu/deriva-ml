@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 # Safe imports - no circular dependencies
+from deriva_ml.execution.base_config import BaseConfig, DerivaBaseConfig, base_defaults
 from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.execution.runner import run_model, create_model_config, reset_multirun_state
@@ -29,4 +30,8 @@ __all__ = [
     "create_model_config",
     "reset_multirun_state",
     "DerivaMLModel",
+    # Base configuration
+    "BaseConfig",
+    "DerivaBaseConfig",
+    "base_defaults",
 ]
