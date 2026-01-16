@@ -1137,6 +1137,156 @@ class Execution:
             description=description,
         )
 
+    # =========================================================================
+    # Execution Nesting Methods
+    # =========================================================================
+
+    def add_nested_execution(
+        self,
+        nested_execution: "Execution | RID",
+        sequence: int | None = None,
+    ) -> None:
+        """Add a nested (child) execution to this execution.
+
+        Creates a parent-child relationship between this execution and another.
+        This is useful for grouping related executions, such as parameter sweeps
+        or pipeline stages.
+
+        Args:
+            nested_execution: The child execution to add (Execution object or RID).
+            sequence: Optional ordering index (0, 1, 2...). Use None for parallel executions.
+
+        Raises:
+            DerivaMLException: If the association cannot be created.
+
+        Example:
+            >>> parent_exec = ml.create_execution(parent_config)
+            >>> child_exec = ml.create_execution(child_config)
+            >>> parent_exec.add_nested_execution(child_exec, sequence=0)
+        """
+        if self._dry_run:
+            return
+
+        nested_rid = nested_execution.execution_rid if isinstance(nested_execution, Execution) else nested_execution
+
+        pb = self._ml_object.pathBuilder()
+        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+
+        record = {
+            "Execution": self.execution_rid,
+            "Nested_Execution": nested_rid,
+        }
+        if sequence is not None:
+            record["Sequence"] = sequence
+
+        execution_execution.insert([record])
+
+    def list_nested_executions(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+    ) -> list["Execution"]:
+        """List all nested (child) executions of this execution.
+
+        Args:
+            recurse: If True, recursively return all descendant executions.
+            _visited: Internal parameter to track visited executions and prevent infinite recursion.
+
+        Returns:
+            List of nested Execution objects, ordered by sequence if available.
+
+        Example:
+            >>> children = parent_exec.list_nested_executions()
+            >>> all_descendants = parent_exec.list_nested_executions(recurse=True)
+        """
+        if _visited is None:
+            _visited = set()
+
+        if self.execution_rid in _visited:
+            return []
+        _visited.add(self.execution_rid)
+
+        pb = self._ml_object.pathBuilder()
+        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+
+        # Query for nested executions, ordered by sequence
+        nested = list(
+            execution_execution.filter(execution_execution.Execution == self.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        # Sort by sequence (None values at the end)
+        nested.sort(key=lambda x: (x.get("Sequence") is None, x.get("Sequence")))
+
+        children = []
+        for record in nested:
+            child = self._ml_object.lookup_execution(record["Nested_Execution"])
+            children.append(child)
+            if recurse:
+                children.extend(child.list_nested_executions(recurse=True, _visited=_visited))
+
+        return children
+
+    def list_parent_executions(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+    ) -> list["Execution"]:
+        """List all parent executions that contain this execution as a nested child.
+
+        Args:
+            recurse: If True, recursively return all ancestor executions.
+            _visited: Internal parameter to track visited executions and prevent infinite recursion.
+
+        Returns:
+            List of parent Execution objects.
+
+        Example:
+            >>> parents = child_exec.list_parent_executions()
+            >>> all_ancestors = child_exec.list_parent_executions(recurse=True)
+        """
+        if _visited is None:
+            _visited = set()
+
+        if self.execution_rid in _visited:
+            return []
+        _visited.add(self.execution_rid)
+
+        pb = self._ml_object.pathBuilder()
+        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+
+        parent_records = list(
+            execution_execution.filter(execution_execution.Nested_Execution == self.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        parents = []
+        for record in parent_records:
+            parent = self._ml_object.lookup_execution(record["Execution"])
+            parents.append(parent)
+            if recurse:
+                parents.extend(parent.list_parent_executions(recurse=True, _visited=_visited))
+
+        return parents
+
+    def is_nested(self) -> bool:
+        """Check if this execution is nested within another execution.
+
+        Returns:
+            True if this execution has at least one parent execution.
+        """
+        return len(self.list_parent_executions()) > 0
+
+    def is_parent(self) -> bool:
+        """Check if this execution has nested child executions.
+
+        Returns:
+            True if this execution has at least one nested execution.
+        """
+        return len(self.list_nested_executions()) > 0
+
     def __str__(self):
         items = [
             f"caching_dir: {self._cache_dir}",
