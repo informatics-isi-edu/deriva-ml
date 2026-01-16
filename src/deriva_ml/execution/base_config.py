@@ -20,7 +20,7 @@ Usage:
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
-from hydra_zen import builds, launch, store
+from hydra_zen import builds, instantiate, launch, store
 
 T = TypeVar("T")
 
@@ -156,15 +156,16 @@ def get_notebook_configuration(
     # Ensure configs are in the hydra store
     store.add_to_hydra_store(overwrite_ok=True)
 
-    # Define a simple task function that just returns the instantiated config
-    def return_config(cfg: T) -> T:
-        return cfg
+    # Define a task function that instantiates and returns the config
+    # The cfg from launch() is an OmegaConf DictConfig, so we need to
+    # use hydra_zen.instantiate() to convert it to actual Python objects
+    def return_instantiated_config(cfg: Any) -> T:
+        return instantiate(cfg)
 
     # Launch hydra-zen to resolve the configuration
-    # We use a simple identity function as the task since we just want the config
     result = launch(
         config_class,
-        return_config,
+        return_instantiated_config,
         version_base=version_base,
         config_name=config_name,
         job_name=job_name,
