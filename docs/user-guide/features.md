@@ -69,11 +69,20 @@ Features can reference both terms and assets for complex annotations.
 
 Feature values are created during **Executions** to maintain provenance. Every value knows which workflow produced it.
 
+The workflow for adding feature values is:
+1. Get the FeatureRecord class for your feature (via `create_feature()` or `feature_record_class()`)
+2. Create instances of the FeatureRecord with your data
+3. Add the records within an execution using `execution.add_features()`
+
 ```python
 from deriva_ml import DerivaML
 from deriva_ml.execution import ExecutionConfiguration
+from deriva_ml.dataset import DatasetSpec
 
 ml = DerivaML(hostname, catalog_id)
+
+# Get the FeatureRecord class for the Diagnosis feature
+DiagnosisFeature = ml.feature_record_class("Image", "Diagnosis")
 
 # Set up execution
 config = ExecutionConfiguration(
@@ -85,15 +94,19 @@ with ml.create_execution(config) as exe:
     # Get images to label
     bag = exe.download_dataset_bag(DatasetSpec(rid=dataset_rid))
 
-    # Add feature values (provenance tracked automatically)
+    # Create feature records (provenance tracked automatically)
+    feature_records = []
     for image in bag.list_dataset_members()["Image"]:
-        ml.add_feature_value(
-            table="Image",
-            feature_name="Diagnosis",
-            target_rid=image["RID"],
-            value="Normal",  # or RID of vocabulary term
+        record = DiagnosisFeature(
+            Image=image["RID"],       # Target record RID
+            Diagnosis_Type="Normal",  # Vocabulary term name
         )
+        feature_records.append(record)
 
+    # Add all feature records to the execution
+    exe.add_features(feature_records)
+
+# Upload after execution context exits
 exe.upload_execution_outputs()
 ```
 
@@ -112,9 +125,12 @@ for v in values:
 
 ```python
 # What features are defined for images?
-features = ml.model.find_features(ml.model.name_to_table("Image"))
+features = ml.find_features("Image")
 for f in features:
     print(f"  {f.feature_name}: {f.feature_table.name}")
+
+# List all features in the catalog
+all_features = ml.find_features()
 ```
 
 ### Get Feature Structure

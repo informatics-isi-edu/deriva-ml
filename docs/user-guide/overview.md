@@ -29,7 +29,7 @@ The method including the following categories:
 To install Deriva-ML and its dependencies, use the following commands:
 ```
 $ pip install deriva
-$ pip install deirva-ml 
+$ pip install deriva-ml
 $ pip install <catalog-ML>
 ```
 
@@ -152,30 +152,32 @@ It is built on top of an `sqLite` database, enabling easy access to the tables b
 ### Step4: ML Execution
 Run ML algorithms within a managed context. This ensures execution status is logged back to the catalog.
 ```python
-with ml_instance.execution(configuration=configuration_record) as exec:
-  # Run machine learning algorithms here ...
-  pass
+with ml_instance.create_execution(config) as exe:
+    # Run machine learning algorithms here ...
+    pass
+
+# Upload after context exits
+exe.upload_execution_outputs()
 ```
 
 ### Step5: Upload results
-Save and upload outputs to the catalog, categorized into:
+Save and upload outputs to the catalog. Use `asset_file_path()` to register files for upload.
 
-- Metadata: Stored in the directory obtained by `execution.execution_metadata_path(<metadata_type>)`.
-- Assets: Stored in the directory obtained by `execution.execution_assets_path(<asset_type>)`.
-
-Ensure that the metadata and asset types exist in the catalog before uploading.
+Ensure that the asset types exist in the catalog before uploading.
 ```python
-# Add controlled vocabulary terms for metadata and assets
-ml_instance.add_term(vc.Execution_Metadata_Type, "Example_Metadata_Type", description="Metadata Type description")
-ml_instance.add_term(vc.Execution_Asset_Type, "Example_Asset_Type", description="Asset Type description")
+# Add controlled vocabulary terms for asset types
+ml_instance.add_term("Asset_Type", "Example_Asset_Type", description="Asset Type description")
 
-metadata_path = execution.execution_metadata_path(Example_Metadata_Type)
-asset_path = execution.execution_asset_path(Example_Asset_Type)
+with ml_instance.create_execution(config) as exe:
+    # Get paths for output files
+    metadata_path = exe.asset_file_path("Execution_Metadata", "metrics.json")
+    asset_path = exe.asset_file_path("Execution_Asset", "model.pt", asset_types=["Example_Asset_Type"])
 
-# Save files to metadata path and asset path.
+    # Save files to the registered paths
+    # ...
 
-# Upload files to the catalog
-execution.upload_execution_outputs(clean_folder=True)
+# Upload files to the catalog after context exits
+exe.upload_execution_outputs(clean_folder=True)
 ```
 
 Upon completion, all files can be accessed in the Execution Assets, Execution Metadata, and Features tables, 

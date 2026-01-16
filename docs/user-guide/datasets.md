@@ -24,7 +24,8 @@ When you create a dataset, you can provide as many dataset types as required to 
 The most common way to create a dataset is within an execution, which provides provenance tracking:
 
 ```python
-from deriva_ml import DerivaML, ExecutionConfiguration, Workflow
+from deriva_ml import DerivaML
+from deriva_ml.execution import ExecutionConfiguration
 
 # Connect to the catalog
 ml = DerivaML("deriva.example.org", "my_catalog")
@@ -36,24 +37,26 @@ workflow = ml.create_workflow(
     description="Prepares training and validation datasets"
 )
 
-# Create an execution
+# Create an execution configuration
 config = ExecutionConfiguration(
     workflow=workflow,
     description="Create datasets for experiment"
 )
-execution = ml.create_execution(config)
 
-# Create datasets within the execution
-with execution.execute():
-    training_dataset = execution.create_dataset(
+# Create datasets within the execution context
+with ml.create_execution(config) as exe:
+    training_dataset = exe.create_dataset(
         dataset_types=["TrainingSet", "Image"],
         description="Training images for classification model"
     )
 
-    validation_dataset = execution.create_dataset(
+    validation_dataset = exe.create_dataset(
         dataset_types=["ValidationSet", "Image"],
         description="Validation images for model evaluation"
     )
+
+# Upload any outputs after context exits
+exe.upload_execution_outputs()
 ```
 
 You can also create datasets directly through the DerivaML instance:
@@ -197,9 +200,11 @@ bag = dataset.download_dataset_bag(materialize=True)
 
 ### Automatic Download in Executions
 
-When creating an execution with dataset specifications, datasets are automatically downloaded:
+When creating an execution with dataset specifications, you can download datasets within the execution context:
 
 ```python
+from deriva_ml.dataset import DatasetSpec
+
 config = ExecutionConfiguration(
     datasets=[
         DatasetSpec(rid="1-abc123", version="1.0.0"),
@@ -209,12 +214,10 @@ config = ExecutionConfiguration(
     description="Process datasets"
 )
 
-execution = ml.create_execution(config)
-
-with execution.execute() as exe:
-    # Access downloaded datasets
-    for dataset in exe.datasets:
-        print(f"Dataset {dataset.dataset_rid} available at {dataset.path}")
+with ml.create_execution(config) as exe:
+    # Download datasets as needed
+    bag = exe.download_dataset_bag(DatasetSpec(rid="1-abc123"))
+    print(f"Dataset available at {bag.bag_path}")
 ```
 
 ## Working with DatasetBag
