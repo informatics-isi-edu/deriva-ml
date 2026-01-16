@@ -191,14 +191,28 @@ class TestDatasetDownload:
         assert "NewTable" not in current_bag.model.schemas[ml_instance.domain_schema].tables
 
     def test_dataset_types_preserved_in_bag(self, dataset_test, tmp_path):
-        """Test that dataset types in downloaded bag match the original catalog dataset types."""
+        """Test that dataset types in downloaded bag match the original catalog dataset types.
+
+        This test verifies nested dataset coverage by:
+        1. Recursively collecting all datasets in the hierarchy (including nested children)
+        2. Verifying we test multiple datasets at different nesting levels
+        3. Checking types match for datasets with various type configurations
+        """
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
 
         # Get reference datasets with their types from the catalog
+        # list_datasets recursively collects ALL datasets including nested children
         reference_datasets = self.list_datasets(dataset_description)
+
+        # Verify we are testing nested datasets (more than just the root)
+        assert len(reference_datasets) > 1, "Test must cover multiple datasets including nested ones"
+
+        # Collect all unique type sets to verify we're testing diverse dataset types
+        all_type_sets = {frozenset(ds.dataset_types) for ds in reference_datasets}
+        assert len(all_type_sets) > 1, "Test must cover datasets with different type configurations"
 
         # Download the bag
         current_version = dataset_description.dataset.current_version
@@ -208,6 +222,7 @@ class TestDatasetDownload:
         db_catalog = DerivaMLDatabase(bag.model)
 
         # Check that dataset types match for all datasets in the hierarchy
+        datasets_checked = 0
         for catalog_dataset in reference_datasets:
             catalog_types = set(catalog_dataset.dataset_types)
 
@@ -219,3 +234,7 @@ class TestDatasetDownload:
                 f"Dataset types mismatch for dataset {catalog_dataset.dataset_rid}: "
                 f"catalog={catalog_types}, bag={bag_types}"
             )
+            datasets_checked += 1
+
+        # Final verification that we checked multiple datasets
+        assert datasets_checked > 1, f"Expected to check multiple datasets, only checked {datasets_checked}"
