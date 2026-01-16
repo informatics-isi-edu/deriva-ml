@@ -23,13 +23,25 @@ from typing_extensions import Self
 # Third-party imports
 import requests
 
-# Deriva imports
-from deriva.core import DEFAULT_SESSION_CONFIG, get_credential, urlquote
-from deriva.core.deriva_server import DerivaServer
-from deriva.core.ermrest_catalog import ErmrestCatalog, ErmrestSnapshot
-from deriva.core.ermrest_model import Table
-from deriva.core.utils.core_utils import DEFAULT_LOGGER_OVERRIDES, tag as deriva_tags
-from deriva.core.utils.globus_auth_utils import GlobusNativeLogin
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+_deriva_core = importlib.import_module("deriva.core")
+_deriva_server = importlib.import_module("deriva.core.deriva_server")
+_ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
+_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
+_core_utils = importlib.import_module("deriva.core.utils.core_utils")
+_globus_auth_utils = importlib.import_module("deriva.core.utils.globus_auth_utils")
+
+DEFAULT_SESSION_CONFIG = _deriva_core.DEFAULT_SESSION_CONFIG
+get_credential = _deriva_core.get_credential
+urlquote = _deriva_core.urlquote
+DerivaServer = _deriva_server.DerivaServer
+ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
+ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
+Table = _ermrest_model.Table
+DEFAULT_LOGGER_OVERRIDES = _core_utils.DEFAULT_LOGGER_OVERRIDES
+deriva_tags = _core_utils.tag
+GlobusNativeLogin = _globus_auth_utils.GlobusNativeLogin
 
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition
