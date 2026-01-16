@@ -142,6 +142,7 @@ See Also
 
 from __future__ import annotations
 
+import atexit
 import logging
 from pathlib import Path
 from typing import Any, TypeVar, TYPE_CHECKING
@@ -209,6 +210,41 @@ def _get_job_num() -> int:
         return 0
 
 
+def _complete_parent_execution() -> None:
+    """Complete the parent execution at the end of a multirun sweep.
+
+    This is registered as an atexit handler to ensure the parent execution
+    is properly completed and its outputs uploaded when the process exits.
+    """
+    global _multirun_state
+
+    if _multirun_state.parent_execution is None:
+        return
+
+    try:
+        parent = _multirun_state.parent_execution
+
+        # Stop the parent execution timing
+        parent.execution_stop()
+
+        # Upload any outputs and clean up
+        parent.upload_execution_outputs()
+
+        logging.info(
+            f"Completed parent execution: {_multirun_state.parent_execution_rid} "
+            f"({_multirun_state.job_sequence} child jobs)"
+        )
+    except Exception as e:
+        logging.warning(f"Failed to complete parent execution: {e}")
+    finally:
+        # Clear the state
+        reset_multirun_state()
+
+
+# Track if atexit handler is registered
+_atexit_registered = False
+
+
 def _create_parent_execution(
     ml_instance: "DerivaML",
     workflow: "Workflow",
@@ -226,7 +262,7 @@ def _create_parent_execution(
         description: Description for the parent execution.
         dry_run: If True, don't write to the catalog.
     """
-    global _multirun_state
+    global _multirun_state, _atexit_registered
 
     # Import here to avoid circular imports
     from deriva_ml.execution import ExecutionConfiguration
@@ -257,6 +293,11 @@ def _create_parent_execution(
     _multirun_state.parent_execution = parent_execution
     _multirun_state.parent_execution_rid = parent_execution.execution_rid
     _multirun_state.ml_instance = ml_instance
+
+    # Register atexit handler to complete parent execution when process exits
+    if not _atexit_registered:
+        atexit.register(_complete_parent_execution)
+        _atexit_registered = True
 
     logging.info(f"Created parent execution: {parent_execution.execution_rid}")
 
