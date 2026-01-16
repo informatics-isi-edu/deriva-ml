@@ -22,10 +22,6 @@ from typing import Any, TypeVar
 
 from hydra_zen import builds, launch, store, zen
 
-from deriva_ml.core.config import DerivaMLConfig
-from deriva_ml.core.definitions import RID
-from deriva_ml.dataset.aux_classes import DatasetSpec
-
 T = TypeVar("T")
 
 
@@ -49,12 +45,18 @@ class BaseConfig:
     both script execution and notebook modes. Project-specific configs
     should inherit from this class to get the standard DerivaML fields.
 
+    Note:
+        Fields use ``Any`` type annotations because several DerivaML types
+        (DerivaMLConfig, DatasetSpec) are Pydantic models which are not
+        compatible with OmegaConf structured configs. The actual types at
+        runtime are documented below.
+
     Attributes:
-        deriva_ml: DerivaML connection configuration (hostname, catalog_id, etc.)
-        datasets: List of dataset specifications to use for training/inference
-        assets: List of asset RIDs to load (model weights, etc.)
-        dry_run: If True, skip catalog writes (for testing/debugging)
-        description: Human-readable description of this run
+        deriva_ml: DerivaML connection configuration (DerivaMLConfig at runtime).
+        datasets: List of dataset specifications (list[DatasetSpec] at runtime).
+        assets: List of asset RIDs to load (list[str] at runtime).
+        dry_run: If True, skip catalog writes (for testing/debugging).
+        description: Human-readable description of this run.
 
     Example:
         >>> from dataclasses import dataclass
@@ -65,9 +67,9 @@ class BaseConfig:
         ...     learning_rate: float = 0.001
         ...     epochs: int = 10
     """
-    deriva_ml: DerivaMLConfig = None
-    datasets: list[DatasetSpec] = field(default_factory=list)
-    assets: list[RID] = field(default_factory=list)
+    deriva_ml: Any = None
+    datasets: Any = field(default_factory=list)
+    assets: Any = field(default_factory=list)
     dry_run: bool = False
     description: str = ""
 
