@@ -150,7 +150,7 @@ class DerivaMLConfig(BaseModel):
 
         Creates a standardized working directory path. If a base directory is provided,
         appends the current username to prevent conflicts between users. If no directory
-        is provided, uses ~/.deriva/deriva-ml. The catalog_id is appended to
+        is provided, uses ~/.deriva-ml. The catalog_id is appended to
         separate data from different catalogs.
 
         Args:
@@ -165,10 +165,13 @@ class DerivaMLConfig(BaseModel):
             >>> DerivaMLConfig.compute_workdir('/shared/data', '52')
             PosixPath('/shared/data/username/deriva-ml/52')
             >>> DerivaMLConfig.compute_workdir(None, 1)
-            PosixPath('/home/username/.deriva/deriva-ml/1')
+            PosixPath('/home/username/.deriva-ml/1')
         """
-        # Append username to provided path, or use ~/.deriva as base
-        base_dir = (Path(working_dir) / getpass.getuser() if working_dir else Path.home() / ".deriva") / "deriva-ml"
+        # Append username and deriva-ml to provided path, or use ~/.deriva-ml as base
+        if working_dir:
+            base_dir = Path(working_dir) / getpass.getuser() / "deriva-ml"
+        else:
+            base_dir = Path.home() / ".deriva-ml"
         # Append catalog_id if provided
         if catalog_id is not None:
             base_dir = base_dir / str(catalog_id)

@@ -83,17 +83,17 @@ class TestHydraZenDerivaMLConfig:
         assert result == expected.absolute()
 
     def test_compute_workdir_with_none(self):
-        """Test that compute_workdir uses ~/.deriva/deriva-ml when None."""
+        """Test that compute_workdir uses ~/.deriva-ml when None."""
         result = DerivaMLConfig.compute_workdir(None, "1")
 
-        expected = Path.home() / ".deriva" / "deriva-ml" / "1"
+        expected = Path.home() / ".deriva-ml" / "1"
         assert result == expected.absolute()
 
     def test_compute_workdir_without_catalog_id(self):
         """Test that compute_workdir works without catalog_id."""
         result = DerivaMLConfig.compute_workdir(None)
 
-        expected = Path.home() / ".deriva" / "deriva-ml"
+        expected = Path.home() / ".deriva-ml"
         assert result == expected.absolute()
 
     def test_omegaconf_resolver_registered(self):
@@ -103,7 +103,7 @@ class TestHydraZenDerivaMLConfig:
         cfg = OmegaConf.create({"path": "${compute_workdir:null,52}"})
         resolved = OmegaConf.to_container(cfg, resolve=True)
 
-        expected = Path.home() / ".deriva" / "deriva-ml" / "52"
+        expected = Path.home() / ".deriva-ml" / "52"
         assert Path(resolved["path"]) == expected.absolute()
 
     def test_working_dir_used_in_hydra_config(self, tmp_path):
