@@ -56,7 +56,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from hydra.conf import HydraConf, RunDir
+from hydra.conf import HydraConf, RunDir, SweepDir
 from hydra.core.hydra_config import HydraConfig
 from hydra_zen import store
 from omegaconf import OmegaConf
@@ -89,6 +89,9 @@ class DerivaMLConfig(BaseModel):
         use_minid: Whether to use MINID service for dataset bags. Only effective when
             s3_bucket is configured. Defaults to True when s3_bucket is set, False otherwise.
         check_auth: Whether to verify authentication on connection. Defaults to True.
+        clean_execution_dir: Whether to automatically clean execution working directories
+            after successful upload. Defaults to True. Set to False to retain local copies
+            of execution outputs for debugging or manual inspection.
 
     Example:
         >>> config = DerivaMLConfig(
@@ -113,6 +116,7 @@ class DerivaMLConfig(BaseModel):
     s3_bucket: str | None = None
     use_minid: bool | None = None  # None means "auto" - True if s3_bucket is set
     check_auth: bool = True
+    clean_execution_dir: bool = True
 
     @model_validator(mode="after")
     def init_working_dir(self) -> "DerivaMLConfig":
@@ -188,9 +192,14 @@ OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdi
 
 # Configure Hydra's output directory structure for reproducible runs
 # Outputs are organized by timestamp under the computed working directory
+# For multirun/sweep, outputs go to a sweep subdirectory with job number subfolders
 store(
     HydraConf(
         run=RunDir("${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"),
+        sweep=SweepDir(
+            dir="${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id}}/hydra-sweep/${now:%Y-%m-%d_%H-%M-%S}",
+            subdir="${hydra.job.num}",
+        ),
         output_subdir="hydra-config",
     ),
     group="hydra",

@@ -729,7 +729,7 @@ class Execution:
         return {path_to_asset(p): r for p, r in results.items()}
 
     def upload_execution_outputs(
-        self, clean_folder: bool = True, progress_callback: Callable[[UploadProgress], None] | None = None
+        self, clean_folder: bool | None = None, progress_callback: Callable[[UploadProgress], None] | None = None
     ) -> dict[str, list[AssetFilePath]]:
         """Uploads all outputs from the execution to the catalog.
 
@@ -742,7 +742,9 @@ class Execution:
         the separate upload step.
 
         Args:
-            clean_folder: Whether to delete output folders after upload. Defaults to True.
+            clean_folder: Whether to delete output folders after upload. If None (default),
+                uses the DerivaML instance's clean_execution_dir setting. Pass True/False
+                to override for this specific execution.
             progress_callback: Optional callback function to receive upload progress updates.
                 Called with UploadProgress objects containing file name, bytes uploaded,
                 total bytes, percent complete, phase, and status message.
@@ -763,9 +765,17 @@ class Execution:
             >>> def my_callback(progress):
             ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
             >>> outputs = execution.upload_execution_outputs(progress_callback=my_callback)
+            >>>
+            >>> # Override cleanup setting for this execution
+            >>> outputs = execution.upload_execution_outputs(clean_folder=False)  # Keep files
         """
         if self._dry_run:
             return {}
+
+        # Use DerivaML instance setting if not explicitly provided
+        if clean_folder is None:
+            clean_folder = getattr(self._ml_object, 'clean_execution_dir', True)
+
         try:
             self.uploaded_assets = self._upload_execution_dirs(progress_callback=progress_callback)
             self.update_status(Status.completed, "Successfully end the execution.")
@@ -777,11 +787,16 @@ class Execution:
             self.update_status(Status.failed, error)
             raise e
 
-    def _clean_folder_contents(self, folder_path: Path):
-        """Clean up folder contents with Windows-compatible error handling.
+    def _clean_folder_contents(self, folder_path: Path, remove_folder: bool = True):
+        """Clean up folder contents and optionally the folder itself.
+
+        Removes all files and subdirectories within the specified folder.
+        Uses retry logic for Windows compatibility where files may be temporarily locked.
 
         Args:
-            folder_path: Path to the folder to clean
+            folder_path: Path to the folder to clean.
+            remove_folder: If True (default), also remove the folder itself after
+                cleaning its contents. If False, only remove contents.
         """
         MAX_RETRIES = 3
         RETRY_DELAY = 1  # seconds
@@ -796,20 +811,26 @@ class Execution:
                     return True
                 except (OSError, PermissionError) as e:
                     if attempt == MAX_RETRIES - 1:
-                        self.update_status(Status.failed, format_exception(e))
+                        logging.warning(f"Failed to remove {path}: {e}")
                         return False
                     time.sleep(RETRY_DELAY)
             return False
 
         try:
+            # First remove all contents
             with os.scandir(folder_path) as entries:
                 for entry in entries:
                     if entry.is_dir() and not entry.is_symlink():
                         remove_with_retry(Path(entry.path), is_dir=True)
                     else:
                         remove_with_retry(Path(entry.path))
+
+            # Then remove the folder itself if requested
+            if remove_folder:
+                remove_with_retry(folder_path, is_dir=True)
+
         except OSError as e:
-            self.update_status(Status.failed, format_exception(e))
+            logging.warning(f"Failed to clean folder {folder_path}: {e}")
 
     def _update_feature_table(
         self,
@@ -1136,6 +1157,156 @@ class Execution:
             dataset_types=dataset_types,
             description=description,
         )
+
+    # =========================================================================
+    # Execution Nesting Methods
+    # =========================================================================
+
+    def add_nested_execution(
+        self,
+        nested_execution: "Execution | RID",
+        sequence: int | None = None,
+    ) -> None:
+        """Add a nested (child) execution to this execution.
+
+        Creates a parent-child relationship between this execution and another.
+        This is useful for grouping related executions, such as parameter sweeps
+        or pipeline stages.
+
+        Args:
+            nested_execution: The child execution to add (Execution object or RID).
+            sequence: Optional ordering index (0, 1, 2...). Use None for parallel executions.
+
+        Raises:
+            DerivaMLException: If the association cannot be created.
+
+        Example:
+            >>> parent_exec = ml.create_execution(parent_config)
+            >>> child_exec = ml.create_execution(child_config)
+            >>> parent_exec.add_nested_execution(child_exec, sequence=0)
+        """
+        if self._dry_run:
+            return
+
+        nested_rid = nested_execution.execution_rid if isinstance(nested_execution, Execution) else nested_execution
+
+        pb = self._ml_object.pathBuilder()
+        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+
+        record = {
+            "Execution": self.execution_rid,
+            "Nested_Execution": nested_rid,
+        }
+        if sequence is not None:
+            record["Sequence"] = sequence
+
+        execution_execution.insert([record])
+
+    def list_nested_executions(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+    ) -> list["Execution"]:
+        """List all nested (child) executions of this execution.
+
+        Args:
+            recurse: If True, recursively return all descendant executions.
+            _visited: Internal parameter to track visited executions and prevent infinite recursion.
+
+        Returns:
+            List of nested Execution objects, ordered by sequence if available.
+
+        Example:
+            >>> children = parent_exec.list_nested_executions()
+            >>> all_descendants = parent_exec.list_nested_executions(recurse=True)
+        """
+        if _visited is None:
+            _visited = set()
+
+        if self.execution_rid in _visited:
+            return []
+        _visited.add(self.execution_rid)
+
+        pb = self._ml_object.pathBuilder()
+        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+
+        # Query for nested executions, ordered by sequence
+        nested = list(
+            execution_execution.filter(execution_execution.Execution == self.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        # Sort by sequence (None values at the end)
+        nested.sort(key=lambda x: (x.get("Sequence") is None, x.get("Sequence")))
+
+        children = []
+        for record in nested:
+            child = self._ml_object.lookup_execution(record["Nested_Execution"])
+            children.append(child)
+            if recurse:
+                children.extend(child.list_nested_executions(recurse=True, _visited=_visited))
+
+        return children
+
+    def list_parent_executions(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+    ) -> list["Execution"]:
+        """List all parent executions that contain this execution as a nested child.
+
+        Args:
+            recurse: If True, recursively return all ancestor executions.
+            _visited: Internal parameter to track visited executions and prevent infinite recursion.
+
+        Returns:
+            List of parent Execution objects.
+
+        Example:
+            >>> parents = child_exec.list_parent_executions()
+            >>> all_ancestors = child_exec.list_parent_executions(recurse=True)
+        """
+        if _visited is None:
+            _visited = set()
+
+        if self.execution_rid in _visited:
+            return []
+        _visited.add(self.execution_rid)
+
+        pb = self._ml_object.pathBuilder()
+        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+
+        parent_records = list(
+            execution_execution.filter(execution_execution.Nested_Execution == self.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        parents = []
+        for record in parent_records:
+            parent = self._ml_object.lookup_execution(record["Execution"])
+            parents.append(parent)
+            if recurse:
+                parents.extend(parent.list_parent_executions(recurse=True, _visited=_visited))
+
+        return parents
+
+    def is_nested(self) -> bool:
+        """Check if this execution is nested within another execution.
+
+        Returns:
+            True if this execution has at least one parent execution.
+        """
+        return len(self.list_parent_executions()) > 0
+
+    def is_parent(self) -> bool:
+        """Check if this execution has nested child executions.
+
+        Returns:
+            True if this execution has at least one nested execution.
+        """
+        return len(self.list_nested_executions()) > 0
 
     def __str__(self):
         items = [

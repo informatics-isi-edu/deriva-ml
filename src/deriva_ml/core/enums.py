@@ -194,6 +194,7 @@ class MLTable(BaseStrEnum):
         file (str): File table for tracking individual files.
         asset (str): Asset table for domain-specific file types.
         execution (str): Execution table for workflow run tracking.
+        execution_execution (str): Execution_Execution table for nested executions.
         dataset_version (str): Dataset_Version table for version history.
         execution_metadata (str): Execution_Metadata table for run metadata.
         execution_asset (str): Execution_Asset table for run outputs.
@@ -204,6 +205,7 @@ class MLTable(BaseStrEnum):
     file = "File"
     asset = "Asset"
     execution = "Execution"
+    execution_execution = "Execution_Execution"
     dataset_version = "Dataset_Version"
     execution_metadata = "Execution_Metadata"
     execution_asset = "Execution_Asset"

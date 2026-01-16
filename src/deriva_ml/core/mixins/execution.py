@@ -10,7 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
-from deriva_ml.core.definitions import RID, Status
+from deriva_ml.core.definitions import RID
+from deriva_ml.core.enums import Status
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.upload import asset_file_path, execution_rids
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
@@ -93,6 +94,59 @@ class ExecutionMixin:
         # Create and store an execution instance
         self._execution = Execution(configuration, self, workflow=workflow, dry_run=dry_run)  # type: ignore[arg-type]
         return self._execution
+
+    def lookup_execution(self, execution_rid: RID) -> "Execution":
+        """Look up an execution by RID without restoring/downloading datasets.
+
+        Creates a lightweight Execution object for querying execution metadata
+        and relationships (e.g., nested executions) without initializing the
+        full execution environment.
+
+        Args:
+            execution_rid: Resource Identifier (RID) of the execution.
+
+        Returns:
+            Execution: An execution object for the given RID.
+
+        Raises:
+            DerivaMLException: If execution_rid is not valid.
+
+        Example:
+            >>> execution = ml.lookup_execution("1-abc123")
+            >>> children = execution.list_nested_executions()
+        """
+        # Import here to avoid circular dependency
+        from deriva_ml.execution.execution import Execution
+
+        # Get execution record from catalog
+        execution_record = self.retrieve_rid(execution_rid)
+
+        # Create minimal configuration
+        configuration = ExecutionConfiguration(
+            workflow=execution_record.get("Workflow"),
+            description=execution_record.get("Description", ""),
+        )
+
+        # Create execution object without initialization (reload mode)
+        exec_obj = Execution.__new__(Execution)
+        exec_obj._ml_object = self  # type: ignore[arg-type]
+        exec_obj._model = self.model
+        exec_obj._logger = self._logger  # type: ignore[attr-defined]
+        exec_obj.configuration = configuration
+        exec_obj.execution_rid = execution_rid
+        exec_obj.workflow_rid = execution_record.get("Workflow")
+        exec_obj.status = Status(execution_record.get("Status", "Created"))
+        exec_obj._dry_run = False
+        exec_obj.dataset_rids = []
+        exec_obj.datasets = []
+        exec_obj.asset_paths = {}
+        exec_obj.start_time = None
+        exec_obj.stop_time = None
+        exec_obj.uploaded_assets = None
+        exec_obj._working_dir = self.working_dir
+        exec_obj._cache_dir = self.cache_dir  # type: ignore[attr-defined]
+
+        return exec_obj
 
     def restore_execution(self, execution_rid: RID | None = None) -> "Execution":
         """Restores a previous execution.

@@ -172,6 +172,7 @@ class DerivaML(
         s3_bucket: str | None = None,
         use_minid: bool | None = None,
         check_auth: bool = True,
+        clean_execution_dir: bool = True,
     ) -> None:
         """Initializes a DerivaML instance.
 
@@ -197,6 +198,8 @@ class DerivaML(
                 s3_bucket is configured. If None (default), automatically set to True when s3_bucket
                 is provided, False otherwise.
             check_auth: Check if the user has access to the catalog.
+            clean_execution_dir: Whether to automatically clean up execution working directories
+                after successful upload. Defaults to True. Set to False to retain local copies.
         """
         # Get or use provided credentials for server access
         self.credential = credential or get_credential(hostname)
@@ -263,6 +266,7 @@ class DerivaML(
         self.project_name = project_name or self.domain_schema
         self.start_time = datetime.now()
         self.status = Status.pending.value
+        self.clean_execution_dir = clean_execution_dir
 
     def __del__(self) -> None:
         """Cleanup method to handle incomplete executions."""
@@ -878,6 +882,261 @@ class DerivaML(
 
         return new_table
 
+    # =========================================================================
+    # Cache and Directory Management
+    # =========================================================================
+
+    def clear_cache(self, older_than_days: int | None = None) -> dict[str, int]:
+        """Clear the dataset cache directory.
+
+        Removes cached dataset bags from the cache directory. Can optionally filter
+        by age to only remove old cache entries.
+
+        Args:
+            older_than_days: If provided, only remove cache entries older than this
+                many days. If None, removes all cache entries.
+
+        Returns:
+            dict with keys:
+                - 'files_removed': Number of files removed
+                - 'dirs_removed': Number of directories removed
+                - 'bytes_freed': Total bytes freed
+                - 'errors': Number of removal errors
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> # Clear all cache
+            >>> result = ml.clear_cache()
+            >>> print(f"Freed {result['bytes_freed'] / 1e6:.1f} MB")
+            >>>
+            >>> # Clear cache older than 7 days
+            >>> result = ml.clear_cache(older_than_days=7)
+        """
+        import shutil
+        import time
+
+        stats = {'files_removed': 0, 'dirs_removed': 0, 'bytes_freed': 0, 'errors': 0}
+
+        if not self.cache_dir.exists():
+            return stats
+
+        cutoff_time = None
+        if older_than_days is not None:
+            cutoff_time = time.time() - (older_than_days * 24 * 60 * 60)
+
+        try:
+            for entry in self.cache_dir.iterdir():
+                try:
+                    # Check age if filtering
+                    if cutoff_time is not None:
+                        entry_mtime = entry.stat().st_mtime
+                        if entry_mtime > cutoff_time:
+                            continue  # Skip recent entries
+
+                    # Calculate size before removal
+                    if entry.is_dir():
+                        entry_size = sum(f.stat().st_size for f in entry.rglob('*') if f.is_file())
+                        shutil.rmtree(entry)
+                        stats['dirs_removed'] += 1
+                    else:
+                        entry_size = entry.stat().st_size
+                        entry.unlink()
+                        stats['files_removed'] += 1
+
+                    stats['bytes_freed'] += entry_size
+                except (OSError, PermissionError) as e:
+                    self._logger.warning(f"Failed to remove cache entry {entry}: {e}")
+                    stats['errors'] += 1
+
+        except OSError as e:
+            self._logger.error(f"Failed to iterate cache directory: {e}")
+            stats['errors'] += 1
+
+        return stats
+
+    def get_cache_size(self) -> dict[str, int | float]:
+        """Get the current size of the cache directory.
+
+        Returns:
+            dict with keys:
+                - 'total_bytes': Total size in bytes
+                - 'total_mb': Total size in megabytes
+                - 'file_count': Number of files
+                - 'dir_count': Number of directories
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> size = ml.get_cache_size()
+            >>> print(f"Cache size: {size['total_mb']:.1f} MB ({size['file_count']} files)")
+        """
+        stats = {'total_bytes': 0, 'total_mb': 0.0, 'file_count': 0, 'dir_count': 0}
+
+        if not self.cache_dir.exists():
+            return stats
+
+        for entry in self.cache_dir.rglob('*'):
+            if entry.is_file():
+                stats['total_bytes'] += entry.stat().st_size
+                stats['file_count'] += 1
+            elif entry.is_dir():
+                stats['dir_count'] += 1
+
+        stats['total_mb'] = stats['total_bytes'] / (1024 * 1024)
+        return stats
+
+    def list_execution_dirs(self) -> list[dict[str, any]]:
+        """List execution working directories.
+
+        Returns information about each execution directory in the working directory,
+        useful for identifying orphaned or incomplete execution outputs.
+
+        Returns:
+            List of dicts, each containing:
+                - 'execution_rid': The execution RID (directory name)
+                - 'path': Full path to the directory
+                - 'size_bytes': Total size in bytes
+                - 'size_mb': Total size in megabytes
+                - 'modified': Last modification time (datetime)
+                - 'file_count': Number of files
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> dirs = ml.list_execution_dirs()
+            >>> for d in dirs:
+            ...     print(f"{d['execution_rid']}: {d['size_mb']:.1f} MB")
+        """
+        from datetime import datetime
+        from deriva_ml.dataset.upload import upload_root
+
+        results = []
+        exec_root = upload_root(self.working_dir) / "execution"
+
+        if not exec_root.exists():
+            return results
+
+        for entry in exec_root.iterdir():
+            if entry.is_dir():
+                size_bytes = sum(f.stat().st_size for f in entry.rglob('*') if f.is_file())
+                file_count = sum(1 for f in entry.rglob('*') if f.is_file())
+                mtime = datetime.fromtimestamp(entry.stat().st_mtime)
+
+                results.append({
+                    'execution_rid': entry.name,
+                    'path': str(entry),
+                    'size_bytes': size_bytes,
+                    'size_mb': size_bytes / (1024 * 1024),
+                    'modified': mtime,
+                    'file_count': file_count,
+                })
+
+        return sorted(results, key=lambda x: x['modified'], reverse=True)
+
+    def clean_execution_dirs(
+        self,
+        older_than_days: int | None = None,
+        exclude_rids: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Clean up execution working directories.
+
+        Removes execution output directories from the local working directory.
+        Use this to free up disk space from completed or orphaned executions.
+
+        Args:
+            older_than_days: If provided, only remove directories older than this
+                many days. If None, removes all execution directories (except excluded).
+            exclude_rids: List of execution RIDs to preserve (never remove).
+
+        Returns:
+            dict with keys:
+                - 'dirs_removed': Number of directories removed
+                - 'bytes_freed': Total bytes freed
+                - 'errors': Number of removal errors
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> # Clean all execution dirs older than 30 days
+            >>> result = ml.clean_execution_dirs(older_than_days=30)
+            >>> print(f"Freed {result['bytes_freed'] / 1e9:.2f} GB")
+            >>>
+            >>> # Clean all except specific executions
+            >>> result = ml.clean_execution_dirs(exclude_rids=['1-ABC', '1-DEF'])
+        """
+        import shutil
+        import time
+        from deriva_ml.dataset.upload import upload_root
+
+        stats = {'dirs_removed': 0, 'bytes_freed': 0, 'errors': 0}
+        exclude_rids = set(exclude_rids or [])
+
+        exec_root = upload_root(self.working_dir) / "execution"
+        if not exec_root.exists():
+            return stats
+
+        cutoff_time = None
+        if older_than_days is not None:
+            cutoff_time = time.time() - (older_than_days * 24 * 60 * 60)
+
+        for entry in exec_root.iterdir():
+            if not entry.is_dir():
+                continue
+
+            # Skip excluded RIDs
+            if entry.name in exclude_rids:
+                continue
+
+            try:
+                # Check age if filtering
+                if cutoff_time is not None:
+                    entry_mtime = entry.stat().st_mtime
+                    if entry_mtime > cutoff_time:
+                        continue
+
+                # Calculate size before removal
+                entry_size = sum(f.stat().st_size for f in entry.rglob('*') if f.is_file())
+                shutil.rmtree(entry)
+                stats['dirs_removed'] += 1
+                stats['bytes_freed'] += entry_size
+
+            except (OSError, PermissionError) as e:
+                self._logger.warning(f"Failed to remove execution dir {entry}: {e}")
+                stats['errors'] += 1
+
+        return stats
+
+    def get_storage_summary(self) -> dict[str, any]:
+        """Get a summary of local storage usage.
+
+        Returns:
+            dict with keys:
+                - 'working_dir': Path to working directory
+                - 'cache_dir': Path to cache directory
+                - 'cache_size_mb': Cache size in MB
+                - 'cache_file_count': Number of files in cache
+                - 'execution_dir_count': Number of execution directories
+                - 'execution_size_mb': Total size of execution directories in MB
+                - 'total_size_mb': Combined size in MB
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> summary = ml.get_storage_summary()
+            >>> print(f"Total storage: {summary['total_size_mb']:.1f} MB")
+            >>> print(f"  Cache: {summary['cache_size_mb']:.1f} MB")
+            >>> print(f"  Executions: {summary['execution_size_mb']:.1f} MB")
+        """
+        cache_stats = self.get_cache_size()
+        exec_dirs = self.list_execution_dirs()
+
+        exec_size_mb = sum(d['size_mb'] for d in exec_dirs)
+
+        return {
+            'working_dir': str(self.working_dir),
+            'cache_dir': str(self.cache_dir),
+            'cache_size_mb': cache_stats['total_mb'],
+            'cache_file_count': cache_stats['file_count'],
+            'execution_dir_count': len(exec_dirs),
+            'execution_size_mb': exec_size_mb,
+            'total_size_mb': cache_stats['total_mb'] + exec_size_mb,
+        }
 
     # Methods moved to mixins:
     # - create_asset, list_assets -> AssetMixin

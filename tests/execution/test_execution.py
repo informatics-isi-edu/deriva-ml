@@ -846,3 +846,374 @@ class TestWorkflowDocker:
         assert workflow.version == "explicit-version"
         assert workflow.url == "https://example.com/workflow"
         assert workflow.checksum == "explicit-checksum"
+
+
+# =============================================================================
+# TestExecutionNesting - Execution Nesting Tests
+# =============================================================================
+
+
+class TestExecutionNesting:
+    """Tests for execution nesting (parent-child relationships)."""
+
+    def test_add_nested_execution(self, workflow_terms, test_workflow):
+        """Test adding a nested execution to a parent."""
+        ml = workflow_terms
+
+        # Create parent execution
+        parent_config = ExecutionConfiguration(
+            description="Parent Execution (Sweep)",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        # Create child execution
+        child_config = ExecutionConfiguration(
+            description="Child Execution (Run 1)",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config)
+
+        # Add child to parent
+        parent_exec.add_nested_execution(child_exec, sequence=0)
+
+        # Verify the relationship via the association table
+        pb = ml.pathBuilder().schemas[ml.ml_schema]
+        exec_exec = pb.Execution_Execution
+        query = exec_exec.filter(
+            (exec_exec.Execution == parent_exec.execution_rid)
+            & (exec_exec.Nested_Execution == child_exec.execution_rid)
+        )
+        records = list(query.entities().fetch())
+
+        assert len(records) == 1
+        assert records[0]["Sequence"] == 0
+
+    def test_add_nested_execution_by_rid(self, workflow_terms, test_workflow):
+        """Test adding a nested execution using RID instead of object."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        child_config = ExecutionConfiguration(
+            description="Child",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config)
+
+        # Add using RID string
+        parent_exec.add_nested_execution(child_exec.execution_rid, sequence=1)
+
+        # Verify
+        pb = ml.pathBuilder().schemas[ml.ml_schema]
+        exec_exec = pb.Execution_Execution
+        records = list(
+            exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        assert len(records) == 1
+        assert records[0]["Nested_Execution"] == child_exec.execution_rid
+
+    def test_add_multiple_nested_executions(self, workflow_terms, test_workflow):
+        """Test adding multiple nested executions with sequence ordering."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Parent Sweep",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        # Create multiple children
+        children = []
+        for i in range(3):
+            child_config = ExecutionConfiguration(
+                description=f"Child Run {i}",
+                workflow=test_workflow,
+            )
+            child_exec = ml.create_execution(child_config)
+            children.append(child_exec)
+            parent_exec.add_nested_execution(child_exec, sequence=i)
+
+        # Verify all children are added
+        pb = ml.pathBuilder().schemas[ml.ml_schema]
+        exec_exec = pb.Execution_Execution
+        records = list(
+            exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        assert len(records) == 3
+        # Verify sequences
+        sequences = sorted([r["Sequence"] for r in records])
+        assert sequences == [0, 1, 2]
+
+    def test_list_nested_executions(self, workflow_terms, test_workflow):
+        """Test listing nested executions."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        # Create and add children
+        child_rids = []
+        for i in range(2):
+            child_config = ExecutionConfiguration(
+                description=f"Child {i}",
+                workflow=test_workflow,
+            )
+            child_exec = ml.create_execution(child_config)
+            child_rids.append(child_exec.execution_rid)
+            parent_exec.add_nested_execution(child_exec, sequence=i)
+
+        # List children
+        children = parent_exec.list_nested_executions()
+
+        assert len(children) == 2
+        # Verify they are returned in sequence order
+        assert children[0].execution_rid == child_rids[0]
+        assert children[1].execution_rid == child_rids[1]
+
+    def test_list_parent_executions(self, workflow_terms, test_workflow):
+        """Test listing parent executions."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        child_config = ExecutionConfiguration(
+            description="Child",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config)
+
+        parent_exec.add_nested_execution(child_exec, sequence=0)
+
+        # List parents from child's perspective
+        parents = child_exec.list_parent_executions()
+
+        assert len(parents) == 1
+        assert parents[0].execution_rid == parent_exec.execution_rid
+
+    def test_list_nested_executions_recurse(self, workflow_terms, test_workflow):
+        """Test recursively listing nested executions."""
+        ml = workflow_terms
+
+        # Create a hierarchy: grandparent -> parent -> child
+        grandparent_config = ExecutionConfiguration(
+            description="Grandparent",
+            workflow=test_workflow,
+        )
+        grandparent_exec = ml.create_execution(grandparent_config)
+
+        parent_config = ExecutionConfiguration(
+            description="Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        child_config = ExecutionConfiguration(
+            description="Child",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config)
+
+        # Build hierarchy
+        grandparent_exec.add_nested_execution(parent_exec, sequence=0)
+        parent_exec.add_nested_execution(child_exec, sequence=0)
+
+        # Non-recursive should only return direct children
+        direct_children = grandparent_exec.list_nested_executions(recurse=False)
+        assert len(direct_children) == 1
+        assert direct_children[0].execution_rid == parent_exec.execution_rid
+
+        # Recursive should return all descendants
+        all_descendants = grandparent_exec.list_nested_executions(recurse=True)
+        assert len(all_descendants) == 2
+        descendant_rids = [d.execution_rid for d in all_descendants]
+        assert parent_exec.execution_rid in descendant_rids
+        assert child_exec.execution_rid in descendant_rids
+
+    def test_list_parent_executions_recurse(self, workflow_terms, test_workflow):
+        """Test recursively listing parent executions."""
+        ml = workflow_terms
+
+        # Create a hierarchy: grandparent -> parent -> child
+        grandparent_config = ExecutionConfiguration(
+            description="Grandparent",
+            workflow=test_workflow,
+        )
+        grandparent_exec = ml.create_execution(grandparent_config)
+
+        parent_config = ExecutionConfiguration(
+            description="Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        child_config = ExecutionConfiguration(
+            description="Child",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config)
+
+        # Build hierarchy
+        grandparent_exec.add_nested_execution(parent_exec, sequence=0)
+        parent_exec.add_nested_execution(child_exec, sequence=0)
+
+        # Non-recursive should only return direct parent
+        direct_parents = child_exec.list_parent_executions(recurse=False)
+        assert len(direct_parents) == 1
+        assert direct_parents[0].execution_rid == parent_exec.execution_rid
+
+        # Recursive should return all ancestors
+        all_ancestors = child_exec.list_parent_executions(recurse=True)
+        assert len(all_ancestors) == 2
+        ancestor_rids = [a.execution_rid for a in all_ancestors]
+        assert parent_exec.execution_rid in ancestor_rids
+        assert grandparent_exec.execution_rid in ancestor_rids
+
+    def test_is_nested(self, workflow_terms, test_workflow):
+        """Test is_nested() method."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        child_config = ExecutionConfiguration(
+            description="Child",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config)
+
+        # Before nesting
+        assert parent_exec.is_nested() is False
+        assert child_exec.is_nested() is False
+
+        # After nesting
+        parent_exec.add_nested_execution(child_exec, sequence=0)
+        assert parent_exec.is_nested() is False  # Parent is not nested
+        assert child_exec.is_nested() is True  # Child is nested
+
+    def test_is_parent(self, workflow_terms, test_workflow):
+        """Test is_parent() method."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        child_config = ExecutionConfiguration(
+            description="Child",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config)
+
+        # Before nesting
+        assert parent_exec.is_parent() is False
+        assert child_exec.is_parent() is False
+
+        # After nesting
+        parent_exec.add_nested_execution(child_exec, sequence=0)
+        assert parent_exec.is_parent() is True  # Parent has children
+        assert child_exec.is_parent() is False  # Child has no children
+
+    def test_lookup_execution(self, workflow_terms, test_workflow):
+        """Test lookup_execution method for lightweight retrieval."""
+        ml = workflow_terms
+
+        config = ExecutionConfiguration(
+            description="Lookup Test",
+            workflow=test_workflow,
+        )
+        original_exec = ml.create_execution(config)
+        original_rid = original_exec.execution_rid
+
+        # Lookup the execution
+        looked_up = ml.lookup_execution(original_rid)
+
+        assert looked_up.execution_rid == original_rid
+        assert looked_up.configuration.description == "Lookup Test"
+
+    def test_nested_execution_null_sequence(self, workflow_terms, test_workflow):
+        """Test adding nested executions without sequence (parallel)."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Parallel Parent",
+            workflow=test_workflow,
+        )
+        parent_exec = ml.create_execution(parent_config)
+
+        # Add children without sequence (parallel execution)
+        for i in range(3):
+            child_config = ExecutionConfiguration(
+                description=f"Parallel Child {i}",
+                workflow=test_workflow,
+            )
+            child_exec = ml.create_execution(child_config)
+            parent_exec.add_nested_execution(child_exec, sequence=None)
+
+        # Verify all children are added with null sequence
+        pb = ml.pathBuilder().schemas[ml.ml_schema]
+        exec_exec = pb.Execution_Execution
+        records = list(
+            exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        assert len(records) == 3
+        # All should have null sequence
+        for record in records:
+            assert record["Sequence"] is None
+
+    def test_dry_run_add_nested_execution(self, workflow_terms, test_workflow):
+        """Test that dry run mode doesn't write nesting records."""
+        ml = workflow_terms
+
+        parent_config = ExecutionConfiguration(
+            description="Dry Run Parent",
+            workflow=test_workflow,
+        )
+        # Create parent in dry run mode
+        parent_exec = ml.create_execution(parent_config, dry_run=True)
+
+        child_config = ExecutionConfiguration(
+            description="Dry Run Child",
+            workflow=test_workflow,
+        )
+        child_exec = ml.create_execution(child_config, dry_run=True)
+
+        # This should not write to catalog
+        parent_exec.add_nested_execution(child_exec, sequence=0)
+
+        # Verify nothing was written (dry run uses fake RIDs)
+        pb = ml.pathBuilder().schemas[ml.ml_schema]
+        exec_exec = pb.Execution_Execution
+        # Both executions use DRY_RUN_RID, so query should return nothing
+        records = list(exec_exec.entities().fetch())
+        # Filter for our dry run RIDs - they shouldn't exist
+        dry_run_records = [
+            r for r in records
+            if r["Execution"] == parent_exec.execution_rid
+        ]
+        assert len(dry_run_records) == 0
