@@ -133,7 +133,7 @@ class DerivaMLDatabase:
             catalog=self,
             dataset_rid=rid,
             description=dataset_record.get("Description", ""),
-            execution_rid=self._database_model._get_dataset_execution(rid).get("Execution"),
+            execution_rid=(self._database_model._get_dataset_execution(rid) or {}).get("Execution"),
             dataset_types=ds_types,
         )
 
@@ -158,7 +158,7 @@ class DerivaMLDatabase:
                     catalog=self,
                     dataset_rid=dataset["RID"],
                     description=dataset.get("Description", ""),
-                    execution_rid=self._database_model._get_dataset_execution(dataset["RID"]).get("Execution"),
+                    execution_rid=(self._database_model._get_dataset_execution(dataset["RID"]) or {}).get("Execution"),
                     dataset_types=my_types,
                 )
             )

@@ -549,20 +549,29 @@ class DatabaseModel(DerivaModel):
                 yield dict(row)
 
     def _get_dataset_execution(self, dataset_rid: str) -> dict[str, Any] | None:
-        """Retrieve an execution record associated with the specified dataset, if one exists.
+        """Retrieve the execution associated with the dataset version in this bag.
 
-        Queries the Dataset_Execution association table which tracks datasets used as
-        inputs to executions. Returns the first (typically oldest) association found.
-        This is used as informational metadata on DatasetBag.
+        Looks up the Dataset_Version record for this dataset's version and returns
+        the associated execution if one exists. This provides the execution that
+        created or is associated with this specific version of the dataset.
 
         Args:
-            dataset_rid: Dataset RID for which to find an associated execution.
+            dataset_rid: Dataset RID for which to find the associated execution.
 
         Returns:
-            The first Dataset_Execution row for this dataset, or None if no association exists.
+            The Dataset_Version row for this dataset's version, or None if not found.
+            The 'Execution' field may be None if no execution is associated with this version.
         """
-        dataset_execution_table = self.find_table("Dataset_Execution")
-        cmd = select(dataset_execution_table).where(dataset_execution_table.columns.Dataset == dataset_rid)
+        # Get the version of this dataset in the bag
+        version = self.bag_rids.get(dataset_rid)
+        if not version:
+            return None
+
+        dataset_version_table = self.find_table("Dataset_Version")
+        cmd = select(dataset_version_table).where(
+            dataset_version_table.columns.Dataset == dataset_rid,
+            dataset_version_table.columns.Version == str(version),
+        )
         with Session(self.engine) as session:
             result = session.execute(cmd).mappings().first()
             return dict(result) if result else None
