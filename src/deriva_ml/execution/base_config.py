@@ -18,12 +18,15 @@ Usage:
 """
 
 from dataclasses import dataclass, field
+from typing import Any, TypeVar
 
-from hydra_zen import builds, store
+from hydra_zen import builds, launch, store, zen
 
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.definitions import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
+
+T = TypeVar("T")
 
 
 # Standard hydra defaults for DerivaML applications.
@@ -78,3 +81,87 @@ DerivaBaseConfig = builds(
 )
 
 store(DerivaBaseConfig, name="deriva_base")
+
+
+def get_notebook_configuration(
+    config_class: type[T],
+    config_name: str,
+    overrides: list[str] | None = None,
+    job_name: str = "notebook",
+    version_base: str = "1.3",
+) -> T:
+    """Load and return a hydra-zen configuration for use in notebooks.
+
+    This function is the notebook equivalent of `run_model`. While `run_model`
+    launches a full execution with model training, `get_notebook_configuration`
+    simply resolves the configuration and returns it for interactive use.
+
+    The function handles:
+    - Adding configurations to the hydra store
+    - Launching hydra-zen to resolve defaults and overrides
+    - Returning the instantiated configuration object
+
+    Args:
+        config_class: The hydra-zen builds() class for the configuration.
+            This should be a class created with `builds(YourConfig, ...)`.
+        config_name: Name of the configuration in the hydra store.
+            Must match the name used when calling `store(config_class, name=...)`.
+        overrides: Optional list of Hydra override strings (e.g., ["param=value"]).
+        job_name: Name for the Hydra job (default: "notebook").
+        version_base: Hydra version base (default: "1.3").
+
+    Returns:
+        The instantiated configuration object with all defaults resolved.
+
+    Example:
+        In your notebook's configuration module (e.g., `configs/roc_analysis.py`):
+
+        >>> from dataclasses import dataclass, field
+        >>> from hydra_zen import builds, store
+        >>> from deriva_ml.execution import BaseConfig
+        >>>
+        >>> @dataclass
+        ... class ROCAnalysisConfig(BaseConfig):
+        ...     execution_rids: list[str] = field(default_factory=list)
+        >>>
+        >>> ROCAnalysisConfigBuilds = builds(
+        ...     ROCAnalysisConfig,
+        ...     populate_full_signature=True,
+        ...     hydra_defaults=["_self_", {"deriva_ml": "default_deriva"}],
+        ... )
+        >>> store(ROCAnalysisConfigBuilds, name="roc_analysis")
+
+        In your notebook:
+
+        >>> from configs import load_all_configs
+        >>> from configs.roc_analysis import ROCAnalysisConfigBuilds
+        >>> from deriva_ml.execution import get_notebook_configuration
+        >>>
+        >>> # Load all project configs into hydra store
+        >>> load_all_configs()
+        >>>
+        >>> # Get resolved configuration
+        >>> config = get_notebook_configuration(
+        ...     ROCAnalysisConfigBuilds,
+        ...     config_name="roc_analysis",
+        ...     overrides=["execution_rids=[3JRC,3KT0]"],
+        ... )
+        >>>
+        >>> # Use the configuration
+        >>> print(config.execution_rids)  # ['3JRC', '3KT0']
+        >>> print(config.deriva_ml.hostname)  # From default_deriva config
+    """
+    # Ensure configs are in the hydra store
+    store.add_to_hydra_store(overwrite_ok=True)
+
+    # Launch hydra-zen to resolve the configuration
+    result = launch(
+        config_class,
+        zen(config_class),
+        version_base=version_base,
+        config_name=config_name,
+        job_name=job_name,
+        overrides=overrides or [],
+    )
+
+    return result.return_value
