@@ -414,6 +414,19 @@ class CatalogGraph:
             or (p[1] not in dataset_associations)  # Tables in the domain schema
             or (p[1] in included_associations)  # Tables that include members of the dataset
         }
+
+        # Add feature table paths for domain tables in the dataset
+        # Feature tables (e.g., Execution_Image_Image_Classification) contain feature values
+        # that need to be exported with the dataset
+        if dataset_rid:
+            for element_table in dataset_elements:
+                for feature in self._ml_instance.find_features(element_table):
+                    # Find the path to the element table and extend it with the feature table
+                    for path in paths.copy():
+                        if path[-1] == element_table:
+                            # Add a path that goes through the element table to the feature table
+                            paths.add(path + (feature.feature_table,))
+
         # Now get paths for nested datasets
         nested_paths = set()
         if dataset_rid:

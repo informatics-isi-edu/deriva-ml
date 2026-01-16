@@ -557,7 +557,8 @@ class DatabaseModel(DerivaModel):
         dataset_execution_table = self.find_table("Dataset_Execution")
         cmd = select(dataset_execution_table).where(dataset_execution_table.columns.Dataset == dataset_rid)
         with Session(self.engine) as session:
-            result = session.execute(cmd).mappings().one_or_none()
+            # A dataset may be used by multiple executions; return the first one (oldest)
+            result = session.execute(cmd).mappings().first()
             return dict(result) if result else None
 
     def rid_lookup(self, dataset_rid: RID) -> DatasetVersion | None:
