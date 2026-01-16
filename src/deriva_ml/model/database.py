@@ -149,7 +149,11 @@ class DatabaseModel(DerivaModel):
         self.bag_path = bag_path
         self.minid = minid
         self.dataset_rid = minid.dataset_rid
-        self.dbase_path = dbase_path / f"{minid.version_rid}"
+
+        # Extract the bag checksum from the cache directory name (e.g., "3YM_abc123...")
+        # This ensures the database is recreated when the bag content changes.
+        bag_cache_dir = bag_path.parent.name  # e.g., "3YM_abc123def456..."
+        self.dbase_path = dbase_path / bag_cache_dir
         self.dbase_path.mkdir(parents=True, exist_ok=True)
 
         self.engine = create_engine(f"sqlite:///{(self.dbase_path / 'main.db').resolve()}", future=True)

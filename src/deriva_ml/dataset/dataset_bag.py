@@ -427,13 +427,17 @@ class DatasetBag:
             feature_name: Name of the feature.
 
         Returns:
-            Feature values.
+            Feature values as a list of dictionaries with column names as keys.
         """
         feature = self.model.lookup_feature(table, feature_name)
-        feature_class = self.model.get_orm_class_for_table(feature.feature_table)
+        feature_table = self.model.find_table(feature.feature_table.name)
         with Session(self.engine) as session:
-            sql_cmd = select(feature_class)
-            return cast(datapath._ResultSet, [row for row in session.execute(sql_cmd).mappings()])
+            # Query directly using the SQL table to avoid ORM lazy loading issues
+            sql_cmd = select(feature_table)
+            result = session.execute(sql_cmd)
+            # Convert to list of dicts with column names as keys
+            rows = [dict(row._mapping) for row in result]
+            return cast(datapath._ResultSet, rows)
 
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of elements that can be contained in datasets.
