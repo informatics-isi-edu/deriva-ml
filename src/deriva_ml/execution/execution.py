@@ -1032,6 +1032,60 @@ class Execution:
                 feature.Execution = self.execution_rid
                 file.write(json.dumps(feature.model_dump(mode="json")) + "\n")
 
+    def list_input_datasets(self) -> list[Dataset]:
+        """List all datasets that were inputs to this execution.
+
+        Returns:
+            List of Dataset objects that were used as inputs.
+
+        Example:
+            >>> for ds in execution.list_input_datasets():
+            ...     print(f"Input: {ds.dataset_rid} - {ds.description}")
+        """
+        pb = self._ml_object.pathBuilder()
+        dataset_exec = pb.schemas[self._ml_object.ml_schema].Dataset_Execution
+
+        records = list(
+            dataset_exec.filter(dataset_exec.Execution == self.execution_rid)
+            .entities()
+            .fetch()
+        )
+
+        return [self._ml_object.lookup_dataset(r["Dataset"]) for r in records]
+
+    def list_input_assets(self, asset_role: str | None = None) -> list["Asset"]:
+        """List all assets that were inputs or outputs of this execution.
+
+        Args:
+            asset_role: Optional filter: "Input" or "Output". If None, returns all.
+
+        Returns:
+            List of Asset objects associated with this execution.
+
+        Example:
+            >>> inputs = execution.list_input_assets(asset_role="Input")
+            >>> outputs = execution.list_input_assets(asset_role="Output")
+        """
+        from deriva_ml.asset.asset import Asset
+
+        pb = self._ml_object.pathBuilder()
+        asset_exec = pb.schemas[self._ml_object.ml_schema].Execution_Asset_Execution
+
+        query = asset_exec.filter(asset_exec.Execution == self.execution_rid)
+        if asset_role:
+            query = query.filter(asset_exec.Asset_Role == asset_role)
+
+        records = list(query.entities().fetch())
+
+        assets = []
+        for r in records:
+            try:
+                asset = self._ml_object.lookup_asset(r["Execution_Asset"])
+                assets.append(asset)
+            except Exception:
+                pass  # Skip assets that can't be looked up
+        return assets
+
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_dataset(
         self,
