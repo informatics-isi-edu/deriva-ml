@@ -297,25 +297,33 @@ class ExecutionMixin:
             >>> for exp in experiments:
             ...     print(f"{exp.name}: {exp.config_choices}")
         """
+        import re
         from deriva_ml.experiment import Experiment
 
-        # Get datapath to Execution table with a link to Execution_Metadata
-        # to find executions that have hydra config files
+        # Get datapath to tables
         pb = self.pathBuilder()
         execution_path = pb.schemas[self.ml_schema].Execution
         metadata_path = pb.schemas[self.ml_schema].Execution_Metadata
+        meta_exec_path = pb.schemas[self.ml_schema].Execution_Metadata_Execution
 
         # Find executions that have metadata assets with config.yaml files
-        # Join Execution -> Execution_Metadata and filter for config.yaml filenames
-        execution_metadata_link = metadata_path.link(execution_path)
-        filtered_metadata = execution_metadata_link.filter(
-            metadata_path.Filename.regexp(".*-config\\.yaml$")
-        )
-
-        # Get distinct execution RIDs that have config files
+        # Query the association table to find executions with hydra config metadata
         exec_rids_with_config = set()
-        for record in filtered_metadata.entities().fetch():
-            exec_rids_with_config.add(record["Execution"])
+
+        # Get all metadata records and filter for config.yaml files in Python
+        # (ERMrest regex support varies by deployment)
+        config_pattern = re.compile(r".*-config\.yaml$")
+        config_metadata_rids = set()
+        for meta in metadata_path.entities().fetch():
+            filename = meta.get("Filename", "")
+            if filename and config_pattern.match(filename):
+                config_metadata_rids.add(meta["RID"])
+
+        if config_metadata_rids:
+            # Query the association table to find which executions have these metadata
+            for assoc_record in meta_exec_path.entities().fetch():
+                if assoc_record.get("Execution_Metadata") in config_metadata_rids:
+                    exec_rids_with_config.add(assoc_record["Execution"])
 
         # Apply additional filters and yield Experiment objects
         filtered_path = execution_path
