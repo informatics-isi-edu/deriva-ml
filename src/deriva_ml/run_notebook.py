@@ -24,15 +24,18 @@ Usage:
     deriva-ml-run-notebook notebook.ipynb -p param1 value1 -p param2 value2
     deriva-ml-run-notebook notebook.ipynb --file parameters.yaml
     deriva-ml-run-notebook notebook.ipynb --inspect  # Show available parameters
+    deriva-ml-run-notebook notebook.ipynb assets=my_assets  # Hydra overrides only
 
 Example:
-    # Run a training notebook with parameters
+    # Run a training notebook with explicit host/catalog
     deriva-ml-run-notebook train_model.ipynb \\
         --host deriva.example.org \\
         --catalog 42 \\
         -p learning_rate 0.001 \\
-        -p epochs 100 \\
         --kernel my_ml_env
+
+    # Run using Hydra config defaults (no --host/--catalog needed)
+    deriva-ml-run-notebook analysis.ipynb assets=roc_comparison_probabilities
 
 See Also:
     - install_kernel: Module for installing Jupyter kernels for virtual environments
@@ -252,8 +255,8 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         self.parser.add_argument(
             "--catalog",
             type=str,
-            default="1",
-            help="Catalog number or identifier"
+            default=None,
+            help="Catalog number or identifier (optional if defined in Hydra config)"
         )
 
         self.parser.add_argument(
@@ -359,9 +362,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         # Build parameters dict from command-line -p/--parameter flags
         # args.parameter is a list of [KEY, VALUE] lists, e.g. [['timeout', '30'], ...]
         parameters = {key: self._coerce_number(val) for key, val in args.parameter}
-        # Always inject host and catalog for DerivaML connection in the notebook
-        parameters['host'] = args.host
-        parameters['catalog'] = args.catalog
+        # Inject host and catalog if provided on command line
+        # If not provided, the notebook will use values from Hydra config
+        if args.host:
+            parameters['host'] = args.host
+        if args.catalog:
+            parameters['catalog'] = args.catalog
 
         # Merge parameters from configuration file if provided
         if parameter_file:
