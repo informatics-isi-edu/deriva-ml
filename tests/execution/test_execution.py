@@ -447,6 +447,51 @@ class TestExecutionAssets:
         assert "deriva-ml/Execution_Asset" in uploaded
         assert len(uploaded["deriva-ml/Execution_Asset"]) == 2
 
+    def test_list_asset_executions(self, basic_execution):
+        """Test listing executions associated with an asset."""
+        ml = basic_execution._ml_object
+
+        # Create and upload an asset
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "traced_asset.txt", "Traceable content")
+
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        # Test list_asset_executions - should return the execution that created the asset
+        executions = ml.list_asset_executions(asset_rid)
+        assert len(executions) == 1
+        assert executions[0]["Execution"] == basic_execution.execution_rid
+        assert executions[0]["Asset_Role"] == "Output"
+
+        # Test with asset_role filter
+        output_executions = ml.list_asset_executions(asset_rid, asset_role="Output")
+        assert len(output_executions) == 1
+
+        input_executions = ml.list_asset_executions(asset_rid, asset_role="Input")
+        assert len(input_executions) == 0
+
+        # Create a new execution that uses the asset as input
+        config = ExecutionConfiguration(
+            description="Input Test",
+            workflow=basic_execution.configuration.workflow,
+            assets=[asset_rid],
+        )
+        input_execution = ml.create_execution(config)
+
+        # Now test again - should have both associations
+        all_executions = ml.list_asset_executions(asset_rid)
+        assert len(all_executions) == 2
+
+        # Filter by role
+        output_only = ml.list_asset_executions(asset_rid, asset_role="Output")
+        assert len(output_only) == 1
+        assert output_only[0]["Execution"] == basic_execution.execution_rid
+
+        input_only = ml.list_asset_executions(asset_rid, asset_role="Input")
+        assert len(input_only) == 1
+        assert input_only[0]["Execution"] == input_execution.execution_rid
+
 
 # =============================================================================
 # TestExecutionDatasets - Dataset Operations Tests

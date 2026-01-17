@@ -58,6 +58,7 @@ from deriva_ml.core.definitions import (
     UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
@@ -99,57 +100,6 @@ except ImportError:
 
     def Markdown(s):
         return s
-
-
-class AssetFilePath(Path):
-    """Extended Path class for managing asset files.
-
-    Represents a file path with additional metadata about its role as an asset in the catalog.
-    This class extends the standard Path class to include information about the asset's
-    catalog representation and type.
-
-    Attributes:
-        asset_name (str): Name of the asset in the catalog (e.g., asset table name).
-        file_name (str): Name of the local file containing the asset.
-        asset_metadata (dict[str, Any]): Additional columns beyond URL, Length, and checksum.
-        asset_types (list[str]): Terms from the Asset_Type controlled vocabulary.
-        asset_rid (RID | None): Resource Identifier if uploaded to an asset table.
-
-    Example:
-        >>> path = AssetFilePath(
-        ...     "/path/to/file.txt",
-        ...     asset_name="analysis_output",
-        ...     file_name="results.txt",
-        ...     asset_metadata={"version": "1.0"},
-        ...     asset_types=["text", "results"]
-        ... )
-    """
-
-    def __init__(
-        self,
-        asset_path: str | Path,
-        asset_name: str,
-        file_name: str,
-        asset_metadata: dict[str, Any],
-        asset_types: list[str] | str,
-        asset_rid: RID | None = None,
-    ):
-        """Initializes an AssetFilePath instance.
-
-        Args:
-            asset_path: Local path to the asset file.
-            asset_name: Name of the asset in the catalog.
-            file_name: Name of the local file.
-            asset_metadata: Additional metadata columns.
-            asset_types: One or more asset type terms.
-            asset_rid: Optional Resource Identifier if already in catalog.
-        """
-        super().__init__(asset_path)
-        self.asset_name = asset_name
-        self.file_name = file_name
-        self.asset_metadata = asset_metadata
-        self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
-        self.asset_rid = asset_rid
 
 
 class Execution:
@@ -616,7 +566,7 @@ class Execution:
             asset_map.setdefault(asset_table, []).append(
                 AssetFilePath(
                     asset_path=path,
-                    asset_name=asset_table,
+                    asset_table=asset_table,
                     file_name=file_name,
                     asset_metadata={
                         k: v
@@ -680,7 +630,7 @@ class Execution:
             asset_rid=asset_rid,
             asset_path=asset_filename,
             asset_metadata=asset_metadata,
-            asset_name=asset_table.name,
+            asset_table=asset_table.name,
             asset_types=asset_types,
         )
 
@@ -1021,7 +971,7 @@ class Execution:
 
         return AssetFilePath(
             asset_path=asset_path,
-            asset_name=asset_name,
+            asset_table=asset_name,
             file_name=target_name.name,
             asset_metadata=kwargs,
             asset_types=asset_types,

@@ -371,3 +371,47 @@ class TestDataset:
         remaining = list(ml_instance.find_datasets())
         assert len(remaining) == 1
         assert remaining[0].dataset_rid == ds3.dataset_rid
+
+    def test_dataset_list_executions(self, test_ml):
+        """Test listing executions associated with a dataset."""
+        ml_instance = test_ml
+
+        # Add required vocabulary terms
+        ml_instance.add_term(MLVocab.workflow_type, "Test Workflow", description="Test workflow")
+        ml_instance.add_term(MLVocab.dataset_type, "TestSet", description="A test dataset type")
+
+        # Create a workflow
+        workflow = ml_instance.create_workflow(
+            name="Test Workflow",
+            workflow_type="Test Workflow",
+            description="Testing list_executions",
+        )
+
+        # Create an execution that will use a dataset
+        execution1 = ml_instance.create_execution(
+            ExecutionConfiguration(description="Execution 1", workflow=workflow)
+        )
+
+        # Create a dataset within this execution
+        dataset = execution1.create_dataset(dataset_types=["TestSet"], description="Test dataset")
+
+        # Test list_executions - should return the execution that created the dataset
+        executions = dataset.list_executions()
+        assert len(executions) == 1
+        assert executions[0].execution_rid == execution1.execution_rid
+
+        # Create a second execution that uses the same dataset
+        execution2 = ml_instance.create_execution(
+            ExecutionConfiguration(
+                description="Execution 2",
+                workflow=workflow,
+                datasets=[DatasetSpec(rid=dataset.dataset_rid)],
+            )
+        )
+
+        # Now list_executions should return both executions
+        executions = dataset.list_executions()
+        assert len(executions) == 2
+        execution_rids = {exe.execution_rid for exe in executions}
+        assert execution1.execution_rid in execution_rids
+        assert execution2.execution_rid in execution_rids

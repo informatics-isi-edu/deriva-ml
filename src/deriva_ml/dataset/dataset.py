@@ -1192,6 +1192,36 @@ class Dataset:
 
         return [self._ml_instance.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
 
+    def list_executions(self) -> list["Execution"]:
+        """List all executions associated with this dataset.
+
+        Returns all executions that used this dataset as input. This is
+        tracked through the Dataset_Execution association table.
+
+        Returns:
+            List of Execution objects associated with this dataset.
+
+        Example:
+            >>> dataset = ml.lookup_dataset("1-abc123")
+            >>> executions = dataset.list_executions()
+            >>> for exe in executions:
+            ...     print(f"Execution {exe.execution_rid}: {exe.status}")
+        """
+        # Import here to avoid circular dependency
+        from deriva_ml.execution.execution import Execution
+
+        pb = self._ml_instance.pathBuilder()
+        dataset_execution_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Execution
+
+        # Query for all executions associated with this dataset
+        records = list(
+            dataset_execution_path.filter(dataset_execution_path.Dataset == self.dataset_rid)
+            .entities()
+            .fetch()
+        )
+
+        return [self._ml_instance.lookup_execution(record["Execution"]) for record in records]
+
     @staticmethod
     def _insert_dataset_versions(
         ml_instance: DerivaMLCatalog,

@@ -390,6 +390,109 @@ class WritableDataset(DatasetLike, Protocol):
 
 
 @runtime_checkable
+class AssetLike(Protocol):
+    """Protocol defining read-only interface for asset access.
+
+    This protocol defines the common read interface for accessing asset
+    metadata, types, and provenance. It parallels DatasetLike but for
+    individual file-based records rather than data collections.
+
+    Attributes:
+        asset_rid: Resource Identifier for the asset.
+        asset_table: Name of the asset table containing this asset.
+        filename: Original filename of the asset.
+        url: URL to access the asset file.
+        length: Size of the asset file in bytes.
+        md5: MD5 checksum of the asset file.
+        asset_types: Type(s) of the asset from Asset_Type vocabulary.
+        description: Description of the asset.
+        execution_rid: Optional execution RID that created the asset.
+    """
+
+    asset_rid: RID
+    asset_table: str
+    filename: str
+    url: str
+    length: int
+    md5: str
+    asset_types: list[str]
+    description: str
+    execution_rid: RID | None
+
+    def list_executions(self, asset_role: str | None = None) -> list[dict[str, Any]]:
+        """List all executions associated with this asset.
+
+        Args:
+            asset_role: Optional filter for asset role ('Input' or 'Output').
+
+        Returns:
+            List of records with Execution RID and Asset_Role.
+        """
+        ...
+
+    def find_features(self) -> Iterable[Feature]:
+        """Find features defined on this asset's table.
+
+        Returns:
+            Iterable of Feature objects.
+        """
+        ...
+
+    def list_feature_values(self, feature_name: str) -> list[dict[str, Any]]:
+        """Get feature values for this specific asset.
+
+        Args:
+            feature_name: Name of the feature to query.
+
+        Returns:
+            List of feature value records.
+        """
+        ...
+
+    def get_metadata(self) -> dict[str, Any]:
+        """Get all metadata for this asset from the catalog.
+
+        Returns:
+            Dictionary of all columns/values for this asset record.
+        """
+        ...
+
+    def get_chaise_url(self) -> str:
+        """Get the Chaise URL for viewing this asset in the web interface.
+
+        Returns:
+            URL to view this asset in Chaise.
+        """
+        ...
+
+
+@runtime_checkable
+class WritableAsset(AssetLike, Protocol):
+    """Protocol defining write operations for assets.
+
+    This protocol extends AssetLike with write operations that are only
+    available on live catalog assets. Downloaded assets are immutable
+    and do not implement these methods.
+    """
+
+    def add_asset_type(self, type_name: str) -> None:
+        """Add an asset type to this asset.
+
+        Args:
+            type_name: Name of the asset type vocabulary term.
+        """
+        ...
+
+    def remove_asset_type(self, type_name: str) -> None:
+        """Remove an asset type from this asset.
+
+        Args:
+            type_name: Name of the asset type vocabulary term.
+        """
+        ...
+
+
+@runtime_checkable
 class DerivaMLCatalogReader(Protocol):
     """Protocol for read-only catalog operations.
 
