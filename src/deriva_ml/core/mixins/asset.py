@@ -301,6 +301,27 @@ class AssetMixin:
             asset_types=asset_types,
         )
 
+    def list_asset_tables(self) -> list[Table]:
+        """List all asset tables in the catalog.
+
+        Returns:
+            List of Table objects that are asset tables.
+
+        Example:
+            >>> for table in ml.list_asset_tables():
+            ...     print(f"Asset table: {table.name}")
+        """
+        tables = [
+            t for t in self.model.schemas[self.domain_schema].tables.values()
+            if self.model.is_asset(t)
+        ]
+        # Also include ML schema asset tables (like Execution_Asset)
+        tables.extend([
+            t for t in self.model.schemas[self.ml_schema].tables.values()
+            if self.model.is_asset(t)
+        ])
+        return tables
+
     def find_assets(
         self,
         asset_table: Table | str | None = None,
@@ -336,16 +357,7 @@ class AssetMixin:
         if asset_table is not None:
             tables = [self.model.name_to_table(asset_table)]
         else:
-            # Find all asset tables
-            tables = [
-                t for t in self.model.schemas[self.domain_schema].tables.values()
-                if self.model.is_asset(t)
-            ]
-            # Also include ML schema asset tables (like Execution_Asset)
-            tables.extend([
-                t for t in self.model.schemas[self.ml_schema].tables.values()
-                if self.model.is_asset(t)
-            ])
+            tables = self.list_asset_tables()
 
         for table in tables:
             # Get all assets from this table
