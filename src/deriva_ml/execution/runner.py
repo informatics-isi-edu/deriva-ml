@@ -418,10 +418,11 @@ def run_model(
     # ---------------------------------------------------------------------------
     # The choices dict maps config group names to the selected config names
     # e.g., {"model_config": "cifar10_quick", "datasets": "cifar10_training"}
+    # Filter out None values (some Hydra internal groups have None choices)
     config_choices: dict[str, str] = {}
     try:
         hydra_cfg = HydraConfig.get()
-        config_choices = dict(hydra_cfg.runtime.choices)
+        config_choices = {k: v for k, v in hydra_cfg.runtime.choices.items() if v is not None}
     except Exception:
         pass  # HydraConfig not available outside Hydra context
 

@@ -214,10 +214,11 @@ def get_notebook_configuration(
     def return_instantiated_config(cfg: Any) -> T:
         nonlocal captured_choices
         # Capture the Hydra runtime choices (which config names were selected)
+        # Filter out None values (some Hydra internal groups have None choices)
         try:
             from hydra.core.hydra_config import HydraConfig
             choices = HydraConfig.get().runtime.choices
-            captured_choices = dict(choices)
+            captured_choices = {k: v for k, v in choices.items() if v is not None}
         except Exception:
             # If HydraConfig is not available, leave choices empty
             pass
