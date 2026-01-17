@@ -1,28 +1,56 @@
 """Base configuration for DerivaML applications.
 
-This module defines the base configuration that both script execution and
-notebooks can inherit from. It provides the common hydra defaults structure
-without tying to the run_model function.
+This module defines the base configuration and helper functions that simplify
+creating hydra-zen configurations for both script execution and notebooks.
 
-Usage:
-    # In notebooks or project configs
-    from deriva_ml.execution import BaseConfig, base_defaults
+Simple Usage (notebooks using only BaseConfig fields):
+    # In configs/my_notebook.py
+    from deriva_ml.execution import notebook_config
+
+    notebook_config(
+        "my_notebook",
+        defaults={"assets": "my_assets", "datasets": "my_dataset"},
+    )
+
+    # In notebook
+    from deriva_ml.execution import run_notebook
+    ml, execution, config = run_notebook("my_notebook")
+
+Advanced Usage (notebooks with custom parameters):
+    # In configs/my_analysis.py
+    from dataclasses import dataclass
+    from deriva_ml.execution import BaseConfig, notebook_config
 
     @dataclass
-    class MyNotebookConfig(BaseConfig):
-        my_param: str = "value"
+    class MyAnalysisConfig(BaseConfig):
+        threshold: float = 0.5
+        num_samples: int = 100
 
-    # Build and register with hydra-zen
-    MyConfig = builds(MyNotebookConfig, hydra_defaults=[...])
-    store(MyConfig, name="my_config")
+    notebook_config(
+        "my_analysis",
+        config_class=MyAnalysisConfig,
+        defaults={"assets": "analysis_assets"},
+    )
+
+    # In notebook
+    from deriva_ml.execution import run_notebook
+    ml, execution, config = run_notebook("my_analysis")
+    print(config.threshold)  # 0.5
 """
 
+import importlib
 import json
 import os
+import pkgutil
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from pathlib import Path
+from typing import Any, TypeVar, TYPE_CHECKING
 
 from hydra_zen import builds, instantiate, launch, store
+
+if TYPE_CHECKING:
+    from deriva_ml import DerivaML
+    from deriva_ml.execution import Execution
 
 T = TypeVar("T")
 
@@ -189,3 +217,279 @@ def get_notebook_configuration(
     )
 
     return result.return_value
+
+
+# ---------------------------------------------------------------------------
+# Registry for notebook configurations
+# ---------------------------------------------------------------------------
+# Maps config_name -> (config_builds_class, config_name)
+_notebook_configs: dict[str, tuple[Any, str]] = {}
+
+
+def notebook_config(
+    name: str,
+    config_class: type[BaseConfig] | None = None,
+    defaults: dict[str, str] | None = None,
+    **field_defaults: Any,
+) -> Any:
+    """Register a notebook configuration with simplified syntax.
+
+    This is the recommended way to create notebook configurations. It handles
+    all the hydra-zen boilerplate (builds, store, defaults) automatically.
+
+    For simple notebooks that only use BaseConfig fields (deriva_ml, datasets,
+    assets, etc.), just specify which defaults to use. For notebooks with
+    custom parameters, provide a config_class that inherits from BaseConfig.
+
+    Args:
+        name: Configuration name. Used both as the hydra config name and
+            to look up the config in run_notebook().
+        config_class: Optional dataclass inheriting from BaseConfig. If None,
+            uses BaseConfig directly (suitable for notebooks that only need
+            the standard fields).
+        defaults: Dict mapping config group names to config names. These
+            override the base defaults. Common groups:
+            - "deriva_ml": Connection config (e.g., "default_deriva", "eye_ai")
+            - "datasets": Dataset config (e.g., "cifar10_training")
+            - "assets": Asset config (e.g., "model_weights")
+            - "workflow": Workflow config (e.g., "default_workflow")
+        **field_defaults: Default values for fields in config_class.
+
+    Returns:
+        The hydra-zen builds() class, in case you need to reference it directly.
+
+    Examples:
+        Simple notebook using only standard fields:
+
+            # configs/roc_analysis.py
+            from deriva_ml.execution import notebook_config
+
+            notebook_config(
+                "roc_analysis",
+                defaults={"assets": "roc_comparison_probabilities"},
+            )
+
+        Notebook with custom parameters:
+
+            # configs/training_analysis.py
+            from dataclasses import dataclass
+            from deriva_ml.execution import BaseConfig, notebook_config
+
+            @dataclass
+            class TrainingAnalysisConfig(BaseConfig):
+                learning_rate: float = 0.001
+                batch_size: int = 32
+
+            notebook_config(
+                "training_analysis",
+                config_class=TrainingAnalysisConfig,
+                defaults={"datasets": "cifar10_training"},
+                learning_rate=0.01,  # Override default
+            )
+    """
+    # Use BaseConfig if no custom class provided
+    actual_class = config_class or BaseConfig
+
+    # Build the hydra defaults list
+    hydra_defaults = ["_self_"]
+
+    # Start with base defaults, then apply overrides
+    default_groups = {
+        "deriva_ml": "default_deriva",
+        "datasets": "default_dataset",
+        "assets": "default_asset",
+    }
+    if defaults:
+        default_groups.update(defaults)
+
+    for group, config_name in default_groups.items():
+        hydra_defaults.append({group: config_name})
+
+    # Create the hydra-zen builds() class
+    config_builds = builds(
+        actual_class,
+        populate_full_signature=True,
+        hydra_defaults=hydra_defaults,
+        **field_defaults,
+    )
+
+    # Register with hydra-zen store
+    store(config_builds, name=name)
+
+    # Also register in our internal registry for run_notebook()
+    _notebook_configs[name] = (config_builds, name)
+
+    return config_builds
+
+
+def load_configs(package_name: str = "configs") -> list[str]:
+    """Dynamically import all configuration modules from a package.
+
+    This function discovers and imports all Python modules in the specified
+    package. Each module is expected to register its configurations with
+    the hydra-zen store as a side effect of being imported.
+
+    Args:
+        package_name: Name of the package containing config modules.
+            Default is "configs" which works for the standard project layout.
+
+    Returns:
+        List of module names that were successfully loaded.
+
+    Raises:
+        ImportError: If a config module fails to import.
+
+    Example:
+        # In your main script or notebook
+        from deriva_ml.execution import load_configs
+
+        load_configs()  # Loads from "configs" package
+        # or
+        load_configs("my_project.configs")  # Custom package
+
+    Note:
+        The "experiments" module (if present) is loaded last because it
+        typically depends on other configs being registered first.
+    """
+    loaded_modules = []
+
+    try:
+        package = importlib.import_module(package_name)
+    except ImportError:
+        # Package doesn't exist, return empty
+        return []
+
+    package_dir = Path(package.__file__).parent
+
+    # Collect module names
+    modules_to_load = []
+    for module_info in pkgutil.iter_modules([str(package_dir)]):
+        modules_to_load.append(module_info.name)
+
+    # Sort modules but ensure 'experiments' is loaded last
+    modules_to_load.sort()
+    if "experiments" in modules_to_load:
+        modules_to_load.remove("experiments")
+        modules_to_load.append("experiments")
+
+    for module_name in modules_to_load:
+        importlib.import_module(f"{package_name}.{module_name}")
+        loaded_modules.append(module_name)
+
+    return sorted(loaded_modules)
+
+
+def run_notebook(
+    config_name: str,
+    overrides: list[str] | None = None,
+    workflow_name: str | None = None,
+    workflow_type: str = "Analysis Notebook",
+    ml_class: type["DerivaML"] | None = None,
+    config_package: str = "configs",
+) -> tuple["DerivaML", "Execution", BaseConfig]:
+    """Initialize a notebook with DerivaML execution context.
+
+    This is the main entry point for notebooks. It handles all the setup:
+    1. Loads all config modules from the config package
+    2. Resolves the hydra-zen configuration
+    3. Creates the DerivaML connection
+    4. Creates a workflow and execution context
+    5. Downloads any specified datasets and assets
+
+    Args:
+        config_name: Name of the notebook configuration (registered via
+            notebook_config() or store()).
+        overrides: Optional list of Hydra override strings
+            (e.g., ["assets=different_assets"]).
+        workflow_name: Name for the workflow. Defaults to config_name.
+        workflow_type: Type of workflow (default: "Analysis Notebook").
+        ml_class: Optional DerivaML subclass to use. If None, uses DerivaML.
+        config_package: Package containing config modules (default: "configs").
+
+    Returns:
+        Tuple of (ml_instance, execution, config):
+        - ml_instance: Connected DerivaML (or subclass) instance
+        - execution: Execution context with downloaded inputs
+        - config: Resolved configuration object
+
+    Example:
+        # Simple usage
+        from deriva_ml.execution import run_notebook
+
+        ml, execution, config = run_notebook("roc_analysis")
+
+        # Access config values
+        print(config.assets)
+        print(config.deriva_ml.hostname)
+
+        # Use ml and execution
+        for asset_table, paths in execution.asset_paths.items():
+            for path in paths:
+                print(f"Downloaded: {path.file_name}")
+
+        # At the end of notebook
+        execution.upload_execution_outputs()
+
+    Example with overrides:
+        ml, execution, config = run_notebook(
+            "roc_analysis",
+            overrides=["assets=roc_quick_probabilities"],
+        )
+
+    Example with custom ML class:
+        from eye_ai import EyeAI
+
+        ml, execution, config = run_notebook(
+            "eye_analysis",
+            ml_class=EyeAI,
+        )
+    """
+    # Import here to avoid circular imports
+    from deriva_ml import DerivaML
+    from deriva_ml.execution import Execution, ExecutionConfiguration
+
+    # Load all config modules
+    load_configs(config_package)
+
+    # Get the config builds class from our registry or try the store
+    if config_name in _notebook_configs:
+        config_builds, _ = _notebook_configs[config_name]
+    else:
+        # Fall back to looking up in hydra store by building a simple config
+        # This handles configs registered the old way
+        config_builds = DerivaBaseConfig
+
+    # Resolve the configuration
+    config = get_notebook_configuration(
+        config_builds,
+        config_name=config_name,
+        overrides=overrides,
+    )
+
+    # Create DerivaML instance
+    actual_ml_class = ml_class or DerivaML
+    ml = actual_ml_class(
+        hostname=config.deriva_ml.hostname,
+        catalog_id=config.deriva_ml.catalog_id,
+    )
+
+    # Create workflow
+    actual_workflow_name = workflow_name or config_name.replace("_", " ").title()
+    workflow = ml.create_workflow(
+        name=actual_workflow_name,
+        workflow_type=workflow_type,
+        description=config.description or f"Running {config_name}",
+    )
+
+    # Create execution configuration
+    exec_config = ExecutionConfiguration(
+        workflow=workflow,
+        datasets=config.datasets if config.datasets else [],
+        assets=config.assets if config.assets else [],
+        description=config.description or f"Execution of {config_name}",
+    )
+
+    # Create execution context (downloads inputs)
+    execution = Execution(configuration=exec_config, ml_object=ml)
+
+    return ml, execution, config

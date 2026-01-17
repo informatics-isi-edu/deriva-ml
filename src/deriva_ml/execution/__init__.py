@@ -6,6 +6,10 @@ from deriva_ml.execution.base_config import (
     DerivaBaseConfig,
     base_defaults,
     get_notebook_configuration,
+    # New simplified API
+    notebook_config,
+    load_configs,
+    run_notebook,
 )
 from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
@@ -40,4 +44,8 @@ __all__ = [
     "DerivaBaseConfig",
     "base_defaults",
     "get_notebook_configuration",
+    # Simplified API
+    "notebook_config",
+    "load_configs",
+    "run_notebook",
 ]

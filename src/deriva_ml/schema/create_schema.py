@@ -360,7 +360,28 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     )
 
 
-def create_ml_catalog(hostname: str, project_name: str) -> ErmrestCatalog:
+def create_ml_catalog(
+    hostname: str,
+    project_name: str,
+    catalog_alias: str | None = None,
+) -> ErmrestCatalog:
+    """Create a new DerivaML catalog with all ML schema tables.
+
+    Args:
+        hostname: Server hostname (e.g., "localhost", "www.eye-ai.org").
+        project_name: Name for the project, becomes the domain schema name.
+        catalog_alias: Optional alias name for the catalog. If provided, creates
+            an alias that points to the new catalog, allowing access via the
+            alias name instead of the numeric catalog ID.
+
+    Returns:
+        The created ErmrestCatalog instance.
+
+    Example:
+        # Create catalog with alias
+        catalog = create_ml_catalog("localhost", "my_project", catalog_alias="my-project")
+        # Now accessible as both /ermrest/catalog/<id> and /ermrest/catalog/my-project
+    """
     server = DerivaServer("https", hostname, credentials=get_credential(hostname))
     catalog = server.create_ermrest_catalog()
     model = catalog.getCatalogModel()
@@ -377,6 +398,16 @@ def create_ml_catalog(hostname: str, project_name: str) -> ErmrestCatalog:
         ]
     )
     create_ml_schema(catalog, project_name=project_name)
+
+    # Create alias if requested
+    if catalog_alias:
+        server.create_ermrest_alias(
+            id=catalog_alias,
+            alias_target=catalog.catalog_id,
+            name=project_name,
+            description=f"Alias for {project_name} catalog (ID: {catalog.catalog_id})",
+        )
+
     return catalog
 
 

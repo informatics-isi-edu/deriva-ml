@@ -39,8 +39,10 @@ See Also:
     - Workflow: Class that handles workflow registration and Git integration
 """
 
+import base64
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -53,6 +55,144 @@ from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, MLAsset
 from deriva_ml.execution import Execution, ExecutionConfiguration, Workflow
+
+
+def _html_table_to_markdown(html: str) -> str | None:
+    """Convert an HTML DataFrame table to markdown format.
+
+    Parses HTML table elements and converts them to a properly formatted
+    markdown table with headers and alignment.
+
+    Args:
+        html: HTML string potentially containing a DataFrame table.
+
+    Returns:
+        Markdown table string if an HTML table was found, None otherwise.
+    """
+    # Check if this looks like a pandas DataFrame HTML output
+    if '<table' not in html or 'dataframe' not in html:
+        return None
+
+    try:
+        # Extract table content using regex (avoid heavy dependency on BeautifulSoup)
+        thead_match = re.search(r'<thead>(.*?)</thead>', html, re.DOTALL)
+        tbody_match = re.search(r'<tbody>(.*?)</tbody>', html, re.DOTALL)
+
+        if not thead_match or not tbody_match:
+            return None
+
+        thead = thead_match.group(1)
+        tbody = tbody_match.group(1)
+
+        # Extract header row(s)
+        header_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', thead, re.DOTALL)
+        if not header_rows:
+            return None
+
+        # For pandas DataFrames with named index:
+        # - First row contains: empty <th> + column names
+        # - Second row (if exists) contains: index name + empty <th>s
+        # We need to use the first row for column names and second row for index name
+
+        first_row = header_rows[0]
+        first_headers = re.findall(r'<th[^>]*>(.*?)</th>', first_row, re.DOTALL)
+        first_headers = [re.sub(r'<[^>]+>', '', h).strip() for h in first_headers]
+
+        # Check if there's a second header row with an index name
+        index_name = ""
+        if len(header_rows) > 1:
+            second_row = header_rows[1]
+            second_headers = re.findall(r'<th[^>]*>(.*?)</th>', second_row, re.DOTALL)
+            second_headers = [re.sub(r'<[^>]+>', '', h).strip() for h in second_headers]
+            # The index name is typically in the first cell of the second row
+            if second_headers and second_headers[0]:
+                index_name = second_headers[0]
+
+        # Build final headers: use index name for first column if available
+        headers = first_headers.copy()
+        if headers and not headers[0] and index_name:
+            headers[0] = index_name
+
+        # Extract body rows
+        body_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', tbody, re.DOTALL)
+
+        rows = []
+        for row_html in body_rows:
+            # Get both th (index) and td (data) cells
+            cells = re.findall(r'<t[hd][^>]*>(.*?)</t[hd]>', row_html, re.DOTALL)
+            cells = [re.sub(r'<[^>]+>', '', c).strip() for c in cells]
+            rows.append(cells)
+
+        if not headers or not rows:
+            return None
+
+        # Build markdown table
+        # Determine column widths for alignment
+        col_widths = [len(h) for h in headers]
+        for row in rows:
+            for i, cell in enumerate(row):
+                if i < len(col_widths):
+                    col_widths[i] = max(col_widths[i], len(cell))
+
+        # Format header
+        header_line = '| ' + ' | '.join(h.ljust(col_widths[i]) for i, h in enumerate(headers)) + ' |'
+        separator = '|' + '|'.join('-' * (w + 2) for w in col_widths) + '|'
+
+        # Format rows
+        formatted_rows = []
+        for row in rows:
+            # Pad row if needed
+            padded = row + [''] * (len(headers) - len(row))
+            formatted = '| ' + ' | '.join(
+                padded[i].ljust(col_widths[i]) if i < len(col_widths) else padded[i]
+                for i in range(len(headers))
+            ) + ' |'
+            formatted_rows.append(formatted)
+
+        return '\n'.join([header_line, separator] + formatted_rows)
+
+    except Exception:
+        # If parsing fails, return None to use default behavior
+        return None
+
+
+def _convert_dataframe_outputs(nb: nbformat.NotebookNode) -> nbformat.NotebookNode:
+    """Convert DataFrame HTML outputs in notebook cells to markdown tables.
+
+    Iterates through all code cells and converts any display_data outputs
+    containing DataFrame HTML tables to markdown format for better rendering.
+
+    Args:
+        nb: The notebook node to process.
+
+    Returns:
+        The modified notebook node with converted outputs.
+    """
+    for cell in nb.cells:
+        if cell.cell_type != 'code':
+            continue
+
+        new_outputs = []
+        for output in cell.get('outputs', []):
+            if output.get('output_type') in ('display_data', 'execute_result'):
+                data = output.get('data', {})
+                html = data.get('text/html', '')
+
+                if html and '<table' in html and 'dataframe' in html:
+                    md_table = _html_table_to_markdown(html)
+                    if md_table:
+                        # Replace the output with markdown text
+                        # Keep the original output type but change the data
+                        new_output = output.copy()
+                        new_output['data'] = {'text/plain': md_table}
+                        new_outputs.append(new_output)
+                        continue
+
+            new_outputs.append(output)
+
+        cell['outputs'] = new_outputs
+
+    return nb
 
 
 class DerivaMLRunNotebookCLI(BaseCLI):
@@ -286,10 +426,14 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         if src_dir.exists():
             sys.path.insert(0, str(src_dir))
 
-        # Try to import and load configs
+        # Try to load configs using the new API, fall back to old method
         try:
-            from configs import load_all_configs
-            load_all_configs()
+            from deriva_ml.execution import load_configs
+            loaded = load_configs("configs")
+            if not loaded:
+                # Try the old way
+                from configs import load_all_configs
+                load_all_configs()
         except ImportError:
             print("Could not import configs module. Make sure src/configs/__init__.py exists.")
             print("Available Hydra groups cannot be determined without loading the config module.")
@@ -472,11 +616,34 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             )
 
             # Convert executed notebook to Markdown for easier viewing
+            # We embed images as base64 data URIs so the markdown is self-contained
             notebook_output_md = notebook_output.with_suffix(".md")
             with notebook_output.open() as f:
                 nb = nbformat.read(f, as_version=4)
+
+            # Convert DataFrame HTML outputs to markdown tables for better rendering
+            nb = _convert_dataframe_outputs(nb)
+
             exporter = MarkdownExporter()
             (body, resources) = exporter.from_notebook_node(nb)
+
+            # Replace file references with inline base64 data URIs
+            if resources.get("outputs"):
+                for filename, data in resources["outputs"].items():
+                    # Determine mime type from extension
+                    if filename.endswith(".png"):
+                        mime_type = "image/png"
+                    elif filename.endswith(".jpg") or filename.endswith(".jpeg"):
+                        mime_type = "image/jpeg"
+                    elif filename.endswith(".svg"):
+                        mime_type = "image/svg+xml"
+                    else:
+                        mime_type = "application/octet-stream"
+
+                    # Create data URI and replace in markdown
+                    b64_data = base64.b64encode(data).decode("utf-8")
+                    data_uri = f"data:{mime_type};base64,{b64_data}"
+                    body = body.replace(filename, data_uri)
 
             with notebook_output_md.open("w") as f:
                 f.write(body)
