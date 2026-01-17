@@ -9,9 +9,10 @@ while automatically tracking the execution in a Deriva catalog. It handles:
 - Multirun/sweep support with parent-child execution nesting
 
 Usage:
-    deriva-ml-run --config-dir src/configs model_config=my_model
-    deriva-ml-run --config-dir src/configs +experiment=my_experiment
-    deriva-ml-run --config-dir src/configs --multirun model_config=m1,m2
+    deriva-ml-run --host localhost --catalog 45 model_config=my_model
+    deriva-ml-run +experiment=my_experiment
+    deriva-ml-run --multirun model_config=m1,m2
+    deriva-ml-run --info  # Show available Hydra config options
 
 This parallels `deriva-ml-run-notebook` but for Python model functions instead
 of Jupyter notebooks.
@@ -21,126 +22,232 @@ See Also:
     - runner.run_model: The underlying function that executes models
 """
 
-import argparse
 import sys
 from pathlib import Path
 
+from deriva.core import BaseCLI
 from hydra_zen import store, zen
 
 from deriva_ml.execution import run_model, load_configs
 
 
+class DerivaMLRunCLI(BaseCLI):
+    """Command-line interface for running ML models with DerivaML execution tracking.
+
+    This CLI extends Deriva's BaseCLI to provide model execution capabilities using
+    hydra-zen. It automatically loads configuration modules from the project's
+    configs directory.
+
+    The CLI supports:
+        - Host and catalog arguments (optional, can use Hydra config defaults)
+        - Hydra configuration overrides as positional arguments
+        - --info flag to display available configuration options
+        - --multirun flag for parameter sweeps
+        - --config-dir to specify custom config location
+
+    Attributes:
+        parser: ArgumentParser instance with configured arguments.
+
+    Example:
+        >>> cli = DerivaMLRunCLI(
+        ...     description="Run ML model",
+        ...     epilog="See documentation for more details"
+        ... )
+        >>> cli.main()  # Parses args and runs model
+    """
+
+    def __init__(self, description: str, epilog: str, **kwargs) -> None:
+        """Initialize the model runner CLI with command-line arguments.
+
+        Sets up argument parsing for model execution, including host/catalog,
+        config directory, and Hydra overrides.
+
+        Args:
+            description: Description text shown in --help output.
+            epilog: Additional text shown after argument help.
+            **kwargs: Additional keyword arguments passed to BaseCLI.
+        """
+        BaseCLI.__init__(self, description, epilog, **kwargs)
+
+        self.parser.add_argument(
+            "--catalog",
+            type=str,
+            default=None,
+            help="Catalog number or identifier (optional if defined in Hydra config)"
+        )
+
+        self.parser.add_argument(
+            "--config-dir",
+            "-c",
+            type=Path,
+            default=Path("src/configs"),
+            help="Path to the configs directory (default: src/configs)",
+        )
+
+        self.parser.add_argument(
+            "--config-name",
+            type=str,
+            default="deriva_model",
+            help="Name of the main hydra-zen config (default: deriva_model)",
+        )
+
+        self.parser.add_argument(
+            "--info",
+            action="store_true",
+            help="Display available Hydra configuration groups and options.",
+        )
+
+        self.parser.add_argument(
+            "--multirun", "-m",
+            action="store_true",
+            help="Run multiple configurations (Hydra multirun mode).",
+        )
+
+        self.parser.add_argument(
+            "hydra_overrides",
+            nargs="*",
+            help="Hydra-zen configuration overrides (e.g., model_config=cifar10_quick)",
+        )
+
+    def main(self) -> int:
+        """Parse command-line arguments and execute the model.
+
+        This is the main entry point that orchestrates:
+        1. Parsing command-line arguments
+        2. Loading configuration modules
+        3. Either showing config info or executing the model
+
+        Returns:
+            Exit code (0 for success, 1 for failure).
+        """
+        args = self.parse_cli()
+
+        # Resolve config directory
+        config_dir = args.config_dir.resolve()
+        if not config_dir.exists():
+            print(f"Error: Config directory not found: {config_dir}")
+            return 1
+
+        # Add the parent of the config directory to sys.path
+        src_dir = config_dir.parent
+        if src_dir.exists() and str(src_dir) not in sys.path:
+            sys.path.insert(0, str(src_dir))
+
+        # Also add project root
+        project_root = src_dir.parent
+        if project_root.exists() and str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+
+        # Load configurations from the configs module
+        config_module_name = config_dir.name
+        loaded = load_configs(config_module_name)
+        if not loaded:
+            # Try the old way
+            try:
+                exec(f"from {config_module_name} import load_all_configs; load_all_configs()")
+            except ImportError:
+                print(f"Error: Could not load configs from '{config_module_name}'")
+                print("Make sure the config directory contains an __init__.py with load_all_configs()")
+                return 1
+
+        if args.info:
+            self._show_hydra_info()
+            return 0
+
+        # Build Hydra overrides list
+        hydra_overrides = list(args.hydra_overrides) if args.hydra_overrides else []
+
+        # Add host/catalog overrides if provided on command line
+        if args.host:
+            hydra_overrides.append(f"deriva_ml.hostname={args.host}")
+        if args.catalog:
+            hydra_overrides.append(f"deriva_ml.catalog_id={args.catalog}")
+
+        # Finalize the hydra-zen store
+        store.add_to_hydra_store()
+
+        # Build argv for Hydra
+        hydra_argv = [sys.argv[0]] + hydra_overrides
+        if args.multirun:
+            hydra_argv.insert(1, "--multirun")
+
+        # Save and replace sys.argv for Hydra
+        original_argv = sys.argv
+        sys.argv = hydra_argv
+
+        try:
+            zen(run_model).hydra_main(
+                config_name=args.config_name,
+                version_base="1.3",
+                config_path=None,
+            )
+        finally:
+            sys.argv = original_argv
+
+        return 0
+
+    @staticmethod
+    def _show_hydra_info() -> None:
+        """Display available Hydra configuration groups and options.
+
+        Inspects the hydra-zen store and prints all registered configuration
+        groups and their available options.
+        """
+        print("Available Hydra Configuration Groups:")
+        print("=" * 50)
+
+        try:
+            groups: dict[str, list[str]] = {}
+
+            for group, name in store._queue:
+                if group:
+                    if group not in groups:
+                        groups[group] = []
+                    if name not in groups[group]:
+                        groups[group].append(name)
+                else:
+                    if "__root__" not in groups:
+                        groups["__root__"] = []
+                    if name not in groups["__root__"]:
+                        groups["__root__"].append(name)
+
+            for group in sorted(groups.keys()):
+                if group == "__root__":
+                    print("\nTop-level configs:")
+                else:
+                    print(f"\n{group}:")
+                for name in sorted(groups[group]):
+                    print(f"  - {name}")
+
+            print("\n" + "=" * 50)
+            print("Usage: deriva-ml-run [options] <group>=<option> ...")
+            print("Example: deriva-ml-run --host localhost --catalog 45 model_config=cifar10_quick")
+            print("Example: deriva-ml-run +experiment=cifar10_quick")
+            print("Example: deriva-ml-run --multirun +experiment=cifar10_quick,cifar10_extended")
+
+        except Exception as e:
+            print(f"Error inspecting Hydra store: {e}")
+
+
 def main() -> int:
     """Main entry point for the model runner CLI.
 
-    Parses command-line arguments, loads configuration modules from the
-    specified config directory, and launches Hydra to execute the model.
+    Creates and runs the DerivaMLRunCLI instance.
 
     Returns:
         Exit code (0 for success, 1 for failure).
     """
-    # Parse initial arguments to get config directory
-    # We need to do this before Hydra takes over argument parsing
-    parser = argparse.ArgumentParser(
+    cli = DerivaMLRunCLI(
         description="Run ML models with DerivaML execution tracking",
         epilog=(
             "Examples:\n"
-            "  deriva-ml-run --config-dir src/configs model_config=my_model\n"
-            "  deriva-ml-run --config-dir src/configs +experiment=my_experiment\n"
-            "  deriva-ml-run --config-dir src/configs --multirun model_config=m1,m2\n"
+            "  deriva-ml-run model_config=my_model\n"
+            "  deriva-ml-run --host localhost --catalog 45 +experiment=cifar10_quick\n"
+            "  deriva-ml-run --multirun +experiment=cifar10_quick,cifar10_extended\n"
+            "  deriva-ml-run --info\n"
         ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        # Don't exit on unrecognized args - let Hydra handle them
-        add_help=False,
     )
-
-    parser.add_argument(
-        "--config-dir",
-        "-c",
-        type=Path,
-        default=Path("src/configs"),
-        help="Path to the configs directory containing hydra-zen configurations (default: src/configs)",
-    )
-
-    parser.add_argument(
-        "--config-name",
-        type=str,
-        default="deriva_model",
-        help="Name of the main hydra-zen config to use (default: deriva_model)",
-    )
-
-    parser.add_argument(
-        "--help",
-        "-h",
-        action="store_true",
-        help="Show this help message and exit",
-    )
-
-    # Parse known args, leaving the rest for Hydra
-    args, remaining = parser.parse_known_args()
-
-    # Show help if requested
-    if args.help and not remaining:
-        parser.print_help()
-        print("\nHydra options (passed through):")
-        print("  --multirun, -m    Run multiple configurations")
-        print("  --info            Show Hydra app info")
-        print("  --help, -h        Show full Hydra help (use with config-dir)")
-        print("\nNote: All other arguments are passed to Hydra for configuration overrides.")
-        return 0
-
-    # Resolve config directory
-    config_dir = args.config_dir.resolve()
-    if not config_dir.exists():
-        print(f"Error: Config directory not found: {config_dir}")
-        return 1
-
-    # Add the parent of the config directory to sys.path so we can import from it
-    # This handles the case where configs is at src/configs
-    src_dir = config_dir.parent
-    if src_dir.exists() and str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
-
-    # Also try adding the config directory's parent's parent (project root)
-    project_root = src_dir.parent
-    if project_root.exists() and str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-
-    # Load configurations from the configs module
-    config_module_name = config_dir.name
-    loaded = load_configs(config_module_name)
-    if not loaded:
-        # Try the old way - import load_all_configs directly
-        try:
-            exec(f"from {config_module_name} import load_all_configs; load_all_configs()")
-        except ImportError:
-            print(f"Error: Could not load configs from '{config_module_name}'")
-            print("Make sure the config directory contains an __init__.py with load_all_configs()")
-            return 1
-
-    # Finalize the hydra-zen store
-    store.add_to_hydra_store()
-
-    # Restore sys.argv for Hydra to parse
-    # Replace --config-dir and --config-name with what Hydra expects
-    hydra_argv = [sys.argv[0]] + remaining
-
-    # Save original argv and replace with hydra_argv
-    original_argv = sys.argv
-    sys.argv = hydra_argv
-
-    try:
-        # Launch Hydra with the model runner
-        zen(run_model).hydra_main(
-            config_name=args.config_name,
-            version_base="1.3",
-            config_path=None,
-        )
-    finally:
-        # Restore original argv
-        sys.argv = original_argv
-
-    return 0
+    return cli.main()
 
 
 if __name__ == "__main__":
