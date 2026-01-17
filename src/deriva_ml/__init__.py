@@ -63,10 +63,6 @@ def __getattr__(name: str) -> type:
         from deriva_ml.asset.aux_classes import AssetSpec
 
         return AssetSpec
-    elif name == "Experiment":
-        from deriva_ml.execution.experiment import Experiment
-
-        return Experiment
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -77,8 +73,6 @@ __all__ = [
     "Asset",
     "AssetFilePath",
     "AssetSpec",
-    # Experiment analysis (lazy-loaded)
-    "Experiment",
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",

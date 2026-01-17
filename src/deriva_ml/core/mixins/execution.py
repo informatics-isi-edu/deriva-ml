@@ -18,8 +18,8 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
-    from deriva_ml.execution.experiment import Experiment
     from deriva_ml.execution.workflow import Workflow
+    from deriva_ml.experiment.experiment import Experiment
     from deriva_ml.model.catalog import DerivaModel
 
 
@@ -270,7 +270,7 @@ class ExecutionMixin:
             >>> print(exp.config_choices)  # Hydra config names used
             >>> print(exp.model_config)  # Model hyperparameters
         """
-        from deriva_ml.execution.experiment import Experiment
+        from deriva_ml.experiment import Experiment
 
         return Experiment(self, execution_rid)  # type: ignore[arg-type]
 
@@ -297,7 +297,7 @@ class ExecutionMixin:
             >>> for exp in experiments:
             ...     print(f"{exp.name}: {exp.config_choices}")
         """
-        from deriva_ml.execution.experiment import Experiment
+        from deriva_ml.experiment import Experiment
 
         # Get datapath to Execution table with a link to Execution_Metadata
         # to find executions that have hydra config files
