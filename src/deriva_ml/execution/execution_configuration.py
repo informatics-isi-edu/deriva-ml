@@ -49,10 +49,11 @@ class ExecutionConfiguration(BaseModel):
             - materialize: Whether to extract dataset contents
         assets (list[RID]): Resource Identifiers of required input assets.
         workflow (RID | Workflow): Workflow definition or its Resource Identifier.
-=            - Dictionary of parameter values
-            - Path to JSON file containing parameters
         description (str): Description of execution purpose (supports Markdown).
         argv (list[str]): Command line arguments used to start execution.
+        config_choices (dict[str, str]): Hydra config group choices that were selected.
+            Maps group names to selected config names (e.g., {"model_config": "cifar10_quick"}).
+            Automatically populated by run_model() and get_notebook_configuration().
 
     Example:
         >>> config = ExecutionConfiguration(
@@ -70,6 +71,7 @@ class ExecutionConfiguration(BaseModel):
     workflow: RID | Workflow | None = None
     description: str = ""
     argv: list[str] = Field(default_factory=lambda: sys.argv)
+    config_choices: dict[str, str] = Field(default_factory=dict)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

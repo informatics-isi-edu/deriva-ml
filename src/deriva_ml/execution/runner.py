@@ -414,6 +414,18 @@ def run_model(
         _create_parent_execution(ml_instance, workflow, description, dry_run)
 
     # ---------------------------------------------------------------------------
+    # Capture Hydra runtime choices for provenance
+    # ---------------------------------------------------------------------------
+    # The choices dict maps config group names to the selected config names
+    # e.g., {"model_config": "cifar10_quick", "datasets": "cifar10_training"}
+    config_choices: dict[str, str] = {}
+    try:
+        hydra_cfg = HydraConfig.get()
+        config_choices = dict(hydra_cfg.runtime.choices)
+    except Exception:
+        pass  # HydraConfig not available outside Hydra context
+
+    # ---------------------------------------------------------------------------
     # Create the execution context
     # ---------------------------------------------------------------------------
     # The ExecutionConfiguration bundles together all the inputs for this run:
@@ -428,7 +440,8 @@ def run_model(
     execution_config = ExecutionConfiguration(
         datasets=datasets,
         assets=assets,
-        description=job_description
+        description=job_description,
+        config_choices=config_choices,
     )
 
     # Create the execution record in the catalog. This generates a unique

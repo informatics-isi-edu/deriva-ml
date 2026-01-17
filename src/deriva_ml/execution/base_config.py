@@ -87,6 +87,10 @@ class BaseConfig:
         assets: List of asset RIDs to load (list[str] at runtime).
         dry_run: If True, skip catalog writes (for testing/debugging).
         description: Human-readable description of this run.
+        config_choices: Dictionary mapping config group names to selected config names.
+            This is automatically populated by get_notebook_configuration() with the
+            Hydra runtime choices (e.g., {"model_config": "cifar10_quick", "assets": "roc_quick"}).
+            Useful for tracking which configurations were used in an execution.
 
     Example:
         >>> from dataclasses import dataclass
@@ -102,6 +106,7 @@ class BaseConfig:
     assets: Any = field(default_factory=list)
     dry_run: bool = False
     description: str = ""
+    config_choices: dict[str, str] = field(default_factory=dict)
 
 
 # Create and register the base config with hydra-zen store.
@@ -200,10 +205,22 @@ def get_notebook_configuration(
     # Merge overrides: env overrides first, then explicit overrides (higher precedence)
     all_overrides = env_overrides + (overrides or [])
 
+    # Variable to capture choices from within the task function
+    captured_choices: dict[str, str] = {}
+
     # Define a task function that instantiates and returns the config
     # The cfg from launch() is an OmegaConf DictConfig, so we need to
     # use hydra_zen.instantiate() to convert it to actual Python objects
     def return_instantiated_config(cfg: Any) -> T:
+        nonlocal captured_choices
+        # Capture the Hydra runtime choices (which config names were selected)
+        try:
+            from hydra.core.hydra_config import HydraConfig
+            choices = HydraConfig.get().runtime.choices
+            captured_choices = dict(choices)
+        except Exception:
+            # If HydraConfig is not available, leave choices empty
+            pass
         return instantiate(cfg)
 
     # Launch hydra-zen to resolve the configuration
@@ -216,7 +233,12 @@ def get_notebook_configuration(
         overrides=all_overrides,
     )
 
-    return result.return_value
+    # Inject the captured choices into the config object
+    config = result.return_value
+    if hasattr(config, "config_choices"):
+        config.config_choices = captured_choices
+
+    return config
 
 
 # ---------------------------------------------------------------------------
