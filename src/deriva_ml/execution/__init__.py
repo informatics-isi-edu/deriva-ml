@@ -15,6 +15,7 @@ from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfi
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.execution.runner import run_model, create_model_config, reset_multirun_state
 from deriva_ml.execution.model_protocol import DerivaMLModel
+from deriva_ml.execution.experiment import Experiment
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
@@ -33,6 +34,7 @@ def __getattr__(name):
 __all__ = [
     "Execution",  # Lazy-loaded
     "ExecutionConfiguration",
+    "Experiment",
     "Workflow",
     "AssetRID",
     "run_model",
