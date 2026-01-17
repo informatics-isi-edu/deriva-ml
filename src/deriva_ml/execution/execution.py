@@ -58,6 +58,7 @@ from deriva_ml.core.definitions import (
     UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
@@ -99,57 +100,6 @@ except ImportError:
 
     def Markdown(s):
         return s
-
-
-class AssetFilePath(Path):
-    """Extended Path class for managing asset files.
-
-    Represents a file path with additional metadata about its role as an asset in the catalog.
-    This class extends the standard Path class to include information about the asset's
-    catalog representation and type.
-
-    Attributes:
-        asset_name (str): Name of the asset in the catalog (e.g., asset table name).
-        file_name (str): Name of the local file containing the asset.
-        asset_metadata (dict[str, Any]): Additional columns beyond URL, Length, and checksum.
-        asset_types (list[str]): Terms from the Asset_Type controlled vocabulary.
-        asset_rid (RID | None): Resource Identifier if uploaded to an asset table.
-
-    Example:
-        >>> path = AssetFilePath(
-        ...     "/path/to/file.txt",
-        ...     asset_name="analysis_output",
-        ...     file_name="results.txt",
-        ...     asset_metadata={"version": "1.0"},
-        ...     asset_types=["text", "results"]
-        ... )
-    """
-
-    def __init__(
-        self,
-        asset_path: str | Path,
-        asset_name: str,
-        file_name: str,
-        asset_metadata: dict[str, Any],
-        asset_types: list[str] | str,
-        asset_rid: RID | None = None,
-    ):
-        """Initializes an AssetFilePath instance.
-
-        Args:
-            asset_path: Local path to the asset file.
-            asset_name: Name of the asset in the catalog.
-            file_name: Name of the local file.
-            asset_metadata: Additional metadata columns.
-            asset_types: One or more asset type terms.
-            asset_rid: Optional Resource Identifier if already in catalog.
-        """
-        super().__init__(asset_path)
-        self.asset_name = asset_name
-        self.file_name = file_name
-        self.asset_metadata = asset_metadata
-        self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
-        self.asset_rid = asset_rid
 
 
 class Execution:
@@ -320,16 +270,16 @@ class Execution:
                 )
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
-        """Initialize the execution by a configuration in the Execution_Metadata table.
-        Set up a working directory and download all the assets and data.
+        """Initialize the execution environment.
 
-        :raise DerivaMLException: If there is an issue initializing the execution.
+        Sets up the working directory, downloads required datasets and assets,
+        and saves initial configuration metadata.
 
         Args:
-            reload: RID of previously initialized execution.
+            reload: Optional RID of a previously initialized execution to reload.
 
-        Returns:
-
+        Raises:
+            DerivaMLException: If initialization fails.
         """
         # Materialize bdbag
         for dataset in self.configuration.datasets:
@@ -396,37 +346,28 @@ class Execution:
 
     @property
     def _execution_root(self) -> Path:
-        """
-
-        Args:
+        """Get the root directory for this execution's files.
 
         Returns:
-          :return:
-
+            Path to the execution-specific directory.
         """
         return execution_root(self._working_dir, self.execution_rid)
 
     @property
     def _feature_root(self) -> Path:
-        """The root path to all execution-specific files.
-        :return:
-
-        Args:
+        """Get the root directory for feature files.
 
         Returns:
-
+            Path to the feature directory within the execution.
         """
         return feature_root(self._working_dir, self.execution_rid)
 
     @property
     def _asset_root(self) -> Path:
-        """The root path to all execution-specific files.
-        :return:
-
-        Args:
+        """Get the root directory for asset files.
 
         Returns:
-
+            Path to the asset directory within the execution.
         """
         return asset_root(self._working_dir, self.execution_rid)
 
@@ -616,7 +557,7 @@ class Execution:
             asset_map.setdefault(asset_table, []).append(
                 AssetFilePath(
                     asset_path=path,
-                    asset_name=asset_table,
+                    asset_table=asset_table,
                     file_name=file_name,
                     asset_metadata={
                         k: v
@@ -680,7 +621,7 @@ class Execution:
             asset_rid=asset_rid,
             asset_path=asset_filename,
             asset_metadata=asset_metadata,
-            asset_name=asset_table.name,
+            asset_table=asset_table.name,
             asset_types=asset_types,
         )
 
@@ -839,14 +780,16 @@ class Execution:
         feature_file: str | Path,
         uploaded_files: dict[str, list[AssetFilePath]],
     ) -> None:
-        """
+        """Update the feature table with values from a JSONL file.
+
+        Reads feature values from a file and inserts them into the catalog,
+        replacing file paths with the RIDs of uploaded assets.
 
         Args:
-            target_table: str:
-            feature_name: str:
-            feature_file: str | Path:
-            uploaded_files: Dictionary whose key is an asset name, file-name pair, and whose value is a filename,
-                RID of that asset.
+            target_table: Name of the table the feature is defined on.
+            feature_name: Name of the feature to update.
+            feature_file: Path to JSONL file containing feature values.
+            uploaded_files: Map from asset table names to their uploaded AssetFilePath objects.
         """
 
         # Get the column names of all the Feature columns that should be the RID of an asset
@@ -1021,7 +964,7 @@ class Execution:
 
         return AssetFilePath(
             asset_path=asset_path,
-            asset_name=asset_name,
+            asset_table=asset_name,
             file_name=target_name.name,
             asset_metadata=kwargs,
             asset_types=asset_types,

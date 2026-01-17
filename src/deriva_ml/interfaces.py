@@ -1,32 +1,60 @@
-"""Protocol definitions for DerivaML dataset and catalog operations.
+"""Protocol definitions for DerivaML dataset, asset, and catalog operations.
 
 This module defines the protocols (interfaces) used throughout DerivaML for
-type checking and polymorphic access to datasets and catalogs. The protocols
-are organized into two hierarchies:
+type checking and polymorphic access to datasets, assets, and catalogs.
 
-Dataset Protocols:
+Protocol Hierarchies
+--------------------
+
+**Dataset Protocols:**
     DatasetLike: Read-only operations for both live datasets and downloaded bags.
     WritableDataset: Write operations only available on live catalog datasets.
 
-Catalog Protocols:
+**Asset Protocols:**
+    AssetLike: Read-only operations for asset access.
+    WritableAsset: Write operations for asset modification.
+
+**Catalog Protocols:**
     DerivaMLCatalogReader: Read-only catalog operations (lookups, queries).
     DerivaMLCatalog: Full catalog operations including write operations.
 
 The separation allows code to express its requirements precisely:
-- Code that only reads data can accept DatasetLike or DerivaMLCatalogReader
-- Code that modifies data requires Dataset or DerivaMLCatalog
+- Code that only reads data can accept DatasetLike, AssetLike, or DerivaMLCatalogReader
+- Code that modifies data requires WritableDataset, WritableAsset, or DerivaMLCatalog
 
-Implementation Notes:
-    - Dataset: Live catalog access via deriva-py/datapath (implements both protocols)
-    - DatasetBag: Downloaded bag access via SQLAlchemy/SQLite (read-only only)
-    - DerivaML: Full catalog operations (implements DerivaMLCatalog)
-    - DerivaMLDatabase: Bag-backed catalog (implements DerivaMLCatalogReader only)
+API Naming Conventions
+----------------------
 
-Classes:
-    DatasetLike: Read-only interface for dataset access.
-    WritableDataset: Write interface for dataset modification.
-    DerivaMLCatalogReader: Read-only interface for catalog access.
-    DerivaMLCatalog: Full interface for catalog operations.
+The DerivaML API follows consistent naming conventions:
+
+- ``lookup_*``: Single item retrieval by identifier. Returns one item or raises exception.
+    Examples: lookup_dataset(), lookup_asset(), lookup_term()
+
+- ``find_*``: Search/discovery operations. Returns Iterable of matching items.
+    Examples: find_datasets(), find_assets(), find_features()
+
+- ``list_*``: List all items of a type, often with context (e.g., members of a dataset).
+    Examples: list_assets(), list_vocabulary_terms(), list_dataset_members()
+
+- ``get_*``: Data retrieval with transformation (e.g., to DataFrame).
+    Examples: get_table_as_dataframe(), get_metadata()
+
+- ``create_*``: Create new entities in the catalog.
+    Examples: create_dataset(), create_execution(), create_feature()
+
+- ``add_*``: Add items to existing entities or create vocabulary terms.
+    Examples: add_term(), add_dataset_members(), add_asset_type()
+
+- ``delete_*`` / ``remove_*``: Remove items from entities.
+    Examples: delete_dataset_members(), remove_asset_type()
+
+Implementation Notes
+--------------------
+- Dataset: Live catalog access via deriva-py/datapath (implements both protocols)
+- DatasetBag: Downloaded bag access via SQLAlchemy/SQLite (read-only only)
+- Asset: Live catalog access for file-based records (implements WritableAsset)
+- DerivaML: Full catalog operations (implements DerivaMLCatalog)
+- DerivaMLDatabase: Bag-backed catalog (implements DerivaMLCatalogReader only)
 """
 
 from __future__ import annotations
@@ -342,11 +370,18 @@ class WritableDataset(DatasetLike, Protocol):
         """
         ...
 
-    def remove_dataset_members(self, members: list[RID]) -> None:
+    def delete_dataset_members(
+        self,
+        members: list[RID],
+        description: str = "",
+        execution_rid: RID | None = None,
+    ) -> None:
         """Remove members from the dataset.
 
         Args:
             members: List of RIDs to remove from the dataset.
+            description: Optional description of the removal operation.
+            execution_rid: Optional RID of execution associated with this operation.
         """
         ...
 
@@ -385,6 +420,109 @@ class WritableDataset(DatasetLike, Protocol):
 
         Raises:
             DerivaMLException: If use_minid=True but s3_bucket is not configured.
+        """
+        ...
+
+
+@runtime_checkable
+class AssetLike(Protocol):
+    """Protocol defining read-only interface for asset access.
+
+    This protocol defines the common read interface for accessing asset
+    metadata, types, and provenance. It parallels DatasetLike but for
+    individual file-based records rather than data collections.
+
+    Attributes:
+        asset_rid: Resource Identifier for the asset.
+        asset_table: Name of the asset table containing this asset.
+        filename: Original filename of the asset.
+        url: URL to access the asset file.
+        length: Size of the asset file in bytes.
+        md5: MD5 checksum of the asset file.
+        asset_types: Type(s) of the asset from Asset_Type vocabulary.
+        description: Description of the asset.
+        execution_rid: Optional execution RID that created the asset.
+    """
+
+    asset_rid: RID
+    asset_table: str
+    filename: str
+    url: str
+    length: int
+    md5: str
+    asset_types: list[str]
+    description: str
+    execution_rid: RID | None
+
+    def list_executions(self, asset_role: str | None = None) -> list[dict[str, Any]]:
+        """List all executions associated with this asset.
+
+        Args:
+            asset_role: Optional filter for asset role ('Input' or 'Output').
+
+        Returns:
+            List of records with Execution RID and Asset_Role.
+        """
+        ...
+
+    def find_features(self) -> Iterable[Feature]:
+        """Find features defined on this asset's table.
+
+        Returns:
+            Iterable of Feature objects.
+        """
+        ...
+
+    def list_feature_values(self, feature_name: str) -> list[dict[str, Any]]:
+        """Get feature values for this specific asset.
+
+        Args:
+            feature_name: Name of the feature to query.
+
+        Returns:
+            List of feature value records.
+        """
+        ...
+
+    def get_metadata(self) -> dict[str, Any]:
+        """Get all metadata for this asset from the catalog.
+
+        Returns:
+            Dictionary of all columns/values for this asset record.
+        """
+        ...
+
+    def get_chaise_url(self) -> str:
+        """Get the Chaise URL for viewing this asset in the web interface.
+
+        Returns:
+            URL to view this asset in Chaise.
+        """
+        ...
+
+
+@runtime_checkable
+class WritableAsset(AssetLike, Protocol):
+    """Protocol defining write operations for assets.
+
+    This protocol extends AssetLike with write operations that are only
+    available on live catalog assets. Downloaded assets are immutable
+    and do not implement these methods.
+    """
+
+    def add_asset_type(self, type_name: str) -> None:
+        """Add an asset type to this asset.
+
+        Args:
+            type_name: Name of the asset type vocabulary term.
+        """
+        ...
+
+    def remove_asset_type(self, type_name: str) -> None:
+        """Remove an asset type from this asset.
+
+        Args:
+            type_name: Name of the asset type vocabulary term.
         """
         ...
 

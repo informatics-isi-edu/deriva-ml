@@ -1021,42 +1021,50 @@ class Dataset:
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def delete_dataset_members(
         self,
-        dataset_rid: RID,
         members: list[RID],
         description: str = "",
         execution_rid: RID | None = None,
     ) -> None:
-        """Remove elements to an existing dataset_table.
+        """Remove members from this dataset.
 
-        Delete elements from an existing dataset. In addition to deleting members, the minor version number of the
-        dataset is incremented and the description, if provide is applied to that new version.
+        Removes the specified members from the dataset. In addition to removing members,
+        the minor version number of the dataset is incremented and the description,
+        if provided, is applied to that new version.
 
         Args:
-            dataset_rid: RID of dataset_table to extend or None if a new dataset_table is to be created.
-            members: List of member RIDs to add to the dataset_table.
-            description: Markdown description of the updated dataset.
+            members: List of member RIDs to remove from the dataset.
+            description: Optional description of the removal operation.
             execution_rid: Optional RID of execution associated with this operation.
+
+        Raises:
+            DerivaMLException: If any RID is invalid or not part of this dataset.
+
+        Example:
+            >>> dataset.delete_dataset_members(
+            ...     members=["1-ABC", "1-DEF"],
+            ...     description="Removed corrupted samples"
+            ... )
         """
-
         members = set(members)
-        description = description or "Deletes dataset members"
+        description = description or "Deleted dataset members"
 
-        # Now go through every rid to be added to the data set and sort them based on what association table entries
-        # need to be made.
+        # Go through every rid to be deleted and sort them based on what association table entries
+        # need to be removed.
         dataset_elements = {}
         association_map = {
             a.other_fkeys.pop().pk_table.name: a.table.name for a in self._dataset_table.find_associations()
         }
-        # Get a list of all the object types that can be linked to a dataset_table.
+        # Get a list of all the object types that can be linked to a dataset.
         for m in members:
             try:
                 rid_info = self._ml_instance.resolve_rid(m)
             except KeyError:
                 raise DerivaMLException(f"Invalid RID: {m}")
             if rid_info.table.name not in association_map:
-                raise DerivaMLException(f"RID table: {rid_info.table.name} not part of dataset_table")
+                raise DerivaMLException(f"RID table: {rid_info.table.name} not part of dataset")
             dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
-        # Now make the entries into the association tables.
+
+        # Delete the entries from the association tables.
         pb = self._ml_instance.pathBuilder()
         for table, elements in dataset_elements.items():
             schema_path = pb.schemas[
@@ -1066,12 +1074,12 @@ class Dataset:
 
             if len(elements):
                 atable_path = schema_path.tables[association_map[table]]
-                # Find out the name of the column in the association table.
                 for e in elements:
                     entity = atable_path.filter(
-                        (atable_path.Dataset == dataset_rid) & (atable_path.columns[fk_column] == e),
+                        (atable_path.Dataset == self.dataset_rid) & (atable_path.columns[fk_column] == e),
                     )
                     entity.delete()
+
         self.increment_dataset_version(
             VersionPart.minor,
             description=description,
@@ -1191,6 +1199,36 @@ class Dataset:
             return [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
 
         return [self._ml_instance.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
+
+    def list_executions(self) -> list["Execution"]:
+        """List all executions associated with this dataset.
+
+        Returns all executions that used this dataset as input. This is
+        tracked through the Dataset_Execution association table.
+
+        Returns:
+            List of Execution objects associated with this dataset.
+
+        Example:
+            >>> dataset = ml.lookup_dataset("1-abc123")
+            >>> executions = dataset.list_executions()
+            >>> for exe in executions:
+            ...     print(f"Execution {exe.execution_rid}: {exe.status}")
+        """
+        # Import here to avoid circular dependency
+        from deriva_ml.execution.execution import Execution
+
+        pb = self._ml_instance.pathBuilder()
+        dataset_execution_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Execution
+
+        # Query for all executions associated with this dataset
+        records = list(
+            dataset_execution_path.filter(dataset_execution_path.Dataset == self.dataset_rid)
+            .entities()
+            .fetch()
+        )
+
+        return [self._ml_instance.lookup_execution(record["Execution"]) for record in records]
 
     @staticmethod
     def _insert_dataset_versions(

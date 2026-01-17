@@ -1,7 +1,7 @@
 """Asset management mixin for DerivaML.
 
 This module provides the AssetMixin class which handles
-asset table operations including creating and listing assets.
+asset table operations including creating, listing, and looking up assets.
 """
 
 from __future__ import annotations
@@ -15,11 +15,12 @@ Table = _ermrest_model.Table
 
 from pydantic import ConfigDict, validate_call
 
-from deriva_ml.core.definitions import ColumnDefinition, MLVocab, VocabularyTerm
+from deriva_ml.core.definitions import ColumnDefinition, MLVocab, RID, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.schema.annotations import asset_annotation
 
 if TYPE_CHECKING:
+    from deriva_ml.asset.asset import Asset
     from deriva_ml.model.catalog import DerivaModel
 
 
@@ -182,3 +183,188 @@ class AssetMixin:
                 asset | {MLVocab.asset_type.value: [asset_type[MLVocab.asset_type.value] for asset_type in asset_types]}
             )
         return assets
+
+    def list_asset_executions(
+        self, asset_rid: str, asset_role: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List all executions associated with an asset.
+
+        Given an asset RID, returns a list of executions that created or used
+        the asset, along with the role (Input/Output) in each execution.
+
+        Args:
+            asset_rid: The RID of the asset to look up.
+            asset_role: Optional filter for asset role ('Input' or 'Output').
+                If None, returns all associations.
+
+        Returns:
+            list[dict[str, Any]]: List of records containing:
+                - Execution: RID of the associated execution
+                - Asset_Role: Role of the asset in the execution ('Input' or 'Output')
+
+        Raises:
+            DerivaMLException: If the asset RID is not found or not an asset.
+
+        Example:
+            >>> # Find all executions that created this asset
+            >>> executions = ml.list_asset_executions("1-abc123", asset_role="Output")
+            >>> for record in executions:
+            ...     print(f"Created by execution {record['Execution']}")
+
+            >>> # Find all executions that used this asset as input
+            >>> executions = ml.list_asset_executions("1-abc123", asset_role="Input")
+        """
+        # Resolve the RID to find which asset table it belongs to
+        rid_info = self.resolve_rid(asset_rid)  # type: ignore[attr-defined]
+        asset_table = rid_info.table
+
+        if not self.model.is_asset(asset_table):
+            raise DerivaMLException(f"RID {asset_rid} is not an asset (table: {asset_table.name})")
+
+        # Find the association table between this asset table and Execution
+        asset_exe_table, asset_fk, execution_fk = self.model.find_association(asset_table, "Execution")
+
+        # Build the query
+        pb = self.pathBuilder()
+        asset_exe_path = pb.schemas[asset_exe_table.schema.name].tables[asset_exe_table.name]
+
+        # Filter by asset RID
+        query = asset_exe_path.filter(asset_exe_path.columns[asset_fk] == asset_rid)
+
+        # Optionally filter by asset role
+        if asset_role:
+            query = query.filter(asset_exe_path.Asset_Role == asset_role)
+
+        return list(query.entities().fetch())
+
+    def lookup_asset(self, asset_rid: RID) -> "Asset":
+        """Look up an asset by its RID.
+
+        Returns an Asset object for the specified RID. The asset can be from
+        any asset table in the catalog.
+
+        Args:
+            asset_rid: The RID of the asset to look up.
+
+        Returns:
+            Asset object for the specified RID.
+
+        Raises:
+            DerivaMLException: If the RID is not found or is not an asset.
+
+        Example:
+            >>> asset = ml.lookup_asset("3JSE")
+            >>> print(f"File: {asset.filename}, Table: {asset.asset_table}")
+        """
+        from deriva_ml.asset.asset import Asset
+
+        # Resolve the RID to find which table it belongs to
+        rid_info = self.resolve_rid(asset_rid)  # type: ignore[attr-defined]
+        asset_table = rid_info.table
+
+        if not self.model.is_asset(asset_table):
+            raise DerivaMLException(f"RID {asset_rid} is not an asset (table: {asset_table.name})")
+
+        # Query the asset table for this record
+        pb = self.pathBuilder()
+        asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
+
+        records = list(asset_path.filter(asset_path.RID == asset_rid).entities().fetch())
+        if not records:
+            raise DerivaMLException(f"Asset {asset_rid} not found in table {asset_table.name}")
+
+        record = records[0]
+
+        # Get asset types
+        asset_types = []
+        try:
+            type_assoc_table, asset_fk, _ = self.model.find_association(asset_table, "Asset_Type")
+            type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
+            types = list(
+                type_path.filter(type_path.columns[asset_fk] == asset_rid)
+                .attributes(type_path.Asset_Type)
+                .fetch()
+            )
+            asset_types = [t["Asset_Type"] for t in types]
+        except Exception:
+            pass  # No type association for this asset table
+
+        return Asset(
+            catalog=self,  # type: ignore[arg-type]
+            asset_rid=asset_rid,
+            asset_table=asset_table.name,
+            filename=record.get("Filename", ""),
+            url=record.get("URL", ""),
+            length=record.get("Length", 0),
+            md5=record.get("MD5", ""),
+            description=record.get("Description", ""),
+            asset_types=asset_types,
+        )
+
+    def find_assets(
+        self,
+        asset_table: Table | str | None = None,
+        asset_type: str | None = None,
+    ) -> Iterable["Asset"]:
+        """Find assets in the catalog.
+
+        Returns an iterable of Asset objects matching the specified criteria.
+        If no criteria are specified, returns all assets from all asset tables.
+
+        Args:
+            asset_table: Optional table or table name to search. If None, searches
+                all asset tables.
+            asset_type: Optional asset type to filter by. Only returns assets
+                with this type.
+
+        Returns:
+            Iterable of Asset objects matching the criteria.
+
+        Example:
+            >>> # Find all assets in the Model table
+            >>> models = list(ml.find_assets(asset_table="Model"))
+
+            >>> # Find all assets with type "Training_Data"
+            >>> training = list(ml.find_assets(asset_type="Training_Data"))
+
+            >>> # Find all assets across all tables
+            >>> all_assets = list(ml.find_assets())
+        """
+        from deriva_ml.asset.asset import Asset
+
+        # Determine which tables to search
+        if asset_table is not None:
+            tables = [self.model.name_to_table(asset_table)]
+        else:
+            # Find all asset tables
+            tables = [
+                t for t in self.model.schemas[self.domain_schema].tables.values()
+                if self.model.is_asset(t)
+            ]
+            # Also include ML schema asset tables (like Execution_Asset)
+            tables.extend([
+                t for t in self.model.schemas[self.ml_schema].tables.values()
+                if self.model.is_asset(t)
+            ])
+
+        for table in tables:
+            # Get all assets from this table
+            assets_data = self.list_assets(table)
+
+            for asset_data in assets_data:
+                # Filter by asset type if specified
+                if asset_type is not None:
+                    if asset_type not in asset_data.get(MLVocab.asset_type.value, []):
+                        continue
+
+                yield Asset(
+                    catalog=self,  # type: ignore[arg-type]
+                    asset_rid=asset_data["RID"],
+                    asset_table=table.name,
+                    filename=asset_data.get("Filename", ""),
+                    url=asset_data.get("URL", ""),
+                    length=asset_data.get("Length", 0),
+                    md5=asset_data.get("MD5", ""),
+                    description=asset_data.get("Description", ""),
+                    asset_types=asset_data.get(MLVocab.asset_type.value, []),
+                )

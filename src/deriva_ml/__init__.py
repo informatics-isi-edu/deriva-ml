@@ -51,12 +51,28 @@ def __getattr__(name: str) -> type:
         from deriva_ml.execution.execution import Execution
 
         return Execution
+    elif name == "Asset":
+        from deriva_ml.asset.asset import Asset
+
+        return Asset
+    elif name == "AssetFilePath":
+        from deriva_ml.asset.aux_classes import AssetFilePath
+
+        return AssetFilePath
+    elif name == "AssetSpec":
+        from deriva_ml.asset.aux_classes import AssetSpec
+
+        return AssetSpec
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [
     "DerivaML",  # Lazy-loaded
     "DerivaMLConfig",
+    # Asset classes (lazy-loaded)
+    "Asset",
+    "AssetFilePath",
+    "AssetSpec",
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",

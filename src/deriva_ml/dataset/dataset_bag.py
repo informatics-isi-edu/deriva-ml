@@ -541,6 +541,32 @@ class DatasetBag:
                 parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited))
         return parents
 
+    def list_executions(self) -> list[RID]:
+        """List all execution RIDs associated with this dataset.
+
+        Returns all executions that used this dataset as input. This is
+        tracked through the Dataset_Execution association table.
+
+        Note:
+            Unlike the live Dataset class which returns Execution objects,
+            DatasetBag returns a list of execution RIDs since the bag is
+            an offline snapshot and cannot look up live execution objects.
+
+        Returns:
+            List of execution RIDs associated with this dataset.
+
+        Example:
+            >>> bag = ml.download_dataset_bag(dataset_spec)
+            >>> execution_rids = bag.list_executions()
+            >>> for rid in execution_rids:
+            ...     print(f"Associated execution: {rid}")
+        """
+        de_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Execution")
+
+        with Session(self.engine) as session:
+            sql_cmd = select(de_table.Execution).where(de_table.Dataset == self.dataset_rid)
+            return [r[0] for r in session.execute(sql_cmd).all()]
+
     def _denormalize(self, include_tables: list[str]) -> Select:
         """Build a SQL query that joins multiple tables into a denormalized view.
 
