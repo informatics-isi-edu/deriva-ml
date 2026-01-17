@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
+from deriva.core.hatrac_store import HatracStore
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
@@ -88,18 +89,90 @@ class Experiment:
         return self._hydra_config
 
     def _load_hydra_config(self) -> dict:
-        """Load the Hydra config YAML from execution metadata assets."""
-        # Find the hydra config file in execution metadata
-        for asset in self.execution.list_input_assets(asset_role="Output"):
-            if asset.filename and "config.yaml" in asset.filename:
-                # Download to temp location and parse
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    dest = Path(tmpdir) / asset.filename
-                    self.ml.download_asset(asset.asset_rid, dest.parent)
-                    if dest.exists():
-                        with open(dest) as f:
-                            return yaml.safe_load(f) or {}
-        return {}
+        """Load Hydra configuration from execution metadata assets.
+
+        Loads both the config.yaml (model parameters) and hydra.yaml (choices)
+        and merges them into a single dictionary with:
+        - config_choices: from hydra.yaml runtime.choices
+        - model_config: from config.yaml model_config section
+        - Full config.yaml contents
+        """
+        # Query Execution_Metadata_Execution to find metadata assets for this execution
+        pb = self.ml.pathBuilder()
+        meta_exec = pb.schemas[self.ml.ml_schema].Execution_Metadata_Execution
+        metadata_table = pb.schemas[self.ml.ml_schema].Execution_Metadata
+
+        # Find metadata assets linked to this execution with role "Output"
+        query = meta_exec.filter(meta_exec.Execution == self.execution_rid)
+        query = query.filter(meta_exec.Asset_Role == "Output")
+        records = list(query.entities().fetch())
+
+        # Collect metadata records
+        metadata_files: dict[str, dict] = {}
+        for record in records:
+            metadata_rid = record.get("Execution_Metadata")
+            if not metadata_rid:
+                continue
+
+            meta_records = list(
+                metadata_table.filter(metadata_table.RID == metadata_rid)
+                .entities()
+                .fetch()
+            )
+            if meta_records:
+                meta = meta_records[0]
+                filename = meta.get("Filename", "")
+                if filename:
+                    metadata_files[filename] = meta
+
+        # Create HatracStore for downloading
+        hs = HatracStore(
+            "https",
+            self.ml.host_name,
+            self.ml.credential,
+        )
+
+        result: dict = {}
+
+        # Load config.yaml for model_config and full configuration
+        for filename, meta in metadata_files.items():
+            if filename.endswith("-config.yaml"):
+                url = meta.get("URL")
+                if url:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        dest = Path(tmpdir) / filename
+                        hs.get_obj(url, destfilename=str(dest))
+                        if dest.exists():
+                            with open(dest) as f:
+                                result = yaml.safe_load(f) or {}
+                break
+
+        # Load hydra.yaml for config_choices (runtime.choices)
+        for filename, meta in metadata_files.items():
+            if filename.endswith("-hydra.yaml"):
+                url = meta.get("URL")
+                if url:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        dest = Path(tmpdir) / filename
+                        hs.get_obj(url, destfilename=str(dest))
+                        if dest.exists():
+                            with open(dest) as f:
+                                hydra_data = yaml.safe_load(f) or {}
+                            # Extract choices from hydra.runtime.choices
+                            choices = (
+                                hydra_data.get("hydra", {})
+                                .get("runtime", {})
+                                .get("choices", {})
+                            )
+                            # Filter out hydra internal choices
+                            result["config_choices"] = {
+                                k: v
+                                for k, v in choices.items()
+                                if not k.startswith("hydra/")
+                            }
+                break
+
+        return result
 
     @property
     def config_choices(self) -> dict[str, str]:
@@ -207,7 +280,12 @@ class Experiment:
                 k: v for k, v in self.model_config.items() if not k.startswith("_")
             },
             "input_datasets": [
-                {"rid": ds.dataset_rid, "description": ds.description}
+                {
+                    "rid": ds.dataset_rid,
+                    "description": ds.description,
+                    "version": str(ds.current_version) if ds.current_version else None,
+                    "dataset_types": ds.dataset_types,
+                }
                 for ds in self.input_datasets
             ],
             "url": self.get_chaise_url(),
