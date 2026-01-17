@@ -69,24 +69,34 @@ class ExecutionMixin:
     def create_execution(
         self, configuration: ExecutionConfiguration, workflow: "Workflow | RID | None" = None, dry_run: bool = False
     ) -> "Execution":
-        """Creates an execution environment.
+        """Create an execution environment.
 
-        Given an execution configuration, initialize the local compute environment to prepare for executing an
-        ML or analytic routine.  This routine has a number of side effects.
+        Initializes a local compute environment for executing an ML or analytic routine.
+        This has several side effects:
 
-        1. The datasets specified in the configuration are downloaded and placed in the cache-dir. If a version is
-        not specified in the configuration, then a new minor version number is created for the dataset and downloaded.
-
-        2. If any execution assets are provided in the configuration, they are downloaded
-        and placed in the working directory.
+        1. Downloads datasets specified in the configuration to the cache directory.
+           If no version is specified, creates a new minor version for the dataset.
+        2. Downloads any execution assets to the working directory.
+        3. Creates an execution record in the catalog (unless dry_run=True).
 
         Args:
-            configuration: ExecutionConfiguration object specifying the execution parameters.
-            workflow: Workflow object representing the workflow to execute if not present in the ExecutionConfiguration.
-            dry_run: Do not create an execution record or upload results.
+            configuration: ExecutionConfiguration specifying execution parameters.
+            workflow: Optional Workflow object or RID if not present in configuration.
+            dry_run: If True, skip creating catalog records and uploading results.
 
         Returns:
-            An execution object.
+            Execution: An execution object for managing the execution lifecycle.
+
+        Example:
+            >>> config = ExecutionConfiguration(
+            ...     workflow=workflow,
+            ...     description="Process samples",
+            ...     datasets=[DatasetSpec(rid="4HM")],
+            ... )
+            >>> with ml.create_execution(config) as execution:
+            ...     # Run analysis
+            ...     pass
+            >>> execution.upload_execution_outputs()
         """
         # Import here to avoid circular dependency
         from deriva_ml.execution.execution import Execution

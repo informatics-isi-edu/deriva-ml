@@ -254,12 +254,10 @@ class TestDataset:
         initial_members = dataset.list_dataset_members()
         assert len(initial_members.get("TestTableDelete", [])) == 5
 
-        # Delete some members using the dataset_rid and flat list of RIDs
-        # Note: delete_dataset_members takes dataset_rid and members as separate args
+        # Delete some members from the dataset
         rids_to_delete = test_rids[:2]
         dataset.delete_dataset_members(
-            dataset.dataset_rid,
-            rids_to_delete,
+            members=rids_to_delete,
             description="Removed 2 test items"
         )
 
@@ -405,7 +403,7 @@ class TestDataset:
             ExecutionConfiguration(
                 description="Execution 2",
                 workflow=workflow,
-                datasets=[DatasetSpec(rid=dataset.dataset_rid)],
+                datasets=[DatasetSpec(rid=dataset.dataset_rid, version=dataset.current_version)],
             )
         )
 

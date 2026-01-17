@@ -31,7 +31,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import ConfigDict, validate_call
+from pydantic import ConfigDict, SkipValidation, validate_call
 
 from deriva_ml.core.definitions import RID
 
@@ -81,7 +81,6 @@ class Asset:
         ...     print(f"Execution {exe.execution_rid}: {exe.configuration.description}")
     """
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def __init__(
         self,
         catalog: "DerivaMLCatalog",
@@ -344,7 +343,7 @@ class Asset:
         table_obj = self._ml_instance.model.name_to_table(self.asset_table)
         schema_name = table_obj.schema.name
         catalog_id = self._ml_instance.catalog_id
-        hostname = self._ml_instance.hostname
+        hostname = self._ml_instance.host_name
 
         return (
             f"https://{hostname}/chaise/record/#{catalog_id}/"

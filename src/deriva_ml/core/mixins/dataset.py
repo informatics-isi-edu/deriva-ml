@@ -62,13 +62,18 @@ class DatasetMixin:
         raise NotImplementedError
 
     def find_datasets(self, deleted: bool = False) -> Iterable["Dataset"]:
-        """Returns a list of currently available datasets.
+        """List all datasets in the catalog.
 
-        Arguments:
-            deleted: If True, included the datasets that have been deleted.
+        Args:
+            deleted: If True, include datasets that have been marked as deleted.
 
         Returns:
-             list of currently available datasets.
+            Iterable of Dataset objects.
+
+        Example:
+            >>> datasets = list(ml.find_datasets())
+            >>> for ds in datasets:
+            ...     print(f"{ds.dataset_rid}: {ds.description}")
         """
         # Import here to avoid circular imports
         from deriva_ml.dataset.dataset import Dataset
@@ -97,14 +102,21 @@ class DatasetMixin:
         return datasets
 
     def lookup_dataset(self, dataset: RID | DatasetSpec, deleted: bool = False) -> "Dataset":
-        """Looks up a dataset by RID or DatasetSpec.
+        """Look up a dataset by RID or DatasetSpec.
 
-        Arguments:
+        Args:
             dataset: Dataset RID or DatasetSpec to look up.
-            deleted: If True, included the datasets that have been deleted.
+            deleted: If True, include datasets that have been marked as deleted.
 
         Returns:
-            A Dataset object for the specified dataset RID or DatasetSpec.
+            Dataset: The dataset object for the specified RID.
+
+        Raises:
+            DerivaMLException: If the dataset is not found.
+
+        Example:
+            >>> dataset = ml.lookup_dataset("4HM")
+            >>> print(f"Version: {dataset.current_version}")
         """
         if isinstance(dataset, DatasetSpec):
             dataset_rid = dataset.rid

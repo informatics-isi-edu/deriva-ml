@@ -1,32 +1,60 @@
-"""Protocol definitions for DerivaML dataset and catalog operations.
+"""Protocol definitions for DerivaML dataset, asset, and catalog operations.
 
 This module defines the protocols (interfaces) used throughout DerivaML for
-type checking and polymorphic access to datasets and catalogs. The protocols
-are organized into two hierarchies:
+type checking and polymorphic access to datasets, assets, and catalogs.
 
-Dataset Protocols:
+Protocol Hierarchies
+--------------------
+
+**Dataset Protocols:**
     DatasetLike: Read-only operations for both live datasets and downloaded bags.
     WritableDataset: Write operations only available on live catalog datasets.
 
-Catalog Protocols:
+**Asset Protocols:**
+    AssetLike: Read-only operations for asset access.
+    WritableAsset: Write operations for asset modification.
+
+**Catalog Protocols:**
     DerivaMLCatalogReader: Read-only catalog operations (lookups, queries).
     DerivaMLCatalog: Full catalog operations including write operations.
 
 The separation allows code to express its requirements precisely:
-- Code that only reads data can accept DatasetLike or DerivaMLCatalogReader
-- Code that modifies data requires Dataset or DerivaMLCatalog
+- Code that only reads data can accept DatasetLike, AssetLike, or DerivaMLCatalogReader
+- Code that modifies data requires WritableDataset, WritableAsset, or DerivaMLCatalog
 
-Implementation Notes:
-    - Dataset: Live catalog access via deriva-py/datapath (implements both protocols)
-    - DatasetBag: Downloaded bag access via SQLAlchemy/SQLite (read-only only)
-    - DerivaML: Full catalog operations (implements DerivaMLCatalog)
-    - DerivaMLDatabase: Bag-backed catalog (implements DerivaMLCatalogReader only)
+API Naming Conventions
+----------------------
 
-Classes:
-    DatasetLike: Read-only interface for dataset access.
-    WritableDataset: Write interface for dataset modification.
-    DerivaMLCatalogReader: Read-only interface for catalog access.
-    DerivaMLCatalog: Full interface for catalog operations.
+The DerivaML API follows consistent naming conventions:
+
+- ``lookup_*``: Single item retrieval by identifier. Returns one item or raises exception.
+    Examples: lookup_dataset(), lookup_asset(), lookup_term()
+
+- ``find_*``: Search/discovery operations. Returns Iterable of matching items.
+    Examples: find_datasets(), find_assets(), find_features()
+
+- ``list_*``: List all items of a type, often with context (e.g., members of a dataset).
+    Examples: list_assets(), list_vocabulary_terms(), list_dataset_members()
+
+- ``get_*``: Data retrieval with transformation (e.g., to DataFrame).
+    Examples: get_table_as_dataframe(), get_metadata()
+
+- ``create_*``: Create new entities in the catalog.
+    Examples: create_dataset(), create_execution(), create_feature()
+
+- ``add_*``: Add items to existing entities or create vocabulary terms.
+    Examples: add_term(), add_dataset_members(), add_asset_type()
+
+- ``delete_*`` / ``remove_*``: Remove items from entities.
+    Examples: delete_dataset_members(), remove_asset_type()
+
+Implementation Notes
+--------------------
+- Dataset: Live catalog access via deriva-py/datapath (implements both protocols)
+- DatasetBag: Downloaded bag access via SQLAlchemy/SQLite (read-only only)
+- Asset: Live catalog access for file-based records (implements WritableAsset)
+- DerivaML: Full catalog operations (implements DerivaMLCatalog)
+- DerivaMLDatabase: Bag-backed catalog (implements DerivaMLCatalogReader only)
 """
 
 from __future__ import annotations
@@ -342,11 +370,18 @@ class WritableDataset(DatasetLike, Protocol):
         """
         ...
 
-    def remove_dataset_members(self, members: list[RID]) -> None:
+    def delete_dataset_members(
+        self,
+        members: list[RID],
+        description: str = "",
+        execution_rid: RID | None = None,
+    ) -> None:
         """Remove members from the dataset.
 
         Args:
             members: List of RIDs to remove from the dataset.
+            description: Optional description of the removal operation.
+            execution_rid: Optional RID of execution associated with this operation.
         """
         ...
 

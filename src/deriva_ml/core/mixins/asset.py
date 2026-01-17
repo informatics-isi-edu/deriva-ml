@@ -215,11 +215,11 @@ class AssetMixin:
             >>> executions = ml.list_asset_executions("1-abc123", asset_role="Input")
         """
         # Resolve the RID to find which asset table it belongs to
-        rid_info = self.retrieve_rid(asset_rid)  # type: ignore[attr-defined]
-        asset_table = self.model.name_to_table(rid_info["table"])
+        rid_info = self.resolve_rid(asset_rid)  # type: ignore[attr-defined]
+        asset_table = rid_info.table
 
         if not self.model.is_asset(asset_table):
-            raise DerivaMLException(f"RID {asset_rid} is not an asset (table: {rid_info['table']})")
+            raise DerivaMLException(f"RID {asset_rid} is not an asset (table: {asset_table.name})")
 
         # Find the association table between this asset table and Execution
         asset_exe_table, asset_fk, execution_fk = self.model.find_association(asset_table, "Execution")
@@ -259,11 +259,11 @@ class AssetMixin:
         from deriva_ml.asset.asset import Asset
 
         # Resolve the RID to find which table it belongs to
-        rid_info = self.retrieve_rid(asset_rid)  # type: ignore[attr-defined]
-        asset_table = self.model.name_to_table(rid_info["table"])
+        rid_info = self.resolve_rid(asset_rid)  # type: ignore[attr-defined]
+        asset_table = rid_info.table
 
         if not self.model.is_asset(asset_table):
-            raise DerivaMLException(f"RID {asset_rid} is not an asset (table: {rid_info['table']})")
+            raise DerivaMLException(f"RID {asset_rid} is not an asset (table: {asset_table.name})")
 
         # Query the asset table for this record
         pb = self.pathBuilder()

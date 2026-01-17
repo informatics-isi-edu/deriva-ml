@@ -270,16 +270,16 @@ class Execution:
                 )
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
-        """Initialize the execution by a configuration in the Execution_Metadata table.
-        Set up a working directory and download all the assets and data.
+        """Initialize the execution environment.
 
-        :raise DerivaMLException: If there is an issue initializing the execution.
+        Sets up the working directory, downloads required datasets and assets,
+        and saves initial configuration metadata.
 
         Args:
-            reload: RID of previously initialized execution.
+            reload: Optional RID of a previously initialized execution to reload.
 
-        Returns:
-
+        Raises:
+            DerivaMLException: If initialization fails.
         """
         # Materialize bdbag
         for dataset in self.configuration.datasets:
@@ -346,37 +346,28 @@ class Execution:
 
     @property
     def _execution_root(self) -> Path:
-        """
-
-        Args:
+        """Get the root directory for this execution's files.
 
         Returns:
-          :return:
-
+            Path to the execution-specific directory.
         """
         return execution_root(self._working_dir, self.execution_rid)
 
     @property
     def _feature_root(self) -> Path:
-        """The root path to all execution-specific files.
-        :return:
-
-        Args:
+        """Get the root directory for feature files.
 
         Returns:
-
+            Path to the feature directory within the execution.
         """
         return feature_root(self._working_dir, self.execution_rid)
 
     @property
     def _asset_root(self) -> Path:
-        """The root path to all execution-specific files.
-        :return:
-
-        Args:
+        """Get the root directory for asset files.
 
         Returns:
-
+            Path to the asset directory within the execution.
         """
         return asset_root(self._working_dir, self.execution_rid)
 
@@ -789,14 +780,16 @@ class Execution:
         feature_file: str | Path,
         uploaded_files: dict[str, list[AssetFilePath]],
     ) -> None:
-        """
+        """Update the feature table with values from a JSONL file.
+
+        Reads feature values from a file and inserts them into the catalog,
+        replacing file paths with the RIDs of uploaded assets.
 
         Args:
-            target_table: str:
-            feature_name: str:
-            feature_file: str | Path:
-            uploaded_files: Dictionary whose key is an asset name, file-name pair, and whose value is a filename,
-                RID of that asset.
+            target_table: Name of the table the feature is defined on.
+            feature_name: Name of the feature to update.
+            feature_file: Path to JSONL file containing feature values.
+            uploaded_files: Map from asset table names to their uploaded AssetFilePath objects.
         """
 
         # Get the column names of all the Feature columns that should be the RID of an asset
