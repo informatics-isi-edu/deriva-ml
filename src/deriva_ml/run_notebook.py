@@ -123,6 +123,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         )
 
         self.parser.add_argument(
+            "--info",
+            action="store_true",
+            help="Display available Hydra configuration groups and options.",
+        )
+
+        self.parser.add_argument(
             "--log-output",
             action="store_true",
             help="Display logging output from notebook.",
@@ -144,6 +150,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             type=str,
             help="Name of kernel to run..",
             default=self._find_kernel_for_venv(),
+        )
+
+        self.parser.add_argument(
+            "hydra_overrides",
+            nargs="*",
+            help="Hydra-zen configuration overrides (e.g., assets=roc_quick_probabilities)",
         )
 
     @staticmethod
@@ -235,10 +247,91 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             for param, value in notebook_parameters.items():
                 print(f"{param}:{value['inferred_type_name']}  (default {value['default']})")
             return
-        else:
-            # Merge notebook defaults with provided parameters and execute
-            notebook_parameters = {k: v["default"] for k, v in notebook_parameters.items()} | parameters
-            self.run_notebook(notebook_file.resolve(), parameters, kernel=args.kernel, log=args.log_output)
+
+        if args.info:
+            # Display available Hydra configuration options
+            self._show_hydra_info(notebook_file)
+            return
+
+        # Merge notebook defaults with provided parameters and execute
+        notebook_parameters = {k: v["default"] for k, v in notebook_parameters.items()} | parameters
+        self.run_notebook(
+            notebook_file.resolve(),
+            parameters,
+            kernel=args.kernel,
+            log=args.log_output,
+            hydra_overrides=args.hydra_overrides,
+        )
+
+    @staticmethod
+    def _show_hydra_info(notebook_file: Path) -> None:
+        """Display available Hydra configuration groups and options.
+
+        Attempts to load the project's config module and display the available
+        configuration groups (e.g., assets, datasets, deriva_ml) and their
+        registered options.
+
+        Args:
+            notebook_file: Path to the notebook file (used to find the project root).
+        """
+        import sys
+
+        from hydra_zen import store
+
+        # Add src directory to path so we can import configs
+        notebook_dir = notebook_file.parent.resolve()
+        project_root = notebook_dir.parent  # Assume notebooks/ is one level down
+        src_dir = project_root / "src"
+
+        if src_dir.exists():
+            sys.path.insert(0, str(src_dir))
+
+        # Try to import and load configs
+        try:
+            from configs import load_all_configs
+            load_all_configs()
+        except ImportError:
+            print("Could not import configs module. Make sure src/configs/__init__.py exists.")
+            print("Available Hydra groups cannot be determined without loading the config module.")
+            return
+
+        # Access the internal store to list groups and entries
+        print("Available Hydra Configuration Groups:")
+        print("=" * 50)
+
+        # The hydra_zen store._queue contains (group, name) tuples
+        try:
+            groups: dict[str, list[str]] = {}
+
+            for group, name in store._queue:
+                if group:
+                    if group not in groups:
+                        groups[group] = []
+                    if name not in groups[group]:
+                        groups[group].append(name)
+                else:
+                    # Top-level configs (group is None)
+                    if "__root__" not in groups:
+                        groups["__root__"] = []
+                    if name not in groups["__root__"]:
+                        groups["__root__"].append(name)
+
+            # Print groups and their options
+            for group in sorted(groups.keys()):
+                if group == "__root__":
+                    print("\nTop-level configs:")
+                else:
+                    print(f"\n{group}:")
+                for name in sorted(groups[group]):
+                    print(f"  - {name}")
+
+            print("\n" + "=" * 50)
+            print("Usage: deriva-ml-run-notebook notebook.ipynb [options] <group>=<option>")
+            print("Example: deriva-ml-run-notebook notebook.ipynb --host localhost assets=roc_quick_probabilities")
+
+        except Exception as e:
+            print(f"Error inspecting Hydra store: {e}")
+            print("Try running with --help for basic usage information.")
 
     @staticmethod
     def _find_kernel_for_venv() -> str | None:
@@ -290,6 +383,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         parameters: dict,
         kernel: str | None = None,
         log: bool = False,
+        hydra_overrides: list[str] | None = None,
     ) -> None:
         """Execute a notebook with papermill and upload results to the catalog.
 
@@ -312,6 +406,10 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             kernel: Name of the Jupyter kernel to use. If None, papermill will
                 use the notebook's default kernel.
             log: If True, stream notebook cell outputs to stdout during execution.
+            hydra_overrides: Optional list of Hydra-zen configuration overrides
+                (e.g., ["assets=roc_quick_probabilities", "deriva_ml=eye_ai"]).
+                These are passed to the notebook via DERIVA_ML_HYDRA_OVERRIDES
+                environment variable as a JSON-encoded list.
 
         Raises:
             SystemExit: If the notebook doesn't save execution metadata.
@@ -325,6 +423,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         os.environ["DERIVA_ML_WORKFLOW_URL"] = url
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
         os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file.as_posix()
+
+        # Pass Hydra overrides to notebook via environment variable
+        if hydra_overrides:
+            os.environ["DERIVA_ML_HYDRA_OVERRIDES"] = json.dumps(hydra_overrides)
+        elif "DERIVA_ML_HYDRA_OVERRIDES" in os.environ:
+            del os.environ["DERIVA_ML_HYDRA_OVERRIDES"]
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             notebook_output = Path(tmpdirname) / Path(notebook_file).name
@@ -394,8 +498,8 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             # Upload all registered assets to the catalog
             execution.upload_execution_outputs()
 
-            # Print citation info for referencing this execution
-            print(ml_instance.cite(execution_rid))
+            # Print execution URL (without snapshot ID for readability)
+            print(f"https://{hostname}/id/{catalog_id}/{execution_rid}")
 
 
 def main():

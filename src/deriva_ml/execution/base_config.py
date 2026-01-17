@@ -17,6 +17,8 @@ Usage:
     store(MyConfig, name="my_config")
 """
 
+import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
@@ -152,9 +154,23 @@ def get_notebook_configuration(
         >>> # Use the configuration
         >>> print(config.execution_rids)  # ['3JRC', '3KT0']
         >>> print(config.deriva_ml.hostname)  # From default_deriva config
+
+    Environment Variables:
+        DERIVA_ML_HYDRA_OVERRIDES: JSON-encoded list of override strings.
+            When running via `deriva-ml-run-notebook`, this is automatically
+            set from command-line arguments. Overrides from this environment
+            variable are applied first, then any overrides passed directly
+            to this function are applied (taking precedence).
     """
     # Ensure configs are in the hydra store
     store.add_to_hydra_store(overwrite_ok=True)
+
+    # Collect overrides from environment variable (set by run_notebook CLI)
+    env_overrides_json = os.environ.get("DERIVA_ML_HYDRA_OVERRIDES")
+    env_overrides = json.loads(env_overrides_json) if env_overrides_json else []
+
+    # Merge overrides: env overrides first, then explicit overrides (higher precedence)
+    all_overrides = env_overrides + (overrides or [])
 
     # Define a task function that instantiates and returns the config
     # The cfg from launch() is an OmegaConf DictConfig, so we need to
@@ -169,7 +185,7 @@ def get_notebook_configuration(
         version_base=version_base,
         config_name=config_name,
         job_name=job_name,
-        overrides=overrides or [],
+        overrides=all_overrides,
     )
 
     return result.return_value
