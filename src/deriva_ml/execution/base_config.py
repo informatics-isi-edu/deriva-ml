@@ -86,12 +86,7 @@ class BaseConfig:
         datasets: List of dataset specifications (list[DatasetSpec] at runtime).
         assets: List of asset RIDs to load (list[str] at runtime).
         dry_run: If True, skip catalog writes (for testing/debugging).
-        description: Human-readable description of this run (used for child executions
-            in multirun mode).
-        sweep_description: Description for the parent execution in multirun/sweep mode.
-            Supports full markdown formatting since it's defined in Python config files
-            rather than passed on the command line. If empty, falls back to using
-            `description` for the parent execution.
+        description: Human-readable description of this run.
         config_choices: Dictionary mapping config group names to selected config names.
             This is automatically populated by get_notebook_configuration() with the
             Hydra runtime choices (e.g., {"model_config": "cifar10_quick", "assets": "roc_quick"}).
@@ -111,7 +106,6 @@ class BaseConfig:
     assets: Any = field(default_factory=list)
     dry_run: bool = False
     description: str = ""
-    sweep_description: str = ""
     config_choices: dict[str, str] = field(default_factory=dict)
 
 

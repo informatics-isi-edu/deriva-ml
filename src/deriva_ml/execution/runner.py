@@ -249,7 +249,6 @@ def _create_parent_execution(
     ml_instance: "DerivaML",
     workflow: "Workflow",
     description: str,
-    sweep_description: str = "",
     dry_run: bool = False,
 ) -> None:
     """Create the parent execution for a multirun sweep.
@@ -260,9 +259,8 @@ def _create_parent_execution(
     Args:
         ml_instance: The DerivaML (or subclass) instance.
         workflow: The workflow to associate with the parent execution.
-        description: Description for the parent execution (fallback if sweep_description empty).
-        sweep_description: Rich description for the sweep (supports markdown). If provided,
-            this is used instead of constructing a description from `description`.
+        description: Description for the parent execution. When using multirun_config,
+            this is the rich markdown description from the config.
         dry_run: If True, don't write to the catalog.
     """
     global _multirun_state, _atexit_registered
@@ -270,16 +268,8 @@ def _create_parent_execution(
     # Import here to avoid circular imports
     from deriva_ml.execution import ExecutionConfiguration
 
-    # Get sweep info from Hydra
-    hydra_cfg = HydraConfig.get()
-    sweep_overrides = list(hydra_cfg.overrides.task)
-
-    # Create a description for the parent execution
-    # Use sweep_description if provided, otherwise construct from description
-    if sweep_description:
-        parent_description = sweep_description
-    else:
-        parent_description = f"Multirun sweep: {description}\n\nOverrides: {', '.join(sweep_overrides)}"
+    # Use the description directly - it comes from multirun_config or the CLI
+    parent_description = description
 
     # Create parent execution configuration (no datasets - those are for children)
     parent_config = ExecutionConfiguration(
@@ -317,7 +307,6 @@ def run_model(
     workflow: "Workflow",
     model_config: Any,
     dry_run: bool = False,
-    sweep_description: str = "",
     ml_class: type["DerivaML"] | None = None,
 ) -> None:
     """
@@ -350,7 +339,8 @@ def run_model(
 
     description : str
         Human-readable description of this execution run. Stored in the
-        Deriva catalog for provenance tracking.
+        Deriva catalog for provenance tracking. In multirun mode, this is
+        also used for the parent execution if running via multirun_config.
 
     workflow : Workflow
         The workflow definition to associate with this execution. Defines
@@ -365,13 +355,6 @@ def run_model(
         If True, create the execution record but skip actual model execution.
         Useful for testing configuration without running expensive computations.
         Default is False.
-
-    sweep_description : str, optional
-        Rich description for the parent execution in multirun/sweep mode.
-        Supports full markdown formatting since it's defined in Python config
-        files rather than passed on the command line. If empty, a default
-        description is constructed from `description` and the Hydra overrides.
-        Use this to document the purpose and design of experiment sweeps.
 
     ml_class : type[DerivaML], optional
         The DerivaML class (or subclass) to instantiate. If None, uses the
@@ -426,9 +409,7 @@ def run_model(
     # ---------------------------------------------------------------------------
     is_multirun = _is_multirun()
     if is_multirun and _multirun_state.parent_execution is None:
-        _create_parent_execution(
-            ml_instance, workflow, description, sweep_description, dry_run
-        )
+        _create_parent_execution(ml_instance, workflow, description, dry_run)
 
     # ---------------------------------------------------------------------------
     # Capture Hydra runtime choices for provenance

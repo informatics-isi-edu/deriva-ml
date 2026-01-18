@@ -11,6 +11,13 @@ from deriva_ml.execution.base_config import (
     load_configs,
     run_notebook,
 )
+from deriva_ml.execution.multirun_config import (
+    MultirunSpec,
+    multirun_config,
+    get_multirun_config,
+    list_multirun_configs,
+    get_all_multirun_configs,
+)
 from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfiguration
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.execution.runner import run_model, create_model_config, reset_multirun_state
@@ -48,4 +55,10 @@ __all__ = [
     "notebook_config",
     "load_configs",
     "run_notebook",
+    # Multirun configuration
+    "MultirunSpec",
+    "multirun_config",
+    "get_multirun_config",
+    "list_multirun_configs",
+    "get_all_multirun_configs",
 ]

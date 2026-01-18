@@ -28,7 +28,12 @@ from pathlib import Path
 from deriva.core import BaseCLI
 from hydra_zen import store, zen
 
-from deriva_ml.execution import run_model, load_configs
+from deriva_ml.execution import (
+    run_model,
+    load_configs,
+    get_multirun_config,
+    get_all_multirun_configs,
+)
 
 
 class DerivaMLRunCLI(BaseCLI):
@@ -157,18 +162,58 @@ class DerivaMLRunCLI(BaseCLI):
         # Build Hydra overrides list
         hydra_overrides = list(args.hydra_overrides) if args.hydra_overrides else []
 
+        # Check for +multirun=<name> and expand it
+        multirun_description = None
+        use_multirun = args.multirun
+        expanded_overrides = []
+
+        for override in hydra_overrides:
+            if override.startswith("+multirun="):
+                # Extract the multirun config name
+                multirun_name = override.split("=", 1)[1]
+                multirun_spec = get_multirun_config(multirun_name)
+
+                if multirun_spec is None:
+                    available = get_all_multirun_configs()
+                    print(f"Error: Unknown multirun config '{multirun_name}'")
+                    if available:
+                        print("Available multirun configs:")
+                        for name in sorted(available.keys()):
+                            print(f"  - {name}")
+                    else:
+                        print("No multirun configs registered. Define them in configs/multiruns.py")
+                    return 1
+
+                # Expand the multirun config's overrides
+                expanded_overrides.extend(multirun_spec.overrides)
+                multirun_description = multirun_spec.description
+                use_multirun = True  # Automatically enable multirun mode
+            else:
+                # Keep non-multirun overrides (they can override multirun config values)
+                expanded_overrides.append(override)
+
+        hydra_overrides = expanded_overrides
+
         # Add host/catalog overrides if provided on command line
         if args.host:
             hydra_overrides.append(f"deriva_ml.hostname={args.host}")
         if args.catalog:
             hydra_overrides.append(f"deriva_ml.catalog_id={args.catalog}")
 
+        # If we have a multirun description, add it as an override
+        # This gets passed to run_model which uses it for the parent execution
+        if multirun_description:
+            # Escape the description for Hydra command line
+            # Use single quotes and escape any internal single quotes
+            escaped_desc = multirun_description.replace("'", "\\'")
+            hydra_overrides.append(f"description='{escaped_desc}'")
+
         # Finalize the hydra-zen store
         store.add_to_hydra_store()
 
         # Build argv for Hydra
         hydra_argv = [sys.argv[0]] + hydra_overrides
-        if args.multirun:
+        if use_multirun:
             hydra_argv.insert(1, "--multirun")
 
         # Save and replace sys.argv for Hydra
@@ -219,10 +264,28 @@ class DerivaMLRunCLI(BaseCLI):
                 for name in sorted(groups[group]):
                     print(f"  - {name}")
 
+            # Show multirun configs if any are registered
+            multirun_configs = get_all_multirun_configs()
+            if multirun_configs:
+                print("\nmultirun:")
+                for name in sorted(multirun_configs.keys()):
+                    spec = multirun_configs[name]
+                    # Show first line of description or overrides summary
+                    if spec.description:
+                        first_line = spec.description.strip().split('\n')[0]
+                        # Remove markdown formatting for display
+                        first_line = first_line.lstrip('#').strip()
+                        if len(first_line) > 50:
+                            first_line = first_line[:47] + "..."
+                        print(f"  - {name}: {first_line}")
+                    else:
+                        print(f"  - {name}: {', '.join(spec.overrides[:2])}")
+
             print("\n" + "=" * 50)
             print("Usage: deriva-ml-run [options] <group>=<option> ...")
             print("Example: deriva-ml-run --host localhost --catalog 45 model_config=cifar10_quick")
             print("Example: deriva-ml-run +experiment=cifar10_quick")
+            print("Example: deriva-ml-run +multirun=quick_vs_extended")
             print("Example: deriva-ml-run --multirun +experiment=cifar10_quick,cifar10_extended")
 
         except Exception as e:
@@ -243,6 +306,8 @@ def main() -> int:
             "Examples:\n"
             "  deriva-ml-run model_config=my_model\n"
             "  deriva-ml-run --host localhost --catalog 45 +experiment=cifar10_quick\n"
+            "  deriva-ml-run +multirun=quick_vs_extended\n"
+            "  deriva-ml-run +multirun=lr_sweep model_config.epochs=5\n"
             "  deriva-ml-run --multirun +experiment=cifar10_quick,cifar10_extended\n"
             "  deriva-ml-run --info\n"
         ),
