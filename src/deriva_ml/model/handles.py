@@ -30,6 +30,7 @@ from deriva_ml.core.enums import BuiltinTypes
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from deriva_ml.model.annotations import AnnotationBuilder
 
 
 class ColumnHandle:
@@ -675,3 +676,29 @@ class TableHandle:
         """
         self._column_handles.clear()
         # The underlying table's apply() or a model refresh would update it
+
+    def set_annotation(self, annotation: "AnnotationBuilder", apply: bool = True) -> None:
+        """Set an annotation using an annotation builder.
+
+        This method accepts any annotation builder from deriva_ml.model.annotations
+        and applies it to the table.
+
+        Args:
+            annotation: An AnnotationBuilder instance (Display, VisibleColumns, etc.)
+            apply: Whether to apply changes immediately (default True).
+
+        Example:
+            >>> from deriva_ml.model.annotations import Display, VisibleColumns
+            >>>
+            >>> # Set display annotation
+            >>> handle.set_annotation(Display(name="My Table"))
+            >>>
+            >>> # Set visible columns
+            >>> vc = VisibleColumns()
+            >>> vc.compact(["RID", "Name"])
+            >>> vc.detailed(["RID", "Name", "Description"])
+            >>> handle.set_annotation(vc)
+        """
+        self._table.annotations[annotation.tag] = annotation.to_dict()
+        if apply:
+            self._table.apply()
