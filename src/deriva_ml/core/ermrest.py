@@ -26,6 +26,7 @@ builtin_types = em.builtin_types
 from pydantic import (
     BaseModel,
     Field,
+    PrivateAttr,
     computed_field,
     field_validator,
     model_serializer,
@@ -133,15 +134,119 @@ class VocabularyTerm(BaseModel):
         ...     RID="1-abc123"
         ... )
     """
-    name: str = Field(alias="Name")
-    synonyms: list[str] | None = Field(alias="Synonyms")
+    _name: str = PrivateAttr()
+    _synonyms: list[str] | None = PrivateAttr()
+    _description: str = PrivateAttr()
     id: str = Field(alias="ID")
     uri: str = Field(alias="URI")
-    description: str = Field(alias="Description")
     rid: str = Field(alias="RID")
+
+    def __init__(self, **data):
+        # Extract fields that will be private attrs before calling super
+        name = data.pop("Name", None) or data.pop("name", None)
+        synonyms = data.pop("Synonyms", None) or data.pop("synonyms", None)
+        description = data.pop("Description", None) or data.pop("description", None)
+        super().__init__(**data)
+        self._name = name
+        self._synonyms = synonyms
+        self._description = description
+
+    @property
+    def name(self) -> str:
+        """Primary name of the term."""
+        return self._name
+
+    @property
+    def synonyms(self) -> tuple[str, ...]:
+        """Alternative names for the term (immutable)."""
+        return tuple(self._synonyms or [])
+
+    @property
+    def description(self) -> str:
+        """Explanation of the term's meaning."""
+        return self._description
 
     class Config:
         extra = "ignore"
+
+
+class VocabularyTermHandle(VocabularyTerm):
+    """A VocabularyTerm with methods to modify it in the catalog.
+
+    This class extends VocabularyTerm to provide mutable access to vocabulary
+    terms. Changes made through property setters are persisted to the catalog.
+
+    The `synonyms` property returns a tuple (immutable) to prevent accidental
+    modification without catalog update. To modify synonyms, assign a new
+    tuple/list to the property.
+
+    Attributes:
+        Inherits all attributes from VocabularyTerm.
+
+    Example:
+        >>> term = ml.lookup_term("Dataset_Type", "Training")
+        >>> term.description = "Data used for model training"
+        >>> term.synonyms = ("Train", "TrainingData")
+        >>> term.delete()
+    """
+
+    _ml: Any = PrivateAttr()
+    _table: str = PrivateAttr()
+
+    def __init__(self, ml: Any, table: str, **data):
+        """Initialize a VocabularyTermHandle.
+
+        Args:
+            ml: DerivaML instance for catalog operations.
+            table: Name of the vocabulary table containing this term.
+            **data: Term data (Name, Synonyms, Description, ID, URI, RID).
+        """
+        super().__init__(**data)
+        self._ml = ml
+        self._table = table
+
+    @property
+    def description(self) -> str:
+        """Explanation of the term's meaning."""
+        return self._description
+
+    @description.setter
+    def description(self, value: str) -> None:
+        """Update the term's description in the catalog.
+
+        Args:
+            value: New description for the term.
+        """
+        self._ml._update_term_description(self._table, self.name, value)
+        self._description = value
+
+    @property
+    def synonyms(self) -> tuple[str, ...]:
+        """Alternative names for the term (immutable).
+
+        Returns a tuple to prevent accidental modification without catalog update.
+        To modify synonyms, assign a new tuple/list to this property.
+        """
+        return tuple(self._synonyms or [])
+
+    @synonyms.setter
+    def synonyms(self, value: list[str] | tuple[str, ...]) -> None:
+        """Replace all synonyms for this term in the catalog.
+
+        Args:
+            value: New list of synonyms (replaces all existing synonyms).
+        """
+        new_synonyms = list(value)
+        self._ml._update_term_synonyms(self._table, self.name, new_synonyms)
+        self._synonyms = new_synonyms
+
+    def delete(self) -> None:
+        """Delete this term from the vocabulary.
+
+        Raises:
+            DerivaMLException: If the term is currently in use by other records.
+        """
+        self._ml.delete_term(self._table, self.name)
 
 
 class ColumnDefinition(BaseModel):

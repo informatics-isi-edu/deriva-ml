@@ -18,7 +18,7 @@ Table = _ermrest_model.Table
 
 from pydantic import ConfigDict, validate_call
 
-from deriva_ml.core.definitions import MLVocab, VocabularyTerm
+from deriva_ml.core.definitions import MLVocab, VocabularyTerm, VocabularyTermHandle
 from deriva_ml.core.exceptions import (
     DerivaMLException,
     DerivaMLInvalidTerm,
@@ -30,8 +30,8 @@ if TYPE_CHECKING:
 
 
 # Type alias for the vocabulary cache structure
-# Maps (schema_name, table_name) -> {term_name -> VocabularyTerm, synonym -> VocabularyTerm}
-VocabCache = dict[tuple[str, str], dict[str, VocabularyTerm]]
+# Maps (schema_name, table_name) -> {term_name -> VocabularyTermHandle, synonym -> VocabularyTermHandle}
+VocabCache = dict[tuple[str, str], dict[str, VocabularyTermHandle]]
 
 
 class VocabularyMixin:
@@ -76,21 +76,21 @@ class VocabularyMixin:
             cache_key = (vocab_table.schema.name, vocab_table.name)
             cache.pop(cache_key, None)
 
-    def _populate_vocab_cache(self, schema_name: str, table_name: str) -> dict[str, VocabularyTerm]:
+    def _populate_vocab_cache(self, schema_name: str, table_name: str) -> dict[str, VocabularyTermHandle]:
         """Fetch all terms from a vocabulary table and populate the cache.
 
         Returns:
-            Dictionary mapping term names and synonyms to VocabularyTerm objects.
+            Dictionary mapping term names and synonyms to VocabularyTermHandle objects.
         """
         cache = self._get_vocab_cache()
         cache_key = (schema_name, table_name)
 
         # Fetch all terms from the server
         schema_path = self.pathBuilder().schemas[schema_name]
-        term_lookup: dict[str, VocabularyTerm] = {}
+        term_lookup: dict[str, VocabularyTermHandle] = {}
 
         for term_data in schema_path.tables[table_name].entities().fetch():
-            term = VocabularyTerm.model_validate(term_data)
+            term = VocabularyTermHandle(ml=self, table=table_name, **term_data)
             # Index by primary name
             term_lookup[term.name] = term
             # Also index by each synonym
@@ -109,7 +109,7 @@ class VocabularyMixin:
         description: str,
         synonyms: list[str] | None = None,
         exists_ok: bool = True,
-    ) -> VocabularyTerm:
+    ) -> VocabularyTermHandle:
         """Adds a term to a vocabulary table.
 
         Creates a new standardized term with description and optional synonyms in a vocabulary table.
@@ -123,7 +123,8 @@ class VocabularyMixin:
             exists_ok: If True, return the existing term if found. If False, raise error.
 
         Returns:
-            VocabularyTerm: Object representing the created or existing term.
+            VocabularyTermHandle: Object representing the created or existing term, with
+                methods to modify it in the catalog.
 
         Raises:
             DerivaMLException: If a term exists and exists_ok=False, or if the table is not a vocabulary table.
@@ -136,6 +137,9 @@ class VocabularyMixin:
                 ...     description="Epithelial tissue type",
                 ...     synonyms=["epithelium"]
                 ... )
+                >>> # Modify the term
+                >>> term.description = "Updated description"
+                >>> term.synonyms = ("epithelium", "epithelial_tissue")
 
             Attempt to add an existing term:
                 >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)
@@ -144,42 +148,39 @@ class VocabularyMixin:
         synonyms = synonyms or []
 
         # Get table reference and validate if it is a vocabulary table
-        table = self.model.name_to_table(table)
+        vocab_table = self.model.name_to_table(table)
         pb = self.pathBuilder()
-        if not (self.model.is_vocabulary(table)):
-            raise DerivaMLTableTypeError("vocabulary", table.name)
+        if not (self.model.is_vocabulary(vocab_table)):
+            raise DerivaMLTableTypeError("vocabulary", vocab_table.name)
 
         # Get schema and table names for path building
-        schema_name = table.schema.name
-        table_name = table.name
+        schema_name = vocab_table.schema.name
+        table_name = vocab_table.name
 
         try:
             # Attempt to insert a new term
-            term_id = VocabularyTerm.model_validate(
-                pb.schemas[schema_name]
-                .tables[table_name]
-                .insert(
-                    [
-                        {
-                            "Name": term_name,
-                            "Description": description,
-                            "Synonyms": synonyms,
-                        }
-                    ],
-                    defaults={"ID", "URI"},
-                )[0]
-            )
+            term_data = pb.schemas[schema_name].tables[table_name].insert(
+                [
+                    {
+                        "Name": term_name,
+                        "Description": description,
+                        "Synonyms": synonyms,
+                    }
+                ],
+                defaults={"ID", "URI"},
+            )[0]
+            term_handle = VocabularyTermHandle(ml=self, table=table_name, **term_data)
             # Invalidate cache for this vocabulary since we added a new term
-            self.clear_vocabulary_cache(table)
+            self.clear_vocabulary_cache(vocab_table)
+            return term_handle
         except DataPathException:
             # Term exists - look it up or raise an error
-            term_id = self.lookup_term(table, term_name)
             if not exists_ok:
-                raise DerivaMLInvalidTerm(table.name, term_name, msg="term already exists")
-        return term_id
+                raise DerivaMLInvalidTerm(vocab_table.name, term_name, msg="term already exists")
+            return self.lookup_term(vocab_table, term_name)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTerm:
+    def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTermHandle:
         """Finds a term in a vocabulary table.
 
         Searches for a term in the specified vocabulary table, matching either the primary name
@@ -191,7 +192,7 @@ class VocabularyMixin:
             term_name: Name or synonym of the term to find.
 
         Returns:
-            VocabularyTerm: The matching vocabulary term.
+            VocabularyTermHandle: The matching vocabulary term, with methods to modify it.
 
         Raises:
             DerivaMLVocabularyException: If the table is not a vocabulary table, or term is not found.
@@ -203,6 +204,11 @@ class VocabularyMixin:
 
             Look up by synonym:
                 >>> term = ml.lookup_term("tissue_types", "epithelium")
+
+            Modify the term:
+                >>> term = ml.lookup_term("tissue_types", "epithelial")
+                >>> term.description = "Updated description"
+                >>> term.synonyms = ("epithelium", "epithelial_tissue")
         """
         # Get and validate vocabulary table reference
         vocab_table = self.model.name_to_table(table)
@@ -226,7 +232,7 @@ class VocabularyMixin:
             if term is not None:
                 # Found it - populate the full cache for future lookups
                 self._populate_vocab_cache(schema_name, table_name)
-                return term
+                return self._get_vocab_cache()[cache_key][term_name]
             # Not found by name - need to check synonyms, populate cache
             term_lookup = self._populate_vocab_cache(schema_name, table_name)
             if term_name in term_lookup:
@@ -236,12 +242,9 @@ class VocabularyMixin:
         # Term not in cache - try server-side lookup (might be newly added)
         term = self._server_lookup_term(schema_name, table_name, term_name)
         if term is not None:
-            # Add to cache
-            cache[cache_key][term_name] = term
-            if term.synonyms:
-                for synonym in term.synonyms:
-                    cache[cache_key][synonym] = term
-            return term
+            # Refresh cache to get the VocabularyTermHandle
+            self._populate_vocab_cache(schema_name, table_name)
+            return self._get_vocab_cache()[cache_key][term_name]
 
         # Still not found - refresh cache and try one more time
         term_lookup = self._populate_vocab_cache(schema_name, table_name)
@@ -253,7 +256,7 @@ class VocabularyMixin:
 
     def _server_lookup_term(
         self, schema_name: str, table_name: str, term_name: str
-    ) -> VocabularyTerm | None:
+    ) -> VocabularyTermHandle | None:
         """Look up a term by name using server-side filtering.
 
         This performs a targeted server query for a specific term name.
@@ -265,7 +268,7 @@ class VocabularyMixin:
             term_name: Primary name of the term to find.
 
         Returns:
-            VocabularyTerm if found by exact name match, None otherwise.
+            VocabularyTermHandle if found by exact name match, None otherwise.
         """
         schema_path = self.pathBuilder().schemas[schema_name]
         table_path = schema_path.tables[table_name]
@@ -273,7 +276,7 @@ class VocabularyMixin:
         # Server-side filter by Name
         results = list(table_path.filter(table_path.Name == term_name).entities().fetch())
         if results:
-            return VocabularyTerm.model_validate(results[0])
+            return VocabularyTermHandle(ml=self, table=table_name, **results[0])
         return None
 
     def list_vocabulary_terms(self, table: str | Table) -> list[VocabularyTerm]:
@@ -308,90 +311,49 @@ class VocabularyMixin:
         # Fetch and convert all terms to VocabularyTerm objects
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def add_synonym(self, table: str | Table, term_name: str, synonym: str) -> VocabularyTerm:
-        """Add a synonym to an existing vocabulary term.
+    def _update_term_synonyms(self, table: str | Table, term_name: str, synonyms: list[str]) -> None:
+        """Internal: Update synonyms for a vocabulary term.
 
-        Adds an alternative name that can be used to look up this term. The term
-        must already exist in the vocabulary table.
+        Called by VocabularyTermHandle.synonyms setter.
 
         Args:
-            table: Vocabulary table containing the term (name or Table object).
-            term_name: Primary name of the term to add synonym to.
-            synonym: Alternative name to add.
-
-        Returns:
-            VocabularyTerm: Updated term with the new synonym.
-
-        Raises:
-            DerivaMLInvalidTerm: If the term doesn't exist in the vocabulary.
-            DerivaMLException: If the synonym already exists for this term.
-
-        Example:
-            >>> ml.add_synonym("tissue_types", "epithelial", "epithelium")
+            table: Vocabulary table containing the term.
+            term_name: Primary name of the term to update.
+            synonyms: New list of synonyms (replaces all existing).
         """
-        # Look up the term (validates table and term existence)
+        # Look up the term to get its RID
         term = self.lookup_term(table, term_name)
-
-        # Check if synonym already exists
-        current_synonyms = term.synonyms or []
-        if synonym in current_synonyms:
-            return term  # Already exists, no-op
-
-        # Build updated synonyms list
-        new_synonyms = current_synonyms + [synonym]
 
         # Update the term in the catalog
         vocab_table = self.model.name_to_table(table)
         pb = self.pathBuilder()
         table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
-        table_path.update([{"RID": term.rid, "Synonyms": new_synonyms}])
+        table_path.update([{"RID": term.rid, "Synonyms": synonyms}])
 
-        # Invalidate cache and return updated term
+        # Invalidate cache
         self.clear_vocabulary_cache(table)
-        return self.lookup_term(table, term_name)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def remove_synonym(self, table: str | Table, term_name: str, synonym: str) -> VocabularyTerm:
-        """Remove a synonym from an existing vocabulary term.
+    def _update_term_description(self, table: str | Table, term_name: str, description: str) -> None:
+        """Internal: Update description for a vocabulary term.
 
-        Removes an alternative name from the term. The term must already exist
-        in the vocabulary table.
+        Called by VocabularyTermHandle.description setter.
 
         Args:
-            table: Vocabulary table containing the term (name or Table object).
-            term_name: Primary name of the term to remove synonym from.
-            synonym: Alternative name to remove.
-
-        Returns:
-            VocabularyTerm: Updated term with the synonym removed.
-
-        Raises:
-            DerivaMLInvalidTerm: If the term doesn't exist in the vocabulary.
-
-        Example:
-            >>> ml.remove_synonym("tissue_types", "epithelial", "epithelium")
+            table: Vocabulary table containing the term.
+            term_name: Primary name of the term to update.
+            description: New description for the term.
         """
-        # Look up the term (validates table and term existence)
+        # Look up the term to get its RID
         term = self.lookup_term(table, term_name)
-
-        # Check if synonym exists
-        current_synonyms = term.synonyms or []
-        if synonym not in current_synonyms:
-            return term  # Doesn't exist, no-op
-
-        # Build updated synonyms list
-        new_synonyms = [s for s in current_synonyms if s != synonym]
 
         # Update the term in the catalog
         vocab_table = self.model.name_to_table(table)
         pb = self.pathBuilder()
         table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
-        table_path.update([{"RID": term.rid, "Synonyms": new_synonyms}])
+        table_path.update([{"RID": term.rid, "Description": description}])
 
-        # Invalidate cache and return updated term
+        # Invalidate cache
         self.clear_vocabulary_cache(table)
-        return self.lookup_term(table, term_name)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def delete_term(self, table: str | Table, term_name: str) -> None:

@@ -65,6 +65,7 @@ from deriva_ml.core.ermrest import (
     UploadCallback,
     UploadProgress,
     VocabularyTerm,
+    VocabularyTermHandle,
 )
 
 # =============================================================================
