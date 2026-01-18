@@ -31,6 +31,8 @@ Example (RID validation):
     ...         print(f"ERROR: {error}")
 """
 
+from __future__ import annotations
+
 from pydantic import ConfigDict
 
 # =============================================================================
@@ -72,8 +74,6 @@ __all__ = [
 # =============================================================================
 # RID Validation
 # =============================================================================
-
-from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
