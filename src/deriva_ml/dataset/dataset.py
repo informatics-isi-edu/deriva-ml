@@ -478,6 +478,72 @@ class Dataset:
             versions = [h.dataset_version for h in history]
             return max(versions) if versions else DatasetVersion(0, 1, 0)
 
+    def get_chaise_url(self) -> str:
+        """Get the Chaise URL for viewing this dataset in the browser.
+
+        Returns:
+            URL string for the dataset record in Chaise.
+        """
+        return (
+            f"https://{self._ml_instance.host_name}/chaise/record/"
+            f"#{self._ml_instance.catalog_id}/deriva-ml:Dataset/RID={self.dataset_rid}"
+        )
+
+    def to_markdown(self, show_children: bool = False, indent: int = 0) -> str:
+        """Generate a markdown representation of this dataset.
+
+        Returns a formatted markdown string with a link to the dataset,
+        version, types, and description. Optionally includes nested children.
+
+        Args:
+            show_children: If True, include direct child datasets.
+            indent: Number of indent levels (each level is 2 spaces).
+
+        Returns:
+            Markdown-formatted string.
+
+        Example:
+            >>> ds = ml.lookup_dataset("4HM")
+            >>> print(ds.to_markdown())
+        """
+        prefix = "  " * indent
+        version = str(self.current_version) if self.current_version else "n/a"
+        types = ", ".join(self.dataset_types) if self.dataset_types else ""
+        desc = self.description or ""
+
+        line = f"{prefix}- [{self.dataset_rid}]({self.get_chaise_url()}) v{version}"
+        if types:
+            line += f" [{types}]"
+        if desc:
+            line += f": {desc}"
+
+        lines = [line]
+
+        if show_children:
+            children = self.list_dataset_children(recurse=False)
+            for child in children:
+                lines.append(child.to_markdown(show_children=False, indent=indent + 1))
+
+        return "\n".join(lines)
+
+    def display_markdown(self, show_children: bool = False, indent: int = 0) -> None:
+        """Display a formatted markdown representation of this dataset in Jupyter.
+
+        Convenience method that calls to_markdown() and displays the result
+        using IPython.display.Markdown.
+
+        Args:
+            show_children: If True, include direct child datasets.
+            indent: Number of indent levels (each level is 2 spaces).
+
+        Example:
+            >>> ds = ml.lookup_dataset("4HM")
+            >>> ds.display_markdown(show_children=True)
+        """
+        from IPython.display import display, Markdown
+
+        display(Markdown(self.to_markdown(show_children, indent)))
+
     def _build_dataset_graph(self) -> Iterable[Dataset]:
         """Build a dependency graph of all related datasets and return in topological order.
 

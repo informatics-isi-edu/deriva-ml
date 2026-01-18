@@ -291,5 +291,81 @@ class Experiment:
             "url": self.get_chaise_url(),
         }
 
+    def to_markdown(self, show_datasets: bool = True, show_assets: bool = True) -> str:
+        """Generate a markdown summary of this experiment.
+
+        Returns a formatted markdown string with clickable links, configuration
+        details, and optionally input datasets and assets.
+
+        Args:
+            show_datasets: If True, include input datasets with nested children.
+            show_assets: If True, include input assets.
+
+        Returns:
+            Markdown-formatted string.
+
+        Example:
+            >>> exp = ml.lookup_experiment("47BE")
+            >>> print(exp.to_markdown())
+        """
+        lines = []
+
+        # Header with execution link
+        lines.append(f"### {self.name} ([{self.execution_rid}]({self.get_chaise_url()}))")
+
+        # Description
+        if self.description:
+            lines.append(f"**Description:** {self.description}")
+
+        # Config choices
+        if self.config_choices:
+            choices_str = ", ".join(
+                f"`{k}={v}`" for k, v in sorted(self.config_choices.items())
+            )
+            lines.append(f"**Configuration Choices:** {choices_str}")
+
+        # Model configuration (filter internal fields)
+        model_cfg = {
+            k: v for k, v in self.model_config.items() if not k.startswith("_")
+        }
+        if model_cfg:
+            lines.append("**Model Configuration:**")
+            for k, v in sorted(model_cfg.items()):
+                lines.append(f"- **{k}**: {v}")
+
+        # Input datasets
+        if show_datasets and self.input_datasets:
+            lines.append("**Input Datasets:**")
+            for ds in self.input_datasets:
+                lines.append(ds.to_markdown(show_children=True, indent=0))
+
+        # Input assets
+        if show_assets and self.input_assets:
+            lines.append("**Input Assets:**")
+            for asset in self.input_assets:
+                lines.append(
+                    f"- [{asset.asset_rid}]({asset.get_chaise_url()}): {asset.filename}"
+                )
+
+        return "\n".join(lines)
+
+    def display_markdown(self, show_datasets: bool = True, show_assets: bool = True) -> None:
+        """Display a formatted markdown summary of this experiment in Jupyter.
+
+        Convenience method that calls to_markdown() and displays the result
+        using IPython.display.Markdown.
+
+        Args:
+            show_datasets: If True, display input datasets with nested children.
+            show_assets: If True, display input assets.
+
+        Example:
+            >>> exp = ml.lookup_experiment("47BE")
+            >>> exp.display_markdown()
+        """
+        from IPython.display import display, Markdown
+
+        display(Markdown(self.to_markdown(show_datasets, show_assets)))
+
     def __repr__(self) -> str:
         return f"Experiment(name={self.name!r}, rid={self.execution_rid!r})"
