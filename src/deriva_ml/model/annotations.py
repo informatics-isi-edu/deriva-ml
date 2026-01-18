@@ -1,29 +1,128 @@
 """Annotation helper classes for DerivaML.
 
-This module provides lightweight helper classes for building common annotation
-structures. These are NOT comprehensive Pydantic models of the full annotation
-schema - instead they are convenience builders for the most common use cases.
+This module provides lightweight helper classes for building Deriva catalog
+annotations that control how data is displayed in the Chaise web interface.
 
-The classes help with:
-- IDE autocompletion and type hints
-- Reducing typos in annotation keys
-- Making code more readable
-- Documenting common patterns
+These builders provide:
 
-For full schema details, see the Deriva annotation documentation.
+- **IDE autocompletion** - Type hints for all annotation properties
+- **Validation** - Catches errors at construction time (e.g., mutually exclusive options)
+- **Reduced typos** - Use `Display(name="...")` instead of `{"name": "..."}`
+- **Self-documenting code** - Easier to read than raw dictionaries
+- **Method chaining** - Fluent API for building complex annotations
 
-Example:
-    >>> from deriva_ml.model.annotations import Display, VisibleColumns, RowNamePattern
-    >>>
-    >>> # Build display annotation
-    >>> display = Display(name="Friendly Name")
-    >>> table_handle.set_annotation(display)
-    >>>
-    >>> # Build visible columns with contexts
-    >>> vis_cols = VisibleColumns()
-    >>> vis_cols.compact(["RID", "Name", "Description"])
-    >>> vis_cols.detailed(["RID", "Name", "Description", "Created"])
-    >>> table_handle.set_annotation(vis_cols)
+For the full annotation schema, see the Deriva documentation at:
+https://docs.derivacloud.org/chaise/annotation/
+
+Quick Start
+-----------
+Basic usage with a TableHandle::
+
+    from deriva_ml.model import TableHandle, Display, VisibleColumns, TableDisplay
+
+    # Get a table handle
+    handle = TableHandle(table)
+
+    # Set display name
+    handle.set_annotation(Display(name="Research Subjects"))
+
+    # Configure visible columns
+    vc = VisibleColumns()
+    vc.compact(["RID", "Name", "Status"])
+    vc.detailed(["RID", "Name", "Status", "Description", "Created"])
+    handle.set_annotation(vc)
+
+    # Set row name pattern
+    td = TableDisplay()
+    td.row_name("{{{Name}}} ({{{RID}}})")
+    handle.set_annotation(td)
+
+Available Builders
+------------------
+**Main annotation builders:**
+
+- `Display` - Basic display properties (name, comment, show_null)
+- `VisibleColumns` - Which columns appear in each UI context
+- `VisibleForeignKeys` - Which related tables appear in detail view
+- `TableDisplay` - Row naming, ordering, and table-level options
+- `ColumnDisplay` - Column value formatting
+
+**Helper classes:**
+
+- `PseudoColumn` - Computed columns, FK traversals, aggregates
+- `Facet` / `FacetList` - Faceted search configuration
+- `SortKey` - Row ordering specification
+- `InboundFK` / `OutboundFK` - Foreign key path steps
+- `NameStyle` - Display name styling
+- `PreFormat` - Column pre-formatting (printf, boolean display)
+
+**Enums:**
+
+- `TemplateEngine` - HANDLEBARS or MUSTACHE
+- `Aggregate` - MIN, MAX, CNT, CNT_D, ARRAY, ARRAY_D
+- `ArrayUxMode` - RAW, CSV, OLIST, ULIST
+- `FacetUxMode` - CHOICES, RANGES, CHECK_PRESENCE
+
+**Context constants:**
+
+- `CONTEXT_DEFAULT` ("*") - Default for all contexts
+- `CONTEXT_COMPACT` - List/table views
+- `CONTEXT_DETAILED` - Single record view
+- `CONTEXT_ENTRY` - Create/edit forms
+- `CONTEXT_FILTER` - Faceted search
+
+Examples
+--------
+Display annotation with description::
+
+    display = Display(
+        name="Research Subjects",
+        comment="Individuals enrolled in the study"
+    )
+
+Visible columns with FK and pseudo-column::
+
+    from deriva_ml.model import fk_constraint, PseudoColumn, InboundFK, Aggregate
+
+    vc = VisibleColumns()
+    vc.compact([
+        "RID",
+        "Name",
+        fk_constraint("domain", "Subject_Species_fkey"),
+        PseudoColumn(
+            source=[InboundFK("domain", "Sample_Subject_fkey"), "RID"],
+            aggregate=Aggregate.CNT,
+            markdown_name="Samples"
+        ),
+    ])
+
+Table display with row name and ordering::
+
+    td = TableDisplay()
+    td.row_name("{{{Name}}} ({{{Species}}})")
+    td.compact(TableDisplayOptions(
+        row_order=[SortKey("Name"), SortKey("Created", descending=True)],
+        page_size=50
+    ))
+
+Faceted search configuration::
+
+    facets = FacetList()
+    facets.add(Facet(source="Species", open=True))
+    facets.add(Facet(source="Age", ux_mode=FacetUxMode.RANGES))
+
+    vc = VisibleColumns()
+    vc._contexts["filter"] = facets.to_dict()
+
+Using Raw Dictionaries
+----------------------
+The builders are optional. You can always use raw dictionaries::
+
+    table.annotations["tag:isrd.isi.edu,2016:visible-columns"] = {
+        "compact": ["RID", "Name"],
+        "detailed": ["RID", "Name", "Description"]
+    }
+    table.apply()
 """
 
 from __future__ import annotations
@@ -38,13 +137,51 @@ from typing import Any, Literal
 # =============================================================================
 
 class TemplateEngine(str, Enum):
-    """Template engine for markdown patterns."""
+    """Template engine for markdown patterns.
+
+    Attributes:
+        HANDLEBARS: Use Handlebars.js templating (recommended, more features)
+        MUSTACHE: Use Mustache templating (simpler, fewer features)
+
+    Example:
+        >>> display = PseudoColumnDisplay(
+        ...     markdown_pattern="[{{{Name}}}]({{{URL}}})",
+        ...     template_engine=TemplateEngine.HANDLEBARS
+        ... )
+    """
     HANDLEBARS = "handlebars"
     MUSTACHE = "mustache"
 
 
 class Aggregate(str, Enum):
-    """Aggregation functions for pseudo-columns."""
+    """Aggregation functions for pseudo-columns.
+
+    Used when a pseudo-column follows an inbound foreign key and returns
+    multiple values that need to be aggregated.
+
+    Attributes:
+        MIN: Minimum value
+        MAX: Maximum value
+        CNT: Count of values
+        CNT_D: Count of distinct values
+        ARRAY: Array of all values
+        ARRAY_D: Array of distinct values
+
+    Example:
+        >>> # Count related records
+        >>> pc = PseudoColumn(
+        ...     source=[InboundFK("domain", "Sample_Subject_fkey"), "RID"],
+        ...     aggregate=Aggregate.CNT,
+        ...     markdown_name="Sample Count"
+        ... )
+        >>>
+        >>> # Get distinct values as array
+        >>> pc = PseudoColumn(
+        ...     source=[InboundFK("domain", "Tag_Item_fkey"), "Name"],
+        ...     aggregate=Aggregate.ARRAY_D,
+        ...     markdown_name="Tags"
+        ... )
+    """
     MIN = "min"
     MAX = "max"
     CNT = "cnt"
@@ -54,7 +191,23 @@ class Aggregate(str, Enum):
 
 
 class ArrayUxMode(str, Enum):
-    """Display modes for array values."""
+    """Display modes for array values in pseudo-columns.
+
+    Controls how arrays of values are rendered in the UI.
+
+    Attributes:
+        RAW: Raw array display
+        CSV: Comma-separated values
+        OLIST: Ordered (numbered) list
+        ULIST: Unordered (bulleted) list
+
+    Example:
+        >>> pc = PseudoColumn(
+        ...     source=[InboundFK("domain", "Tag_Item_fkey"), "Name"],
+        ...     aggregate=Aggregate.ARRAY,
+        ...     display=PseudoColumnDisplay(array_ux_mode=ArrayUxMode.CSV)
+        ... )
+    """
     RAW = "raw"
     CSV = "csv"
     OLIST = "olist"
@@ -62,7 +215,25 @@ class ArrayUxMode(str, Enum):
 
 
 class FacetUxMode(str, Enum):
-    """UX modes for facet filters."""
+    """UX modes for facet filters in the search panel.
+
+    Controls how users interact with a facet filter.
+
+    Attributes:
+        CHOICES: Checkbox list for selecting values
+        RANGES: Range slider/inputs for numeric or date ranges
+        CHECK_PRESENCE: Check if value exists or is null
+
+    Example:
+        >>> # Choice-based facet
+        >>> Facet(source="Status", ux_mode=FacetUxMode.CHOICES)
+        >>>
+        >>> # Range-based facet for numeric values
+        >>> Facet(source="Age", ux_mode=FacetUxMode.RANGES)
+        >>>
+        >>> # Check presence (has value / no value)
+        >>> Facet(source="Notes", ux_mode=FacetUxMode.CHECK_PRESENCE)
+    """
     CHOICES = "choices"
     RANGES = "ranges"
     CHECK_PRESENCE = "check_presence"
@@ -124,12 +295,20 @@ class AnnotationBuilder:
 
 @dataclass
 class NameStyle:
-    """Styling options for display names.
+    """Styling options for automatic display name formatting.
+
+    Applied to table or column names when no explicit display name is set.
 
     Args:
-        underline_space: Replace underscores with spaces
-        title_case: Apply title case formatting
-        markdown: Render as markdown
+        underline_space: Replace underscores with spaces (e.g., "First_Name" -> "First Name")
+        title_case: Apply title case formatting (e.g., "firstname" -> "Firstname")
+        markdown: Render the name as markdown
+
+    Example:
+        >>> # Transform "Subject_ID" to "Subject Id" with title case
+        >>> display = Display(
+        ...     name_style=NameStyle(underline_space=True, title_case=True)
+        ... )
     """
     underline_space: bool | None = None
     title_case: bool | None = None
@@ -151,23 +330,55 @@ class NameStyle:
 class Display(AnnotationBuilder):
     """Display annotation for tables and columns.
 
-    Controls basic naming and display options.
+    Controls the display name, description/tooltip, and how null values
+    and foreign key links are rendered. Can be applied to both tables
+    and columns.
 
     Args:
-        name: Display name (mutually exclusive with markdown_name)
-        markdown_name: Markdown-formatted display name
-        name_style: Styling options for the name
-        comment: Description/tooltip text
-        show_null: How to show null values (by context)
-        show_foreign_key_link: Show FK as link (by context)
+        name: Display name shown in the UI (mutually exclusive with markdown_name)
+        markdown_name: Markdown-formatted display name (mutually exclusive with name)
+        name_style: Styling options for automatic name formatting
+        comment: Description text shown as tooltip/help text
+        show_null: How to display null values, per context
+        show_foreign_key_link: Whether to show FK values as links, per context
+
+    Raises:
+        ValueError: If both name and markdown_name are provided
 
     Example:
-        >>> display = Display(name="Friendly Name")
-        >>> display = Display(
-        ...     markdown_name="**Bold** Name",
-        ...     comment="Description text",
-        ...     show_null={CONTEXT_COMPACT: False}
-        ... )
+        Basic display name::
+
+            >>> display = Display(name="Research Subjects")
+            >>> handle.set_annotation(display)
+
+        With description/tooltip::
+
+            >>> display = Display(
+            ...     name="Subjects",
+            ...     comment="Individuals enrolled in research studies"
+            ... )
+
+        Markdown-formatted name::
+
+            >>> display = Display(markdown_name="**Bold** _Italic_ Name")
+
+        Context-specific null display::
+
+            >>> from deriva_ml.model import CONTEXT_COMPACT, CONTEXT_DETAILED
+            >>> display = Display(
+            ...     name="Value",
+            ...     show_null={
+            ...         CONTEXT_COMPACT: False,      # Hide nulls in lists
+            ...         CONTEXT_DETAILED: '"N/A"'    # Show "N/A" string
+            ...     }
+            ... )
+
+        Control foreign key link display::
+
+            >>> display = Display(
+            ...     name="Subject",
+            ...     show_foreign_key_link={CONTEXT_COMPACT: False}
+            ... )
     """
     tag = TAG_DISPLAY
 
@@ -233,11 +444,24 @@ class SortKey:
 
 @dataclass
 class InboundFK:
-    """An inbound foreign key path step.
+    """An inbound foreign key path step for pseudo-column source paths.
+
+    Use this when following a foreign key FROM another table TO the current table.
+    This is common when counting or aggregating related records.
 
     Args:
-        schema: Schema name containing the FK
-        constraint: Constraint name
+        schema: Schema name containing the FK constraint
+        constraint: Foreign key constraint name
+
+    Example:
+        Count images related to a subject (Image has FK to Subject)::
+
+            >>> # In Subject table, count related images
+            >>> pc = PseudoColumn(
+            ...     source=[InboundFK("domain", "Image_Subject_fkey"), "RID"],
+            ...     aggregate=Aggregate.CNT,
+            ...     markdown_name="Image Count"
+            ... )
     """
     schema: str
     constraint: str
@@ -248,11 +472,35 @@ class InboundFK:
 
 @dataclass
 class OutboundFK:
-    """An outbound foreign key path step.
+    """An outbound foreign key path step for pseudo-column source paths.
+
+    Use this when following a foreign key FROM the current table TO another table.
+    This is common when displaying values from referenced tables.
 
     Args:
-        schema: Schema name containing the FK
-        constraint: Constraint name
+        schema: Schema name containing the FK constraint
+        constraint: Foreign key constraint name
+
+    Example:
+        Show species name from a related Species table::
+
+            >>> # Subject has FK to Species, display Species.Name
+            >>> pc = PseudoColumn(
+            ...     source=[OutboundFK("domain", "Subject_Species_fkey"), "Name"],
+            ...     markdown_name="Species"
+            ... )
+
+        Chain multiple outbound FKs::
+
+            >>> # Image -> Subject -> Species
+            >>> pc = PseudoColumn(
+            ...     source=[
+            ...         OutboundFK("domain", "Image_Subject_fkey"),
+            ...         OutboundFK("domain", "Subject_Species_fkey"),
+            ...         "Name"
+            ...     ],
+            ...     markdown_name="Species"
+            ... )
     """
     schema: str
     constraint: str
@@ -262,18 +510,32 @@ class OutboundFK:
 
 
 def fk_constraint(schema: str, constraint: str) -> list[str]:
-    """Create a foreign key constraint reference.
+    """Create a foreign key constraint reference for visible-columns.
+
+    Use this in visible-columns to include a foreign key column (showing the
+    referenced row's name/link). This is different from InboundFK/OutboundFK
+    which are used inside PseudoColumn source paths.
 
     Args:
-        schema: Schema name
-        constraint: Constraint name
+        schema: Schema name containing the FK constraint
+        constraint: Foreign key constraint name
 
     Returns:
-        [schema, constraint] list suitable for annotations
+        [schema, constraint] list for use in visible-columns
 
     Example:
-        >>> fk_constraint("domain", "Image_Subject_fkey")
-        ['domain', 'Image_Subject_fkey']
+        Include a foreign key in visible columns::
+
+            >>> vc = VisibleColumns()
+            >>> vc.compact([
+            ...     "RID",
+            ...     "Name",
+            ...     fk_constraint("domain", "Subject_Species_fkey"),  # Shows Species
+            ... ])
+
+        This is equivalent to the raw format::
+
+            >>> vc.compact(["RID", "Name", ["domain", "Subject_Species_fkey"]])
     """
     return [schema, constraint]
 
@@ -330,40 +592,84 @@ class PseudoColumnDisplay:
 
 @dataclass
 class PseudoColumn:
-    """A pseudo-column definition for visible columns/foreign keys.
+    """A pseudo-column definition for visible columns and foreign keys.
 
-    Pseudo-columns allow displaying computed values, values from related tables,
-    or custom markdown patterns in table views.
+    Pseudo-columns display computed values, values from related tables,
+    or custom markdown patterns. They appear as columns in table views
+    but are not actual database columns.
 
     Args:
-        source: Path to source data (column name, or list with FK paths)
-        sourcekey: Reference to a named source in source-definitions
-        markdown_name: Display name (supports markdown)
-        comment: Description/tooltip
-        entity: Whether this represents an entity
-        aggregate: Aggregation function for array sources
-        self_link: Make row a self-link
-        display: Display options
-        array_options: Options for array aggregates
+        source: Path to source data. Can be:
+            - A column name (string)
+            - A list of FK path steps ending with a column name
+        sourcekey: Reference to a named source in source-definitions annotation
+        markdown_name: Display name for the column (supports markdown)
+        comment: Description/tooltip text (or False to hide)
+        entity: Whether this represents an entity (affects rendering)
+        aggregate: Aggregation function when source returns multiple values
+        self_link: Make the value a link to the current row
+        display: Display formatting options
+        array_options: Options for array aggregates (max_length, order)
 
-    Note: source and sourcekey are mutually exclusive.
+    Note:
+        source and sourcekey are mutually exclusive. Use source for inline
+        definitions, sourcekey to reference pre-defined sources.
+
+    Raises:
+        ValueError: If both source and sourcekey are provided
 
     Example:
-        >>> # Simple column reference
-        >>> PseudoColumn(source="Name", markdown_name="Subject Name")
-        >>>
-        >>> # FK traversal
-        >>> PseudoColumn(
-        ...     source=[OutboundFK("domain", "Image_Subject_fkey"), "Name"],
-        ...     markdown_name="Subject"
-        ... )
-        >>>
-        >>> # With aggregate
-        >>> PseudoColumn(
-        ...     source=[InboundFK("domain", "Image_Subject_fkey"), "RID"],
-        ...     aggregate=Aggregate.CNT,
-        ...     markdown_name="Image Count"
-        ... )
+        Simple column with custom display name::
+
+            >>> PseudoColumn(source="Internal_ID", markdown_name="ID")
+
+        Outbound FK traversal (display value from referenced table)::
+
+            >>> # Subject has FK to Species - show Species.Name
+            >>> PseudoColumn(
+            ...     source=[OutboundFK("domain", "Subject_Species_fkey"), "Name"],
+            ...     markdown_name="Species"
+            ... )
+
+        Inbound FK with aggregation (count related records)::
+
+            >>> # Count images pointing to this subject
+            >>> PseudoColumn(
+            ...     source=[InboundFK("domain", "Image_Subject_fkey"), "RID"],
+            ...     aggregate=Aggregate.CNT,
+            ...     markdown_name="Images"
+            ... )
+
+        Multi-hop FK path::
+
+            >>> # Image -> Subject -> Species
+            >>> PseudoColumn(
+            ...     source=[
+            ...         OutboundFK("domain", "Image_Subject_fkey"),
+            ...         OutboundFK("domain", "Subject_Species_fkey"),
+            ...         "Name"
+            ...     ],
+            ...     markdown_name="Species"
+            ... )
+
+        With custom display formatting::
+
+            >>> PseudoColumn(
+            ...     source="URL",
+            ...     display=PseudoColumnDisplay(
+            ...         markdown_pattern="[Download]({{{_value}}})",
+            ...         show_foreign_key_link=False
+            ...     )
+            ... )
+
+        Array aggregate with display options::
+
+            >>> PseudoColumn(
+            ...     source=[InboundFK("domain", "Tag_Item_fkey"), "Name"],
+            ...     aggregate=Aggregate.ARRAY_D,
+            ...     display=PseudoColumnDisplay(array_ux_mode=ArrayUxMode.CSV),
+            ...     markdown_name="Tags"
+            ... )
     """
     source: str | list[str | InboundFK | OutboundFK] | None = None
     sourcekey: str | None = None
@@ -424,17 +730,74 @@ ColumnEntry = str | list[str] | PseudoColumn
 class VisibleColumns(AnnotationBuilder):
     """Visible-columns annotation builder.
 
-    Controls which columns appear in different UI contexts.
+    Controls which columns appear in different UI contexts and their order.
+    This is one of the most commonly used annotations for customizing the
+    Chaise interface.
+
+    Column entries can be:
+    - Column names (strings): "Name", "RID", "Description"
+    - Foreign key references: fk_constraint("schema", "constraint_name")
+    - Pseudo-columns: PseudoColumn(...) for computed/derived values
+
+    Contexts:
+    - ``compact``: Table/list views (search results, data browser)
+    - ``detailed``: Single record view (full record page)
+    - ``entry``: Create/edit forms
+    - ``entry/create``: Create form only
+    - ``entry/edit``: Edit form only
+    - ``*``: Default for all contexts
 
     Example:
-        >>> vc = VisibleColumns()
-        >>> vc.set_context(CONTEXT_COMPACT, ["RID", "Name"])
-        >>> vc.set_context(CONTEXT_DETAILED, ["RID", "Name", "Description"])
-        >>>
-        >>> # Or use convenience methods
-        >>> vc = VisibleColumns()
-        >>> vc.compact(["RID", "Name"])
-        >>> vc.detailed(["RID", "Name", "Description"])
+        Basic column lists for different contexts::
+
+            >>> vc = VisibleColumns()
+            >>> vc.compact(["RID", "Name", "Status"])
+            >>> vc.detailed(["RID", "Name", "Status", "Description", "Created"])
+            >>> vc.entry(["Name", "Status", "Description"])
+            >>> handle.set_annotation(vc)
+
+        Method chaining::
+
+            >>> vc = (VisibleColumns()
+            ...     .compact(["RID", "Name"])
+            ...     .detailed(["RID", "Name", "Description"])
+            ...     .entry(["Name", "Description"]))
+
+        Including foreign key references::
+
+            >>> vc = VisibleColumns()
+            >>> vc.compact([
+            ...     "RID",
+            ...     "Name",
+            ...     fk_constraint("domain", "Subject_Species_fkey"),
+            ... ])
+
+        With pseudo-columns for computed values::
+
+            >>> vc = VisibleColumns()
+            >>> vc.compact([
+            ...     "RID",
+            ...     "Name",
+            ...     PseudoColumn(
+            ...         source=[InboundFK("domain", "Sample_Subject_fkey"), "RID"],
+            ...         aggregate=Aggregate.CNT,
+            ...         markdown_name="Samples"
+            ...     ),
+            ... ])
+
+        Context inheritance (reference another context)::
+
+            >>> vc = VisibleColumns()
+            >>> vc.compact(["RID", "Name"])
+            >>> vc.set_context("compact/brief", "compact")  # Inherit from compact
+
+        With faceted search (filter context)::
+
+            >>> vc = VisibleColumns()
+            >>> vc.compact(["RID", "Name", "Status"])
+            >>> facets = FacetList()
+            >>> facets.add(Facet(source="Status", open=True))
+            >>> vc._contexts["filter"] = facets.to_dict()
     """
     tag = TAG_VISIBLE_COLUMNS
 

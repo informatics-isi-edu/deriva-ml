@@ -47,6 +47,7 @@ nav:
       - Datasets: user-guide/datasets.md
       - Features: user-guide/features.md
       - File Assets: user-guide/file-assets.md
+      - Catalog Annotations: user-guide/annotations.md
       - Configuring an Execution: user-guide/execution-configuration.md
       - Using DerivaML with Jupiter Notebooks: user-guide/notebooks.md
   - Sample Notebooks:
