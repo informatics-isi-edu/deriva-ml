@@ -10,6 +10,9 @@ from deriva_ml.execution.base_config import (
     notebook_config,
     load_configs,
     run_notebook,
+    # Config metadata helpers
+    DescribedList,
+    with_description,
 )
 from deriva_ml.execution.multirun_config import (
     MultirunSpec,
@@ -55,6 +58,9 @@ __all__ = [
     "notebook_config",
     "load_configs",
     "run_notebook",
+    # Config metadata helpers
+    "DescribedList",
+    "with_description",
     # Multirun configuration
     "MultirunSpec",
     "multirun_config",

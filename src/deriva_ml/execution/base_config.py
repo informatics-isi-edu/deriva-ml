@@ -46,7 +46,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TypeVar, TYPE_CHECKING
 
-from hydra_zen import builds, instantiate, launch, store
+from hydra_zen import builds, instantiate, launch, make_config, store
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
@@ -516,3 +516,124 @@ def run_notebook(
     execution = Execution(configuration=exec_config, ml_object=ml)
 
     return ml, execution, config
+
+
+class DescribedList(list):
+    """A list with an attached description.
+
+    This class extends list to add a `description` attribute while maintaining
+    full list compatibility. This allows configuration values (like asset RIDs
+    or dataset specs) to carry documentation without changing how they're used.
+
+    When stored in hydra-zen and resolved via `instantiate()`, the result is a
+    DescribedList that behaves like a regular list but has a `description` attribute.
+
+    Attributes:
+        description: Human-readable description of this configuration.
+
+    Example:
+        >>> from hydra_zen import store
+        >>> from deriva_ml.execution import with_description
+        >>>
+        >>> asset_store = store(group="assets")
+        >>> asset_store(
+        ...     with_description(
+        ...         ["3WMG", "3XPA"],
+        ...         "Model weights from quick and extended training",
+        ...     ),
+        ...     name="comparison_weights",
+        ... )
+        >>>
+        >>> # After instantiation, usage is identical to a regular list:
+        >>> # config.assets[0]  # "3WMG"
+        >>> # len(config.assets)  # 2
+        >>> # for rid in config.assets: ...
+        >>> # config.assets.description  # "Model weights from..."
+    """
+
+    def __init__(self, items: list | None = None, description: str = ""):
+        """Initialize a DescribedList.
+
+        Args:
+            items: Initial list items. If None, creates empty list.
+            description: Human-readable description of this list.
+        """
+        super().__init__(items or [])
+        self.description = description
+
+    def __repr__(self) -> str:
+        """Return string representation including description."""
+        if self.description:
+            return f"DescribedList({list(self)!r}, description={self.description!r})"
+        return f"DescribedList({list(self)!r})"
+
+
+def _make_described_list(items: list, description: str = "") -> DescribedList:
+    """Factory function for creating DescribedList instances.
+
+    This is used internally by `with_description` to create a hydra-zen
+    compatible config.
+    """
+    return DescribedList(items, description)
+
+
+# Pre-built config for DescribedList
+_DescribedListConfig = builds(_make_described_list, populate_full_signature=True)
+
+
+def with_description(items: list, description: str) -> Any:
+    """Create a hydra-zen config for a list with an attached description.
+
+    Use this to add descriptions to configuration values like asset RIDs
+    or dataset specifications. The result is a hydra-zen config that, when
+    instantiated, produces a DescribedList.
+
+    Args:
+        items: List items (e.g., asset RIDs, dataset specs).
+        description: Human-readable description of this configuration.
+
+    Returns:
+        A hydra-zen config that instantiates to a DescribedList.
+
+    Example:
+        >>> from hydra_zen import store
+        >>> from deriva_ml.execution import with_description
+        >>>
+        >>> # Assets with description
+        >>> asset_store = store(group="assets")
+        >>> asset_store(
+        ...     with_description(
+        ...         ["3WMG", "3XPA"],
+        ...         "Model weights from quick and extended training runs",
+        ...     ),
+        ...     name="comparison_weights",
+        ... )
+        >>>
+        >>> # Datasets with description
+        >>> from deriva_ml.dataset import DatasetSpecConfig
+        >>> datasets_store = store(group="datasets")
+        >>> datasets_store(
+        ...     with_description(
+        ...         [DatasetSpecConfig(rid="28CT", version="0.21.0")],
+        ...         "Complete CIFAR-10 dataset with 10,000 images",
+        ...     ),
+        ...     name="cifar10_complete",
+        ... )
+        >>>
+        >>> # After instantiation:
+        >>> # config.assets is a DescribedList
+        >>> # config.assets[0]  # "3WMG"
+        >>> # config.assets.description  # "Model weights from..."
+
+    Note:
+        For model configs created with `builds()`, use the `zen_meta` parameter
+        instead:
+
+        >>> model_store(
+        ...     Cifar10CNNConfig,
+        ...     name="cifar10_quick",
+        ...     epochs=3,
+        ...     zen_meta={"description": "Quick training - 3 epochs"},
+        ... )
+    """
+    return _DescribedListConfig(items=items, description=description)
