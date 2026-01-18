@@ -254,7 +254,7 @@ class Execution:
             json.dump(get_execution_environment(), fp)
 
     def _upload_hydra_config_assets(self):
-        """Upload hydra assets to the catalog."""
+        """Upload hydra assets to the catalog with Hydra_Config type."""
         hydra_runtime_output_dir = self._ml_object.hydra_runtime_output_dir
         if hydra_runtime_output_dir:
             timestamp = hydra_runtime_output_dir.parts[-1]
@@ -262,11 +262,12 @@ class Execution:
                 if hydra_asset.is_dir():
                     continue
                 # Register file for upload (side effect); result intentionally unused
+                # Use Hydra_Config type for Hydra YAML configuration files
                 self.asset_file_path(
                     asset_name=MLAsset.execution_metadata,
                     file_name=hydra_runtime_output_dir / hydra_asset,
                     rename_file=f"hydra-{timestamp}-{hydra_asset.name}",
-                    asset_types=ExecMetadataType.execution_config.value,
+                    asset_types=ExecMetadataType.hydra_config.value,
                 )
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
@@ -313,10 +314,11 @@ class Execution:
 
         # Save configuration details for later upload
         if not reload:
+            # Save DerivaML configuration with Deriva_Config type
             cfile = self.asset_file_path(
                 asset_name=MLAsset.execution_metadata,
                 file_name="configuration.json",
-                asset_types=ExecMetadataType.execution_config.value,
+                asset_types=ExecMetadataType.deriva_config.value,
             )
 
             with Path(cfile).open("w", encoding="utf-8") as config_file:

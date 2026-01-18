@@ -563,6 +563,141 @@ python train.py --multirun model_config=default,fast_training,long_training
 4. **CLI flexibility**: All hyperparameters are exposed to Hydra's CLI
 5. **Reproducibility**: Full configuration is logged by Hydra
 
+## Configuration Descriptions
+
+Adding descriptions to configurations helps users and AI assistants understand and discover the right configurations. DerivaML provides two mechanisms depending on the configuration type:
+
+### For List-Based Configs (Assets, Datasets)
+
+Use `with_description()` to wrap lists of RIDs or `DatasetSpecConfig` objects:
+
+```python
+from hydra_zen import store
+from deriva_ml.dataset import DatasetSpecConfig
+from deriva_ml.execution import with_description
+
+# Datasets with descriptions
+datasets_store = store(group="datasets")
+datasets_store(
+    with_description(
+        [DatasetSpecConfig(rid="28D4", version="0.22.0")],
+        "Split dataset with 10,000 images (5,000 train + 5,000 test). "
+        "Testing images are unlabeled. Use for standard train/test workflows."
+    ),
+    name="cifar10_split",
+)
+
+# Assets with descriptions
+asset_store = store(group="assets")
+asset_store(
+    with_description(
+        ["3WMG", "3XPA"],
+        "Model weights from quick (3WMG) and extended (3XPA) training runs. "
+        "Use for comparison experiments."
+    ),
+    name="comparison_weights",
+)
+
+# Empty default
+asset_store(
+    with_description([], "No assets - empty default configuration"),
+    name="default_asset",
+)
+```
+
+After instantiation, `config.datasets` and `config.assets` behave like regular lists but have a `.description` attribute:
+
+```python
+# Normal list operations work
+for dataset in config.datasets:
+    print(dataset.rid)
+
+# Access description
+print(config.assets.description)  # "Model weights from quick..."
+```
+
+### For Model Configs (builds())
+
+Use `zen_meta` parameter when storing `builds()` configs:
+
+```python
+from hydra_zen import builds, store
+from models.my_model import train_classifier
+
+model_store = store(group="model_config")
+
+ModelConfig = builds(
+    train_classifier,
+    learning_rate=1e-3,
+    epochs=10,
+    populate_full_signature=True,
+    zen_partial=True,
+)
+
+# Add description via zen_meta
+model_store(
+    ModelConfig,
+    name="default_model",
+    zen_meta={
+        "description": (
+            "Default training config: 10 epochs, lr=1e-3. "
+            "Balanced for standard training runs."
+        )
+    },
+)
+
+# Variant with description
+model_store(
+    ModelConfig,
+    name="quick",
+    epochs=3,
+    batch_size=128,
+    zen_meta={
+        "description": (
+            "Quick validation: 3 epochs, batch 128. "
+            "Use for rapid iteration and debugging."
+        )
+    },
+)
+```
+
+### Summary: When to Use Each Mechanism
+
+| Config Type | Storage Pattern | Description Mechanism |
+|-------------|-----------------|----------------------|
+| Assets (RID lists) | `store(["RID1", "RID2"], ...)` | `with_description(items, desc)` |
+| Datasets (DatasetSpecConfig lists) | `store([DatasetSpecConfig(...)], ...)` | `with_description(items, desc)` |
+| Model configs | `store(builds(...), ...)` | `zen_meta={"description": desc}` |
+| Workflow configs | `store(builds(Workflow, ...), ...)` | `zen_meta={"description": desc}` |
+
+### Writing Good Descriptions
+
+Include:
+- **What it contains**: Size, types, key parameters
+- **Where it came from**: Source execution, version
+- **When to use it**: Training, testing, debugging, production
+
+Examples:
+
+```python
+# ✓ Good dataset description
+"Training dataset with 5,000 labeled CIFAR-10 images (32x32 RGB). "
+"All images have ground truth classifications."
+
+# ✓ Good asset description
+"Model weights (model.pt) from extended training: 50 epochs, "
+"64→128 channels, dropout 0.25. Use for inference or fine-tuning."
+
+# ✓ Good model config description
+"Quick training: 3 epochs, batch 128. Use for rapid iteration "
+"and verifying the training pipeline works."
+
+# ✗ Bad (too vague)
+"Training dataset"
+"Model weights"
+"Quick config"
+```
+
 ## Best Practices
 
 1. **Use `builds()` with `populate_full_signature=True`** to expose all parameters
@@ -573,6 +708,7 @@ python train.py --multirun model_config=default,fast_training,long_training
 6. **Use `DatasetSpecConfig`** instead of building `DatasetSpec` directly for cleaner configs
 7. **Use `AssetRIDConfig`** for consistent asset specification
 8. **Define a model protocol** for consistent model interfaces across your project
+9. **Always add descriptions** using `with_description()` for lists or `zen_meta` for builds
 
 ## Related Documentation
 

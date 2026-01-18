@@ -220,12 +220,16 @@ class ExecMetadataType(BaseStrEnum):
     Defines the types of metadata that can be associated with an execution.
 
     Attributes:
-        execution_config (str): Execution configuration data.
+        execution_config (str): General execution configuration data.
         runtime_env (str): Runtime environment information.
+        hydra_config (str): Hydra YAML configuration files (config.yaml, overrides.yaml).
+        deriva_config (str): DerivaML execution configuration (configuration.json).
     """
 
     execution_config = "Execution_Config"
     runtime_env = "Runtime_Env"
+    hydra_config = "Hydra_Config"
+    deriva_config = "Deriva_Config"
 
 
 class ExecAssetType(BaseStrEnum):

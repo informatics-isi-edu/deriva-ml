@@ -326,6 +326,14 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
                 "Description": "Information about the runtime environment",
             },
             {
+                "Name": "Hydra_Config",
+                "Description": "Hydra YAML configuration file (config.yaml, overrides.yaml, hydra.yaml)",
+            },
+            {
+                "Name": "Deriva_Config",
+                "Description": "DerivaML execution configuration (configuration.json with datasets, assets, workflow)",
+            },
+            {
                 "Name": "Execution_Metadata",
                 "Description": "Information about the execution environment",
             },
