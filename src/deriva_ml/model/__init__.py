@@ -1,14 +1,22 @@
 """Model module for DerivaML.
 
-This module provides catalog and database model classes.
+This module provides catalog and database model classes, as well as
+handle wrappers for ERMrest model objects.
 
 Lazy imports are used for DatabaseModel and DerivaMLDatabase to avoid
 circular imports with the dataset module.
 """
 
 from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.model.handles import ColumnHandle, TableHandle
 
-__all__ = ["DerivaModel", "DatabaseModel", "DerivaMLDatabase"]
+__all__ = [
+    "DerivaModel",
+    "DatabaseModel",
+    "DerivaMLDatabase",
+    "TableHandle",
+    "ColumnHandle",
+]
 
 
 def __getattr__(name: str):
