@@ -281,7 +281,7 @@ class Experiment:
             },
             "input_datasets": [
                 {
-                    "rid": ds.dataset_rid,
+                    "dataset_rid": ds.dataset_rid,
                     "description": ds.description,
                     "version": str(ds.current_version) if ds.current_version else None,
                     "dataset_types": ds.dataset_types,
