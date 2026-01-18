@@ -1,7 +1,7 @@
 import pytest
 
 from deriva_ml import DerivaMLException, DerivaMLInvalidTerm
-from deriva_ml.core.definitions import VocabularyTerm
+from deriva_ml.core.definitions import VocabularyTerm, VocabularyTermHandle
 
 
 class TestVocabulary:
@@ -36,7 +36,7 @@ class TestVocabulary:
         )
 
         assert term.name == "Test Term"
-        assert term.synonyms == ["test", "term"]
+        assert term.synonyms == ("test", "term")  # Returns tuple, not list
         assert term.id == "TEST:001"
         assert term.uri == "http://example.com/test"
         assert term.description == "A test term"
@@ -107,34 +107,41 @@ class TestVocabulary:
         assert cache_key in ml_instance._get_vocab_cache()
 
     def test_add_synonym(self, test_ml):
-        """Test adding synonyms to an existing term."""
+        """Test adding synonyms to an existing term via property setter."""
         ml_instance = test_ml
         ml_instance.create_vocabulary("CV_Syn", "Test synonyms")
 
         # Add a term without synonyms
         ml_instance.add_term("CV_Syn", "MainTerm", description="A term")
         term = ml_instance.lookup_term("CV_Syn", "MainTerm")
-        assert term.synonyms == [] or term.synonyms is None
+        assert term.synonyms == ()  # Empty tuple
 
-        # Add a synonym
-        updated_term = ml_instance.add_synonym("CV_Syn", "MainTerm", "Alias1")
-        assert "Alias1" in updated_term.synonyms
+        # Verify term is a VocabularyTermHandle
+        assert isinstance(term, VocabularyTermHandle)
 
-        # Verify lookup by synonym works
+        # Add a synonym via property setter
+        term.synonyms = ("Alias1",)
+        assert "Alias1" in term.synonyms
+
+        # Verify lookup by synonym works (need fresh lookup to test cache invalidation)
         found_term = ml_instance.lookup_term("CV_Syn", "Alias1")
         assert found_term.name == "MainTerm"
 
-        # Add another synonym
-        updated_term = ml_instance.add_synonym("CV_Syn", "MainTerm", "Alias2")
-        assert "Alias1" in updated_term.synonyms
-        assert "Alias2" in updated_term.synonyms
+        # Add another synonym (must include existing ones)
+        term = ml_instance.lookup_term("CV_Syn", "MainTerm")
+        term.synonyms = term.synonyms + ("Alias2",)
+        assert "Alias1" in term.synonyms
+        assert "Alias2" in term.synonyms
 
-        # Adding existing synonym should be a no-op
-        updated_term = ml_instance.add_synonym("CV_Syn", "MainTerm", "Alias1")
-        assert updated_term.synonyms.count("Alias1") == 1
+        # Adding existing synonym is handled by caller (no-op pattern)
+        term = ml_instance.lookup_term("CV_Syn", "MainTerm")
+        current = term.synonyms
+        if "Alias1" not in current:
+            term.synonyms = current + ("Alias1",)
+        assert term.synonyms.count("Alias1") == 1
 
     def test_remove_synonym(self, test_ml):
-        """Test removing synonyms from an existing term."""
+        """Test removing synonyms from an existing term via property setter."""
         ml_instance = test_ml
         ml_instance.create_vocabulary("CV_RemSyn", "Test remove synonyms")
 
@@ -144,10 +151,10 @@ class TestVocabulary:
         assert "Alias1" in term.synonyms
         assert "Alias2" in term.synonyms
 
-        # Remove a synonym
-        updated_term = ml_instance.remove_synonym("CV_RemSyn", "MainTerm", "Alias1")
-        assert "Alias1" not in updated_term.synonyms
-        assert "Alias2" in updated_term.synonyms
+        # Remove a synonym via property setter
+        term.synonyms = tuple(s for s in term.synonyms if s != "Alias1")
+        assert "Alias1" not in term.synonyms
+        assert "Alias2" in term.synonyms
 
         # Verify lookup by removed synonym no longer works
         with pytest.raises(DerivaMLInvalidTerm):
@@ -157,9 +164,82 @@ class TestVocabulary:
         found_term = ml_instance.lookup_term("CV_RemSyn", "Alias2")
         assert found_term.name == "MainTerm"
 
-        # Removing non-existent synonym should be a no-op
-        updated_term = ml_instance.remove_synonym("CV_RemSyn", "MainTerm", "NonExistent")
-        assert "Alias2" in updated_term.synonyms
+        # Removing non-existent synonym is handled by caller (no-op pattern)
+        term = ml_instance.lookup_term("CV_RemSyn", "MainTerm")
+        term.synonyms = tuple(s for s in term.synonyms if s != "NonExistent")
+        assert "Alias2" in term.synonyms
+
+    def test_vocabulary_term_handle(self, test_ml):
+        """Test VocabularyTermHandle class and its property setters."""
+        ml_instance = test_ml
+        ml_instance.create_vocabulary("CV_Handle", "Test VocabularyTermHandle")
+
+        # Add a term - should return VocabularyTermHandle
+        term = ml_instance.add_term("CV_Handle", "HandleTest", description="Original description")
+        assert isinstance(term, VocabularyTermHandle)
+        assert term.description == "Original description"
+
+        # Update description via property setter
+        term.description = "Updated description"
+        assert term.description == "Updated description"
+
+        # Verify description persisted to catalog
+        fresh_term = ml_instance.lookup_term("CV_Handle", "HandleTest")
+        assert fresh_term.description == "Updated description"
+
+    def test_vocabulary_term_handle_delete(self, test_ml):
+        """Test VocabularyTermHandle.delete() method."""
+        ml_instance = test_ml
+        ml_instance.create_vocabulary("CV_HandleDel", "Test VocabularyTermHandle delete")
+
+        # Add a term
+        term = ml_instance.add_term("CV_HandleDel", "ToDelete", description="A term")
+
+        # Delete via handle method
+        term.delete()
+
+        # Verify it's gone
+        with pytest.raises(DerivaMLInvalidTerm):
+            ml_instance.lookup_term("CV_HandleDel", "ToDelete")
+
+    def test_cache_invalidation_on_synonym_update(self, test_ml):
+        """Test that cache is properly invalidated when synonyms are updated."""
+        ml_instance = test_ml
+        ml_instance.create_vocabulary("CV_CacheInv", "Test cache invalidation")
+
+        # Add a term with synonyms
+        ml_instance.add_term("CV_CacheInv", "CacheTerm", description="Test", synonyms=["OldAlias"])
+
+        # Lookup to populate cache
+        term = ml_instance.lookup_term("CV_CacheInv", "OldAlias")
+        assert term.name == "CacheTerm"
+
+        # Update synonyms (removes OldAlias, adds NewAlias)
+        term.synonyms = ("NewAlias",)
+
+        # Old alias should no longer work (cache was invalidated)
+        with pytest.raises(DerivaMLInvalidTerm):
+            ml_instance.lookup_term("CV_CacheInv", "OldAlias")
+
+        # New alias should work
+        found = ml_instance.lookup_term("CV_CacheInv", "NewAlias")
+        assert found.name == "CacheTerm"
+
+    def test_synonyms_returns_tuple(self, test_ml):
+        """Test that synonyms property returns tuple to prevent accidental mutation."""
+        ml_instance = test_ml
+        ml_instance.create_vocabulary("CV_Tuple", "Test tuple return")
+
+        ml_instance.add_term("CV_Tuple", "TupleTerm", description="Test", synonyms=["a", "b"])
+        term = ml_instance.lookup_term("CV_Tuple", "TupleTerm")
+
+        # Should be a tuple, not list
+        assert isinstance(term.synonyms, tuple)
+        assert term.synonyms == ("a", "b")
+
+        # Cannot append to tuple (would raise AttributeError)
+        with pytest.raises(AttributeError):
+            term.synonyms.append("c")
 
     def test_delete_term_unused(self, test_ml):
         """Test deleting an unused term."""
