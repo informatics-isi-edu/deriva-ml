@@ -417,26 +417,36 @@ class DerivaML(
             uri = self.cite(cast(str, table))
         return f"{uri}/{urlquote(table_obj.schema.name)}:{urlquote(table_obj.name)}"
 
-    def cite(self, entity: Dict[str, Any] | str) -> str:
-        """Generates permanent citation URL.
+    def cite(self, entity: Dict[str, Any] | str, current: bool = False) -> str:
+        """Generates citation URL for an entity.
 
-        Creates a versioned URL that can be used to reference a specific entity in the catalog. The URL includes
-        the catalog snapshot time to ensure version stability.
+        Creates a URL that can be used to reference a specific entity in the catalog.
+        By default, includes the catalog snapshot time to ensure version stability
+        (permanent citation). With current=True, returns a URL to the current state.
 
         Args:
             entity: Either a RID string or a dictionary containing entity data with a 'RID' key.
+            current: If True, return URL to current catalog state (no snapshot).
+                     If False (default), return permanent citation URL with snapshot time.
 
         Returns:
-            str: Permanent citation URL in format: https://{host}/id/{catalog}/{rid}@{snapshot_time}
+            str: Citation URL. Format depends on `current` parameter:
+                - current=False: https://{host}/id/{catalog}/{rid}@{snapshot_time}
+                - current=True: https://{host}/id/{catalog}/{rid}
 
         Raises:
             DerivaMLException: If an entity doesn't exist or lacks a RID.
 
         Examples:
-            Using a RID string:
+            Permanent citation (default):
                 >>> url = ml.cite("1-abc123")
                 >>> print(url)
                 'https://deriva.org/id/1/1-abc123@2024-01-01T12:00:00'
+
+            Current catalog URL:
+                >>> url = ml.cite("1-abc123", current=True)
+                >>> print(url)
+                'https://deriva.org/id/1/1-abc123'
 
             Using a dictionary:
                 >>> url = ml.cite({"RID": "1-abc123"})
@@ -446,9 +456,12 @@ class DerivaML(
             return entity
 
         try:
-            # Resolve RID and create citation URL with snapshot time
+            # Resolve RID and create citation URL
             self.resolve_rid(rid := entity if isinstance(entity, str) else entity["RID"])
-            return f"https://{self.host_name}/id/{self.catalog_id}/{rid}@{self.catalog.latest_snapshot().snaptime}"
+            base_url = f"https://{self.host_name}/id/{self.catalog_id}/{rid}"
+            if current:
+                return base_url
+            return f"{base_url}@{self.catalog.latest_snapshot().snaptime}"
         except KeyError as e:
             raise DerivaMLException(f"Entity {e} does not have RID column")
         except DerivaMLException as _e:
