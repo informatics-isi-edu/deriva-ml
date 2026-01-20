@@ -295,17 +295,25 @@ class Dataset:
             description=description,
         )
 
-        dataset.add_dataset_types(dataset_types)
+        # Skip version increment during initial creation (version already set above)
+        dataset.add_dataset_types(dataset_types, _skip_version_increment=True)
         return dataset
 
-    def add_dataset_type(self, dataset_type: str | VocabularyTerm) -> None:
+    def add_dataset_type(
+        self,
+        dataset_type: str | VocabularyTerm,
+        _skip_version_increment: bool = False,
+    ) -> None:
         """Add a dataset type to this dataset.
 
         Adds a type term to this dataset if it's not already present. The term must
-        exist in the Dataset_Type vocabulary.
+        exist in the Dataset_Type vocabulary. Also increments the dataset's minor
+        version to reflect the metadata change.
 
         Args:
             dataset_type: Term name (string) or VocabularyTerm object from Dataset_Type vocabulary.
+            _skip_version_increment: Internal parameter to skip version increment when
+                called from add_dataset_types (which handles versioning itself).
 
         Raises:
             DerivaMLInvalidTerm: If the term doesn't exist in the Dataset_Type vocabulary.
@@ -327,6 +335,13 @@ class Dataset:
         # Insert into association table
         _, atable_path = self._get_dataset_type_association_table()
         atable_path.insert([{MLVocab.dataset_type: vocab_term.name, "Dataset": self.dataset_rid}])
+
+        # Increment minor version to reflect metadata change (unless called from add_dataset_types)
+        if not _skip_version_increment:
+            self.increment_dataset_version(
+                VersionPart.minor,
+                description=f"Added dataset type: {vocab_term.name}",
+            )
 
     def remove_dataset_type(self, dataset_type: str | VocabularyTerm) -> None:
         """Remove a dataset type from this dataset.
@@ -359,16 +374,23 @@ class Dataset:
             (atable_path.Dataset == self.dataset_rid) & (atable_path.Dataset_Type == vocab_term.name)
         ).delete()
 
-    def add_dataset_types(self, dataset_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
+    def add_dataset_types(
+        self,
+        dataset_types: str | VocabularyTerm | list[str | VocabularyTerm],
+        _skip_version_increment: bool = False,
+    ) -> None:
         """Add one or more dataset types to this dataset.
 
         Convenience method for adding multiple types at once. Each term must exist
         in the Dataset_Type vocabulary. Types that are already associated with the
-        dataset are silently skipped.
+        dataset are silently skipped. Increments the dataset's minor version once
+        after all types are added.
 
         Args:
             dataset_types: Single term or list of terms. Can be strings (term names)
                 or VocabularyTerm objects.
+            _skip_version_increment: Internal parameter to skip version increment
+                (used during initial dataset creation).
 
         Raises:
             DerivaMLInvalidTerm: If any term doesn't exist in the Dataset_Type vocabulary.
@@ -380,8 +402,27 @@ class Dataset:
         # Normalize input to a list
         types_to_add = [dataset_types] if not isinstance(dataset_types, list) else dataset_types
 
+        # Track which types were actually added (not already present)
+        added_types: list[str] = []
         for term in types_to_add:
-            self.add_dataset_type(term)
+            # Get term name before calling add_dataset_type
+            if isinstance(term, VocabularyTerm):
+                term_name = term.name
+            else:
+                term_name = self._ml_instance.lookup_term(MLVocab.dataset_type, term).name
+
+            # Check if already present before adding
+            if term_name not in self.dataset_types:
+                self.add_dataset_type(term, _skip_version_increment=True)
+                added_types.append(term_name)
+
+        # Increment version once for all added types (if any were added)
+        if added_types and not _skip_version_increment:
+            type_names = ", ".join(added_types)
+            self.increment_dataset_version(
+                VersionPart.minor,
+                description=f"Added dataset type(s): {type_names}",
+            )
 
     @property
     def _dataset_table(self) -> Table:
