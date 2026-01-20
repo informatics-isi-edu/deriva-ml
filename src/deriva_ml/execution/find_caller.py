@@ -68,7 +68,7 @@ def _is_pseudo_user_filename(filename: str) -> bool:
     return lower.startswith("<ipython-input-") or lower.startswith("<jupyter-input-") or lower.startswith("<ipykernel_")
 
 
-# Names that frequently represent “system/tooling” frames rather than user code
+# Names that frequently represent "system/tooling" frames rather than user code
 _SYSTEM_MODULE_PREFIXES = (
     # pytest + plugin stack
     "pytest",
@@ -93,6 +93,13 @@ _SYSTEM_MODULE_PREFIXES = (
     "contextlib",
     "asyncio",
     "threading",
+    # DerivaML CLI runners - skip to find user's model code
+    "deriva_ml.run_model",
+    "deriva_ml.run_notebook",
+    # Hydra/hydra-zen internals
+    "hydra",
+    "hydra_zen",
+    "omegaconf",
 )
 
 
@@ -115,6 +122,13 @@ def _top_user_frame() -> Optional[FrameType]:
         "/_pydev_bundle/",
         "_pytest",
         "/pycharm/",
+        # DerivaML CLI entry points - skip to find user's model code
+        "/deriva_ml/run_model.py",
+        "/deriva_ml/run_notebook.py",
+        # Hydra/hydra-zen internals
+        "/hydra/",
+        "/hydra_zen/",
+        "/omegaconf/",
     )
 
     f = inspect.currentframe()
@@ -249,12 +263,15 @@ def _get_calling_module() -> str:
     def _is_tooling_script_path(p: str) -> bool:
         # Normalize path to forward slashes and lowercase for robust substring checks
         pn = p.replace("\\", "/").casefold()
-        # Detect common IDE/console helper scripts
+        # Detect common IDE/console helper scripts and CLI runners
         tooling_markers = (
             "pydevconsole.py",
             "/pydev/",
             "/_pydevd_bundle/",
             "/_pydev_bundle/",
+            # DerivaML CLI entry points - skip to find user's model code
+            "/deriva_ml/run_model.py",
+            "/deriva_ml/run_notebook.py",
         )
         return any(m in pn for m in tooling_markers)
 
