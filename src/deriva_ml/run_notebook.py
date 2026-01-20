@@ -608,15 +608,17 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             execution_rid = execution_config["execution_rid"]
             hostname = execution_config["hostname"]
             catalog_id = execution_config["catalog_id"]
-            workflow_rid = execution_config["workflow_rid"]
 
             # Create DerivaML instance to upload results
             ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id, working_dir=tmpdirname)
             workflow_rid = ml_instance.retrieve_rid(execution_config["execution_rid"])["Workflow"]
 
+            # Look up the workflow object from the RID
+            workflow = ml_instance.lookup_workflow(workflow_rid)
+
             # Restore the execution context to upload outputs
             execution = Execution(
-                configuration=ExecutionConfiguration(workflow=workflow_rid),
+                configuration=ExecutionConfiguration(workflow=workflow),
                 ml_object=ml_instance,
                 reload=execution_rid,
             )

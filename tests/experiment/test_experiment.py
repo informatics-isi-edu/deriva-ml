@@ -38,13 +38,16 @@ def workflow_terms(test_ml):
 
 @pytest.fixture
 def test_workflow(workflow_terms):
-    """Create a test workflow."""
+    """Create a test workflow and register it in the catalog."""
     ml = workflow_terms
-    return ml.create_workflow(
+    workflow = ml.create_workflow(
         name="Test Workflow",
         workflow_type="Test Workflow",
         description="A test workflow for experiment testing",
     )
+    # Register the workflow in the catalog and return a bound workflow
+    workflow_rid = ml.add_workflow(workflow)
+    return ml.lookup_workflow(workflow_rid)
 
 
 @pytest.fixture
@@ -463,7 +466,7 @@ class TestExperimentFinder:
         ml = completed_execution._ml_object
 
         # Find executions by workflow
-        executions = list(ml.find_executions(workflow_rid=test_workflow.rid))
+        executions = list(ml.find_executions(workflow=test_workflow))
 
         assert len(executions) >= 1
         execution_rids = [e.execution_rid for e in executions]
@@ -557,7 +560,7 @@ class TestExperimentWithDatasets:
         assert len(input_datasets) == 1
         ds_info = input_datasets[0]
 
-        assert "rid" in ds_info
+        assert "dataset_rid" in ds_info
         assert "description" in ds_info
         assert "version" in ds_info
         assert "dataset_types" in ds_info

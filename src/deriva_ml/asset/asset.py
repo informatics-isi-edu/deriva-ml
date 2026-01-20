@@ -37,7 +37,8 @@ from deriva_ml.core.definitions import RID
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
-    from deriva_ml.feature import Feature
+    from deriva_ml.execution.execution_record import ExecutionRecord
+    from deriva_ml.feature import Feature, FeatureRecord
     from deriva_ml.interfaces import DerivaMLCatalog
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
@@ -179,10 +180,10 @@ class Asset:
             # Try to find the execution that created this asset (Output role)
             executions = self.list_executions(asset_role="Output")
             if executions:
-                self._execution_rid = executions[0]["Execution"]
+                self._execution_rid = executions[0].execution_rid
         return self._execution_rid
 
-    def list_executions(self, asset_role: str | None = None) -> list[dict[str, Any]]:
+    def list_executions(self, asset_role: str | None = None) -> list["ExecutionRecord"]:
         """List all executions associated with this asset.
 
         Returns all executions that created or used this asset, along with
@@ -193,15 +194,14 @@ class Asset:
                 If None, returns all associations.
 
         Returns:
-            List of records containing:
-                - Execution: RID of the associated execution
-                - Asset_Role: Role of the asset in the execution
+            List of ExecutionRecord objects for the executions associated
+            with this asset.
 
         Example:
             >>> # Find the execution that created this asset
             >>> creators = asset.list_executions(asset_role="Output")
             >>> if creators:
-            ...     print(f"Created by execution {creators[0]['Execution']}")
+            ...     print(f"Created by execution {creators[0].execution_rid}")
 
             >>> # Find all executions that used this asset as input
             >>> users = asset.list_executions(asset_role="Input")
@@ -221,19 +221,25 @@ class Asset:
         """
         return self._ml_instance.find_features(self.asset_table)
 
-    def list_feature_values(self, feature_name: str) -> list[dict[str, Any]]:
+    def list_feature_values(self, feature_name: str) -> list["FeatureRecord"]:
         """Get feature values for this specific asset.
 
         Args:
             feature_name: Name of the feature to query.
 
         Returns:
-            List of feature value records for this asset.
+            List of FeatureRecord instances for this asset. Each record has:
+                - Execution: RID of the execution that created this feature value
+                - Feature_Name: Name of the feature
+                - All feature-specific columns as typed attributes
+                - model_dump() method to convert back to a dictionary
 
         Example:
             >>> values = asset.list_feature_values("quality_score")
             >>> for v in values:
-            ...     print(f"Score: {v['Score']}")
+            ...     print(f"Score: {v.Score}, Execution: {v.Execution}")
+            >>> # Or convert to dict:
+            >>> dicts = [v.model_dump() for v in values]
         """
         return list(self._ml_instance.list_feature_values(self.asset_table, feature_name))
 

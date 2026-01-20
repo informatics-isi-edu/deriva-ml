@@ -243,23 +243,25 @@ class TestFeatures:
         s_features_bag = [f"{f.target_table.name}:{f.feature_name}" for f in bag.find_features("Image")]
         assert s_features == s_features_bag
 
+        # list_feature_values now returns FeatureRecord instances - use model_dump() for dict access
         catalog_feature_values = {
-            f["RID"] for f in ml_instance.list_feature_values("Subject", "Health") if f["Subject"] in subject_rids
+            f.model_dump()["RID"] for f in ml_instance.list_feature_values("Subject", "Health")
+            if f.model_dump()["Subject"] in subject_rids
         }
 
-        bag_feature_values = {f["RID"] for f in bag.list_feature_values("Subject", "Health")}
+        bag_feature_values = {f.model_dump()["RID"] for f in bag.list_feature_values("Subject", "Health")}
         assert catalog_feature_values == bag_feature_values
 
         for t in ["Subject", "Image"]:
             for f in ml_instance.model.find_features(t):
                 catalog_features = [
-                    {"Execution": e["Execution"], "Feature_Name": e["Feature_Name"], t: e[t]}
+                    {"Execution": e.model_dump()["Execution"], "Feature_Name": e.Feature_Name, t: e.model_dump()[t]}
                     for e in ml_instance.list_feature_values(t, f.feature_name)
-                    if e[t] in (subject_rids | image_rids)
+                    if e.model_dump()[t] in (subject_rids | image_rids)
                 ]
                 catalog_features.sort(key=lambda x: x[t])
                 bag_features = [
-                    {"Execution": e["Execution"], "Feature_Name": e["Feature_Name"], t: e[t]}
+                    {"Execution": e.model_dump()["Execution"], "Feature_Name": e.Feature_Name, t: e.model_dump()[t]}
                     for e in bag.list_feature_values(t, f.feature_name)
                 ]
                 bag_features.sort(key=lambda x: x[t])

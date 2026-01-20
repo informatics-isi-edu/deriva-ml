@@ -285,6 +285,17 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
     }
 
 
+# Default timeout for large file uploads in seconds
+# The requests timeout tuple is (connect_timeout, read_timeout), but this doesn't
+# cover write operations. We also need to set socket.setdefaulttimeout() for writes.
+DEFAULT_UPLOAD_TIMEOUT = (6, 600)
+
+# Socket timeout for write operations (in seconds)
+# This is needed because requests timeout only covers connect and read, not write.
+# For large chunk uploads, the socket write can take significant time.
+DEFAULT_SOCKET_TIMEOUT = 600.0
+
+
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
 def upload_directory(
     model: DerivaModel,
@@ -292,6 +303,7 @@ def upload_directory(
     progress_callback: Callable[[UploadProgress], None] | None = None,
     max_retries: int = 3,
     retry_delay: float = 5.0,
+    timeout: tuple[int, int] | None = None,
 ) -> dict[Any, FileUploadState] | None:
     """Upload assets from a directory. This routine assumes that the current upload specification includes a
     configuration for the specified directory.  Every asset in the specified directory is uploaded
@@ -303,6 +315,9 @@ def upload_directory(
             Called with UploadProgress objects containing file information and progress.
         max_retries: Maximum number of retry attempts for failed uploads (default: 3).
         retry_delay: Initial delay in seconds between retries, doubles with each attempt (default: 5.0).
+        timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (6, 600)
+            which allows up to 10 minutes for each chunk upload. Increase read_timeout for
+            very large files on slow connections.
 
     Returns:
         Results of the upload operation.
@@ -311,9 +326,36 @@ def upload_directory(
         DerivaMLException: If there is an issue with uploading the assets.
     """
     import logging
+    import socket
     import time
 
+    from deriva.core import DEFAULT_SESSION_CONFIG
+
     logger = logging.getLogger("deriva_ml")
+
+    # Use provided timeout or default to 10 minute read timeout for large files
+    upload_timeout = timeout or DEFAULT_UPLOAD_TIMEOUT
+
+    # Set socket default timeout for write operations
+    # The requests library timeout only covers connect and read, not write.
+    # For large file uploads, write operations can take significant time.
+    old_socket_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(DEFAULT_SOCKET_TIMEOUT)
+    logger.debug(f"Set socket timeout to {DEFAULT_SOCKET_TIMEOUT}s for upload (was {old_socket_timeout})")
+
+    # Close any existing connections in the model's catalog session
+    # This is necessary because socket.setdefaulttimeout() only affects NEW sockets,
+    # not existing ones that were created before the timeout was set.
+    # By closing existing connections, we force the creation of new sockets
+    # which will inherit the updated socket timeout.
+    try:
+        if hasattr(model.catalog, '_session') and model.catalog._session:
+            for adapter in model.catalog._session.adapters.values():
+                if hasattr(adapter, 'poolmanager') and adapter.poolmanager:
+                    adapter.poolmanager.clear()
+            logger.debug("Cleared existing connection pools to use new socket timeout")
+    except Exception as e:
+        logger.debug(f"Could not clear connection pools: {e}")
 
     directory = Path(directory)
     if not directory.is_dir():
@@ -386,75 +428,89 @@ def upload_directory(
         )
 
     # Now upload the files by creating an upload spec and then calling the uploader.
-    with TemporaryDirectory() as temp_dir:
-        spec_file = Path(temp_dir) / "config.json"
-        with spec_file.open("w+") as cfile:
-            json.dump(bulk_upload_configuration(model), cfile)
+    try:
+        with TemporaryDirectory() as temp_dir:
+            spec_file = Path(temp_dir) / "config.json"
+            with spec_file.open("w+") as cfile:
+                json.dump(bulk_upload_configuration(model), cfile)
 
-        all_results = {}
-        attempt = 0
-        current_delay = retry_delay
+            # Create session config with longer timeout for large file uploads
+            session_config = DEFAULT_SESSION_CONFIG.copy()
+            session_config["timeout"] = upload_timeout
+            logger.debug(f"Upload session config timeout: {session_config['timeout']}")
 
-        while attempt <= max_retries:
-            uploader = GenericUploader(
-                server={
-                    "host": model.hostname,
-                    "protocol": "https",
-                    "catalog_id": model.catalog.catalog_id,
-                },
-                config_file=spec_file,
-            )
-            try:
-                raw_results = do_upload(uploader)
+            all_results = {}
+            attempt = 0
+            current_delay = retry_delay
 
-                # Process results and check for failures
-                failed_files = []
-                for path, result in raw_results.items():
-                    state = UploadState(result["State"])
-                    if state == UploadState.failed or result["Result"] is None:
-                        failed_files.append((path, result["Status"]))
-                    else:
-                        # Store successful results
-                        all_results[path] = FileUploadState(
-                            state=state,
-                            status=result["Status"],
-                            result=result["Result"],
+            while attempt <= max_retries:
+                import sys
+                print(f"DEBUG: socket.getdefaulttimeout() = {socket.getdefaulttimeout()}", file=sys.stderr)
+                uploader = GenericUploader(
+                    server={
+                        "host": model.hostname,
+                        "protocol": "https",
+                        "catalog_id": model.catalog.catalog_id,
+                        "session": session_config,
+                    },
+                    config_file=spec_file,
+                )
+                print(f"DEBUG: After GenericUploader, timeout = {socket.getdefaulttimeout()}, store timeout = {uploader.store.session_config.get('timeout')}", file=sys.stderr)
+                try:
+                    raw_results = do_upload(uploader)
+
+                    # Process results and check for failures
+                    failed_files = []
+                    for path, result in raw_results.items():
+                        state = UploadState(result["State"])
+                        if state == UploadState.failed or result["Result"] is None:
+                            failed_files.append((path, result["Status"]))
+                        else:
+                            # Store successful results
+                            all_results[path] = FileUploadState(
+                                state=state,
+                                status=result["Status"],
+                                result=result["Result"],
+                            )
+
+                    if not failed_files:
+                        # All uploads successful
+                        break
+
+                    attempt += 1
+                    if attempt > max_retries:
+                        # Final attempt failed, raise error with details
+                        error_details = "; ".join([f"{path}: {msg}" for path, msg in failed_files])
+                        raise DerivaMLException(
+                            f"Failed to upload {len(failed_files)} file(s) after {max_retries} retries: {error_details}"
                         )
 
-                if not failed_files:
-                    # All uploads successful
-                    break
-
-                attempt += 1
-                if attempt > max_retries:
-                    # Final attempt failed, raise error with details
-                    error_details = "; ".join([f"{path}: {msg}" for path, msg in failed_files])
-                    raise DerivaMLException(
-                        f"Failed to upload {len(failed_files)} file(s) after {max_retries} retries: {error_details}"
+                    # Log retry attempt and wait before retrying
+                    logger.warning(
+                        f"Upload failed for {len(failed_files)} file(s), retrying in {current_delay:.1f}s "
+                        f"(attempt {attempt}/{max_retries}): {[p for p, _ in failed_files]}"
                     )
+                    if progress_callback:
+                        progress_callback(UploadProgress(
+                            phase="retrying",
+                            message=f"Retrying {len(failed_files)} failed upload(s) in {current_delay:.1f}s (attempt {attempt}/{max_retries})",
+                            percent_complete=0,
+                        ))
 
-                # Log retry attempt and wait before retrying
-                logger.warning(
-                    f"Upload failed for {len(failed_files)} file(s), retrying in {current_delay:.1f}s "
-                    f"(attempt {attempt}/{max_retries}): {[p for p, _ in failed_files]}"
-                )
-                if progress_callback:
-                    progress_callback(UploadProgress(
-                        phase="retrying",
-                        message=f"Retrying {len(failed_files)} failed upload(s) in {current_delay:.1f}s (attempt {attempt}/{max_retries})",
-                        percent_complete=0,
-                    ))
+                    time.sleep(current_delay)
+                    current_delay *= 2  # Exponential backoff
 
-                time.sleep(current_delay)
-                current_delay *= 2  # Exponential backoff
+                    # Reset upload state for retry
+                    upload_state["status_calls"] = 0
 
-                # Reset upload state for retry
-                upload_state["status_calls"] = 0
+                finally:
+                    uploader.cleanup()
 
-            finally:
-                uploader.cleanup()
-
-        return all_results
+            return all_results
+    finally:
+        # Restore the original socket timeout
+        socket.setdefaulttimeout(old_socket_timeout)
+        logger.debug(f"Restored socket timeout to {old_socket_timeout}")
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))

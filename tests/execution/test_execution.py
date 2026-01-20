@@ -151,9 +151,15 @@ class TestWorkflow:
         workflow_url = workflows[0]["URL"]
         assert workflow_url.endswith("workflow-test.py")
 
-        # Verify lookup works
-        looked_up_rid = ml_instance.lookup_workflow(workflow_url)
-        assert looked_up_rid == workflow_rid
+        # Verify lookup_workflow_by_url returns the workflow
+        looked_up_workflow = ml_instance.lookup_workflow_by_url(workflow_url)
+        assert looked_up_workflow.rid == workflow_rid
+        assert looked_up_workflow.url == workflow_url
+
+        # Verify lookup_workflow works with RID
+        looked_up_workflow_by_rid = ml_instance.lookup_workflow(workflow_rid)
+        assert looked_up_workflow_by_rid.rid == workflow_rid
+        assert looked_up_workflow_by_rid.url == workflow_url
 
         # Verify running again doesn't duplicate
         result = subprocess.run(
@@ -458,11 +464,10 @@ class TestExecutionAssets:
         uploaded = basic_execution.upload_execution_outputs()
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
-        # Test list_asset_executions - should return the execution that created the asset
+        # Test list_asset_executions - should return ExecutionRecord objects
         executions = ml.list_asset_executions(asset_rid)
         assert len(executions) == 1
-        assert executions[0]["Execution"] == basic_execution.execution_rid
-        assert executions[0]["Asset_Role"] == "Output"
+        assert executions[0].execution_rid == basic_execution.execution_rid
 
         # Test with asset_role filter
         output_executions = ml.list_asset_executions(asset_rid, asset_role="Output")
@@ -486,11 +491,11 @@ class TestExecutionAssets:
         # Filter by role
         output_only = ml.list_asset_executions(asset_rid, asset_role="Output")
         assert len(output_only) == 1
-        assert output_only[0]["Execution"] == basic_execution.execution_rid
+        assert output_only[0].execution_rid == basic_execution.execution_rid
 
         input_only = ml.list_asset_executions(asset_rid, asset_role="Input")
         assert len(input_only) == 1
-        assert input_only[0]["Execution"] == input_execution.execution_rid
+        assert input_only[0].execution_rid == input_execution.execution_rid
 
 
 # =============================================================================
@@ -1192,11 +1197,11 @@ class TestExecutionNesting:
         original_exec = ml.create_execution(config)
         original_rid = original_exec.execution_rid
 
-        # Lookup the execution
+        # Lookup the execution - returns ExecutionRecord
         looked_up = ml.lookup_execution(original_rid)
 
         assert looked_up.execution_rid == original_rid
-        assert looked_up.configuration.description == "Lookup Test"
+        assert looked_up.description == "Lookup Test"
 
     def test_nested_execution_null_sequence(self, workflow_terms, test_workflow):
         """Test adding nested executions without sequence (parallel)."""

@@ -459,68 +459,71 @@ class TestFeatureCacheLoading:
 class TestListFeatureValuesReturnType:
     """Tests for list_feature_values return type correctness."""
 
-    def test_list_feature_values_returns_dictionaries(self, dataset_test, tmp_path):
-        """Test that list_feature_values returns dictionaries with column names.
+    def test_list_feature_values_returns_feature_records(self, dataset_test, tmp_path):
+        """Test that list_feature_values returns FeatureRecord instances.
 
-        This test verifies that feature values are returned as dicts with
-        column names as keys, not SQLAlchemy ORM objects that require
-        attribute access and may cause lazy loading issues.
-
-        Bug reference: Commit 5a1e8b5 fixed this issue where ORM objects
-        were returned instead of dicts, breaking restructure_assets.
+        This test verifies that feature values are returned as typed FeatureRecord
+        Pydantic models with proper attribute access and model_dump() support.
         """
+        from deriva_ml.feature import FeatureRecord
+
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # Get feature values from the bag
-        feature_values = bag.list_feature_values("Image", "Quality")
-
-        # Should return a list
-        assert isinstance(feature_values, list)
+        feature_values = list(bag.list_feature_values("Image", "Quality"))
 
         if feature_values:
-            # Each item should be a dict, not an ORM object
+            # Each item should be a FeatureRecord subclass
             first_value = feature_values[0]
-            assert isinstance(first_value, dict), (
-                f"Expected dict, got {type(first_value).__name__}. "
-                "list_feature_values may be returning ORM objects instead of dicts."
+            assert isinstance(first_value, FeatureRecord), (
+                f"Expected FeatureRecord subclass, got {type(first_value).__name__}."
             )
 
-            # Should have column names as keys (not numeric indices)
-            # Feature table should have at least Image and the feature value column
-            assert "Image" in first_value, (
-                f"Expected 'Image' key in feature value dict, "
-                f"got keys: {list(first_value.keys())}"
+            # Should have model_dump() method from Pydantic
+            assert hasattr(first_value, "model_dump"), (
+                "FeatureRecord should have model_dump() method"
             )
 
-            # Should NOT have ORM-specific attributes
-            assert not hasattr(first_value, "_mapping"), (
-                "Feature value has _mapping attribute - likely an ORM object, not a dict"
-            )
-            assert not hasattr(first_value, "_fields"), (
-                "Feature value has _fields attribute - likely a Row object, not a dict"
+            # model_dump() should return a dict with column names as keys
+            dumped = first_value.model_dump()
+            assert isinstance(dumped, dict), "model_dump() should return a dict"
+            assert "Image" in dumped, (
+                f"Expected 'Image' key in model_dump(), got keys: {list(dumped.keys())}"
             )
 
-    def test_list_feature_values_columns_accessible_by_name(self, dataset_test, tmp_path):
-        """Test that feature value columns can be accessed by name as dict keys."""
+            # Should have Feature_Name and Execution attributes
+            assert hasattr(first_value, "Feature_Name"), (
+                "FeatureRecord should have Feature_Name attribute"
+            )
+            assert hasattr(first_value, "Execution"), (
+                "FeatureRecord should have Execution attribute for provenance"
+            )
+
+    def test_list_feature_values_columns_accessible_by_attribute(self, dataset_test, tmp_path):
+        """Test that feature value columns can be accessed as attributes."""
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        feature_values = bag.list_feature_values("Image", "Quality")
+        feature_values = list(bag.list_feature_values("Image", "Quality"))
 
         if feature_values:
             for fv in feature_values:
-                # Access as dict key should work without errors
-                image_rid = fv.get("Image")
-                assert image_rid is not None or "Image" in fv, (
-                    "Cannot access 'Image' column from feature value"
+                # Access as attribute should work
+                image_rid = getattr(fv, "Image", None)
+                assert image_rid is not None, (
+                    "Cannot access 'Image' column from feature value as attribute"
                 )
+
+                # Can also access via model_dump()
+                dumped = fv.model_dump()
+                assert dumped.get("Image") == image_rid
 
                 # The vocabulary term column should also be accessible
                 # Quality feature uses ImageQuality vocabulary
-                quality_value = fv.get("ImageQuality")
-                # Value may be None, but key should exist
-                assert "ImageQuality" in fv or quality_value is not None
+                quality_value = getattr(fv, "ImageQuality", None)
+                # Value may be None, but attribute should exist
+                assert hasattr(fv, "ImageQuality") or quality_value is not None
 
 
 class TestFeatureTablesInBagExport:

@@ -238,12 +238,11 @@ class TestAssetExecutions:
 
         asset = ml.lookup_asset(asset_rid)
 
-        # List executions with Output role
+        # List executions with Output role - now returns ExecutionRecord objects
         executions = asset.list_executions(asset_role="Output")
 
         assert len(executions) == 1
-        assert executions[0]["Execution"] == basic_execution.execution_rid
-        assert executions[0]["Asset_Role"] == "Output"
+        assert executions[0].execution_rid == basic_execution.execution_rid
 
     def test_list_executions_input(self, workflow_terms, test_workflow, basic_execution):
         """Test listing executions that used an asset as input."""
@@ -266,14 +265,14 @@ class TestAssetExecutions:
 
         asset = ml.lookup_asset(asset_rid)
 
-        # List all executions
+        # List all executions - now returns ExecutionRecord objects
         all_executions = asset.list_executions()
         assert len(all_executions) == 2
 
         # List only input executions
         input_executions = asset.list_executions(asset_role="Input")
         assert len(input_executions) == 1
-        assert input_executions[0]["Execution"] == input_execution.execution_rid
+        assert input_executions[0].execution_rid == input_execution.execution_rid
 
     def test_execution_rid_property(self, basic_execution):
         """Test that execution_rid property returns the creating execution."""

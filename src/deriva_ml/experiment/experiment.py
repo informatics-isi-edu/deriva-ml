@@ -27,7 +27,7 @@ from deriva.core.hatrac_store import HatracStore
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
-    from deriva_ml.execution.execution import Execution
+    from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.asset.asset import Asset
     from deriva_ml.dataset.dataset import Dataset
 
@@ -60,15 +60,15 @@ class Experiment:
 
     ml: "DerivaML"
     execution_rid: str
-    _execution: "Execution | None" = field(default=None, repr=False)
+    _execution: "ExecutionRecord | None" = field(default=None, repr=False)
     _hydra_config: dict | None = field(default=None, repr=False)
     _config_choices: dict | None = field(default=None, repr=False)
     _model_config: dict | None = field(default=None, repr=False)
     _name: str | None = field(default=None, repr=False)
 
     @property
-    def execution(self) -> "Execution":
-        """Get the underlying Execution object (lazy-loaded)."""
+    def execution(self) -> "ExecutionRecord":
+        """Get the underlying ExecutionRecord (lazy-loaded)."""
         if self._execution is None:
             self._execution = self.ml.lookup_execution(self.execution_rid)
         return self._execution
@@ -215,9 +215,7 @@ class Experiment:
     @property
     def description(self) -> str:
         """Get the execution description."""
-        if self.execution.configuration:
-            return self.execution.configuration.description or ""
-        return ""
+        return self.execution.description or ""
 
     @property
     def status(self) -> str:
