@@ -97,7 +97,7 @@ class FileMixin:
 
         # Get a list of all defined file types and their synonyms.
         defined_types = set(
-            chain.from_iterable([[t.name] + t.synonyms for t in self.list_vocabulary_terms(MLVocab.asset_type)])
+            chain.from_iterable([[t.name] + list(t.synonyms or []) for t in self.list_vocabulary_terms(MLVocab.asset_type)])
         )
 
         # Get a list of all of the file types used in the filespec_list

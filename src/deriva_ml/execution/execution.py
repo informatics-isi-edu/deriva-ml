@@ -76,6 +76,7 @@ from deriva_ml.dataset.upload import (
 )
 from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution.execution_record import ExecutionRecord
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
@@ -149,7 +150,7 @@ class Execution:
         self,
         configuration: ExecutionConfiguration,
         ml_object: DerivaML,
-        workflow: Workflow | RID | None = None,
+        workflow: Workflow | None = None,
         reload: RID | None = None,
         dry_run: bool = False,
     ):
@@ -161,13 +162,32 @@ class Execution:
         Args:
             configuration: Settings and parameters for the execution.
             ml_object: DerivaML instance managing the execution.
-            workflow: Optional workflow RID or Workflow object.  If not specified, the workflow RID is taken from
-              the ExecutionConfiguration object
+            workflow: Optional Workflow object. If not specified, the workflow is taken from
+                the ExecutionConfiguration object. Must be a Workflow object, not a RID.
             reload: Optional RID of existing execution to reload.
             dry_run: If True, don't create catalog records or upload results.
 
         Raises:
-            DerivaMLException: If initialization fails or configuration is invalid.
+            DerivaMLException: If initialization fails, configuration is invalid,
+                or workflow is not a Workflow object.
+
+        Example:
+            Create an execution with a workflow::
+
+                >>> workflow = ml.lookup_workflow("2-ABC1")
+                >>> config = ExecutionConfiguration(
+                ...     workflow=workflow,
+                ...     description="Process data"
+                ... )
+                >>> execution = Execution(config, ml)
+
+            Or pass workflow separately::
+
+                >>> workflow = ml.lookup_workflow_by_url(
+                ...     "https://github.com/org/repo/blob/abc123/analysis.py"
+                ... )
+                >>> config = ExecutionConfiguration(description="Run analysis")
+                >>> execution = Execution(config, ml, workflow=workflow)
         """
 
         self.asset_paths: dict[str, list[AssetFilePath]] = {}
@@ -177,9 +197,10 @@ class Execution:
         self._logger = ml_object._logger
         self.start_time = None
         self.stop_time = None
-        self.status = Status.created
+        self._status = Status.created
         self.uploaded_assets: dict[str, list[AssetFilePath]] | None = None
         self.configuration.argv = sys.argv
+        self._execution_record: ExecutionRecord | None = None  # Lazily created after RID is assigned
 
         self.dataset_rids: List[RID] = []
         self.datasets: list[DatasetBag] = []
@@ -188,18 +209,24 @@ class Execution:
         self._cache_dir = self._ml_object.cache_dir
         self._dry_run = dry_run
 
-        # Make sure we have a good workflow.
+        # Make sure we have a valid Workflow object.
         if workflow:
             self.configuration.workflow = workflow
-        if isinstance(self.configuration.workflow, Workflow):
-            self._ml_object.lookup_term(MLVocab.workflow_type, configuration.workflow.workflow_type)
-            self.workflow_rid = (
-                self._ml_object.add_workflow(self.configuration.workflow) if not self._dry_run else DRY_RUN_RID
+
+        if self.configuration.workflow is None:
+            raise DerivaMLException("Workflow must be specified either in configuration or as a parameter")
+
+        if not isinstance(self.configuration.workflow, Workflow):
+            raise DerivaMLException(
+                f"Workflow must be a Workflow object, not {type(self.configuration.workflow).__name__}. "
+                "Use ml.lookup_workflow(rid) or ml.lookup_workflow_by_url(url) to get a Workflow object."
             )
-        else:
-            self.workflow_rid = self.configuration.workflow
-            if self._ml_object.resolve_rid(configuration.workflow).table.name != "Workflow":
-                raise DerivaMLException("Workflow specified in execution configuration is not a Workflow")
+
+        # Validate workflow type and register in catalog
+        self._ml_object.lookup_term(MLVocab.workflow_type, self.configuration.workflow.workflow_type)
+        self.workflow_rid = (
+            self._ml_object.add_workflow(self.configuration.workflow) if not self._dry_run else DRY_RUN_RID
+        )
 
         # Validate the datasets and assets to be valid.
         for d in self.configuration.datasets:
@@ -242,6 +269,18 @@ class Execution:
 
         # Create a directory for execution rid so we can recover the state in case of a crash.
         execution_root(prefix=self._ml_object.working_dir, exec_rid=self.execution_rid)
+
+        # Create the ExecutionRecord to handle catalog state operations
+        if not self._dry_run:
+            self._execution_record = ExecutionRecord(
+                execution_rid=self.execution_rid,
+                workflow=self.configuration.workflow,
+                status=Status.created,
+                description=self.configuration.description,
+                _ml_instance=self._ml_object,
+                _logger=self._logger,
+            )
+
         self._initialize_execution(reload)
 
     def _save_runtime_environment(self):
@@ -323,8 +362,12 @@ class Execution:
 
             with Path(cfile).open("w", encoding="utf-8") as config_file:
                 json.dump(self.configuration.model_dump(mode="json"), config_file)
-            lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
-            if lock_file.exists():
+            # Only try to copy uv.lock if git_root is available (local workflow)
+            if self.configuration.workflow.git_root:
+                lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
+            else:
+                lock_file = None
+            if lock_file and lock_file.exists():
                 _ = self.asset_file_path(
                     asset_name=MLAsset.execution_metadata,
                     file_name=lock_file,
@@ -340,6 +383,37 @@ class Execution:
             self.uploaded_assets = self._upload_execution_dirs()
         self.start_time = datetime.now()
         self.update_status(Status.pending, "Initialize status finished.")
+
+    @property
+    def status(self) -> Status:
+        """Get the current execution status.
+
+        Returns:
+            Status: The current status (Created, Running, Completed, Failed, etc.).
+        """
+        if self._execution_record is not None:
+            return self._execution_record.status
+        return self._status
+
+    @status.setter
+    def status(self, value: Status) -> None:
+        """Set the execution status.
+
+        Args:
+            value: The new status value.
+        """
+        self._status = value
+        if self._execution_record is not None:
+            self._execution_record._status = value
+
+    @property
+    def execution_record(self) -> ExecutionRecord | None:
+        """Get the ExecutionRecord for catalog operations.
+
+        Returns:
+            ExecutionRecord if not in dry_run mode, None otherwise.
+        """
+        return self._execution_record
 
     @property
     def working_dir(self) -> Path:
@@ -465,21 +539,26 @@ class Execution:
         Example:
             >>> execution.update_status(Status.running, "Processing sample 1 of 10")
         """
-        self.status = status
+        self._status = status
         self._logger.info(msg)
 
         if self._dry_run:
             return
 
-        self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
-            [
-                {
-                    "RID": self.execution_rid,
-                    "Status": self.status.value,
-                    "Status_Detail": msg,
-                }
-            ]
-        )
+        # Delegate to ExecutionRecord for catalog updates
+        if self._execution_record is not None:
+            self._execution_record.update_status(status, msg)
+        else:
+            # Fallback for cases where ExecutionRecord isn't available
+            self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
+                [
+                    {
+                        "RID": self.execution_rid,
+                        "Status": status.value,
+                        "Status_Detail": msg,
+                    }
+                ]
+            )
 
     def execution_start(self) -> None:
         """Marks the execution as started.
@@ -1044,6 +1123,10 @@ class Execution:
             >>> for ds in execution.list_input_datasets():
             ...     print(f"Input: {ds.dataset_rid} - {ds.description}")
         """
+        if self._execution_record is not None:
+            return self._execution_record.list_input_datasets()
+
+        # Fallback for dry_run mode
         pb = self._ml_object.pathBuilder()
         dataset_exec = pb.schemas[self._ml_object.ml_schema].Dataset_Execution
 
@@ -1068,6 +1151,10 @@ class Execution:
             >>> inputs = execution.list_input_assets(asset_role="Input")
             >>> outputs = execution.list_input_assets(asset_role="Output")
         """
+        if self._execution_record is not None:
+            return self._execution_record.list_input_assets(asset_role=asset_role)
+
+        # Fallback for dry_run mode
         from deriva_ml.asset.asset import Asset
 
         pb = self._ml_object.pathBuilder()
@@ -1163,7 +1250,7 @@ class Execution:
 
     def add_nested_execution(
         self,
-        nested_execution: "Execution | RID",
+        nested_execution: "Execution | ExecutionRecord | RID",
         sequence: int | None = None,
     ) -> None:
         """Add a nested (child) execution to this execution.
@@ -1173,7 +1260,7 @@ class Execution:
         or pipeline stages.
 
         Args:
-            nested_execution: The child execution to add (Execution object or RID).
+            nested_execution: The child execution to add (Execution, ExecutionRecord, or RID).
             sequence: Optional ordering index (0, 1, 2...). Use None for parallel executions.
 
         Raises:
@@ -1187,25 +1274,36 @@ class Execution:
         if self._dry_run:
             return
 
-        nested_rid = nested_execution.execution_rid if isinstance(nested_execution, Execution) else nested_execution
+        # Get the RID from the nested execution
+        if isinstance(nested_execution, Execution):
+            nested_rid = nested_execution.execution_rid
+        elif isinstance(nested_execution, ExecutionRecord):
+            nested_rid = nested_execution.execution_rid
+        else:
+            nested_rid = nested_execution
 
-        pb = self._ml_object.pathBuilder()
-        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+        # Delegate to ExecutionRecord if available
+        if self._execution_record is not None:
+            self._execution_record.add_nested_execution(nested_rid, sequence=sequence)
+        else:
+            # Fallback for cases without execution record
+            pb = self._ml_object.pathBuilder()
+            execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
 
-        record = {
-            "Execution": self.execution_rid,
-            "Nested_Execution": nested_rid,
-        }
-        if sequence is not None:
-            record["Sequence"] = sequence
+            record = {
+                "Execution": self.execution_rid,
+                "Nested_Execution": nested_rid,
+            }
+            if sequence is not None:
+                record["Sequence"] = sequence
 
-        execution_execution.insert([record])
+            execution_execution.insert([record])
 
     def list_nested_executions(
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
-    ) -> list["Execution"]:
+    ) -> list["ExecutionRecord"]:
         """List all nested (child) executions of this execution.
 
         Args:
@@ -1213,12 +1311,17 @@ class Execution:
             _visited: Internal parameter to track visited executions and prevent infinite recursion.
 
         Returns:
-            List of nested Execution objects, ordered by sequence if available.
+            List of nested ExecutionRecord objects, ordered by sequence if available.
+            To get full Execution objects with lifecycle management, use restore_execution().
 
         Example:
             >>> children = parent_exec.list_nested_executions()
             >>> all_descendants = parent_exec.list_nested_executions(recurse=True)
         """
+        if self._execution_record is not None:
+            return list(self._execution_record.list_nested_executions(recurse=recurse, _visited=_visited))
+
+        # Fallback for dry_run mode
         if _visited is None:
             _visited = set()
 
@@ -1252,7 +1355,7 @@ class Execution:
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
-    ) -> list["Execution"]:
+    ) -> list["ExecutionRecord"]:
         """List all parent executions that contain this execution as a nested child.
 
         Args:
@@ -1260,12 +1363,17 @@ class Execution:
             _visited: Internal parameter to track visited executions and prevent infinite recursion.
 
         Returns:
-            List of parent Execution objects.
+            List of parent ExecutionRecord objects.
+            To get full Execution objects with lifecycle management, use restore_execution().
 
         Example:
             >>> parents = child_exec.list_parent_executions()
             >>> all_ancestors = child_exec.list_parent_executions(recurse=True)
         """
+        if self._execution_record is not None:
+            return list(self._execution_record.list_parent_executions(recurse=recurse, _visited=_visited))
+
+        # Fallback for dry_run mode
         if _visited is None:
             _visited = set()
 
@@ -1297,6 +1405,8 @@ class Execution:
         Returns:
             True if this execution has at least one parent execution.
         """
+        if self._execution_record is not None:
+            return self._execution_record.is_nested()
         return len(self.list_parent_executions()) > 0
 
     def is_parent(self) -> bool:
@@ -1305,6 +1415,8 @@ class Execution:
         Returns:
             True if this execution has at least one nested execution.
         """
+        if self._execution_record is not None:
+            return self._execution_record.is_parent()
         return len(self.list_nested_executions()) > 0
 
     def __str__(self):

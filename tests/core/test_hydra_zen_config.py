@@ -201,18 +201,26 @@ class TestHydraZenExecutionConfiguration:
         assert exec_config.description == "Instantiation test"
         assert exec_config.assets == ["1ABC", "2DEF"]
 
-    def test_execution_config_with_workflow_rid(self):
-        """Test ExecutionConfiguration with workflow RID."""
-        ExecConf = builds(ExecutionConfiguration, populate_full_signature=True)
+    def test_execution_config_with_workflow(self):
+        """Test ExecutionConfiguration with Workflow object."""
+        from deriva_ml.execution.workflow import Workflow
 
-        # Use valid RID format
-        conf = ExecConf(
-            workflow="WXYZ",  # Valid short RID
+        # Create a mock workflow object
+        workflow = Workflow(
+            name="Test Workflow",
+            workflow_type="python_script",
+            description="Test workflow description",
+            rid="WXYZ",
+        )
+
+        exec_config = ExecutionConfiguration(
+            workflow=workflow,
             description="Workflow test",
         )
 
-        exec_config = instantiate(conf)
-        assert exec_config.workflow == "WXYZ"
+        assert exec_config.workflow is workflow
+        assert exec_config.workflow.rid == "WXYZ"
+        assert exec_config.workflow.name == "Test Workflow"
 
     def test_make_config_for_custom_execution(self):
         """Test using make_config for custom execution parameters."""

@@ -6,15 +6,18 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import requests
-from pydantic import BaseModel, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 from requests import RequestException
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.find_caller import _get_calling_module
+
+if TYPE_CHECKING:
+    from deriva_ml.interfaces import DerivaMLCatalog
 
 try:
     from IPython.core.getipython import get_ipython
@@ -59,25 +62,59 @@ class Workflow(BaseModel):
     a unique identifier, source code location, and type. Workflows are typically
     associated with Git repositories for version control.
 
+    When a Workflow is retrieved via ``lookup_workflow(rid)`` or ``lookup_workflow_by_url()``,
+    it is bound to a catalog and its ``description`` and ``workflow_type`` properties become
+    writable. Setting these properties will update the catalog record. If the catalog is
+    read-only (a snapshot), attempting to set them will raise a ``DerivaMLException``.
+
     Attributes:
         name (str): Human-readable name of the workflow.
         url (str): URI to the workflow source code (typically a GitHub URL).
         workflow_type (str): Type of workflow (must be a controlled vocabulary term).
+            When the workflow is bound to a writable catalog, setting this property
+            will update the catalog record. The new value must be a valid term from
+            the Workflow_Type vocabulary.
         version (str | None): Version identifier (semantic versioning).
         description (str | None): Description of workflow purpose and behavior.
+            When the workflow is bound to a writable catalog, setting this property
+            will update the catalog record.
         rid (RID | None): Resource Identifier if registered in catalog.
         checksum (str | None): Git hash of workflow source code.
         is_notebook (bool): Whether workflow is a Jupyter notebook.
 
     Example:
-        >>> workflow = Workflow(
-        ...     name="RNA Analysis",
-        ...     url="https://github.com/org/repo/analysis.ipynb",
-        ...     workflow_type="python_notebook",
-        ...     version="1.0.0",
-        ...     description="RNA sequence analysis"
-        ... )
+        Create a workflow programmatically::
+
+            >>> workflow = Workflow(
+            ...     name="RNA Analysis",
+            ...     url="https://github.com/org/repo/analysis.ipynb",
+            ...     workflow_type="python_notebook",
+            ...     version="1.0.0",
+            ...     description="RNA sequence analysis"
+            ... )
+
+        Look up an existing workflow by RID and update its properties::
+
+            >>> workflow = ml.lookup_workflow("2-ABC1")
+            >>> workflow.description = "Updated description for RNA analysis"
+            >>> workflow.workflow_type = "python_script"
+            >>> print(workflow.description)
+            Updated description for RNA analysis
+
+        Look up by URL and update::
+
+            >>> url = "https://github.com/org/repo/blob/abc123/analysis.py"
+            >>> workflow = ml.lookup_workflow_by_url(url)
+            >>> workflow.description = "New description"
+
+        Attempting to update on a read-only catalog raises an error::
+
+            >>> snapshot_ml = ml.catalog_snapshot("2023-01-15T10:30:00")
+            >>> workflow = snapshot_ml.lookup_workflow("2-ABC1")
+            >>> workflow.description = "New description"  # Raises DerivaMLException
     """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
     workflow_type: str
@@ -89,7 +126,118 @@ class Workflow(BaseModel):
     is_notebook: bool = False
     git_root: Path | None = None
 
+    _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
     _logger: logging.Logger = PrivateAttr(default=10)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Override setattr to intercept description and workflow_type updates.
+
+        When the workflow is bound to a catalog (via lookup_workflow), setting
+        the ``description`` or ``workflow_type`` properties will update the catalog
+        record. If the catalog is read-only (a snapshot), a DerivaMLException is raised.
+
+        Args:
+            name: The attribute name being set.
+            value: The value to set.
+
+        Raises:
+            DerivaMLException: If attempting to set properties on a read-only
+                catalog (snapshot), or if workflow_type is not a valid vocabulary term.
+
+        Examples:
+            Update description::
+
+                >>> workflow = ml.lookup_workflow("2-ABC1")
+                >>> workflow.description = "Updated description"
+
+            Update workflow type::
+
+                >>> workflow = ml.lookup_workflow("2-ABC1")
+                >>> workflow.workflow_type = "python_notebook"
+        """
+        # Only intercept updates after full initialization
+        # Use __dict__ check to avoid recursion during Pydantic model construction
+        if (
+            "__pydantic_private__" in self.__dict__
+            and self.__dict__.get("__pydantic_private__", {}).get("_ml_instance") is not None
+        ):
+            if name == "description":
+                self._update_description_in_catalog(value)
+            elif name == "workflow_type":
+                self._update_workflow_type_in_catalog(value)
+        super().__setattr__(name, value)
+
+    def _check_writable_catalog(self, operation: str) -> None:
+        """Check that the catalog is writable and workflow is registered.
+
+        Args:
+            operation: Description of the operation being attempted.
+
+        Raises:
+            DerivaMLException: If the workflow is not registered (no RID),
+                or if the catalog is read-only (a snapshot).
+        """
+        # Import here to avoid circular dependency at module load
+        import importlib
+        _deriva_core = importlib.import_module("deriva.core")
+        ErmrestSnapshot = _deriva_core.ErmrestSnapshot
+
+        if self.rid is None:
+            raise DerivaMLException(
+                f"Cannot {operation}: Workflow is not registered in the catalog (no RID)"
+            )
+
+        if isinstance(self._ml_instance.catalog, ErmrestSnapshot):
+            raise DerivaMLException(
+                f"Cannot {operation} on a read-only catalog snapshot. "
+                "Use a writable catalog connection instead."
+            )
+
+    def _update_description_in_catalog(self, new_description: str | None) -> None:
+        """Update the description field in the catalog.
+
+        This internal method is called when the description property is set
+        on a catalog-bound Workflow object.
+
+        Args:
+            new_description: The new description value.
+
+        Raises:
+            DerivaMLException: If the workflow is not registered (no RID),
+                or if the catalog is read-only (a snapshot).
+        """
+        self._check_writable_catalog("update description")
+
+        # Update the catalog record
+        pb = self._ml_instance.pathBuilder()
+        workflow_path = pb.schemas[self._ml_instance.ml_schema].Workflow
+        workflow_path.update([{"RID": self.rid, "Description": new_description}])
+
+    def _update_workflow_type_in_catalog(self, new_workflow_type: str) -> None:
+        """Update the workflow_type field in the catalog.
+
+        This internal method is called when the workflow_type property is set
+        on a catalog-bound Workflow object. The new workflow type must be a valid
+        term from the Workflow_Type vocabulary.
+
+        Args:
+            new_workflow_type: The new workflow type (must be a valid vocabulary term).
+
+        Raises:
+            DerivaMLException: If the workflow is not registered (no RID),
+                the catalog is read-only (a snapshot), or the workflow_type
+                is not a valid vocabulary term.
+        """
+        self._check_writable_catalog("update workflow_type")
+
+        # Validate that the new workflow type exists in vocabulary
+        from deriva_ml.core.definitions import MLVocab
+        self._ml_instance.lookup_term(MLVocab.workflow_type, new_workflow_type)
+
+        # Update the catalog record
+        pb = self._ml_instance.pathBuilder()
+        workflow_path = pb.schemas[self._ml_instance.ml_schema].Workflow
+        workflow_path.update([{"RID": self.rid, "Workflow_Type": new_workflow_type}])
 
     @model_validator(mode="after")
     def setup_url_checksum(self) -> "Workflow":

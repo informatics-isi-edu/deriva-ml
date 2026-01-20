@@ -8,7 +8,7 @@ and listing feature values.
 from __future__ import annotations
 
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
@@ -299,31 +299,55 @@ class FeatureMixin:
         return list(self.model.find_features(table))
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_feature_values(self, table: Table | str, feature_name: str) -> datapath._ResultSet:
-        """Retrieves all values for a feature.
+    def list_feature_values(
+        self, table: Table | str, feature_name: str
+    ) -> Iterable[FeatureRecord]:
+        """Retrieves all values for a feature as typed FeatureRecord instances.
 
-        Returns all instances of the specified feature that have been created, including their associated
-        metadata and references.
+        Returns an iterator of dynamically-generated FeatureRecord objects for each
+        feature value. Each record is an instance of a Pydantic model specific to
+        this feature, with typed attributes for all columns including the Execution
+        that created the feature value.
 
         Args:
             table: The table containing the feature, either as name or Table object.
             feature_name: Name of the feature to retrieve values for.
 
         Returns:
-            datapath._ResultSet: A result set containing all feature values and their metadata.
+            Iterable[FeatureRecord]: An iterator of FeatureRecord instances.
+                Each instance has:
+                - Execution: RID of the execution that created this feature value
+                - Feature_Name: Name of the feature
+                - All feature-specific columns as typed attributes
+                - model_dump() method to convert back to a dictionary
 
         Raises:
             DerivaMLException: If the feature doesn't exist or cannot be accessed.
 
         Example:
-            >>> values = ml.list_feature_values("samples", "expression_level")
-            >>> for value in values:
-            ...     print(f"Sample {value['RID']}: {value['value']}")
+            >>> # Get typed feature records
+            >>> for record in ml.list_feature_values("Image", "Quality"):
+            ...     print(f"Image {record.Image}: {record.ImageQuality}")
+            ...     print(f"Created by execution: {record.Execution}")
+
+            >>> # Convert records to dictionaries
+            >>> records = list(ml.list_feature_values("Image", "Quality"))
+            >>> dicts = [r.model_dump() for r in records]
         """
-        # Get table and feature references
+        # Get table and feature
         table = self.model.name_to_table(table)
         feature = self.lookup_feature(table, feature_name)
 
+        # Get the dynamically-generated FeatureRecord subclass for this feature
+        record_class = feature.feature_record_class()
+
         # Build and execute query for feature values
         pb = self.pathBuilder()
-        return pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
+        raw_values = pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
+
+        for raw_value in raw_values:
+            # Create a record instance from the raw dictionary
+            # Filter to only include fields that the record class expects
+            field_names = set(record_class.model_fields.keys())
+            filtered_data = {k: v for k, v in raw_value.items() if k in field_names}
+            yield record_class(**filtered_data)

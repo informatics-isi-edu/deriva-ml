@@ -63,6 +63,10 @@ def __getattr__(name: str) -> type:
         from deriva_ml.asset.aux_classes import AssetSpec
 
         return AssetSpec
+    elif name == "FeatureValueRecord":
+        from deriva_ml.dataset.dataset_bag import FeatureValueRecord
+
+        return FeatureValueRecord
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -73,6 +77,8 @@ __all__ = [
     "Asset",
     "AssetFilePath",
     "AssetSpec",
+    # Feature value record for restructure_assets
+    "FeatureValueRecord",
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",

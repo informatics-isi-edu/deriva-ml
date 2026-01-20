@@ -18,6 +18,7 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
+    from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
     from deriva_ml.model.catalog import DerivaModel
@@ -106,58 +107,89 @@ class ExecutionMixin:
         self._execution = Execution(configuration, self, workflow=workflow, dry_run=dry_run)  # type: ignore[arg-type]
         return self._execution
 
-    def lookup_execution(self, execution_rid: RID) -> "Execution":
-        """Look up an execution by RID without restoring/downloading datasets.
+    def lookup_execution(self, execution_rid: RID) -> "ExecutionRecord":
+        """Look up an execution by RID and return an ExecutionRecord.
 
-        Creates a lightweight Execution object for querying execution metadata
-        and relationships (e.g., nested executions) without initializing the
-        full execution environment.
+        Creates an ExecutionRecord object for querying and modifying execution
+        metadata. The ExecutionRecord provides access to the catalog record
+        state and allows updating mutable properties like status and description.
+
+        For running computations with datasets and assets, use ``restore_execution()``
+        or ``create_execution()`` which return full Execution objects.
 
         Args:
             execution_rid: Resource Identifier (RID) of the execution.
 
         Returns:
-            Execution: An execution object for the given RID.
+            ExecutionRecord: An execution record object bound to the catalog.
 
         Raises:
-            DerivaMLException: If execution_rid is not valid.
+            DerivaMLException: If execution_rid is not valid or doesn't refer
+                to an Execution record.
 
         Example:
-            >>> execution = ml.lookup_execution("1-abc123")
-            >>> children = execution.list_nested_executions()
+            Look up an execution and query its state::
+
+                >>> record = ml.lookup_execution("1-abc123")
+                >>> print(f"Status: {record.status}")
+                >>> print(f"Description: {record.description}")
+
+            Update mutable properties::
+
+                >>> record.status = Status.completed
+                >>> record.description = "Analysis finished"
+
+            Query relationships::
+
+                >>> children = list(record.list_nested_executions())
+                >>> parents = list(record.list_parent_executions())
         """
         # Import here to avoid circular dependency
-        from deriva_ml.execution.execution import Execution
+        from deriva_ml.execution.execution_record import ExecutionRecord
 
-        # Get execution record from catalog
-        execution_record = self.retrieve_rid(execution_rid)
+        # Get execution record from catalog and verify it's an Execution
+        resolved = self.resolve_rid(execution_rid)
+        if resolved.table.name != "Execution":
+            raise DerivaMLException(
+                f"RID '{execution_rid}' refers to a {resolved.table.name}, not an Execution"
+            )
 
-        # Create minimal configuration
-        configuration = ExecutionConfiguration(
-            workflow=execution_record.get("Workflow"),
-            description=execution_record.get("Description", ""),
+        execution_data = self.retrieve_rid(execution_rid)
+
+        # Parse timestamps if present
+        start_time = None
+        stop_time = None
+        if execution_data.get("Start"):
+            from datetime import datetime
+            try:
+                start_time = datetime.fromisoformat(execution_data["Start"].replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                pass
+        if execution_data.get("Stop"):
+            from datetime import datetime
+            try:
+                stop_time = datetime.fromisoformat(execution_data["Stop"].replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                pass
+
+        # Look up the workflow if present
+        workflow_rid = execution_data.get("Workflow")
+        workflow = self.lookup_workflow(workflow_rid) if workflow_rid else None
+
+        # Create ExecutionRecord bound to this catalog
+        record = ExecutionRecord(
+            execution_rid=execution_rid,
+            workflow=workflow,
+            status=Status(execution_data.get("Status", "Created")),
+            description=execution_data.get("Description"),
+            start_time=start_time,
+            stop_time=stop_time,
+            duration=execution_data.get("Duration"),
+            _ml_instance=self,
+            _logger=getattr(self, "_logger", None),
         )
 
-        # Create execution object without initialization (reload mode)
-        exec_obj = Execution.__new__(Execution)
-        exec_obj._ml_object = self  # type: ignore[arg-type]
-        exec_obj._model = self.model
-        exec_obj._logger = self._logger  # type: ignore[attr-defined]
-        exec_obj.configuration = configuration
-        exec_obj.execution_rid = execution_rid
-        exec_obj.workflow_rid = execution_record.get("Workflow")
-        exec_obj.status = Status(execution_record.get("Status", "Created"))
-        exec_obj._dry_run = False
-        exec_obj.dataset_rids = []
-        exec_obj.datasets = []
-        exec_obj.asset_paths = {}
-        exec_obj.start_time = None
-        exec_obj.stop_time = None
-        exec_obj.uploaded_assets = None
-        exec_obj._working_dir = self.working_dir
-        exec_obj._cache_dir = self.cache_dir  # type: ignore[attr-defined]
-
-        return exec_obj
+        return record
 
     def restore_execution(self, execution_rid: RID | None = None) -> "Execution":
         """Restores a previous execution.
@@ -207,8 +239,11 @@ class ExecutionMixin:
             configuration = ExecutionConfiguration.load_configuration(cfile)
         else:
             execution = self.retrieve_rid(execution_rid)
+            # Look up the workflow object from the RID
+            workflow_rid = execution.get("Workflow")
+            workflow = self.lookup_workflow(workflow_rid) if workflow_rid else None
             configuration = ExecutionConfiguration(
-                workflow=execution["Workflow"],
+                workflow=workflow,
                 description=execution["Description"],
             )
 
@@ -217,37 +252,73 @@ class ExecutionMixin:
 
     def find_executions(
         self,
-        workflow_rid: RID | None = None,
+        workflow: "Workflow | RID | None" = None,
+        workflow_type: str | None = None,
         status: Status | None = None,
-    ) -> Iterable["Execution"]:
+    ) -> Iterable["ExecutionRecord"]:
         """List all executions in the catalog.
 
+        Returns ExecutionRecord objects for each execution. These provide access
+        to execution metadata and allow updating mutable properties.
+
         Args:
-            workflow_rid: Optional workflow RID to filter by.
-            status: Optional status to filter by (e.g., Status.Completed).
+            workflow: Optional Workflow object or RID to filter by.
+            workflow_type: Optional workflow type name to filter by (e.g., "python_script").
+                This filters by the Workflow_Type vocabulary term.
+            status: Optional status to filter by (e.g., Status.completed).
 
         Returns:
-            Iterable of Execution objects.
+            Iterable of ExecutionRecord objects.
 
         Example:
-            >>> executions = list(ml.find_executions())
-            >>> for exec in executions:
-            ...     print(f"{exec.execution_rid}: {exec.status}")
-            >>> # Filter by workflow
-            >>> completed = list(ml.find_executions(status=Status.Completed))
+            List all executions::
+
+                >>> for record in ml.find_executions():
+                ...     print(f"{record.execution_rid}: {record.status}")
+
+            Filter by status::
+
+                >>> completed = list(ml.find_executions(status=Status.completed))
+
+            Filter by specific workflow::
+
+                >>> workflow = ml.lookup_workflow("2-ABC1")
+                >>> for record in ml.find_executions(workflow=workflow):
+                ...     print(f"{record.execution_rid}: {record.description}")
+
+            Filter by workflow type (all notebooks)::
+
+                >>> notebooks = list(ml.find_executions(workflow_type="python_notebook"))
         """
+        # Import for type checking
+        from deriva_ml.execution.workflow import Workflow as WorkflowClass
+
         # Get datapath to the Execution table
         pb = self.pathBuilder()
         execution_path = pb.schemas[self.ml_schema].Execution
 
         # Apply filters
         filtered_path = execution_path
-        if workflow_rid:
+
+        # Filter by specific workflow
+        if workflow:
+            workflow_rid = workflow.rid if isinstance(workflow, WorkflowClass) else workflow
             filtered_path = filtered_path.filter(execution_path.Workflow == workflow_rid)
+
+        # Filter by workflow type - need to join with Workflow table
+        if workflow_type:
+            workflow_path = pb.schemas[self.ml_schema].Workflow
+            # Link to workflows with matching type
+            filtered_path = (
+                filtered_path
+                .link(workflow_path, on=(execution_path.Workflow == workflow_path.RID))
+                .filter(workflow_path.Workflow_Type == workflow_type)
+            )
+
         if status:
             filtered_path = filtered_path.filter(execution_path.Status == status.value)
 
-        # Create Execution objects
+        # Create ExecutionRecord objects
         for exec_record in filtered_path.entities().fetch():
             yield self.lookup_execution(exec_record["RID"])
 

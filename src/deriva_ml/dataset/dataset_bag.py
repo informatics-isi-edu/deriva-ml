@@ -36,6 +36,7 @@ import logging
 import shutil
 from collections import defaultdict
 from copy import copy
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Self, cast
 
@@ -55,7 +56,7 @@ from sqlalchemy.orm.util import AliasedClass
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
-from deriva_ml.feature import Feature
+from deriva_ml.feature import Feature, FeatureRecord
 
 if TYPE_CHECKING:
     from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
@@ -64,6 +65,59 @@ try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
+@dataclass
+class FeatureValueRecord:
+    """A feature value record with execution provenance.
+
+    This class represents a single feature value assigned to an asset,
+    including the execution that created it. Used by restructure_assets
+    when a value_selector function needs to choose between multiple
+    feature values for the same asset.
+
+    The raw_record attribute contains the complete feature table row as
+    a dictionary, which can be used to access all columns including any
+    additional metadata or columns beyond the primary value.
+
+    Attributes:
+        target_rid: RID of the asset/entity this feature value applies to.
+        feature_name: Name of the feature.
+        value: The feature value (typically a vocabulary term name).
+        execution_rid: RID of the execution that created this feature value, if any.
+            Use this to distinguish between values from different executions.
+        raw_record: The complete raw record from the feature table as a dictionary.
+            Access all columns via dict keys, e.g., record.raw_record["MyColumn"].
+
+    Example:
+        Using a value_selector to choose the most recent feature value::
+
+            def select_by_execution(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+                # Select value from most recent execution (assuming RIDs are sortable)
+                return max(records, key=lambda r: r.execution_rid or "")
+
+            bag.restructure_assets(
+                output_dir="./ml_data",
+                group_by=["Diagnosis"],
+                value_selector=select_by_execution,
+            )
+
+        Accessing raw record data::
+
+            def select_by_confidence(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+                # Select value with highest confidence score from raw record
+                return max(records, key=lambda r: r.raw_record.get("Confidence", 0))
+    """
+    target_rid: RID
+    feature_name: str
+    value: Any
+    execution_rid: RID | None = None
+    raw_record: dict[str, Any] = field(default_factory=dict)
+
+    def __repr__(self) -> str:
+        return (f"FeatureValueRecord(target_rid='{self.target_rid}', "
+                f"feature_name='{self.feature_name}', value='{self.value}', "
+                f"execution_rid='{self.execution_rid}')")
 
 
 class DatasetBag:
@@ -421,25 +475,60 @@ class DatasetBag:
         """
         return self.model.find_features(table)
 
-    def list_feature_values(self, table: Table | str, feature_name: str) -> datapath._ResultSet:
-        """Return feature values for a table.
+    def list_feature_values(
+        self, table: Table | str, feature_name: str
+    ) -> Iterable[FeatureRecord]:
+        """Retrieves all values for a feature as typed FeatureRecord instances.
+
+        Returns an iterator of dynamically-generated FeatureRecord objects for each
+        feature value. Each record is an instance of a Pydantic model specific to
+        this feature, with typed attributes for all columns including the Execution
+        that created the feature value.
 
         Args:
-            table: The table to get feature values for.
-            feature_name: Name of the feature.
+            table: The table containing the feature, either as name or Table object.
+            feature_name: Name of the feature to retrieve values for.
 
         Returns:
-            Feature values as a list of dictionaries with column names as keys.
+            Iterable[FeatureRecord]: An iterator of FeatureRecord instances.
+                Each instance has:
+                - Execution: RID of the execution that created this feature value
+                - Feature_Name: Name of the feature
+                - All feature-specific columns as typed attributes
+                - model_dump() method to convert back to a dictionary
+
+        Raises:
+            DerivaMLException: If the feature doesn't exist or cannot be accessed.
+
+        Example:
+            >>> # Get typed feature records
+            >>> for record in bag.list_feature_values("Image", "Quality"):
+            ...     print(f"Image {record.Image}: {record.ImageQuality}")
+            ...     print(f"Created by execution: {record.Execution}")
+
+            >>> # Convert records to dictionaries
+            >>> records = list(bag.list_feature_values("Image", "Quality"))
+            >>> dicts = [r.model_dump() for r in records]
         """
+        # Get table and feature
         feature = self.model.lookup_feature(table, feature_name)
+
+        # Get the dynamically-generated FeatureRecord subclass for this feature
+        record_class = feature.feature_record_class()
+
+        # Query raw values from SQLite
         feature_table = self.model.find_table(feature.feature_table.name)
         with Session(self.engine) as session:
-            # Query directly using the SQL table to avoid ORM lazy loading issues
             sql_cmd = select(feature_table)
             result = session.execute(sql_cmd)
-            # Convert to list of dicts with column names as keys
             rows = [dict(row._mapping) for row in result]
-            return cast(datapath._ResultSet, rows)
+
+        # Convert to typed records
+        for raw_value in rows:
+            # Filter to only include fields that the record class expects
+            field_names = set(record_class.model_fields.keys())
+            filtered_data = {k: v for k, v in raw_value.items() if k in field_names}
+            yield record_class(**filtered_data)
 
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of elements that can be contained in datasets.
@@ -935,6 +1024,7 @@ class DatasetBag:
         asset_table: str,
         group_keys: list[str],
         enforce_vocabulary: bool = True,
+        value_selector: Callable[[list[FeatureValueRecord]], FeatureValueRecord] | None = None,
     ) -> dict[str, dict[RID, Any]]:
         """Load feature values into a cache for efficient lookup.
 
@@ -950,6 +1040,12 @@ class DatasetBag:
                 controlled vocabulary term columns and raise an error if an
                 asset has multiple values. If False, allow any feature type
                 and use the first value found when multiple exist.
+            value_selector: Optional function to select which feature value to use
+                when an asset has multiple values for the same feature. Receives a
+                list of FeatureValueRecord objects (each with execution_rid for
+                provenance) and returns the selected one. If not provided and
+                multiple values exist, raises DerivaMLException when
+                enforce_vocabulary=True or uses the first value when False.
 
         Returns:
             Dictionary mapping group_key -> {target_rid -> feature_value}
@@ -958,11 +1054,14 @@ class DatasetBag:
         Raises:
             DerivaMLException: If enforce_vocabulary is True and:
                 - A feature has no term columns (not vocabulary-based), or
-                - An asset has multiple different vocabulary term values for the same feature.
+                - An asset has multiple different vocabulary term values for the same feature
+                  and no value_selector is provided.
         """
         from deriva_ml.core.exceptions import DerivaMLException
 
         cache: dict[str, dict[RID, Any]] = {}
+        # Store all feature value records for later selection when there are multiples
+        records_cache: dict[str, dict[RID, list[FeatureValueRecord]]] = {}
         logger = logging.getLogger("deriva_ml")
 
         # Parse group_keys to extract feature names and optional column specifications
@@ -1011,37 +1110,33 @@ class DatasetBag:
                     )
                 return
 
-            cache[group_key] = {}
+            records_cache[group_key] = defaultdict(list)
             feature_values = self.list_feature_values(table_name, feat.feature_name)
 
             for fv in feature_values:
+                # Convert FeatureRecord to dict for easier access
+                fv_dict = fv.model_dump()
                 target_col = table_name
-                if target_col not in fv:
+                if target_col not in fv_dict:
                     continue
 
-                target_rid = fv[target_col]
+                target_rid = fv_dict[target_col]
 
                 # Get the value from the specified column
-                value = fv.get(use_column) if use_column in fv else None
+                value = fv_dict.get(use_column) if use_column in fv_dict else None
 
                 if value is None:
                     continue
 
-                # Check for multiple values for the same target
-                if target_rid in cache[group_key]:
-                    existing_value = cache[group_key][target_rid]
-                    if existing_value != value:
-                        if enforce_vocabulary:
-                            raise DerivaMLException(
-                                f"Asset '{target_rid}' has multiple different values for "
-                                f"feature '{feat.feature_name}': '{existing_value}' and '{value}'. "
-                                f"Each asset must have at most one vocabulary term value per feature "
-                                f"when enforce_vocabulary=True. Set enforce_vocabulary=False to use "
-                                f"the first value found."
-                            )
-                        # If not enforcing, keep the first value (already in cache)
-                else:
-                    cache[group_key][target_rid] = value
+                # Create a FeatureValueRecord with execution provenance
+                record = FeatureValueRecord(
+                    target_rid=target_rid,
+                    feature_name=feat.feature_name,
+                    value=value,
+                    execution_rid=fv_dict.get("Execution"),
+                    raw_record=fv_dict,
+                )
+                records_cache[group_key][target_rid].append(record)
 
         # Find all features on tables that this asset table references
         asset_table_obj = self.model.name_to_table(asset_table)
@@ -1077,6 +1172,36 @@ class DatasetBag:
                                 raise
                             except Exception as e:
                                 logger.warning(f"Could not load feature {feature.feature_name}: {e}")
+
+        # Now resolve multiple values using value_selector or error handling
+        for group_key, target_records in records_cache.items():
+            cache[group_key] = {}
+            for target_rid, records in target_records.items():
+                if len(records) == 1:
+                    # Single value - straightforward
+                    cache[group_key][target_rid] = records[0].value
+                elif len(records) > 1:
+                    # Multiple values - need to resolve
+                    unique_values = set(r.value for r in records)
+                    if len(unique_values) == 1:
+                        # All records have same value, use it
+                        cache[group_key][target_rid] = records[0].value
+                    elif value_selector:
+                        # Use provided selector function
+                        selected = value_selector(records)
+                        cache[group_key][target_rid] = selected.value
+                    elif enforce_vocabulary:
+                        # Multiple different values without selector - error
+                        values_str = ", ".join(f"'{r.value}' (exec: {r.execution_rid})" for r in records)
+                        raise DerivaMLException(
+                            f"Asset '{target_rid}' has multiple different values for "
+                            f"feature '{records[0].feature_name}': {values_str}. "
+                            f"Provide a value_selector function to choose between values, "
+                            f"or set enforce_vocabulary=False to use the first value."
+                        )
+                    else:
+                        # Not enforcing - use first value
+                        cache[group_key][target_rid] = records[0].value
 
         return cache
 
@@ -1119,14 +1244,66 @@ class DatasetBag:
 
         return "unknown"
 
+    def _detect_asset_table(self) -> str | None:
+        """Auto-detect the asset table from dataset members.
+
+        Searches for asset tables in the dataset members by examining
+        the schema. Returns the first asset table found, or None if
+        no asset tables are in the dataset.
+
+        Returns:
+            Name of the detected asset table, or None if not found.
+        """
+        members = self.list_dataset_members(recurse=True)
+        for table_name in members:
+            if table_name == "Dataset":
+                continue
+            # Check if this table is an asset table
+            try:
+                table = self.model.name_to_table(table_name)
+                if self.model.is_asset(table):
+                    return table_name
+            except (KeyError, AttributeError):
+                continue
+        return None
+
+    def _validate_dataset_types(self) -> list[str] | None:
+        """Validate that the dataset or its children have Training/Testing types.
+
+        Checks if this dataset is of type Training or Testing, or if it has
+        nested children of those types. Returns the valid types found.
+
+        Returns:
+            List of Training/Testing type names found, or None if validation fails.
+        """
+        valid_types = {"Training", "Testing"}
+        found_types: set[str] = set()
+
+        def check_dataset(ds: DatasetBag, visited: set[RID]) -> None:
+            if ds.dataset_rid in visited:
+                return
+            visited.add(ds.dataset_rid)
+
+            for dtype in ds.dataset_types:
+                if dtype in valid_types:
+                    found_types.add(dtype)
+
+            for child in ds.list_dataset_children():
+                check_dataset(child, visited)
+
+        check_dataset(self, set())
+        return list(found_types) if found_types else None
+
     def restructure_assets(
         self,
-        asset_table: str,
         output_dir: Path | str,
+        asset_table: str | None = None,
         group_by: list[str] | None = None,
         use_symlinks: bool = True,
         type_selector: Callable[[list[str]], str] | None = None,
+        type_to_dir_map: dict[str, str] | None = None,
         enforce_vocabulary: bool = True,
+        value_selector: Callable[[list[FeatureValueRecord]], FeatureValueRecord] | None = None,
     ) -> Path:
         """Restructure downloaded assets into a directory hierarchy.
 
@@ -1134,9 +1311,15 @@ class DatasetBag:
         grouping values. This is useful for ML workflows that expect data
         organized in conventional folder structures (e.g., PyTorch ImageFolder).
 
+        The dataset should be of type Training or Testing, or have nested
+        children of those types. The top-level directory name is determined
+        by the dataset type (e.g., "Training" -> "training").
+
         Args:
-            asset_table: Name of the asset table (e.g., "Image").
             output_dir: Base directory for restructured assets.
+            asset_table: Name of the asset table (e.g., "Image"). If None,
+                auto-detects from dataset members. Raises DerivaMLException
+                if multiple asset tables are found and none is specified.
             group_by: Names to group assets by. Each name creates a subdirectory
                 level after the dataset type path. Names can be:
 
@@ -1145,6 +1328,8 @@ class DatasetBag:
                 - **Feature names**: Features defined on the asset table (or tables
                   it references via foreign keys). The feature's vocabulary term
                   value becomes the subdirectory name.
+                - **Feature.column**: Specify a particular column from a multi-term
+                  feature (e.g., "Classification.Label" to use the Label column).
 
                 Column names are checked first, then feature names. If a value
                 is not found, "unknown" is used as the subdirectory name.
@@ -1155,65 +1340,70 @@ class DatasetBag:
             type_selector: Function to select type when dataset has multiple types.
                 Receives list of type names, returns selected type name.
                 Defaults to selecting first type or "unknown" if no types.
+            type_to_dir_map: Optional mapping from dataset type names to directory
+                names. Defaults to {"Training": "training", "Testing": "testing"}.
+                Use this to customize directory names or add new type mappings.
             enforce_vocabulary: If True (default), only allow features that have
                 controlled vocabulary term columns, and raise an error if an asset
-                has multiple different values for the same feature. This ensures
-                clean, unambiguous directory structures. If False, allow any feature
-                type and use the first value found when multiple values exist.
+                has multiple different values for the same feature without a
+                value_selector. This ensures clean, unambiguous directory structures.
+                If False, allow any feature type and use the first value found
+                when multiple values exist.
+            value_selector: Optional function to select which feature value to use
+                when an asset has multiple values for the same feature. Receives a
+                list of FeatureValueRecord objects (each containing target_rid,
+                feature_name, value, execution_rid, and raw_record) and returns
+                the selected FeatureValueRecord. Use execution_rid to distinguish
+                between values from different executions.
 
         Returns:
             Path to the output directory.
 
         Raises:
-            DerivaMLException: If asset_table is not found in the dataset, or if
-                enforce_vocabulary is True and a feature is not vocabulary-based
-                or has multiple values for an asset.
+            DerivaMLException: If asset_table cannot be determined (multiple
+                asset tables exist without specification), if no valid dataset
+                types (Training/Testing) are found, or if enforce_vocabulary
+                is True and a feature has multiple values without value_selector.
 
         Examples:
-            Group by a column on the asset table::
+            Basic restructuring with auto-detected asset table::
 
-                # If Image table has a "label" column with values like "cat", "dog"
                 bag.restructure_assets(
-                    asset_table="Image",
-                    output_dir="./ml_data",
-                    group_by=["label"],
-                )
-                # Creates:
-                # ./ml_data/training/cat/image1.jpg
-                # ./ml_data/training/dog/image2.jpg
-                # ./ml_data/testing/cat/image3.jpg
-
-            Group by a feature's vocabulary term value::
-
-                # If Image has a "Diagnosis" feature with vocabulary terms "Normal", "Abnormal"
-                bag.restructure_assets(
-                    asset_table="Image",
                     output_dir="./ml_data",
                     group_by=["Diagnosis"],
                 )
                 # Creates:
                 # ./ml_data/training/Normal/image1.jpg
-                # ./ml_data/training/Abnormal/image2.jpg
+                # ./ml_data/testing/Abnormal/image2.jpg
 
-            Combine column and feature grouping::
+            Custom type-to-directory mapping::
 
-                # Group first by a column, then by a feature
                 bag.restructure_assets(
-                    asset_table="Image",
                     output_dir="./ml_data",
-                    group_by=["modality", "Diagnosis"],
+                    group_by=["Diagnosis"],
+                    type_to_dir_map={"Training": "train", "Testing": "test"},
                 )
                 # Creates:
-                # ./ml_data/training/MRI/Normal/image1.jpg
-                # ./ml_data/training/CT/Abnormal/image2.jpg
+                # ./ml_data/train/Normal/image1.jpg
+                # ./ml_data/test/Abnormal/image2.jpg
 
-            Allow non-vocabulary features (use with caution)::
+            Select specific feature column for multi-term features::
 
                 bag.restructure_assets(
-                    asset_table="Image",
                     output_dir="./ml_data",
-                    group_by=["score_bucket"],
-                    enforce_vocabulary=False,  # Allow numeric/text features
+                    group_by=["Classification.Label"],  # Use Label column
+                )
+
+            Handle multiple feature values with a selector::
+
+                def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+                    # Select value from most recent execution
+                    return max(records, key=lambda r: r.execution_rid or "")
+
+                bag.restructure_assets(
+                    output_dir="./ml_data",
+                    group_by=["Diagnosis"],
+                    value_selector=select_latest,
                 )
         """
         logger = logging.getLogger("deriva_ml")
@@ -1221,14 +1411,38 @@ class DatasetBag:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Step 1: Build dataset type path map
-        type_path_map = self._build_dataset_type_path_map(type_selector)
+        # Default type-to-directory mapping
+        if type_to_dir_map is None:
+            type_to_dir_map = {"Training": "training", "Testing": "testing"}
+
+        # Auto-detect asset table if not provided
+        if asset_table is None:
+            asset_table = self._detect_asset_table()
+            if asset_table is None:
+                raise DerivaMLException(
+                    "Could not auto-detect asset table. No asset tables found in dataset members. "
+                    "Specify the asset_table parameter explicitly."
+                )
+            logger.info(f"Auto-detected asset table: {asset_table}")
+
+        # Step 1: Build dataset type path map with directory name mapping
+        def map_type_to_dir(types: list[str]) -> str:
+            """Map dataset types to directory name using type_to_dir_map."""
+            if type_selector:
+                selected_type = type_selector(types)
+            else:
+                selected_type = types[0] if types else "unknown"
+            return type_to_dir_map.get(selected_type, selected_type.lower())
+
+        type_path_map = self._build_dataset_type_path_map(map_type_to_dir)
 
         # Step 2: Get asset-to-dataset mapping
         asset_dataset_map = self._get_asset_dataset_mapping(asset_table)
 
         # Step 3: Load feature values cache for relevant features
-        feature_cache = self._load_feature_values_cache(asset_table, group_by, enforce_vocabulary)
+        feature_cache = self._load_feature_values_cache(
+            asset_table, group_by, enforce_vocabulary, value_selector
+        )
 
         # Step 4: Get all assets
         members = self.list_dataset_members(recurse=True)

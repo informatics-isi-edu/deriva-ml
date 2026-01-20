@@ -79,12 +79,15 @@ Table = _ermrest_model.Table
 
 from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.core.mixins.rid_resolution import BatchRidResult
-from deriva_ml.feature import Feature
+from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.model.catalog import DerivaModel
 
 if TYPE_CHECKING:
+    from deriva_ml.core.enums import Status
     from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion
     from deriva_ml.dataset.dataset import Dataset
+    from deriva_ml.execution.execution_record import ExecutionRecord
+    from deriva_ml.execution.workflow import Workflow
 
 
 @runtime_checkable
@@ -473,14 +476,18 @@ class AssetLike(Protocol):
         """
         ...
 
-    def list_feature_values(self, feature_name: str) -> list[dict[str, Any]]:
+    def list_feature_values(self, feature_name: str) -> list[FeatureRecord]:
         """Get feature values for this specific asset.
 
         Args:
             feature_name: Name of the feature to query.
 
         Returns:
-            List of feature value records.
+            List of FeatureRecord instances. Each record has:
+                - Execution: RID of the execution that created this feature value
+                - Feature_Name: Name of the feature
+                - All feature-specific columns as typed attributes
+                - model_dump() method to convert back to a dictionary
         """
         ...
 
@@ -630,6 +637,110 @@ class DerivaMLCatalogReader(Protocol):
 
         Returns:
             Iterable of Feature objects.
+        """
+        ...
+
+    def lookup_workflow(self, rid: RID) -> "Workflow":
+        """Look up a workflow by its Resource Identifier (RID).
+
+        Retrieves a workflow from the catalog by its RID. The returned Workflow
+        is bound to the catalog, allowing its description to be updated (on
+        writable catalogs).
+
+        Args:
+            rid: Resource Identifier of the workflow to look up.
+
+        Returns:
+            Workflow: The workflow object bound to this catalog.
+
+        Raises:
+            DerivaMLException: If the RID does not correspond to a workflow.
+
+        Example:
+            >>> workflow = catalog.lookup_workflow("2-ABC1")
+            >>> print(f"{workflow.name}: {workflow.description}")
+        """
+        ...
+
+    def find_workflows(self) -> Iterable["Workflow"]:
+        """Find all workflows in the catalog.
+
+        Returns all workflow definitions, each bound to the catalog for
+        potential modification.
+
+        Returns:
+            Iterable of Workflow objects.
+
+        Example:
+            >>> for workflow in catalog.find_workflows():
+            ...     print(f"{workflow.name}: {workflow.description}")
+        """
+        ...
+
+    def lookup_workflow_by_url(self, url_or_checksum: str) -> "Workflow":
+        """Look up a workflow by URL or checksum.
+
+        Searches for a workflow matching the given GitHub URL or Git object
+        hash (checksum) and returns a bound Workflow object.
+
+        Args:
+            url_or_checksum: GitHub URL with commit hash, or Git object hash.
+
+        Returns:
+            Workflow: The workflow object bound to this catalog.
+
+        Raises:
+            DerivaMLException: If no matching workflow is found.
+
+        Example:
+            >>> url = "https://github.com/org/repo/blob/abc123/workflow.py"
+            >>> workflow = catalog.lookup_workflow_by_url(url)
+            >>> print(f"{workflow.name}: {workflow.description}")
+        """
+        ...
+
+    def lookup_execution(self, execution_rid: RID) -> "ExecutionRecord":
+        """Look up an execution by RID.
+
+        Returns an ExecutionRecord for querying and modifying execution metadata.
+
+        Args:
+            execution_rid: Resource Identifier of the execution.
+
+        Returns:
+            ExecutionRecord: The execution record bound to this catalog.
+
+        Raises:
+            DerivaMLException: If the RID doesn't refer to an Execution.
+
+        Example:
+            >>> record = catalog.lookup_execution("2-ABC1")
+            >>> print(f"{record.status}: {record.description}")
+        """
+        ...
+
+    def find_executions(
+        self,
+        workflow: "Workflow | RID | None" = None,
+        workflow_type: str | None = None,
+        status: "Status | None" = None,
+    ) -> Iterable["ExecutionRecord"]:
+        """List all executions in the catalog.
+
+        Args:
+            workflow: Optional Workflow object or RID to filter by.
+            workflow_type: Optional workflow type name to filter by.
+            status: Optional status to filter by.
+
+        Returns:
+            Iterable of ExecutionRecord objects.
+
+        Example:
+            >>> for record in catalog.find_executions():
+            ...     print(f"{record.execution_rid}: {record.status}")
+            >>> # Filter by workflow type
+            >>> for record in catalog.find_executions(workflow_type="python_script"):
+            ...     print(f"{record.execution_rid}")
         """
         ...
 

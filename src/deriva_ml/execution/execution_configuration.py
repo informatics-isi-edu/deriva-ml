@@ -48,7 +48,9 @@ class ExecutionConfiguration(BaseModel):
             - version: Version to use
             - materialize: Whether to extract dataset contents
         assets (list[RID]): Resource Identifiers of required input assets.
-        workflow (RID | Workflow): Workflow definition or its Resource Identifier.
+        workflow (Workflow | None): Workflow object defining the computational process.
+            Use ``ml.lookup_workflow(rid)`` or ``ml.lookup_workflow_by_url(url)`` to get
+            a Workflow object from a RID or URL.
         description (str): Description of execution purpose (supports Markdown).
         argv (list[str]): Command line arguments used to start execution.
         config_choices (dict[str, str]): Hydra config group choices that were selected.
@@ -56,19 +58,20 @@ class ExecutionConfiguration(BaseModel):
             Automatically populated by run_model() and get_notebook_configuration().
 
     Example:
+        >>> # Look up workflow by RID or URL first
+        >>> workflow = ml.lookup_workflow("2-ABC1")
         >>> config = ExecutionConfiguration(
-        ...     workflow=Workflow.create_workflow("analysis", "python_script"),
+        ...     workflow=workflow,
         ...     datasets=[
         ...         DatasetSpec(rid="1-abc123", version="1.0.0", materialize=True)
         ...     ],
-        ...     parameters={"threshold": 0.5, "max_iterations": 100},
         ...     description="Process RNA sequence data"
         ... )
     """
 
     datasets: list[DatasetSpec] = []
     assets: list[RID] = []
-    workflow: RID | Workflow | None = None
+    workflow: Workflow | None = None
     description: str = ""
     argv: list[str] = Field(default_factory=lambda: sys.argv)
     config_choices: dict[str, str] = Field(default_factory=dict)
