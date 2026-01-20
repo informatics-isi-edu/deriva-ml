@@ -547,10 +547,10 @@ class Execution:
         try:
             self.update_status(Status.running, "Uploading execution files...")
             results = upload_directory(self._model, self._asset_root, progress_callback=progress_callback)
-        except RuntimeError as e:
+        except (RuntimeError, DerivaMLException) as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
-            raise DerivaMLException(f"Fail to upload execution_assets. Error: {error}")
+            raise DerivaMLException(f"Failed to upload execution_assets: {error}")
 
         asset_map = {}
         for path, status in results.items():

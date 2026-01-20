@@ -290,6 +290,8 @@ def upload_directory(
     model: DerivaModel,
     directory: Path | str,
     progress_callback: Callable[[UploadProgress], None] | None = None,
+    max_retries: int = 3,
+    retry_delay: float = 5.0,
 ) -> dict[Any, FileUploadState] | None:
     """Upload assets from a directory. This routine assumes that the current upload specification includes a
     configuration for the specified directory.  Every asset in the specified directory is uploaded
@@ -299,6 +301,8 @@ def upload_directory(
         directory: Directory containing the assets and tables to upload.
         progress_callback: Optional callback function to receive upload progress updates.
             Called with UploadProgress objects containing file information and progress.
+        max_retries: Maximum number of retry attempts for failed uploads (default: 3).
+        retry_delay: Initial delay in seconds between retries, doubles with each attempt (default: 5.0).
 
     Returns:
         Results of the upload operation.
@@ -306,6 +310,11 @@ def upload_directory(
     Raises:
         DerivaMLException: If there is an issue with uploading the assets.
     """
+    import logging
+    import time
+
+    logger = logging.getLogger("deriva_ml")
+
     directory = Path(directory)
     if not directory.is_dir():
         raise DerivaMLException("Directory does not exist")
@@ -367,36 +376,85 @@ def upload_directory(
             )
             progress_callback(progress)
 
+    def do_upload(uploader) -> dict[str, dict]:
+        """Perform the upload and return raw results."""
+        uploader.getUpdatedConfig()
+        uploader.scanDirectory(directory, purge_state=True)
+        return uploader.uploadFiles(
+            file_callback=file_callback if progress_callback else None,
+            status_callback=status_callback if progress_callback else None,
+        )
+
     # Now upload the files by creating an upload spec and then calling the uploader.
     with TemporaryDirectory() as temp_dir:
         spec_file = Path(temp_dir) / "config.json"
         with spec_file.open("w+") as cfile:
             json.dump(bulk_upload_configuration(model), cfile)
-        uploader = GenericUploader(
-            server={
-                "host": model.hostname,
-                "protocol": "https",
-                "catalog_id": model.catalog.catalog_id,
-            },
-            config_file=spec_file,
-        )
-        try:
-            uploader.getUpdatedConfig()
-            uploader.scanDirectory(directory, purge_state=True)
-            results = {
-                path: FileUploadState(
-                    state=UploadState(result["State"]),
-                    status=result["Status"],
-                    result=result["Result"],
+
+        all_results = {}
+        attempt = 0
+        current_delay = retry_delay
+
+        while attempt <= max_retries:
+            uploader = GenericUploader(
+                server={
+                    "host": model.hostname,
+                    "protocol": "https",
+                    "catalog_id": model.catalog.catalog_id,
+                },
+                config_file=spec_file,
+            )
+            try:
+                raw_results = do_upload(uploader)
+
+                # Process results and check for failures
+                failed_files = []
+                for path, result in raw_results.items():
+                    state = UploadState(result["State"])
+                    if state == UploadState.failed or result["Result"] is None:
+                        failed_files.append((path, result["Status"]))
+                    else:
+                        # Store successful results
+                        all_results[path] = FileUploadState(
+                            state=state,
+                            status=result["Status"],
+                            result=result["Result"],
+                        )
+
+                if not failed_files:
+                    # All uploads successful
+                    break
+
+                attempt += 1
+                if attempt > max_retries:
+                    # Final attempt failed, raise error with details
+                    error_details = "; ".join([f"{path}: {msg}" for path, msg in failed_files])
+                    raise DerivaMLException(
+                        f"Failed to upload {len(failed_files)} file(s) after {max_retries} retries: {error_details}"
+                    )
+
+                # Log retry attempt and wait before retrying
+                logger.warning(
+                    f"Upload failed for {len(failed_files)} file(s), retrying in {current_delay:.1f}s "
+                    f"(attempt {attempt}/{max_retries}): {[p for p, _ in failed_files]}"
                 )
-                for path, result in uploader.uploadFiles(
-                    file_callback=file_callback if progress_callback else None,
-                    status_callback=status_callback if progress_callback else None,
-                ).items()
-            }
-        finally:
-            uploader.cleanup()
-        return results
+                if progress_callback:
+                    progress_callback(UploadProgress(
+                        phase="retrying",
+                        message=f"Retrying {len(failed_files)} failed upload(s) in {current_delay:.1f}s (attempt {attempt}/{max_retries})",
+                        percent_complete=0,
+                    ))
+
+                time.sleep(current_delay)
+                current_delay *= 2  # Exponential backoff
+
+                # Reset upload state for retry
+                upload_state["status_calls"] = 0
+
+            finally:
+                uploader.cleanup()
+
+        return all_results
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
