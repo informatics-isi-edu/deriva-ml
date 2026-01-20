@@ -238,7 +238,10 @@ class DerivaModel:
             return table
         if table in (s := self.model.schemas[self.domain_schema].tables):
             return s[table]
-        for s in [self.model.schemas[sname] for sname in [self.domain_schema, self.ml_schema, "WWW"]]:
+        for sname in [self.domain_schema, self.ml_schema, "WWW"]:
+            if sname not in self.model.schemas:
+                continue
+            s = self.model.schemas[sname]
             if table in s.tables.keys():
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
