@@ -943,14 +943,16 @@ class DatasetBag:
 
         Args:
             asset_table: The asset table name to find features for.
-            group_keys: List of potential feature names to cache.
+            group_keys: List of potential feature names to cache. Supports two formats:
+                - "FeatureName": Uses the first term column (default behavior)
+                - "FeatureName.column_name": Uses the specified column from the feature table
             enforce_vocabulary: If True (default), only allow features with
                 controlled vocabulary term columns and raise an error if an
                 asset has multiple values. If False, allow any feature type
                 and use the first value found when multiple exist.
 
         Returns:
-            Dictionary mapping feature_name -> {target_rid -> feature_value}
+            Dictionary mapping group_key -> {target_rid -> feature_value}
             Only includes entries for keys that are actually features.
 
         Raises:
@@ -963,22 +965,53 @@ class DatasetBag:
         cache: dict[str, dict[RID, Any]] = {}
         logger = logging.getLogger("deriva_ml")
 
-        def process_feature(feat: Any, table_name: str) -> None:
+        # Parse group_keys to extract feature names and optional column specifications
+        # Format: "FeatureName" or "FeatureName.column_name"
+        feature_column_map: dict[str, str | None] = {}  # group_key -> specific column or None
+        feature_names_to_check: set[str] = set()
+        for key in group_keys:
+            if "." in key:
+                parts = key.split(".", 1)
+                feature_name = parts[0]
+                column_name = parts[1]
+                feature_column_map[key] = column_name
+                feature_names_to_check.add(feature_name)
+            else:
+                feature_column_map[key] = None
+                feature_names_to_check.add(key)
+
+        def process_feature(feat: Any, table_name: str, group_key: str, specific_column: str | None) -> None:
             """Process a single feature and add its values to the cache."""
             term_cols = [c.name for c in feat.term_columns]
             value_cols = [c.name for c in feat.value_columns]
+            all_cols = term_cols + value_cols
 
-            if enforce_vocabulary:
-                # Only allow features with vocabulary term columns
-                if not term_cols:
+            # Determine which column to use for the value
+            if specific_column:
+                # User specified a specific column
+                if specific_column not in all_cols:
+                    raise DerivaMLException(
+                        f"Column '{specific_column}' not found in feature '{feat.feature_name}'. "
+                        f"Available columns: {all_cols}"
+                    )
+                use_column = specific_column
+            elif term_cols:
+                # Use first term column (default behavior)
+                use_column = term_cols[0]
+            elif not enforce_vocabulary and value_cols:
+                # Fall back to value columns if allowed
+                use_column = value_cols[0]
+            else:
+                if enforce_vocabulary:
                     raise DerivaMLException(
                         f"Feature '{feat.feature_name}' on table '{table_name}' has no "
                         f"controlled vocabulary term columns. Only vocabulary-based features "
                         f"can be used for grouping when enforce_vocabulary=True. "
                         f"Set enforce_vocabulary=False to allow non-vocabulary features."
                     )
+                return
 
-            cache[feat.feature_name] = {}
+            cache[group_key] = {}
             feature_values = self.list_feature_values(table_name, feat.feature_name)
 
             for fv in feature_values:
@@ -988,19 +1021,15 @@ class DatasetBag:
 
                 target_rid = fv[target_col]
 
-                # Get the value - prefer term columns, then value columns
-                value = None
-                if term_cols and term_cols[0] in fv:
-                    value = fv[term_cols[0]]
-                elif not enforce_vocabulary and value_cols and value_cols[0] in fv:
-                    value = fv[value_cols[0]]
+                # Get the value from the specified column
+                value = fv.get(use_column) if use_column in fv else None
 
                 if value is None:
                     continue
 
                 # Check for multiple values for the same target
-                if target_rid in cache[feat.feature_name]:
-                    existing_value = cache[feat.feature_name][target_rid]
+                if target_rid in cache[group_key]:
+                    existing_value = cache[group_key][target_rid]
                     if existing_value != value:
                         if enforce_vocabulary:
                             raise DerivaMLException(
@@ -1012,32 +1041,42 @@ class DatasetBag:
                             )
                         # If not enforcing, keep the first value (already in cache)
                 else:
-                    cache[feat.feature_name][target_rid] = value
+                    cache[group_key][target_rid] = value
 
         # Find all features on tables that this asset table references
         asset_table_obj = self.model.name_to_table(asset_table)
 
         # Check features on the asset table itself
         for feature in self.find_features(asset_table):
-            if feature.feature_name in group_keys:
-                try:
-                    process_feature(feature, asset_table)
-                except DerivaMLException:
-                    raise
-                except Exception as e:
-                    logger.warning(f"Could not load feature {feature.feature_name}: {e}")
+            if feature.feature_name in feature_names_to_check:
+                # Find all group_keys that reference this feature
+                for group_key, specific_col in feature_column_map.items():
+                    # Check if this group_key references this feature
+                    key_feature = group_key.split(".")[0] if "." in group_key else group_key
+                    if key_feature == feature.feature_name:
+                        try:
+                            process_feature(feature, asset_table, group_key, specific_col)
+                        except DerivaMLException:
+                            raise
+                        except Exception as e:
+                            logger.warning(f"Could not load feature {feature.feature_name}: {e}")
 
         # Also check features on referenced tables (via foreign keys)
         for fk in asset_table_obj.foreign_keys:
             target_table = fk.pk_table
             for feature in self.find_features(target_table):
-                if feature.feature_name in group_keys:
-                    try:
-                        process_feature(feature, target_table.name)
-                    except DerivaMLException:
-                        raise
-                    except Exception as e:
-                        logger.warning(f"Could not load feature {feature.feature_name}: {e}")
+                if feature.feature_name in feature_names_to_check:
+                    # Find all group_keys that reference this feature
+                    for group_key, specific_col in feature_column_map.items():
+                        # Check if this group_key references this feature
+                        key_feature = group_key.split(".")[0] if "." in group_key else group_key
+                        if key_feature == feature.feature_name:
+                            try:
+                                process_feature(feature, target_table.name, group_key, specific_col)
+                            except DerivaMLException:
+                                raise
+                            except Exception as e:
+                                logger.warning(f"Could not load feature {feature.feature_name}: {e}")
 
         return cache
 
