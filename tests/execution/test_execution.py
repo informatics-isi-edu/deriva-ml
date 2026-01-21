@@ -497,6 +497,87 @@ class TestExecutionAssets:
         assert len(input_only) == 1
         assert input_only[0].execution_rid == input_execution.execution_rid
 
+    def test_asset_file_path_with_relative_path(self, basic_execution):
+        """Test that asset_file_path works correctly with relative paths.
+
+        This verifies that relative paths are resolved to absolute paths,
+        which is important when the current working directory changes
+        (e.g., in Hydra workflows).
+        """
+        with TemporaryDirectory() as tmpdir:
+            # Create a file with a relative path from tmpdir
+            tmpdir = Path(tmpdir)
+            subdir = tmpdir / "subdir"
+            subdir.mkdir()
+            test_file = subdir / "relative_test.txt"
+            test_file.write_text("Test content for relative path")
+
+            # Save original working directory
+            original_cwd = os.getcwd()
+
+            try:
+                # Change to tmpdir so we can use a relative path
+                os.chdir(tmpdir)
+
+                # Use a relative path
+                relative_path = Path("subdir/relative_test.txt")
+                assert relative_path.exists(), "Relative path should exist from tmpdir"
+
+                with basic_execution.execute() as execution:
+                    # Register the file using a relative path
+                    asset_path = execution.asset_file_path(
+                        MLAsset.execution_asset,
+                        relative_path,
+                        asset_types=ExecAssetType.model_file,
+                    )
+
+                    # The asset_path should exist and be a symlink to the original file
+                    assert asset_path.exists(), "Asset path should exist"
+
+                    # Verify the content is accessible
+                    content = asset_path.read_text()
+                    assert content == "Test content for relative path"
+
+                    # Change to a different directory and verify symlink still works
+                    os.chdir(original_cwd)
+
+                    # The symlink should still work because it points to an absolute path
+                    assert asset_path.exists(), "Asset path should still exist after cwd change"
+                    content_after_chdir = asset_path.read_text()
+                    assert content_after_chdir == "Test content for relative path"
+            finally:
+                os.chdir(original_cwd)
+
+    def test_asset_file_path_with_relative_path_copy(self, basic_execution):
+        """Test that asset_file_path copy mode works with relative paths."""
+        with TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            test_file = tmpdir / "copy_test.txt"
+            test_file.write_text("Content to copy")
+
+            original_cwd = os.getcwd()
+
+            try:
+                os.chdir(tmpdir)
+
+                relative_path = Path("copy_test.txt")
+
+                with basic_execution.execute() as execution:
+                    # Register with copy_file=True
+                    asset_path = execution.asset_file_path(
+                        MLAsset.execution_asset,
+                        relative_path,
+                        asset_types=ExecAssetType.model_file,
+                        copy_file=True,
+                    )
+
+                    assert asset_path.exists()
+                    # Should be a regular file, not a symlink
+                    assert not asset_path.is_symlink()
+                    assert asset_path.read_text() == "Content to copy"
+            finally:
+                os.chdir(original_cwd)
+
 
 # =============================================================================
 # TestExecutionDatasets - Dataset Operations Tests

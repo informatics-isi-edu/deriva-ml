@@ -1020,6 +1020,11 @@ class Execution:
             # There is a funny bug with S3 hatrac if we have the leading _ in the filename.
             file_name = file_name.with_name("-implementations.log")
 
+        # Resolve relative paths to absolute paths to ensure exists() and symlink work correctly
+        # regardless of the current working directory
+        if not file_name.is_absolute():
+            file_name = file_name.resolve()
+
         target_name = Path(rename_file) if file_name.exists() and rename_file else file_name
         asset_path = asset_file_path(
             prefix=self._working_dir,
