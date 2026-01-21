@@ -207,3 +207,53 @@ Use `builds()` with `populate_full_signature=True` for hydra-zen integration.
 Use `zen_partial=True` for model functions that receive execution context at runtime.
 
 See `docs/user-guide/hydra-zen-configuration.md` for complete documentation.
+
+## Best Practices & Patterns
+
+### Version Bumping
+
+Use the `bump-version` script for releases - it handles the complete workflow:
+```bash
+uv run bump-version patch  # or minor, major
+```
+This fetches tags, bumps the version, creates a tag, and pushes everything in one command.
+Don't use `bump-my-version` directly as it doesn't push changes.
+
+### Asset Upload
+
+Use `asset_file_path()` API to register files for upload:
+```python
+path = execution.asset_file_path(
+    MLAsset.execution_metadata,
+    "my-file.yaml",
+    asset_types=ExecMetadataType.hydra_config.value,
+)
+with path.open("w") as f:
+    f.write(content)
+```
+Don't manually create files in `working_dir / "Execution_Metadata"` - they won't be uploaded.
+
+### Upload Network Configuration
+
+`upload_directory()` has two network configuration parameters:
+- `timeout`: HTTP session timeout (connect, read) - passed to session config
+- `chunk_size`: Hatrac chunk upload size in bytes - passed through upload spec
+
+### Workflow Deduplication
+
+Workflows are deduplicated by checksum. When the same script runs multiple times, `add_workflow()` returns the existing workflow's RID rather than creating a new one. Tests that need distinct workflows must account for this.
+
+### Testing find_experiments
+
+The `find_experiments()` function finds executions with Hydra config files (matching `*-config.yaml` in Execution_Metadata). Test fixtures must use `asset_file_path()` to properly register config files - see `execution_with_hydra_config` fixture.
+
+### Association Tables
+
+Use `Table.define_association()` for creating association tables instead of manually defining columns, keys, and foreign keys:
+```python
+Table.define_association(
+    associates=[("Execution", execution), ("Nested_Execution", execution)],
+    comment="Description",
+    metadata=[Column.define("Sequence", builtin_types.int4, nullok=True)]
+)
+```
