@@ -993,8 +993,9 @@ class DatasetBag:
     def _get_asset_dataset_mapping(self, asset_table: str) -> dict[RID, RID]:
         """Map asset RIDs to their containing dataset RID.
 
-        For each asset in the specified table, determines which dataset directly
-        contains it (not considering nesting - just direct membership).
+        For each asset in the specified table, determines which dataset it belongs to.
+        This uses _dataset_table_view to find assets reachable through any FK path
+        from the dataset, not just directly associated assets.
 
         Args:
             asset_table: Name of the asset table (e.g., "Image")
@@ -1009,15 +1010,42 @@ class DatasetBag:
                 return
             visited.add(dataset.dataset_rid)
 
-            members = dataset.list_dataset_members(recurse=False)
-            for asset in members.get(asset_table, []):
-                asset_to_dataset[asset["RID"]] = dataset.dataset_rid
+            # Use _get_reachable_assets to find all assets reachable through FK paths
+            for asset in dataset._get_reachable_assets(asset_table):
+                # Only set if not already mapped (first dataset wins)
+                if asset["RID"] not in asset_to_dataset:
+                    asset_to_dataset[asset["RID"]] = dataset.dataset_rid
 
             for child in dataset.list_dataset_children():
                 collect_from_dataset(child, visited)
 
         collect_from_dataset(self, set())
         return asset_to_dataset
+
+    def _get_reachable_assets(self, asset_table: str) -> list[dict[str, Any]]:
+        """Get all assets reachable from this dataset through any FK path.
+
+        Unlike list_dataset_members which only returns directly associated entities,
+        this method traverses foreign key relationships to find assets that are
+        indirectly connected to the dataset. For example, if a dataset contains
+        Subjects, and Subject -> Encounter -> Image, this method will find those
+        Images even though they're not directly in the Dataset_Image association table.
+
+        Args:
+            asset_table: Name of the asset table (e.g., "Image")
+
+        Returns:
+            List of asset records as dictionaries.
+        """
+        # Use the _dataset_table_view query which traverses all FK paths
+        sql_query = self._dataset_table_view(asset_table)
+
+        with Session(self.engine) as session:
+            result = session.execute(sql_query)
+            # Convert rows to dictionaries
+            rows = [dict(row._mapping) for row in result]
+
+        return rows
 
     def _load_feature_values_cache(
         self,
@@ -1316,6 +1344,14 @@ class DatasetBag:
         children of those types. The top-level directory name is determined
         by the dataset type (e.g., "Training" -> "training").
 
+        **Finding assets through foreign key relationships:**
+
+        Assets are found by traversing all foreign key paths from the dataset,
+        not just direct associations. For example, if a dataset contains Subjects,
+        and the schema has Subject -> Encounter -> Image relationships, this method
+        will find all Images reachable through those paths even though they are
+        not directly in a Dataset_Image association table.
+
         **Handling datasets without types (prediction scenarios):**
 
         If a dataset has no type defined, it is treated as Testing. This is
@@ -1476,9 +1512,11 @@ class DatasetBag:
             asset_table, group_by, enforce_vocabulary, value_selector
         )
 
-        # Step 4: Get all assets
-        members = self.list_dataset_members(recurse=True)
-        assets = members.get(asset_table, [])
+        # Step 4: Get all assets reachable through FK paths
+        # This uses _get_reachable_assets which traverses FK relationships,
+        # so assets connected via Subject -> Encounter -> Image are found
+        # even if the dataset only contains Subjects directly.
+        assets = self._get_reachable_assets(asset_table)
 
         if not assets:
             logger.warning(f"No assets found in table '{asset_table}'")
