@@ -114,6 +114,112 @@ class TestRestructureAssets:
         unknown_dirs = list(output_dir.rglob("Unknown"))
         assert len(unknown_dirs) >= 1
 
+    def test_restructure_dataset_without_type_uses_testing(self, dataset_test, tmp_path):
+        """Test that datasets without a type are treated as Testing (prediction scenario).
+
+        When a dataset has no type defined, restructure_assets should place its
+        assets in a 'testing' directory. This supports prediction/inference
+        scenarios where unlabeled data is being processed.
+        """
+        ml = dataset_test.ml_instance
+
+        # Create a dataset with NO types (empty list)
+        dataset = ml.create_dataset(
+            dataset_types=[],  # No type - prediction scenario
+            description="Unlabeled prediction dataset",
+        )
+
+        # Add some images to the dataset
+        image_path = ml.domain_path.tables["Image"]
+        images = list(image_path.entities().fetch())
+        if not images:
+            pytest.skip("No images in test data")
+
+        image_rids = [img["RID"] for img in images[:2]]
+        dataset.add_dataset_members({"Image": image_rids})
+
+        # Download and restructure
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_prediction"
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=[],
+        )
+
+        assert output_dir.exists()
+
+        # Files should be in a 'testing' directory (default for datasets without type)
+        testing_dirs = list(output_dir.rglob("testing"))
+        assert len(testing_dirs) >= 1, (
+            f"Expected 'testing' directory for dataset without type. "
+            f"Found directories: {[d.name for d in output_dir.rglob('*') if d.is_dir()]}"
+        )
+
+        # Verify files are inside the testing directory
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) > 0, "Expected files to be restructured"
+
+        for f in all_files:
+            relative = f.relative_to(output_dir)
+            assert relative.parts[0] == "testing", (
+                f"File {f} should be under 'testing' directory, got {relative.parts[0]}"
+            )
+
+    def test_restructure_prediction_with_missing_labels(self, dataset_test, tmp_path):
+        """Test full prediction scenario: no type + no labels = testing/Unknown/.
+
+        This tests the complete prediction workflow where:
+        1. Dataset has no type (treated as Testing)
+        2. Assets have no labels for group_by (placed in Unknown)
+        Result: files end up in testing/Unknown/
+        """
+        ml = dataset_test.ml_instance
+
+        # Create a dataset with NO types
+        dataset = ml.create_dataset(
+            dataset_types=[],
+            description="Full prediction scenario test",
+        )
+
+        # Add images
+        image_path = ml.domain_path.tables["Image"]
+        images = list(image_path.entities().fetch())
+        if not images:
+            pytest.skip("No images in test data")
+
+        image_rids = [img["RID"] for img in images[:2]]
+        dataset.add_dataset_members({"Image": image_rids})
+
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_full_prediction"
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=["NonExistentLabel"],  # No labels - will use Unknown
+        )
+
+        assert output_dir.exists()
+
+        # Should have testing/Unknown path
+        expected_path = output_dir / "testing" / "Unknown"
+        assert expected_path.exists(), (
+            f"Expected testing/Unknown directory for prediction scenario. "
+            f"Found: {list(output_dir.rglob('*'))}"
+        )
+
+        # Verify files are in testing/Unknown
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) > 0
+
+        for f in all_files:
+            relative = f.relative_to(output_dir)
+            assert relative.parts[:2] == ("testing", "Unknown"), (
+                f"File {f} should be in testing/Unknown/, got {relative.parts[:2]}"
+            )
+
     def test_restructure_empty_asset_table(self, dataset_test, tmp_path):
         """Test restructuring with an asset table that has no members in the dataset."""
         dataset = dataset_test.dataset_description.dataset
