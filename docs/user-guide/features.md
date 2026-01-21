@@ -181,6 +181,68 @@ This structure enables:
 - Use meaningful workflow types: "Manual_Annotation", "Model_Inference", etc.
 - Include dataset versions for reproducibility
 
+## Working with Multiple Values
+
+A single object can have multiple values for the same feature. This is common when:
+
+- Multiple annotators label the same image
+- A model produces predictions at different times
+- Different versions of analysis are run
+
+### Querying Multiple Values
+
+```python
+# Get all values for a specific image
+values = ml.list_feature_values("Image", "Diagnosis")
+image_values = [v for v in values if v["Image"] == image_rid]
+
+for v in image_values:
+    print(f"Value: {v['Diagnosis_Type']} from Execution {v['Execution']}")
+```
+
+### Resolving Multiple Values in restructure_assets
+
+When restructuring assets by a feature that has multiple values, you can provide a `value_selector` function to choose which value to use:
+
+```python
+from deriva_ml.dataset.dataset_bag import FeatureValueRecord
+
+def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    """Select the value from the most recent execution."""
+    return max(records, key=lambda r: r.execution_rid or "")
+
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./ml_data"),
+    group_by=["Diagnosis"],
+    value_selector=select_latest,
+)
+```
+
+The `FeatureValueRecord` provides:
+
+| Attribute | Description |
+|-----------|-------------|
+| `target_rid` | RID of the object this value applies to |
+| `feature_name` | Name of the feature |
+| `value` | The feature value (e.g., vocabulary term name) |
+| `execution_rid` | RID of the execution that created this value |
+| `raw_record` | Complete feature table row as a dictionary |
+
+### Consensus or Aggregation
+
+For more complex scenarios, you might aggregate multiple values:
+
+```python
+from collections import Counter
+
+def select_majority_vote(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    """Select the most common value (majority vote)."""
+    counts = Counter(r.value for r in records)
+    most_common_value = counts.most_common(1)[0][0]
+    return next(r for r in records if r.value == most_common_value)
+```
+
 ## Deleting Features
 
 ```python

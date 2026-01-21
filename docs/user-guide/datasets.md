@@ -367,15 +367,124 @@ bag.restructure_assets(
 
 #### Handling Missing Values
 
-When a grouping value is missing or `None`, assets are placed in an `unknown` folder:
+When a grouping value is missing or `None`, assets are placed in an `Unknown` folder:
 
 ```
 ml_data/
   Training/
     positive/
       image1.jpg
-    unknown/          # Assets with missing label values
+    Unknown/          # Assets with missing label values
       image2.jpg
+```
+
+#### Prediction Scenarios (Datasets Without Types)
+
+When a dataset has no type defined (empty `dataset_types` list), it is treated as a Testing dataset. This is common for prediction/inference scenarios where you want to apply a trained model to new unlabeled data:
+
+```python
+# Create a dataset for prediction (no type)
+prediction_dataset = ml.create_dataset(
+    dataset_types=[],  # No type - will be treated as Testing
+    description="Unlabeled images for prediction"
+)
+
+# Add images and download
+prediction_dataset.add_dataset_members({"Image": image_rids})
+bag = prediction_dataset.download_dataset_bag()
+
+# Restructure for prediction - ends up in testing/Unknown/
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./prediction_data"),
+    group_by=["Diagnosis"],  # No labels assigned yet
+)
+```
+
+This creates:
+
+```
+prediction_data/
+  testing/            # Dataset without type treated as Testing
+    Unknown/          # No labels assigned
+      image1.jpg
+      image2.jpg
+```
+
+#### Finding Assets Through Foreign Key Paths
+
+Assets are found by traversing all foreign key paths from the dataset, not just direct associations. For example, if a dataset contains Subjects and the schema has Subject → Encounter → Image relationships, `restructure_assets()` will find all Images reachable through those paths even though they are not directly in a Dataset_Image association table:
+
+```python
+# Dataset contains only Subjects
+subject_dataset = ml.create_dataset(
+    dataset_types=["Training"],
+    description="Training subjects"
+)
+subject_dataset.add_dataset_members({"Subject": subject_rids})
+
+# But we want to restructure Images connected via FK path
+bag = subject_dataset.download_dataset_bag()
+bag.restructure_assets(
+    asset_table="Image",  # Finds Images via Subject -> Encounter -> Image
+    output_dir=Path("./ml_data"),
+    group_by=["Quality"],
+)
+```
+
+#### Handling Multiple Feature Values
+
+When an asset has multiple values for the same feature (e.g., labeled by different annotators or different model runs), you can provide a `value_selector` function to choose which value to use:
+
+```python
+from deriva_ml.dataset.dataset_bag import FeatureValueRecord
+
+def select_latest_execution(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    """Select the feature value from the most recent execution."""
+    return max(records, key=lambda r: r.execution_rid or "")
+
+def select_by_confidence(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    """Select the feature value with highest confidence from raw record."""
+    return max(records, key=lambda r: r.raw_record.get("Confidence", 0))
+
+# Use value_selector to resolve multiple values
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./ml_data"),
+    group_by=["Diagnosis"],
+    value_selector=select_latest_execution,
+)
+```
+
+The `FeatureValueRecord` contains:
+- `target_rid`: RID of the asset this feature value applies to
+- `feature_name`: Name of the feature
+- `value`: The feature value (typically a vocabulary term name)
+- `execution_rid`: RID of the execution that created this value (for provenance)
+- `raw_record`: The complete feature table row as a dictionary
+
+If no `value_selector` is provided and an asset has multiple different values for the same feature, an error is raised when `enforce_vocabulary=True` (the default). Set `enforce_vocabulary=False` to use the first value found instead.
+
+#### Enforcing Vocabulary-Based Grouping
+
+By default, `enforce_vocabulary=True` ensures that feature-based grouping only uses vocabulary-controlled features. This prevents accidental grouping by asset-based features (which would create cryptic directory names):
+
+```python
+# This will raise an error if BoundingBox is an asset-based feature
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./ml_data"),
+    group_by=["BoundingBox"],  # Asset-based feature
+    enforce_vocabulary=True,   # Default - will error
+)
+
+# Allow non-vocabulary features
+bag.restructure_assets(
+    asset_table="Image",
+    output_dir=Path("./ml_data"),
+    group_by=["BoundingBox"],
+    enforce_vocabulary=False,  # Allows asset-based features
+)
 ```
 
 ## Finding Datasets
