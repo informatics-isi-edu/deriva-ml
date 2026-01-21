@@ -971,7 +971,7 @@ class DatasetBag:
             e.g., {"4-ABC": ["complete", "training"], "4-DEF": ["complete", "testing"]}
         """
         if type_selector is None:
-            type_selector = lambda types: types[0] if types else "unknown"
+            type_selector = lambda types: types[0] if types else "Testing"
 
         type_paths: dict[RID, list[str]] = {}
 
@@ -1222,14 +1222,15 @@ class DatasetBag:
             feature_cache: Pre-loaded feature values keyed by feature name -> target RID -> value.
 
         Returns:
-            The resolved value as a string, or "unknown" if not found or None.
+            The resolved value as a string, or "Unknown" if not found or None.
+            Uses "Unknown" (capitalized) to match vocabulary term naming conventions.
         """
         # First check if it's a direct column on the asset table
         if group_key in asset:
             value = asset[group_key]
             if value is not None:
                 return str(value)
-            return "unknown"
+            return "Unknown"
 
         # Check if it's a feature name
         if group_key in feature_cache:
@@ -1242,7 +1243,7 @@ class DatasetBag:
             if asset.get("RID") in feature_values:
                 return str(feature_values[asset["RID"]])
 
-        return "unknown"
+        return "Unknown"
 
     def _detect_asset_table(self) -> str | None:
         """Auto-detect the asset table from dataset members.
@@ -1315,6 +1316,18 @@ class DatasetBag:
         children of those types. The top-level directory name is determined
         by the dataset type (e.g., "Training" -> "training").
 
+        **Handling datasets without types (prediction scenarios):**
+
+        If a dataset has no type defined, it is treated as Testing. This is
+        common for prediction/inference scenarios where you want to apply a
+        trained model to new unlabeled data.
+
+        **Handling missing labels:**
+
+        If an asset doesn't have a value for a group_by key (e.g., no label
+        assigned), it is placed in an "Unknown" directory. This allows
+        restructure_assets to work with unlabeled data for prediction.
+
         Args:
             output_dir: Base directory for restructured assets.
             asset_table: Name of the asset table (e.g., "Image"). If None,
@@ -1341,8 +1354,9 @@ class DatasetBag:
                 Receives list of type names, returns selected type name.
                 Defaults to selecting first type or "unknown" if no types.
             type_to_dir_map: Optional mapping from dataset type names to directory
-                names. Defaults to {"Training": "training", "Testing": "testing"}.
-                Use this to customize directory names or add new type mappings.
+                names. Defaults to {"Training": "training", "Testing": "testing",
+                "Unknown": "unknown"}. Use this to customize directory names or
+                add new type mappings.
             enforce_vocabulary: If True (default), only allow features that have
                 controlled vocabulary term columns, and raise an error if an asset
                 has multiple different values for the same feature without a
@@ -1405,6 +1419,18 @@ class DatasetBag:
                     group_by=["Diagnosis"],
                     value_selector=select_latest,
                 )
+
+            Prediction scenario with unlabeled data::
+
+                # Dataset has no type - treated as Testing
+                # Assets have no labels - placed in Unknown directory
+                bag.restructure_assets(
+                    output_dir="./prediction_data",
+                    group_by=["Diagnosis"],
+                )
+                # Creates:
+                # ./prediction_data/testing/Unknown/image1.jpg
+                # ./prediction_data/testing/Unknown/image2.jpg
         """
         logger = logging.getLogger("deriva_ml")
         group_by = group_by or []
@@ -1413,7 +1439,7 @@ class DatasetBag:
 
         # Default type-to-directory mapping
         if type_to_dir_map is None:
-            type_to_dir_map = {"Training": "training", "Testing": "testing"}
+            type_to_dir_map = {"Training": "training", "Testing": "testing", "Unknown": "unknown"}
 
         # Auto-detect asset table if not provided
         if asset_table is None:
@@ -1427,11 +1453,17 @@ class DatasetBag:
 
         # Step 1: Build dataset type path map with directory name mapping
         def map_type_to_dir(types: list[str]) -> str:
-            """Map dataset types to directory name using type_to_dir_map."""
+            """Map dataset types to directory name using type_to_dir_map.
+
+            If dataset has no types, treat it as Testing (prediction use case).
+            """
+            if not types:
+                # No types defined - treat as Testing for prediction scenarios
+                return type_to_dir_map.get("Testing", "testing")
             if type_selector:
                 selected_type = type_selector(types)
             else:
-                selected_type = types[0] if types else "unknown"
+                selected_type = types[0]
             return type_to_dir_map.get(selected_type, selected_type.lower())
 
         type_path_map = self._build_dataset_type_path_map(map_type_to_dir)
