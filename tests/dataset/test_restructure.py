@@ -268,6 +268,97 @@ class TestRestructureAssets:
             # Should have at least 2 levels for nested datasets (parent type + child type)
             assert len(relative_path.parts) >= 2, f"Expected at least 2 levels, got {relative_path}"
 
+    def test_restructure_split_with_training_testing_children(self, dataset_test, tmp_path):
+        """Test that Split parent with Training/Testing children creates correct structure.
+
+        When a Split dataset contains Training and Testing child datasets, assets
+        should be organized under split/training/ and split/testing/ directories,
+        NOT all under split/ directly.
+
+        This tests that assets are mapped to their leaf (most specific) dataset,
+        not the parent dataset.
+        """
+        ml = dataset_test.ml_instance
+
+        # Create parent "Split" dataset
+        split_dataset = ml.create_dataset(
+            dataset_types=["Split"],
+            description="Split dataset with Training/Testing children",
+        )
+
+        # Create Training child
+        training_dataset = ml.create_dataset(
+            dataset_types=["Training"],
+            description="Training split",
+        )
+
+        # Create Testing child
+        testing_dataset = ml.create_dataset(
+            dataset_types=["Testing"],
+            description="Testing split",
+        )
+
+        # Get some images
+        image_path = ml.domain_path.tables["Image"]
+        images = list(image_path.entities().fetch())
+        if len(images) < 4:
+            pytest.skip("Need at least 4 images for this test")
+
+        # Add images to Training and Testing (not to Split directly)
+        training_images = [img["RID"] for img in images[:2]]
+        testing_images = [img["RID"] for img in images[2:4]]
+
+        training_dataset.add_dataset_members({"Image": training_images})
+        testing_dataset.add_dataset_members({"Image": testing_images})
+
+        # Add children to parent
+        split_dataset.add_dataset_child(training_dataset)
+        split_dataset.add_dataset_child(testing_dataset)
+
+        # Download the Split dataset bag
+        bag = split_dataset.download_dataset_bag(
+            version=split_dataset.current_version, use_minid=False
+        )
+
+        output_dir = tmp_path / "restructured_split"
+        bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=[],
+        )
+
+        assert output_dir.exists()
+
+        # Check that training and testing subdirectories exist under split
+        # The structure should be: split/training/*.jpg and split/testing/*.jpg
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) == 4, f"Expected 4 files, got {len(all_files)}"
+
+        # Group files by their parent directory name
+        file_dirs = {}
+        for f in all_files:
+            relative = f.relative_to(output_dir)
+            # Expected: split/training/file.jpg or split/testing/file.jpg
+            if len(relative.parts) >= 2:
+                parent_dir = relative.parts[-2]  # training or testing
+                if parent_dir not in file_dirs:
+                    file_dirs[parent_dir] = []
+                file_dirs[parent_dir].append(f.name)
+
+        # Should have both training and testing directories with files
+        assert "training" in file_dirs, (
+            f"Expected 'training' subdirectory, got directories: {list(file_dirs.keys())}. "
+            f"All files: {[str(f.relative_to(output_dir)) for f in all_files]}"
+        )
+        assert "testing" in file_dirs, (
+            f"Expected 'testing' subdirectory, got directories: {list(file_dirs.keys())}. "
+            f"All files: {[str(f.relative_to(output_dir)) for f in all_files]}"
+        )
+
+        # Each should have 2 files
+        assert len(file_dirs["training"]) == 2, f"Expected 2 training files, got {len(file_dirs['training'])}"
+        assert len(file_dirs["testing"]) == 2, f"Expected 2 testing files, got {len(file_dirs['testing'])}"
+
     def test_restructure_multi_group(self, dataset_test, tmp_path):
         """Test restructuring with multiple grouping keys."""
         dataset = dataset_test.dataset_description.dataset
