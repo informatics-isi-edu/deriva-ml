@@ -267,7 +267,46 @@ class Experiment:
 
         Returns:
             Dictionary with experiment metadata suitable for display or analysis.
+            Includes:
+            - name, execution_rid, description, status
+            - config_choices: Hydra config names used
+            - model_config: Model hyperparameters
+            - input_datasets: List of input dataset info
+            - input_assets: List of input asset info (non-metadata)
+            - output_assets: List of output asset info (non-metadata)
+            - metadata_assets: List of execution metadata assets (config files, etc.)
+            - url: Chaise URL to view execution
         """
+        def asset_summary(asset: "Asset") -> dict[str, Any]:
+            """Create a summary dict for an asset."""
+            return {
+                "asset_rid": asset.asset_rid,
+                "asset_table": asset.asset_table,
+                "filename": asset.filename,
+                "description": asset.description,
+                "asset_types": asset.asset_types,
+                "url": asset.url,
+            }
+
+        # Separate metadata assets from other assets
+        input_assets = []
+        output_assets = []
+        metadata_assets = []
+
+        for asset in self.input_assets:
+            if asset.asset_table == "Execution_Metadata":
+                metadata_assets.append(asset_summary(asset))
+            else:
+                input_assets.append(asset_summary(asset))
+
+        for asset in self.output_assets:
+            if asset.asset_table == "Execution_Metadata":
+                # Avoid duplicates - metadata is typically output
+                if not any(m["asset_rid"] == asset.asset_rid for m in metadata_assets):
+                    metadata_assets.append(asset_summary(asset))
+            else:
+                output_assets.append(asset_summary(asset))
+
         return {
             "name": self.name,
             "execution_rid": self.execution_rid,
@@ -286,6 +325,9 @@ class Experiment:
                 }
                 for ds in self.input_datasets
             ],
+            "input_assets": input_assets,
+            "output_assets": output_assets,
+            "metadata_assets": metadata_assets,
             "url": self.get_chaise_url(),
         }
 
