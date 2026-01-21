@@ -512,7 +512,7 @@ class ExecutionRecord(BaseModel):
                 datasets.append(self._ml_instance.lookup_dataset(dataset_rid))
         return datasets
 
-    def list_input_assets(self, asset_role: str | None = None) -> list["Asset"]:
+    def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
         """List assets associated with this execution.
 
         Args:
@@ -527,10 +527,10 @@ class ExecutionRecord(BaseModel):
 
         Example:
             >>> # Get all input assets
-            >>> for asset in record.list_input_assets(asset_role="Input"):
+            >>> for asset in record.list_assets(asset_role="Input"):
             ...     print(f"Input Asset: {asset.asset_rid} - {asset.filename}")
             >>> # Get all output assets
-            >>> for asset in record.list_input_assets(asset_role="Output"):
+            >>> for asset in record.list_assets(asset_role="Output"):
             ...     print(f"Output Asset: {asset.asset_rid}")
         """
         from deriva_ml.asset.asset import Asset

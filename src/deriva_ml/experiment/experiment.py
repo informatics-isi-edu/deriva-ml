@@ -240,7 +240,7 @@ class Experiment:
         Returns:
             List of Asset objects used as inputs.
         """
-        return self.execution.list_input_assets(asset_role="Input")
+        return self.execution.list_assets(asset_role="Input")
 
     @property
     def output_assets(self) -> list["Asset"]:
@@ -249,7 +249,7 @@ class Experiment:
         Returns:
             List of Asset objects produced as outputs.
         """
-        return self.execution.list_input_assets(asset_role="Output")
+        return self.execution.list_assets(asset_role="Output")
 
     def get_chaise_url(self) -> str:
         """Get the Chaise URL for viewing this execution in the browser.
