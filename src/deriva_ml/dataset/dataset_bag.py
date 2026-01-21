@@ -997,6 +997,10 @@ class DatasetBag:
         This uses _dataset_table_view to find assets reachable through any FK path
         from the dataset, not just directly associated assets.
 
+        Assets are mapped to their most specific (leaf) dataset in the hierarchy.
+        For example, if a Split dataset contains Training and Testing children,
+        and images are members of Training, the images map to Training (not Split).
+
         Args:
             asset_table: Name of the asset table (e.g., "Image")
 
@@ -1010,14 +1014,16 @@ class DatasetBag:
                 return
             visited.add(dataset.dataset_rid)
 
-            # Use _get_reachable_assets to find all assets reachable through FK paths
-            for asset in dataset._get_reachable_assets(asset_table):
-                # Only set if not already mapped (first dataset wins)
-                if asset["RID"] not in asset_to_dataset:
-                    asset_to_dataset[asset["RID"]] = dataset.dataset_rid
-
+            # Process children FIRST (depth-first) so leaf datasets get priority
+            # This ensures assets are mapped to their most specific dataset
             for child in dataset.list_dataset_children():
                 collect_from_dataset(child, visited)
+
+            # Then process this dataset's assets
+            # Only set if not already mapped (child/leaf dataset wins)
+            for asset in dataset._get_reachable_assets(asset_table):
+                if asset["RID"] not in asset_to_dataset:
+                    asset_to_dataset[asset["RID"]] = dataset.dataset_rid
 
         collect_from_dataset(self, set())
         return asset_to_dataset
