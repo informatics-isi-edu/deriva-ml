@@ -189,12 +189,16 @@ def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     return path / f"{table}.csv"
 
 
-def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
+def asset_table_upload_spec(
+    model: DerivaModel, asset_table: str | Table, chunk_size: int | None = None
+):
     """Generate upload specification for an asset table.
 
     Args:
         model: The DerivaModel instance.
         asset_table: The asset table name or Table object.
+        chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
+            large files will be uploaded in chunks of this size.
 
     Returns:
         A dictionary containing the upload specification for the asset table.
@@ -208,6 +212,11 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
     asset_path = f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
+
+    # Build hatrac_options with optional chunk_size
+    hatrac_options = {"versioned_urls": True}
+    if chunk_size is not None:
+        hatrac_options["chunk_size"] = chunk_size
 
     # Create upload specification
     spec = {
@@ -223,7 +232,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
         "asset_type": "file",
         "target_table": [schema, asset_table.name],
         "checksum_types": ["sha256", "md5"],
-        "hatrac_options": {"versioned_urls": True},
+        "hatrac_options": hatrac_options,
         "hatrac_templates": {
             "hatrac_uri": f"/hatrac/{asset_table.name}/{{md5}}.{{file_name}}",
             "content-disposition": "filename*=UTF-8''{file_name}",
@@ -233,14 +242,27 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table):
     return spec
 
 
-def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
+def bulk_upload_configuration(
+    model: DerivaModel, chunk_size: int | None = None
+) -> dict[str, Any]:
     """Return an upload specification for deriva-ml
-    Arguments:
-        model: Model from which to generate the upload configuration
+
+    Args:
+        model: Model from which to generate the upload configuration.
+        chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
+            large files will be uploaded in chunks of this size.
     """
     asset_tables_with_metadata = [
-        asset_table_upload_spec(model=model, asset_table=t) for t in model.find_assets() if model.asset_metadata(t)
+        asset_table_upload_spec(model=model, asset_table=t, chunk_size=chunk_size)
+        for t in model.find_assets()
+        if model.asset_metadata(t)
     ]
+
+    # Build hatrac_options with optional chunk_size for non-metadata assets
+    hatrac_options = {"versioned_urls": True}
+    if chunk_size is not None:
+        hatrac_options["chunk_size"] = chunk_size
+
     return {
         "asset_mappings": asset_tables_with_metadata
         + [
@@ -256,7 +278,7 @@ def bulk_upload_configuration(model: DerivaModel) -> dict[str, Any]:
                 "target_table": ["{schema}", "{asset_table}"],
                 "file_pattern": asset_path_regex + "/" + asset_file_regex,  # Sets schema, asset_table, name, ext
                 "checksum_types": ["sha256", "md5"],
-                "hatrac_options": {"versioned_urls": True},
+                "hatrac_options": hatrac_options,
                 "hatrac_templates": {
                     "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
                     "content-disposition": "filename*=UTF-8''{file_name}",
@@ -304,6 +326,7 @@ def upload_directory(
     max_retries: int = 3,
     retry_delay: float = 5.0,
     timeout: tuple[int, int] | None = None,
+    chunk_size: int | None = None,
 ) -> dict[Any, FileUploadState] | None:
     """Upload assets from a directory. This routine assumes that the current upload specification includes a
     configuration for the specified directory.  Every asset in the specified directory is uploaded
@@ -318,6 +341,8 @@ def upload_directory(
         timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (6, 600)
             which allows up to 10 minutes for each chunk upload. Increase read_timeout for
             very large files on slow connections.
+        chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
+            large files will be uploaded in chunks of this size.
 
     Returns:
         Results of the upload operation.
@@ -326,36 +351,11 @@ def upload_directory(
         DerivaMLException: If there is an issue with uploading the assets.
     """
     import logging
-    import socket
     import time
 
     from deriva.core import DEFAULT_SESSION_CONFIG
 
     logger = logging.getLogger("deriva_ml")
-
-    # Use provided timeout or default to 10 minute read timeout for large files
-    upload_timeout = timeout or DEFAULT_UPLOAD_TIMEOUT
-
-    # Set socket default timeout for write operations
-    # The requests library timeout only covers connect and read, not write.
-    # For large file uploads, write operations can take significant time.
-    old_socket_timeout = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(DEFAULT_SOCKET_TIMEOUT)
-    logger.debug(f"Set socket timeout to {DEFAULT_SOCKET_TIMEOUT}s for upload (was {old_socket_timeout})")
-
-    # Close any existing connections in the model's catalog session
-    # This is necessary because socket.setdefaulttimeout() only affects NEW sockets,
-    # not existing ones that were created before the timeout was set.
-    # By closing existing connections, we force the creation of new sockets
-    # which will inherit the updated socket timeout.
-    try:
-        if hasattr(model.catalog, '_session') and model.catalog._session:
-            for adapter in model.catalog._session.adapters.values():
-                if hasattr(adapter, 'poolmanager') and adapter.poolmanager:
-                    adapter.poolmanager.clear()
-            logger.debug("Cleared existing connection pools to use new socket timeout")
-    except Exception as e:
-        logger.debug(f"Could not clear connection pools: {e}")
 
     directory = Path(directory)
     if not directory.is_dir():
@@ -427,90 +427,85 @@ def upload_directory(
             status_callback=status_callback if progress_callback else None,
         )
 
+    # Use provided timeout or default
+    upload_timeout = timeout if timeout is not None else DEFAULT_UPLOAD_TIMEOUT
+
     # Now upload the files by creating an upload spec and then calling the uploader.
-    try:
-        with TemporaryDirectory() as temp_dir:
-            spec_file = Path(temp_dir) / "config.json"
-            with spec_file.open("w+") as cfile:
-                json.dump(bulk_upload_configuration(model), cfile)
+    with TemporaryDirectory() as temp_dir:
+        spec_file = Path(temp_dir) / "config.json"
+        with spec_file.open("w+") as cfile:
+            json.dump(bulk_upload_configuration(model, chunk_size=chunk_size), cfile)
 
-            # Create session config with longer timeout for large file uploads
-            session_config = DEFAULT_SESSION_CONFIG.copy()
-            session_config["timeout"] = upload_timeout
-            logger.debug(f"Upload session config timeout: {session_config['timeout']}")
+        # Create session config with longer timeout for large file uploads
+        session_config = DEFAULT_SESSION_CONFIG.copy()
+        session_config["timeout"] = upload_timeout
+        logger.debug(f"Upload session config timeout: {session_config['timeout']}")
 
-            all_results = {}
-            attempt = 0
-            current_delay = retry_delay
+        all_results = {}
+        attempt = 0
+        current_delay = retry_delay
 
-            while attempt <= max_retries:
-                import sys
-                print(f"DEBUG: socket.getdefaulttimeout() = {socket.getdefaulttimeout()}", file=sys.stderr)
-                uploader = GenericUploader(
-                    server={
-                        "host": model.hostname,
-                        "protocol": "https",
-                        "catalog_id": model.catalog.catalog_id,
-                        "session": session_config,
-                    },
-                    config_file=spec_file,
-                )
-                print(f"DEBUG: After GenericUploader, timeout = {socket.getdefaulttimeout()}, store timeout = {uploader.store.session_config.get('timeout')}", file=sys.stderr)
-                try:
-                    raw_results = do_upload(uploader)
+        while attempt <= max_retries:
+            uploader = GenericUploader(
+                server={
+                    "host": model.hostname,
+                    "protocol": "https",
+                    "catalog_id": model.catalog.catalog_id,
+                    "session": session_config,
+                },
+                config_file=spec_file,
+            )
+            try:
+                raw_results = do_upload(uploader)
 
-                    # Process results and check for failures
-                    failed_files = []
-                    for path, result in raw_results.items():
-                        state = UploadState(result["State"])
-                        if state == UploadState.failed or result["Result"] is None:
-                            failed_files.append((path, result["Status"]))
-                        else:
-                            # Store successful results
-                            all_results[path] = FileUploadState(
-                                state=state,
-                                status=result["Status"],
-                                result=result["Result"],
-                            )
-
-                    if not failed_files:
-                        # All uploads successful
-                        break
-
-                    attempt += 1
-                    if attempt > max_retries:
-                        # Final attempt failed, raise error with details
-                        error_details = "; ".join([f"{path}: {msg}" for path, msg in failed_files])
-                        raise DerivaMLException(
-                            f"Failed to upload {len(failed_files)} file(s) after {max_retries} retries: {error_details}"
+                # Process results and check for failures
+                failed_files = []
+                for path, result in raw_results.items():
+                    state = UploadState(result["State"])
+                    if state == UploadState.failed or result["Result"] is None:
+                        failed_files.append((path, result["Status"]))
+                    else:
+                        # Store successful results
+                        all_results[path] = FileUploadState(
+                            state=state,
+                            status=result["Status"],
+                            result=result["Result"],
                         )
 
-                    # Log retry attempt and wait before retrying
-                    logger.warning(
-                        f"Upload failed for {len(failed_files)} file(s), retrying in {current_delay:.1f}s "
-                        f"(attempt {attempt}/{max_retries}): {[p for p, _ in failed_files]}"
+                if not failed_files:
+                    # All uploads successful
+                    break
+
+                attempt += 1
+                if attempt > max_retries:
+                    # Final attempt failed, raise error with details
+                    error_details = "; ".join([f"{path}: {msg}" for path, msg in failed_files])
+                    raise DerivaMLException(
+                        f"Failed to upload {len(failed_files)} file(s) after {max_retries} retries: {error_details}"
                     )
-                    if progress_callback:
-                        progress_callback(UploadProgress(
-                            phase="retrying",
-                            message=f"Retrying {len(failed_files)} failed upload(s) in {current_delay:.1f}s (attempt {attempt}/{max_retries})",
-                            percent_complete=0,
-                        ))
 
-                    time.sleep(current_delay)
-                    current_delay *= 2  # Exponential backoff
+                # Log retry attempt and wait before retrying
+                logger.warning(
+                    f"Upload failed for {len(failed_files)} file(s), retrying in {current_delay:.1f}s "
+                    f"(attempt {attempt}/{max_retries}): {[p for p, _ in failed_files]}"
+                )
+                if progress_callback:
+                    progress_callback(UploadProgress(
+                        phase="retrying",
+                        message=f"Retrying {len(failed_files)} failed upload(s) in {current_delay:.1f}s (attempt {attempt}/{max_retries})",
+                        percent_complete=0,
+                    ))
 
-                    # Reset upload state for retry
-                    upload_state["status_calls"] = 0
+                time.sleep(current_delay)
+                current_delay *= 2  # Exponential backoff
 
-                finally:
-                    uploader.cleanup()
+                # Reset upload state for retry
+                upload_state["status_calls"] = 0
 
-            return all_results
-    finally:
-        # Restore the original socket timeout
-        socket.setdefaulttimeout(old_socket_timeout)
-        logger.debug(f"Restored socket timeout to {old_socket_timeout}")
+            finally:
+                uploader.cleanup()
+
+        return all_results
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))

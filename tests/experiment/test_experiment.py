@@ -86,7 +86,10 @@ def execution_with_hydra_config(workflow_terms, test_workflow, tmp_path):
 
     Note: This fixture manually creates the hydra config files in the working
     directory structure that would normally be created by hydra-zen during model runs.
+    We use asset_file_path to properly register the files for upload.
     """
+    from deriva_ml import ExecMetadataType, MLAsset
+
     ml = workflow_terms
     config = ExecutionConfiguration(
         description="Hydra Config Test Execution",
@@ -97,9 +100,6 @@ def execution_with_hydra_config(workflow_terms, test_workflow, tmp_path):
     with execution.execute():
         # Create hydra-style config files that would be uploaded as metadata
         # In real usage, these come from hydra-zen but we create them manually for testing
-
-        # Get the working directory where metadata files should be placed
-        working_dir = execution.working_dir
 
         # Create config.yaml (model configuration with resolved values)
         config_content = {
@@ -114,14 +114,14 @@ def execution_with_hydra_config(workflow_terms, test_workflow, tmp_path):
             },
         }
 
-        # Create a metadata file in the proper location
-        # The asset_file_path returns an AssetFilePath, but we need to create
-        # the actual file. Let's use the working directory structure directly.
-        metadata_dir = working_dir / "Execution_Metadata"
-        metadata_dir.mkdir(parents=True, exist_ok=True)
-
+        # Use asset_file_path to properly register files for upload
+        # The filename must end with -config.yaml for find_experiments to find it
         config_filename = f"{execution.execution_rid}-config.yaml"
-        config_path = metadata_dir / config_filename
+        config_path = execution.asset_file_path(
+            MLAsset.execution_metadata,
+            config_filename,
+            asset_types=ExecMetadataType.hydra_config.value,
+        )
         with config_path.open("w") as f:
             yaml.dump(config_content, f)
 
@@ -140,7 +140,11 @@ def execution_with_hydra_config(workflow_terms, test_workflow, tmp_path):
         }
 
         hydra_filename = f"{execution.execution_rid}-hydra.yaml"
-        hydra_path = metadata_dir / hydra_filename
+        hydra_path = execution.asset_file_path(
+            MLAsset.execution_metadata,
+            hydra_filename,
+            asset_types=ExecMetadataType.hydra_config.value,
+        )
         with hydra_path.open("w") as f:
             yaml.dump(hydra_content, f)
 
@@ -437,6 +441,116 @@ class TestExperimentFinder:
         # Should find at least the execution with hydra config
         # (depends on whether config files were properly uploaded)
         assert isinstance(experiments, list)
+        # Verify the execution with hydra config is found
+        experiment_rids = [e.execution_rid for e in experiments]
+        assert execution_with_hydra_config.execution_rid in experiment_rids
+
+    def test_find_experiments_excludes_non_hydra_executions(
+        self, completed_execution, execution_with_hydra_config
+    ):
+        """Test that find_experiments excludes executions without hydra config."""
+        ml = completed_execution._ml_object
+
+        experiments = list(ml.find_experiments())
+        experiment_rids = [e.execution_rid for e in experiments]
+
+        # completed_execution does NOT have hydra config files, should be excluded
+        assert completed_execution.execution_rid not in experiment_rids
+
+        # execution_with_hydra_config DOES have hydra config, should be included
+        assert execution_with_hydra_config.execution_rid in experiment_rids
+
+    def test_find_experiments_by_status(self, execution_with_hydra_config):
+        """Test find_experiments with status filter."""
+        from deriva_ml.core.definitions import Status
+
+        ml = execution_with_hydra_config._ml_object
+
+        # Find completed experiments
+        completed = list(ml.find_experiments(status=Status.completed))
+
+        # The execution_with_hydra_config should be completed and found
+        experiment_rids = [e.execution_rid for e in completed]
+        assert execution_with_hydra_config.execution_rid in experiment_rids
+
+        # Verify all returned experiments have Completed status
+        for exp in completed:
+            assert exp.status == "Completed"
+
+    def test_find_experiments_by_status_filters_correctly(
+        self, execution_with_hydra_config
+    ):
+        """Test that status filter excludes experiments with different status."""
+        from deriva_ml.core.definitions import Status
+
+        ml = execution_with_hydra_config._ml_object
+
+        # Find running experiments (our test execution is Completed, not Running)
+        running = list(ml.find_experiments(status=Status.running))
+
+        # The completed execution should NOT appear in running experiments
+        experiment_rids = [e.execution_rid for e in running]
+        assert execution_with_hydra_config.execution_rid not in experiment_rids
+
+    def test_find_experiments_by_workflow_rid(
+        self, execution_with_hydra_config, test_workflow
+    ):
+        """Test find_experiments with workflow_rid filter."""
+        ml = execution_with_hydra_config._ml_object
+
+        # Find experiments by workflow RID
+        experiments = list(ml.find_experiments(workflow_rid=test_workflow.rid))
+
+        # The execution with hydra config was created with test_workflow
+        experiment_rids = [e.execution_rid for e in experiments]
+        assert execution_with_hydra_config.execution_rid in experiment_rids
+
+    def test_find_experiments_by_workflow_rid_filters_correctly(
+        self, workflow_terms, execution_with_hydra_config
+    ):
+        """Test that workflow_rid filter excludes experiments with different workflow.
+
+        Note: We can't easily create a workflow with a different checksum in tests
+        since workflows are de-duplicated by checksum. Instead, we use a non-existent
+        RID to verify the filter mechanism works.
+        """
+        ml = workflow_terms
+
+        # Use a clearly non-existent workflow RID to test filtering
+        # This verifies the filter mechanism works correctly
+        nonexistent_workflow_rid = "ZZZZZ"  # RID that doesn't exist
+
+        # Find experiments by a non-existent workflow RID (should return empty)
+        experiments = list(ml.find_experiments(workflow_rid=nonexistent_workflow_rid))
+
+        # No experiments should be found since no executions use this workflow
+        assert experiments == [], (
+            f"Expected no experiments for non-existent workflow, got {len(experiments)}"
+        )
+
+        # Also verify that the execution_with_hydra_config IS found when searching
+        # without a workflow filter (already tested elsewhere, but confirms setup)
+        all_experiments = list(ml.find_experiments())
+        assert execution_with_hydra_config.execution_rid in [
+            e.execution_rid for e in all_experiments
+        ]
+
+    def test_find_experiments_combined_filters(self, execution_with_hydra_config, test_workflow):
+        """Test find_experiments with both status and workflow_rid filters."""
+        from deriva_ml.core.definitions import Status
+
+        ml = execution_with_hydra_config._ml_object
+
+        # Find completed experiments for the specific workflow
+        experiments = list(
+            ml.find_experiments(
+                workflow_rid=test_workflow.rid,
+                status=Status.completed,
+            )
+        )
+
+        experiment_rids = [e.execution_rid for e in experiments]
+        assert execution_with_hydra_config.execution_rid in experiment_rids
 
     def test_find_executions(self, completed_execution):
         """Test find_executions returns all executions."""

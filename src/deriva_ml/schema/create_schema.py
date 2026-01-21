@@ -134,27 +134,16 @@ def create_execution_table(schema, annotation: Optional[dict] = None):
     # Nested executions - allows grouping executions hierarchically
     # (e.g., a sweep/multirun as parent with individual runs as children)
     schema.create_table(
-        Table.define(
-            MLTable.execution_execution,
-            column_defs=[
-                Column.define("Execution", builtin_types.text, nullok=False),
-                Column.define("Nested_Execution", builtin_types.text, nullok=False),
-                Column.define(
+        Table.define_association(associates=[("Execution", execution), ("Nested_Execution", execution)],
+                                 comment="Association table for hierarchical execution nesting (parent-child relationships)",
+                                 metadata=[Column.define(
                     "Sequence",
                     builtin_types.int4,
                     nullok=True,
                     comment="Order of nested execution (null if parallel)",
-                ),
-            ],
-            key_defs=[Key.define(["Execution", "Nested_Execution"])],
-            fkey_defs=[
-                ForeignKey.define(["Execution"], schema.name, MLTable.execution, ["RID"]),
-                ForeignKey.define(["Nested_Execution"], schema.name, MLTable.execution, ["RID"]),
-            ],
-            comment="Association table for hierarchical execution nesting (parent-child relationships)",
-        )
-    )
+                )])
 
+    )
     return execution
 
 
