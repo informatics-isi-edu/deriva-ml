@@ -1143,7 +1143,7 @@ class Execution:
 
         return [self._ml_object.lookup_dataset(r["Dataset"]) for r in records]
 
-    def list_input_assets(self, asset_role: str | None = None) -> list["Asset"]:
+    def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
         """List all assets that were inputs or outputs of this execution.
 
         Args:
@@ -1153,11 +1153,11 @@ class Execution:
             List of Asset objects associated with this execution.
 
         Example:
-            >>> inputs = execution.list_input_assets(asset_role="Input")
-            >>> outputs = execution.list_input_assets(asset_role="Output")
+            >>> inputs = execution.list_assets(asset_role="Input")
+            >>> outputs = execution.list_assets(asset_role="Output")
         """
         if self._execution_record is not None:
-            return self._execution_record.list_input_assets(asset_role=asset_role)
+            return self._execution_record.list_assets(asset_role=asset_role)
 
         # Fallback for dry_run mode
         from deriva_ml.asset.asset import Asset
