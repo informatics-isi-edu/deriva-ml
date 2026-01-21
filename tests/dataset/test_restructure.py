@@ -95,13 +95,13 @@ class TestRestructureAssets:
         assert len(all_files) > 0, f"Expected files in {output_dir}"
 
     def test_restructure_missing_values_unknown(self, dataset_test, tmp_path):
-        """Test that missing grouping values use 'unknown' folder."""
+        """Test that missing grouping values use 'Unknown' folder."""
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         output_dir = tmp_path / "restructured_missing"
 
-        # Use a non-existent column - should result in "unknown" folders
+        # Use a non-existent column - should result in "Unknown" folders
         bag.restructure_assets(
             asset_table="Image",
             output_dir=output_dir,
@@ -110,8 +110,8 @@ class TestRestructureAssets:
 
         assert output_dir.exists()
 
-        # All files should end up in "unknown" folder at the group level
-        unknown_dirs = list(output_dir.rglob("unknown"))
+        # All files should end up in "Unknown" folder at the group level (capitalized)
+        unknown_dirs = list(output_dir.rglob("Unknown"))
         assert len(unknown_dirs) >= 1
 
     def test_restructure_empty_asset_table(self, dataset_test, tmp_path):
@@ -188,6 +188,131 @@ class TestRestructureAssets:
             assert len(relative_path.parts) >= 3, f"Expected at least 3 levels, got {relative_path}"
 
 
+class TestRestructureForeignKeyPaths:
+    """Tests for restructure_assets finding assets through FK paths."""
+
+    def test_get_reachable_assets_finds_indirectly_linked(self, dataset_test, tmp_path):
+        """Test that _get_reachable_assets finds assets linked via FK chain.
+
+        The demo schema has Image -> Subject FK relationship. When a dataset
+        contains Subjects but not Images directly, _get_reachable_assets should
+        still find Images reachable through the Subject FK.
+        """
+        ml = dataset_test.ml_instance
+
+        # Create a dataset that only contains Subjects (no Images directly)
+        dataset = ml.create_dataset(
+            dataset_types=["Testing"],
+            description="Dataset with only subjects",
+        )
+
+        # Get some subject RIDs from the catalog
+        subject_path = ml.domain_path.tables["Subject"]
+        subjects = list(subject_path.entities().fetch())
+        if not subjects:
+            pytest.skip("No subjects in test data")
+
+        # Add only subjects to the dataset (not images)
+        subject_rids = [s["RID"] for s in subjects[:2]]
+        dataset.add_dataset_members({"Subject": subject_rids})
+
+        # Download the bag
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # _get_reachable_assets should find Images through Subject -> Image FK
+        reachable_images = bag._get_reachable_assets("Image")
+
+        # There should be images reachable through the Subject FK
+        # (Each subject should have associated images in the demo data)
+        assert len(reachable_images) > 0, (
+            "Expected to find Images reachable through Subject FK path. "
+            "The demo catalog has Image -> Subject FK relationship."
+        )
+
+        # Verify the images are associated with the subjects we added
+        for img in reachable_images:
+            assert img.get("Subject") in subject_rids, (
+                f"Image {img.get('RID')} has Subject={img.get('Subject')} "
+                f"which is not in added subjects {subject_rids}"
+            )
+
+    def test_restructure_finds_assets_via_fk_path(self, dataset_test, tmp_path):
+        """Test that restructure_assets finds assets connected via FK paths.
+
+        Creates a dataset with only Subject members, then restructures Images.
+        Images should be found via Subject -> Image FK relationship.
+        """
+        ml = dataset_test.ml_instance
+
+        # Create a dataset that only contains Subjects
+        dataset = ml.create_dataset(
+            dataset_types=["Training"],
+            description="Dataset with subjects only - images via FK",
+        )
+
+        # Get subjects and their associated images
+        subject_path = ml.domain_path.tables["Subject"]
+        subjects = list(subject_path.entities().fetch())
+        if not subjects:
+            pytest.skip("No subjects in test data")
+
+        # Add only subjects to the dataset
+        subject_rids = [s["RID"] for s in subjects[:2]]
+        dataset.add_dataset_members({"Subject": subject_rids})
+
+        # Download and restructure
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        output_dir = tmp_path / "restructured_fk"
+        result = bag.restructure_assets(
+            asset_table="Image",
+            output_dir=output_dir,
+            group_by=[],
+        )
+
+        assert result == output_dir
+        assert output_dir.exists()
+
+        # Should have found images through the FK path
+        all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
+        assert len(all_files) > 0, (
+            "No images found via FK path. restructure_assets should find Images "
+            "connected through Subject -> Image FK relationship."
+        )
+
+    def test_asset_dataset_mapping_via_fk_path(self, dataset_test, tmp_path):
+        """Test that _get_asset_dataset_mapping works with FK-connected assets."""
+        ml = dataset_test.ml_instance
+
+        # Create a dataset with only Subjects
+        dataset = ml.create_dataset(
+            dataset_types=["Testing"],
+            description="Test FK mapping",
+        )
+
+        subject_path = ml.domain_path.tables["Subject"]
+        subjects = list(subject_path.entities().fetch())
+        if not subjects:
+            pytest.skip("No subjects in test data")
+
+        subject_rids = [s["RID"] for s in subjects[:2]]
+        dataset.add_dataset_members({"Subject": subject_rids})
+
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # Get the asset-to-dataset mapping
+        asset_map = bag._get_asset_dataset_mapping("Image")
+
+        # Images found via FK should be mapped to the dataset
+        assert len(asset_map) > 0, "Expected images to be mapped via FK path"
+
+        # All mapped images should point to our dataset
+        for image_rid, dataset_rid in asset_map.items():
+            assert dataset_rid == bag.dataset_rid, (
+                f"Image {image_rid} mapped to {dataset_rid}, expected {bag.dataset_rid}"
+            )
+
+
 class TestRestructureHelperMethods:
     """Tests for the helper methods used by restructure_assets."""
 
@@ -261,10 +386,10 @@ class TestRestructureHelperMethods:
         if not images:
             pytest.skip("No images in test data")
 
-        # Test with a column that doesn't exist
+        # Test with a column that doesn't exist - should return "Unknown" (capitalized)
         asset = images[0]
         value = bag._resolve_grouping_value(asset, "NonExistent", {})
-        assert value == "unknown"
+        assert value == "Unknown"
 
 
 class TestRestructureWithFeatures:
