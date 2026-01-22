@@ -50,7 +50,7 @@ python-preference = "only-managed"
 
 [tool.uv.sources]
 #bdbag = {git = "https://github.com/fair-research/bdbag", branch = "master" }
-deriva = {git = "https://github.com/informatics-isi-edu/deriva-py", branch = "master" }
+deriva = {git = "https://github.com/informatics-isi-edu/deriva-py", branch = "typed-interface" }
 
 
 [tool.setuptools.package-data]

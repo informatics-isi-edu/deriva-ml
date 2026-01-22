@@ -899,7 +899,9 @@ class DerivaML(
                 >>> ml.apply_catalog_annotations()  # Update navbar once at the end
         """
         # Create table in domain schema using provided definition
-        new_table = self.model.schemas[self.domain_schema].create_table(table.model_dump())
+        # Handle both TableDefinition (dataclass with to_dict) and plain dicts
+        table_dict = table.to_dict() if hasattr(table, 'to_dict') else table
+        new_table = self.model.schemas[self.domain_schema].create_table(table_dict)
 
         # Update navbar to include the new table
         if update_navbar:

@@ -7,16 +7,20 @@ submodules for convenience and backwards compatibility.
 The module consolidates:
     - Constants: Schema names, RID patterns, column definitions
     - Enums: Status codes, upload states, built-in types, vocabulary identifiers
-    - Models: Pydantic models for ERMrest structures (tables, columns, keys)
+    - Models: Dataclass-based models for ERMrest structures (tables, columns, keys)
     - Utilities: FileSpec for file metadata handling
 
+Core definition classes (ColumnDef, KeyDef, ForeignKeyDef, TableDef) are provided by
+`deriva.core.typed` and re-exported here. Legacy aliases (ColumnDefinition, etc.)
+are maintained for backwards compatibility.
+
 This is the recommended import location for most DerivaML type definitions:
-    >>> from deriva_ml.core.definitions import RID, MLVocab, TableDefinition
+    >>> from deriva_ml.core.definitions import RID, MLVocab, TableDef
 
 For more specialized imports, you can import directly from submodules:
     >>> from deriva_ml.core.constants import ML_SCHEMA
     >>> from deriva_ml.core.enums import Status
-    >>> from deriva_ml.core.ermrest import ColumnDefinition
+    >>> from deriva.core.typed import ColumnDef
 """
 
 from __future__ import annotations
@@ -55,13 +59,24 @@ from deriva_ml.core.enums import (
 # =============================================================================
 # Re-exported ERMrest Models
 # =============================================================================
-# From ermrest.py: Pydantic models for catalog structure definitions
+# From ermrest.py: Dataclass-based models for catalog structure definitions
+# New typed classes from deriva.core.typed
 from deriva_ml.core.ermrest import (
+    # New dataclass-based definitions from deriva.core.typed
+    ColumnDef,
+    KeyDef,
+    ForeignKeyDef,
+    TableDef,
+    VocabularyTableDef,
+    AssetTableDef,
+    SchemaDef,
+    # Legacy aliases for backwards compatibility
     ColumnDefinition,
-    FileUploadState,
-    ForeignKeyDefinition,
     KeyDefinition,
+    ForeignKeyDefinition,
     TableDefinition,
+    # DerivaML-specific classes
+    FileUploadState,
     UploadCallback,
     UploadProgress,
     VocabularyTerm,
@@ -117,14 +132,24 @@ __all__ = [
     "MLAsset",
     "ExecMetadataType",
     "ExecAssetType",
-    # Models
-    "FileUploadState",
-    "FileSpec",
-    "VocabularyTerm",
+    # Typed definitions from deriva.core.typed
+    "ColumnDef",
+    "KeyDef",
+    "ForeignKeyDef",
+    "TableDef",
+    "VocabularyTableDef",
+    "AssetTableDef",
+    "SchemaDef",
+    # Legacy aliases for backwards compatibility
     "ColumnDefinition",
     "KeyDefinition",
     "ForeignKeyDefinition",
     "TableDefinition",
+    # DerivaML-specific models
+    "FileUploadState",
+    "FileSpec",
+    "VocabularyTerm",
+    "VocabularyTermHandle",
     "UploadProgress",
     "UploadCallback",
     # Exceptions

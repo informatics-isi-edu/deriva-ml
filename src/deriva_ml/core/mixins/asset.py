@@ -13,8 +13,6 @@ import importlib
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
-from pydantic import ConfigDict, validate_call
-
 from deriva_ml.core.definitions import ColumnDefinition, MLVocab, RID, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.schema.annotations import asset_annotation
@@ -49,7 +47,8 @@ class AssetMixin:
     add_term: Callable[..., VocabularyTerm]
     apply_catalog_annotations: Callable[[], None]
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    # Note: @validate_call removed because ColumnDefinition is now a dataclass from
+    # deriva.core.typed and Pydantic validation doesn't work well with dataclass fields
     def create_asset(
         self,
         asset_name: str,
@@ -76,6 +75,11 @@ class AssetMixin:
         Returns:
             Table object for the asset table.
         """
+        # Helper to convert column/fkey defs to dict format
+        # Supports both ColumnDefinition (dataclass with to_dict) and plain dicts
+        def to_dict_if_needed(item):
+            return item.to_dict() if hasattr(item, 'to_dict') else item
+
         # Initialize empty collections if None provided
         column_defs = column_defs or []
         fkey_defs = fkey_defs or []
@@ -90,8 +94,8 @@ class AssetMixin:
             Table.define_asset(
                 schema,
                 asset_name,
-                column_defs=[c.model_dump() for c in column_defs],
-                fkey_defs=[fk.model_dump() for fk in fkey_defs],
+                column_defs=[to_dict_if_needed(c) for c in column_defs],
+                fkey_defs=[to_dict_if_needed(fk) for fk in fkey_defs],
                 comment=comment,
             )
         )

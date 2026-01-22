@@ -124,12 +124,23 @@ class FeatureMixin:
         metadata = metadata or []
         optional = optional or []
 
-        def normalize_metadata(m: Key | Table | ColumnDefinition | str) -> Key | Table | dict:
-            """Helper function to normalize metadata references."""
+        def normalize_metadata(m: Key | Table | ColumnDefinition | str | dict) -> Key | Table | dict:
+            """Helper function to normalize metadata references.
+
+            Handles:
+            - str: Table name, converted to Table object
+            - ColumnDefinition: Dataclass with to_dict() method
+            - dict: Already in dict format (from Column.define())
+            - Key/Table: Passed through unchanged
+            """
             if isinstance(m, str):
                 return self.model.name_to_table(m)
-            elif isinstance(m, ColumnDefinition):
-                return m.model_dump()
+            elif isinstance(m, dict):
+                # Already a dict (e.g., from Column.define())
+                return m
+            elif hasattr(m, 'to_dict'):
+                # ColumnDefinition or similar dataclass
+                return m.to_dict()
             else:
                 return m
 

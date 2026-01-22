@@ -614,7 +614,12 @@ class DerivaModel:
             paths.extend(self._schema_to_paths(child, path))
         return paths
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def create_table(self, table_def: TableDefinition) -> Table:
-        """Create a new table from TableDefinition."""
-        return self.model.schemas[self.domain_schema].create_table(table_def.model_dump())
+        """Create a new table from TableDefinition.
+
+        Note: @validate_call removed because TableDefinition is now a dataclass from
+        deriva.core.typed and Pydantic validation doesn't work well with dataclass fields.
+        """
+        # Handle both TableDefinition (dataclass with to_dict) and plain dicts
+        table_dict = table_def.to_dict() if hasattr(table_def, 'to_dict') else table_def
+        return self.model.schemas[self.domain_schema].create_table(table_dict)
