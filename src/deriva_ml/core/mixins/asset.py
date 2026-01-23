@@ -13,7 +13,7 @@ import importlib
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
-from deriva_ml.core.definitions import ColumnDefinition, MLVocab, RID, VocabularyTerm
+from deriva_ml.core.definitions import AssetTableDef, ColumnDefinition, MLVocab, RID, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.schema.annotations import asset_annotation
 
@@ -75,11 +75,6 @@ class AssetMixin:
         Returns:
             Table object for the asset table.
         """
-        # Helper to convert column/fkey defs to dict format
-        # Supports both ColumnDefinition (dataclass with to_dict) and plain dicts
-        def to_dict_if_needed(item):
-            return item.to_dict() if hasattr(item, 'to_dict') else item
-
         # Initialize empty collections if None provided
         column_defs = column_defs or []
         fkey_defs = fkey_defs or []
@@ -90,12 +85,13 @@ class AssetMixin:
         self.add_term(MLVocab.asset_type, asset_name, description=f"A {asset_name} asset")
 
         # Create the main asset table
+        # Note: column_defs and fkey_defs should be ColumnDef/ForeignKeyDef objects
         asset_table = self.model.schemas[schema].create_table(
-            Table.define_asset(
-                schema,
-                asset_name,
-                column_defs=[to_dict_if_needed(c) for c in column_defs],
-                fkey_defs=[to_dict_if_needed(fk) for fk in fkey_defs],
+            AssetTableDef(
+                schema_name=schema,
+                name=asset_name,
+                columns=list(column_defs),
+                foreign_keys=list(fkey_defs),
                 comment=comment,
             )
         )

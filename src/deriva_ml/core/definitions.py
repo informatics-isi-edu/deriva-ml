@@ -55,6 +55,8 @@ from deriva_ml.core.enums import (
     Status,
     UploadState,
 )
+# Also export BuiltinType directly (BuiltinTypes is the backwards-compatible alias)
+from deriva.core.typed import BuiltinType
 
 # =============================================================================
 # Re-exported ERMrest Models
@@ -69,6 +71,7 @@ from deriva_ml.core.ermrest import (
     TableDef,
     VocabularyTableDef,
     AssetTableDef,
+    AssociationTableDef,
     SchemaDef,
     # Legacy aliases for backwards compatibility
     ColumnDefinition,
@@ -126,6 +129,7 @@ __all__ = [
     "BaseStrEnum",
     "UploadState",
     "Status",
+    "BuiltinType",
     "BuiltinTypes",
     "MLVocab",
     "MLTable",
@@ -139,6 +143,7 @@ __all__ = [
     "TableDef",
     "VocabularyTableDef",
     "AssetTableDef",
+    "AssociationTableDef",
     "SchemaDef",
     # Legacy aliases for backwards compatibility
     "ColumnDefinition",

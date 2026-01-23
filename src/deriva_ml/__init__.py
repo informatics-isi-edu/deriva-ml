@@ -67,6 +67,14 @@ def __getattr__(name: str) -> type:
         from deriva_ml.dataset.dataset_bag import FeatureValueRecord
 
         return FeatureValueRecord
+    elif name == "SchemaValidationReport":
+        from deriva_ml.schema.validation import SchemaValidationReport
+
+        return SchemaValidationReport
+    elif name == "validate_ml_schema":
+        from deriva_ml.schema.validation import validate_ml_schema
+
+        return validate_ml_schema
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -79,6 +87,9 @@ __all__ = [
     "AssetSpec",
     # Feature value record for restructure_assets
     "FeatureValueRecord",
+    # Schema validation (lazy-loaded)
+    "SchemaValidationReport",
+    "validate_ml_schema",
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",

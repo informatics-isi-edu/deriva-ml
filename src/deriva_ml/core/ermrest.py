@@ -39,6 +39,7 @@ from deriva.core.typed import (
     TableDef,
     VocabularyTableDef,
     AssetTableDef,
+    AssociationTableDef,
     SchemaDef,
 )
 
@@ -51,6 +52,7 @@ __all__ = [
     "TableDef",
     "VocabularyTableDef",
     "AssetTableDef",
+    "AssociationTableDef",
     "SchemaDef",
     # Legacy aliases for backwards compatibility
     "ColumnDefinition",

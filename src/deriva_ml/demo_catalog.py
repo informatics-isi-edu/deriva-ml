@@ -20,7 +20,8 @@ from random import choice, randint, random
 from tempfile import TemporaryDirectory
 
 from deriva.core import BaseCLI, ErmrestCatalog
-from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
+from deriva.core.ermrest_model import Schema, Table
+from deriva.core.typed import BuiltinType, ColumnDef, SchemaDef, TableDef
 from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError
 
@@ -337,9 +338,11 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         else:
             raise e
 
-    domain_schema = model.create_schema(Schema.define(sname, annotations={"name_style": {"underline_space": True}}))
+    domain_schema = model.create_schema(
+        SchemaDef(name=sname, annotations={"name_style": {"underline_space": True}})
+    )
     subject_table = domain_schema.create_table(
-        Table.define("Subject", column_defs=[Column.define("Name", builtin_types.text)])
+        TableDef(name="Subject", columns=[ColumnDef("Name", BuiltinType.text)])
     )
     with TemporaryDirectory() as tmpdir:
         ml_instance = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
@@ -347,8 +350,8 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         ml_instance.create_asset(
             "Image",
             column_defs=[
-                Column.define("Acquisition_Time", builtin_types.timestamp),
-                Column.define("Acquisition_Date", builtin_types.date),
+                ColumnDef("Acquisition_Time", BuiltinType.timestamp),
+                ColumnDef("Acquisition_Date", BuiltinType.date),
             ],
             referenced_tables=[subject_table],
             update_navbar=False,

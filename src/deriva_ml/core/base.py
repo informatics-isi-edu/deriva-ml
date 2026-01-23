@@ -44,7 +44,7 @@ deriva_tags = _core_utils.tag
 GlobusNativeLogin = _globus_auth_utils.GlobusNativeLogin
 
 from deriva_ml.core.config import DerivaMLConfig
-from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition
+from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition, VocabularyTableDef
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
 from deriva_ml.dataset.upload import bulk_upload_configuration
@@ -778,7 +778,11 @@ class DerivaML(
         # Create and return vocabulary table with RID-based URI pattern
         try:
             vocab_table = self.model.schemas[schema].create_table(
-                Table.define_vocabulary(vocab_name, f"{self.project_name}:{{RID}}", comment=comment)
+                VocabularyTableDef(
+                    name=vocab_name,
+                    curie_template=f"{self.project_name}:{{RID}}",
+                    comment=comment,
+                )
             )
         except ValueError:
             raise DerivaMLException(f"Table {vocab_name} already exist")
@@ -1164,6 +1168,71 @@ class DerivaML(
             'execution_size_mb': exec_size_mb,
             'total_size_mb': cache_stats['total_mb'] + exec_size_mb,
         }
+
+    # =========================================================================
+    # Schema Validation
+    # =========================================================================
+
+    def validate_schema(self, strict: bool = False) -> "SchemaValidationReport":
+        """Validate that the catalog's ML schema matches the expected structure.
+
+        This method inspects the catalog schema and verifies that it contains all
+        the required tables, columns, vocabulary terms, and relationships that are
+        created by the ML schema initialization routines in create_schema.py.
+
+        The validation checks:
+        - All required ML tables exist (Dataset, Execution, Workflow, etc.)
+        - All required columns exist with correct types
+        - All required vocabulary tables exist (Asset_Type, Dataset_Type, etc.)
+        - All required vocabulary terms are initialized
+        - All association tables exist for relationships
+
+        In strict mode, the validator also reports errors for:
+        - Extra tables not in the expected schema
+        - Extra columns not in the expected table definitions
+
+        Args:
+            strict: If True, extra tables and columns are reported as errors.
+                   If False (default), they are reported as informational items.
+                   Use strict=True to verify a clean ML catalog matches exactly.
+                   Use strict=False to validate a catalog that may have domain extensions.
+
+        Returns:
+            SchemaValidationReport with validation results. Key attributes:
+                - is_valid: True if no errors were found
+                - errors: List of error-level issues
+                - warnings: List of warning-level issues
+                - info: List of informational items
+                - to_text(): Human-readable report
+                - to_dict(): JSON-serializable dictionary
+
+        Example:
+            >>> ml = DerivaML('localhost', 'my_catalog')
+            >>> report = ml.validate_schema(strict=False)
+            >>> if report.is_valid:
+            ...     print("Schema is valid!")
+            ... else:
+            ...     print(report.to_text())
+
+            >>> # Strict validation for a fresh ML catalog
+            >>> report = ml.validate_schema(strict=True)
+            >>> print(f"Found {len(report.errors)} errors, {len(report.warnings)} warnings")
+
+            >>> # Get report as dictionary for JSON/logging
+            >>> import json
+            >>> print(json.dumps(report.to_dict(), indent=2))
+
+        Note:
+            This method validates the ML schema (typically 'deriva-ml'), not the
+            domain schema. Domain-specific tables and columns are not checked
+            unless they are part of the ML schema itself.
+
+        See Also:
+            - deriva_ml.schema.validation.SchemaValidationReport
+            - deriva_ml.schema.validation.validate_ml_schema
+        """
+        from deriva_ml.schema.validation import SchemaValidationReport, validate_ml_schema
+        return validate_ml_schema(self, strict=strict)
 
     # Methods moved to mixins:
     # - create_asset, list_assets -> AssetMixin
