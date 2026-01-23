@@ -175,10 +175,6 @@ class DerivaModel:
         self.model = self.catalog.getCatalogModel()
 
     @property
-    def schemas(self) -> dict[str, Schema]:
-        return self.model.schemas
-
-    @property
     def chaise_config(self) -> dict[str, Any]:
         """Return the chaise configuration."""
         return self.model.chaise_config

@@ -690,7 +690,7 @@ class TestExecutionFeatures:
 
         # Create subjects to attach features to
         pb = ml.pathBuilder()
-        subjects = list(pb.schemas[ml.domain_schema].Subject.entities().fetch())
+        subjects = list(pb.schemas[ml.default_schema].Subject.entities().fetch())
 
         if not subjects:
             pytest.skip("No subjects in catalog for feature testing")

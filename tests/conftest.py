@@ -97,7 +97,7 @@ def deriva_catalog(catalog_manager: CatalogManager) -> MLCatalog:
             self.catalog = manager.catalog
             self.catalog_id = manager.catalog_id
             self.hostname = manager.hostname
-            self.domain_schema = manager.domain_schema
+            self.default_schema = manager.default_schema
 
         def cleanup(self) -> None:
             """No-op: session catalog is cleaned up at session end."""

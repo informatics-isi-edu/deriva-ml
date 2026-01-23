@@ -698,7 +698,7 @@ wheels = [
 [[package]]
 name = "deriva"
 version = "1.7.12"
-source = { git = "https://github.com/informatics-isi-edu/deriva-py?branch=typed-interface#d664de22b6089569f4b15a6f2c0eda09fe8634e1" }
+source = { editable = "../deriva-py" }
 dependencies = [
     { name = "bdbag" },
     { name = "fair-identifiers-client" },
@@ -710,6 +710,20 @@ dependencies = [
     { name = "portalocker" },
     { name = "requests" },
     { name = "urllib3" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bdbag", specifier = ">=1.8.0" },
+    { name = "fair-identifiers-client", specifier = ">=0.5.1" },
+    { name = "fair-research-login", specifier = ">=0.3.1" },
+    { name = "globus-sdk", specifier = ">=3,<4" },
+    { name = "jsonschema", specifier = ">=3.1" },
+    { name = "packaging" },
+    { name = "pika" },
+    { name = "portalocker", specifier = ">=1.2.1" },
+    { name = "requests" },
+    { name = "urllib3", specifier = ">=1.26.20,<3" },
 ]
 
 [[package]]
@@ -759,7 +773,7 @@ requires-dist = [
     { name = "bdbag" },
     { name = "bump-my-version" },
     { name = "deepdiff" },
-    { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?branch=typed-interface" },
+    { name = "deriva", editable = "../deriva-py" },
     { name = "hydra-zen" },
     { name = "nbconvert" },
     { name = "nbstripout" },

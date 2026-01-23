@@ -130,7 +130,7 @@ class TestCatalogDatasetFunctions:
         )
         ml_instance.add_dataset_element_type("TestTableExecution")
         table_path = (
-            ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["TestTableExecution"]
+            ml_instance.catalog.getPathBuilder().schemas[ml_instance.default_schema].tables["TestTableExecution"]
         )
         table_path.insert([{"Col1": f"Thing{t + 1}"} for t in range(4)])
         test_rids = [i["RID"] for i in table_path.entities().fetch()]

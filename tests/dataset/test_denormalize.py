@@ -345,7 +345,7 @@ class TestDenormalizeOrmRelationships:
 
         # Get classes from different schemas
         dataset_class = bag.model.get_orm_class_by_name(f"{bag.model.ml_schema}.Dataset")
-        subject_class = bag.model.get_orm_class_by_name(f"{bag.model.domain_schema}.Subject")
+        subject_class = bag.model.get_orm_class_by_name(f"{bag.model.default_schema}.Subject")
 
         # Both should be found
         assert dataset_class is not None, "Should find Dataset class from ml schema"
@@ -542,11 +542,11 @@ class TestDenormalizeEdgeCases:
 
         # Verify that the model has both schemas loaded correctly
         assert bag.model.ml_schema is not None, "ML schema should be set"
-        assert bag.model.domain_schema is not None, "Domain schema should be set"
+        assert bag.model.default_schema is not None, "Domain schema should be set"
 
         # Verify tables exist in the metadata from both schemas
         ml_tables = [t for t in bag.model.metadata.tables.keys() if t.startswith(bag.model.ml_schema)]
-        domain_tables = [t for t in bag.model.metadata.tables.keys() if t.startswith(bag.model.domain_schema)]
+        domain_tables = [t for t in bag.model.metadata.tables.keys() if t.startswith(bag.model.default_schema)]
 
         assert len(ml_tables) > 0, "Should have ML schema tables"
         assert len(domain_tables) > 0, "Should have domain schema tables"

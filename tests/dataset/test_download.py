@@ -152,7 +152,7 @@ class TestDatasetDownload:
         self.compare_datasets(ml_instance, dataset_test, current_spec)
 
         pb = ml_instance.pathBuilder()
-        subjects = [s["RID"] for s in pb.schemas[ml_instance.domain_schema].tables["Subject"].path.entities().fetch()]
+        subjects = [s["RID"] for s in pb.schemas[ml_instance.default_schema].tables["Subject"].path.entities().fetch()]
 
         dataset_description.dataset.add_dataset_members(subjects[-2:])
         new_version = dataset_description.dataset.current_version
@@ -187,8 +187,8 @@ class TestDatasetDownload:
         current_bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset_description.dataset.download_dataset_bag(new_version, use_minid=False)
 
-        assert "NewTable" in new_bag.model.schemas[ml_instance.domain_schema].tables
-        assert "NewTable" not in current_bag.model.schemas[ml_instance.domain_schema].tables
+        assert "NewTable" in new_bag.model.schemas[ml_instance.default_schema].tables
+        assert "NewTable" not in current_bag.model.schemas[ml_instance.default_schema].tables
 
     def test_dataset_types_preserved_in_bag(self, dataset_test, tmp_path):
         """Test that dataset types in downloaded bag match the original catalog dataset types.

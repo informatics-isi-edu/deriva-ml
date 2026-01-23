@@ -44,11 +44,11 @@ class TestDataBaseModel:
 
         pb = snapshot_catalog.pathBuilder()
         ds = pb.schemas[snapshot_catalog.ml_schema].tables["Dataset"]
-        subject = pb.schemas[snapshot_catalog.domain_schema].tables["Subject"]
-        image = pb.schemas[snapshot_catalog.domain_schema].tables["Image"]
+        subject = pb.schemas[snapshot_catalog.default_schema].tables["Subject"]
+        image = pb.schemas[snapshot_catalog.default_schema].tables["Image"]
         ds_ds = pb.schemas[snapshot_catalog.ml_schema].tables["Dataset_Dataset"]
-        ds_subject = pb.schemas[snapshot_catalog.domain_schema].tables["Dataset_Subject"]
-        ds_image = pb.schemas[snapshot_catalog.domain_schema].tables["Dataset_Image"]
+        ds_subject = pb.schemas[snapshot_catalog.default_schema].tables["Dataset_Subject"]
+        ds_image = pb.schemas[snapshot_catalog.default_schema].tables["Dataset_Image"]
 
         # Check to make sure that all of the datasets are present.
         assert {r for r in bag.model.bag_rids.keys()} == {r for r in reference_datasets}
@@ -109,7 +109,7 @@ class TestDataBaseModel:
         current_bag = ml_instance.download_dataset_bag(current_spec)
         tables = current_bag.model.list_tables()
         schemas = ml_instance.model.schemas
-        catalog_tables = len(schemas[ml_instance.domain_schema].tables) + len(schemas[ml_instance.ml_schema].tables)
+        catalog_tables = len(schemas[ml_instance.default_schema].tables) + len(schemas[ml_instance.ml_schema].tables)
         assert catalog_tables == len(tables)
 
     def test_table_as_dict(self, dataset_test):
@@ -131,7 +131,7 @@ class TestDataBaseModel:
         )
 
         pb = ml_instance.pathBuilder()
-        subject = pb.schemas[ml_instance.domain_schema].Subject
+        subject = pb.schemas[ml_instance.default_schema].Subject
         new_subjects = [s["RID"] for s in subject.insert([{"Name": f"Mew Thing{t + 1}"} for t in range(2)])]
         dataset_description.dataset.add_dataset_members(new_subjects)
         print("Adding subjects: ", new_subjects)

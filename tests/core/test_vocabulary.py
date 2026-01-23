@@ -86,7 +86,7 @@ class TestVocabulary:
 
         # Subsequent lookups should use cache (we can verify by checking cache exists)
         cache = ml_instance._get_vocab_cache()
-        cache_key = (ml_instance.model.domain_schema, "CV_Cache")
+        cache_key = (ml_instance.model.default_schema, "CV_Cache")
         assert cache_key in cache, "Cache should be populated after first lookup"
 
         # Lookup by synonym should work from cache

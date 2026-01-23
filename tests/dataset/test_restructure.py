@@ -130,7 +130,7 @@ class TestRestructureAssets:
         )
 
         # Add some images to the dataset
-        image_path = ml.domain_path.tables["Image"]
+        image_path = ml.domain_path().tables["Image"]
         images = list(image_path.entities().fetch())
         if not images:
             pytest.skip("No images in test data")
@@ -184,7 +184,7 @@ class TestRestructureAssets:
         )
 
         # Add images
-        image_path = ml.domain_path.tables["Image"]
+        image_path = ml.domain_path().tables["Image"]
         images = list(image_path.entities().fetch())
         if not images:
             pytest.skip("No images in test data")
@@ -299,7 +299,7 @@ class TestRestructureAssets:
         )
 
         # Get some images
-        image_path = ml.domain_path.tables["Image"]
+        image_path = ml.domain_path().tables["Image"]
         images = list(image_path.entities().fetch())
         if len(images) < 4:
             pytest.skip("Need at least 4 images for this test")
@@ -404,7 +404,7 @@ class TestRestructureForeignKeyPaths:
         )
 
         # Get some subject RIDs from the catalog
-        subject_path = ml.domain_path.tables["Subject"]
+        subject_path = ml.domain_path().tables["Subject"]
         subjects = list(subject_path.entities().fetch())
         if not subjects:
             pytest.skip("No subjects in test data")
@@ -448,7 +448,7 @@ class TestRestructureForeignKeyPaths:
         )
 
         # Get subjects and their associated images
-        subject_path = ml.domain_path.tables["Subject"]
+        subject_path = ml.domain_path().tables["Subject"]
         subjects = list(subject_path.entities().fetch())
         if not subjects:
             pytest.skip("No subjects in test data")
@@ -487,7 +487,7 @@ class TestRestructureForeignKeyPaths:
             description="Test FK mapping",
         )
 
-        subject_path = ml.domain_path.tables["Subject"]
+        subject_path = ml.domain_path().tables["Subject"]
         subjects = list(subject_path.entities().fetch())
         if not subjects:
             pytest.skip("No subjects in test data")
@@ -805,7 +805,7 @@ class TestValueSelectorWithNestedDatasets:
         )
 
         # Add images to the child dataset
-        image_path = ml.domain_path.tables["Image"]
+        image_path = ml.domain_path().tables["Image"]
         images = list(image_path.entities().fetch())
         if not images:
             pytest.skip("No images in test data")
@@ -866,7 +866,7 @@ class TestValueSelectorWithNestedDatasets:
         child = ml.create_dataset(dataset_types=["Training"], description="Child")
 
         # Add images to child only (not parent)
-        image_path = ml.domain_path.tables["Image"]
+        image_path = ml.domain_path().tables["Image"]
         images = list(image_path.entities().fetch())
         if not images:
             pytest.skip("No images in test data")
@@ -983,7 +983,7 @@ class TestFeatureTablesInBagExport:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # Check that the feature table is present in the bag's schema
-        domain_schema = ml_instance.domain_schema
+        domain_schema = ml_instance.default_schema
         bag_tables = set(bag.model.schemas[domain_schema].tables.keys())
 
         # The feature table name follows pattern: {target_table}{feature_name}

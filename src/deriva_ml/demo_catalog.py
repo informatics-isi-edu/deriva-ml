@@ -231,8 +231,8 @@ def create_demo_features(execution: Execution) -> None:
 
     # Get the workflow for this notebook
 
-    subject_rids = [i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()]
-    image_rids = [i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()]
+    subject_rids = [i["RID"] for i in ml_instance.domain_path().tables["Subject"].entities().fetch()]
+    image_rids = [i["RID"] for i in ml_instance.domain_path().tables["Image"].entities().fetch()]
     _subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
@@ -405,7 +405,7 @@ def create_demo_catalog(
                 ml_instance = DerivaML(
                     hostname,
                     catalog_id=test_catalog.catalog_id,
-                    domain_schema=domain_schema,
+                    default_schema=domain_schema,
                     working_dir=tmpdir,
                     logging_level=logging_level,
                 )

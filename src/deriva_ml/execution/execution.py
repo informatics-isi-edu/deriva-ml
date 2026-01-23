@@ -900,7 +900,7 @@ class Execution:
         with Path(feature_file).open("r") as feature_values:
             entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
-        self._ml_object.domain_path.tables[feature_table].insert([map_path(e) for e in entities], on_conflict_skip=True)
+        self._ml_object.domain_path().tables[feature_table].insert([map_path(e) for e in entities], on_conflict_skip=True)
 
     def _update_asset_execution_table(
         self,
