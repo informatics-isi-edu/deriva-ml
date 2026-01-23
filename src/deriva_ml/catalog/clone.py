@@ -65,6 +65,8 @@ class CloneCatalogResult:
         schema_only: True if only schema was copied (no data).
         source_hostname: The source catalog's hostname.
         source_catalog_id: The source catalog's ID.
+        source_snapshot: The source catalog's snapshot ID at clone time.
+        datasets_reinitialized: Number of datasets that had their versions reinitialized.
     """
 
     catalog_id: str
@@ -75,6 +77,8 @@ class CloneCatalogResult:
     schema_only: bool = False
     source_hostname: str = ""
     source_catalog_id: str = ""
+    source_snapshot: str = ""
+    datasets_reinitialized: int = 0
     errors: list[str] = field(default_factory=list)
 
 
@@ -92,6 +96,7 @@ def clone_catalog(
     exclude_schemas: list[str] | None = None,
     source_credential: dict | None = None,
     dest_credential: dict | None = None,
+    reinitialize_dataset_versions: bool = True,
 ) -> CloneCatalogResult:
     """Clone a catalog with optional cross-server support and selective asset copying.
 
@@ -114,6 +119,26 @@ def clone_catalog(
     - REFERENCES: Keep URLs pointing to source hatrac (cross-server only)
     - FULL: Download and re-upload all assets (creates independent copy)
 
+    **Dataset version handling**:
+    Cloned catalogs do not inherit the source catalog's history. This means that
+    dataset versions copied from the source reference snapshot IDs that don't
+    exist in the clone, making those versions unusable for bag downloads.
+    Previous versions from the source catalog are not accessible in the clone.
+
+    By default (reinitialize_dataset_versions=True), this function automatically
+    handles this by:
+    1. Pruning old version history (previous versions are not accessible anyway)
+    2. Incrementing the patch version for all datasets, creating new version
+       records with valid snapshots in the clone's history
+    3. Including a URL to the source catalog snapshot in version descriptions
+       for provenance tracking (e.g., "Cloned from
+       https://source.org/chaise/recordset/#21@2024-01-15T10:30:00")
+
+    This ensures that datasets in the cloned catalog can immediately be
+    downloaded as bags without manual intervention. Set
+    reinitialize_dataset_versions=False to skip this behavior if you want
+    to handle version updates manually.
+
     Args:
         source_hostname: Hostname of the source catalog server.
         source_catalog_id: ID of the catalog to clone.
@@ -133,6 +158,14 @@ def clone_catalog(
             If None, uses credential from ~/.deriva/credentials.
         dest_credential: Optional credential dict for destination server.
             If None, uses credential from ~/.deriva/credentials.
+        reinitialize_dataset_versions: If True (default), increment dataset
+            versions after cloning. This is necessary because cloned catalogs
+            don't inherit the source catalog's history, so existing dataset
+            versions reference invalid snapshots (previous versions are not
+            accessible). When enabled, old version history is pruned and the
+            patch version is incremented with a new snapshot in the clone's
+            history. The version description includes a URL to the source
+            catalog snapshot for provenance.
 
     Returns:
         CloneCatalogResult with details of the cloned catalog.
@@ -179,6 +212,11 @@ def clone_catalog(
     is_same_server = dest_hostname is None or dest_hostname == source_hostname
     effective_dest_hostname = source_hostname if dest_hostname is None else dest_hostname
 
+    # Get the source catalog's current snapshot ID for provenance tracking
+    source_snapshot = _get_catalog_snapshot(
+        source_hostname, source_catalog_id, source_credential
+    )
+
     if is_same_server:
         result = _clone_same_server(
             source_hostname=source_hostname,
@@ -204,6 +242,9 @@ def clone_catalog(
             dest_credential=dest_credential,
         )
 
+    # Store source snapshot in result
+    result.source_snapshot = source_snapshot
+
     # Post-clone operations: alias creation and ML schema addition
     result = _post_clone_operations(
         result=result,
@@ -212,7 +253,202 @@ def clone_catalog(
         credential=dest_credential,
     )
 
+    # Reinitialize dataset versions if requested and data was copied
+    if reinitialize_dataset_versions and not schema_only:
+        result = _reinitialize_dataset_versions(
+            result=result,
+            credential=dest_credential,
+        )
+
     return result
+
+
+def _get_catalog_snapshot(
+    hostname: str,
+    catalog_id: str,
+    credential: dict | None,
+) -> str:
+    """Get the current snapshot ID of a catalog.
+
+    Args:
+        hostname: The server hostname.
+        catalog_id: The catalog ID.
+        credential: Optional credential dict.
+
+    Returns:
+        The current snapshot ID string, or empty string if unable to retrieve.
+    """
+    try:
+        cred = credential or get_credential(hostname)
+        server = DerivaServer("https", hostname, credentials=cred)
+        catalog = server.connect_ermrest(catalog_id)
+        cat_desc = catalog.get("/").json()
+        return cat_desc.get("snaptime", "")
+    except Exception as e:
+        logger.warning(f"Could not get snapshot ID for catalog {catalog_id}: {e}")
+        return ""
+
+
+def _reinitialize_dataset_versions(
+    result: CloneCatalogResult,
+    credential: dict | None,
+) -> CloneCatalogResult:
+    """Reinitialize dataset versions in the cloned catalog.
+
+    Cloned catalogs don't inherit the source catalog's history, so existing
+    dataset versions reference invalid snapshot IDs. This function:
+    1. Finds all datasets in the cloned catalog
+    2. Prunes old version history (keeps only the latest version record per dataset)
+    3. Creates new versions with valid snapshots in the clone's history
+    4. Includes source catalog and snapshot info in the version description
+
+    Args:
+        result: The clone result with catalog information.
+        credential: Optional credential dict for the destination server.
+
+    Returns:
+        Updated CloneCatalogResult with datasets_reinitialized count.
+    """
+    from tempfile import TemporaryDirectory
+
+    try:
+        from deriva_ml import DerivaML
+        from deriva_ml.dataset.aux_classes import VersionPart
+
+        with TemporaryDirectory() as tmpdir:
+            # Connect to the cloned catalog
+            ml = DerivaML(
+                result.hostname,
+                result.catalog_id,
+                working_dir=tmpdir,
+            )
+
+            # Check if this is a DerivaML catalog with datasets
+            model = ml.catalog.getCatalogModel()
+            if "deriva-ml" not in model.schemas:
+                logger.info("No DerivaML schema found, skipping dataset version reinitialization")
+                return result
+
+            ml_schema = model.schemas["deriva-ml"]
+            if "Dataset" not in ml_schema.tables or "Dataset_Version" not in ml_schema.tables:
+                logger.info("No Dataset tables found, skipping dataset version reinitialization")
+                return result
+
+            # Get all datasets
+            pb = ml.pathBuilder()
+            ml_path = pb.schemas["deriva-ml"]
+            datasets = list(ml_path.tables["Dataset"].path.entities().fetch())
+
+            if not datasets:
+                logger.info("No datasets found in cloned catalog")
+                return result
+
+            # Build provenance description with URL to source catalog snapshot
+            if result.source_snapshot:
+                # Include full URL to the source catalog at the specific snapshot
+                source_url = (
+                    f"https://{result.source_hostname}/chaise/recordset/"
+                    f"#{result.source_catalog_id}@{result.source_snapshot}"
+                )
+                provenance_desc = (
+                    f"Cloned from {source_url}"
+                )
+            else:
+                # Fallback without snapshot
+                provenance_desc = (
+                    f"Cloned from catalog {result.source_catalog_id} "
+                    f"on {result.source_hostname}"
+                )
+
+            # Process each dataset
+            datasets_processed = 0
+            for dataset_record in datasets:
+                try:
+                    dataset_rid = dataset_record["RID"]
+                    dataset = ml.lookup_dataset(dataset_rid)
+
+                    # Prune old version history for this dataset
+                    _prune_dataset_version_history(ml, dataset_rid)
+
+                    # Create a new version with valid snapshot in clone's history
+                    dataset.increment_dataset_version(
+                        component=VersionPart.patch,
+                        description=provenance_desc,
+                    )
+                    datasets_processed += 1
+                    logger.debug(f"Reinitialized version for dataset {dataset_rid}")
+
+                except Exception as e:
+                    error_msg = f"Failed to reinitialize dataset {dataset_record.get('RID', 'unknown')}: {e}"
+                    logger.warning(error_msg)
+                    result.errors.append(error_msg)
+
+            result.datasets_reinitialized = datasets_processed
+            logger.info(f"Reinitialized versions for {datasets_processed} datasets")
+
+    except ImportError as e:
+        error_msg = f"Could not import DerivaML for dataset reinitialization: {e}"
+        logger.warning(error_msg)
+        result.errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"Failed to reinitialize dataset versions: {e}"
+        logger.error(error_msg)
+        result.errors.append(error_msg)
+
+    return result
+
+
+def _prune_dataset_version_history(ml: Any, dataset_rid: str) -> None:
+    """Prune old version history for a dataset, keeping only the latest version.
+
+    This removes version records with invalid snapshot references from the
+    source catalog while preserving the latest version number.
+
+    Args:
+        ml: DerivaML instance connected to the catalog.
+        dataset_rid: RID of the dataset to prune history for.
+    """
+    try:
+        pb = ml.pathBuilder()
+        version_table = pb.schemas["deriva-ml"].tables["Dataset_Version"]
+
+        # Get all versions for this dataset, ordered by version number descending
+        versions = list(
+            version_table.path
+            .filter(version_table.Dataset == dataset_rid)
+            .entities()
+            .fetch()
+        )
+
+        if len(versions) <= 1:
+            # Nothing to prune
+            return
+
+        # Sort by version to find the latest
+        # Versions are semantic versions like "1.2.3"
+        def parse_version(v: str) -> tuple:
+            try:
+                parts = v.split(".")
+                return tuple(int(p) for p in parts)
+            except (ValueError, AttributeError):
+                return (0, 0, 0)
+
+        versions.sort(key=lambda v: parse_version(v.get("Version", "0.0.0")), reverse=True)
+
+        # Keep the latest, delete the rest
+        versions_to_delete = versions[1:]  # All except the first (latest)
+
+        for old_version in versions_to_delete:
+            try:
+                version_table.path.filter(
+                    version_table.RID == old_version["RID"]
+                ).delete()
+                logger.debug(f"Deleted old version {old_version.get('Version')} for dataset {dataset_rid}")
+            except Exception as e:
+                logger.warning(f"Could not delete version {old_version.get('RID')}: {e}")
+
+    except Exception as e:
+        logger.warning(f"Could not prune version history for dataset {dataset_rid}: {e}")
 
 
 def _clone_same_server(
