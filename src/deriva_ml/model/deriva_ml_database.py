@@ -37,7 +37,8 @@ class DerivaMLDatabase:
 
     Attributes:
         ml_schema: Name of the ML schema.
-        domain_schema: Name of the domain schema.
+        domain_schemas: Frozenset of domain schema names.
+        default_schema: Default schema for table creation.
         model: The underlying DatabaseModel.
         working_dir: Working directory path.
         cache_dir: Cache directory path.
@@ -59,9 +60,14 @@ class DerivaMLDatabase:
         return self._database_model.ml_schema
 
     @property
-    def domain_schema(self) -> str:
-        """Get the domain schema name."""
-        return self._database_model.domain_schema
+    def domain_schemas(self) -> frozenset[str]:
+        """Get the domain schema names."""
+        return self._database_model.domain_schemas
+
+    @property
+    def default_schema(self) -> str | None:
+        """Get the default schema name."""
+        return self._database_model.default_schema
 
     @property
     def model(self) -> "DatabaseModel":

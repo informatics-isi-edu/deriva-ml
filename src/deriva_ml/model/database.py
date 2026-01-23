@@ -23,7 +23,7 @@ from deriva.core.bag_database import BagDatabase
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
 
-from deriva_ml.core.definitions import ML_SCHEMA, RID
+from deriva_ml.core.definitions import ML_SCHEMA, RID, get_domain_schemas
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
@@ -71,22 +71,16 @@ class DatabaseModel(BagDatabase, DerivaModel):
         schema_file = bag_path / "data/schema.json"
         temp_model = Model.fromfile("file-system", schema_file)
 
-        # Determine domain schema
+        # Determine domain schemas using schema classification
         ml_schema = ML_SCHEMA
-        builtin_schemas = {"public", ml_schema, "www", "WWW"}
-        user_schemas = {k for k in temp_model.schemas.keys()} - builtin_schemas
-
-        if len(user_schemas) == 1:
-            domain_schema = user_schemas.pop()
-        else:
-            raise DerivaMLException(f"Ambiguous domain schema: {user_schemas}")
+        domain_schemas = get_domain_schemas(temp_model.schemas.keys(), ml_schema)
 
         # Initialize BagDatabase (creates SQLite DB)
         BagDatabase.__init__(
             self,
             bag_path=bag_path,
             database_dir=dbase_path,
-            schemas=[domain_schema, ml_schema],
+            schemas=[*domain_schemas, ml_schema],
         )
 
         # Initialize DerivaModel (provides schema analysis methods)
@@ -95,7 +89,7 @@ class DatabaseModel(BagDatabase, DerivaModel):
             self,
             model=self.model,
             ml_schema=ml_schema,
-            domain_schema=domain_schema,
+            domain_schemas=domain_schemas,
         )
 
         self.dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]

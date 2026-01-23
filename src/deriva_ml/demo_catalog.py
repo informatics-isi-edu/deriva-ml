@@ -53,7 +53,7 @@ TEST_DATASET_SIZE = 12
 def populate_demo_catalog(execution: Execution) -> None:
     # Delete any vocabularies and features.
     ml_instance = execution._ml_object
-    domain_schema = ml_instance.pathBuilder().schemas[ml_instance.domain_schema]
+    domain_schema = ml_instance.domain_path()
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
     for s in ss:
@@ -179,10 +179,10 @@ def create_demo_datasets(execution: Execution) -> DatasetDescription:
         "Dataset_Type", "Testing", synonyms=["Test", "test", "testing"], description="A testing set"
     )
 
-    table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
+    table_path = ml_instance.domain_path().tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
 
-    table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Image"]
+    table_path = ml_instance.domain_path().tables["Image"]
     image_rids = [i["RID"] for i in table_path.entities().fetch()]
 
     spec = dataset_spec()

@@ -74,8 +74,14 @@ class DerivaMLConfig(BaseModel):
     Attributes:
         hostname: Hostname of the Deriva server (e.g., 'deriva.example.org').
         catalog_id: Catalog identifier, either numeric ID or catalog name.
-        domain_schema: Schema name for domain-specific tables. If None, auto-detected.
-        project_name: Project name for organizing outputs. Defaults to domain_schema.
+        domain_schemas: Optional set of domain schema names. If None, auto-detects all
+            non-system schemas. Use this when working with catalogs that have multiple
+            user-defined schemas.
+        default_schema: The default schema for table creation operations. If None and
+            there is exactly one domain schema, that schema is used. If there are multiple
+            domain schemas, this must be specified for table creation to work without
+            explicit schema parameters.
+        project_name: Project name for organizing outputs. Defaults to default_schema.
         cache_dir: Directory for caching downloaded datasets. Defaults to working_dir/cache.
         working_dir: Base directory for computation data. Defaults to ~/deriva-ml.
         hydra_runtime_output_dir: Hydra's runtime output directory (set automatically).
@@ -97,14 +103,15 @@ class DerivaMLConfig(BaseModel):
         >>> config = DerivaMLConfig(
         ...     hostname='deriva.example.org',
         ...     catalog_id=1,
-        ...     domain_schema='my_domain',
+        ...     default_schema='my_domain',
         ...     logging_level=logging.INFO
         ... )
     """
 
     hostname: str
     catalog_id: str | int = 1
-    domain_schema: str | None = None
+    domain_schemas: set[str] | None = None
+    default_schema: str | None = None
     project_name: str | None = None
     cache_dir: str | Path | None = None
     working_dir: str | Path | None = None

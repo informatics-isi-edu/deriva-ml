@@ -33,8 +33,11 @@ from deriva_ml.core.constants import (
     DRY_RUN_RID,
     ML_SCHEMA,
     RID,
+    SYSTEM_SCHEMAS,
     DerivaAssetColumns,
     DerivaSystemColumns,
+    get_domain_schemas,
+    is_system_schema,
     rid_part,
     rid_regex,
     snapshot_part,
@@ -119,12 +122,16 @@ __all__ = [
     # Constants
     "ML_SCHEMA",
     "DRY_RUN_RID",
+    "SYSTEM_SCHEMAS",
     "rid_part",
     "snapshot_part",
     "rid_regex",
     "DerivaSystemColumns",
     "DerivaAssetColumns",
     "RID",
+    # Schema classification helpers
+    "is_system_schema",
+    "get_domain_schemas",
     # Enums
     "BaseStrEnum",
     "UploadState",

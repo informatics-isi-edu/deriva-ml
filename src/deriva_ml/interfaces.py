@@ -559,7 +559,8 @@ class DerivaMLCatalogReader(Protocol):
     """
 
     ml_schema: str
-    domain_schema: str
+    domain_schemas: frozenset[str]
+    default_schema: str | None
     model: DerivaModel
     cache_dir: Path
     working_dir: Path

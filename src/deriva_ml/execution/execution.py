@@ -1065,10 +1065,18 @@ class Execution:
         Returns:
             Pathlib path to the file in which to place table values.
         """
-        if table not in self._model.schemas[self._ml_object.domain_schema].tables:
-            raise DerivaMLException("Table '{}' not found in domain schema".format(table))
+        # Find which domain schema contains this table
+        table_schema = None
+        for domain_schema in self._ml_object.domain_schemas:
+            if domain_schema in self._model.schemas:
+                if table in self._model.schemas[domain_schema].tables:
+                    table_schema = domain_schema
+                    break
 
-        return table_path(self._working_dir, schema=self._ml_object.domain_schema, table=table)
+        if table_schema is None:
+            raise DerivaMLException("Table '{}' not found in any domain schema".format(table))
+
+        return table_path(self._working_dir, schema=table_schema, table=table)
 
     def execute(self) -> Execution:
         """Initiate an execution with the provided configuration. Can be used in a context manager."""
@@ -1106,9 +1114,11 @@ class Execution:
         # Update feature records to include current execution_rid
         first_row = features[0]
         feature = first_row.feature
+        # Use the schema from the feature table
+        feature_schema = feature.feature_table.schema.name
         json_path = feature_value_path(
             self._working_dir,
-            schema=self._ml_object.domain_schema,
+            schema=feature_schema,
             target_table=feature.target_table.name,
             feature_name=feature.feature_name,
             exec_rid=self.execution_rid,

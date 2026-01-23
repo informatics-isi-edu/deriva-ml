@@ -50,7 +50,8 @@ class FeatureMixin:
     # Type hints for IDE support - actual attributes/methods from host class
     model: "DerivaModel"
     ml_schema: str
-    domain_schema: str
+    domain_schemas: frozenset[str]
+    default_schema: str | None
     pathBuilder: Callable[[], Any]
     add_term: Callable[..., VocabularyTerm]
     apply_catalog_annotations: Callable[[], None]
@@ -159,7 +160,7 @@ class FeatureMixin:
         feature_name_term = self.add_term("Feature_Name", feature_name, description=comment)
         atable_name = f"Execution_{target_table.name}_{feature_name_term.name}"
         # Create an association table implementing the feature
-        atable = self.model.schemas[self.domain_schema].create_table(
+        atable = self.model.create_table(
             target_table.define_association(
                 table_name=atable_name,
                 associates=[execution, target_table, feature_name_table],

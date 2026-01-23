@@ -47,7 +47,8 @@ class PathBuilderMixin:
 
     # Type hints for IDE support - actual attributes from host class
     catalog: ErmrestCatalog | ErmrestSnapshot
-    domain_schema: str
+    domain_schemas: frozenset[str]
+    default_schema: str | None
     model: "DerivaModel"
     working_dir: Path
 
@@ -66,22 +67,30 @@ class PathBuilderMixin:
         """
         return self.catalog.getPathBuilder()
 
-    @property
-    def domain_path(self) -> datapath.DataPath:
-        """Returns path builder for domain schema.
+    def domain_path(self, schema: str | None = None) -> datapath.DataPath:
+        """Returns path builder for a domain schema.
 
-        Provides a convenient way to access tables and construct queries within the domain-specific schema.
+        Provides a convenient way to access tables and construct queries within a domain-specific schema.
+
+        Args:
+            schema: Schema name to get path builder for. If None, uses default_schema.
 
         Returns:
-            datapath._CatalogWrapper: Path builder object scoped to the domain schema.
+            datapath._CatalogWrapper: Path builder object scoped to the specified domain schema.
+
+        Raises:
+            DerivaMLException: If no schema specified and default_schema is not set.
 
         Example:
-            >>> domain = ml.domain_path
+            >>> domain = ml.domain_path()  # Uses default schema
             >>> results = domain.my_table.entities().fetch()
+            >>> # Or with explicit schema:
+            >>> domain = ml.domain_path("my_schema")
         """
-        return self.pathBuilder().schemas[self.domain_schema]
+        schema = schema or self.model._require_default_schema()
+        return self.pathBuilder().schemas[schema]
 
-    def table_path(self, table: str | Table) -> Path:
+    def table_path(self, table: str | Table, schema: str | None = None) -> Path:
         """Returns a local filesystem path for table CSV files.
 
         Generates a standardized path where CSV files should be placed when preparing to upload data to a table.
@@ -89,6 +98,7 @@ class PathBuilderMixin:
 
         Args:
             table: Name of the table or Table object to get the path for.
+            schema: Schema name for the path. If None, uses the table's schema or default_schema.
 
         Returns:
             Path: Filesystem path where the CSV file should be placed.
@@ -97,10 +107,13 @@ class PathBuilderMixin:
             >>> path = ml.table_path("experiment_results")
             >>> df.to_csv(path) # Save data for upload
         """
+        table_obj = self.model.name_to_table(table)
+        # Use table's schema if available, otherwise use provided schema or default
+        schema = schema or table_obj.schema.name
         return _table_path(
             self.working_dir,
-            schema=self.domain_schema,
-            table=self.model.name_to_table(table).name,
+            schema=schema,
+            table=table_obj.name,
         )
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
