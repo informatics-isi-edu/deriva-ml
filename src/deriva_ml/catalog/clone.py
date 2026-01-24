@@ -502,8 +502,8 @@ def _clone_via_backup_restore(
     dest_credential: dict | None,
 ) -> CloneCatalogResult:
     """Clone a catalog across servers using DerivaBackup/DerivaRestore."""
-    from deriva.transfer.backup import DerivaBackup
-    from deriva.transfer.restore import DerivaRestore
+    from deriva.transfer.backup.deriva_backup import DerivaBackup
+    from deriva.transfer.restore.deriva_restore import DerivaRestore
 
     errors: list[str] = []
 
