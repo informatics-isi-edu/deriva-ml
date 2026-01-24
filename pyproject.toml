@@ -49,7 +49,7 @@ build-backend = "setuptools.build_meta"
 python-preference = "only-managed"
 
 [tool.uv.sources]
-deriva = { path = "../deriva-py", editable = true }
+deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", branch = "typed-interface" }
 
 
 [tool.setuptools.package-data]
