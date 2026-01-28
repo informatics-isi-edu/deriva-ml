@@ -97,6 +97,7 @@ def clone_catalog(
     source_credential: dict | None = None,
     dest_credential: dict | None = None,
     reinitialize_dataset_versions: bool = True,
+    ignore_acl: bool = True,
 ) -> CloneCatalogResult:
     """Clone a catalog with optional cross-server support and selective asset copying.
 
@@ -166,6 +167,8 @@ def clone_catalog(
             patch version is incremented with a new snapshot in the clone's
             history. The version description includes a URL to the source
             catalog snapshot for provenance.
+        ignore_acl: If True (default), allow backup without catalog owner
+            permissions. Set to False to require owner permissions.
 
     Returns:
         CloneCatalogResult with details of the cloned catalog.
@@ -240,6 +243,7 @@ def clone_catalog(
             exclude_schemas=exclude_schemas,
             source_credential=source_credential,
             dest_credential=dest_credential,
+            ignore_acl=ignore_acl,
         )
 
     # Store source snapshot in result
@@ -500,6 +504,7 @@ def _clone_via_backup_restore(
     exclude_schemas: list[str] | None,
     source_credential: dict | None,
     dest_credential: dict | None,
+    ignore_acl: bool = True,
 ) -> CloneCatalogResult:
     """Clone a catalog across servers using DerivaBackup/DerivaRestore."""
     from deriva.transfer.backup.deriva_backup import DerivaBackup
@@ -541,6 +546,7 @@ def _clone_via_backup_restore(
             no_data=schema_only,
             include_assets=include_assets,
             exclude_data=exclude_data,
+            ignore_acl=ignore_acl,
         )
         backup.transfer()
 
