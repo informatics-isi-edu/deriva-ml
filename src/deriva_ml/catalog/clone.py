@@ -94,6 +94,7 @@ def clone_catalog(
     copy_annotations: bool = True,
     copy_policy: bool = True,
     exclude_schemas: list[str] | None = None,
+    exclude_objects: list[str] | None = None,
     source_credential: dict | None = None,
     dest_credential: dict | None = None,
     reinitialize_dataset_versions: bool = True,
@@ -155,6 +156,11 @@ def clone_catalog(
         copy_annotations: If True (default), copy all catalog annotations.
         copy_policy: If True (default), copy ACL policies.
         exclude_schemas: List of schema names to exclude from cloning.
+        exclude_objects: List of specific tables to exclude from cloning, in
+            "schema:table" format (e.g., ["isa:dataset_qc_issue"]). Use this
+            to skip problematic tables that may have schema issues like missing
+            key constraints. These tables will be excluded from both schema
+            and data backup/restore operations.
         source_credential: Optional credential dict for source server.
             If None, uses credential from ~/.deriva/credentials.
         dest_credential: Optional credential dict for destination server.
@@ -241,6 +247,7 @@ def clone_catalog(
             copy_annotations=copy_annotations,
             copy_policy=copy_policy,
             exclude_schemas=exclude_schemas,
+            exclude_objects=exclude_objects,
             source_credential=source_credential,
             dest_credential=dest_credential,
             ignore_acl=ignore_acl,
@@ -502,6 +509,7 @@ def _clone_via_backup_restore(
     copy_annotations: bool,
     copy_policy: bool,
     exclude_schemas: list[str] | None,
+    exclude_objects: list[str] | None,
     source_credential: dict | None,
     dest_credential: dict | None,
     ignore_acl: bool = True,
@@ -524,8 +532,10 @@ def _clone_via_backup_restore(
         else:  # AssetCopyMode.FULL
             include_assets = True  # Download assets
 
-        # Build exclude_data list for selective asset filtering
+        # Build exclude_data list - includes both schemas and specific objects
         exclude_data = list(exclude_schemas) if exclude_schemas else []
+        if exclude_objects:
+            exclude_data.extend(exclude_objects)
 
         # Step 1: Backup the source catalog
         logger.info(f"Backing up catalog {source_hostname}:{source_catalog_id}")
@@ -548,13 +558,17 @@ def _clone_via_backup_restore(
             exclude_data=exclude_data,
             ignore_acl=ignore_acl,
         )
-        backup.transfer()
+        backup.download()
 
         # Find the backup output
         bag_dirs = list(backup_dir.glob("*"))
         if not bag_dirs:
             raise RuntimeError("Backup failed: no output created")
         bag_path = bag_dirs[0]
+
+        # Filter excluded objects from the backup schema
+        if exclude_objects:
+            _filter_excluded_objects_from_bag(bag_path, exclude_objects)
 
         # Apply asset filtering if specified
         if asset_filter and not schema_only:
@@ -575,6 +589,10 @@ def _clone_via_backup_restore(
         # Determine whether to restore assets
         no_assets = asset_mode == AssetCopyMode.NONE or asset_mode == AssetCopyMode.REFERENCES
 
+        # Build restore exclude lists - separate schemas from specific objects
+        restore_exclude_schemas = list(exclude_schemas) if exclude_schemas else []
+        restore_exclude_data = list(exclude_objects) if exclude_objects else []
+
         restore = DerivaRestore(
             restore_args,
             input_path=str(bag_path),
@@ -582,7 +600,8 @@ def _clone_via_backup_restore(
             no_annotations=not copy_annotations,
             no_policy=not copy_policy,
             no_assets=no_assets,
-            exclude_schemas=exclude_data if exclude_data else [],
+            exclude_schemas=restore_exclude_schemas,
+            exclude_data=restore_exclude_data,
         )
         restore.restore()
 
@@ -597,6 +616,111 @@ def _clone_via_backup_restore(
         source_catalog_id=source_catalog_id,
         errors=errors,
     )
+
+
+def _filter_excluded_objects_from_bag(
+    bag_path: Path,
+    exclude_objects: list[str],
+) -> None:
+    """Remove excluded tables from the backup bag's schema.
+
+    Modifies the catalog-schema.json in the bag to remove tables that are
+    specified in exclude_objects. This is necessary because DerivaRestore
+    will fail on tables with schema issues (e.g., missing key constraints).
+
+    Args:
+        bag_path: Path to the extracted backup bag directory (or .tgz file).
+        exclude_objects: List of "schema:table" strings to exclude.
+    """
+    import json
+    import tarfile
+
+    if not exclude_objects:
+        return
+
+    # Parse exclude_objects into a set of (schema, table) tuples
+    tables_to_exclude: set[tuple[str, str]] = set()
+    for obj in exclude_objects:
+        if ":" in obj:
+            schema, table = obj.split(":", 1)
+            tables_to_exclude.add((schema, table))
+        else:
+            logger.warning(f"Invalid exclude_object format '{obj}', expected 'schema:table'")
+
+    if not tables_to_exclude:
+        return
+
+    # Handle both extracted directories and .tgz files
+    if bag_path.suffix == ".tgz":
+        # Need to extract, modify, and repack
+        import shutil
+
+        extract_dir = bag_path.parent / f"{bag_path.stem}_extracted"
+        with tarfile.open(bag_path, "r:gz") as tar:
+            tar.extractall(extract_dir)
+
+        # Find the actual bag directory inside
+        inner_dirs = list(extract_dir.iterdir())
+        if len(inner_dirs) == 1 and inner_dirs[0].is_dir():
+            actual_bag_path = inner_dirs[0]
+        else:
+            actual_bag_path = extract_dir
+
+        # Modify the schema
+        _modify_schema_in_bag(actual_bag_path, tables_to_exclude)
+
+        # Repack the bag
+        bag_path.unlink()
+        with tarfile.open(bag_path, "w:gz") as tar:
+            for item in extract_dir.iterdir():
+                tar.add(item, arcname=item.name)
+
+        # Clean up
+        shutil.rmtree(extract_dir)
+    else:
+        # Direct modification of extracted bag
+        _modify_schema_in_bag(bag_path, tables_to_exclude)
+
+
+def _modify_schema_in_bag(
+    bag_path: Path,
+    tables_to_exclude: set[tuple[str, str]],
+) -> None:
+    """Modify the catalog-schema.json to remove excluded tables.
+
+    Args:
+        bag_path: Path to the extracted bag directory.
+        tables_to_exclude: Set of (schema, table) tuples to remove.
+    """
+    import json
+
+    schema_file = bag_path / "data" / "catalog-schema.json"
+    if not schema_file.exists():
+        logger.warning(f"Schema file not found at {schema_file}")
+        return
+
+    # Load the schema
+    with open(schema_file) as f:
+        catalog_schema = json.load(f)
+
+    # Remove excluded tables
+    schemas = catalog_schema.get("schemas", {})
+    tables_removed = []
+
+    for schema_name, table_name in tables_to_exclude:
+        if schema_name in schemas:
+            schema_def = schemas[schema_name]
+            tables = schema_def.get("tables", {})
+            if table_name in tables:
+                del tables[table_name]
+                tables_removed.append(f"{schema_name}:{table_name}")
+                logger.info(f"Removed table {schema_name}:{table_name} from backup schema")
+
+    if tables_removed:
+        # Write the modified schema back
+        with open(schema_file, "w") as f:
+            json.dump(catalog_schema, f, indent=2)
+        logger.info(f"Removed {len(tables_removed)} tables from backup schema: {tables_removed}")
 
 
 def _apply_asset_filter(
