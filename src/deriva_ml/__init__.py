@@ -75,6 +75,26 @@ def __getattr__(name: str) -> type:
         from deriva_ml.schema.validation import validate_ml_schema
 
         return validate_ml_schema
+    elif name == "CatalogProvenance":
+        from deriva_ml.catalog.clone import CatalogProvenance
+
+        return CatalogProvenance
+    elif name == "CatalogCreationMethod":
+        from deriva_ml.catalog.clone import CatalogCreationMethod
+
+        return CatalogCreationMethod
+    elif name == "CloneDetails":
+        from deriva_ml.catalog.clone import CloneDetails
+
+        return CloneDetails
+    elif name == "get_catalog_provenance":
+        from deriva_ml.catalog.clone import get_catalog_provenance
+
+        return get_catalog_provenance
+    elif name == "set_catalog_provenance":
+        from deriva_ml.catalog.clone import set_catalog_provenance
+
+        return set_catalog_provenance
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -90,6 +110,12 @@ __all__ = [
     # Schema validation (lazy-loaded)
     "SchemaValidationReport",
     "validate_ml_schema",
+    # Catalog provenance (lazy-loaded)
+    "CatalogProvenance",
+    "CatalogCreationMethod",
+    "CloneDetails",
+    "get_catalog_provenance",
+    "set_catalog_provenance",
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",

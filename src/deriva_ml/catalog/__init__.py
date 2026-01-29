@@ -3,8 +3,13 @@
 from deriva_ml.catalog.clone import (
     AssetCopyMode,
     AssetFilter,
+    CatalogCreationMethod,
+    CatalogProvenance,
     CloneCatalogResult,
+    CloneDetails,
     clone_catalog,
+    get_catalog_provenance,
+    set_catalog_provenance,
 )
 from deriva_ml.catalog.localize import (
     LocalizeResult,
@@ -14,8 +19,13 @@ from deriva_ml.catalog.localize import (
 __all__ = [
     "AssetCopyMode",
     "AssetFilter",
+    "CatalogCreationMethod",
+    "CatalogProvenance",
     "CloneCatalogResult",
+    "CloneDetails",
     "LocalizeResult",
     "clone_catalog",
+    "get_catalog_provenance",
     "localize_assets",
+    "set_catalog_provenance",
 ]

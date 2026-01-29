@@ -71,6 +71,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 if TYPE_CHECKING:
+    from deriva_ml.catalog.clone import CatalogProvenance
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
 
@@ -478,6 +479,33 @@ class DerivaML(
             raise DerivaMLException(f"Entity {e} does not have RID column")
         except DerivaMLException as _e:
             raise DerivaMLException("Entity RID does not exist")
+
+    @property
+    def catalog_provenance(self) -> "CatalogProvenance | None":
+        """Get the provenance information for this catalog.
+
+        Returns provenance information if the catalog has it set. This includes
+        information about how the catalog was created (clone, create, schema),
+        who created it, when, and any workflow information.
+
+        For cloned catalogs, additional details about the clone operation are
+        available in the `clone_details` attribute.
+
+        Returns:
+            CatalogProvenance if available, None otherwise.
+
+        Example:
+            >>> ml = DerivaML('localhost', '45')
+            >>> prov = ml.catalog_provenance
+            >>> if prov:
+            ...     print(f"Created: {prov.created_at} by {prov.created_by}")
+            ...     print(f"Method: {prov.creation_method.value}")
+            ...     if prov.is_clone:
+            ...         print(f"Cloned from: {prov.clone_details.source_hostname}")
+        """
+        from deriva_ml.catalog.clone import get_catalog_provenance
+
+        return get_catalog_provenance(self.catalog)
 
     def user_list(self) -> List[Dict[str, str]]:
         """Returns catalog user list.

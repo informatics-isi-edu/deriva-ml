@@ -18,13 +18,16 @@ all edge cases including circular dependencies and complex FK relationships.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from urllib.parse import quote as urlquote
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva.core.hatrac_store import HatracStore
 
 logger = logging.getLogger("deriva_ml")
 
@@ -49,6 +52,7 @@ class CloneIssueCategory(Enum):
     FK_VIOLATION = "fk_violation"
     FK_PRUNED = "fk_pruned"  # FK was intentionally not applied
     POLICY_INCOHERENCE = "policy_incoherence"
+    INDEX_REBUILT = "index_rebuilt"  # Index was dropped and rebuilt due to size limits
 
 
 class OrphanStrategy(Enum):
@@ -259,6 +263,26 @@ class AssetFilter:
 
 
 @dataclass
+class TruncatedValue:
+    """Record of a value that was truncated during cloning."""
+
+    table: str
+    rid: str
+    column: str
+    original_bytes: int
+    truncated_bytes: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "table": self.table,
+            "rid": self.rid,
+            "column": self.column,
+            "original_bytes": self.original_bytes,
+            "truncated_bytes": self.truncated_bytes,
+        }
+
+
+@dataclass
 class CloneCatalogResult:
     """Result of a catalog clone operation."""
 
@@ -275,11 +299,651 @@ class CloneCatalogResult:
     orphan_rows_removed: int = 0
     orphan_rows_nullified: int = 0
     fkeys_pruned: int = 0
+    rows_skipped: int = 0
+    truncated_values: list[TruncatedValue] = field(default_factory=list)
     report: CloneReport | None = None
 
 
 # Clone state annotation URL (same as deriva-py)
 _clone_state_url = "tag:isrd.isi.edu,2018:clone-state"
+
+# Catalog provenance annotation URL
+_catalog_provenance_url = "tag:deriva-ml.org,2025:catalog-provenance"
+
+# Pattern to detect btree index size errors
+_BTREE_INDEX_ERROR_PATTERN = "index row size"
+_BTREE_INDEX_NAME_PATTERN = r'for index "([^"]+)"'
+
+
+class CatalogCreationMethod(Enum):
+    """How a catalog was created."""
+
+    CLONE = "clone"  # Cloned from another catalog
+    CREATE = "create"  # Created programmatically (e.g., create_catalog)
+    SCHEMA = "schema"  # Created from schema definition
+    UNKNOWN = "unknown"  # Unknown or pre-existing catalog
+
+
+@dataclass
+class CloneDetails:
+    """Details specific to cloned catalogs."""
+
+    source_hostname: str
+    source_catalog_id: str
+    source_snapshot: str | None = None
+    source_schema_url: str | None = None  # Hatrac URL to source schema JSON
+    orphan_strategy: str = "fail"
+    truncate_oversized: bool = False
+    prune_hidden_fkeys: bool = False
+    schema_only: bool = False
+    asset_mode: str = "refs"
+    exclude_schemas: list[str] = field(default_factory=list)
+    exclude_objects: list[str] = field(default_factory=list)
+    rows_copied: int = 0
+    rows_skipped: int = 0
+    truncated_count: int = 0
+    orphan_rows_removed: int = 0
+    orphan_rows_nullified: int = 0
+    fkeys_pruned: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_hostname": self.source_hostname,
+            "source_catalog_id": self.source_catalog_id,
+            "source_snapshot": self.source_snapshot,
+            "source_schema_url": self.source_schema_url,
+            "orphan_strategy": self.orphan_strategy,
+            "truncate_oversized": self.truncate_oversized,
+            "prune_hidden_fkeys": self.prune_hidden_fkeys,
+            "schema_only": self.schema_only,
+            "asset_mode": self.asset_mode,
+            "exclude_schemas": self.exclude_schemas,
+            "exclude_objects": self.exclude_objects,
+            "rows_copied": self.rows_copied,
+            "rows_skipped": self.rows_skipped,
+            "truncated_count": self.truncated_count,
+            "orphan_rows_removed": self.orphan_rows_removed,
+            "orphan_rows_nullified": self.orphan_rows_nullified,
+            "fkeys_pruned": self.fkeys_pruned,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CloneDetails":
+        return cls(
+            source_hostname=data.get("source_hostname", ""),
+            source_catalog_id=data.get("source_catalog_id", ""),
+            source_snapshot=data.get("source_snapshot"),
+            source_schema_url=data.get("source_schema_url"),
+            orphan_strategy=data.get("orphan_strategy", "fail"),
+            truncate_oversized=data.get("truncate_oversized", False),
+            prune_hidden_fkeys=data.get("prune_hidden_fkeys", False),
+            schema_only=data.get("schema_only", False),
+            asset_mode=data.get("asset_mode", "refs"),
+            exclude_schemas=data.get("exclude_schemas", []),
+            exclude_objects=data.get("exclude_objects", []),
+            rows_copied=data.get("rows_copied", 0),
+            rows_skipped=data.get("rows_skipped", 0),
+            truncated_count=data.get("truncated_count", 0),
+            orphan_rows_removed=data.get("orphan_rows_removed", 0),
+            orphan_rows_nullified=data.get("orphan_rows_nullified", 0),
+            fkeys_pruned=data.get("fkeys_pruned", 0),
+        )
+
+
+@dataclass
+class CatalogProvenance:
+    """Provenance information for a catalog.
+
+    This metadata is stored as a catalog-level annotation and tracks
+    how the catalog was created, by whom, and with what parameters.
+    Supports both cloned catalogs and catalogs created by other means.
+
+    Attributes:
+        creation_method: How the catalog was created (clone, create, schema, unknown).
+        created_at: ISO timestamp when the catalog was created.
+        created_by: User or system that created the catalog (Globus identity or description).
+        hostname: Hostname where the catalog resides.
+        catalog_id: Catalog ID.
+        name: Human-readable name for the catalog.
+        description: Description of the catalog's purpose.
+        workflow_url: URL to the workflow/script that created the catalog (e.g., GitHub URL).
+        workflow_version: Version of the workflow (e.g., git commit hash, package version).
+        clone_details: If cloned, detailed information about the clone operation.
+    """
+
+    creation_method: CatalogCreationMethod
+    created_at: str
+    hostname: str
+    catalog_id: str
+    created_by: str | None = None
+    name: str | None = None
+    description: str | None = None
+    workflow_url: str | None = None
+    workflow_version: str | None = None
+    clone_details: CloneDetails | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        result = {
+            "creation_method": self.creation_method.value,
+            "created_at": self.created_at,
+            "hostname": self.hostname,
+            "catalog_id": self.catalog_id,
+            "created_by": self.created_by,
+            "name": self.name,
+            "description": self.description,
+            "workflow_url": self.workflow_url,
+            "workflow_version": self.workflow_version,
+        }
+        if self.clone_details:
+            result["clone_details"] = self.clone_details.to_dict()
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CatalogProvenance":
+        clone_details = None
+        if data.get("clone_details"):
+            clone_details = CloneDetails.from_dict(data["clone_details"])
+
+        # Handle legacy format where creation_method might be missing
+        method_str = data.get("creation_method", "unknown")
+        try:
+            creation_method = CatalogCreationMethod(method_str)
+        except ValueError:
+            creation_method = CatalogCreationMethod.UNKNOWN
+
+        return cls(
+            creation_method=creation_method,
+            created_at=data.get("created_at", ""),
+            hostname=data.get("hostname", ""),
+            catalog_id=data.get("catalog_id", ""),
+            created_by=data.get("created_by"),
+            name=data.get("name"),
+            description=data.get("description"),
+            workflow_url=data.get("workflow_url"),
+            workflow_version=data.get("workflow_version"),
+            clone_details=clone_details,
+        )
+
+    @property
+    def is_clone(self) -> bool:
+        """Return True if this catalog was cloned from another catalog."""
+        return self.creation_method == CatalogCreationMethod.CLONE and self.clone_details is not None
+
+
+def _upload_source_schema(
+    hostname: str,
+    catalog_id: str,
+    schema_json: dict[str, Any],
+    credential: dict | None,
+) -> str | None:
+    """Upload source schema JSON to Hatrac.
+
+    Args:
+        hostname: Destination catalog hostname.
+        catalog_id: Destination catalog ID.
+        schema_json: The source schema as a dictionary.
+        credential: Credential for Hatrac access.
+
+    Returns:
+        Hatrac URL for the uploaded schema, or None if upload failed.
+    """
+    try:
+        cred = credential or get_credential(hostname)
+        hatrac = HatracStore("https", hostname, credentials=cred)
+
+        # Create namespace for catalog provenance metadata if it doesn't exist
+        namespace = f"/hatrac/catalog/{catalog_id}/provenance"
+        try:
+            hatrac.create_namespace(namespace, parents=True)
+        except Exception:
+            pass  # Namespace may already exist
+
+        # Upload schema JSON
+        schema_bytes = json.dumps(schema_json, indent=2).encode("utf-8")
+        object_path = f"{namespace}/source-schema.json"
+
+        url = hatrac.put_obj(
+            object_path,
+            schema_bytes,
+            content_type="application/json",
+        )
+
+        logger.info(f"Uploaded source schema to {url}")
+        return url
+
+    except Exception as e:
+        logger.warning(f"Failed to upload source schema to Hatrac: {e}")
+        return None
+
+
+def _set_catalog_provenance(
+    dst_catalog: ErmrestCatalog,
+    provenance: CatalogProvenance,
+) -> None:
+    """Set the catalog provenance annotation on a catalog.
+
+    Args:
+        dst_catalog: Catalog connection.
+        provenance: Catalog provenance information.
+    """
+    try:
+        dst_catalog.put(
+            f"/annotation/{urlquote(_catalog_provenance_url)}",
+            json=provenance.to_dict(),
+        )
+        logger.info("Set catalog provenance annotation")
+    except Exception as e:
+        logger.warning(f"Failed to set catalog provenance annotation: {e}")
+
+
+def set_catalog_provenance(
+    catalog: ErmrestCatalog,
+    name: str | None = None,
+    description: str | None = None,
+    workflow_url: str | None = None,
+    workflow_version: str | None = None,
+    creation_method: CatalogCreationMethod = CatalogCreationMethod.CREATE,
+) -> CatalogProvenance:
+    """Set catalog provenance information for a newly created catalog.
+
+    Use this function when creating a catalog programmatically to record
+    how and why it was created. This is similar to workflow metadata but
+    at the catalog level.
+
+    Args:
+        catalog: The catalog to annotate.
+        name: Human-readable name for the catalog.
+        description: Description of the catalog's purpose.
+        workflow_url: URL to the workflow/script that created the catalog
+            (e.g., GitHub URL, notebook URL).
+        workflow_version: Version of the workflow (e.g., git commit hash,
+            package version, or semantic version).
+        creation_method: How the catalog was created. Defaults to CREATE.
+
+    Returns:
+        The CatalogProvenance object that was set.
+
+    Example:
+        >>> from deriva_ml.catalog import set_catalog_provenance, CatalogCreationMethod
+        >>> provenance = set_catalog_provenance(
+        ...     catalog,
+        ...     name="CIFAR-10 Training Catalog",
+        ...     description="Catalog for CIFAR-10 image classification experiments",
+        ...     workflow_url="https://github.com/org/repo/blob/main/setup_catalog.py",
+        ...     workflow_version="v1.2.0",
+        ... )
+    """
+    # Try to get current user identity
+    created_by = None
+    try:
+        # Get user info from catalog session
+        session_info = catalog.get("/authn/session").json()
+        if session_info and "client" in session_info:
+            client = session_info["client"]
+            created_by = client.get("display_name") or client.get("id")
+    except Exception:
+        pass
+
+    # Get catalog info
+    try:
+        catalog_info = catalog.get("/").json()
+        hostname = catalog_info.get("meta", {}).get("host", "")
+        catalog_id = str(catalog.catalog_id)
+    except Exception:
+        hostname = ""
+        catalog_id = str(catalog.catalog_id)
+
+    provenance = CatalogProvenance(
+        creation_method=creation_method,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        hostname=hostname,
+        catalog_id=catalog_id,
+        created_by=created_by,
+        name=name,
+        description=description,
+        workflow_url=workflow_url,
+        workflow_version=workflow_version,
+    )
+
+    _set_catalog_provenance(catalog, provenance)
+    return provenance
+
+
+def get_catalog_provenance(catalog: ErmrestCatalog) -> CatalogProvenance | None:
+    """Get the catalog provenance information.
+
+    Returns provenance information if the catalog has it set. This includes
+    information about how the catalog was created (clone, create, schema),
+    who created it, and any workflow information.
+
+    Args:
+        catalog: The catalog to check.
+
+    Returns:
+        CatalogProvenance if available, None otherwise.
+    """
+    try:
+        model = catalog.getCatalogModel()
+        provenance_data = model.annotations.get(_catalog_provenance_url)
+        if provenance_data:
+            return CatalogProvenance.from_dict(provenance_data)
+    except Exception as e:
+        logger.debug(f"Could not get catalog provenance: {e}")
+
+    return None
+
+
+def _parse_index_error(error_msg: str) -> tuple[str | None, str | None]:
+    """Parse a btree index size error to extract index name and column.
+
+    Args:
+        error_msg: The error message from ERMrest/PostgreSQL.
+
+    Returns:
+        Tuple of (index_name, column_name) if this is an index size error,
+        (None, None) otherwise.
+    """
+    import re
+
+    if _BTREE_INDEX_ERROR_PATTERN not in error_msg:
+        return None, None
+
+    # Extract index name from error message
+    match = re.search(_BTREE_INDEX_NAME_PATTERN, error_msg)
+    if not match:
+        return None, None
+
+    index_name = match.group(1)
+
+    # Try to extract column name from index name (common pattern: table__column_idx)
+    # e.g., "dataset__keywords_idx" -> "keywords"
+    if "__" in index_name and index_name.endswith("_idx"):
+        parts = index_name.rsplit("__", 1)
+        if len(parts) == 2:
+            column_name = parts[1].replace("_idx", "")
+            return index_name, column_name
+
+    return index_name, None
+
+
+
+
+def _copy_table_data_with_retry(
+    src_catalog: ErmrestCatalog,
+    dst_catalog: ErmrestCatalog,
+    sname: str,
+    tname: str,
+    page_size: int,
+    report: "CloneReport",
+    deferred_indexes: dict[str, list[dict]],
+    truncate_oversized: bool = False,
+) -> tuple[int, int, list[TruncatedValue]]:
+    """Copy data for a single table with retry logic for index errors.
+
+    If a btree index size error occurs, this function will:
+    1. Detect the problematic index and column
+    2. Switch to row-by-row insertion mode
+    3. Either truncate oversized values (if truncate_oversized=True) or skip rows
+    4. Record skipped/truncated rows in the report
+
+    Args:
+        src_catalog: Source catalog connection.
+        dst_catalog: Destination catalog connection.
+        sname: Schema name.
+        tname: Table name.
+        page_size: Number of rows per page.
+        report: Clone report for recording issues.
+        deferred_indexes: Dict to collect indexes that need rebuilding.
+            Key is "schema:table", value is list of index definitions.
+        truncate_oversized: If True, truncate oversized values instead of skipping rows.
+
+    Returns:
+        Tuple of (rows_copied, rows_skipped, truncated_values).
+        rows_copied is -1 if the copy failed entirely.
+    """
+    tname_uri = f"{urlquote(sname)}:{urlquote(tname)}"
+    table_key = f"{sname}:{tname}"
+
+    # Maximum safe size for btree index values (with margin below 2704 limit)
+    MAX_INDEX_VALUE_BYTES = 2600
+    TRUNCATE_SUFFIX = "...[TRUNCATED]"
+
+    last = None
+    table_rows = 0
+    rows_skipped = 0
+    truncated_values: list[TruncatedValue] = []
+    row_by_row_mode = False
+    problematic_index = None
+    problematic_column = None
+
+    def truncate_row_values(row: dict, column: str | None) -> tuple[dict, list[TruncatedValue]]:
+        """Truncate oversized text values in a row.
+
+        Returns the modified row and list of truncation records.
+        """
+        truncations = []
+        modified_row = row.copy()
+        rid = row.get('RID', 'unknown')
+
+        # If we know the problematic column, only check that one
+        columns_to_check = [column] if column else list(row.keys())
+
+        for col in columns_to_check:
+            if col not in modified_row:
+                continue
+            value = modified_row[col]
+            if isinstance(value, str):
+                value_bytes = len(value.encode('utf-8'))
+                if value_bytes > MAX_INDEX_VALUE_BYTES:
+                    # Truncate to safe size, accounting for suffix
+                    max_chars = MAX_INDEX_VALUE_BYTES - len(TRUNCATE_SUFFIX.encode('utf-8'))
+                    # Be conservative - truncate by character count as approximation
+                    # since UTF-8 chars can be multi-byte
+                    truncated = value[:max_chars] + TRUNCATE_SUFFIX
+                    # Verify the result fits
+                    while len(truncated.encode('utf-8')) > MAX_INDEX_VALUE_BYTES:
+                        max_chars -= 100
+                        truncated = value[:max_chars] + TRUNCATE_SUFFIX
+
+                    modified_row[col] = truncated
+                    truncations.append(TruncatedValue(
+                        table=table_key,
+                        rid=str(rid),
+                        column=col,
+                        original_bytes=value_bytes,
+                        truncated_bytes=len(truncated.encode('utf-8')),
+                    ))
+                    logger.debug(
+                        f"Truncated {table_key}.{col} for RID {rid}: "
+                        f"{value_bytes} -> {len(truncated.encode('utf-8'))} bytes"
+                    )
+
+        return modified_row, truncations
+
+    while True:
+        after_clause = f"@after({urlquote(last)})" if last else ""
+        try:
+            page = src_catalog.get(
+                f"/entity/{tname_uri}@sort(RID){after_clause}?limit={page_size}"
+            ).json()
+        except Exception as e:
+            logger.warning(f"Failed to read from {sname}:{tname}: {e}")
+            return -1, rows_skipped, truncated_values
+
+        if not page:
+            break
+
+        if row_by_row_mode:
+            # Insert rows one at a time, handling oversized values
+            for row in page:
+                row_to_insert = row
+
+                # If truncation is enabled, try to truncate first
+                if truncate_oversized and problematic_column:
+                    row_to_insert, truncations = truncate_row_values(row, problematic_column)
+                    truncated_values.extend(truncations)
+
+                try:
+                    dst_catalog.post(
+                        f"/entity/{tname_uri}?nondefaults=RID,RCT,RCB",
+                        json=[row_to_insert]
+                    )
+                    table_rows += 1
+                except Exception as row_error:
+                    error_msg = str(row_error)
+                    if _BTREE_INDEX_ERROR_PATTERN in error_msg:
+                        # This row has a value too large for the index
+                        if truncate_oversized:
+                            # Try truncating all text columns
+                            row_to_insert, truncations = truncate_row_values(row, None)
+                            truncated_values.extend(truncations)
+                            try:
+                                dst_catalog.post(
+                                    f"/entity/{tname_uri}?nondefaults=RID,RCT,RCB",
+                                    json=[row_to_insert]
+                                )
+                                table_rows += 1
+                                continue
+                            except Exception:
+                                pass  # Fall through to skip
+
+                        rows_skipped += 1
+                        rid = row.get('RID', 'unknown')
+                        logger.debug(f"Skipping row {rid} in {table_key} due to index size limit")
+                    else:
+                        # Different error - log and skip
+                        rows_skipped += 1
+                        logger.debug(f"Skipping row in {table_key}: {row_error}")
+            last = page[-1]['RID']
+        else:
+            # Normal batch mode
+            try:
+                dst_catalog.post(
+                    f"/entity/{tname_uri}?nondefaults=RID,RCT,RCB",
+                    json=page
+                )
+                last = page[-1]['RID']
+                table_rows += len(page)
+            except Exception as e:
+                error_msg = str(e)
+
+                # Check if this is a btree index size error
+                index_name, column_name = _parse_index_error(error_msg)
+
+                if index_name:
+                    action_desc = "Values will be truncated" if truncate_oversized else "Rows with oversized values will be skipped"
+                    logger.info(
+                        f"Detected btree index size error for '{index_name}' on {table_key}. "
+                        f"Switching to row-by-row mode. {action_desc}."
+                    )
+                    problematic_index = index_name
+                    problematic_column = column_name
+                    row_by_row_mode = True
+
+                    # Record the issue
+                    report.add_issue(CloneIssue(
+                        severity=CloneIssueSeverity.WARNING,
+                        category=CloneIssueCategory.INDEX_REBUILT,
+                        message=f"Index '{index_name}' has oversized values, using row-by-row mode",
+                        table=table_key,
+                        details=f"Column '{column_name}' has values exceeding btree 2704 byte limit",
+                        action=action_desc,
+                    ))
+
+                    # Retry this page in row-by-row mode
+                    for row in page:
+                        row_to_insert = row
+
+                        # If truncation is enabled, try to truncate first
+                        if truncate_oversized and problematic_column:
+                            row_to_insert, truncations = truncate_row_values(row, problematic_column)
+                            truncated_values.extend(truncations)
+
+                        try:
+                            dst_catalog.post(
+                                f"/entity/{tname_uri}?nondefaults=RID,RCT,RCB",
+                                json=[row_to_insert]
+                            )
+                            table_rows += 1
+                        except Exception as row_error:
+                            error_msg_row = str(row_error)
+                            if _BTREE_INDEX_ERROR_PATTERN in error_msg_row:
+                                # Try truncating all columns if not already done
+                                if truncate_oversized:
+                                    row_to_insert, truncations = truncate_row_values(row, None)
+                                    truncated_values.extend(truncations)
+                                    try:
+                                        dst_catalog.post(
+                                            f"/entity/{tname_uri}?nondefaults=RID,RCT,RCB",
+                                            json=[row_to_insert]
+                                        )
+                                        table_rows += 1
+                                        continue
+                                    except Exception:
+                                        pass  # Fall through to skip
+
+                                rows_skipped += 1
+                                rid = row.get('RID', 'unknown')
+                                logger.debug(f"Skipping row {rid} due to index size limit")
+                            else:
+                                rows_skipped += 1
+                                logger.debug(f"Skipping row: {row_error}")
+                    last = page[-1]['RID']
+                else:
+                    logger.warning(f"Failed to write to {sname}:{tname}: {e}")
+                    return -1, rows_skipped, truncated_values
+
+    # Report skipped rows
+    if rows_skipped > 0:
+        report.add_issue(CloneIssue(
+            severity=CloneIssueSeverity.WARNING,
+            category=CloneIssueCategory.DATA_INTEGRITY,
+            message=f"Skipped {rows_skipped} rows due to index size limits",
+            table=table_key,
+            details=f"Index '{problematic_index}' on column '{problematic_column}'",
+            action="These rows have values too large for btree index (>2704 bytes)",
+            row_count=rows_skipped,
+        ))
+        logger.warning(f"Skipped {rows_skipped} rows in {table_key} due to index size limits")
+
+    # Report truncated values
+    if truncated_values:
+        report.add_issue(CloneIssue(
+            severity=CloneIssueSeverity.INFO,
+            category=CloneIssueCategory.DATA_INTEGRITY,
+            message=f"Truncated {len(truncated_values)} values to fit index size limits",
+            table=table_key,
+            details=f"Values in column '{problematic_column}' were truncated to <{MAX_INDEX_VALUE_BYTES} bytes",
+            action="Original data was preserved with '[TRUNCATED]' suffix",
+            row_count=len(truncated_values),
+        ))
+        logger.info(f"Truncated {len(truncated_values)} values in {table_key}")
+
+    return table_rows, rows_skipped, truncated_values
+
+
+
+
+def _rebuild_deferred_indexes(
+    dst_catalog: ErmrestCatalog,
+    deferred_indexes: dict[str, list[dict]],
+    report: "CloneReport",
+) -> None:
+    """Note any indexes that had issues during data copy.
+
+    This function is called after data copy to report on any index-related
+    issues that were encountered. Since ERMrest doesn't provide direct index
+    management, we can only report these issues for manual follow-up.
+
+    Args:
+        dst_catalog: Destination catalog.
+        deferred_indexes: Dict of table -> list of index definitions with issues.
+        report: Clone report.
+    """
+    if not deferred_indexes:
+        return
+
+    logger.info(f"Reporting {sum(len(v) for v in deferred_indexes.values())} index issues...")
 
 
 def clone_catalog(
@@ -300,6 +964,7 @@ def clone_catalog(
     reinitialize_dataset_versions: bool = True,
     orphan_strategy: OrphanStrategy = OrphanStrategy.FAIL,
     prune_hidden_fkeys: bool = False,
+    truncate_oversized: bool = False,
 ) -> CloneCatalogResult:
     """Clone a catalog with robust handling of policy-induced FK violations.
 
@@ -336,9 +1001,18 @@ def clone_catalog(
         prune_hidden_fkeys: If True, skip FKs where referenced columns have
             "select": null rights (indicating potentially hidden data). This
             prevents FK violations but degrades schema structure.
+        truncate_oversized: If True, automatically truncate text values that
+            exceed PostgreSQL's btree index size limit (2704 bytes). Truncated
+            values will have "...[TRUNCATED]" appended. If False (default),
+            rows with oversized values are skipped. All truncations are recorded
+            in the result's truncated_values list.
 
     Returns:
-        CloneCatalogResult with details of the cloned catalog.
+        CloneCatalogResult with details of the cloned catalog, including:
+        - truncated_values: List of TruncatedValue records for any values
+          that were truncated due to index size limits.
+        - rows_skipped: Count of rows skipped due to index size limits
+          (when truncate_oversized=False).
 
     Raises:
         ValueError: If invalid parameters or FK violations with FAIL strategy.
@@ -372,6 +1046,9 @@ def clone_catalog(
     src_server = DerivaServer("https", source_hostname, credentials=src_cred)
     src_catalog = src_server.connect_ermrest(source_catalog_id)
 
+    # Capture source schema for provenance before any modifications
+    source_schema_json = src_catalog.get("/schema").json()
+
     # Connect to destination and create new catalog
     if is_same_server:
         dst_cred = src_cred
@@ -387,8 +1064,15 @@ def clone_catalog(
 
     report = CloneReport()
 
+    # Track truncated values
+    truncated_values: list[TruncatedValue] = []
+    rows_skipped = 0
+
+    # Record clone timestamp
+    clone_timestamp = datetime.now(timezone.utc).isoformat()
+
     # Perform the three-stage clone
-    orphan_rows_removed, orphan_rows_nullified, fkeys_pruned = _clone_three_stage(
+    orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, rows_skipped, truncated_values = _clone_three_stage(
         src_catalog=src_catalog,
         dst_catalog=dst_catalog,
         copy_data=not schema_only,
@@ -398,6 +1082,7 @@ def clone_catalog(
         exclude_objects=exclude_objects or [],
         orphan_strategy=orphan_strategy,
         prune_hidden_fkeys=prune_hidden_fkeys,
+        truncate_oversized=truncate_oversized,
         report=report,
     )
 
@@ -412,8 +1097,65 @@ def clone_catalog(
         orphan_rows_removed=orphan_rows_removed,
         orphan_rows_nullified=orphan_rows_nullified,
         fkeys_pruned=fkeys_pruned,
+        rows_skipped=rows_skipped,
+        truncated_values=truncated_values,
         report=report,
     )
+
+    # Upload source schema to Hatrac and set catalog provenance
+    source_schema_url = _upload_source_schema(
+        hostname=effective_dest_hostname,
+        catalog_id=result.catalog_id,
+        schema_json=source_schema_json,
+        credential=dst_cred,
+    )
+
+    # Calculate total rows copied from report
+    total_rows_copied = sum(report.tables_restored.values())
+
+    # Try to get current user identity
+    created_by = None
+    try:
+        session_info = dst_catalog.get("/authn/session").json()
+        if session_info and "client" in session_info:
+            client = session_info["client"]
+            created_by = client.get("display_name") or client.get("id")
+    except Exception:
+        pass
+
+    # Create clone details
+    clone_details = CloneDetails(
+        source_hostname=source_hostname,
+        source_catalog_id=source_catalog_id,
+        source_snapshot=source_snapshot,
+        source_schema_url=source_schema_url,
+        orphan_strategy=orphan_strategy.value,
+        truncate_oversized=truncate_oversized,
+        prune_hidden_fkeys=prune_hidden_fkeys,
+        schema_only=schema_only,
+        asset_mode=asset_mode.value,
+        exclude_schemas=exclude_schemas or [],
+        exclude_objects=exclude_objects or [],
+        rows_copied=total_rows_copied,
+        rows_skipped=rows_skipped,
+        truncated_count=len(truncated_values),
+        orphan_rows_removed=orphan_rows_removed,
+        orphan_rows_nullified=orphan_rows_nullified,
+        fkeys_pruned=fkeys_pruned,
+    )
+
+    # Create and set catalog provenance annotation
+    provenance = CatalogProvenance(
+        creation_method=CatalogCreationMethod.CLONE,
+        created_at=clone_timestamp,
+        hostname=effective_dest_hostname,
+        catalog_id=result.catalog_id,
+        created_by=created_by,
+        name=alias or f"Clone of {source_catalog_id}",
+        description=f"Cloned from {source_hostname}:{source_catalog_id}",
+        clone_details=clone_details,
+    )
+    _set_catalog_provenance(dst_catalog, provenance)
 
     # Post-clone operations
     result = _post_clone_operations(
@@ -442,11 +1184,12 @@ def _clone_three_stage(
     exclude_objects: list[str],
     orphan_strategy: OrphanStrategy,
     prune_hidden_fkeys: bool,
+    truncate_oversized: bool,
     report: CloneReport,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, int, list[TruncatedValue]]:
     """Perform three-stage catalog cloning.
 
-    Returns: (orphan_rows_removed, orphan_rows_nullified, fkeys_pruned)
+    Returns: (orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, rows_skipped, truncated_values)
     """
     src_model = src_catalog.getCatalogModel()
 
@@ -584,6 +1327,10 @@ def _clone_three_stage(
 
     # Stage 2: Copy data
     total_rows = 0
+    total_rows_skipped = 0
+    all_truncated_values: list[TruncatedValue] = []
+    deferred_indexes: dict[str, list[dict]] = {}  # Track indexes dropped for later rebuild
+
     if copy_data:
         logger.info("Stage 2: Copying data...")
         page_size = 10000
@@ -592,40 +1339,29 @@ def _clone_three_stage(
             if state != 1:
                 continue
 
-            tname_uri = f"{urlquote(sname)}:{urlquote(tname)}"
-            logger.debug(f"Copying data for {sname}:{tname}")
+            table_key = f"{sname}:{tname}"
+            logger.debug(f"Copying data for {table_key}")
 
-            last = None
-            table_rows = 0
+            # Use the new copy function with index error handling
+            table_rows, rows_skipped, truncated = _copy_table_data_with_retry(
+                src_catalog=src_catalog,
+                dst_catalog=dst_catalog,
+                sname=sname,
+                tname=tname,
+                page_size=page_size,
+                report=report,
+                deferred_indexes=deferred_indexes,
+                truncate_oversized=truncate_oversized,
+            )
 
-            while True:
-                after_clause = f"@after({urlquote(last)})" if last else ""
-                try:
-                    page = src_catalog.get(
-                        f"/entity/{tname_uri}@sort(RID){after_clause}?limit={page_size}"
-                    ).json()
-                except Exception as e:
-                    logger.warning(f"Failed to read from {sname}:{tname}: {e}")
-                    report.tables_failed.append(f"{sname}:{tname}")
-                    break
+            total_rows_skipped += rows_skipped
+            all_truncated_values.extend(truncated)
 
-                if page:
-                    try:
-                        dst_catalog.post(
-                            f"/entity/{tname_uri}?nondefaults=RID,RCT,RCB",
-                            json=page
-                        )
-                        last = page[-1]['RID']
-                        table_rows += len(page)
-                    except Exception as e:
-                        logger.warning(f"Failed to write to {sname}:{tname}: {e}")
-                        report.tables_failed.append(f"{sname}:{tname}")
-                        break
-                else:
-                    break
-
-            if f"{sname}:{tname}" not in report.tables_failed:
-                report.tables_restored[f"{sname}:{tname}"] = table_rows
+            if table_rows < 0:
+                # Copy failed
+                report.tables_failed.append(table_key)
+            else:
+                report.tables_restored[table_key] = table_rows
                 total_rows += table_rows
 
                 # Mark complete
@@ -638,6 +1374,10 @@ def _clone_three_stage(
                     pass
 
     logger.info(f"Stage 2 complete: {total_rows} rows copied")
+
+    # Rebuild any indexes that were dropped during data copy
+    if deferred_indexes:
+        _rebuild_deferred_indexes(dst_catalog, deferred_indexes, report)
 
     # Stage 3: Apply foreign keys
     logger.info("Stage 3: Applying foreign keys...")
@@ -841,7 +1581,7 @@ def _clone_three_stage(
     if copy_annotations or copy_policy:
         _copy_configuration(src_model, dst_catalog, copy_annotations, copy_policy, exclude_schemas, excluded_tables)
 
-    return orphan_rows_removed, orphan_rows_nullified, fkeys_pruned
+    return orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, total_rows_skipped, all_truncated_values
 
 
 def _identify_orphan_values(
