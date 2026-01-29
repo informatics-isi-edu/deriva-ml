@@ -87,9 +87,10 @@ class CloneIssue:
     details: str | None = None
     action: str | None = None
     row_count: int = 0
+    skipped_rids: list[str] | None = None  # RIDs of rows that were skipped
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "severity": self.severity.value,
             "category": self.category.value,
             "message": self.message,
@@ -98,6 +99,9 @@ class CloneIssue:
             "action": self.action,
             "row_count": self.row_count,
         }
+        if self.skipped_rids:
+            result["skipped_rids"] = self.skipped_rids
+        return result
 
     def __str__(self) -> str:
         parts = [f"[{self.severity.value.upper()}]"]
@@ -106,7 +110,14 @@ class CloneIssue:
         parts.append(self.message)
         if self.row_count > 0:
             parts.append(f"({self.row_count} rows)")
-        return " ".join(parts)
+        result = " ".join(parts)
+        if self.skipped_rids:
+            # For small numbers, list the RIDs; for large numbers, just show count
+            if len(self.skipped_rids) <= 5:
+                result += f"\n    Skipped RIDs: {', '.join(self.skipped_rids)}"
+            else:
+                result += f"\n    Skipped RIDs: {len(self.skipped_rids)} rows (see JSON for full list)"
+        return result
 
 
 @dataclass
@@ -332,6 +343,7 @@ class CloneDetails:
     source_catalog_id: str
     source_snapshot: str | None = None
     source_schema_url: str | None = None  # Hatrac URL to source schema JSON
+    # Clone parameters
     orphan_strategy: str = "fail"
     truncate_oversized: bool = False
     prune_hidden_fkeys: bool = False
@@ -339,15 +351,21 @@ class CloneDetails:
     asset_mode: str = "refs"
     exclude_schemas: list[str] = field(default_factory=list)
     exclude_objects: list[str] = field(default_factory=list)
+    add_ml_schema: bool = False
+    copy_annotations: bool = True
+    copy_policy: bool = True
+    reinitialize_dataset_versions: bool = True
+    # Statistics
     rows_copied: int = 0
     rows_skipped: int = 0
+    skipped_rids: list[str] = field(default_factory=list)  # RIDs of skipped rows
     truncated_count: int = 0
     orphan_rows_removed: int = 0
     orphan_rows_nullified: int = 0
     fkeys_pruned: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "source_hostname": self.source_hostname,
             "source_catalog_id": self.source_catalog_id,
             "source_snapshot": self.source_snapshot,
@@ -359,6 +377,10 @@ class CloneDetails:
             "asset_mode": self.asset_mode,
             "exclude_schemas": self.exclude_schemas,
             "exclude_objects": self.exclude_objects,
+            "add_ml_schema": self.add_ml_schema,
+            "copy_annotations": self.copy_annotations,
+            "copy_policy": self.copy_policy,
+            "reinitialize_dataset_versions": self.reinitialize_dataset_versions,
             "rows_copied": self.rows_copied,
             "rows_skipped": self.rows_skipped,
             "truncated_count": self.truncated_count,
@@ -366,6 +388,9 @@ class CloneDetails:
             "orphan_rows_nullified": self.orphan_rows_nullified,
             "fkeys_pruned": self.fkeys_pruned,
         }
+        if self.skipped_rids:
+            result["skipped_rids"] = self.skipped_rids
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CloneDetails":
@@ -381,8 +406,13 @@ class CloneDetails:
             asset_mode=data.get("asset_mode", "refs"),
             exclude_schemas=data.get("exclude_schemas", []),
             exclude_objects=data.get("exclude_objects", []),
+            add_ml_schema=data.get("add_ml_schema", False),
+            copy_annotations=data.get("copy_annotations", True),
+            copy_policy=data.get("copy_policy", True),
+            reinitialize_dataset_versions=data.get("reinitialize_dataset_versions", True),
             rows_copied=data.get("rows_copied", 0),
             rows_skipped=data.get("rows_skipped", 0),
+            skipped_rids=data.get("skipped_rids", []),
             truncated_count=data.get("truncated_count", 0),
             orphan_rows_removed=data.get("orphan_rows_removed", 0),
             orphan_rows_nullified=data.get("orphan_rows_nullified", 0),
@@ -677,7 +707,7 @@ def _copy_table_data_with_retry(
     report: "CloneReport",
     deferred_indexes: dict[str, list[dict]],
     truncate_oversized: bool = False,
-) -> tuple[int, int, list[TruncatedValue]]:
+) -> tuple[int, int, list[str], list[TruncatedValue]]:
     """Copy data for a single table with retry logic for index errors.
 
     If a btree index size error occurs, this function will:
@@ -698,7 +728,7 @@ def _copy_table_data_with_retry(
         truncate_oversized: If True, truncate oversized values instead of skipping rows.
 
     Returns:
-        Tuple of (rows_copied, rows_skipped, truncated_values).
+        Tuple of (rows_copied, rows_skipped, skipped_rids, truncated_values).
         rows_copied is -1 if the copy failed entirely.
     """
     tname_uri = f"{urlquote(sname)}:{urlquote(tname)}"
@@ -711,6 +741,7 @@ def _copy_table_data_with_retry(
     last = None
     table_rows = 0
     rows_skipped = 0
+    skipped_rids: list[str] = []  # Track RIDs of skipped rows
     truncated_values: list[TruncatedValue] = []
     row_by_row_mode = False
     problematic_index = None
@@ -768,7 +799,7 @@ def _copy_table_data_with_retry(
             ).json()
         except Exception as e:
             logger.warning(f"Failed to read from {sname}:{tname}: {e}")
-            return -1, rows_skipped, truncated_values
+            return -1, rows_skipped, skipped_rids, truncated_values
 
         if not page:
             break
@@ -809,11 +840,14 @@ def _copy_table_data_with_retry(
 
                         rows_skipped += 1
                         rid = row.get('RID', 'unknown')
+                        skipped_rids.append(rid)
                         logger.debug(f"Skipping row {rid} in {table_key} due to index size limit")
                     else:
                         # Different error - log and skip
                         rows_skipped += 1
-                        logger.debug(f"Skipping row in {table_key}: {row_error}")
+                        rid = row.get('RID', 'unknown')
+                        skipped_rids.append(rid)
+                        logger.debug(f"Skipping row {rid} in {table_key}: {row_error}")
             last = page[-1]['RID']
         else:
             # Normal batch mode
@@ -884,14 +918,17 @@ def _copy_table_data_with_retry(
 
                                 rows_skipped += 1
                                 rid = row.get('RID', 'unknown')
+                                skipped_rids.append(rid)
                                 logger.debug(f"Skipping row {rid} due to index size limit")
                             else:
                                 rows_skipped += 1
-                                logger.debug(f"Skipping row: {row_error}")
+                                rid = row.get('RID', 'unknown')
+                                skipped_rids.append(rid)
+                                logger.debug(f"Skipping row {rid}: {row_error}")
                     last = page[-1]['RID']
                 else:
                     logger.warning(f"Failed to write to {sname}:{tname}: {e}")
-                    return -1, rows_skipped, truncated_values
+                    return -1, rows_skipped, skipped_rids, truncated_values
 
     # Report skipped rows
     if rows_skipped > 0:
@@ -903,8 +940,9 @@ def _copy_table_data_with_retry(
             details=f"Index '{problematic_index}' on column '{problematic_column}'",
             action="These rows have values too large for btree index (>2704 bytes)",
             row_count=rows_skipped,
+            skipped_rids=skipped_rids if skipped_rids else None,
         ))
-        logger.warning(f"Skipped {rows_skipped} rows in {table_key} due to index size limits")
+        logger.warning(f"Skipped {rows_skipped} rows in {table_key} due to index size limits: RIDs={skipped_rids}")
 
     # Report truncated values
     if truncated_values:
@@ -919,7 +957,7 @@ def _copy_table_data_with_retry(
         ))
         logger.info(f"Truncated {len(truncated_values)} values in {table_key}")
 
-    return table_rows, rows_skipped, truncated_values
+    return table_rows, rows_skipped, skipped_rids, truncated_values
 
 
 
@@ -1072,7 +1110,7 @@ def clone_catalog(
     clone_timestamp = datetime.now(timezone.utc).isoformat()
 
     # Perform the three-stage clone
-    orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, rows_skipped, truncated_values = _clone_three_stage(
+    orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, rows_skipped, skipped_rids, truncated_values = _clone_three_stage(
         src_catalog=src_catalog,
         dst_catalog=dst_catalog,
         copy_data=not schema_only,
@@ -1136,8 +1174,13 @@ def clone_catalog(
         asset_mode=asset_mode.value,
         exclude_schemas=exclude_schemas or [],
         exclude_objects=exclude_objects or [],
+        add_ml_schema=add_ml_schema,
+        copy_annotations=copy_annotations,
+        copy_policy=copy_policy,
+        reinitialize_dataset_versions=reinitialize_dataset_versions,
         rows_copied=total_rows_copied,
         rows_skipped=rows_skipped,
+        skipped_rids=skipped_rids,
         truncated_count=len(truncated_values),
         orphan_rows_removed=orphan_rows_removed,
         orphan_rows_nullified=orphan_rows_nullified,
@@ -1186,10 +1229,10 @@ def _clone_three_stage(
     prune_hidden_fkeys: bool,
     truncate_oversized: bool,
     report: CloneReport,
-) -> tuple[int, int, int, int, list[TruncatedValue]]:
+) -> tuple[int, int, int, int, list[str], list[TruncatedValue]]:
     """Perform three-stage catalog cloning.
 
-    Returns: (orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, rows_skipped, truncated_values)
+    Returns: (orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, rows_skipped, skipped_rids, truncated_values)
     """
     src_model = src_catalog.getCatalogModel()
 
@@ -1328,6 +1371,7 @@ def _clone_three_stage(
     # Stage 2: Copy data
     total_rows = 0
     total_rows_skipped = 0
+    all_skipped_rids: list[str] = []
     all_truncated_values: list[TruncatedValue] = []
     deferred_indexes: dict[str, list[dict]] = {}  # Track indexes dropped for later rebuild
 
@@ -1343,7 +1387,7 @@ def _clone_three_stage(
             logger.debug(f"Copying data for {table_key}")
 
             # Use the new copy function with index error handling
-            table_rows, rows_skipped, truncated = _copy_table_data_with_retry(
+            table_rows, rows_skipped, skipped_rids, truncated = _copy_table_data_with_retry(
                 src_catalog=src_catalog,
                 dst_catalog=dst_catalog,
                 sname=sname,
@@ -1355,6 +1399,7 @@ def _clone_three_stage(
             )
 
             total_rows_skipped += rows_skipped
+            all_skipped_rids.extend(skipped_rids)
             all_truncated_values.extend(truncated)
 
             if table_rows < 0:
@@ -1581,7 +1626,7 @@ def _clone_three_stage(
     if copy_annotations or copy_policy:
         _copy_configuration(src_model, dst_catalog, copy_annotations, copy_policy, exclude_schemas, excluded_tables)
 
-    return orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, total_rows_skipped, all_truncated_values
+    return orphan_rows_removed, orphan_rows_nullified, fkeys_pruned, total_rows_skipped, all_skipped_rids, all_truncated_values
 
 
 def _identify_orphan_values(
@@ -1896,6 +1941,23 @@ def _post_clone_operations(
             catalog = server.connect_ermrest(result.catalog_id)
             create_ml_schema(catalog)
             result.ml_schema_added = True
+
+            # Apply catalog annotations (chaise-config, navbar, etc.)
+            try:
+                from deriva_ml import DerivaML
+                ml = DerivaML(result.hostname, result.catalog_id, check_auth=False)
+                ml.apply_catalog_annotations()
+                logger.info("Applied catalog annotations (chaise-config, navbar)")
+            except Exception as e:
+                logger.warning(f"Failed to apply catalog annotations: {e}")
+                if result.report:
+                    result.report.add_issue(CloneIssue(
+                        severity=CloneIssueSeverity.WARNING,
+                        category=CloneIssueCategory.SCHEMA_ISSUE,
+                        message="Failed to apply catalog annotations",
+                        details=str(e),
+                        action="Manually call apply_catalog_annotations() after clone",
+                    ))
         except Exception as e:
             logger.warning(f"Failed to add ML schema: {e}")
             if result.report:
