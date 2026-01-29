@@ -1892,12 +1892,20 @@ def _post_clone_operations(
 
     if add_ml_schema:
         try:
-            from deriva_ml.schema import add_ml_schema as add_schema
+            from deriva_ml.schema import create_ml_schema
             catalog = server.connect_ermrest(result.catalog_id)
-            add_schema(catalog)
+            create_ml_schema(catalog)
             result.ml_schema_added = True
         except Exception as e:
             logger.warning(f"Failed to add ML schema: {e}")
+            if result.report:
+                result.report.add_issue(CloneIssue(
+                    severity=CloneIssueSeverity.ERROR,
+                    category=CloneIssueCategory.SCHEMA_ISSUE,
+                    message="Failed to add DerivaML schema",
+                    details=str(e),
+                    action="ML schema was not added to the clone",
+                ))
 
     return result
 
