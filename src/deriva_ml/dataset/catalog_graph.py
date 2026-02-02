@@ -9,6 +9,7 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 
 from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
+from deriva_ml.model.catalog import ASSET_COLUMNS
 
 try:
 
@@ -117,8 +118,7 @@ class CatalogGraph:
         ]
 
         # If this table is an asset table, then we need to output the files associated with the asset.
-        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
-        if asset_columns.issubset({c.name for c in table.columns}):
+        if ASSET_COLUMNS.issubset({c.name for c in table.columns}):
             exports.append(
                 {
                     "processor": "fetch",
@@ -168,8 +168,7 @@ class CatalogGraph:
         ]
 
         # If this table is an asset table, then we need to output the files associated with the asset.
-        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
-        if asset_columns.issubset({c.name for c in table.columns}):
+        if ASSET_COLUMNS.issubset({c.name for c in table.columns}):
             exports.append(
                 {
                     "source": {

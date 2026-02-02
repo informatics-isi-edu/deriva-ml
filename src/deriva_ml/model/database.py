@@ -1,25 +1,33 @@
 """DerivaML-specific database model for downloaded BDBags.
 
-This module provides the DatabaseModel class which extends the generic BagDatabase
-from deriva-py with DerivaML-specific functionality:
+This module provides the DatabaseModel class which creates a SQLite database
+from a BDBag and provides DerivaML-specific functionality:
 
 - Dataset version tracking
 - Dataset RID resolution
 - Integration with DerivaModel for schema analysis
 
-For schema-independent BDBag operations, see deriva.core.bag_database.BagDatabase.
+The implementation uses a two-phase pattern:
+1. Phase 1 (SchemaBuilder): Create SQLAlchemy ORM from schema.json
+2. Phase 2 (DataLoader): Load data from CSV files
+
+For the low-level components, see:
+- schema_builder.py: SchemaBuilder, SchemaORM
+- data_sources.py: DataSource, BagDataSource, CatalogDataSource
+- data_loader.py: DataLoader
+- fk_orderer.py: ForeignKeyOrderer
 """
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Type
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy import Table as SQLTable
 
-from deriva.core.bag_database import BagDatabase
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
 
@@ -27,19 +35,26 @@ from deriva_ml.core.definitions import ML_SCHEMA, RID, get_domain_schemas
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
+from deriva_ml.model.data_sources import BagDataSource
+from deriva_ml.model.data_loader import DataLoader
 
 
-class DatabaseModel(BagDatabase, DerivaModel):
+logger = logging.getLogger(__name__)
+
+
+class DatabaseModel(DerivaModel):
     """DerivaML database model for downloaded BDBags.
 
-    This class combines the generic BagDatabase functionality with DerivaML-specific
-    features like dataset versioning and the DerivaModel schema utilities.
-
-    It reads a BDBag and creates a SQLite database, then provides:
-    - All BagDatabase query methods (list_tables, get_table_contents, etc.)
-    - All DerivaModel schema methods (find_features, is_asset, etc.)
+    This class creates a SQLite database from a BDBag and provides:
+    - SQLAlchemy ORM access (engine, metadata, Base)
+    - DerivaModel schema methods (find_features, is_asset, etc.)
     - Dataset version tracking (bag_rids, dataset_version)
     - Dataset RID validation (rid_lookup)
+
+    The implementation uses a two-phase pattern:
+    1. SchemaBuilder creates SQLAlchemy ORM from schema.json
+    2. DataLoader fills the database from CSV files
 
     Attributes:
         bag_path: Path to the BDBag directory.
@@ -47,6 +62,9 @@ class DatabaseModel(BagDatabase, DerivaModel):
         dataset_rid: Primary dataset RID in this bag.
         bag_rids: Dictionary mapping all dataset RIDs to their versions.
         dataset_table: The Dataset table from the ERMrest model.
+        engine: SQLAlchemy engine for database access.
+        metadata: SQLAlchemy MetaData with table definitions.
+        Base: SQLAlchemy automap base for ORM classes.
 
     Example:
         >>> db = DatabaseModel(minid, bag_path, working_dir)
@@ -66,33 +84,47 @@ class DatabaseModel(BagDatabase, DerivaModel):
         self._logger = logging.getLogger("deriva_ml")
         self.minid = minid
         self.dataset_rid = minid.dataset_rid
+        self.bag_path = bag_path
 
-        # Load the model first to determine schema names
+        # Load the model from schema.json
         schema_file = bag_path / "data/schema.json"
-        temp_model = Model.fromfile("file-system", schema_file)
+        model = Model.fromfile("file-system", schema_file)
 
-        # Determine domain schemas using schema classification
+        # Determine schemas using schema classification
         ml_schema = ML_SCHEMA
-        domain_schemas = get_domain_schemas(temp_model.schemas.keys(), ml_schema)
+        domain_schemas = get_domain_schemas(model.schemas.keys(), ml_schema)
+        schemas = [*domain_schemas, ml_schema]
 
-        # Initialize BagDatabase (creates SQLite DB)
-        BagDatabase.__init__(
-            self,
-            bag_path=bag_path,
-            database_dir=dbase_path,
-            schemas=[*domain_schemas, ml_schema],
+        # Extract bag checksum for unique database path
+        bag_cache_dir = bag_path.parent.name
+        self.database_dir = dbase_path / bag_cache_dir
+        self.database_dir.mkdir(parents=True, exist_ok=True)
+
+        # Phase 1: Build ORM structure
+        builder = SchemaBuilder(
+            model=model,
+            schemas=schemas,
+            database_path=self.database_dir,
         )
+        self._orm: SchemaORM = builder.build()
+
+        # Phase 2: Load data from bag CSVs
+        source = BagDataSource(bag_path, model=model)
+        loader = DataLoader(self._orm, source)
+        load_counts = loader.load_tables()
+
+        total_rows = sum(load_counts.values())
+        self._logger.debug(f"Loaded {total_rows} rows from bag")
 
         # Initialize DerivaModel (provides schema analysis methods)
-        # Note: We pass self.model which was set by BagDatabase
         DerivaModel.__init__(
             self,
-            model=self.model,
+            model=model,
             ml_schema=ml_schema,
             domain_schemas=domain_schemas,
         )
 
-        self.dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
+        self.dataset_table = model.schemas[ml_schema].tables["Dataset"]
 
         # Build dataset RID -> version mapping from Dataset_Version table
         self._build_bag_rids()
@@ -102,6 +134,34 @@ class DatabaseModel(BagDatabase, DerivaModel):
             self.dataset_rid,
             self.database_dir,
         )
+
+    # =========================================================================
+    # Property delegates to SchemaORM
+    # =========================================================================
+
+    @property
+    def engine(self):
+        """SQLAlchemy engine for database access."""
+        return self._orm.engine
+
+    @property
+    def metadata(self):
+        """SQLAlchemy MetaData with table definitions."""
+        return self._orm.metadata
+
+    @property
+    def Base(self):
+        """SQLAlchemy automap base for ORM classes."""
+        return self._orm.Base
+
+    @property
+    def schemas(self) -> list[str]:
+        """List of schema names in the database."""
+        return self._orm.schemas
+
+    # =========================================================================
+    # Dataset version tracking
+    # =========================================================================
 
     def _build_bag_rids(self) -> None:
         """Build mapping of dataset RIDs to their versions in this bag."""
@@ -121,7 +181,7 @@ class DatabaseModel(BagDatabase, DerivaModel):
                 if rid not in self.bag_rids or version > self.bag_rids[rid]:
                     self.bag_rids[rid] = version
 
-    def dataset_version(self, dataset_rid: Optional[RID] = None) -> DatasetVersion:
+    def dataset_version(self, dataset_rid: RID | None = None) -> DatasetVersion:
         """Get the version of a dataset in this bag.
 
         Args:
@@ -153,6 +213,107 @@ class DatabaseModel(BagDatabase, DerivaModel):
         if dataset_rid in self.bag_rids:
             return self.bag_rids[dataset_rid]
         raise DerivaMLException(f"Dataset {dataset_rid} not found in this bag")
+
+    # =========================================================================
+    # Table/ORM access methods - delegate to SchemaORM
+    # =========================================================================
+
+    def list_tables(self) -> list[str]:
+        """List all tables in the database.
+
+        Returns:
+            List of fully-qualified table names (schema.table), sorted.
+        """
+        return self._orm.list_tables()
+
+    def find_table(self, table_name: str) -> SQLTable:
+        """Find a table by name.
+
+        Args:
+            table_name: Table name, with or without schema prefix.
+
+        Returns:
+            SQLAlchemy Table object.
+
+        Raises:
+            KeyError: If table not found.
+        """
+        return self._orm.find_table(table_name)
+
+    def get_table_contents(self, table: str) -> Generator[dict[str, Any], None, None]:
+        """Retrieve all rows from a table as dictionaries.
+
+        Args:
+            table: Table name (with or without schema prefix).
+
+        Yields:
+            Dictionary for each row with column names as keys.
+        """
+        yield from self._orm.get_table_contents(table)
+
+    def get_orm_class_by_name(self, table_name: str) -> Any | None:
+        """Get the ORM class for a table by name.
+
+        Args:
+            table_name: Table name, with or without schema prefix.
+
+        Returns:
+            SQLAlchemy ORM class for the table.
+
+        Raises:
+            KeyError: If table not found.
+        """
+        return self._orm.get_orm_class(table_name)
+
+    def get_orm_class_for_table(self, table: SQLTable | DerivaTable | str) -> Any | None:
+        """Get the ORM class for a table.
+
+        Args:
+            table: SQLAlchemy Table, Deriva Table, or table name.
+
+        Returns:
+            SQLAlchemy ORM class, or None if not found.
+        """
+        return self._orm.get_orm_class_for_table(table)
+
+    @staticmethod
+    def is_association_table(
+        table_class,
+        min_arity: int = 2,
+        max_arity: int = 2,
+        unqualified: bool = True,
+        pure: bool = True,
+        no_overlap: bool = True,
+        return_fkeys: bool = False,
+    ):
+        """Check if an ORM class represents an association table.
+
+        Delegates to SchemaORM.is_association_table.
+        """
+        return SchemaORM.is_association_table(
+            table_class, min_arity, max_arity, unqualified, pure, no_overlap, return_fkeys
+        )
+
+    def get_association_class(
+        self,
+        left_cls: Type[Any],
+        right_cls: Type[Any],
+    ) -> tuple[Any, Any, Any] | None:
+        """Find an association class connecting two ORM classes.
+
+        Args:
+            left_cls: First ORM class.
+            right_cls: Second ORM class.
+
+        Returns:
+            Tuple of (association_class, left_relationship, right_relationship),
+            or None if no association found.
+        """
+        return self._orm.get_association_class(left_cls, right_cls)
+
+    # =========================================================================
+    # Compatibility methods
+    # =========================================================================
 
     def _get_table_contents(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Retrieve table contents as dictionaries.
@@ -195,13 +356,25 @@ class DatabaseModel(BagDatabase, DerivaModel):
             result = session.execute(cmd).mappings().first()
             return dict(result) if result else None
 
-    # Compatibility aliases for methods that have different names in BagDatabase
     def get_orm_association_class(self, left_cls, right_cls, **kwargs):
         """Find association class between two ORM classes.
 
-        Wrapper around BagDatabase.get_association_class for compatibility.
+        Wrapper around get_association_class for compatibility.
         """
         return self.get_association_class(left_cls, right_cls)
+
+    # =========================================================================
+    # Resource management
+    # =========================================================================
+
+    def dispose(self) -> None:
+        """Dispose of SQLAlchemy resources.
+
+        Call this when done with the database to properly clean up connections.
+        After calling dispose(), the instance should not be used further.
+        """
+        if hasattr(self, "_orm") and self._orm is not None:
+            self._orm.dispose()
 
     def delete_database(self) -> None:
         """Delete the database files.
@@ -212,3 +385,16 @@ class DatabaseModel(BagDatabase, DerivaModel):
         self.dispose()
         # Note: We don't actually delete files here to avoid data loss.
         # The caller should handle file deletion if needed.
+
+    def __del__(self) -> None:
+        """Cleanup resources when garbage collected."""
+        self.dispose()
+
+    def __enter__(self) -> "DatabaseModel":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Context manager exit - dispose resources."""
+        self.dispose()
+        return False

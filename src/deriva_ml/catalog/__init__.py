@@ -9,6 +9,7 @@ from deriva_ml.catalog.clone import (
     CloneDetails,
     OrphanStrategy,
     clone_catalog,
+    clone_subset_catalog,
     get_catalog_provenance,
     set_catalog_provenance,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "LocalizeResult",
     "OrphanStrategy",
     "clone_catalog",
+    "clone_subset_catalog",
     "get_catalog_provenance",
     "localize_assets",
     "set_catalog_provenance",

@@ -44,19 +44,20 @@ def localize_assets(
     hatrac_namespace: str | None = None,
     chunk_size: int | None = None,
     dry_run: bool = False,
+    source_hostname: str | None = None,
 ) -> LocalizeResult:
     """Localize remote hatrac assets to the local catalog server.
 
-    Downloads assets from remote hatrac servers (determined from the URL in each
-    asset record) and uploads them to the local hatrac server, updating the asset
-    table URLs to point to the local copies.
+    Downloads assets from remote hatrac servers and uploads them to the local
+    hatrac server, updating the asset table URLs to point to the local copies.
 
     This is useful after cloning a catalog with asset_mode="refs" where the
-    asset URLs still point to the source server. Use this function to make
-    the assets fully local.
+    asset URLs still point to the source server (either as absolute URLs or
+    as relative hatrac paths). Use this function to make the assets fully local.
 
-    The source hatrac server for each asset is determined automatically from
-    the URL stored in the asset record.
+    The source hatrac server for each asset is determined:
+    1. From the URL if it's an absolute URL (e.g., https://source.org/hatrac/...)
+    2. From the source_hostname parameter if the URL is relative (e.g., /hatrac/...)
 
     This function is optimized for bulk operations:
     - Fetches all asset records in a single query
@@ -75,6 +76,9 @@ def localize_assets(
         chunk_size: Optional chunk size in bytes for large file uploads. If None,
             uses default chunking behavior.
         dry_run: If True, only report what would be done without making changes.
+        source_hostname: Hostname to use for assets with relative URLs (e.g.,
+            "www.facebase.org"). Required when localizing assets cloned with
+            asset_mode="refs" from a different server.
 
     Returns:
         LocalizeResult with counts and details of the operation.
@@ -92,6 +96,15 @@ def localize_assets(
             ...     asset_rids=["1-ABC", "2-DEF", "3-GHI"],
             ... )
             >>> print(f"Localized {result.assets_processed} assets")
+
+        Localize assets cloned from another server with relative URLs:
+            >>> result = localize_assets(
+            ...     ml,
+            ...     asset_table="file",
+            ...     asset_rids=["TG0", "TG2"],
+            ...     schema_name="isa",
+            ...     source_hostname="www.facebase.org",  # Where the hatrac files are
+            ... )
 
         Localize using ErmrestCatalog:
             >>> from deriva.core import DerivaServer
@@ -131,6 +144,12 @@ def localize_assets(
     # Build a map of RID -> record for easy lookup
     records_by_rid = {r["RID"]: r for r in all_records}
 
+    # Detect URL column name from first record (try URL first, then url)
+    url_column = "URL"
+    if all_records:
+        if "URL" not in all_records[0] and "url" in all_records[0]:
+            url_column = "url"
+
     # Identify which assets need to be localized
     assets_to_localize = []
     for rid in asset_rids:
@@ -140,22 +159,29 @@ def localize_assets(
             result.assets_skipped += 1
             continue
 
-        current_url = record.get("URL")
+        # Try both URL and url column names (different catalogs use different conventions)
+        current_url = record.get("URL") or record.get("url")
         if not current_url:
-            logger.warning(f"Asset {rid} has no URL, skipping")
+            logger.warning(f"Asset {rid} has no URL column, skipping")
             result.assets_skipped += 1
             continue
 
         # Parse the URL to get source hostname
         parsed_url = urlparse(current_url)
-        source_hostname = parsed_url.netloc
+        asset_source_hostname = parsed_url.netloc
 
-        if not source_hostname:
-            logger.info(f"Asset {rid} has relative URL, already local")
-            result.assets_skipped += 1
-            continue
+        if not asset_source_hostname:
+            # URL is relative (e.g., /hatrac/facebase/data/...)
+            if source_hostname:
+                # Use provided source_hostname for relative URLs
+                asset_source_hostname = source_hostname
+                logger.info(f"Asset {rid} has relative URL, using source_hostname={source_hostname}")
+            else:
+                logger.info(f"Asset {rid} has relative URL, already local (specify source_hostname to localize)")
+                result.assets_skipped += 1
+                continue
 
-        if source_hostname == hostname:
+        if asset_source_hostname == hostname:
             logger.info(f"Asset {rid} is already local, skipping")
             result.assets_skipped += 1
             continue
@@ -170,7 +196,7 @@ def localize_assets(
         assets_to_localize.append({
             "rid": rid,
             "record": record,
-            "source_hostname": source_hostname,
+            "source_hostname": asset_source_hostname,
             "source_path": source_path,
             "current_url": current_url,
         })
@@ -209,8 +235,9 @@ def localize_assets(
             source_hostname = asset_info["source_hostname"]
             source_path = asset_info["source_path"]
             current_url = asset_info["current_url"]
-            filename = record.get("Filename")
-            md5 = record.get("MD5")
+            # Handle case variations in column names
+            filename = record.get("Filename") or record.get("filename")
+            md5 = record.get("MD5") or record.get("md5")
 
             logger.info(f"[{i+1}/{len(assets_to_localize)}] Localizing {rid}: {filename} from {source_hostname}")
 
@@ -232,16 +259,22 @@ def localize_assets(
                 # Upload to local hatrac
                 dest_path = f"{hatrac_namespace}/{md5}.{filename}" if md5 and filename else f"{hatrac_namespace}/{rid}"
 
+                # Enable chunking for large files (> 100MB) by default
+                file_size = local_file.stat().st_size
+                default_chunk_size = 50 * 1024 * 1024  # 50MB chunks
+                use_chunked = chunk_size is not None or file_size > 100 * 1024 * 1024
+                actual_chunk_size = chunk_size or default_chunk_size
+
                 new_url = local_hatrac.put_loc(
                     dest_path,
                     str(local_file),
                     headers={"Content-Disposition": f"filename*=UTF-8''{urlquote(filename or 'asset')}"},
-                    chunked=chunk_size is not None,
-                    chunk_size=chunk_size or 0,
+                    chunked=use_chunked,
+                    chunk_size=actual_chunk_size if use_chunked else 0,
                 )
 
-                # Queue the catalog update
-                catalog_updates.append({"RID": rid, "URL": new_url})
+                # Queue the catalog update using the detected URL column name
+                catalog_updates.append({"RID": rid, url_column: new_url})
 
                 logger.info(f"Localized asset {rid}: {current_url} -> {new_url}")
                 result.assets_processed += 1
@@ -257,20 +290,23 @@ def localize_assets(
                 result.errors.append(error_msg)
                 result.assets_failed += 1
 
-    # Batch update the catalog records
+    # Batch update the catalog records using datapath
     if catalog_updates:
         logger.info(f"Updating {len(catalog_updates)} catalog records...")
         try:
-            table_path.path.update(catalog_updates)
-            logger.info("Catalog records updated successfully")
+            # Use datapath update - table_path.update() handles the update correctly
+            table_path.update(catalog_updates)
+            logger.info(f"Updated {len(catalog_updates)} catalog records successfully")
         except Exception as e:
             # If batch update fails, try individual updates as fallback
             logger.warning(f"Batch update failed ({e}), falling back to individual updates...")
             for update in catalog_updates:
+                rid = update["RID"]
                 try:
-                    table_path.path.filter(table_path.RID == update["RID"]).update([update])
+                    table_path.update([update])
+                    logger.info(f"Updated catalog record {rid}")
                 except Exception as e2:
-                    error_msg = f"Failed to update catalog record {update['RID']}: {e2}"
+                    error_msg = f"Failed to update catalog record {rid}: {e2}"
                     logger.error(error_msg)
                     result.errors.append(error_msg)
 
