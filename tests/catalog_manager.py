@@ -289,7 +289,7 @@ class CatalogManager:
         return DerivaML(
             self.hostname,
             self.catalog_id,
-            domain_schema=self.domain_schema,
+            default_schema=self.domain_schema,
             working_dir=working_dir,
             use_minid=False,
         )
@@ -379,6 +379,11 @@ class CatalogManager:
     def dataset_description(self) -> DatasetDescription | None:
         """Get the current dataset description, if datasets have been created."""
         return self._dataset_description
+
+    @property
+    def default_schema(self) -> str:
+        """Alias for domain_schema to match DerivaML API."""
+        return self.domain_schema
 
 
 # Fixture helper functions for common patterns

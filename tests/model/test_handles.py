@@ -13,7 +13,7 @@ class TestColumnHandle:
         """Test creating a ColumnHandle from an existing column."""
         ml = test_ml
         # Get an existing table
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         col = table.columns["Filename"]
 
         handle = ColumnHandle(col)
@@ -23,7 +23,7 @@ class TestColumnHandle:
     def test_column_handle_delegation(self, test_ml):
         """Test that ColumnHandle delegates to underlying Column."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         col = table.columns["Filename"]
         handle = ColumnHandle(col)
 
@@ -36,7 +36,7 @@ class TestColumnHandle:
         """Test getting and setting column description."""
         ml = test_ml
         ml.create_vocabulary("CV_ColDesc", "Test column description")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_ColDesc"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_ColDesc"]
 
         handle = ColumnHandle(table.columns["Name"])
 
@@ -48,13 +48,13 @@ class TestColumnHandle:
         assert handle.description == "Test description for Name column"
 
         # Verify it persisted (the alter() call applies immediately)
-        fresh_col = ml.model.schemas[ml.domain_schema].tables["CV_ColDesc"].columns["Name"]
+        fresh_col = ml.model.schemas[ml.default_schema].tables["CV_ColDesc"].columns["Name"]
         assert fresh_col.comment == "Test description for Name column"
 
     def test_column_handle_column_type(self, test_ml):
         """Test getting column type as BuiltinTypes enum."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = ColumnHandle(table.columns["Filename"])
 
         col_type = handle.column_type
@@ -64,7 +64,7 @@ class TestColumnHandle:
     def test_column_handle_is_system_column(self, test_ml):
         """Test identifying system columns."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
 
         rid_handle = ColumnHandle(table.columns["RID"])
         assert rid_handle.is_system_column is True
@@ -76,7 +76,7 @@ class TestColumnHandle:
         """Test setting and getting column display name."""
         ml = test_ml
         ml.create_vocabulary("CV_ColDisp", "Test column display")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_ColDisp"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_ColDisp"]
         handle = ColumnHandle(table.columns["Name"])
 
         # Set display name
@@ -88,7 +88,7 @@ class TestColumnHandle:
     def test_column_handle_repr(self, test_ml):
         """Test ColumnHandle string representation."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = ColumnHandle(table.columns["Filename"])
 
         repr_str = repr(handle)
@@ -102,7 +102,7 @@ class TestTableHandle:
     def test_table_handle_creation(self, test_ml):
         """Test creating a TableHandle from an existing table."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
 
         handle = TableHandle(table)
         assert handle.name == "Image"
@@ -111,7 +111,7 @@ class TestTableHandle:
     def test_table_handle_delegation(self, test_ml):
         """Test that TableHandle delegates to underlying Table."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         # Delegated properties should work
@@ -123,7 +123,7 @@ class TestTableHandle:
         """Test getting and setting table description."""
         ml = test_ml
         ml.create_vocabulary("CV_TblDesc", "Original description")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_TblDesc"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_TblDesc"]
         handle = TableHandle(table)
 
         # Set new description
@@ -133,7 +133,7 @@ class TestTableHandle:
     def test_table_handle_get_column(self, test_ml):
         """Test getting a column by name."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         # Get existing column
@@ -149,7 +149,7 @@ class TestTableHandle:
     def test_table_handle_column(self, test_ml):
         """Test getting a column with KeyError on missing."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         # Get existing column
@@ -163,7 +163,7 @@ class TestTableHandle:
     def test_table_handle_all_columns(self, test_ml):
         """Test iterating over all columns."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         columns = list(handle.all_columns)
@@ -177,7 +177,7 @@ class TestTableHandle:
     def test_table_handle_user_columns(self, test_ml):
         """Test getting non-system columns."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         user_cols = handle.user_columns
@@ -196,7 +196,7 @@ class TestTableHandle:
     def test_table_handle_column_names(self, test_ml):
         """Test getting list of column names."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         names = handle.column_names
@@ -207,7 +207,7 @@ class TestTableHandle:
     def test_table_handle_has_column(self, test_ml):
         """Test checking if column exists."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         assert handle.has_column("Filename") is True
@@ -217,7 +217,7 @@ class TestTableHandle:
         """Test adding a new column to a table."""
         ml = test_ml
         ml.create_vocabulary("CV_AddCol", "Test add column")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_AddCol"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_AddCol"]
         handle = TableHandle(table)
 
         # Add a new column
@@ -240,7 +240,7 @@ class TestTableHandle:
         """Test setting and getting table display name."""
         ml = test_ml
         ml.create_vocabulary("CV_TblDisp", "Test table display")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_TblDisp"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_TblDisp"]
         handle = TableHandle(table)
 
         # Set display name
@@ -253,7 +253,7 @@ class TestTableHandle:
         """Test setting and getting row name pattern."""
         ml = test_ml
         ml.create_vocabulary("CV_RowName", "Test row name")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_RowName"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_RowName"]
         handle = TableHandle(table)
 
         # Set row name pattern
@@ -266,7 +266,7 @@ class TestTableHandle:
         """Test setting and getting visible columns."""
         ml = test_ml
         ml.create_vocabulary("CV_VisCols", "Test visible columns")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_VisCols"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_VisCols"]
         handle = TableHandle(table)
 
         # Set visible columns
@@ -280,7 +280,7 @@ class TestTableHandle:
         """Test adding and removing individual visible columns."""
         ml = test_ml
         ml.create_vocabulary("CV_AddVisCols", "Test add/remove visible columns")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_AddVisCols"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_AddVisCols"]
         handle = TableHandle(table)
 
         # Set initial visible columns
@@ -302,7 +302,7 @@ class TestTableHandle:
         """Test is_generated, is_immutable, is_non_deletable properties."""
         ml = test_ml
         ml.create_vocabulary("CV_Presence", "Test presence annotations")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_Presence"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_Presence"]
         handle = TableHandle(table)
 
         # Initially should be false
@@ -327,7 +327,7 @@ class TestTableHandle:
     def test_table_handle_repr(self, test_ml):
         """Test TableHandle string representation."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         repr_str = repr(handle)
@@ -337,7 +337,7 @@ class TestTableHandle:
     def test_table_handle_column_caching(self, test_ml):
         """Test that ColumnHandle objects are cached."""
         ml = test_ml
-        table = ml.model.schemas[ml.domain_schema].tables["Image"]
+        table = ml.model.schemas[ml.default_schema].tables["Image"]
         handle = TableHandle(table)
 
         # Get same column twice
@@ -355,7 +355,7 @@ class TestTableColumnIntegration:
         """Test modifying a column obtained from TableHandle."""
         ml = test_ml
         ml.create_vocabulary("CV_Integration", "Test integration")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_Integration"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_Integration"]
         handle = TableHandle(table)
 
         # Get column and modify
@@ -363,7 +363,7 @@ class TestTableColumnIntegration:
         col.description = "Modified via handle"
 
         # Verify change persisted
-        fresh_handle = TableHandle(ml.model.schemas[ml.domain_schema].tables["CV_Integration"])
+        fresh_handle = TableHandle(ml.model.schemas[ml.default_schema].tables["CV_Integration"])
         fresh_col = fresh_handle.column("Name")
         assert fresh_col.description == "Modified via handle"
 
@@ -371,7 +371,7 @@ class TestTableColumnIntegration:
         """Test iterating over columns and modifying them."""
         ml = test_ml
         ml.create_vocabulary("CV_IterMod", "Test iterate and modify")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_IterMod"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_IterMod"]
         handle = TableHandle(table)
 
         # Set display names for all user columns
@@ -386,7 +386,7 @@ class TestTableColumnIntegration:
         """Test adding a column and immediately configuring it."""
         ml = test_ml
         ml.create_vocabulary("CV_AddConfig", "Test add and configure")
-        table = ml.model.schemas[ml.domain_schema].tables["CV_AddConfig"]
+        table = ml.model.schemas[ml.default_schema].tables["CV_AddConfig"]
         handle = TableHandle(table)
 
         # Add column

@@ -23,7 +23,7 @@ class MLCatalog:
     def __init__(self, hostname):
         self.catalog = create_demo_catalog(
             hostname,
-            domain_schema="test-schema",
+            default_schema="test-schema",
             project_name="ml-test",
             populate=False,
             create_features=False,
@@ -32,7 +32,7 @@ class MLCatalog:
         )
         self.catalog_id = self.catalog.catalog_id
         self.hostname = hostname
-        self.domain_schema = "test-schema"
+        self.default_schema = "test-schema"
         print(f"🚀 Created demo catalog {self.catalog_id}")
 
     def cleanup(self):
@@ -47,7 +47,7 @@ class MLCatalog:
         print("Resetting demo catalog")
         pb = self.catalog.getPathBuilder()
         ml_path = pb.schemas["deriva-ml"]
-        domain_path = pb.schemas[self.domain_schema]
+        domain_path = pb.schemas[self.default_schema]
         for t in [
             "Dataset_Execution",
             "Dataset_Version",

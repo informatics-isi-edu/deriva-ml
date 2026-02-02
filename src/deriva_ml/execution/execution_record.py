@@ -539,9 +539,9 @@ class ExecutionRecord(BaseModel):
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")
 
         # Find all *_Execution association tables and query them
-        # Search both the domain schema and the ML schema
+        # Search both the domain schemas and the ML schema
         assets: list[Asset] = []
-        schemas_to_search = [self._ml_instance.domain_schema, self._ml_instance.ml_schema]
+        schemas_to_search = [*self._ml_instance.domain_schemas, self._ml_instance.ml_schema]
 
         for schema_name in schemas_to_search:
             for table in self._ml_instance.model.model.schemas[schema_name].tables.values():

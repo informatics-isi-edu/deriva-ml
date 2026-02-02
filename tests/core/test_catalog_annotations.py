@@ -70,8 +70,8 @@ class TestCatalogAnnotations:
         assert "Documentation" in menu_names
         assert "Catalog Registry" in menu_names
 
-        # Check domain schema menu exists
-        assert ml.domain_schema in menu_names
+        # Check default schema menu exists
+        assert ml.default_schema in menu_names
 
     def test_apply_catalog_annotations_deriva_ml_menu(self, test_ml):
         """Test that Deriva-ML menu has expected items."""

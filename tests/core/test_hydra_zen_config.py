@@ -29,13 +29,13 @@ class TestHydraZenDerivaMLConfig:
         conf = DerivaMLConf(
             hostname="test.example.org",
             catalog_id="123",
-            domain_schema="test_schema",
+            default_schema="test_schema",
         )
 
         # Verify the config has expected structure
         assert conf.hostname == "test.example.org"
         assert conf.catalog_id == "123"
-        assert conf.domain_schema == "test_schema"
+        assert conf.default_schema == "test_schema"
 
     def test_builds_with_defaults(self):
         """Test that builds() preserves default values."""

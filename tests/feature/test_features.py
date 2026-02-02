@@ -188,7 +188,7 @@ class TestFeatures:
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
         )
-        subject_table = ml_instance.pathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
+        subject_table = ml_instance.pathBuilder().schemas[ml_instance.default_schema].tables["Subject"]
         subject_rids = [s["RID"] for s in subject_table.path.entities().fetch()]
 
         assert "Health" in [f.feature_name for f in ml_instance.model.find_features("Subject")]

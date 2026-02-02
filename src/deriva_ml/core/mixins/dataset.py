@@ -51,7 +51,8 @@ class DatasetMixin:
     # Type hints for IDE support - actual attributes/methods from host class
     model: "DerivaModel"
     ml_schema: str
-    domain_schema: str
+    domain_schemas: frozenset[str]
+    default_schema: str | None
     s3_bucket: str | None
     use_minid: bool
     pathBuilder: Callable[[], Any]
@@ -159,10 +160,10 @@ class DatasetMixin:
             An iterable of Table objects that can be included as an element of a dataset.
         """
 
-        def domain_table(table: Table) -> bool:
-            return table.schema.name == self.domain_schema or table.name == self._dataset_table.name
+        def is_domain_or_dataset_table(table: Table) -> bool:
+            return self.model.is_domain_schema(table.schema.name) or table.name == self._dataset_table.name
 
-        return [t for a in self._dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
+        return [t for a in self._dataset_table.find_associations() if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
@@ -184,7 +185,7 @@ class DatasetMixin:
         element_table = self.model.name_to_table(element)
         atable_def = Table.define_association([self._dataset_table, element_table])
         try:
-            table = self.model.schemas[self.model.domain_schema].create_table(atable_def)
+            table = self.model.create_table(atable_def)
         except ValueError as e:
             if "already exists" in str(e):
                 table = self.model.name_to_table(atable_def["table_name"])

@@ -154,7 +154,7 @@ class RidResolutionMixin:
         if candidate_tables is None:
             # Search all tables in domain and ML schemas
             candidate_tables = []
-            for schema_name in [self.model.domain_schema, self.model.ml_schema]:
+            for schema_name in [*self.model.domain_schemas, self.model.ml_schema]:
                 schema = self.model.model.schemas.get(schema_name)
                 if schema:
                     candidate_tables.extend(schema.tables.values())

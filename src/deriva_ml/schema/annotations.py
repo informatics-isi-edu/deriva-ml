@@ -92,7 +92,7 @@ def catalog_annotation(model: DerivaModel) -> None:
                             },
                         ],
                     },
-                    {  # All the primary tables in deriva-ml schema.
+                    {  # WWW schema tables.
                         "name": "WWW",
                         "children": [
                             {
@@ -105,19 +105,24 @@ def catalog_annotation(model: DerivaModel) -> None:
                             },
                         ],
                     },
-                    {
-                        "name": model.domain_schema,
-                        "children": [
-                            {
-                                "name": tname,
-                                "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
-                            }
-                            for tname in model.schemas[model.domain_schema].tables
-                            # Don't include controlled vocabularies, association tables, or feature tables.
-                            if not (model.is_vocabulary(tname) or model.is_association(tname, pure=False, max_arity=3))
-                        ],
-                    },
-                    {  # Vocabulary menu which will list all the controlled vocabularies in deriva-ml and domain.
+                    # One menu per domain schema
+                    *[
+                        {
+                            "name": domain_schema,
+                            "children": [
+                                {
+                                    "name": tname,
+                                    "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
+                                }
+                                for tname in model.schemas[domain_schema].tables
+                                # Don't include controlled vocabularies, association tables, or feature tables.
+                                if not (model.is_vocabulary(tname) or model.is_association(tname, pure=False, max_arity=3))
+                            ],
+                        }
+                        for domain_schema in sorted(model.domain_schemas)
+                        if domain_schema in model.schemas
+                    ],
+                    {  # Vocabulary menu with all controlled vocabularies.
                         "name": "Vocabulary",
                         "children": [{"name": f"{ml_schema} Vocabularies", "header": True}]
                         + [
@@ -129,21 +134,22 @@ def catalog_annotation(model: DerivaModel) -> None:
                             if model.is_vocabulary(tname)
                         ]
                         + [
-                            {
-                                "name": f"{model.domain_schema} Vocabularies",
-                                "header": True,
-                            }
-                        ]
-                        + [
-                            {
-                                "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
-                                "name": tname,
-                            }
-                            for tname in model.schemas[model.domain_schema].tables
-                            if model.is_vocabulary(tname)
+                            item
+                            for domain_schema in sorted(model.domain_schemas)
+                            if domain_schema in model.schemas
+                            for item in [
+                                {"name": f"{domain_schema} Vocabularies", "header": True}
+                            ] + [
+                                {
+                                    "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
+                                    "name": tname,
+                                }
+                                for tname in model.schemas[domain_schema].tables
+                                if model.is_vocabulary(tname)
+                            ]
                         ],
                     },
-                    {  # List of all of the asset tables in deriva-ml and domain schemas.
+                    {  # List of all asset tables.
                         "name": "Assets",
                         "children": [
                             {
@@ -155,10 +161,12 @@ def catalog_annotation(model: DerivaModel) -> None:
                         ]
                         + [
                             {
-                                "url": f"/chaise/recordset/#{catalog_id}/{model.domain_schema}:{tname}",
+                                "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
                                 "name": tname,
                             }
-                            for tname in model.schemas[model.domain_schema].tables
+                            for domain_schema in sorted(model.domain_schemas)
+                            if domain_schema in model.schemas
+                            for tname in model.schemas[domain_schema].tables
                             if model.is_asset(tname)
                         ],
                     },

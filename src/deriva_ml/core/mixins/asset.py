@@ -13,9 +13,7 @@ import importlib
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
-from pydantic import ConfigDict, validate_call
-
-from deriva_ml.core.definitions import ColumnDefinition, MLVocab, RID, VocabularyTerm
+from deriva_ml.core.definitions import AssetTableDef, ColumnDefinition, MLVocab, RID, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.schema.annotations import asset_annotation
 
@@ -44,12 +42,14 @@ class AssetMixin:
     # Type hints for IDE support - actual attributes/methods from host class
     model: "DerivaModel"
     ml_schema: str
-    domain_schema: str
+    domain_schemas: frozenset[str]
+    default_schema: str | None
     pathBuilder: Callable[[], Any]
     add_term: Callable[..., VocabularyTerm]
     apply_catalog_annotations: Callable[[], None]
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    # Note: @validate_call removed because ColumnDefinition is now a dataclass from
+    # deriva.core.typed and Pydantic validation doesn't work well with dataclass fields
     def create_asset(
         self,
         asset_name: str,
@@ -80,30 +80,32 @@ class AssetMixin:
         column_defs = column_defs or []
         fkey_defs = fkey_defs or []
         referenced_tables = referenced_tables or []
-        schema = schema or self.domain_schema
+        schema = schema or self.model._require_default_schema()
 
         # Add an asset type to vocabulary
         self.add_term(MLVocab.asset_type, asset_name, description=f"A {asset_name} asset")
 
         # Create the main asset table
+        # Note: column_defs and fkey_defs should be ColumnDef/ForeignKeyDef objects
         asset_table = self.model.schemas[schema].create_table(
-            Table.define_asset(
-                schema,
-                asset_name,
-                column_defs=[c.model_dump() for c in column_defs],
-                fkey_defs=[fk.model_dump() for fk in fkey_defs],
+            AssetTableDef(
+                schema_name=schema,
+                name=asset_name,
+                columns=list(column_defs),
+                foreign_keys=list(fkey_defs),
                 comment=comment,
             )
         )
 
         # Create an association table between asset and asset type
-        self.model.schemas[self.domain_schema].create_table(
+        self.model.create_table(
             Table.define_association(
                 [
                     (asset_table.name, asset_table),
                     ("Asset_Type", self.model.name_to_table("Asset_Type")),
                 ]
-            )
+            ),
+            schema=schema,
         )
 
         # Create references to other tables if specified
@@ -111,7 +113,7 @@ class AssetMixin:
             asset_table.create_reference(self.model.name_to_table(t))
 
         # Create an association table for tracking execution
-        atable = self.model.schemas[self.domain_schema].create_table(
+        atable = self.model.create_table(
             Table.define_association(
                 [
                     (asset_name, asset_table),
@@ -120,7 +122,8 @@ class AssetMixin:
                         self.model.schemas[self.ml_schema].tables["Execution"],
                     ),
                 ]
-            )
+            ),
+            schema=schema,
         )
         atable.create_reference(self.model.name_to_table("Asset_Role"))
 
@@ -321,10 +324,14 @@ class AssetMixin:
             >>> for table in ml.list_asset_tables():
             ...     print(f"Asset table: {table.name}")
         """
-        tables = [
-            t for t in self.model.schemas[self.domain_schema].tables.values()
-            if self.model.is_asset(t)
-        ]
+        tables = []
+        # Include asset tables from all domain schemas
+        for domain_schema in self.domain_schemas:
+            if domain_schema in self.model.schemas:
+                tables.extend([
+                    t for t in self.model.schemas[domain_schema].tables.values()
+                    if self.model.is_asset(t)
+                ])
         # Also include ML schema asset tables (like Execution_Asset)
         tables.extend([
             t for t in self.model.schemas[self.ml_schema].tables.values()

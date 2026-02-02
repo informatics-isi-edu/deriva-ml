@@ -381,7 +381,7 @@ def make_table_rows(
         ml: DerivaML instance.
         table_name: Name of the table to insert into.
         rows: List of row dictionaries to insert.
-        schema: Schema name. Defaults to domain_schema.
+        schema: Schema name. Defaults to default_schema.
 
     Returns:
         List of RIDs for the inserted rows.
@@ -393,7 +393,7 @@ def make_table_rows(
         ... ])
     """
     if schema is None:
-        schema = ml.domain_schema
+        schema = ml.default_schema
 
     pb = ml.pathBuilder()
     table = pb.schemas[schema].tables[table_name]

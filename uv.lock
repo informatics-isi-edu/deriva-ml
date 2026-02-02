@@ -697,8 +697,8 @@ wheels = [
 
 [[package]]
 name = "deriva"
-version = "1.7.11"
-source = { registry = "https://pypi.org/simple" }
+version = "1.7.12"
+source = { git = "https://github.com/informatics-isi-edu/deriva-py?branch=typed-interface#0a0f88da969cbab6606472b00031a6c1d02ec63d" }
 dependencies = [
     { name = "bdbag" },
     { name = "fair-identifiers-client" },
@@ -710,10 +710,6 @@ dependencies = [
     { name = "portalocker" },
     { name = "requests" },
     { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f4/d9/de6844ad99c5934391e70da4ccd806bf9d2ebd75d4652beda555d9a21b18/deriva-1.7.11.tar.gz", hash = "sha256:bbac625a30329bce97c34d45d330027a5ff8c7d81e55d632f7b107750d090932", size = 212483, upload-time = "2025-09-29T18:54:20.047Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/91/be62c52b97ce8618ef2a70679b6ecd5c86006eb269ee9df9cc2cd2bf4bff/deriva-1.7.11-py3-none-any.whl", hash = "sha256:9c8b7afafa5c208b905968c02ccdf1a1f8f8546e950a08a6d0b5d428fd954048", size = 236006, upload-time = "2025-09-29T18:54:18.802Z" },
 ]
 
 [[package]]
@@ -763,7 +759,7 @@ requires-dist = [
     { name = "bdbag" },
     { name = "bump-my-version" },
     { name = "deepdiff" },
-    { name = "deriva", specifier = "~=1.7.10" },
+    { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?branch=typed-interface" },
     { name = "hydra-zen" },
     { name = "nbconvert" },
     { name = "nbstripout" },

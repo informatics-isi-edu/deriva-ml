@@ -42,6 +42,55 @@ ML_SCHEMA = "deriva-ml"
 # Special RID value used for dry-run operations that don't modify the database
 DRY_RUN_RID = "0000"
 
+# System schemas that are part of Deriva infrastructure (not user domain schemas)
+# These are excluded when auto-detecting domain schemas
+SYSTEM_SCHEMAS: frozenset[str] = frozenset({"public", "www", "WWW"})
+
+
+def is_system_schema(schema_name: str, ml_schema: str = ML_SCHEMA) -> bool:
+    """Check if a schema is a system or ML schema (not a domain schema).
+
+    System schemas are Deriva infrastructure schemas (public, www, WWW) and the
+    ML schema (deriva-ml by default). Domain schemas are user-defined schemas
+    containing business logic tables.
+
+    Args:
+        schema_name: Name of the schema to check.
+        ml_schema: Name of the ML schema (default: 'deriva-ml').
+
+    Returns:
+        True if the schema is a system or ML schema, False if it's a domain schema.
+
+    Example:
+        >>> is_system_schema("public")
+        True
+        >>> is_system_schema("deriva-ml")
+        True
+        >>> is_system_schema("my_project")
+        False
+    """
+    return schema_name.lower() in {s.lower() for s in SYSTEM_SCHEMAS} or schema_name == ml_schema
+
+
+def get_domain_schemas(all_schemas: set[str] | list[str], ml_schema: str = ML_SCHEMA) -> frozenset[str]:
+    """Return all domain schemas from a collection of schema names.
+
+    Filters out system schemas (public, www, WWW) and the ML schema to return
+    only user-defined domain schemas.
+
+    Args:
+        all_schemas: Collection of schema names to filter.
+        ml_schema: Name of the ML schema to exclude (default: 'deriva-ml').
+
+    Returns:
+        Frozen set of domain schema names.
+
+    Example:
+        >>> get_domain_schemas(["public", "deriva-ml", "my_project", "www"])
+        frozenset({'my_project'})
+    """
+    return frozenset(s for s in all_schemas if not is_system_schema(s, ml_schema))
+
 # =============================================================================
 # RID Regular Expression Components
 # =============================================================================

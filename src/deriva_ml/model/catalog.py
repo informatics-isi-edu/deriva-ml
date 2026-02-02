@@ -30,8 +30,11 @@ from pydantic import ConfigDict, validate_call
 from deriva_ml.core.definitions import (
     ML_SCHEMA,
     RID,
+    SYSTEM_SCHEMAS,
     DerivaAssetColumns,
     TableDefinition,
+    get_domain_schemas,
+    is_system_schema,
 )
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
@@ -67,12 +70,12 @@ class DerivaModel:
     This class provides a number of DerivaML specific methods that augment the interface in the deriva model class.
 
     Attributes:
-        domain_schema: Schema name for domain-specific tables and relationships.
         model: ERMRest model for the catalog.
-        catalog: ERMRest catalog for the model
-        hostname: ERMRest catalog for the model
-        ml_schema: The ML schema for the catalog.
-        domain_schema: The domain schema for the catalog.
+        catalog: ERMRest catalog for the model.
+        hostname: Hostname of the ERMRest server.
+        ml_schema: The ML schema name for the catalog.
+        domain_schemas: Frozenset of all domain schema names in the catalog.
+        default_schema: The default schema for table creation operations.
 
     """
 
@@ -80,17 +83,22 @@ class DerivaModel:
         self,
         model: Model,
         ml_schema: str = ML_SCHEMA,
-        domain_schema: str | None = None,
+        domain_schemas: set[str] | None = None,
+        default_schema: str | None = None,
     ):
-        """Create and initialize a DerivaML instance.
+        """Create and initialize a DerivaModel instance.
 
-        This method will connect to a catalog, and initialize local configuration for the ML execution.
+        This method will connect to a catalog and initialize schema configuration.
         This class is intended to be used as a base class on which domain-specific interfaces are built.
 
         Args:
             model: The ERMRest model for the catalog.
             ml_schema: The ML schema name.
-            domain_schema: The domain schema name.
+            domain_schemas: Optional explicit set of domain schema names. If None,
+                auto-detects all non-system schemas.
+            default_schema: The default schema for table creation operations. If None
+                and there is exactly one domain schema, that schema is used as default.
+                If there are multiple domain schemas, default_schema must be specified.
         """
         self.model = model
         self.configuration = None
@@ -98,21 +106,73 @@ class DerivaModel:
         self.hostname = self.catalog.deriva_server.server if isinstance(self.catalog, ErmrestCatalog) else "localhost"
 
         self.ml_schema = ml_schema
-        builtin_schemas = ("public", self.ml_schema, "www", "WWW")
-        if domain_schema:
-            self.domain_schema = domain_schema
+        self._system_schemas = frozenset(SYSTEM_SCHEMAS | {ml_schema})
+
+        # Determine domain schemas
+        if domain_schemas is not None:
+            self.domain_schemas = frozenset(domain_schemas)
         else:
-            if len(user_schemas := {k for k in self.model.schemas.keys()} - set(builtin_schemas)) == 1:
-                self.domain_schema = user_schemas.pop()
-            else:
-                raise DerivaMLException(f"Ambiguous domain schema: {user_schemas}")
+            # Auto-detect all domain schemas
+            self.domain_schemas = get_domain_schemas(self.model.schemas.keys(), ml_schema)
+
+        # Determine default schema for table creation
+        if default_schema is not None:
+            if default_schema not in self.domain_schemas:
+                raise DerivaMLException(
+                    f"default_schema '{default_schema}' is not in domain_schemas: {self.domain_schemas}"
+                )
+            self.default_schema = default_schema
+        elif len(self.domain_schemas) == 1:
+            # Single domain schema - use it as default
+            self.default_schema = next(iter(self.domain_schemas))
+        elif len(self.domain_schemas) == 0:
+            # No domain schemas - default_schema will be None
+            self.default_schema = None
+        else:
+            # Multiple domain schemas, no explicit default
+            self.default_schema = None
+
+    def is_system_schema(self, schema_name: str) -> bool:
+        """Check if a schema is a system or ML schema.
+
+        Args:
+            schema_name: Name of the schema to check.
+
+        Returns:
+            True if the schema is a system or ML schema.
+        """
+        return is_system_schema(schema_name, self.ml_schema)
+
+    def is_domain_schema(self, schema_name: str) -> bool:
+        """Check if a schema is a domain schema.
+
+        Args:
+            schema_name: Name of the schema to check.
+
+        Returns:
+            True if the schema is a domain schema.
+        """
+        return schema_name in self.domain_schemas
+
+    def _require_default_schema(self) -> str:
+        """Get default schema, raising an error if not set.
+
+        Returns:
+            The default schema name.
+
+        Raises:
+            DerivaMLException: If default_schema is not set.
+        """
+        if self.default_schema is None:
+            raise DerivaMLException(
+                f"No default_schema set. With multiple domain schemas {self.domain_schemas}, "
+                "you must either specify a default_schema when creating DerivaML or "
+                "pass an explicit schema parameter to this method."
+            )
+        return self.default_schema
 
     def refresh_model(self) -> None:
         self.model = self.catalog.getCatalogModel()
-
-    @property
-    def schemas(self) -> dict[str, Schema]:
-        return self.model.schemas
 
     @property
     def chaise_config(self) -> dict[str, Any]:
@@ -133,7 +193,8 @@ class DerivaModel:
         Returns:
             Dictionary with schema structure:
             {
-                "domain_schema": "schema_name",
+                "domain_schemas": ["schema_name1", "schema_name2"],
+                "default_schema": "schema_name1",
                 "ml_schema": "deriva-ml",
                 "schemas": {
                     "schema_name": {
@@ -154,12 +215,14 @@ class DerivaModel:
         """
         system_columns = {"RID", "RCT", "RMT", "RCB", "RMB"}
         result = {
-            "domain_schema": self.domain_schema,
+            "domain_schemas": sorted(self.domain_schemas),
+            "default_schema": self.default_schema,
             "ml_schema": self.ml_schema,
             "schemas": {},
         }
 
-        for schema_name in [self.domain_schema, self.ml_schema]:
+        # Include all domain schemas and the ML schema
+        for schema_name in [*self.domain_schemas, self.ml_schema]:
             schema = self.model.schemas.get(schema_name)
             if not schema:
                 continue
@@ -192,7 +255,7 @@ class DerivaModel:
 
                 # Get features if this is a domain table
                 features = []
-                if schema_name == self.domain_schema:
+                if self.is_domain_schema(schema_name):
                     try:
                         for f in self.find_features(table):
                             features.append({
@@ -226,23 +289,28 @@ class DerivaModel:
     def name_to_table(self, table: TableInput) -> Table:
         """Return the table object corresponding to the given table name.
 
-        If the table name appears in more than one schema, return the first one you find.
+        Searches domain schemas first (in sorted order), then ML schema, then WWW.
+        If the table name appears in more than one schema, returns the first match.
 
         Args:
           table: A ERMRest table object or a string that is the name of the table.
 
         Returns:
           Table object.
+
+        Raises:
+          DerivaMLException: If the table doesn't exist in any searchable schema.
         """
         if isinstance(table, Table):
             return table
-        if table in (s := self.model.schemas[self.domain_schema].tables):
-            return s[table]
-        for sname in [self.domain_schema, self.ml_schema, "WWW"]:
+
+        # Search domain schemas (sorted for deterministic order), then ML schema, then WWW
+        search_order = [*sorted(self.domain_schemas), self.ml_schema, "WWW"]
+        for sname in search_order:
             if sname not in self.model.schemas:
                 continue
             s = self.model.schemas[sname]
-            if table in s.tables.keys():
+            if table in s.tables:
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
 
@@ -329,8 +397,13 @@ class DerivaModel:
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
     def find_vocabularies(self) -> list[Table]:
-        """Return a list of all the controlled vocabulary tables in the domain schema."""
-        return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_vocabulary(t)]
+        """Return a list of all controlled vocabulary tables in domain and ML schemas."""
+        tables = []
+        for schema_name in [*self.domain_schemas, self.ml_schema]:
+            schema = self.model.schemas.get(schema_name)
+            if schema:
+                tables.extend(t for t in schema.tables.values() if self.is_vocabulary(t))
+        return tables
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def find_features(self, table: TableInput | None = None) -> Iterable[Feature]:
@@ -373,7 +446,7 @@ class DerivaModel:
         else:
             # Find all features across all domain and ML schema tables
             features: list[Feature] = []
-            for schema_name in [self.domain_schema, self.ml_schema]:
+            for schema_name in [*self.domain_schemas, self.ml_schema]:
                 schema = self.model.schemas.get(schema_name)
                 if schema:
                     for t in schema.tables.values():
@@ -447,10 +520,10 @@ class DerivaModel:
 
         dataset_table = self.name_to_table("Dataset")
 
-        def domain_table(table: Table) -> bool:
-            return table.schema.name == self.domain_schema or table.name == dataset_table.name
+        def is_domain_or_dataset_table(table: Table) -> bool:
+            return self.is_domain_schema(table.schema.name) or table.name == dataset_table.name
 
-        return [t for a in dataset_table.find_associations() if domain_table(t := a.other_fkeys.pop().pk_table)]
+        return [t for a in dataset_table.find_associations() if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)]
 
     def _prepare_wide_table(
         self, dataset, dataset_rid: RID, include_tables: list[str]
@@ -580,9 +653,11 @@ class DerivaModel:
 
         def find_arcs(table: Table) -> set[Table]:
             """Given a path through the model, return the FKs that link the tables"""
+            # Valid schemas for traversal: all domain schemas + ML schema
+            valid_schemas = self.domain_schemas | {self.ml_schema}
             arc_list = [fk.pk_table for fk in table.foreign_keys] + [fk.table for fk in table.referenced_by]
-            arc_list = [t for t in arc_list if t.schema.name in {self.domain_schema, self.ml_schema}]
-            domain_tables = [t for t in arc_list if t.schema.name == self.domain_schema]
+            arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
+            domain_tables = [t for t in arc_list if self.is_domain_schema(t.schema.name)]
             if multiple_columns := [c for c, cnt in Counter(domain_tables).items() if cnt > 1]:
                 raise DerivaMLException(f"Ambiguous relationship in {table.name} {multiple_columns}")
             return set(arc_list)
@@ -614,7 +689,23 @@ class DerivaModel:
             paths.extend(self._schema_to_paths(child, path))
         return paths
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def create_table(self, table_def: TableDefinition) -> Table:
-        """Create a new table from TableDefinition."""
-        return self.model.schemas[self.domain_schema].create_table(table_def.model_dump())
+    def create_table(self, table_def: TableDefinition, schema: str | None = None) -> Table:
+        """Create a new table from TableDefinition.
+
+        Args:
+            table_def: Table definition (dataclass or dict).
+            schema: Schema to create the table in. If None, uses default_schema.
+
+        Returns:
+            The newly created Table.
+
+        Raises:
+            DerivaMLException: If no schema specified and default_schema is not set.
+
+        Note: @validate_call removed because TableDefinition is now a dataclass from
+        deriva.core.typed and Pydantic validation doesn't work well with dataclass fields.
+        """
+        schema = schema or self._require_default_schema()
+        # Handle both TableDefinition (dataclass with to_dict) and plain dicts
+        table_dict = table_def.to_dict() if hasattr(table_def, 'to_dict') else table_def
+        return self.model.schemas[schema].create_table(table_dict)

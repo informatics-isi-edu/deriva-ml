@@ -20,7 +20,8 @@ from random import choice, randint, random
 from tempfile import TemporaryDirectory
 
 from deriva.core import BaseCLI, ErmrestCatalog
-from deriva.core.ermrest_model import Column, Schema, Table, builtin_types
+from deriva.core.ermrest_model import Schema, Table
+from deriva.core.typed import BuiltinType, ColumnDef, SchemaDef, TableDef
 from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError
 
@@ -52,7 +53,7 @@ TEST_DATASET_SIZE = 12
 def populate_demo_catalog(execution: Execution) -> None:
     # Delete any vocabularies and features.
     ml_instance = execution._ml_object
-    domain_schema = ml_instance.pathBuilder().schemas[ml_instance.domain_schema]
+    domain_schema = ml_instance.domain_path()
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
     for s in ss:
@@ -178,10 +179,10 @@ def create_demo_datasets(execution: Execution) -> DatasetDescription:
         "Dataset_Type", "Testing", synonyms=["Test", "test", "testing"], description="A testing set"
     )
 
-    table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Subject"]
+    table_path = ml_instance.domain_path().tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
 
-    table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.domain_schema].tables["Image"]
+    table_path = ml_instance.domain_path().tables["Image"]
     image_rids = [i["RID"] for i in table_path.entities().fetch()]
 
     spec = dataset_spec()
@@ -230,8 +231,8 @@ def create_demo_features(execution: Execution) -> None:
 
     # Get the workflow for this notebook
 
-    subject_rids = [i["RID"] for i in ml_instance.domain_path.tables["Subject"].entities().fetch()]
-    image_rids = [i["RID"] for i in ml_instance.domain_path.tables["Image"].entities().fetch()]
+    subject_rids = [i["RID"] for i in ml_instance.domain_path().tables["Subject"].entities().fetch()]
+    image_rids = [i["RID"] for i in ml_instance.domain_path().tables["Image"].entities().fetch()]
     _subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,
@@ -337,9 +338,11 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         else:
             raise e
 
-    domain_schema = model.create_schema(Schema.define(sname, annotations={"name_style": {"underline_space": True}}))
+    domain_schema = model.create_schema(
+        SchemaDef(name=sname, annotations={"name_style": {"underline_space": True}})
+    )
     subject_table = domain_schema.create_table(
-        Table.define("Subject", column_defs=[Column.define("Name", builtin_types.text)])
+        TableDef(name="Subject", columns=[ColumnDef("Name", BuiltinType.text)])
     )
     with TemporaryDirectory() as tmpdir:
         ml_instance = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
@@ -347,8 +350,8 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         ml_instance.create_asset(
             "Image",
             column_defs=[
-                Column.define("Acquisition_Time", builtin_types.timestamp),
-                Column.define("Acquisition_Date", builtin_types.date),
+                ColumnDef("Acquisition_Time", BuiltinType.timestamp),
+                ColumnDef("Acquisition_Date", BuiltinType.date),
             ],
             referenced_tables=[subject_table],
             update_navbar=False,
@@ -402,7 +405,7 @@ def create_demo_catalog(
                 ml_instance = DerivaML(
                     hostname,
                     catalog_id=test_catalog.catalog_id,
-                    domain_schema=domain_schema,
+                    default_schema=domain_schema,
                     working_dir=tmpdir,
                     logging_level=logging_level,
                 )

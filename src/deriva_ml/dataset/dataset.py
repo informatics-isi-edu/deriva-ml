@@ -739,7 +739,7 @@ class Dataset:
             member_table = assoc_table.table
 
             # Look at domain tables and nested datasets.
-            if target_table.schema.name != self._ml_instance.domain_schema and not (
+            if not self._ml_instance.model.is_domain_schema(target_table.schema.name) and not (
                 target_table == self._dataset_table or target_table.name == "File"
             ):
                 continue
@@ -1108,11 +1108,14 @@ class Dataset:
         # Now make the entries into the association tables.
         pb = self._ml_instance.pathBuilder()
         for table, elements in dataset_elements.items():
-            schema_path = pb.schemas[
-                self._ml_instance.ml_schema
-                if (table == "Dataset" or table == "File")
-                else self._ml_instance.domain_schema
-            ]
+            # Determine schema: ML schema for Dataset/File, otherwise use the table's actual schema
+            if table == "Dataset" or table == "File":
+                schema_name = self._ml_instance.ml_schema
+            else:
+                # Find the table and use its schema
+                table_obj = self._ml_instance.model.name_to_table(table)
+                schema_name = table_obj.schema.name
+            schema_path = pb.schemas[schema_name]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
             if len(elements):
                 # Find out the name of the column in the association table.
@@ -1174,9 +1177,14 @@ class Dataset:
         # Delete the entries from the association tables.
         pb = self._ml_instance.pathBuilder()
         for table, elements in dataset_elements.items():
-            schema_path = pb.schemas[
-                self._ml_instance.ml_schema if table == "Dataset" else self._ml_instance.domain_schema
-            ]
+            # Determine schema: ML schema for Dataset, otherwise use the table's actual schema
+            if table == "Dataset":
+                schema_name = self._ml_instance.ml_schema
+            else:
+                # Find the table and use its schema
+                table_obj = self._ml_instance.model.name_to_table(table)
+                schema_name = table_obj.schema.name
+            schema_path = pb.schemas[schema_name]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
 
             if len(elements):

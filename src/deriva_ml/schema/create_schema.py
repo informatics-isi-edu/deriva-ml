@@ -5,14 +5,16 @@ from importlib.resources import files
 from typing import Any, Optional
 
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
-from deriva.core.ermrest_model import (
-    Column,
-    ForeignKey,
-    Key,
-    Model,
-    Schema,
-    Table,
-    builtin_types,
+from deriva.core.ermrest_model import Model, Schema, Table
+from deriva.core.typed import (
+    BuiltinType,
+    ColumnDef,
+    ForeignKeyDef,
+    KeyDef,
+    SchemaDef,
+    TableDef,
+    VocabularyTableDef,
+    AssetTableDef,
 )
 
 from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
@@ -32,18 +34,21 @@ def create_dataset_table(
     version_annotation: Optional[dict] = None,
 ) -> Table:
     dataset_table = schema.create_table(
-        Table.define(
-            tname=MLTable.dataset,
-            column_defs=[
-                Column.define("Description", builtin_types.markdown),
-                Column.define("Deleted", builtin_types.boolean),
+        TableDef(
+            name=MLTable.dataset,
+            columns=[
+                ColumnDef("Description", BuiltinType.markdown),
+                ColumnDef("Deleted", BuiltinType.boolean),
             ],
             annotations=dataset_annotation if dataset_annotation is not None else {},
         )
     )
 
-    dataset_type = schema.create_table(Table.define_vocabulary(MLVocab.dataset_type, f"{project_name}:{{RID}}"))
+    dataset_type = schema.create_table(
+        VocabularyTableDef(name=MLVocab.dataset_type, curie_template=f"{project_name}:{{RID}}")
+    )
 
+    # Association table for Dataset <-> Dataset_Type
     schema.create_table(
         Table.define_association(
             associates=[
@@ -66,7 +71,7 @@ def create_dataset_table(
     return dataset_table
 
 
-def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
+def define_table_dataset_version(sname: str, annotation: Optional[dict] = None) -> TableDef:
     """Define the dataset version table in the specified schema.
 
     Args:
@@ -74,38 +79,47 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None):
         annotation: Optional annotation dictionary for the table.
 
     Returns:
-        The created Table object.
+        A TableDef for the dataset version table.
     """
-    table = Table.define(
-        tname=MLTable.dataset_version,
-        column_defs=[
-            Column.define(
-                "Version",
-                builtin_types.text,
+    return TableDef(
+        name=MLTable.dataset_version,
+        columns=[
+            ColumnDef(
+                name="Version",
+                type=BuiltinType.text,
                 default="0.1.0",
                 comment="Semantic version of dataset",
             ),
-            Column.define("Description", builtin_types.markdown),
-            Column.define("Dataset", builtin_types.text, comment="RID of dataset"),
-            Column.define("Execution", builtin_types.text, comment="RID of execution"),
-            Column.define("Minid", builtin_types.text, comment="URL to MINID for dataset"),
-            Column.define(
-                "Snapshot",
-                builtin_types.text,
+            ColumnDef("Description", BuiltinType.markdown),
+            ColumnDef("Dataset", BuiltinType.text, comment="RID of dataset"),
+            ColumnDef("Execution", BuiltinType.text, comment="RID of execution"),
+            ColumnDef("Minid", BuiltinType.text, comment="URL to MINID for dataset"),
+            ColumnDef(
+                name="Snapshot",
+                type=BuiltinType.text,
                 comment="Catalog Snapshot ID for dataset",
             ),
         ],
-        annotations=annotation,
-        key_defs=[Key.define(["Dataset", "Version"])],
-        fkey_defs=[
-            ForeignKey.define(["Dataset"], sname, "Dataset", ["RID"]),
-            ForeignKey.define(["Execution"], sname, "Execution", ["RID"]),
+        annotations=annotation if annotation else {},
+        keys=[KeyDef(columns=["Dataset", "Version"])],
+        foreign_keys=[
+            ForeignKeyDef(
+                columns=["Dataset"],
+                referenced_schema=sname,
+                referenced_table="Dataset",
+                referenced_columns=["RID"],
+            ),
+            ForeignKeyDef(
+                columns=["Execution"],
+                referenced_schema=sname,
+                referenced_table="Execution",
+                referenced_columns=["RID"],
+            ),
         ],
     )
-    return table
 
 
-def create_execution_table(schema, annotation: Optional[dict] = None):
+def create_execution_table(schema: Schema, annotation: Optional[dict] = None) -> Table:
     """Create the execution table in the specified schema.
 
     Args:
@@ -117,16 +131,23 @@ def create_execution_table(schema, annotation: Optional[dict] = None):
     """
     annotation = annotation if annotation is not None else {}
     execution = schema.create_table(
-        Table.define(
-            MLTable.execution,
-            column_defs=[
-                Column.define("Workflow", builtin_types.text),
-                Column.define("Description", builtin_types.markdown),
-                Column.define("Duration", builtin_types.text),
-                Column.define("Status", builtin_types.text),
-                Column.define("Status_Detail", builtin_types.text),
+        TableDef(
+            name=MLTable.execution,
+            columns=[
+                ColumnDef("Workflow", BuiltinType.text),
+                ColumnDef("Description", BuiltinType.markdown),
+                ColumnDef("Duration", BuiltinType.text),
+                ColumnDef("Status", BuiltinType.text),
+                ColumnDef("Status_Detail", BuiltinType.text),
             ],
-            fkey_defs=[ForeignKey.define(["Workflow"], schema.name, "Workflow", ["RID"])],
+            foreign_keys=[
+                ForeignKeyDef(
+                    columns=["Workflow"],
+                    referenced_schema=schema.name,
+                    referenced_table="Workflow",
+                    referenced_columns=["RID"],
+                )
+            ],
             annotations=annotation,
         )
     )
@@ -134,31 +155,47 @@ def create_execution_table(schema, annotation: Optional[dict] = None):
     # Nested executions - allows grouping executions hierarchically
     # (e.g., a sweep/multirun as parent with individual runs as children)
     schema.create_table(
-        Table.define_association(associates=[("Execution", execution), ("Nested_Execution", execution)],
-                                 comment="Association table for hierarchical execution nesting (parent-child relationships)",
-                                 metadata=[Column.define(
-                    "Sequence",
-                    builtin_types.int4,
+        Table.define_association(
+            associates=[("Execution", execution), ("Nested_Execution", execution)],
+            comment="Association table for hierarchical execution nesting (parent-child relationships)",
+            metadata=[
+                ColumnDef(
+                    name="Sequence",
+                    type=BuiltinType.int4,
                     nullok=True,
                     comment="Order of nested execution (null if parallel)",
-                )])
-
+                ).to_dict()  # Convert to dict for Table.define_association()
+            ],
+        )
     )
     return execution
 
 
 def create_asset_table(
-    schema,
+    schema: Schema,
     asset_name: str,
-    execution_table,
-    asset_type_table,
-    asset_role_table,
+    execution_table: Table,
+    asset_type_table: Table,
+    asset_role_table: Table,
     use_hatrac: bool = True,
-):
+) -> Table:
+    """Create an asset table with associated type and execution associations.
+
+    Args:
+        schema: The schema where the table should be created.
+        asset_name: Name for the asset table.
+        execution_table: The execution table for association.
+        asset_type_table: The asset type vocabulary table.
+        asset_role_table: The asset role vocabulary table.
+        use_hatrac: Whether to use Hatrac for file storage (default True).
+
+    Returns:
+        The created asset Table object.
+    """
     asset_table = schema.create_table(
-        Table.define_asset(
-            sname=schema.name,
-            tname=asset_name,
+        AssetTableDef(
+            schema_name=schema.name,
+            name=asset_name,
             hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
         )
     )
@@ -184,7 +221,7 @@ def create_asset_table(
     return asset_table
 
 
-def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] = None):
+def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] = None) -> Table:
     """Create the workflow table in the specified schema.
 
     Args:
@@ -195,20 +232,22 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
         The created Table object.
     """
     workflow_table = schema.create_table(
-        Table.define(
-            tname=MLTable.workflow,
-            column_defs=[
-                Column.define("Name", builtin_types.text),
-                Column.define("Description", builtin_types.markdown),
-                Column.define("URL", builtin_types.ermrest_uri),
-                Column.define("Checksum", builtin_types.text),
-                Column.define("Version", builtin_types.text),
+        TableDef(
+            name=MLTable.workflow,
+            columns=[
+                ColumnDef("Name", BuiltinType.text),
+                ColumnDef("Description", BuiltinType.markdown),
+                ColumnDef("URL", BuiltinType.ermrest_uri),
+                ColumnDef("Checksum", BuiltinType.text),
+                ColumnDef("Version", BuiltinType.text),
             ],
-            annotations=annotations,
+            annotations=annotations if annotations else {},
         )
     )
     workflow_table.create_reference(
-        schema.create_table(Table.define_vocabulary(MLVocab.workflow_type, f"{schema.name}:{{RID}}"))
+        schema.create_table(
+            VocabularyTableDef(name=MLVocab.workflow_type, curie_template=f"{schema.name}:{{RID}}")
+        )
     )
     return workflow_table
 
@@ -235,13 +274,21 @@ def create_ml_schema(
     model.schemas["public"].tables["ERMrest_Client"].annotations.update(client_annotation)
     model.apply()
 
-    schema = model.create_schema(Schema.define(schema_name, annotations=annotations["schema_annotation"]))
+    schema = model.create_schema(
+        SchemaDef(name=schema_name, annotations=annotations["schema_annotation"])
+    )
 
     # Create workflow and execution table.
 
-    schema.create_table(Table.define_vocabulary(MLVocab.feature_name, f"{project_name}:{{RID}}"))
-    asset_type_table = schema.create_table(Table.define_vocabulary(MLVocab.asset_type, f"{project_name}:{{RID}}"))
-    asset_role_table = schema.create_table(Table.define_vocabulary(MLVocab.asset_role, f"{project_name}:{{RID}}"))
+    schema.create_table(
+        VocabularyTableDef(name=MLVocab.feature_name, curie_template=f"{project_name}:{{RID}}")
+    )
+    asset_type_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.asset_type, curie_template=f"{project_name}:{{RID}}")
+    )
+    asset_role_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.asset_role, curie_template=f"{project_name}:{{RID}}")
+    )
 
     create_workflow_table(schema, annotations["workflow_annotation"])
     execution_table = create_execution_table(schema, annotations["execution_annotation"])

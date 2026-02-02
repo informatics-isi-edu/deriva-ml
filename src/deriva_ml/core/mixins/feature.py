@@ -50,7 +50,8 @@ class FeatureMixin:
     # Type hints for IDE support - actual attributes/methods from host class
     model: "DerivaModel"
     ml_schema: str
-    domain_schema: str
+    domain_schemas: frozenset[str]
+    default_schema: str | None
     pathBuilder: Callable[[], Any]
     add_term: Callable[..., VocabularyTerm]
     apply_catalog_annotations: Callable[[], None]
@@ -124,12 +125,23 @@ class FeatureMixin:
         metadata = metadata or []
         optional = optional or []
 
-        def normalize_metadata(m: Key | Table | ColumnDefinition | str) -> Key | Table | dict:
-            """Helper function to normalize metadata references."""
+        def normalize_metadata(m: Key | Table | ColumnDefinition | str | dict) -> Key | Table | dict:
+            """Helper function to normalize metadata references.
+
+            Handles:
+            - str: Table name, converted to Table object
+            - ColumnDefinition: Dataclass with to_dict() method
+            - dict: Already in dict format (from Column.define())
+            - Key/Table: Passed through unchanged
+            """
             if isinstance(m, str):
                 return self.model.name_to_table(m)
-            elif isinstance(m, ColumnDefinition):
-                return m.model_dump()
+            elif isinstance(m, dict):
+                # Already a dict (e.g., from Column.define())
+                return m
+            elif hasattr(m, 'to_dict'):
+                # ColumnDefinition or similar dataclass
+                return m.to_dict()
             else:
                 return m
 
@@ -148,7 +160,7 @@ class FeatureMixin:
         feature_name_term = self.add_term("Feature_Name", feature_name, description=comment)
         atable_name = f"Execution_{target_table.name}_{feature_name_term.name}"
         # Create an association table implementing the feature
-        atable = self.model.schemas[self.domain_schema].create_table(
+        atable = self.model.create_table(
             target_table.define_association(
                 table_name=atable_name,
                 associates=[execution, target_table, feature_name_table],

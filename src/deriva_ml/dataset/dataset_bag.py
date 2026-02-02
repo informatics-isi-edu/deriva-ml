@@ -428,7 +428,7 @@ class DatasetBag:
             assoc_class, dataset_rel, element_rel = self.model.get_orm_association_class(dataset_class, element_class)
 
             element_table = inspect(element_class).mapped_table
-            if element_table.schema != self.model.domain_schema and element_table.name not in ["Dataset", "File"]:
+            if not self.model.is_domain_schema(element_table.schema) and element_table.name not in ["Dataset", "File"]:
                 # Look at domain tables and nested datasets.
                 continue
 

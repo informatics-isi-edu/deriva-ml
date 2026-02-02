@@ -1,568 +1,347 @@
-"""This module contains the definition of the DatabaseModel class.  The role of this class is to provide an interface
-between the BDBag representation of a dataset and a sqlite database in which the contents of the bag are stored.
+"""DerivaML-specific database model for downloaded BDBags.
+
+This module provides the DatabaseModel class which creates a SQLite database
+from a BDBag and provides DerivaML-specific functionality:
+
+- Dataset version tracking
+- Dataset RID resolution
+- Integration with DerivaModel for schema analysis
+
+The implementation uses a two-phase pattern:
+1. Phase 1 (SchemaBuilder): Create SQLAlchemy ORM from schema.json
+2. Phase 2 (DataLoader): Load data from CSV files
+
+For the low-level components, see:
+- schema_builder.py: SchemaBuilder, SchemaORM
+- data_sources.py: DataSource, BagDataSource, CatalogDataSource
+- data_loader.py: DataLoader
+- fk_orderer.py: ForeignKeyOrderer
 """
 
 from __future__ import annotations
 
-import json
 import logging
-from csv import reader
 from pathlib import Path
-from typing import Any, Generator, Optional, Type
-from urllib.parse import urlparse
+from typing import Any, Generator, Type
 
-from dateutil import parser
-from deriva.core.ermrest_model import Column as DerivaColumn
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from sqlalchemy import Table as SQLTable
+
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
-from deriva.core.ermrest_model import Type as DerivaType
-from pydantic import ConfigDict, validate_call
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    Date,
-    DateTime,
-    Float,
-    Integer,
-    MetaData,
-    String,
-    create_engine,
-    event,
-    inspect,
-    select,
-)
-from sqlalchemy import Column as SQLColumn
-from sqlalchemy import ForeignKeyConstraint as SQLForeignKeyConstraint
-from sqlalchemy import Table as SQLTable
-from sqlalchemy import UniqueConstraint as SQLUniqueConstraint
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import Session, backref, foreign, relationship
-from sqlalchemy.sql.type_api import TypeEngine
-from sqlalchemy.types import TypeDecorator
 
-from deriva_ml.core.definitions import ML_SCHEMA, RID
+from deriva_ml.core.definitions import ML_SCHEMA, RID, get_domain_schemas
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
-
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
+from deriva_ml.model.data_sources import BagDataSource
+from deriva_ml.model.data_loader import DataLoader
 
 
-class ERMRestBoolean(TypeDecorator):
-    impl = Boolean
-    cache_ok = True
-
-    def process_bind_param(self, value: Any, dialect: Any) -> bool | None:
-        if value in ("Y", "y", 1, True, "t", "T"):
-            return True
-        elif value in ("N", "n", 0, False, "f", "F"):
-            return False
-        elif value is None:
-            return None
-        raise ValueError(f"Invalid boolean value: {value!r}")
-
-
-class StringToFloat(TypeDecorator):
-    impl = Float
-    cache_ok = True
-
-    def process_bind_param(self, value: Any, dialect: Any) -> float | None:
-        if value == "" or value is None:
-            return None
-        else:
-            return float(value)
-
-
-class StringToInteger(TypeDecorator):
-    impl = Integer
-    cache_ok = True
-
-    def process_bind_param(self, value: Any, dialect: Any) -> int | None:
-        if value == "" or value is None:
-            return None
-        else:
-            return int(value)
-
-
-class StringToDateTime(TypeDecorator):
-    impl = DateTime
-    cache_ok = True
-
-    def process_bind_param(self, value: Any, dialect: Any) -> Any:
-        if value == "" or value is None:
-            return None
-        else:
-            return parser.parse(value)
-
-
-class StringToDate(TypeDecorator):
-    impl = Date
-    cache_ok = True
-
-    def process_bind_param(self, value: Any, dialect: Any) -> Any:
-        if value == "" or value is None:
-            return None
-        else:
-            return parser.parse(value).date()
+logger = logging.getLogger(__name__)
 
 
 class DatabaseModel(DerivaModel):
-    """Read in the contents of a BDBag and create a local SQLite database.
+    """DerivaML database model for downloaded BDBags.
 
-    As part of its initialization, this routine will create a sqlite database that has the contents of all the
-    tables in the dataset_table.  In addition, any asset tables will the `Filename` column remapped to have the path
-    of the local copy of the file. In addition, a local version of the ERMRest model that as used to generate the
-    dataset_table is available.
+    This class creates a SQLite database from a BDBag and provides:
+    - SQLAlchemy ORM access (engine, metadata, Base)
+    - DerivaModel schema methods (find_features, is_asset, etc.)
+    - Dataset version tracking (bag_rids, dataset_version)
+    - Dataset RID validation (rid_lookup)
 
-    The sqlite database will not have any foreign key constraints applied, however, foreign-key relationships can be
-    found by looking in the ERMRest model.  In addition, as sqlite doesn't support schema, Ermrest schema are added
-    to the table name using the convention SchemaName:TableName.  Methods in DatasetBag that have table names as the
-    argument will perform the appropriate name mappings.
-
-    Because of nested datasets, it's possible that more than one dataset rid is in a bag. The bag_rids attribute
-    tracks all datasets contained in this bag along with their versions.
+    The implementation uses a two-phase pattern:
+    1. SchemaBuilder creates SQLAlchemy ORM from schema.json
+    2. DataLoader fills the database from CSV files
 
     Attributes:
-        bag_path (Path): path to the local copy of the BDBag
-        minid (DatasetMinid): Minid for the specified bag
-        dataset_rid (RID): RID for the specified dataset
-        engine (Connection): connection to the sqlalchemy database holding table values
-        domain_schema (str): Name of the domain schema
-        dataset_table (Table): the dataset table in the ERMRest model.
-        bag_rids (dict): Maps dataset RIDs to their versions within this bag.
+        bag_path: Path to the BDBag directory.
+        minid: DatasetMinid for the downloaded bag.
+        dataset_rid: Primary dataset RID in this bag.
+        bag_rids: Dictionary mapping all dataset RIDs to their versions.
+        dataset_table: The Dataset table from the ERMrest model.
+        engine: SQLAlchemy engine for database access.
+        metadata: SQLAlchemy MetaData with table definitions.
+        Base: SQLAlchemy automap base for ORM classes.
+
+    Example:
+        >>> db = DatabaseModel(minid, bag_path, working_dir)
+        >>> version = db.dataset_version("ABC123")
+        >>> for row in db.get_table_contents("Image"):
+        ...     print(row["Filename"])
     """
 
     def __init__(self, minid: DatasetMinid, bag_path: Path, dbase_path: Path):
-        """Create a new DatabaseModel.
+        """Create a DerivaML database from a BDBag.
 
         Args:
-            minid: Minid for the specified bag.
-            bag_path:  Path to the local copy of the BDBag.
+            minid: DatasetMinid containing bag metadata (RID, version, etc.).
+            bag_path: Path to the BDBag directory.
+            dbase_path: Base directory for SQLite database files.
         """
-
-        super().__init__(Model.fromfile("file-system", bag_path / "data/schema.json"))
-
-        self.bag_path = bag_path
+        self._logger = logging.getLogger("deriva_ml")
         self.minid = minid
         self.dataset_rid = minid.dataset_rid
+        self.bag_path = bag_path
 
-        # Extract the bag checksum from the cache directory name (e.g., "3YM_abc123...")
-        # This ensures the database is recreated when the bag content changes.
-        bag_cache_dir = bag_path.parent.name  # e.g., "3YM_abc123def456..."
-        self.dbase_path = dbase_path / bag_cache_dir
-        self.dbase_path.mkdir(parents=True, exist_ok=True)
+        # Load the model from schema.json
+        schema_file = bag_path / "data/schema.json"
+        model = Model.fromfile("file-system", schema_file)
 
-        self.engine = create_engine(f"sqlite:///{(self.dbase_path / 'main.db').resolve()}", future=True)
-        self.metadata = MetaData()
-        self.Base = automap_base(metadata=self.metadata)
-        # Generate a unique prefix for ORM class names to prevent sharing between instances
-        self._class_prefix = f"_{id(self)}_"
+        # Determine schemas using schema classification
+        ml_schema = ML_SCHEMA
+        domain_schemas = get_domain_schemas(model.schemas.keys(), ml_schema)
+        schemas = [*domain_schemas, ml_schema]
 
-        # Attach event listener for *this instance's* engine
-        event.listen(self.engine, "connect", self._attach_schemas)
+        # Extract bag checksum for unique database path
+        bag_cache_dir = bag_path.parent.name
+        self.database_dir = dbase_path / bag_cache_dir
+        self.database_dir.mkdir(parents=True, exist_ok=True)
 
-        schema_file = self.bag_path / "data/schema.json"
-        with schema_file.open("r") as f:
-            self.snaptime = json.load(f)["snaptime"]
+        # Phase 1: Build ORM structure
+        builder = SchemaBuilder(
+            model=model,
+            schemas=schemas,
+            database_path=self.database_dir,
+        )
+        self._orm: SchemaORM = builder.build()
 
-        self._logger = logging.getLogger("deriva_ml")
-        self._load_model()
-        self.ml_schema = ML_SCHEMA
-        self._load_database()
+        # Phase 2: Load data from bag CSVs
+        source = BagDataSource(bag_path, model=model)
+        loader = DataLoader(self._orm, source)
+        load_counts = loader.load_tables()
+
+        total_rows = sum(load_counts.values())
+        self._logger.debug(f"Loaded {total_rows} rows from bag")
+
+        # Initialize DerivaModel (provides schema analysis methods)
+        DerivaModel.__init__(
+            self,
+            model=model,
+            ml_schema=ml_schema,
+            domain_schemas=domain_schemas,
+        )
+
+        self.dataset_table = model.schemas[ml_schema].tables["Dataset"]
+
+        # Build dataset RID -> version mapping from Dataset_Version table
+        self._build_bag_rids()
+
         self._logger.info(
-            "Creating new database for dataset: %s in %s",
+            "Created DerivaML database for dataset %s in %s",
             self.dataset_rid,
-            self.dbase_path,
+            self.database_dir,
         )
-        self.dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
 
-        # Now go through the database and pick out all the dataset_table RIDS, along with their versions.
+    # =========================================================================
+    # Property delegates to SchemaORM
+    # =========================================================================
+
+    @property
+    def engine(self):
+        """SQLAlchemy engine for database access."""
+        return self._orm.engine
+
+    @property
+    def metadata(self):
+        """SQLAlchemy MetaData with table definitions."""
+        return self._orm.metadata
+
+    @property
+    def Base(self):
+        """SQLAlchemy automap base for ORM classes."""
+        return self._orm.Base
+
+    @property
+    def schemas(self) -> list[str]:
+        """List of schema names in the database."""
+        return self._orm.schemas
+
+    # =========================================================================
+    # Dataset version tracking
+    # =========================================================================
+
+    def _build_bag_rids(self) -> None:
+        """Build mapping of dataset RIDs to their versions in this bag."""
+        self.bag_rids: dict[RID, DatasetVersion] = {}
+
+        dataset_version_table = self.metadata.tables.get(f"{self.ml_schema}.Dataset_Version")
+        if dataset_version_table is None:
+            return
+
         with self.engine.connect() as conn:
-            dataset_version = self.metadata.tables[f"{self.ml_schema}.Dataset_Version"]
-            result = conn.execute(select(dataset_version.c.Dataset, dataset_version.c.Version))
-            dataset_versions = [t for t in result]
+            result = conn.execute(
+                select(dataset_version_table.c.Dataset, dataset_version_table.c.Version)
+            )
+            for rid, version_str in result:
+                version = DatasetVersion.parse(version_str)
+                # Keep the highest version for each RID
+                if rid not in self.bag_rids or version > self.bag_rids[rid]:
+                    self.bag_rids[rid] = version
 
-        dataset_versions = [(v[0], DatasetVersion.parse(v[1])) for v in dataset_versions]
-        # Get most current version of each rid
-        self.bag_rids = {}
-        for rid, version in dataset_versions:
-            self.bag_rids[rid] = max(self.bag_rids.get(rid, DatasetVersion(0, 1, 0)), version)
-
-    def _attach_schemas(self, dbapi_conn, _conn_record):
-        cur = dbapi_conn.cursor()
-        for schema in [self.domain_schema, self.ml_schema]:
-            schema_file = (self.dbase_path / f"{schema}.db").resolve()
-            cur.execute(f"ATTACH DATABASE '{schema_file}' AS '{schema}'")
-        cur.close()
-
-    @staticmethod
-    def _sql_type(type: DerivaType) -> TypeEngine:
-        """Return the SQL type for a Deriva column."""
-        return {
-            "boolean": ERMRestBoolean,
-            "date": StringToDate,
-            "float4": StringToFloat,
-            "float8": StringToFloat,
-            "int2": StringToInteger,
-            "int4": StringToInteger,
-            "int8": StringToInteger,
-            "json": JSON,
-            "jsonb": JSON,
-            "timestamptz": StringToDateTime,
-            "timestamp": StringToDateTime,
-        }.get(type.typename, String)
-
-    def _load_model(self) -> None:
-        """Create a sqlite database schema that contains all the tables within the catalog from which the BDBag
-        was created."""
-
-        def is_key(column: DerivaColumn, table: DerivaTable) -> bool:
-            return column in [key.unique_columns[0] for key in table.keys] and column.name == "RID"
-
-        def col(model, name: str):
-            # try ORM attribute first
-            try:
-                return getattr(model, name).property.columns[0]
-            except AttributeError:
-                # fall back to exact DB column key on the Table
-                return model.__table__.c[name]
-
-        def guess_attr_name(col_name: str) -> str:
-            return col_name[:-3] if col_name.lower().endswith("_id") else col_name
-
-        database_tables: list[SQLTable] = []
-        for schema_name in [self.domain_schema, self.ml_schema]:
-            for table in self.model.schemas[schema_name].tables.values():
-                database_columns: list[SQLColumn] = []
-                for c in table.columns:
-                    # clone column (type, nullability, PK, defaults, unique)
-                    database_column = SQLColumn(
-                        name=c.name,
-                        type_=self._sql_type(c.type),  # SQLAlchemy type object is reusable
-                        comment=c.comment,
-                        default=c.default,
-                        primary_key=is_key(c, table),
-                        nullable=c.nullok,
-                        # NOTE: server_onupdate, computed, etc. can be added if you use them
-                    )
-                    database_columns.append(database_column)
-                database_table = SQLTable(table.name, self.metadata, *database_columns, schema=schema_name)
-                for key in table.keys:
-                    key_columns = [c.name for c in key.unique_columns]
-                    #     if key.name[0] == "RID":
-                    #        continue
-                    database_table.append_constraint(
-                        SQLUniqueConstraint(
-                            *key_columns,
-                            name=key.name[1],
-                        )
-                    )
-                for fk in table.foreign_keys:
-                    if fk.pk_table.schema.name not in [self.domain_schema, self.ml_schema]:
-                        continue
-                    if fk.pk_table.schema.name != schema_name:
-                        continue
-                    # Attach FK to the chosen column
-                    database_table.append_constraint(
-                        SQLForeignKeyConstraint(
-                            columns=[f"{c.name}" for c in fk.foreign_key_columns],
-                            refcolumns=[f"{schema_name}.{c.table.name}.{c.name}" for c in fk.referenced_columns],
-                            name=fk.name[1],
-                            comment=fk.comment,
-                        )
-                    )
-                database_tables.append(database_table)
-        with self.engine.begin() as conn:
-            self.metadata.create_all(conn, tables=database_tables)
-
-        def name_for_scalar_relationship(_base, local_cls, referred_cls, constraint):
-            cols = list(constraint.columns) if constraint is not None else []
-            if len(cols) == 1:
-                name = cols[0].key
-                if name in {c.key for c in local_cls.__table__.columns}:
-                    name += "_rel"
-                return name
-            return constraint.name or referred_cls.__name__.lower()
-
-        def name_for_collection_relationship(_base, local_cls, referred_cls, constraint):
-            backref_name = constraint.name.replace("_fkey", "_collection")
-            return backref_name or (referred_cls.__name__.lower() + "_collection")
-
-        def classname_for_table(_base, tablename, table):
-            # Use instance-unique prefix to prevent ORM class sharing between DatabaseModel instances
-            return self._class_prefix + tablename.replace(".", "_").replace("-", "_")
-
-        # Now build ORM mappings for the tables.
-        self.Base.prepare(
-            self.engine,
-            name_for_scalar_relationship=name_for_scalar_relationship,
-            name_for_collection_relationship=name_for_collection_relationship,
-            classname_for_table=classname_for_table,
-            reflect=True,
-        )
-
-        for schema in [self.domain_schema, self.ml_schema]:
-            for table in self.model.schemas[schema].tables.values():
-                for fk in table.foreign_keys:
-                    if fk.pk_table.schema.name not in [self.domain_schema, self.ml_schema]:
-                        continue
-                    if fk.pk_table.schema.name == schema:
-                        continue
-                    table_name = f"{schema}.{table.name}"
-                    table_class = self.get_orm_class_by_name(table_name)
-                    foreign_key_column_name = fk.foreign_key_columns[0].name
-                    foreign_key_column = col(table_class, foreign_key_column_name)
-
-                    referenced_table_name = f"{fk.pk_table.schema.name}.{fk.pk_table.name}"
-                    referenced_class = self.get_orm_class_by_name(referenced_table_name)
-                    referenced_column = col(referenced_class, fk.referenced_columns[0].name)
-
-                    relationship_attr = guess_attr_name(foreign_key_column_name)
-                    backref_attr = fk.name[1].replace("_fkey", "_collection")
-
-                    # Check if a proper relationship already exists (not just any attribute)
-                    existing_attr = getattr(table_class, relationship_attr, None)
-                    from sqlalchemy.orm import RelationshipProperty
-                    from sqlalchemy.orm.attributes import InstrumentedAttribute
-
-                    is_relationship = isinstance(existing_attr, InstrumentedAttribute) and isinstance(
-                        existing_attr.property, RelationshipProperty
-                    )
-                    if not is_relationship:
-                        setattr(
-                            table_class,
-                            relationship_attr,
-                            relationship(
-                                referenced_class,
-                                foreign_keys=[foreign_key_column],
-                                primaryjoin=foreign(foreign_key_column) == referenced_column,
-                                backref=backref(backref_attr, viewonly=True),
-                                viewonly=True,
-                            ),
-                        )
-
-        # Reflect won't pick up the second FK in the dataset_dataset table.  We need to do it manually
-        # dataset_dataset_class = self.get_orm_class_by_name("deriva-ml.Dataset_Dataset")
-        # dataset_class = self.get_orm_class_by_name("deriva-ml.Dataset")
-        #     dataset_dataset_class.Nested_Dataset = relationship(
-        #         dataset_class,
-        #         primaryjoin=foreign(dataset_dataset_class.__table__.c["Nested_Dataset"])
-        #         == dataset_class.__table__.c["RID"],
-        #         foreign_keys=[dataset_dataset_class.__table__.c["Nested_Dataset"]],
-        #         backref=backref("nested_dataset_collection", viewonly=True),  # pick a distinct name
-        #         viewonly=True,  # keep it read-only unless you truly want writes
-        #         overlaps="Dataset,dataset_dataset_collection",  # optional: silence overlap warnings
-        #     )
-        # Use instance-specific registry.configure() instead of global configure_mappers()
-        # to avoid cross-contamination between DatabaseModel instances
-        self.Base.registry.configure()
-
-    def dispose(self) -> None:
-        """Dispose of SQLAlchemy resources to prevent state leakage between instances.
-
-        This should be called when the DatabaseModel is no longer needed, especially
-        in test scenarios where multiple DatabaseModel instances may be created.
-
-        After calling dispose(), the instance should not be used further.
-        """
-        if hasattr(self, "_disposed") and self._disposed:
-            return  # Already disposed
-
-        # Dispose the registry to clear all mappers for this Base
-        if hasattr(self, "Base"):
-            self.Base.registry.dispose()
-        # Dispose the engine to close all connections
-        if hasattr(self, "engine"):
-            self.engine.dispose()
-
-        self._disposed = True
-
-    def __del__(self) -> None:
-        """Cleanup resources when the instance is garbage collected.
-
-        This ensures that database connections are properly closed even if
-        dispose() is not explicitly called. However, explicit dispose() calls
-        are preferred for deterministic cleanup.
-        """
-        self.dispose()
-
-    def __enter__(self) -> "DatabaseModel":
-        """Enter context manager protocol.
-
-        Returns:
-            self: The DatabaseModel instance for use within the context.
-
-        Example:
-            >>> with DatabaseModel(minid, bag_path, dbase_path) as db:
-            ...     tables = db.list_tables()
-            ...     # db is automatically disposed when exiting the context
-        """
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
-        """Exit context manager protocol, disposing resources.
+    def dataset_version(self, dataset_rid: RID | None = None) -> DatasetVersion:
+        """Get the version of a dataset in this bag.
 
         Args:
-            exc_type: Exception type if an exception was raised.
-            exc_val: Exception value if an exception was raised.
-            exc_tb: Exception traceback if an exception was raised.
+            dataset_rid: Dataset RID to look up. If None, uses the primary dataset.
 
         Returns:
-            False to propagate any exceptions.
+            DatasetVersion for the specified dataset.
+
+        Raises:
+            DerivaMLException: If the RID is not in this bag.
         """
-        self.dispose()
-        return False
+        rid = dataset_rid or self.dataset_rid
+        if rid not in self.bag_rids:
+            raise DerivaMLException(f"Dataset RID {rid} is not in this bag")
+        return self.bag_rids[rid]
 
-    def _load_database(self) -> None:
-        """Load a SQLite database from a bdbag.  THis is done by looking for all the CSV files in the bdbag directory.
-
-        If the file is for an asset table, update the FileName column of the table to have the local file path for
-        the materialized file.  Then load into the sqlite database.
-        Note: none of the foreign key constraints are included in the database.
-        """
-        dpath = self.bag_path / "data"
-        asset_map = self._localize_asset_table()  # Map of remote to local assets.
-
-        # Find all the CSV files in the subdirectory and load each file into the database.
-        for csv_file in Path(dpath).rglob("*.csv"):
-            table = csv_file.stem
-            schema = self.domain_schema if table in self.model.schemas[self.domain_schema].tables else self.ml_schema
-            sql_table = self.metadata.tables[f"{schema}.{table}"]
-
-            with csv_file.open(newline="") as csvfile:
-                csv_reader = reader(csvfile)
-                column_names = next(csv_reader)
-
-                # Determine which columns in the table has the Filename and the URL
-                asset_indexes = (
-                    (column_names.index("Filename"), column_names.index("URL")) if self._is_asset(table) else None
-                )
-
-                with self.engine.begin() as conn:
-                    object_table = [
-                        self._localize_asset(o, asset_indexes, asset_map, table == "Dataset") for o in csv_reader
-                    ]
-                    conn.execute(
-                        sqlite_insert(sql_table).on_conflict_do_nothing(),
-                        [dict(zip(column_names, row)) for row in object_table],
-                    )
-
-    def _localize_asset_table(self) -> dict[str, str]:
-        """Use the fetch.txt file in a bdbag to create a map from a URL to a local file path.
-
-        Returns:
-            Dictionary that maps a URL to a local file path.
-
-        """
-        fetch_map = {}
-        try:
-            with Path.open(self.bag_path / "fetch.txt", newline="\n") as fetch_file:
-                for row in fetch_file:
-                    # Rows in fetch.text are tab seperated with URL filename.
-                    fields = row.split("\t")
-                    local_file = fields[2].replace("\n", "")
-                    local_path = f"{self.bag_path}/{local_file}"
-                    fetch_map[urlparse(fields[0]).path] = local_path
-        except FileNotFoundError:
-            dataset_rid = self.bag_path.name.replace("Dataset_", "")
-            logging.info(f"No downloaded assets in bag {dataset_rid}")
-        return fetch_map
-
-    def _is_asset(self, table_name: str) -> bool:
-        """
+    def rid_lookup(self, dataset_rid: RID) -> DatasetVersion | None:
+        """Check if a dataset RID exists in this bag.
 
         Args:
-          table_name: str:
+            dataset_rid: RID to look up.
 
         Returns:
-            Boolean that is true if the table looks like an asset table.
+            DatasetVersion if found.
+
+        Raises:
+            DerivaMLException: If the RID is not found in this bag.
         """
-        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
-        sname = self.domain_schema if table_name in self.model.schemas[self.domain_schema].tables else self.ml_schema
-        asset_table = self.model.schemas[sname].tables[table_name]
-        return asset_columns.issubset({c.name for c in asset_table.columns})
+        if dataset_rid in self.bag_rids:
+            return self.bag_rids[dataset_rid]
+        raise DerivaMLException(f"Dataset {dataset_rid} not found in this bag")
 
-    @staticmethod
-    def _localize_asset(o: list, indexes: tuple[int, int], asset_map: dict[str, str], debug: bool = False) -> tuple:
-        """Given a list of column values for a table, replace the FileName column with the local file name based on
-        the URL value.
-
-        Args:
-          o: List of values for each column in a table row.
-          indexes: A tuple whose first element is the column index of the file name and whose second element
-        is the index of the URL in an asset table.  Tuple is None if table is not an asset table.
-          o: list:
-          indexes: Optional[tuple[int, int]]:
-
-        Returns:
-          Tuple of updated column values.
-
-        """
-        if indexes:
-            file_column, url_column = indexes
-            o[file_column] = asset_map[o[url_column]] if o[url_column] else ""
-        return tuple(o)
-
-    def find_table(self, table_name: str) -> SQLTable:
-        """Find a table in the catalog."""
-        # We will look across ml and domain schema to find a table whose name matches.
-        try:
-            table = [t for t in self.metadata.tables if t == table_name or t.split(".")[1] == table_name][0]
-        except IndexError:
-            raise DerivaMLException(f"Table {table_name} not found in catalog.")
-        return self.metadata.tables[table]
+    # =========================================================================
+    # Table/ORM access methods - delegate to SchemaORM
+    # =========================================================================
 
     def list_tables(self) -> list[str]:
-        """List the names of the tables in the catalog
+        """List all tables in the database.
 
         Returns:
-            A list of table names.  These names are all qualified with the Deriva schema name.
+            List of fully-qualified table names (schema.table), sorted.
         """
-        tables = list(self.metadata.tables.keys())
-        tables.sort()
-        return tables
+        return self._orm.list_tables()
 
-    def dataset_version(self, dataset_rid: Optional[RID] = None) -> DatasetVersion:
-        """Return the version of the specified dataset."""
-        if dataset_rid and dataset_rid not in self.bag_rids:
-            DerivaMLException(f"Dataset RID {dataset_rid} is not in model.")
-        return self.bag_rids[dataset_rid]
+    def find_table(self, table_name: str) -> SQLTable:
+        """Find a table by name.
+
+        Args:
+            table_name: Table name, with or without schema prefix.
+
+        Returns:
+            SQLAlchemy Table object.
+
+        Raises:
+            KeyError: If table not found.
+        """
+        return self._orm.find_table(table_name)
+
+    def get_table_contents(self, table: str) -> Generator[dict[str, Any], None, None]:
+        """Retrieve all rows from a table as dictionaries.
+
+        Args:
+            table: Table name (with or without schema prefix).
+
+        Yields:
+            Dictionary for each row with column names as keys.
+        """
+        yield from self._orm.get_table_contents(table)
+
+    def get_orm_class_by_name(self, table_name: str) -> Any | None:
+        """Get the ORM class for a table by name.
+
+        Args:
+            table_name: Table name, with or without schema prefix.
+
+        Returns:
+            SQLAlchemy ORM class for the table.
+
+        Raises:
+            KeyError: If table not found.
+        """
+        return self._orm.get_orm_class(table_name)
+
+    def get_orm_class_for_table(self, table: SQLTable | DerivaTable | str) -> Any | None:
+        """Get the ORM class for a table.
+
+        Args:
+            table: SQLAlchemy Table, Deriva Table, or table name.
+
+        Returns:
+            SQLAlchemy ORM class, or None if not found.
+        """
+        return self._orm.get_orm_class_for_table(table)
+
+    @staticmethod
+    def is_association_table(
+        table_class,
+        min_arity: int = 2,
+        max_arity: int = 2,
+        unqualified: bool = True,
+        pure: bool = True,
+        no_overlap: bool = True,
+        return_fkeys: bool = False,
+    ):
+        """Check if an ORM class represents an association table.
+
+        Delegates to SchemaORM.is_association_table.
+        """
+        return SchemaORM.is_association_table(
+            table_class, min_arity, max_arity, unqualified, pure, no_overlap, return_fkeys
+        )
+
+    def get_association_class(
+        self,
+        left_cls: Type[Any],
+        right_cls: Type[Any],
+    ) -> tuple[Any, Any, Any] | None:
+        """Find an association class connecting two ORM classes.
+
+        Args:
+            left_cls: First ORM class.
+            right_cls: Second ORM class.
+
+        Returns:
+            Tuple of (association_class, left_relationship, right_relationship),
+            or None if no association found.
+        """
+        return self._orm.get_association_class(left_cls, right_cls)
+
+    # =========================================================================
+    # Compatibility methods
+    # =========================================================================
 
     def _get_table_contents(self, table: str) -> Generator[dict[str, Any], None, None]:
-        """Retrieve the contents of the specified table as a dictionary.
+        """Retrieve table contents as dictionaries.
+
+        This method provides compatibility with existing code that uses
+        _get_table_contents. New code should use get_table_contents instead.
 
         Args:
-            table: Table to retrieve data from. If schema is not provided as part of the table name,
-                the method will attempt to locate the schema for the table.
+            table: Table name.
 
-        Returns:
-          A generator producing dictionaries containing the contents of the specified table as name/value pairs.
+        Yields:
+            Dictionary for each row.
         """
-
-        with self.engine.connect() as conn:
-            result = conn.execute(select(self.find_table(table)))
-            for row in result.mappings():
-                yield dict(row)
+        yield from self.get_table_contents(table)
 
     def _get_dataset_execution(self, dataset_rid: str) -> dict[str, Any] | None:
-        """Retrieve the execution associated with the dataset version in this bag.
+        """Get the execution associated with a dataset version.
 
-        Looks up the Dataset_Version record for this dataset's version and returns
-        the associated execution if one exists. This provides the execution that
-        created or is associated with this specific version of the dataset.
+        Looks up the Dataset_Version record for the dataset's version in this bag
+        and returns the associated execution information.
 
         Args:
-            dataset_rid: Dataset RID for which to find the associated execution.
+            dataset_rid: Dataset RID to look up.
 
         Returns:
-            The Dataset_Version row for this dataset's version, or None if not found.
-            The 'Execution' field may be None if no execution is associated with this version.
+            Dataset_Version row as dict, or None if not found.
+            The 'Execution' field contains the execution RID (may be None).
         """
-        # Get the version of this dataset in the bag
         version = self.bag_rids.get(dataset_rid)
         if not version:
             return None
@@ -572,199 +351,50 @@ class DatabaseModel(DerivaModel):
             dataset_version_table.columns.Dataset == dataset_rid,
             dataset_version_table.columns.Version == str(version),
         )
+
         with Session(self.engine) as session:
             result = session.execute(cmd).mappings().first()
             return dict(result) if result else None
 
-    def rid_lookup(self, dataset_rid: RID) -> DatasetVersion | None:
-        """Check if a dataset RID exists in this bag and return its version.
+    def get_orm_association_class(self, left_cls, right_cls, **kwargs):
+        """Find association class between two ORM classes.
 
-        Args:
-            dataset_rid: RID to be looked up.
-
-        Returns:
-            DatasetVersion if found, None otherwise.
-
-        Raises:
-            DerivaMLException if the given RID is not found in this bag.
+        Wrapper around get_association_class for compatibility.
         """
-        if dataset_rid in self.bag_rids:
-            return self.bag_rids[dataset_rid]
-        raise DerivaMLException(f"Dataset {dataset_rid} not found in this bag")
+        return self.get_association_class(left_cls, right_cls)
 
-    def get_orm_class_by_name(self, table: str) -> Any | None:
-        sql_table = self.find_table(table)
-        if sql_table is None:
-            raise DerivaMLException(f"Table {table} not found")
-        return self.get_orm_class_for_table(sql_table)
+    # =========================================================================
+    # Resource management
+    # =========================================================================
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def get_orm_class_for_table(self, table: SQLTable | DerivaTable | str) -> Any | None:
-        if isinstance(table, DerivaTable):
-            table = self.metadata.tables[f"{table.schema.name}.{table.name}"]
-            if isinstance(table, str):
-                table = self.find_table(table)
-        for mapper in self.Base.registry.mappers:
-            if mapper.persist_selectable is table or table in mapper.tables:
-                return mapper.class_
-        return None
+    def dispose(self) -> None:
+        """Dispose of SQLAlchemy resources.
 
-    @staticmethod
-    def _is_association(
-        table_class, min_arity=2, max_arity=2, unqualified=True, pure=True, no_overlap=True, return_fkeys=False
-    ):
-        """Return (truthy) integer arity if self is a matching association, else False.
-
-        min_arity: minimum number of associated fkeys (default 2)
-        max_arity: maximum number of associated fkeys (default 2) or None
-        unqualified: reject qualified associations when True (default True)
-        pure: reject impure associations when True (default True)
-        no_overlap: reject overlapping associations when True (default True)
-        return_fkeys: return the set of N associated ForeignKeys if True
-
-        The default behavior with no arguments is to test for pure,
-        unqualified, non-overlapping, binary associations.
-
-        An association is comprised of several foreign keys which are
-        covered by a non-nullable composite row key. This allows
-        specific combinations of foreign keys to appear at most once.
-
-        The arity of an association is the number of foreign keys
-        being associated. A typical binary association has arity=2.
-
-        An unqualified association contains *only* the foreign key
-        material in its row key. Conversely, a qualified association
-        mixes in other material which means that a specific
-        combination of foreign keys may repeat with different
-        qualifiers.
-
-        A pure association contains *only* row key
-        material. Conversely, an impure association includes
-        additional metadata columns not covered by the row key. Unlike
-        qualifiers, impure metadata merely decorates an association
-        without augmenting its identifying characteristics.
-
-        A non-overlapping association does not share any columns
-        between multiple foreign keys. This means that all
-        combinations of foreign keys are possible. Conversely, an
-        overlapping association shares some columns between multiple
-        foreign keys, potentially limiting the combinations which can
-        be represented in an association row.
-
-        These tests ignore the five ERMrest system columns and any
-        corresponding constraints.
-
+        Call this when done with the database to properly clean up connections.
+        After calling dispose(), the instance should not be used further.
         """
-        if min_arity < 2:
-            raise ValueError("An assocation cannot have arity < 2")
-        if max_arity is not None and max_arity < min_arity:
-            raise ValueError("max_arity cannot be less than min_arity")
+        if hasattr(self, "_orm") and self._orm is not None:
+            self._orm.dispose()
 
-        mapper = inspect(table_class).mapper
+    def delete_database(self) -> None:
+        """Delete the database files.
 
-        # TODO: revisit whether there are any other cases we might
-        # care about where system columns are involved?
-        non_sys_cols = {col.name for col in mapper.columns if col.name not in {"RID", "RCT", "RMT", "RCB", "RMB"}}
-        unique_columns = [
-            {c.name for c in constraint.columns}
-            for constraint in inspect(table_class).local_table.constraints
-            if isinstance(constraint, SQLUniqueConstraint)
-        ]
-
-        non_sys_key_colsets = {
-            frozenset(unique_column_set)
-            for unique_column_set in unique_columns
-            if unique_column_set.issubset(non_sys_cols) and len(unique_column_set) > 1
-        }
-
-        if not non_sys_key_colsets:
-            # reject: not association
-            return False
-
-        # choose longest compound key (arbitrary choice with ties!)
-        row_key = sorted(non_sys_key_colsets, key=lambda s: len(s), reverse=True)[0]
-        foreign_keys = [constraint for constraint in inspect(table_class).relationships.values()]
-
-        covered_fkeys = {fkey for fkey in foreign_keys if {c.name for c in fkey.local_columns}.issubset(row_key)}
-        covered_fkey_cols = set()
-
-        if len(covered_fkeys) < min_arity:
-            # reject: not enough fkeys in association
-            return False
-        elif max_arity is not None and len(covered_fkeys) > max_arity:
-            # reject: too many fkeys in association
-            return False
-
-        for fkey in covered_fkeys:
-            fkcols = {c.name for c in fkey.local_columns}
-            if no_overlap and fkcols.intersection(covered_fkey_cols):
-                # reject: overlapping fkeys in association
-                return False
-            covered_fkey_cols.update(fkcols)
-
-        if unqualified and row_key.difference(covered_fkey_cols):
-            # reject: qualified association
-            return False
-
-        if pure and non_sys_cols.difference(row_key):
-            # reject: impure association
-            return False
-
-        # return (truthy) arity or fkeys
-        if return_fkeys:
-            return covered_fkeys
-        else:
-            return len(covered_fkeys)
-
-    def get_orm_association_class(
-        self,
-        left_cls: Type[Any],
-        right_cls: Type[Any],
-        min_arity=2,
-        max_arity=2,
-        unqualified=True,
-        pure=True,
-        no_overlap=True,
-    ):
+        Note: This method is deprecated. Use dispose() and manually remove
+        the database directory if needed.
         """
-        Find an association class C by: (1) walking rels on left_cls to a mid class C,
-        (2) verifying C also relates to right_cls. Returns (C, C->left, C->right) or None.
+        self.dispose()
+        # Note: We don't actually delete files here to avoid data loss.
+        # The caller should handle file deletion if needed.
 
-        """
-        for _, left_rel in inspect(left_cls).relationships.items():
-            mid_cls = left_rel.mapper.class_
-            is_assoc = self._is_association(mid_cls, return_fkeys=True)
-            if not is_assoc:
-                continue
-            assoc_local_columns_left = list(is_assoc)[0].local_columns
-            assoc_local_columns_right = list(is_assoc)[1].local_columns
+    def __del__(self) -> None:
+        """Cleanup resources when garbage collected."""
+        self.dispose()
 
-            found_left = found_right = False
-            for r in inspect(left_cls).relationships.values():
-                remote_side = list(r.remote_side)[0]
-                if remote_side in assoc_local_columns_left:
-                    found_left = r
-                if remote_side in assoc_local_columns_right:
-                    found_left = r
-                    # We have left and right backwards from the assocation, so swap them.
-                    assoc_local_columns_left, assoc_local_columns_right = (
-                        assoc_local_columns_right,
-                        assoc_local_columns_left,
-                    )
-            for r in inspect(right_cls).relationships.values():
-                remote_side = list(r.remote_side)[0]
-                if remote_side in assoc_local_columns_right:
-                    found_right = r
-            if found_left != False and found_right != False:
-                return mid_cls, found_left.class_attribute, found_right.class_attribute
-        return None
+    def __enter__(self) -> "DatabaseModel":
+        """Context manager entry."""
+        return self
 
-    def delete_database(self):
-        """
-
-        Args:
-
-        Returns:
-
-        """
-        self.dbase_file.unlink()
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Context manager exit - dispose resources."""
+        self.dispose()
+        return False
