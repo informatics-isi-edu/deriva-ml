@@ -3439,10 +3439,7 @@ def clone_subset_catalog(
         # Post-clone operations
         if alias:
             try:
-                dst_server.post(
-                    f"/ermrest/alias/{urlquote(alias)}",
-                    json={"id": dst_catalog_id, "owner": None}
-                )
+                dst_server.create_ermrest_alias(id=alias, alias_target=str(dst_catalog_id))
                 result.alias = alias
             except Exception as e:
                 logger.warning(f"Failed to create alias '{alias}': {e}")
@@ -3457,6 +3454,18 @@ def clone_subset_catalog(
 
         if reinitialize_dataset_versions and "deriva-ml" in src_model.schemas:
             result = _reinitialize_dataset_versions(result, dst_cred)
+
+        # Set defaultTable to the root table for partial clones
+        # This ensures the Chaise UI has a valid landing page
+        try:
+            chaise_config_url = "tag:isrd.isi.edu,2019:chaise-config"
+            dst_model = dst_catalog.getCatalogModel()
+            dst_model.annotations[chaise_config_url] = dst_model.annotations.get(chaise_config_url, {})
+            dst_model.annotations[chaise_config_url]["defaultTable"] = root_table_key
+            dst_model.apply()
+            logger.info(f"Set defaultTable to {root_table_key}")
+        except Exception as e:
+            logger.warning(f"Failed to set defaultTable annotation: {e}")
 
         logger.info(
             f"Subset clone complete: {dest_hostname}/{dst_catalog_id} "
