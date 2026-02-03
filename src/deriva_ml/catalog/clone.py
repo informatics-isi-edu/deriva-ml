@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -123,6 +123,24 @@ class CloneIssue:
 
 
 @dataclass
+class CloneReportSummary:
+    """Summary statistics for a clone operation."""
+
+    total_issues: int
+    errors: int
+    warnings: int
+    tables_restored: int
+    tables_failed: int
+    tables_skipped: int
+    total_rows_restored: int
+    orphan_rows_removed: int
+    orphan_rows_nullified: int
+    fkeys_applied: int
+    fkeys_failed: int
+    fkeys_pruned: int
+
+
+@dataclass
 class CloneReport:
     """Comprehensive report of catalog clone operation.
 
@@ -147,27 +165,32 @@ class CloneReport:
     def add_issue(self, issue: CloneIssue) -> None:
         self.issues.append(issue)
 
+    @property
+    def summary(self) -> CloneReportSummary:
+        """Return summary statistics as a dataclass."""
+        return CloneReportSummary(
+            total_issues=len(self.issues),
+            errors=len([i for i in self.issues if i.severity == CloneIssueSeverity.ERROR]),
+            warnings=len([i for i in self.issues if i.severity == CloneIssueSeverity.WARNING]),
+            tables_restored=len(self.tables_restored),
+            tables_failed=len(self.tables_failed),
+            tables_skipped=len(self.tables_skipped),
+            total_rows_restored=sum(self.tables_restored.values()),
+            orphan_rows_removed=sum(
+                d.get("rows_removed", 0) for d in self.orphan_details.values()
+            ),
+            orphan_rows_nullified=sum(
+                d.get("rows_nullified", 0) for d in self.orphan_details.values()
+            ),
+            fkeys_applied=self.fkeys_applied,
+            fkeys_failed=self.fkeys_failed,
+            fkeys_pruned=self.fkeys_pruned,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Return the report as a JSON-serializable dictionary."""
         return {
-            "summary": {
-                "total_issues": len(self.issues),
-                "errors": len([i for i in self.issues if i.severity == CloneIssueSeverity.ERROR]),
-                "warnings": len([i for i in self.issues if i.severity == CloneIssueSeverity.WARNING]),
-                "tables_restored": len(self.tables_restored),
-                "tables_failed": len(self.tables_failed),
-                "tables_skipped": len(self.tables_skipped),
-                "total_rows_restored": sum(self.tables_restored.values()),
-                "orphan_rows_removed": sum(
-                    d.get("rows_removed", 0) for d in self.orphan_details.values()
-                ),
-                "orphan_rows_nullified": sum(
-                    d.get("rows_nullified", 0) for d in self.orphan_details.values()
-                ),
-                "fkeys_applied": self.fkeys_applied,
-                "fkeys_failed": self.fkeys_failed,
-                "fkeys_pruned": self.fkeys_pruned,
-            },
+            "summary": asdict(self.summary),
             "issues": [i.to_dict() for i in self.issues],
             "tables_restored": self.tables_restored,
             "tables_failed": self.tables_failed,
