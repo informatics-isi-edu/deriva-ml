@@ -30,6 +30,7 @@ from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.hatrac_store import HatracStore
 
 from deriva_ml.model.catalog import VOCAB_COLUMNS
+from deriva_ml.schema import create_ml_schema
 
 logger = logging.getLogger("deriva_ml")
 
@@ -2881,12 +2882,12 @@ def _post_clone_operations(
 
     if add_ml_schema:
         try:
-            from deriva_ml.schema import create_ml_schema
             catalog = server.connect_ermrest(result.catalog_id)
             create_ml_schema(catalog)
             result.ml_schema_added = True
 
             # Apply catalog annotations (chaise-config, navbar, etc.)
+            # Import DerivaML locally to avoid circular import (deriva_ml.__init__ imports from clone.py)
             try:
                 from deriva_ml import DerivaML
                 ml = DerivaML(result.hostname, result.catalog_id, check_auth=False)
@@ -3446,9 +3447,18 @@ def clone_subset_catalog(
 
         if add_ml_schema:
             try:
-                from deriva_ml.core.ml_schema import add_ml_schema as add_schema
-                add_schema(dst_catalog)
+                create_ml_schema(dst_catalog)
                 result.ml_schema_added = True
+
+                # Apply catalog annotations (chaise-config, navbar, etc.)
+                # Import DerivaML locally to avoid circular import (deriva_ml.__init__ imports from clone.py)
+                try:
+                    from deriva_ml import DerivaML
+                    ml = DerivaML(dest_hostname, str(dst_catalog_id), check_auth=False)
+                    ml.apply_catalog_annotations()
+                    logger.info("Applied catalog annotations (chaise-config, navbar)")
+                except Exception as e:
+                    logger.warning(f"Failed to apply catalog annotations: {e}")
             except Exception as e:
                 logger.warning(f"Failed to add ML schema: {e}")
 
