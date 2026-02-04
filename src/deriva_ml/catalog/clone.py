@@ -3471,7 +3471,12 @@ def clone_subset_catalog(
             chaise_config_url = "tag:isrd.isi.edu,2019:chaise-config"
             dst_model = dst_catalog.getCatalogModel()
             dst_model.annotations[chaise_config_url] = dst_model.annotations.get(chaise_config_url, {})
-            dst_model.annotations[chaise_config_url]["defaultTable"] = root_table_key
+            # Chaise expects defaultTable as an object with schema and table keys
+            root_schema, root_tname = root_table_key.split(":", 1)
+            dst_model.annotations[chaise_config_url]["defaultTable"] = {
+                "schema": root_schema,
+                "table": root_tname,
+            }
             dst_model.apply()
             logger.info(f"Set defaultTable to {root_table_key}")
         except Exception as e:
