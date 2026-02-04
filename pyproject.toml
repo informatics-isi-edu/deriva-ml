@@ -90,13 +90,14 @@ addopts = ["-v", "--import-mode=importlib"]
 line-length = 120
 target-version = "py312"
 lint.select = ["E", "F", "I", "PTH"]
-lint.ignore = []
+# E402: Module level import not at top of file - intentional in some files to handle deriva import shadowing
+lint.ignore = ["E402"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
 quote-style = "double"
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["deriva_ml"]
 
 [metadata]

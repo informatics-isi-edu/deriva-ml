@@ -40,8 +40,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Self, cast
 
-import deriva.core.datapath as datapath
-
 # Third-party imports
 import pandas as pd
 

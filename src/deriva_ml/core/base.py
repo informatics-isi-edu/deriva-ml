@@ -47,20 +47,20 @@ from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition, VocabularyTableDef
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
-from deriva_ml.dataset.upload import bulk_upload_configuration
-from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.core.mixins import (
     AnnotationMixin,
-    VocabularyMixin,
-    RidResolutionMixin,
-    PathBuilderMixin,
-    WorkflowMixin,
-    FeatureMixin,
-    DatasetMixin,
     AssetMixin,
+    DatasetMixin,
     ExecutionMixin,
+    FeatureMixin,
     FileMixin,
+    PathBuilderMixin,
+    RidResolutionMixin,
+    VocabularyMixin,
+    WorkflowMixin,
 )
+from deriva_ml.dataset.upload import bulk_upload_configuration
+from deriva_ml.interfaces import DerivaMLCatalog
 
 # Optional debug imports
 try:
@@ -74,6 +74,7 @@ if TYPE_CHECKING:
     from deriva_ml.catalog.clone import CatalogProvenance
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
+    from deriva_ml.schema.validation import SchemaValidationReport
 
 # Stop pycharm from complaining about undefined references.
 ml: DerivaML
@@ -1098,6 +1099,7 @@ class DerivaML(
             ...     print(f"{d['execution_rid']}: {d['size_mb']:.1f} MB")
         """
         from datetime import datetime
+
         from deriva_ml.dataset.upload import upload_root
 
         results = []
@@ -1155,6 +1157,7 @@ class DerivaML(
         """
         import shutil
         import time
+
         from deriva_ml.dataset.upload import upload_root
 
         stats = {'dirs_removed': 0, 'bytes_freed': 0, 'errors': 0}
@@ -1292,7 +1295,7 @@ class DerivaML(
             - deriva_ml.schema.validation.SchemaValidationReport
             - deriva_ml.schema.validation.validate_ml_schema
         """
-        from deriva_ml.schema.validation import SchemaValidationReport, validate_ml_schema
+        from deriva_ml.schema.validation import validate_ml_schema
         return validate_ml_schema(self, strict=strict)
 
     # Methods moved to mixins:

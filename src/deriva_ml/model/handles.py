@@ -9,6 +9,6 @@ Classes:
     TableHandle: Wrapper for ERMrest Table with simplified operations.
 """
 
-from deriva.core.model_handles import TableHandle, ColumnHandle
+from deriva.core.model_handles import ColumnHandle, TableHandle
 
 __all__ = ["TableHandle", "ColumnHandle"]

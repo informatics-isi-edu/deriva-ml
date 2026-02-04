@@ -32,7 +32,6 @@ from deriva.core import ErmrestCatalog
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
 
-
 logger = logging.getLogger(__name__)
 
 

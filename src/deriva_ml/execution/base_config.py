@@ -44,9 +44,9 @@ import os
 import pkgutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TypeVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar
 
-from hydra_zen import builds, instantiate, launch, make_config, store
+from hydra_zen import builds, instantiate, launch, store
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML

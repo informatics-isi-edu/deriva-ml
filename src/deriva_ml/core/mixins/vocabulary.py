@@ -7,10 +7,10 @@ controlled vocabulary tables.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
-
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+from typing import TYPE_CHECKING, Any, Callable
+
 _datapath = importlib.import_module("deriva.core.datapath")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 DataPathException = _datapath.DataPathException

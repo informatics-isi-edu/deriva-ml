@@ -2270,7 +2270,7 @@ def _clone_three_stage(
                 report.add_issue(CloneIssue(
                     severity=CloneIssueSeverity.WARNING,
                     category=CloneIssueCategory.FK_PRUNED,
-                    message=f"FK pruned due to hidden reference data",
+                    message="FK pruned due to hidden reference data",
                     table=f"{sname}:{tname}",
                     details=f"FK {fk_name} references columns with 'select': null",
                     action="Source catalog may have incoherent policies",
@@ -2674,7 +2674,7 @@ def _delete_orphan_rows(
         report.add_issue(CloneIssue(
             severity=CloneIssueSeverity.WARNING,
             category=CloneIssueCategory.ORPHAN_ROWS,
-            message=f"Orphan rows deleted",
+            message="Orphan rows deleted",
             table=table_key,
             details=f"Missing references to: {ref_key} ({len(orphan_values)})",
             action="Source catalog may have incoherent row-level policies",

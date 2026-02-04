@@ -59,13 +59,13 @@ Implementation Notes
 
 from __future__ import annotations
 
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generator, Iterable, Protocol, Self, runtime_checkable
 
 import pandas as pd
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
 _deriva_core = importlib.import_module("deriva.core")
 _datapath = importlib.import_module("deriva.core.datapath")
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")

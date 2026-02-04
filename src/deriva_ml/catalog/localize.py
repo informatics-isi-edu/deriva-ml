@@ -7,7 +7,8 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse, quote as urlquote
+from urllib.parse import quote as urlquote
+from urllib.parse import urlparse
 
 from deriva.core import ErmrestCatalog, HatracStore, get_credential
 

@@ -15,49 +15,48 @@ Lazy imports are used for DatabaseModel and DerivaMLDatabase to avoid
 circular imports with the dataset module.
 """
 
+# Annotation builders - import the most common ones for convenience
+from deriva_ml.model.annotations import (
+    CONTEXT_COMPACT,
+    # Context constants
+    CONTEXT_DEFAULT,
+    CONTEXT_DETAILED,
+    CONTEXT_ENTRY,
+    CONTEXT_FILTER,
+    Aggregate,
+    ArrayUxMode,
+    ColumnDisplay,
+    ColumnDisplayOptions,
+    # Builders
+    Display,
+    Facet,
+    FacetList,
+    FacetRange,
+    FacetUxMode,
+    # FK helpers
+    InboundFK,
+    NameStyle,
+    OutboundFK,
+    PreFormat,
+    PseudoColumn,
+    PseudoColumnDisplay,
+    SortKey,
+    TableDisplay,
+    TableDisplayOptions,
+    # Enums
+    TemplateEngine,
+    VisibleColumns,
+    VisibleForeignKeys,
+    fk_constraint,
+)
 from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.model.data_loader import DataLoader
+from deriva_ml.model.data_sources import BagDataSource, CatalogDataSource, DataSource
+from deriva_ml.model.fk_orderer import ForeignKeyOrderer
 from deriva_ml.model.handles import ColumnHandle, TableHandle
 
 # Two-phase ORM creation components
 from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
-from deriva_ml.model.data_sources import DataSource, BagDataSource, CatalogDataSource
-from deriva_ml.model.data_loader import DataLoader
-from deriva_ml.model.fk_orderer import ForeignKeyOrderer
-
-# Annotation builders - import the most common ones for convenience
-from deriva_ml.model.annotations import (
-    # Builders
-    Display,
-    VisibleColumns,
-    VisibleForeignKeys,
-    TableDisplay,
-    TableDisplayOptions,
-    ColumnDisplay,
-    ColumnDisplayOptions,
-    PreFormat,
-    PseudoColumn,
-    PseudoColumnDisplay,
-    Facet,
-    FacetList,
-    FacetRange,
-    SortKey,
-    NameStyle,
-    # FK helpers
-    InboundFK,
-    OutboundFK,
-    fk_constraint,
-    # Enums
-    TemplateEngine,
-    Aggregate,
-    ArrayUxMode,
-    FacetUxMode,
-    # Context constants
-    CONTEXT_DEFAULT,
-    CONTEXT_COMPACT,
-    CONTEXT_DETAILED,
-    CONTEXT_ENTRY,
-    CONTEXT_FILTER,
-)
 
 __all__ = [
     # Core classes

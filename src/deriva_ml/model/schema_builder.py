@@ -29,6 +29,10 @@ from pathlib import Path
 from typing import Any, Generator, Type
 
 from dateutil import parser
+from deriva.core.ermrest_model import Column as DerivaColumn
+from deriva.core.ermrest_model import Model
+from deriva.core.ermrest_model import Table as DerivaTable
+from deriva.core.ermrest_model import Type as DerivaType
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -48,16 +52,10 @@ from sqlalchemy import ForeignKeyConstraint as SQLForeignKeyConstraint
 from sqlalchemy import Table as SQLTable
 from sqlalchemy import UniqueConstraint as SQLUniqueConstraint
 from sqlalchemy.engine import Engine
-from sqlalchemy.ext.automap import automap_base, AutomapBase
-from sqlalchemy.orm import backref, foreign, relationship, Session
+from sqlalchemy.ext.automap import AutomapBase, automap_base
+from sqlalchemy.orm import backref, foreign, relationship
 from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import TypeDecorator
-
-from deriva.core.ermrest_model import Column as DerivaColumn
-from deriva.core.ermrest_model import Model
-from deriva.core.ermrest_model import Table as DerivaTable
-from deriva.core.ermrest_model import Type as DerivaType
-
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +213,7 @@ class SchemaORM:
             if "." in full_name and full_name.split(".")[-1] == table_name:
                 return table
             # Handle _ separator (in-memory) - match suffix after first _
-            if "_" in full_name and not "." in full_name:
+            if "_" in full_name and "." not in full_name:
                 # Check if table_name matches the part after schema prefix
                 parts = full_name.split("_", 1)
                 if len(parts) > 1 and parts[1] == table_name:

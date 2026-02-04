@@ -7,6 +7,7 @@ from typing import Any, Optional
 from deriva.core import DerivaServer, ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Model, Schema, Table
 from deriva.core.typed import (
+    AssetTableDef,
     BuiltinType,
     ColumnDef,
     ForeignKeyDef,
@@ -14,7 +15,6 @@ from deriva.core.typed import (
     SchemaDef,
     TableDef,
     VocabularyTableDef,
-    AssetTableDef,
 )
 
 from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab

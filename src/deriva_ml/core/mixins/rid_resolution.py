@@ -6,11 +6,11 @@ Resource Identifier (RID) resolution and retrieval operations.
 
 from __future__ import annotations
 
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
 _datapath = importlib.import_module("deriva.core.datapath")
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")

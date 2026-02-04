@@ -6,11 +6,11 @@ catalog path building and table access utilities.
 
 from __future__ import annotations
 
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
 datapath = importlib.import_module("deriva.core.datapath")
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")

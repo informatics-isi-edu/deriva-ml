@@ -369,6 +369,7 @@ class ExecutionMixin:
             ...     print(f"{exp.name}: {exp.config_choices}")
         """
         import re
+
         from deriva_ml.experiment import Experiment
 
         # Get datapath to tables

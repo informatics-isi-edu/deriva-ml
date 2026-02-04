@@ -1,8 +1,9 @@
 import argparse
-import sys
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+import sys
+
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 _core_utils = importlib.import_module("deriva.core.utils.core_utils")
 

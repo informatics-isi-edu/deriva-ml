@@ -39,11 +39,14 @@ from pathlib import Path
 # Local imports
 from pprint import pformat
 from tempfile import TemporaryDirectory
-from typing import Any, Generator, Iterable, Self
+from typing import TYPE_CHECKING, Any, Generator, Iterable, Self
 from urllib.parse import urlparse
 
 # Deriva imports
 import deriva.core.utils.hash_utils as hash_utils
+
+if TYPE_CHECKING:
+    from deriva_ml.execution.execution import Execution
 
 # Third-party imports
 import pandas as pd
@@ -581,7 +584,7 @@ class Dataset:
             >>> ds = ml.lookup_dataset("4HM")
             >>> ds.display_markdown(show_children=True)
         """
-        from IPython.display import display, Markdown
+        from IPython.display import Markdown, display
 
         display(Markdown(self.to_markdown(show_children, indent)))
 
@@ -1331,7 +1334,6 @@ class Dataset:
             ...     print(f"Execution {exe.execution_rid}: {exe.status}")
         """
         # Import here to avoid circular dependency
-        from deriva_ml.execution.execution import Execution
 
         pb = self._ml_instance.pathBuilder()
         dataset_execution_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Execution

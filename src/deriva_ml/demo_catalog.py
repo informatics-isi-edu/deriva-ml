@@ -20,7 +20,6 @@ from random import choice, randint, random
 from tempfile import TemporaryDirectory
 
 from deriva.core import BaseCLI, ErmrestCatalog
-from deriva.core.ermrest_model import Schema, Table
 from deriva.core.typed import BuiltinType, ColumnDef, SchemaDef, TableDef
 from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError

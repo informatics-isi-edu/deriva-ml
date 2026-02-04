@@ -24,21 +24,19 @@ import logging
 from pathlib import Path
 from typing import Any, Generator, Type
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from sqlalchemy import Table as SQLTable
-
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
+from sqlalchemy import Table as SQLTable
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from deriva_ml.core.definitions import ML_SCHEMA, RID, get_domain_schemas
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
-from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
-from deriva_ml.model.data_sources import BagDataSource
 from deriva_ml.model.data_loader import DataLoader
-
+from deriva_ml.model.data_sources import BagDataSource
+from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
 
 logger = logging.getLogger(__name__)
 

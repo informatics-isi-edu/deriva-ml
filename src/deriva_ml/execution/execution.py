@@ -39,12 +39,16 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Iterable, List
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List
 
 from deriva.core import format_exception
+
+if TYPE_CHECKING:
+    from deriva_ml.asset.asset import Asset
 from deriva.core.hatrac_store import HatracStore
 from pydantic import ConfigDict, validate_call
 
+from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.core.base import DerivaML
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
@@ -58,7 +62,6 @@ from deriva_ml.core.definitions import (
     UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
@@ -1170,7 +1173,6 @@ class Execution:
             return self._execution_record.list_assets(asset_role=asset_role)
 
         # Fallback for dry_run mode
-        from deriva_ml.asset.asset import Asset
 
         pb = self._ml_object.pathBuilder()
         asset_exec = pb.schemas[self._ml_object.ml_schema].Execution_Asset_Execution

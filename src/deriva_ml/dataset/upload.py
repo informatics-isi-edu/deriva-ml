@@ -35,6 +35,8 @@ Here is the directory layout we support:
                         file1.jsonl, file2.jsonl
 """
 
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
 import json
 import os
 from pathlib import Path
@@ -43,8 +45,6 @@ from typing import Any, Callable, Optional
 
 import regex as re
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
 _deriva_core = importlib.import_module("deriva.core")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 _hatrac_store = importlib.import_module("deriva.core.hatrac_store")

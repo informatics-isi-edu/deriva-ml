@@ -6,14 +6,14 @@ asset table operations including creating, listing, and looking up assets.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Iterable
-
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+from typing import TYPE_CHECKING, Any, Callable, Iterable
+
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
-from deriva_ml.core.definitions import AssetTableDef, ColumnDefinition, MLVocab, RID, VocabularyTerm
+from deriva_ml.core.definitions import RID, AssetTableDef, ColumnDefinition, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.schema.annotations import asset_annotation
 

@@ -25,6 +25,9 @@ For more specialized imports, you can import directly from submodules:
 
 from __future__ import annotations
 
+# Also export BuiltinType directly (BuiltinTypes is the backwards-compatible alias)
+from deriva.core.typed import BuiltinType
+
 # =============================================================================
 # Re-exported Constants
 # =============================================================================
@@ -58,8 +61,6 @@ from deriva_ml.core.enums import (
     Status,
     UploadState,
 )
-# Also export BuiltinType directly (BuiltinTypes is the backwards-compatible alias)
-from deriva.core.typed import BuiltinType
 
 # =============================================================================
 # Re-exported ERMrest Models
@@ -67,24 +68,24 @@ from deriva.core.typed import BuiltinType
 # From ermrest.py: Dataclass-based models for catalog structure definitions
 # New typed classes from deriva.core.typed
 from deriva_ml.core.ermrest import (
-    # New dataclass-based definitions from deriva.core.typed
-    ColumnDef,
-    KeyDef,
-    ForeignKeyDef,
-    TableDef,
-    VocabularyTableDef,
     AssetTableDef,
     AssociationTableDef,
-    SchemaDef,
+    # New dataclass-based definitions from deriva.core.typed
+    ColumnDef,
     # Legacy aliases for backwards compatibility
     ColumnDefinition,
-    KeyDefinition,
-    ForeignKeyDefinition,
-    TableDefinition,
     # DerivaML-specific classes
     FileUploadState,
+    ForeignKeyDef,
+    ForeignKeyDefinition,
+    KeyDef,
+    KeyDefinition,
+    SchemaDef,
+    TableDef,
+    TableDefinition,
     UploadCallback,
     UploadProgress,
+    VocabularyTableDef,
     VocabularyTerm,
     VocabularyTermHandle,
 )

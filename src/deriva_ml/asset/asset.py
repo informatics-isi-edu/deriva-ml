@@ -31,12 +31,9 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import ConfigDict, SkipValidation, validate_call
-
 from deriva_ml.core.definitions import RID
 
 if TYPE_CHECKING:
-    from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.feature import Feature, FeatureRecord
     from deriva_ml.interfaces import DerivaMLCatalog
@@ -309,7 +306,6 @@ class Asset:
             >>> local_path = asset.download(Path("/tmp/assets"))
             >>> print(f"Downloaded to: {local_path}")
         """
-        from deriva_ml.execution.execution import Execution
 
         # Use hatrac to download the file
         dest_dir = Path(dest_dir)

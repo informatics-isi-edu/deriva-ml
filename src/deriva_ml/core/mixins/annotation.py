@@ -14,10 +14,10 @@ Annotation Tags:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
-
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+from typing import TYPE_CHECKING, Any, Callable
+
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Column = _ermrest_model.Column
 Table = _ermrest_model.Table

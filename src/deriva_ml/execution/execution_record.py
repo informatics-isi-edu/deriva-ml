@@ -533,7 +533,6 @@ class ExecutionRecord(BaseModel):
             >>> for asset in record.list_assets(asset_role="Output"):
             ...     print(f"Output Asset: {asset.asset_rid}")
         """
-        from deriva_ml.asset.asset import Asset
 
         if self._ml_instance is None:
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")

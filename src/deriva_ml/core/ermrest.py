@@ -21,6 +21,17 @@ import warnings
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+# Import and re-export typed definitions from deriva.core.typed
+from deriva.core.typed import (
+    AssetTableDef,
+    AssociationTableDef,
+    ColumnDef,
+    ForeignKeyDef,
+    KeyDef,
+    SchemaDef,
+    TableDef,
+    VocabularyTableDef,
+)
 from pydantic import (
     BaseModel,
     Field,
@@ -30,18 +41,6 @@ from pydantic import (
 
 from .constants import RID
 from .enums import UploadState
-
-# Import and re-export typed definitions from deriva.core.typed
-from deriva.core.typed import (
-    ColumnDef,
-    KeyDef,
-    ForeignKeyDef,
-    TableDef,
-    VocabularyTableDef,
-    AssetTableDef,
-    AssociationTableDef,
-    SchemaDef,
-)
 
 # Re-export all typed classes for convenience
 __all__ = [

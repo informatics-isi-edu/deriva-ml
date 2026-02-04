@@ -29,10 +29,10 @@ from deriva.core import BaseCLI
 from hydra_zen import store, zen
 
 from deriva_ml.execution import (
-    run_model,
-    load_configs,
-    get_multirun_config,
     get_all_multirun_configs,
+    get_multirun_config,
+    load_configs,
+    run_model,
 )
 
 

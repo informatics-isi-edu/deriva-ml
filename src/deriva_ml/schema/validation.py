@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
 
-from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
+from deriva_ml.core.definitions import MLTable, MLVocab
 
 
 class ValidationSeverity(str, Enum):

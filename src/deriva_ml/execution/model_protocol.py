@@ -82,7 +82,7 @@ The protocol uses @runtime_checkable, so isinstance() checks work at runtime.
 
 from __future__ import annotations
 
-from typing import Protocol, Any, runtime_checkable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML

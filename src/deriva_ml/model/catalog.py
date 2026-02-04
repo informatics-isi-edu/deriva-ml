@@ -7,13 +7,14 @@ ML-specific functionality. It handles schema management, feature definitions, an
 
 from __future__ import annotations
 
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
+
 # Standard library imports
 from collections import Counter, defaultdict
 from graphlib import CycleError, TopologicalSorter
 from typing import Any, Callable, Final, Iterable, NewType, TypeAlias
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 

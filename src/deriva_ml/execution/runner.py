@@ -145,7 +145,7 @@ from __future__ import annotations
 import atexit
 import logging
 from pathlib import Path
-from typing import Any, TypeVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from hydra.core.hydra_config import HydraConfig
 from hydra_zen import builds
@@ -153,9 +153,9 @@ from hydra_zen import builds
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
     from deriva_ml.core.config import DerivaMLConfig
-    from deriva_ml.dataset import DatasetSpec
-    from deriva_ml.execution import ExecutionConfiguration, Workflow
     from deriva_ml.core.definitions import RID
+    from deriva_ml.dataset import DatasetSpec
+    from deriva_ml.execution import Workflow
 
 
 # Type variable for DerivaML and its subclasses

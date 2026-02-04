@@ -7,10 +7,10 @@ and creating workflows.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
-
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+from typing import TYPE_CHECKING, Any, Callable
+
 _deriva_core = importlib.import_module("deriva.core")
 format_exception = _deriva_core.format_exception
 
@@ -19,7 +19,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.workflow import Workflow
 
 if TYPE_CHECKING:
-    from deriva_ml.interfaces import DerivaMLCatalog
+    pass
 
 
 class WorkflowMixin:

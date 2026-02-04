@@ -26,10 +26,10 @@ import yaml
 from deriva.core.hatrac_store import HatracStore
 
 if TYPE_CHECKING:
-    from deriva_ml.core.base import DerivaML
-    from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.asset.asset import Asset
+    from deriva_ml.core.base import DerivaML
     from deriva_ml.dataset.dataset import Dataset
+    from deriva_ml.execution.execution_record import ExecutionRecord
 
 
 @dataclass
@@ -403,7 +403,7 @@ class Experiment:
             >>> exp = ml.lookup_experiment("47BE")
             >>> exp.display_markdown()
         """
-        from IPython.display import display, Markdown
+        from IPython.display import Markdown, display
 
         display(Markdown(self.to_markdown(show_datasets, show_assets)))
 

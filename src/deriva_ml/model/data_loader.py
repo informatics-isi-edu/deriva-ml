@@ -27,14 +27,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
+from deriva.core.ermrest_model import Table as DerivaTable
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from deriva.core.ermrest_model import Table as DerivaTable
-
-from .schema_builder import SchemaORM
 from .data_sources import DataSource
 from .fk_orderer import ForeignKeyOrderer
-
+from .schema_builder import SchemaORM
 
 logger = logging.getLogger(__name__)
 

@@ -24,12 +24,10 @@ Example:
 from __future__ import annotations
 
 import logging
-from graphlib import TopologicalSorter, CycleError
-from typing import Any
+from graphlib import CycleError, TopologicalSorter
 
 from deriva.core.ermrest_model import Model
 from deriva.core.ermrest_model import Table as DerivaTable
-
 
 logger = logging.getLogger(__name__)
 

@@ -7,16 +7,16 @@ deleting, and managing dataset elements.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Iterable
-
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+from typing import TYPE_CHECKING, Any, Callable, Iterable
+
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
 from pydantic import ConfigDict, validate_call
 
-from deriva_ml.core.definitions import RID, MLVocab
+from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 from deriva_ml.dataset.aux_classes import DatasetSpec
 

@@ -12,12 +12,12 @@ Typical usage example:
     >>> record = FeatureClass(value="high", confidence=0.95)
 """
 
+# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
+import importlib
 from pathlib import Path
 from types import UnionType
 from typing import TYPE_CHECKING, ClassVar, Optional, Type
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Column = _ermrest_model.Column
 FindAssociationResult = _ermrest_model.FindAssociationResult
