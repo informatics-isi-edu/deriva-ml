@@ -19,7 +19,7 @@ datapath = importlib.import_module("deriva.core.datapath")
 from deriva_ml.core.definitions import RID, FileSpec, MLTable, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLInvalidTerm, DerivaMLTableTypeError
 from deriva_ml.dataset.aux_classes import DatasetVersion
-from deriva_ml.dataset.history import iso_to_snap
+from deriva.core.ermrest_model import timestamptz_to_snaptime
 
 if TYPE_CHECKING:
     from deriva.core.ermrest_catalog import ResolveRidResult
@@ -205,7 +205,7 @@ class FileMixin:
         dataset_version_path = self.pathBuilder().schemas[self.model.ml_schema].tables["Dataset_Version"]
         versions = dataset_version_path.entities().fetch()
         dataset_version_path.update(
-            [{"RID": h["RID"], "Snapshot": iso_to_snap(h["RCT"])} for h in versions if not h["Snapshot"]]
+            [{"RID": h["RID"], "Snapshot": timestamptz_to_snaptime(h["RCT"])} for h in versions if not h["Snapshot"]]
         )
 
     def list_files(self, file_types: list[str] | None = None) -> list[dict[str, Any]]:
