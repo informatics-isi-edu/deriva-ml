@@ -1,14 +1,21 @@
-import base64
-import struct
+"""History tracking utilities for Deriva records.
+
+This module provides functions for retrieving the history of records
+from a Deriva catalog using snaptime-based queries.
+"""
+
 from datetime import datetime
 from typing import Any
 
-from dateutil.parser import isoparse
 from deriva.core import urlquote
 from deriva.core.deriva_server import DerivaServer
+from deriva.core.ermrest_model import (
+    datetime_to_epoch_microseconds,
+    epoch_microseconds_to_snaptime,
+    timestamptz_to_snaptime,
+)
 
 
-# -- ==============================================================================================
 def get_record_history(
     server: DerivaServer,
     cid: str | int,
@@ -20,6 +27,9 @@ def get_record_history(
 ) -> dict[str, dict[str, Any]]:
     """Get the history of a record from the catalog.
 
+    Traverses backward through catalog snapshots to find all versions
+    of a record, starting from the latest (or specified) snapshot.
+
     Args:
         server: The server instance.
         cid: The catalog ID.
@@ -27,13 +37,13 @@ def get_record_history(
         tname: The table name.
         kvals: The key values to look up.
         kcols: The key columns. Defaults to ["RID"].
-        snap: Optional snapshot ID.
+        snap: Optional snapshot ID to start from. If None, uses latest.
 
     Returns:
-        The history data for the record.
+        A dict mapping snapshot IDs to row data for each version found.
 
     Raises:
-        ValueError: If more than one row is returned.
+        ValueError: If more than one row is returned for a query.
     """
     if kcols is None:
         kcols = ["RID"]
@@ -51,37 +61,49 @@ def get_record_history(
     }
 
     if snap is None:
-        # determinate starting (latest) snapshot
+        # Determine starting (latest) snapshot
         r = server.get("/ermrest/catalog/%(cid)s" % parts)
         snap = r.json()["snaptime"]
     parts["snap"] = snap
 
     path = "/ermrest/catalog/%(cid)s@%(snap)s/entity/%(sname)s:%(tname)s/%(filter)s"
 
-    rows_found = []
     snap2rows: dict[str, dict[str, Any]] = {}
     while True:
         url = path % parts
-        # sys.stderr.write("%s\n" % url)
         response_data = server.get(url).json()
         if len(response_data) > 1:
             raise ValueError("got more than one row for %r" % url)
         if len(response_data) == 0:
-            #  sys.stderr.write("ERROR: %s: No record found \n" % (url))
             break
         row = response_data[0]
         snap2rows[parts["snap"]] = row
-        rows_found.append(row)
+        # Parse RMT and find snap ID prior to row version birth time
         rmt = datetime.fromisoformat(row["RMT"])
-        # find snap ID prior to row version birth time
-        parts["snap"] = urlb32_encode(datetime_epoch_us(rmt) - 1)
+        rmt_us = datetime_to_epoch_microseconds(rmt)
+        parts["snap"] = epoch_microseconds_to_snaptime(rmt_us - 1)
 
     return snap2rows
 
 
-# -- --------------------------------------------------------------------------------------
+def iso_to_snaptime(iso_datetime: str) -> str:
+    """Convert ISO datetime string to ERMrest snaptime format.
+
+    Args:
+        iso_datetime: The ISO datetime string (e.g., from RMT column).
+
+    Returns:
+        The ERMrest snaptime string.
+    """
+    return timestamptz_to_snaptime(iso_datetime)
+
+
+# Deprecated aliases for backward compatibility
 def datetime_epoch_us(dt: datetime) -> int:
     """Convert datetime to epoch microseconds.
+
+    .. deprecated::
+        Use `deriva.core.ermrest_model.datetime_to_epoch_microseconds` instead.
 
     Args:
         dt: The datetime object to convert.
@@ -89,34 +111,19 @@ def datetime_epoch_us(dt: datetime) -> int:
     Returns:
         The epoch time in microseconds.
     """
-    return int(dt.timestamp() * 1000000)
+    return datetime_to_epoch_microseconds(dt)
 
 
-# -- --------------------------------------------------------------------------------------
-# Take the iso format string (same as RMT) and return the version number
-#
-
-
-def iso_to_snap(iso_datetime: str) -> int:
+def iso_to_snap(iso_datetime: str) -> str:
     """Convert ISO datetime string to snapshot format.
+
+    .. deprecated::
+        Use `iso_to_snaptime` or `deriva.core.ermrest_model.timestamptz_to_snaptime` instead.
 
     Args:
         iso_datetime: The ISO datetime string.
 
     Returns:
-        The snapshot timestamp.
+        The snapshot timestamp string.
     """
-    return datetime_epoch_us(isoparse(iso_datetime))
-
-
-# -- --------------------------------------------------------------------------------------
-def urlb32_encode(i: int) -> str:
-    """Encode an integer to URL-safe base32.
-
-    Args:
-        i: The integer to encode.
-
-    Returns:
-        The URL-safe base32 encoded string.
-    """
-    return base64.urlsafe_b64encode(struct.pack(">Q", i)).decode("ascii").rstrip("=")
+    return timestamptz_to_snaptime(iso_datetime)
