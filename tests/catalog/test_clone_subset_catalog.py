@@ -1,7 +1,10 @@
-"""Tests for clone_subset_catalog functionality.
+"""Tests for create_ml_workspace and its helper functions.
 
-Tests cover the subset cloning feature that creates a catalog containing
-only the data reachable from a specified RID.
+Tests cover:
+- Table discovery helpers (_discover_reachable_tables, _expand_tables_with_associations, etc.)
+- Export annotation parsing
+- Input validation
+- Integration tests for subset cloning via create_ml_workspace
 """
 
 from __future__ import annotations
@@ -13,16 +16,12 @@ from unittest.mock import MagicMock, patch
 from deriva.core import DerivaServer, get_credential
 
 from deriva_ml import DerivaML
-from deriva_ml.catalog import clone_subset_catalog, CloneCatalogResult, AssetCopyMode
+from deriva_ml.catalog import create_ml_workspace, CloneCatalogResult, AssetCopyMode
 from deriva_ml.catalog.clone import (
     _discover_reachable_tables,
     _expand_tables_with_associations,
     _expand_tables_with_vocabularies,
-    _build_path_query,
-    _compute_reachable_rids,
-    _copy_subset_table_data,
     _parse_export_annotation_tables,
-    _compute_reachable_rids_from_paths,
 )
 from tests.catalog_manager import CatalogManager
 
@@ -389,257 +388,6 @@ class TestExpandTablesWithVocabularies:
         assert added == []
 
 
-class TestBuildPathQuery:
-    """Tests for _build_path_query helper function."""
-
-    def test_simple_path(self):
-        """Test building query with a simple path."""
-        query = _build_path_query(
-            root_table="demo:Subject",
-            root_rid="ABC123",
-            path=[("demo", "Image")],
-        )
-        # Colon must NOT be encoded - ERMrest uses it as schema:table separator
-        assert query == "/entity/demo:Subject/RID=ABC123/demo:Image"
-
-    def test_multi_hop_path(self):
-        """Test building query with multiple hops."""
-        query = _build_path_query(
-            root_table="demo:Dataset",
-            root_rid="XYZ789",
-            path=[("demo", "Subject"), ("demo", "Image")],
-        )
-        assert query == "/entity/demo:Dataset/RID=XYZ789/demo:Subject/demo:Image"
-
-    def test_empty_path(self):
-        """Test building query with empty path (root only)."""
-        query = _build_path_query(
-            root_table="demo:Subject",
-            root_rid="ABC123",
-            path=[],
-        )
-        assert query == "/entity/demo:Subject/RID=ABC123"
-
-    def test_special_characters_escaped(self):
-        """Test that special characters in RID are URL-escaped."""
-        query = _build_path_query(
-            root_table="demo:Table",
-            root_rid="A+B=C",
-            path=[],
-        )
-        # The + should be URL-encoded (urlquote default escapes +)
-        assert "A%2BB%3DC" in query
-
-
-class TestCopySubsetTableData:
-    """Tests for _copy_subset_table_data helper function."""
-
-    def test_empty_rids_returns_zero(self):
-        """Test that empty RID set returns zero rows."""
-        src_catalog = MagicMock()
-        dst_catalog = MagicMock()
-        report = MagicMock()
-
-        rows_copied, rows_skipped, skipped, truncated = _copy_subset_table_data(
-            src_catalog=src_catalog,
-            dst_catalog=dst_catalog,
-            sname="demo",
-            tname="Table1",
-            reachable_rids=set(),
-            page_size=100,
-            report=report,
-        )
-
-        assert rows_copied == 0
-        assert rows_skipped == 0
-        assert skipped == []
-        assert truncated == []
-        # Should not have called catalog methods
-        src_catalog.get.assert_not_called()
-        dst_catalog.post.assert_not_called()
-
-    def test_copies_rows_successfully(self):
-        """Test successful copying of rows."""
-        src_catalog = MagicMock()
-        dst_catalog = MagicMock()
-        report = MagicMock()
-
-        # Mock source returning rows
-        src_catalog.get.return_value.json.return_value = [
-            {"RID": "A1", "Name": "Test1"},
-            {"RID": "A2", "Name": "Test2"},
-        ]
-
-        rows_copied, rows_skipped, skipped, truncated = _copy_subset_table_data(
-            src_catalog=src_catalog,
-            dst_catalog=dst_catalog,
-            sname="demo",
-            tname="Table1",
-            reachable_rids={"A1", "A2"},
-            page_size=100,
-            report=report,
-        )
-
-        assert rows_copied == 2
-        assert rows_skipped == 0
-        dst_catalog.post.assert_called_once()
-
-
-class TestCloneSubsetCatalogIntegration:
-    """Integration tests for clone_subset_catalog (requires running catalog)."""
-
-    @pytest.mark.skip(reason="Requires running catalog")
-    def test_clone_subset_basic(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """Test basic subset cloning from a dataset RID."""
-        # First populate the source catalog
-        ml = catalog_manager.ensure_populated(tmp_path / "source")
-        source_catalog_id = str(catalog_manager.catalog_id)
-        hostname = catalog_manager.hostname
-
-        # Get a dataset RID to use as root
-        pb = ml.pathBuilder()
-        ml_path = pb.schemas["deriva-ml"]
-        datasets = list(ml_path.tables["Dataset"].path.entities().fetch())
-
-        if not datasets:
-            pytest.skip("No datasets in source catalog")
-
-        root_rid = datasets[0]["RID"]
-
-        # Clone subset
-        result = clone_subset_catalog(
-            source_hostname=hostname,
-            source_catalog_id=source_catalog_id,
-            root_rid=root_rid,
-            include_tables=[
-                f"{catalog_manager.domain_schema}:Subject",
-                f"{catalog_manager.domain_schema}:Image",
-                "deriva-ml:Dataset",
-            ],
-        )
-
-        try:
-            assert isinstance(result, CloneCatalogResult)
-            assert result.catalog_id is not None
-
-            # Connect to cloned catalog
-            cloned_ml = DerivaML(
-                hostname,
-                result.catalog_id,
-                working_dir=tmp_path / "cloned",
-            )
-
-            # Verify only specified tables exist
-            model = cloned_ml.catalog.getCatalogModel()
-            assert "deriva-ml" in model.schemas
-
-            # Verify data was filtered to reachable rows
-            cloned_pb = cloned_ml.pathBuilder()
-            cloned_datasets = list(
-                cloned_pb.schemas["deriva-ml"].tables["Dataset"].path.entities().fetch()
-            )
-            # Should have at most the original dataset count (likely just the root)
-            assert len(cloned_datasets) <= len(datasets)
-
-        finally:
-            # Clean up
-            try:
-                cred = get_credential(hostname)
-                server = DerivaServer("https", hostname, credentials=cred)
-                server.delete_ermrest_catalog(result.catalog_id)
-            except Exception:
-                pass
-
-    @pytest.mark.skip(reason="Requires running catalog")
-    def test_clone_subset_with_associations(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
-        """Test that association tables are automatically included."""
-        ml = catalog_manager.ensure_populated(tmp_path / "source")
-        source_catalog_id = str(catalog_manager.catalog_id)
-        hostname = catalog_manager.hostname
-
-        # Get a subject RID
-        pb = ml.pathBuilder()
-        domain_path = pb.schemas[catalog_manager.domain_schema]
-        subjects = list(domain_path.tables["Subject"].path.entities().fetch())
-
-        if not subjects:
-            pytest.skip("No subjects in source catalog")
-
-        root_rid = subjects[0]["RID"]
-
-        result = clone_subset_catalog(
-            source_hostname=hostname,
-            source_catalog_id=source_catalog_id,
-            root_rid=root_rid,
-            include_tables=[
-                f"{catalog_manager.domain_schema}:Subject",
-                f"{catalog_manager.domain_schema}:Image",
-            ],
-            include_associations=True,
-        )
-
-        try:
-            # Connect and verify association tables were included
-            cloned_ml = DerivaML(
-                hostname,
-                result.catalog_id,
-                working_dir=tmp_path / "cloned",
-            )
-
-            model = cloned_ml.catalog.getCatalogModel()
-            domain_schema = model.schemas.get(catalog_manager.domain_schema)
-
-            # Check that any Subject_Image association exists (if there was one)
-            # The actual table name depends on the schema
-            assert domain_schema is not None
-
-        finally:
-            try:
-                cred = get_credential(hostname)
-                server = DerivaServer("https", hostname, credentials=cred)
-                server.delete_ermrest_catalog(result.catalog_id)
-            except Exception:
-                pass
-
-
-class TestCloneSubsetCatalogValidation:
-    """Tests for input validation in clone_subset_catalog."""
-
-    def test_invalid_include_table_format_raises(self):
-        """Test that invalid include_tables format raises ValueError."""
-        with pytest.raises(ValueError, match="must be specified as 'schema:table'"):
-            clone_subset_catalog(
-                source_hostname="localhost",
-                source_catalog_id="1",
-                root_rid="ABC123",
-                include_tables=["InvalidTableName"],  # Missing schema prefix
-            )
-
-    def test_invalid_exclude_objects_format_raises(self):
-        """Test that invalid exclude_objects format raises ValueError."""
-        with pytest.raises(ValueError, match="exclude_objects entries must be 'schema:table'"):
-            clone_subset_catalog(
-                source_hostname="localhost",
-                source_catalog_id="1",
-                root_rid="ABC123",
-                exclude_objects=["InvalidTableName"],  # Missing schema prefix
-            )
-
-    def test_empty_include_tables(self):
-        """Test behavior with empty include_tables list."""
-        # This should work - tables will be auto-discovered from root RID
-        # Can't actually test without a running catalog
-        pass
-
-    def test_none_include_tables(self):
-        """Test behavior with None include_tables."""
-        # This should work - tables will be auto-discovered from root RID
-        # Can't actually test without a running catalog
-        pass
-
-
 class TestParseExportAnnotationTables:
     """Tests for _parse_export_annotation_tables helper function."""
 
@@ -759,74 +507,135 @@ class TestParseExportAnnotationTables:
         assert paths == []
 
 
-class TestComputeReachableRidsFromPaths:
-    """Tests for _compute_reachable_rids_from_paths helper function."""
+class TestCreateMlWorkspaceIntegration:
+    """Integration tests for create_ml_workspace (requires running catalog)."""
 
-    def test_returns_root_rid_for_root_table(self):
-        """Test that root RID is always included for root table."""
-        catalog = MagicMock()
-        catalog.get.return_value.json.return_value = []
+    @pytest.mark.skip(reason="Requires running catalog")
+    def test_create_workspace_basic(self, catalog_manager: CatalogManager, tmp_path: Path):
+        """Test basic workspace creation from a dataset RID."""
+        ml = catalog_manager.ensure_populated(tmp_path / "source")
+        source_catalog_id = str(catalog_manager.catalog_id)
+        hostname = catalog_manager.hostname
 
-        root_rid = "ABC123"
-        root_table = "demo:Project"
-        paths = []
-        include_tables = ["demo:Project"]
+        # Get a dataset RID to use as root
+        pb = ml.pathBuilder()
+        ml_path = pb.schemas["deriva-ml"]
+        datasets = list(ml_path.tables["Dataset"].path.entities().fetch())
 
-        result = _compute_reachable_rids_from_paths(
-            catalog, root_rid, root_table, paths, include_tables
+        if not datasets:
+            pytest.skip("No datasets in source catalog")
+
+        root_rid = datasets[0]["RID"]
+
+        result = create_ml_workspace(
+            source_hostname=hostname,
+            source_catalog_id=source_catalog_id,
+            root_rid=root_rid,
+            include_tables=[
+                f"{catalog_manager.domain_schema}:Subject",
+                f"{catalog_manager.domain_schema}:Image",
+                "deriva-ml:Dataset",
+            ],
         )
 
-        assert root_rid in result["demo:Project"]
+        try:
+            assert isinstance(result, CloneCatalogResult)
+            assert result.catalog_id is not None
 
-    def test_queries_each_path(self):
-        """Test that each path is queried for reachable rows."""
-        catalog = MagicMock()
+            # Connect to cloned catalog
+            cloned_ml = DerivaML(
+                hostname,
+                result.catalog_id,
+                working_dir=tmp_path / "cloned",
+            )
 
-        # First call returns empty, subsequent calls return rows
-        def mock_get(uri):
-            mock_response = MagicMock()
-            if "Dataset" in uri and "Experiment" not in uri:
-                mock_response.json.return_value = [{"RID": "D1"}, {"RID": "D2"}]
-            elif "Experiment" in uri:
-                mock_response.json.return_value = [{"RID": "E1"}]
-            else:
-                mock_response.json.return_value = []
-            return mock_response
+            # Verify only specified tables exist
+            model = cloned_ml.catalog.getCatalogModel()
+            assert "deriva-ml" in model.schemas
 
-        catalog.get.side_effect = mock_get
+            # Verify data was filtered to reachable rows
+            cloned_pb = cloned_ml.pathBuilder()
+            cloned_datasets = list(
+                cloned_pb.schemas["deriva-ml"].tables["Dataset"].path.entities().fetch()
+            )
+            assert len(cloned_datasets) <= len(datasets)
 
-        root_rid = "P1"
-        root_table = "demo:Project"
-        paths = [
-            ["demo:Project", "demo:Dataset"],
-            ["demo:Project", "demo:Dataset", "demo:Experiment"],
-        ]
-        include_tables = ["demo:Project", "demo:Dataset", "demo:Experiment"]
+        finally:
+            self._delete_catalog(hostname, result.catalog_id)
 
-        result = _compute_reachable_rids_from_paths(
-            catalog, root_rid, root_table, paths, include_tables
+    @pytest.mark.skip(reason="Requires running catalog")
+    def test_create_workspace_with_associations(
+        self, catalog_manager: CatalogManager, tmp_path: Path
+    ):
+        """Test that association tables are automatically included."""
+        ml = catalog_manager.ensure_populated(tmp_path / "source")
+        source_catalog_id = str(catalog_manager.catalog_id)
+        hostname = catalog_manager.hostname
+
+        # Get a subject RID
+        pb = ml.pathBuilder()
+        domain_path = pb.schemas[catalog_manager.domain_schema]
+        subjects = list(domain_path.tables["Subject"].path.entities().fetch())
+
+        if not subjects:
+            pytest.skip("No subjects in source catalog")
+
+        root_rid = subjects[0]["RID"]
+
+        result = create_ml_workspace(
+            source_hostname=hostname,
+            source_catalog_id=source_catalog_id,
+            root_rid=root_rid,
+            include_tables=[
+                f"{catalog_manager.domain_schema}:Subject",
+                f"{catalog_manager.domain_schema}:Image",
+            ],
+            include_associations=True,
         )
 
-        assert "P1" in result["demo:Project"]
-        assert "D1" in result["demo:Dataset"]
-        assert "D2" in result["demo:Dataset"]
-        assert "E1" in result["demo:Experiment"]
+        try:
+            cloned_ml = DerivaML(
+                hostname,
+                result.catalog_id,
+                working_dir=tmp_path / "cloned",
+            )
 
-    def test_handles_query_failures_gracefully(self):
-        """Test that query failures are handled without crashing."""
-        catalog = MagicMock()
-        catalog.get.side_effect = Exception("Connection error")
+            model = cloned_ml.catalog.getCatalogModel()
+            domain_schema = model.schemas.get(catalog_manager.domain_schema)
+            assert domain_schema is not None
 
-        root_rid = "P1"
-        root_table = "demo:Project"
-        paths = [["demo:Project", "demo:Dataset"]]
-        include_tables = ["demo:Project", "demo:Dataset"]
+        finally:
+            self._delete_catalog(hostname, result.catalog_id)
 
-        result = _compute_reachable_rids_from_paths(
-            catalog, root_rid, root_table, paths, include_tables
-        )
+    def _delete_catalog(self, hostname: str, catalog_id: str) -> None:
+        """Helper to delete a catalog."""
+        try:
+            server = DerivaServer("https", hostname, credentials=get_credential(hostname))
+            catalog = server.connect_ermrest(catalog_id)
+            catalog.delete_ermrest_catalog(really=True)
+        except Exception as e:
+            print(f"Warning: Failed to delete catalog {catalog_id}: {e}")
 
-        # Should still have root RID
-        assert "P1" in result["demo:Project"]
-        # Dataset may be empty due to error
-        assert result["demo:Dataset"] == set()
+
+class TestCreateMlWorkspaceValidation:
+    """Tests for input validation in create_ml_workspace."""
+
+    def test_invalid_include_table_format_raises(self):
+        """Test that invalid include_tables format raises ValueError."""
+        with pytest.raises(ValueError, match="must be specified as 'schema:table'"):
+            create_ml_workspace(
+                source_hostname="localhost",
+                source_catalog_id="1",
+                root_rid="ABC123",
+                include_tables=["InvalidTableName"],  # Missing schema prefix
+            )
+
+    def test_invalid_exclude_objects_format_raises(self):
+        """Test that invalid exclude_objects format raises ValueError."""
+        with pytest.raises(ValueError, match="exclude_objects entries must be 'schema:table'"):
+            create_ml_workspace(
+                source_hostname="localhost",
+                source_catalog_id="1",
+                root_rid="ABC123",
+                exclude_objects=["InvalidTableName"],  # Missing schema prefix
+            )
