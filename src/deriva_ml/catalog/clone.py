@@ -1911,7 +1911,7 @@ def create_ml_workspace(
     include_vocabularies: bool = True,
     dest_hostname: str | None = None,
     alias: str | None = None,
-    add_ml_schema: bool = False,
+    add_ml_schema: bool = True,
     asset_mode: AssetCopyMode = AssetCopyMode.REFERENCES,
     copy_annotations: bool = True,
     copy_policy: bool = True,
