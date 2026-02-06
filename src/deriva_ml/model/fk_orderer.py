@@ -254,6 +254,7 @@ class ForeignKeyOrderer:
         self,
         graph: dict[str, set[str]],
         error: CycleError,
+        _depth: int = 0,
     ) -> list[str]:
         """Handle cycles by breaking them and re-sorting.
 
@@ -267,19 +268,41 @@ class ForeignKeyOrderer:
         Returns:
             Ordered list of table keys.
         """
-        # Get cycle from error message
+        max_depth = len(graph)  # Can't have more cycles than edges
+        if _depth > max_depth:
+            logger.error("Too many cycles to break, returning arbitrary order")
+            return list(graph.keys())
+
+        # Get cycle from error message.
+        # CycleError.args[1] is like ['A', 'B', 'C', 'A'] where first == last.
         cycle = list(error.args[1]) if len(error.args) > 1 else []
 
         if cycle:
             logger.warning(f"Breaking cycle in FK dependencies: {' -> '.join(cycle)}")
 
-            # Remove the last edge in the cycle
-            if len(cycle) >= 2:
-                from_node = cycle[-1]
-                to_node = cycle[0]
-                if from_node in graph and to_node in graph[from_node]:
-                    graph[from_node].remove(to_node)
-                    logger.debug(f"Removed edge {from_node} -> {to_node}")
+            # Remove one edge from the cycle to break it.
+            # cycle[-1] == cycle[0], so the unique nodes are cycle[:-1].
+            # Each consecutive pair cycle[i] -> cycle[i+1] corresponds to
+            # graph[cycle[i+1]] containing cycle[i] (i.e., cycle[i+1] depends on cycle[i]).
+            # Remove the last real edge: cycle[-2] from graph[cycle[-1]].
+            edge_removed = False
+            if len(cycle) >= 3:
+                dep_node = cycle[-2]  # the dependency
+                node = cycle[-1]      # the node that depends on dep_node
+                if node in graph and dep_node in graph[node]:
+                    graph[node].remove(dep_node)
+                    logger.debug(f"Removed dependency {node} -> {dep_node}")
+                    edge_removed = True
+
+            if not edge_removed:
+                # Try removing any edge in the cycle
+                for i in range(len(cycle) - 1):
+                    dep_node, node = cycle[i], cycle[i + 1]
+                    if node in graph and dep_node in graph[node]:
+                        graph[node].remove(dep_node)
+                        logger.debug(f"Removed dependency {node} -> {dep_node}")
+                        edge_removed = True
+                        break
 
         # Try again
         try:
@@ -287,7 +310,7 @@ class ForeignKeyOrderer:
             return list(ts.static_order())
         except CycleError as e:
             # Recursively break more cycles
-            return self._break_cycles_and_sort(graph, e)
+            return self._break_cycles_and_sort(graph, e, _depth + 1)
 
     def validate_insertion_order(
         self,
