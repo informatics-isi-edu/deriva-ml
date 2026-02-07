@@ -261,7 +261,7 @@ class DerivaML(
             self.use_minid = use_minid
 
         # Set up working and cache directories
-        self.working_dir = DerivaMLConfig.compute_workdir(working_dir, catalog_id)
+        self.working_dir = DerivaMLConfig.compute_workdir(working_dir, catalog_id, hostname)
         self.working_dir.mkdir(parents=True, exist_ok=True)
         self.hydra_runtime_output_dir = hydra_runtime_output_dir
 

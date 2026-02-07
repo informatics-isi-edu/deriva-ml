@@ -142,7 +142,7 @@ class DerivaMLConfig(BaseModel):
         Returns:
             Self: The configuration instance with initialized paths.
         """
-        self.working_dir = DerivaMLConfig.compute_workdir(self.working_dir, self.catalog_id)
+        self.working_dir = DerivaMLConfig.compute_workdir(self.working_dir, self.catalog_id, self.hostname)
         self.hydra_runtime_output_dir = Path(HydraConfig.get().runtime.output_dir)
 
         # Resolve use_minid based on s3_bucket configuration
@@ -156,33 +156,42 @@ class DerivaMLConfig(BaseModel):
         return self
 
     @staticmethod
-    def compute_workdir(working_dir: str | Path | None, catalog_id: str | int | None = None) -> Path:
+    def compute_workdir(
+        working_dir: str | Path | None,
+        catalog_id: str | int | None = None,
+        hostname: str | None = None,
+    ) -> Path:
         """Compute the effective working directory path.
 
         Creates a standardized working directory path. If a base directory is provided,
         appends the current username to prevent conflicts between users. If no directory
-        is provided, uses ~/.deriva-ml. The catalog_id is appended to
-        separate data from different catalogs.
+        is provided, uses ~/.deriva-ml. The hostname and catalog_id are appended to
+        separate data from different servers and catalogs.
 
         Args:
             working_dir: Base working directory path, or None for default.
             catalog_id: Catalog identifier to include in the path. If None, no
                        catalog subdirectory is created.
+            hostname: Server hostname to include in the path. If None, no
+                     hostname subdirectory is created.
 
         Returns:
             Path: Absolute path to the working directory.
 
         Example:
-            >>> DerivaMLConfig.compute_workdir('/shared/data', '52')
-            PosixPath('/shared/data/username/deriva-ml/52')
-            >>> DerivaMLConfig.compute_workdir(None, 1)
-            PosixPath('/home/username/.deriva-ml/1')
+            >>> DerivaMLConfig.compute_workdir('/shared/data', '52', 'ml.example.org')
+            PosixPath('/shared/data/username/deriva-ml/ml.example.org/52')
+            >>> DerivaMLConfig.compute_workdir(None, 1, 'localhost')
+            PosixPath('/home/username/.deriva-ml/localhost/1')
         """
         # Append username and deriva-ml to provided path, or use ~/.deriva-ml as base
         if working_dir:
             base_dir = Path(working_dir) / getpass.getuser() / "deriva-ml"
         else:
             base_dir = Path.home() / ".deriva-ml"
+        # Append hostname if provided to separate data from different servers
+        if hostname is not None:
+            base_dir = base_dir / hostname
         # Append catalog_id if provided
         if catalog_id is not None:
             base_dir = base_dir / str(catalog_id)
@@ -202,9 +211,9 @@ OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdi
 # For multirun/sweep, outputs go to a sweep subdirectory with job number subfolders
 store(
     HydraConf(
-        run=RunDir("${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"),
+        run=RunDir("${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id},${deriva_ml.hostname}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"),
         sweep=SweepDir(
-            dir="${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id}}/hydra-sweep/${now:%Y-%m-%d_%H-%M-%S}",
+            dir="${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id},${deriva_ml.hostname}}/hydra-sweep/${now:%Y-%m-%d_%H-%M-%S}",
             subdir="${hydra.job.num}",
         ),
         output_subdir="hydra-config",
