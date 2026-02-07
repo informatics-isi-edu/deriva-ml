@@ -132,15 +132,20 @@ class BagDataSource:
         # Build asset map for URL localization
         self._asset_map = self._build_asset_map() if asset_localization else {}
 
-        # Cache of table name -> csv file path
-        self._csv_cache: dict[str, Path] = {}
+        # Cache of table name -> list of csv file paths (multiple paths for nested datasets)
+        self._csv_cache: dict[str, list[Path]] = {}
         self._build_csv_cache()
 
     def _build_csv_cache(self) -> None:
-        """Build cache mapping table names to CSV file paths."""
+        """Build cache mapping table names to CSV file paths.
+
+        Nested datasets can produce multiple CSV files for the same table
+        at different directory depths. All paths are collected so that
+        get_table_data() yields the union of all rows.
+        """
         for csv_file in self.data_path.rglob("*.csv"):
             table_name = csv_file.stem
-            self._csv_cache[table_name] = csv_file
+            self._csv_cache.setdefault(table_name, []).append(csv_file)
 
     def _build_asset_map(self) -> dict[str, str]:
         """Build a map from remote URLs to local file paths using fetch.txt.
@@ -209,7 +214,12 @@ class BagDataSource:
         self,
         table: DerivaTable | str,
     ) -> Iterator[dict[str, Any]]:
-        """Read table data from CSV file.
+        """Read table data from CSV files.
+
+        Nested datasets may produce multiple CSV files for the same table
+        at different directory depths. This method yields rows from all of
+        them so that the full dataset (including parent and child records)
+        is loaded.
 
         Args:
             table: Table object or name.
@@ -218,20 +228,23 @@ class BagDataSource:
             Dictionary per row with column names as keys.
         """
         table_name = self._get_table_name(table)
-        csv_file = self._csv_cache.get(table_name)
+        csv_files = self._csv_cache.get(table_name)
 
-        if csv_file is None or not csv_file.exists():
+        if not csv_files:
             logger.debug(f"No CSV file found for table {table_name}")
             return
 
         is_asset = self._is_asset_table(table_name)
 
-        with csv_file.open(newline="") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if is_asset and self._asset_map:
-                    row = self._localize_asset_row(row)
-                yield row
+        for csv_file in csv_files:
+            if not csv_file.exists():
+                continue
+            with csv_file.open(newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if is_asset and self._asset_map:
+                        row = self._localize_asset_row(row)
+                    yield row
 
     def has_table(self, table: DerivaTable | str) -> bool:
         """Check if CSV exists for table.
@@ -254,23 +267,27 @@ class BagDataSource:
         return sorted(self._csv_cache.keys())
 
     def get_row_count(self, table: DerivaTable | str) -> int:
-        """Get the number of rows in a table's CSV file.
+        """Get the number of rows across all CSV files for a table.
 
         Args:
             table: Table object or name.
 
         Returns:
-            Number of data rows (excluding header).
+            Number of data rows (excluding headers).
         """
         table_name = self._get_table_name(table)
-        csv_file = self._csv_cache.get(table_name)
+        csv_files = self._csv_cache.get(table_name)
 
-        if csv_file is None or not csv_file.exists():
+        if not csv_files:
             return 0
 
-        with csv_file.open(newline="") as f:
-            # Count lines minus header
-            return sum(1 for _ in f) - 1
+        total = 0
+        for csv_file in csv_files:
+            if csv_file.exists():
+                with csv_file.open(newline="") as f:
+                    # Count lines minus header
+                    total += sum(1 for _ in f) - 1
+        return total
 
 
 class CatalogDataSource:
