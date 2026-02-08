@@ -84,7 +84,7 @@ class DerivaModel:
         self,
         model: Model,
         ml_schema: str = ML_SCHEMA,
-        domain_schemas: set[str] | None = None,
+        domain_schemas: str | set[str] | None = None,
         default_schema: str | None = None,
     ):
         """Create and initialize a DerivaModel instance.
@@ -111,6 +111,8 @@ class DerivaModel:
 
         # Determine domain schemas
         if domain_schemas is not None:
+            if isinstance(domain_schemas, str):
+                domain_schemas = {domain_schemas}
             self.domain_schemas = frozenset(domain_schemas)
         else:
             # Auto-detect all domain schemas

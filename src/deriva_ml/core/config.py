@@ -110,7 +110,7 @@ class DerivaMLConfig(BaseModel):
 
     hostname: str
     catalog_id: str | int = 1
-    domain_schemas: set[str] | None = None
+    domain_schemas: str | set[str] | None = None
     default_schema: str | None = None
     project_name: str | None = None
     cache_dir: str | Path | None = None
