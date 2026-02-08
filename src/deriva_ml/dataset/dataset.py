@@ -749,13 +749,16 @@ class Dataset:
             member_column = (
                 "Nested_Dataset" if target_table == self._dataset_table else other_fkey.foreign_key_columns[0].name
             )
+            # Use the actual referenced column from the FK definition, not always "RID".
+            # e.g. isa:Dataset_file.file -> isa:file.id (integer), not RID.
+            target_column = other_fkey.referenced_columns[0].name
 
             target_path = pb.schemas[target_table.schema.name].tables[target_table.name]
             member_path = pb.schemas[member_table.schema.name].tables[member_table.name]
 
             path = member_path.filter(member_path.Dataset == self.dataset_rid).link(
                 target_path,
-                on=(member_path.columns[member_column] == target_path.columns["RID"]),
+                on=(member_path.columns[member_column] == target_path.columns[target_column]),
             )
             target_entities = list(path.entities().fetch(limit=limit) if limit else path.entities().fetch())
             members[target_table.name].extend(target_entities)
