@@ -227,11 +227,17 @@ class CatalogManager:
             "TestTable_Asset_Type",
             "Dataset_TestTableExecution",
             "Dataset_TestTable",
+            "SplitTestItem_Execution",
+            "SplitTestItem_Asset_Type",
+            "Dataset_SplitTestItem",
+            "TestTableDelete_Execution",
+            "TestTableDelete_Asset_Type",
+            "Dataset_TestTableDelete",
         ]
         for t in test_assoc_tables:
             self._drop_table_if_exists(self.domain_schema, t)
 
-        test_tables = ["TestTableExecution", "TestTable"]
+        test_tables = ["TestTableExecution", "TestTable", "SplitTestItem", "TestTableDelete"]
         for t in test_tables:
             self._drop_table_if_exists(self.domain_schema, t)
 

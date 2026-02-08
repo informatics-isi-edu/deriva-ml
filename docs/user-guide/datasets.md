@@ -138,6 +138,162 @@ children = parent_dataset.list_dataset_children()
 parents = training_dataset.list_dataset_parents()
 ```
 
+## Splitting Datasets
+
+A common ML workflow is splitting a dataset into training and testing subsets. DerivaML provides the [`split_dataset`][deriva_ml.dataset.split.split_dataset] function for this, with full provenance tracking. The API follows scikit-learn conventions (`test_size`, `train_size`, `shuffle`, `seed`, `stratify`) while creating a proper dataset hierarchy in the catalog.
+
+### How Splitting Works
+
+`split_dataset` creates a three-level dataset hierarchy:
+
+```
+Split (parent, type: "Split")
+├── Training (child, type: "Training")
+└── Testing (child, type: "Testing")
+```
+
+The entire operation is performed within an execution context, so the split is fully traceable back to the source dataset, the parameters used, and the code that ran it.
+
+### Simple Random Split
+
+The simplest case splits a dataset into training and testing subsets by randomly shuffling members:
+
+```python
+from deriva_ml.dataset.split import split_dataset
+
+# 80/20 random split (default)
+result = split_dataset(ml, source_dataset_rid, test_size=0.2, seed=42)
+
+print(f"Split:    {result['split']}")
+print(f"Training: {result['training']} ({result['train_count']} samples)")
+print(f"Testing:  {result['testing']} ({result['test_count']} samples)")
+```
+
+You can also specify absolute counts instead of fractions:
+
+```python
+# Fixed-count split
+result = split_dataset(
+    ml, source_dataset_rid,
+    train_size=400,
+    test_size=100,
+    seed=42,
+)
+```
+
+### Labeled Splits
+
+When your experiment needs ground truth labels in both training and testing sets (for evaluation, ROC curves, etc.), add the `"Labeled"` dataset type:
+
+```python
+result = split_dataset(
+    ml, source_dataset_rid,
+    test_size=0.2,
+    seed=42,
+    training_types=["Labeled"],
+    testing_types=["Labeled"],
+)
+```
+
+This creates Training and Testing datasets with both their default type and the additional `"Labeled"` type, making them easy to discover and distinguish from unlabeled splits.
+
+### Stratified Splitting
+
+Stratified splitting maintains the class distribution of a column across both splits. This requires denormalizing the dataset to access the column values:
+
+```python
+result = split_dataset(
+    ml, source_dataset_rid,
+    test_size=0.2,
+    seed=42,
+    stratify_by_column="Image_Classification_Image_Class",
+    include_tables=["Image", "Image_Classification"],
+)
+```
+
+The `stratify_by_column` uses the denormalized column name format: `{TableName}_{ColumnName}`. The `include_tables` parameter specifies which tables to join during denormalization.
+
+!!! note
+    Stratified splitting requires scikit-learn to be installed. It is imported lazily, so the base `split_dataset` function works without it for random splits.
+
+### Custom Selection Functions
+
+For advanced splitting logic (balanced sampling, filtered subsets, etc.), provide a custom selection function:
+
+```python
+import numpy as np
+
+def balanced_selector(df, train_size, test_size, seed):
+    """Select equal numbers from each class."""
+    rng = np.random.default_rng(seed)
+    label_col = "Image_Classification_Image_Class"
+    classes = df[label_col].unique()
+    train_idx, test_idx = [], []
+    for cls in classes:
+        cls_indices = df.index[df[label_col] == cls].to_numpy()
+        rng.shuffle(cls_indices)
+        per_class_train = train_size // len(classes)
+        per_class_test = test_size // len(classes)
+        train_idx.extend(cls_indices[:per_class_train])
+        test_idx.extend(cls_indices[per_class_train:per_class_train + per_class_test])
+    return np.array(train_idx), np.array(test_idx)
+
+result = split_dataset(
+    ml, source_dataset_rid,
+    test_size=100,
+    selection_fn=balanced_selector,
+    include_tables=["Image", "Image_Classification"],
+)
+```
+
+A selection function must conform to the [`SelectionFunction`][deriva_ml.dataset.split.SelectionFunction] protocol: it receives a DataFrame, train/test sizes, and a seed, and returns `(train_indices, test_indices)` as numpy arrays.
+
+### Dry Run
+
+Use `dry_run=True` to preview what would happen without modifying the catalog:
+
+```python
+result = split_dataset(
+    ml, source_dataset_rid,
+    test_size=0.2,
+    dry_run=True,
+)
+print(f"Would create: {result['train_count']} train, {result['test_count']} test")
+print(f"Strategy: {result['strategy']}")
+```
+
+### Command-Line Interface
+
+The `deriva-ml-split-dataset` CLI provides the same functionality from the command line:
+
+```bash
+# Simple random split
+deriva-ml-split-dataset --hostname localhost --catalog-id 9 \
+    --dataset-rid 28D0 --test-size 0.2
+
+# Stratified split
+deriva-ml-split-dataset --hostname localhost --catalog-id 9 \
+    --dataset-rid 28D0 --test-size 0.2 \
+    --stratify-by-column Image_Classification_Image_Class \
+    --include-tables Image,Image_Classification
+
+# Dry run
+deriva-ml-split-dataset --hostname localhost --catalog-id 9 \
+    --dataset-rid 28D0 --dry-run
+```
+
+### Auto-Detection
+
+When the source dataset has members in only one element table, `split_dataset` auto-detects which table to split. If the dataset has members in multiple tables, you must specify `element_table`:
+
+```python
+result = split_dataset(
+    ml, source_dataset_rid,
+    test_size=0.2,
+    element_table="Image",  # Required when dataset has multiple element types
+)
+```
+
 ## Dataset Versioning
 
 Every dataset is assigned a version number using semantic versioning (`major.minor.patch`):

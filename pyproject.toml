@@ -38,6 +38,7 @@ bump-version = "deriva_ml.bump_version:main"
 create-demo-catalog = "deriva_ml.demo_catalog:main"
 
 deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
+deriva-ml-split-dataset = "deriva_ml.dataset.split:main"
 
 [project.optional-dependencies]
 

@@ -62,6 +62,7 @@ nav:
       - Datasets:
           - Dataset: code-docs/dataset.md
           - DatasetBag: code-docs/dataset_bag.md
+          - Dataset Splitting: code-docs/dataset_split.md
           - Dataset Auxiliary Classes: code-docs/dataset_aux_classes.md
       - Execution:
           - Execution: code-docs/execution.md
