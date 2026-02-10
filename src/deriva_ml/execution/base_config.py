@@ -54,6 +54,11 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
+# Module-level storage for hydra runtime output dir captured during
+# get_notebook_configuration(). This is a side-channel because the value
+# is a runtime artifact, not a configuration parameter, and should NOT
+# be part of the Hydra structured config schema.
+_captured_hydra_output_dir: str | None = None
 
 # Standard hydra defaults for DerivaML applications.
 # Projects can customize these or define their own defaults.
@@ -205,20 +210,24 @@ def get_notebook_configuration(
     # Merge overrides: env overrides first, then explicit overrides (higher precedence)
     all_overrides = env_overrides + (overrides or [])
 
-    # Variable to capture choices from within the task function
+    # Variables to capture from within the task function
     captured_choices: dict[str, str] = {}
+    captured_output_dir: str | None = None
 
     # Define a task function that instantiates and returns the config
     # The cfg from launch() is an OmegaConf DictConfig, so we need to
     # use hydra_zen.instantiate() to convert it to actual Python objects
     def return_instantiated_config(cfg: Any) -> T:
-        nonlocal captured_choices
+        nonlocal captured_choices, captured_output_dir
         # Capture the Hydra runtime choices (which config names were selected)
+        # and runtime output directory (for uploading hydra config files)
         # Filter out None values (some Hydra internal groups have None choices)
         try:
             from hydra.core.hydra_config import HydraConfig
-            choices = HydraConfig.get().runtime.choices
+            hydra_cfg = HydraConfig.get()
+            choices = hydra_cfg.runtime.choices
             captured_choices = {k: v for k, v in choices.items() if v is not None}
+            captured_output_dir = hydra_cfg.runtime.output_dir
         except Exception:
             # If HydraConfig is not available, leave choices empty
             pass
@@ -238,6 +247,13 @@ def get_notebook_configuration(
     config = result.return_value
     if hasattr(config, "config_choices"):
         config.config_choices = captured_choices
+
+    # Store the hydra output dir in module-level variable for run_notebook() to use.
+    # This is NOT stored on the config because it's a runtime artifact, not a
+    # configuration parameter, and adding it to the structured config causes
+    # Hydra OmegaConf composition errors.
+    global _captured_hydra_output_dir
+    _captured_hydra_output_dir = captured_output_dir
 
     return config
 
@@ -489,11 +505,14 @@ def run_notebook(
         overrides=overrides,
     )
 
-    # Create DerivaML instance
+    # Create DerivaML instance, passing the hydra output dir captured during
+    # config resolution so that hydra YAML configs get uploaded with the execution.
     actual_ml_class = ml_class or DerivaML
+    hydra_output_dir = Path(_captured_hydra_output_dir) if _captured_hydra_output_dir else None
     ml = actual_ml_class(
         hostname=config.deriva_ml.hostname,
         catalog_id=config.deriva_ml.catalog_id,
+        hydra_runtime_output_dir=hydra_output_dir,
     )
 
     # Create workflow
