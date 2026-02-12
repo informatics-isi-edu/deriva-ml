@@ -156,18 +156,19 @@ class VocabularyMixin:
         # Get schema and table names for path building
         schema_name = vocab_table.schema.name
         table_name = vocab_table.name
+        cols = self.model.vocab_columns(vocab_table)
 
         try:
             # Attempt to insert a new term
             term_data = pb.schemas[schema_name].tables[table_name].insert(
                 [
                     {
-                        "Name": term_name,
-                        "Description": description,
-                        "Synonyms": synonyms,
+                        cols["Name"]: term_name,
+                        cols["Description"]: description,
+                        cols["Synonyms"]: synonyms,
                     }
                 ],
-                defaults={"ID", "URI"},
+                defaults={cols["ID"], cols["URI"]},
             )[0]
             term_handle = VocabularyTermHandle(ml=self, table=table_name, **term_data)
             # Invalidate cache for this vocabulary since we added a new term
@@ -273,8 +274,10 @@ class VocabularyMixin:
         schema_path = self.pathBuilder().schemas[schema_name]
         table_path = schema_path.tables[table_name]
 
-        # Server-side filter by Name
-        results = list(table_path.filter(table_path.Name == term_name).entities().fetch())
+        # Server-side filter by Name (use column_definitions for case-flexible access)
+        cols = self.model.vocab_columns(table_name)
+        name_col = table_path.column_definitions[cols["Name"]]
+        results = list(table_path.filter(name_col == term_name).entities().fetch())
         if results:
             return VocabularyTermHandle(ml=self, table=table_name, **results[0])
         return None
@@ -326,9 +329,10 @@ class VocabularyMixin:
 
         # Update the term in the catalog
         vocab_table = self.model.name_to_table(table)
+        cols = self.model.vocab_columns(vocab_table)
         pb = self.pathBuilder()
         table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
-        table_path.update([{"RID": term.rid, "Synonyms": synonyms}])
+        table_path.update([{"RID": term.rid, cols["Synonyms"]: synonyms}])
 
         # Invalidate cache
         self.clear_vocabulary_cache(table)
@@ -348,9 +352,10 @@ class VocabularyMixin:
 
         # Update the term in the catalog
         vocab_table = self.model.name_to_table(table)
+        cols = self.model.vocab_columns(vocab_table)
         pb = self.pathBuilder()
         table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
-        table_path.update([{"RID": term.rid, "Description": description}])
+        table_path.update([{"RID": term.rid, cols["Description"]: description}])
 
         # Invalidate cache
         self.clear_vocabulary_cache(table)

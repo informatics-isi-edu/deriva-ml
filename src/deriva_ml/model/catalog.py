@@ -334,6 +334,25 @@ class DerivaModel:
         table = self.name_to_table(table_name)
         return vocab_columns.issubset({c.name.upper() for c in table.columns})
 
+    def vocab_columns(self, table_name: TableInput) -> dict[str, str]:
+        """Return mapping from canonical vocab column name to actual column name.
+
+        Canonical names are TitleCase (Name, ID, URI, Description, Synonyms).
+        Actual names reflect the table's schema — could be lowercase for
+        FaceBase-style catalogs or TitleCase for DerivaML-native tables.
+
+        Args:
+            table_name: A table object or the name of the table.
+
+        Returns:
+            Dict mapping canonical name to actual column name in the table.
+            E.g. ``{"Name": "name", "ID": "id", ...}`` for FaceBase tables
+            or ``{"Name": "Name", "ID": "ID", ...}`` for DerivaML tables.
+        """
+        table = self.name_to_table(table_name)
+        col_map = {c.name.upper(): c.name for c in table.columns}
+        return {canon: col_map[canon.upper()] for canon in ("Name", "ID", "URI", "Description", "Synonyms")}
+
     def is_association(
         self,
         table_name: str | Table,

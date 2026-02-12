@@ -33,6 +33,7 @@ from deriva.core.typed import (
     VocabularyTableDef,
 )
 from pydantic import (
+    AliasChoices,
     BaseModel,
     Field,
     PrivateAttr,
@@ -208,9 +209,9 @@ class VocabularyTerm(BaseModel):
     _name: str = PrivateAttr()
     _synonyms: list[str] | None = PrivateAttr()
     _description: str = PrivateAttr()
-    id: str = Field(alias="ID")
-    uri: str = Field(alias="URI")
-    rid: str = Field(alias="RID")
+    id: str = Field(validation_alias=AliasChoices("ID", "id"))
+    uri: str = Field(validation_alias=AliasChoices("URI", "uri"))
+    rid: str = Field(validation_alias=AliasChoices("RID", "rid"))
 
     def __init__(self, **data):
         # Extract fields that will be private attrs before calling super
