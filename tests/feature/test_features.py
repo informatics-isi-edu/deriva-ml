@@ -219,6 +219,69 @@ class TestFeatures:
         _ImageBoundingboxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
         _ImageQualtiyFeature = ml_instance.feature_record_class("Image", "Quality")
 
+    def test_add_asset_feature(self, dataset_test, tmp_path):
+        """Test adding feature values that reference asset files."""
+        ml_instance = DerivaML(
+            dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
+        )
+
+        # Get image RIDs to annotate
+        image_table = ml_instance.pathBuilder().schemas[ml_instance.default_schema].tables["Image"]
+        image_rids = [img["RID"] for img in image_table.path.entities().fetch()]
+        assert len(image_rids) > 0
+
+        # Verify the BoundingBox feature exists and has an asset column
+        ImageBoundingBoxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
+        assert len(ImageBoundingBoxFeature.asset_columns()) == 1
+        assert len(ImageBoundingBoxFeature.term_columns()) == 0
+
+        # Create a workflow and execution for adding asset features
+        ml_instance.add_term(
+            vc.workflow_type, "Test Asset Feature Workflow", description="Workflow for testing asset features"
+        )
+        asset_workflow = ml_instance.create_workflow(
+            name="Test Asset Feature Workflow",
+            workflow_type="Test Asset Feature Workflow",
+            description="A test workflow for asset features",
+        )
+        asset_execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Asset Feature Execution", workflow=asset_workflow)
+        )
+
+        with asset_execution.execute() as exe:
+            # Create asset files and feature records
+            feature_records = []
+            for i, image_rid in enumerate(image_rids[:3]):
+                # Create a bounding box asset file
+                bb_file = exe.asset_file_path("BoundingBox", f"bbox_{i}.txt")
+                with bb_file.open("w") as f:
+                    f.write(f"bounding box data for image {i}")
+
+                feature_records.append(
+                    ImageBoundingBoxFeature(
+                        Image=image_rid,
+                        BoundingBox=bb_file,
+                    )
+                )
+
+            exe.add_features(feature_records)
+
+        # Upload outputs (assets + feature values)
+        asset_execution.upload_execution_outputs()
+
+        # Verify the feature values were created
+        features = list(ml_instance.list_feature_values("Image", "BoundingBox"))
+        assert len(features) == 3
+
+        # Verify each feature value has a valid asset RID (not a file path)
+        for f in features:
+            dumped = f.model_dump()
+            assert dumped["BoundingBox"] is not None
+            # The BoundingBox column should contain an RID, not a file path
+            assert "/" not in str(dumped["BoundingBox"]), "BoundingBox should be an asset RID, not a file path"
+            assert dumped["Execution"] is not None
+            assert dumped["Image"] in image_rids[:3]
+
     def test_download_feature(self, dataset_test, tmp_path):
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False

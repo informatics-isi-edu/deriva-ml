@@ -61,6 +61,8 @@ ml.create_feature(
 )
 ```
 
+When you create an asset-based feature, the generated `FeatureRecord` class accepts either a file path or an asset RID for the asset column. During execution upload, file paths are automatically replaced with the RIDs of the uploaded assets.
+
 ### Mixed Features
 
 Features can reference both terms and assets for complex annotations.
@@ -109,6 +111,54 @@ with ml.create_execution(config) as exe:
 # Upload after execution context exits
 exe.upload_execution_outputs()
 ```
+
+### Asset-Based Feature Values
+
+For asset-based features, you provide file paths instead of vocabulary terms. The execution handles uploading the asset files and linking them to the feature records.
+
+```python
+# Get the FeatureRecord class for an asset-based feature
+SegmentationFeature = ml.feature_record_class("Image", "Segmentation")
+
+config = ExecutionConfiguration(
+    workflow=ml.create_workflow("Segmentation", "Model_Inference"),
+    datasets=[DatasetSpec(rid=dataset_rid)],
+)
+
+with ml.create_execution(config) as exe:
+    bag = exe.download_dataset_bag(DatasetSpec(rid=dataset_rid))
+
+    feature_records = []
+    for image in bag.list_dataset_members()["Image"]:
+        # Create the asset file using asset_file_path
+        mask_path = exe.asset_file_path(
+            "Segmentation_Mask",
+            f"mask_{image['RID']}.png",
+        )
+
+        # Write the asset file (e.g., a segmentation mask)
+        generate_segmentation_mask(image, output_path=mask_path)
+
+        # Reference the file path in the feature record
+        record = SegmentationFeature(
+            Image=image["RID"],
+            Segmentation_Mask=mask_path,  # File path, not an RID
+        )
+        feature_records.append(record)
+
+    exe.add_features(feature_records)
+
+# Upload assets and feature values
+exe.upload_execution_outputs()
+```
+
+During upload, the execution automatically:
+
+1. Uploads each asset file to the catalog's object store
+2. Replaces the file paths in the feature records with the RIDs of the uploaded assets
+3. Inserts the feature records into the catalog
+
+After upload, querying the feature values returns asset RIDs rather than file paths.
 
 ## Querying Feature Values
 
