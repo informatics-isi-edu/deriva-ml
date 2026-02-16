@@ -16,14 +16,13 @@ from pprint import pformat
 
 import pandas as pd
 import pytest
-from icecream import ic
+try:
+    from icecream import ic
+except ImportError:
+    ic = lambda *a, **kw: None
 
 from deriva_ml import DerivaML
 from deriva_ml.execution.execution import ExecutionConfiguration
-
-ic.configureOutput(
-    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
-)
 
 
 class TestDenormalize:
@@ -464,11 +463,15 @@ class TestDenormalizeDataIntegrity:
         # Each row should have matching Subject FK
         # Image has a Subject FK column
         if "Image.Subject" in df.columns and "Subject.RID" in df.columns:
-            for _, row in df.iterrows():
-                image_subject_fk = row.get("Image.Subject")
-                subject_rid = row.get("Subject.RID")
-                if image_subject_fk and subject_rid:
-                    assert image_subject_fk == subject_rid, "FK relationship should be maintained in join"
+            # Filter to rows where both values are non-null
+            valid_rows = df.dropna(subset=["Image.Subject", "Subject.RID"])
+            for _, row in valid_rows.iterrows():
+                image_subject_fk = row["Image.Subject"]
+                subject_rid = row["Subject.RID"]
+                assert image_subject_fk == subject_rid, (
+                    f"FK relationship should be maintained in join: "
+                    f"Image.Subject={image_subject_fk} != Subject.RID={subject_rid}"
+                )
 
 
 class TestDenormalizeEdgeCases:

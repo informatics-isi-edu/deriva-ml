@@ -1,7 +1,10 @@
 from pathlib import Path
 from pprint import pformat
 
-from icecream import ic
+try:
+    from icecream import ic
+except ImportError:
+    ic = lambda *a, **kw: None
 
 # Local imports
 from deriva_ml import DerivaML, MLVocab, TableDefinition
@@ -10,10 +13,6 @@ from deriva_ml.dataset.dataset import Dataset, DatasetBag
 from deriva_ml.demo_catalog import DatasetDescription
 from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 from tests.test_utils import MLDatasetCatalog
-
-ic.configureOutput(
-    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
-)
 
 
 class TestDatasetDownload:
@@ -179,7 +178,7 @@ class TestDatasetDownload:
         ml_instance.create_table(
             TableDefinition(
                 name="NewTable",
-                column_defs=[],
+                columns=[],
             )
         )
         new_version = dataset_description.dataset.increment_dataset_version(component=VersionPart.minor)
@@ -187,8 +186,8 @@ class TestDatasetDownload:
         current_bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset_description.dataset.download_dataset_bag(new_version, use_minid=False)
 
-        assert "NewTable" in new_bag.model.schemas[ml_instance.default_schema].tables
-        assert "NewTable" not in current_bag.model.schemas[ml_instance.default_schema].tables
+        assert "NewTable" in new_bag.model.model.schemas[ml_instance.default_schema].tables
+        assert "NewTable" not in current_bag.model.model.schemas[ml_instance.default_schema].tables
 
     def test_dataset_types_preserved_in_bag(self, dataset_test, tmp_path):
         """Test that dataset types in downloaded bag match the original catalog dataset types.
@@ -367,7 +366,7 @@ class TestDatabasePathCaching:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # The database path should include the bag cache directory name
-        dbase_path = bag.model.dbase_path
+        dbase_path = bag.model.database_dir
 
         # Path should exist and be a directory
         assert dbase_path.exists(), f"Database path does not exist: {dbase_path}"
@@ -398,7 +397,7 @@ class TestDatabasePathCaching:
 
         # Download the current version
         bag1 = dataset.download_dataset_bag(version=current_version, use_minid=False)
-        dbase_path1 = bag1.model.dbase_path
+        dbase_path1 = bag1.model.database_dir
 
         # Increment version (this creates a new version in the catalog)
         new_version = dataset.increment_dataset_version(
@@ -408,7 +407,7 @@ class TestDatabasePathCaching:
 
         # Download the new version
         bag2 = dataset.download_dataset_bag(version=new_version, use_minid=False)
-        dbase_path2 = bag2.model.dbase_path
+        dbase_path2 = bag2.model.database_dir
 
         # The database paths should be different
         assert dbase_path1 != dbase_path2, (

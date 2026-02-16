@@ -4,7 +4,10 @@ Tests for dataset functionality.
 
 from pprint import pformat
 
-from icecream import ic
+try:
+    from icecream import ic
+except ImportError:
+    ic = lambda *a, **kw: None
 
 from deriva_ml import (
     BuiltinTypes,
@@ -18,10 +21,6 @@ from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.demo_catalog import DatasetDescription
 from deriva_ml.execution.execution import ExecutionConfiguration
 
-ic.configureOutput(
-    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
-)
-
 
 class TestDataset:
     def test_dataset_elements(self, deriva_catalog, tmp_path):
@@ -31,7 +30,7 @@ class TestDataset:
         _test_table = ml_instance.model.create_table(
             TableDefinition(
                 name="TestTable",
-                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+                columns=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
             )
         )
         ml_instance.add_dataset_element_type("TestTable")
@@ -177,7 +176,7 @@ class TestDataset:
         ml_instance.model.create_table(
             TableDefinition(
                 name="TestTableExecution",
-                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+                columns=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
             )
         )
         ml_instance.add_dataset_element_type("TestTableExecution")
@@ -223,7 +222,7 @@ class TestDataset:
         ml_instance.model.create_table(
             TableDefinition(
                 name="TestTableDelete",
-                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+                columns=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
             )
         )
         ml_instance.add_dataset_element_type("TestTableDelete")

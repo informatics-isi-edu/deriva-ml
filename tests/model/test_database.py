@@ -8,14 +8,8 @@ from tests.test_utils import DatasetDescription, DerivaML, MLDatasetCatalog
 
 try:
     from icecream import ic
-
-    ic.configureOutput(
-        includeContext=True,
-        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
-    )
-
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+except ImportError:
+    ic = lambda *a, **kw: None
 
 class TestDataBaseModel:
     def make_frozen(self, e) -> frozenset:
@@ -64,16 +58,13 @@ class TestDataBaseModel:
             ds_path = ds.path.link(ds_ds).filter(ds_ds.Dataset == Any(*dataset_rids)).link(ds)
             subject_path = ds.path.link(ds_subject).filter(ds_subject.Dataset == Any(*dataset_rids)).link(subject)
             image_path = ds.path.link(ds_image).filter(ds_image.Dataset == Any(*dataset_rids)).link(image)
-            subject_path_1 = (
-                ds.path.link(ds_image).filter(ds_image.Dataset == Any(*dataset_rids)).link(image).link(subject)
-            )
-            image_path_1 = (
-                ds.path.link(ds_subject).filter(ds_subject.Dataset == Any(*dataset_rids)).link(subject).link(image)
-            )
+            # Note: Cross-element-type paths (e.g., Dataset→Image→Subject) are no longer
+            # included in bag exports since the element-type boundary fix. The bag only
+            # contains data reachable through direct dataset association paths.
             dataset_path_1 = ds.path.filter(ds.RID == Any(*dataset_rids))
             datasets = list(ds_path.entities().fetch()) + list(dataset_path_1.entities().fetch())
-            subjects = list(subject_path.entities().fetch()) + list(subject_path_1.entities().fetch())
-            images = list(image_path.entities().fetch()) + list(image_path_1.entities().fetch())
+            subjects = list(subject_path.entities().fetch())
+            images = list(image_path.entities().fetch())
 
             # Get RIDs from catalog results
             catalog_dataset_rids = {d["RID"] for d in datasets}

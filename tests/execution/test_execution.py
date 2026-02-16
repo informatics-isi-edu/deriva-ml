@@ -892,12 +892,12 @@ class TestWorkflowDocker:
         from deriva_ml.execution.workflow import Workflow
 
         # Set Docker environment variables
-        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
-        monkeypatch.setenv("DERIVAML_MCP_VERSION", "1.2.3")
-        monkeypatch.setenv("DERIVAML_MCP_GIT_COMMIT", "abc123def")
-        monkeypatch.setenv("DERIVAML_MCP_IMAGE_NAME", "ghcr.io/test/image")
+        monkeypatch.setenv("DERIVA_MCP_IN_DOCKER", "true")
+        monkeypatch.setenv("DERIVA_MCP_VERSION", "1.2.3")
+        monkeypatch.setenv("DERIVA_MCP_GIT_COMMIT", "abc123def")
+        monkeypatch.setenv("DERIVA_MCP_IMAGE_NAME", "ghcr.io/test/image")
         # Clear image digest to test git commit fallback
-        monkeypatch.delenv("DERIVAML_MCP_IMAGE_DIGEST", raising=False)
+        monkeypatch.delenv("DERIVA_MCP_IMAGE_DIGEST", raising=False)
 
         # Create workflow - should not fail even without git
         workflow = Workflow(
@@ -917,11 +917,11 @@ class TestWorkflowDocker:
         from deriva_ml.execution.workflow import Workflow
 
         # Set Docker environment with image digest
-        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
-        monkeypatch.setenv("DERIVAML_MCP_VERSION", "2.0.0")
-        monkeypatch.setenv("DERIVAML_MCP_GIT_COMMIT", "abc123")
-        monkeypatch.setenv("DERIVAML_MCP_IMAGE_DIGEST", "sha256:deadbeef123456")
-        monkeypatch.setenv("DERIVAML_MCP_IMAGE_NAME", "ghcr.io/org/repo")
+        monkeypatch.setenv("DERIVA_MCP_IN_DOCKER", "true")
+        monkeypatch.setenv("DERIVA_MCP_VERSION", "2.0.0")
+        monkeypatch.setenv("DERIVA_MCP_GIT_COMMIT", "abc123")
+        monkeypatch.setenv("DERIVA_MCP_IMAGE_DIGEST", "sha256:deadbeef123456")
+        monkeypatch.setenv("DERIVA_MCP_IMAGE_NAME", "ghcr.io/org/repo")
 
         workflow = Workflow(
             name="Digest Test",
@@ -938,11 +938,11 @@ class TestWorkflowDocker:
         from deriva_ml.execution.workflow import Workflow
 
         # Only set the Docker flag, no other env vars
-        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
+        monkeypatch.setenv("DERIVA_MCP_IN_DOCKER", "true")
         # Clear any existing env vars
-        monkeypatch.delenv("DERIVAML_MCP_VERSION", raising=False)
-        monkeypatch.delenv("DERIVAML_MCP_GIT_COMMIT", raising=False)
-        monkeypatch.delenv("DERIVAML_MCP_IMAGE_DIGEST", raising=False)
+        monkeypatch.delenv("DERIVA_MCP_VERSION", raising=False)
+        monkeypatch.delenv("DERIVA_MCP_GIT_COMMIT", raising=False)
+        monkeypatch.delenv("DERIVA_MCP_IMAGE_DIGEST", raising=False)
 
         workflow = Workflow(
             name="Minimal Docker Test",
@@ -960,9 +960,9 @@ class TestWorkflowDocker:
         """Test that explicitly provided values are preserved in Docker mode."""
         from deriva_ml.execution.workflow import Workflow
 
-        monkeypatch.setenv("DERIVAML_MCP_IN_DOCKER", "true")
-        monkeypatch.setenv("DERIVAML_MCP_VERSION", "env-version")
-        monkeypatch.setenv("DERIVAML_MCP_GIT_COMMIT", "env-commit")
+        monkeypatch.setenv("DERIVA_MCP_IN_DOCKER", "true")
+        monkeypatch.setenv("DERIVA_MCP_VERSION", "env-version")
+        monkeypatch.setenv("DERIVA_MCP_GIT_COMMIT", "env-commit")
 
         # Provide explicit values
         workflow = Workflow(

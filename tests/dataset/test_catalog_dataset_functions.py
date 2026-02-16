@@ -1,38 +1,19 @@
 """ Test catalog level functions that support datasets."""
 from pprint import pformat
 
-from icecream import ic
+try:
+    from icecream import ic
+except ImportError:
+    ic = lambda *a, **kw: None
 
 from deriva_ml import (
-    BuiltinTypes,
-    ColumnDefinition,
     DerivaML,
     MLVocab,
-    TableDefinition,
 )
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution import ExecutionConfiguration
 
-ic.configureOutput(
-    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
-)
-
 class TestCatalogDatasetFunctions:
-    def test_dataset_elements(self, deriva_catalog, tmp_path):
-        ml_instance = DerivaML(
-            deriva_catalog.hostname, deriva_catalog.catalog_id, working_dir=tmp_path, use_minid=False
-        )
-        _test_table = ml_instance.model.create_table(
-            TableDefinition(
-                name="TestTable",
-                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
-            )
-        )
-        ml_instance.add_dataset_element_type("TestTable")
-        assert "TestTable" in [t.name for t in ml_instance.list_dataset_element_types()]
-        # Check for repeat addition.
-        ml_instance.add_dataset_element_type("TestTable")
-
     def test_dataset_creation(self, deriva_catalog, tmp_path):
         """Test dataset creation and modification."""
 
@@ -119,42 +100,6 @@ class TestCatalogDatasetFunctions:
         # Create with all fields
         spec = DatasetSpec(rid="1234", version="1.0.0", materialize=True)
         assert spec.materialize
-
-    def test_dataset_execution(self, test_ml):
-        ml_instance = test_ml
-        ml_instance.model.create_table(
-            TableDefinition(
-                name="TestTableExecution",
-                column_defs=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
-            )
-        )
-        ml_instance.add_dataset_element_type("TestTableExecution")
-        table_path = (
-            ml_instance.catalog.getPathBuilder().schemas[ml_instance.default_schema].tables["TestTableExecution"]
-        )
-        table_path.insert([{"Col1": f"Thing{t + 1}"} for t in range(4)])
-        test_rids = [i["RID"] for i in table_path.entities().fetch()]
-
-        ml_instance.add_term(
-            MLVocab.workflow_type,
-            "Manual Workflow",
-            description="Initial setup of Model File",
-        )
-        ml_instance.add_term("Dataset_Type", "TestSet", description="A test")
-
-        api_workflow = ml_instance.create_workflow(
-            name="Manual Workflow",
-            workflow_type="Manual Workflow",
-            description="A manual operation",
-        )
-        manual_execution = ml_instance.create_execution(
-            ExecutionConfiguration(description="Sample Execution", workflow=api_workflow)
-        )
-
-        dataset = manual_execution.create_dataset(dataset_types=["TestSet"], description="A dataset")
-        dataset.add_dataset_members(test_rids)
-        history = dataset.dataset_history()
-        assert manual_execution.execution_rid == history[0].execution_rid
 
     def test_dataset_type_manipulation(self, test_ml):
         """Test adding and removing dataset types."""

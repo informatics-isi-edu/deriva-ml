@@ -210,6 +210,11 @@ class Execution:
 
         self._working_dir = self._ml_object.working_dir
         self._cache_dir = self._ml_object.cache_dir
+        if self._working_dir is None:
+            raise DerivaMLException(
+                "DerivaML working_dir is not set. "
+                "Ensure the DerivaML instance was initialized with a valid working_dir."
+            )
         self._dry_run = dry_run
 
         # Make sure we have a valid Workflow object.

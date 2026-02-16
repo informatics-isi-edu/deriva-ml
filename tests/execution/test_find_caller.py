@@ -4,6 +4,7 @@ These tests verify that the caller detection logic correctly identifies the
 user's script rather than DerivaML's internal CLI runners.
 """
 
+import os
 import sys
 import tempfile
 import subprocess
@@ -152,6 +153,12 @@ class TestRunModelSkipsCliRunnerPaths:
 class TestCallerDetectionIntegration:
     """Integration tests for caller detection when invoked through CLI runner."""
 
+    def _subprocess_env(self):
+        """Get environment for subprocess calls, ensuring distutils is available on Python 3.12+."""
+        env = os.environ.copy()
+        env["SETUPTOOLS_USE_DISTUTILS"] = "local"
+        return env
+
     def test_subprocess_script_returns_script_path(self):
         """Test that a script run via subprocess returns its own path, not the runner."""
         # Create a temporary script that imports find_caller and prints the result
@@ -180,6 +187,7 @@ print(result)
                 capture_output=True,
                 text=True,
                 cwd=str(Path(script_path).parent),
+                env=self._subprocess_env(),
             )
 
             # Check the result
@@ -244,6 +252,7 @@ print(result)
                 [sys.executable, script_path],
                 capture_output=True,
                 text=True,
+                env=self._subprocess_env(),
             )
 
             output = result.stdout.strip()
@@ -306,6 +315,7 @@ else:
                 [sys.executable, script_path],
                 capture_output=True,
                 text=True,
+                env=self._subprocess_env(),
             )
 
             assert result.returncode == 0, f"Test failed:\n{result.stdout}\n{result.stderr}"

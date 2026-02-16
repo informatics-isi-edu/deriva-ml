@@ -77,12 +77,12 @@ class DerivaMLDatabase:
     @property
     def working_dir(self) -> Path:
         """Get the working directory path."""
-        return self._database_model.dbase_path
+        return self._database_model.database_dir
 
     @property
     def cache_dir(self) -> Path:
         """Get the cache directory path (same as working_dir for bags)."""
-        return self._database_model.dbase_path
+        return self._database_model.database_dir
 
     @property
     def catalog_id(self) -> str:

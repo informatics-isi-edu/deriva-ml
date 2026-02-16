@@ -1,13 +1,12 @@
 from pprint import pformat
 
-from icecream import ic
+try:
+    from icecream import ic
+except ImportError:
+    ic = lambda *a, **kw: None
 
 from deriva_ml.dataset.aux_classes import DatasetVersion, VersionPart
 from deriva_ml.execution.execution import ExecutionConfiguration
-
-ic.configureOutput(
-    argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10)
-)
 
 class TestDatasetVersion:
     def test_dataset_version_simple(self, test_ml):

@@ -354,6 +354,16 @@ bag = dataset.download_dataset_bag(version="1.0.0")
 bag = dataset.download_dataset_bag(materialize=True)
 ```
 
+### How Bag Export Traverses Related Tables
+
+When exporting a dataset as a BDBag, DerivaML follows foreign key relationships from each member table to include related data (e.g., vocabulary terms, device records). However, it stops traversing when it reaches another **dataset element type** — a table that has its own `Dataset_X` association table — if that element type has no members in this dataset.
+
+For example, consider a catalog where `CGM_Blood_Glucose` has a foreign key to `Observation`, which is referenced by `Image`, which links to `Image_Diagnosis`. If a dataset contains only `CGM_Blood_Glucose` records, the export will *not* follow the path through `Observation → Image → Image_Diagnosis`, because `Observation` is itself a dataset element type with no members in this dataset. If `Observation` records were needed, they would be included as explicit dataset members and reached through their own `Dataset_Observation` association path.
+
+Non-element-type tables (tables without a `Dataset_X` association, such as `Device`) are traversed normally regardless of dataset membership.
+
+This boundary-aware traversal ensures that bag exports include only the data relevant to the dataset's actual members, avoiding expensive multi-table joins that would return empty results.
+
 ### Automatic Download in Executions
 
 When creating an execution with dataset specifications, you can download datasets within the execution context:

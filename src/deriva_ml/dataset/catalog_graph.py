@@ -368,6 +368,18 @@ class CatalogGraph:
         depth, and returns those paths. The paths represent relationships between tables in the schema and how they can
         be traversed based on the dataset's structure and context.
 
+        When a dataset_rid is provided, paths are filtered in two stages:
+
+        1. **Association filtering**: Only paths whose association table (p[1]) corresponds to an element type
+           with members in this dataset are included.
+        2. **Element-type boundary filtering**: Paths are truncated when they traverse through a dataset element
+           type that has no members in this dataset. A dataset element type is any table that has a ``Dataset_X``
+           association table (e.g., ``Image``, ``Subject``, ``Observation``). If a path from one element type
+           (e.g., ``CGM_Blood_Glucose``) follows a foreign key into another element type (e.g., ``Observation``)
+           that is not a member of this dataset, the path is truncated at that boundary. This prevents expensive
+           multi-table joins that would return empty results. Non-element-type tables (e.g., ``Device``) are
+           traversed normally.
+
         Args:
             dataset_rid:
                 An optional identifier for the specific dataset to filter paths. If provided,
@@ -413,6 +425,29 @@ class CatalogGraph:
             or (p[1] not in dataset_associations)  # Tables in the domain schema
             or (p[1] in included_associations)  # Tables that include members of the dataset
         }
+
+        if dataset_rid:
+            # Get ALL dataset element types in the catalog (tables with Dataset_X associations)
+            all_element_types = set(self._ml_instance.model.list_dataset_element_types())
+
+            # Filter out paths that traverse through non-member element types.
+            # If a path goes through an element type that has no members in this dataset,
+            # that element type's data would be reached through its own association path
+            # if it were included. Traversing through it from another element's path
+            # creates expensive joins that return empty results.
+            filtered_paths = set()
+            for path in paths:
+                if len(path) <= 2:
+                    filtered_paths.add(path)
+                    continue
+                # Check tables after the element table (p[2] onwards, excluding p[2] itself)
+                truncated = list(path[:3])  # Keep Dataset, association, element table
+                for table in path[3:]:
+                    if table in all_element_types and table not in dataset_elements:
+                        break  # Stop at non-member element type
+                    truncated.append(table)
+                filtered_paths.add(tuple(truncated))
+            paths = filtered_paths
 
         # Add feature table paths for domain tables in the dataset
         # Feature tables (e.g., Execution_Image_Image_Classification) contain feature values
