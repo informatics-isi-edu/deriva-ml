@@ -174,11 +174,20 @@ class VocabularyMixin:
             # Invalidate cache for this vocabulary since we added a new term
             self.clear_vocabulary_cache(vocab_table)
             return term_handle
-        except DataPathException:
-            # Term exists - look it up or raise an error
+        except DataPathException as e:
+            # Insert failed — check if it's because the term already exists
+            # or because of some other database error (permissions, schema, etc.)
+            try:
+                existing_term = self.lookup_term(vocab_table, term_name)
+            except DerivaMLInvalidTerm:
+                # Term doesn't exist — the insert failed for another reason
+                raise DerivaMLException(
+                    f"Failed to insert term '{term_name}' into {vocab_table.name}: {e}"
+                ) from e
+            # Term does exist — either return it or raise depending on exists_ok
             if not exists_ok:
                 raise DerivaMLInvalidTerm(vocab_table.name, term_name, msg="term already exists")
-            return self.lookup_term(vocab_table, term_name)
+            return existing_term
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTermHandle:
