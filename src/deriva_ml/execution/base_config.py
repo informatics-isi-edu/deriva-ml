@@ -107,8 +107,8 @@ class BaseConfig:
         ...     epochs: int = 10
     """
     deriva_ml: Any = None
-    datasets: Any = field(default_factory=list)
-    assets: Any = field(default_factory=list)
+    datasets: Any = None
+    assets: Any = None
     dry_run: bool = False
     description: str = ""
     config_choices: dict[str, str] = field(default_factory=dict)
