@@ -369,16 +369,17 @@ class CatalogGraph:
         depth, and returns those paths. The paths represent relationships between tables in the schema and how they can
         be traversed based on the dataset's structure and context.
 
-        When a dataset_rid is provided, paths are filtered in two stages:
+        When a dataset_rid is provided, paths are filtered by **association filtering**: only paths whose
+        association table (p[1]) corresponds to an element type with members in this dataset are included.
+        Paths starting from element types without members are excluded. Once a path starts from a member
+        element type, all FK-reachable tables are followed (both incoming and outgoing foreign keys),
+        with vocabulary tables acting as natural path terminators.
 
-        1. **Association filtering**: Only paths whose association table (p[1]) corresponds to an element type
-           with members in this dataset are included. Element types without members are excluded entirely.
-        2. **Element-type boundary truncation**: Paths are truncated when they encounter a dataset element
-           type that has no members in this dataset. A dataset element type is any table that has a ``Dataset_X``
-           association table (e.g., ``Image``, ``Subject``, ``Observation``). This prevents exporting data
-           for element types that aren't part of the dataset.
+        Paths ending in vocabulary tables are removed since vocabulary tables are exported in full
+        separately by ``_export_vocabulary()``. This avoids redundant multi-table joins that can
+        cause server-side query timeouts on large catalogs.
 
-        Feature tables are included for member element types reachable via the filtered paths.
+        Feature tables are included for element types reachable via the filtered paths.
 
         Args:
             dataset_rid:
@@ -429,38 +430,17 @@ class CatalogGraph:
             # Get ALL dataset element types in the catalog (tables with Dataset_X associations)
             all_element_types = set(self._ml_instance.model.list_dataset_element_types())
 
-            # Truncate paths at non-member element type boundaries.
-            # If a dataset doesn't contain members of a given element type, we don't need
-            # to traverse through that element type's table. This prevents expensive joins
-            # through large tables (e.g., Image with 225K rows) when the dataset only
-            # contains other element types (e.g., Subject, OCT_DICOM, CGM_Blood_Glucose).
-            # Non-element-type tables (e.g., Device) are traversed normally.
-            filtered_paths = set()
-            for path in paths:
-                if len(path) <= 2:
-                    filtered_paths.add(path)
-                    continue
-                # Keep Dataset, association, element table; check tables after that
-                truncated = list(path[:3])
-                for table in path[3:]:
-                    if table in all_element_types and table not in dataset_elements:
-                        break  # Stop at non-member element type
-                    truncated.append(table)
-                filtered_paths.add(tuple(truncated))
-            paths = filtered_paths
-
-            # Prune paths ending in vocabulary tables. Vocabulary tables are exported
-            # separately by _export_vocabulary() as standalone queries, so paths that
-            # terminate at a vocabulary table via expensive multi-table joins are redundant.
-            # Keep short paths (depth <= 4) since they're cheap and provide filtered
-            # subsets of vocab terms relevant to the dataset.
+            # Remove paths ending in vocabulary tables. Vocabulary tables are exported
+            # in full by _export_vocabulary() as standalone queries, so path-based
+            # joins to vocab tables are redundant and can cause server-side query
+            # timeouts when the join chain is deep.
             vocab_tables = {
                 table
                 for s in self._ml_instance.model.schemas.values()
                 for table in s.tables.values()
                 if self._ml_instance.model.is_vocabulary(table)
             }
-            paths = {p for p in paths if len(p) <= 4 or p[-1] not in vocab_tables}
+            paths = {p for p in paths if p[-1] not in vocab_tables}
 
             # Add feature table paths for member element types reachable via paths.
             reachable_element_types = {
