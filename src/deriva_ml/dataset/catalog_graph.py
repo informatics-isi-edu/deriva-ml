@@ -113,6 +113,7 @@ class CatalogGraph:
                 "processor_params": {
                     "query_path": f"/entity/{spath}",
                     "output_path": dpath,
+                    "paged_query": True,
                 },
             }
         ]
@@ -371,14 +372,13 @@ class CatalogGraph:
         When a dataset_rid is provided, paths are filtered in two stages:
 
         1. **Association filtering**: Only paths whose association table (p[1]) corresponds to an element type
-           with members in this dataset are included.
-        2. **Element-type boundary filtering**: Paths are truncated when they traverse through a dataset element
+           with members in this dataset are included. Element types without members are excluded entirely.
+        2. **Element-type boundary truncation**: Paths are truncated when they encounter a dataset element
            type that has no members in this dataset. A dataset element type is any table that has a ``Dataset_X``
-           association table (e.g., ``Image``, ``Subject``, ``Observation``). If a path from one element type
-           (e.g., ``CGM_Blood_Glucose``) follows a foreign key into another element type (e.g., ``Observation``)
-           that is not a member of this dataset, the path is truncated at that boundary. This prevents expensive
-           multi-table joins that would return empty results. Non-element-type tables (e.g., ``Device``) are
-           traversed normally.
+           association table (e.g., ``Image``, ``Subject``, ``Observation``). This prevents exporting data
+           for element types that aren't part of the dataset.
+
+        Feature tables are included for member element types reachable via the filtered paths.
 
         Args:
             dataset_rid:
@@ -399,11 +399,10 @@ class CatalogGraph:
         dataset_dataset = self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
 
         # Figure out what types of elements the dataset contains.
-        dataset_associations = [
-            a
-            for a in self._dataset_table.find_associations()
-            if a.table.schema.name != self._ml_schema or a.table.name == "Dataset_Dataset"
-        ]
+        # dataset_association_tables: all association linking tables (e.g., Dataset_Subject, Dataset_Image)
+        # Include associations from ALL schemas so that core associations like File_Dataset,
+        # Dataset_Execution, etc. are properly filtered when they have no members.
+        dataset_association_tables = [a.table for a in self._dataset_table.find_associations()]
 
         if dataset_rid:
             # Get a list of the members of the dataset so we can figure out which tables to query.
@@ -411,37 +410,38 @@ class CatalogGraph:
             dataset_elements = [
                 self._ml_instance.model.name_to_table(e) for e, m in dataset.list_dataset_members().items() if m
             ]
+            # included_associations: only association tables whose target element type has members
             included_associations = [
-                a.table for a in dataset_table.find_associations() if a.other_fkeys.pop().pk_table in dataset_elements
+                a.table for a in dataset_table.find_associations()
+                if any(fk.pk_table in dataset_elements for fk in a.other_fkeys)
             ]
         else:
-            included_associations = [a.table for a in dataset_associations]
+            included_associations = dataset_association_tables
 
         # Get the paths through the schema and filter out all the dataset paths not used by this dataset.
-        paths = {
-            tuple(p)
-            for p in self._ml_instance.model._schema_to_paths()
-            if (len(p) == 1)
-            or (p[1] not in dataset_associations)  # Tables in the domain schema
-            or (p[1] in included_associations)  # Tables that include members of the dataset
-        }
+        paths = set()
+        for p in self._ml_instance.model._schema_to_paths():
+            tp = tuple(p)
+            if (len(p) == 1) or (p[1] not in dataset_association_tables) or (p[1] in included_associations):
+                paths.add(tp)
 
         if dataset_rid:
             # Get ALL dataset element types in the catalog (tables with Dataset_X associations)
             all_element_types = set(self._ml_instance.model.list_dataset_element_types())
 
-            # Filter out paths that traverse through non-member element types.
-            # If a path goes through an element type that has no members in this dataset,
-            # that element type's data would be reached through its own association path
-            # if it were included. Traversing through it from another element's path
-            # creates expensive joins that return empty results.
+            # Truncate paths at non-member element type boundaries.
+            # If a dataset doesn't contain members of a given element type, we don't need
+            # to traverse through that element type's table. This prevents expensive joins
+            # through large tables (e.g., Image with 225K rows) when the dataset only
+            # contains other element types (e.g., Subject, OCT_DICOM, CGM_Blood_Glucose).
+            # Non-element-type tables (e.g., Device) are traversed normally.
             filtered_paths = set()
             for path in paths:
                 if len(path) <= 2:
                     filtered_paths.add(path)
                     continue
-                # Check tables after the element table (p[2] onwards, excluding p[2] itself)
-                truncated = list(path[:3])  # Keep Dataset, association, element table
+                # Keep Dataset, association, element table; check tables after that
+                truncated = list(path[:3])
                 for table in path[3:]:
                     if table in all_element_types and table not in dataset_elements:
                         break  # Stop at non-member element type
@@ -449,16 +449,27 @@ class CatalogGraph:
                 filtered_paths.add(tuple(truncated))
             paths = filtered_paths
 
-        # Add feature table paths for domain tables in the dataset
-        # Feature tables (e.g., Execution_Image_Image_Classification) contain feature values
-        # that need to be exported with the dataset
-        if dataset_rid:
-            for element_table in dataset_elements:
+            # Prune paths ending in vocabulary tables. Vocabulary tables are exported
+            # separately by _export_vocabulary() as standalone queries, so paths that
+            # terminate at a vocabulary table via expensive multi-table joins are redundant.
+            # Keep short paths (depth <= 4) since they're cheap and provide filtered
+            # subsets of vocab terms relevant to the dataset.
+            vocab_tables = {
+                table
+                for s in self._ml_instance.model.schemas.values()
+                for table in s.tables.values()
+                if self._ml_instance.model.is_vocabulary(table)
+            }
+            paths = {p for p in paths if len(p) <= 4 or p[-1] not in vocab_tables}
+
+            # Add feature table paths for member element types reachable via paths.
+            reachable_element_types = {
+                table for path in paths for table in path if table in all_element_types
+            }
+            for element_table in reachable_element_types:
                 for feature in self._ml_instance.find_features(element_table):
-                    # Find the path to the element table and extend it with the feature table
                     for path in paths.copy():
                         if path[-1] == element_table:
-                            # Add a path that goes through the element table to the feature table
                             paths.add(path + (feature.feature_table,))
 
         # Now get paths for nested datasets
@@ -504,23 +515,53 @@ class CatalogGraph:
         dataset: DatasetLike | None = None,
     ) -> Iterator[tuple[str, str, Table]]:
         paths = self._collect_paths(dataset and dataset.dataset_rid)
+        pb = self._ml_instance.catalog.getPathBuilder()
 
-        def source_path(path: tuple[Table, ...]) -> list[str]:
-            """Convert a tuple representing a path into a source path component with FK linkage"""
-            path = list(path)
-            p = [f"{self._ml_instance.ml_schema}:Dataset/RID={{RID}}"]
+        def _pb_table(table: Table):
+            """Look up a pathBuilder table from an ermrest_model Table."""
+            return pb.schemas[table.schema.name].tables[table.name]
+
+        def source_path(path: tuple[Table, ...]) -> str:
+            """Build an ERMrest query path using the datapath API.
+
+            Uses the datapath API to construct properly-formed ERMrest paths with
+            correct FK resolution across schemas. The datapath API generates alias
+            syntax (TableName:=schema:TableName) and explicit FK specifications
+            where needed, avoiding manual ERMrest path string construction.
+
+            The resulting path has the root Dataset filter replaced with RID={RID}
+            placeholder for use in export specifications.
+            """
+            # Start with root Dataset table via datapath
+            ds_table = _pb_table(path[0])
+            dp = ds_table
+            dd_table = _pb_table(self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"])
+
+            prev_table = path[0]
             for table in path[1:]:
+                pb_table = _pb_table(table)
                 if table.name == "Dataset_Dataset":
-                    p.append("(RID)=(deriva-ml:Dataset_Dataset:Dataset)")
-                elif table.name == "Dataset":
-                    p.append("(Nested_Dataset)=(deriva-ml:Dataset:RID)")
-                elif table.name == "Dataset_Version":
-                    p.append(f"(RID)=({self._ml_instance.ml_schema}:Dataset_Version:Dataset)")
+                    dp = dp.link(pb_table)
+                elif table.name == "Dataset" and prev_table.name == "Dataset_Dataset":
+                    # Nested dataset: follow Nested_Dataset FK back to Dataset
+                    dp = dp.link(pb_table, on=(dd_table.Nested_Dataset == pb_table.RID))
                 else:
-                    p.append(f"{table.schema.name}:{table.name}")
-            return p
+                    dp = dp.link(pb_table)
+                prev_table = table
 
-        src_paths = ["/".join(source_path(p)) for p in paths]
+            # Extract path portion from the datapath URI
+            uri = dp.uri
+            entity_prefix = "/entity/"
+            idx = uri.index(entity_prefix)
+            entity_path = uri[idx + len(entity_prefix):]
+
+            # Insert RID={RID} placeholder after the root Dataset segment
+            parts = entity_path.split("/", 1)
+            if len(parts) == 1:
+                return f"{parts[0]}/RID={{RID}}"
+            return f"{parts[0]}/RID={{RID}}/{parts[1]}"
+
+        src_paths = [source_path(p) for p in paths]
         dest_paths = ["/".join([t.name for t in p]) for p in paths]
         target_tables = [p[-1] for p in paths]
         return zip(src_paths, dest_paths, target_tables)

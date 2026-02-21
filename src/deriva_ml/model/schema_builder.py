@@ -704,7 +704,7 @@ class SchemaBuilder:
 
         # Create all tables
         with self.engine.begin() as conn:
-            self.metadata.create_all(conn, tables=database_tables)
+            self.metadata.create_all(conn, tables=database_tables, checkfirst=True)
 
         # Configure ORM class naming
         def name_for_scalar_relationship(_base, local_cls, referred_cls, constraint):

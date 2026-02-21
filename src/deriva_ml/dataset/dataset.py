@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from collections import defaultdict
 
 # Standard library imports
@@ -55,7 +56,7 @@ from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import format_exception
-from deriva.transfer.download.deriva_download import (
+from deriva.transfer.download import (
     DerivaDownloadAuthenticationError,
     DerivaDownloadAuthorizationError,
     DerivaDownloadConfigurationError,
@@ -1422,9 +1423,9 @@ class Dataset:
         contains only ``CGM_Blood_Glucose`` records and those records reference ``Observation`` via
         a foreign key, but ``Observation`` is itself a dataset element type with no members in this
         dataset, the export will not traverse through ``Observation`` into further tables like
-        ``Image`` or ``Image_Diagnosis``. This prevents expensive multi-table joins that would
-        return empty results. Related records from other element types are included only when they
-        are explicit members of the dataset, reached through their own association paths.
+        ``Image`` or ``Image_Diagnosis``. This prevents expensive multi-table joins on snapshot
+        catalogs. Related records from other element types are included only when they are explicit
+        members of the dataset, reached through their own association paths.
 
         Args:
             version: Dataset version to download. If not specified, the version must be set in the dataset.
@@ -1553,9 +1554,13 @@ class Dataset:
                 # Get bag from S3
                 bag_path = Path(tmp_dir) / Path(urlparse(minid.bag_url).path).name
                 archive_path = fetch_single_file(minid.bag_url, output_path=bag_path)
+            elif minid.bag_url.startswith("file://"):
+                # Client-side generated bag — already local
+                archive_path = urlparse(minid.bag_url).path
             else:
                 exporter = DerivaExport(host=self._ml_instance.catalog.deriva_server.server, output_dir=tmp_dir)
                 archive_path = exporter.retrieve_file(minid.bag_url)
+            if not use_minid:
                 hashes = hash_utils.compute_file_hashes(archive_path, hashes=["md5", "sha256"])
                 checksum = hashes["sha256"][0]
                 bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{checksum}"
@@ -1587,48 +1592,254 @@ class Dataset:
             # will generate a minid and place the bag into S3 storage.
             spec_file = Path(tmp_dir) / "download_spec.json"
             version_snapshot_catalog = self._version_snapshot_catalog(version)
+            downloader = CatalogGraph(
+                version_snapshot_catalog,
+                s3_bucket=self._ml_instance.s3_bucket,
+                use_minid=use_minid,
+            )
+            spec = downloader.generate_dataset_download_spec(self)
             with spec_file.open("w", encoding="utf-8") as ds:
-                downloader = CatalogGraph(
-                    version_snapshot_catalog,
-                    s3_bucket=self._ml_instance.s3_bucket,
-                    use_minid=use_minid,
+                json.dump(spec, ds)
+
+            self._logger.info(
+                "Downloading dataset %s for catalog: %s@%s"
+                % (
+                    "minid" if use_minid else "bag",
+                    self.dataset_rid,
+                    str(version),
                 )
-                json.dump(downloader.generate_dataset_download_spec(self), ds)
-            try:
-                self._logger.info(
-                    "Downloading dataset %s for catalog: %s@%s"
-                    % (
-                        "minid" if use_minid else "bag",
-                        self.dataset_rid,
-                        str(version),
-                    )
-                )
-                # Generate the bag and put into S3 storage.
-                exporter = DerivaExport(
-                    host=self._ml_instance.catalog.deriva_server.server,
-                    config_file=spec_file,
-                    output_dir=tmp_dir,
-                    defer_download=True,
-                    timeout=(10, 610),
-                    envars={"RID": self.dataset_rid},
-                )
-                minid_page_url = exporter.export()[0]  # Get the MINID launch page
-            except (
-                DerivaDownloadError,
-                DerivaDownloadConfigurationError,
-                DerivaDownloadAuthenticationError,
-                DerivaDownloadAuthorizationError,
-                DerivaDownloadTimeoutError,
-            ) as e:
-                raise DerivaMLException(format_exception(e))
-            # Update version table with MINID.
+            )
+
             if use_minid:
+                # Server-side export: generates bag, uploads to S3, registers MINID.
+                try:
+                    exporter = DerivaExport(
+                        host=self._ml_instance.catalog.deriva_server.server,
+                        config_file=spec_file,
+                        output_dir=tmp_dir,
+                        defer_download=True,
+                        timeout=(10, 610),
+                        envars={"RID": self.dataset_rid},
+                    )
+                    minid_page_url = exporter.export()[0]
+                except (
+                    DerivaDownloadError,
+                    DerivaDownloadConfigurationError,
+                    DerivaDownloadAuthenticationError,
+                    DerivaDownloadAuthorizationError,
+                    DerivaDownloadTimeoutError,
+                ) as e:
+                    raise DerivaMLException(format_exception(e))
+                # Update version table with MINID.
                 version_path = (
                     self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
                 )
                 version_rid = [h for h in self.dataset_history() if h.dataset_version == version][0].version_rid
                 version_path.update([{"RID": version_rid, "Minid": minid_page_url}])
-        return minid_page_url
+                return minid_page_url
+            else:
+                # Client-side download: runs queries locally with paged query support
+                # for automatic retry on query timeout errors. This avoids server-side
+                # export lock contention and gives better control over query execution.
+                return self._create_dataset_bag_client(version, spec)
+
+    def _create_dataset_bag_client(self, version: DatasetVersion, spec: dict) -> str:
+        """Create a dataset bag using client-side download.
+
+        Executes ERMrest queries directly using ErmrestCatalog.get_as_file() with
+        paged query support, building a BDBag from the results. Unlike DerivaDownload,
+        this method is tolerant of individual query failures — if a query times out
+        on the snapshot catalog (common for large multi-table joins), it logs a warning
+        and continues with remaining queries. The resulting bag contains all data that
+        was successfully retrieved.
+
+        Args:
+            version: The dataset version to export.
+            spec: The download specification dict (from generate_dataset_download_spec).
+
+        Returns:
+            str: A file:// URI pointing to the generated bag zip archive.
+        """
+        import csv
+        import codecs
+        import uuid
+
+        from deriva.core import DerivaServer, get_credential
+
+        snapshot_catalog_id = self._version_snapshot_catalog_id(version)
+        hostname = self._ml_instance.catalog.deriva_server.server
+        protocol = self._ml_instance.catalog.deriva_server.scheme
+
+        # Connect to the snapshot catalog
+        credentials = get_credential(hostname)
+        server = DerivaServer(protocol, hostname, credentials=credentials)
+        catalog = server.connect_ermrest(snapshot_catalog_id)
+
+        # Build bag in a persistent directory (survives for _download_dataset_minid)
+        tmp_dir = Path(self._ml_instance.working_dir) / "client_export" / str(uuid.uuid4())[:8]
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Format environment variables
+        envars = {"RID": self.dataset_rid}
+        bag_config = spec.get("bag", {})
+        bag_name = bag_config.get("bag_name", f"Dataset_{self.dataset_rid}").format(**envars)
+        bag_path = tmp_dir / bag_name
+        bag_algorithms = bag_config.get("bag_algorithms", ["md5"])
+
+        # Create the bag
+        bdb.ensure_bag_path_exists(str(bag_path))
+        bag = bdb.make_bag(str(bag_path), algs=bag_algorithms, idempotent=True)
+
+        # Process query_processors from the spec
+        query_processors = spec.get("catalog", {}).get("query_processors", [])
+        failed_queries = []
+        skipped_empty = []
+        fetch_entries = []  # (url, length, rel_path, md5) tuples for fetch.txt
+
+        for qp in query_processors:
+            processor_name = qp.get("processor", "")
+            params = qp.get("processor_params", {})
+
+            if processor_name == "env":
+                # Environment variable processors — execute and capture values
+                query_path = params.get("query_path", "")
+                if not query_path:
+                    continue
+                query_path = query_path.format(**envars)
+                query_keys = params.get("query_keys", [])
+                try:
+                    if query_path == "/":
+                        # Root query returns catalog metadata including snaptime
+                        resp = catalog.get("/").json()
+                    else:
+                        resp = catalog.get(query_path).json()
+                    if isinstance(resp, list) and resp:
+                        resp = resp[0]
+                    if resp and query_keys:
+                        for key in query_keys:
+                            if key in resp:
+                                envars[key] = resp[key]
+                except Exception as e:
+                    self._logger.warning("Failed to execute env query %s: %s", query_path, e)
+
+            elif processor_name == "json":
+                # JSON query (e.g., schema dump)
+                query_path = params.get("query_path", "")
+                output_path = params.get("output_path", "")
+                if not query_path:
+                    continue
+                query_path = query_path.format(**envars)
+                # Output path becomes filename with .json extension
+                dest_file = bag_path / "data" / (output_path + ".json")
+                dest_file.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    resp = catalog.get(query_path).json()
+                    dest_file.write_text(json.dumps(resp, indent=2), encoding="utf-8")
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to download {output_path} from snapshot catalog "
+                        f"({query_path}): {e}"
+                    ) from e
+
+            elif processor_name == "csv":
+                # Data query — use paged mode for resilience
+                query_path = params.get("query_path", "")
+                output_path = params.get("output_path", "")
+                if not query_path:
+                    continue
+                query_path = query_path.format(**envars)
+                paged = params.get("paged_query", False)
+
+                dest_dir = bag_path / "data" / output_path
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                dest_file = str(dest_dir) + ".csv"
+
+                try:
+                    catalog.get_as_file(
+                        query_path,
+                        dest_file,
+                        headers={"accept": "text/csv"},
+                        delete_if_empty=True,
+                        paged=paged,
+                        page_size=100000,
+                    )
+                    if not os.path.isfile(dest_file):
+                        skipped_empty.append(output_path)
+                except Exception as e:
+                    # Tolerate individual query failures — log and continue.
+                    # This handles snapshot catalog timeouts for large joins.
+                    self._logger.warning(
+                        "Query failed for %s (will be missing from bag): %s",
+                        output_path,
+                        e,
+                    )
+                    failed_queries.append(output_path)
+                    # Clean up partial file if it exists
+                    if os.path.isfile(dest_file):
+                        os.remove(dest_file)
+
+            elif processor_name == "fetch":
+                # Asset file references — write entries to fetch.txt for lazy materialization.
+                # The actual binary files are downloaded later by bdbag.materialize() when
+                # materialize=True is set on download_dataset_bag().
+                query_path = params.get("query_path", "")
+                output_path = params.get("output_path", "")
+                if not query_path:
+                    continue
+                query_path = query_path.format(**envars)
+
+                try:
+                    resp = catalog.get(query_path).json()
+                    for record in resp:
+                        url = record.get("url")
+                        filename = record.get("filename", "unknown")
+                        length = record.get("length", "")
+                        md5 = record.get("md5", "")
+                        asset_rid = record.get("asset_rid", "unknown")
+                        if not url:
+                            continue
+                        # Build the full URL for the asset
+                        if url.startswith("/"):
+                            asset_url = f"{protocol}://{hostname}{url}"
+                        else:
+                            asset_url = url
+                        # Build relative path within bag data directory
+                        file_output_path = output_path.format(asset_rid=asset_rid)
+                        rel_path = f"data/{file_output_path}/{filename}"
+                        # Add to fetch.txt entries
+                        fetch_entries.append((asset_url, length, rel_path, md5))
+                except Exception as e:
+                    self._logger.warning("Asset query failed for %s: %s", output_path, e)
+
+        # Remove empty directories left behind by empty/failed queries
+        for dirpath, dirnames, filenames in os.walk(str(bag_path / "data"), topdown=False):
+            if not dirnames and not filenames:
+                try:
+                    os.rmdir(dirpath)
+                except OSError:
+                    pass
+
+        if failed_queries:
+            self._logger.warning(
+                "Bag created with %d failed queries (data will be missing): %s",
+                len(failed_queries),
+                failed_queries,
+            )
+
+        # Write fetch.txt for remote asset references.
+        # BDBag's materialize() handles directory creation for fetch targets.
+        if fetch_entries:
+            fetch_file = bag_path / "fetch.txt"
+            with fetch_file.open("w", encoding="utf-8") as f:
+                for url, length, rel_path, md5 in fetch_entries:
+                    length_str = str(length) if length else "-"
+                    f.write(f"{url}\t{length_str}\t{rel_path}\n")
+            self._logger.info("Wrote %d fetch entries for remote assets", len(fetch_entries))
+
+        # Update and archive the bag
+        bdb.make_bag(str(bag_path), algs=bag_algorithms, update=True, idempotent=True)
+        archive_path = bdb.archive_bag(str(bag_path), bag_config.get("bag_archiver", "zip"))
+        return Path(archive_path).as_uri()
 
     def _get_dataset_minid(
         self,
@@ -1760,6 +1971,15 @@ class Dataset:
         # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
         if not validated_check.exists():
             self._logger.info(f"Materializing bag {minid.dataset_rid} Version:{minid.dataset_version}")
+            # Ensure parent directories exist for all fetch entries
+            fetch_file = bag_path / "fetch.txt"
+            if fetch_file.exists():
+                with fetch_file.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        parts = line.strip().split("\t")
+                        if len(parts) >= 3:
+                            rel_path = parts[2]
+                            (bag_path / rel_path).parent.mkdir(parents=True, exist_ok=True)
             bdb.materialize(
                 bag_path.as_posix(),
                 fetch_callback=fetch_progress_callback,
