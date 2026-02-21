@@ -6,7 +6,7 @@ It includes:
 - ExecutionConfiguration class: Core class for execution settings
 - Parameter validation: Handles JSON and file-based parameters
 - Dataset specifications: Manages dataset versions and materialization
-- Asset management: Tracks required input files
+- Asset management: Tracks required input files with optional caching
 
 The module supports both direct parameter specification and JSON-based configuration files.
 
@@ -31,6 +31,7 @@ from typing import Any
 from omegaconf import DictConfig
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.core.definitions import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.workflow import Workflow
@@ -47,7 +48,9 @@ class ExecutionConfiguration(BaseModel):
             - rid: Dataset Resource Identifier
             - version: Version to use
             - materialize: Whether to extract dataset contents
-        assets (list[RID]): Resource Identifiers of required input assets.
+        assets (list[AssetSpec]): Asset specifications. Each element can be:
+            - A plain RID string (no caching)
+            - An ``AssetSpec(rid=..., cache=True)`` for checksum-based caching
         workflow (Workflow | None): Workflow object defining the computational process.
             Use ``ml.lookup_workflow(rid)`` or ``ml.lookup_workflow_by_url(url)`` to get
             a Workflow object from a RID or URL.
@@ -58,19 +61,20 @@ class ExecutionConfiguration(BaseModel):
             Automatically populated by run_model() and get_notebook_configuration().
 
     Example:
-        >>> # Look up workflow by RID or URL first
-        >>> workflow = ml.lookup_workflow("2-ABC1")
+        >>> # Plain RIDs (backward compatible)
+        >>> config = ExecutionConfiguration(assets=["6-EPNR", "6-EP56"])
+        >>>
+        >>> # Mixed: cached model weights + uncached embeddings
         >>> config = ExecutionConfiguration(
-        ...     workflow=workflow,
-        ...     datasets=[
-        ...         DatasetSpec(rid="1-abc123", version="1.0.0", materialize=True)
-        ...     ],
-        ...     description="Process RNA sequence data"
+        ...     assets=[
+        ...         AssetSpec(rid="6-EPNR", cache=True),
+        ...         "6-EP56",
+        ...     ]
         ... )
     """
 
     datasets: list[DatasetSpec] = []
-    assets: list[RID] = []
+    assets: list[AssetSpec] = []
     workflow: Workflow | None = None
     description: str = ""
     argv: list[str] = Field(default_factory=lambda: sys.argv)
@@ -78,17 +82,37 @@ class ExecutionConfiguration(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    #  @field_validator("datasets", mode="before")
-    #  @classmethod
-    #  def validate_datasets(cls, value: Any) -> Any:
-    #      if isinstance(value, DatasetList):
-    #          config_list: DatasetList = value
-    #          value = config_list.datasets
-    #      return value
     @field_validator("assets", mode="before")
     @classmethod
     def validate_assets(cls, value: Any) -> Any:
-        return [v.rid if isinstance(v, DictConfig) or isinstance(v, AssetRID) else v for v in value]
+        """Normalize asset entries to AssetSpec objects.
+
+        Accepts plain RID strings, AssetRID objects, DictConfig from Hydra,
+        AssetSpec objects, or dicts with 'rid' and optional 'cache' keys.
+        """
+        result = []
+        for v in value:
+            if isinstance(v, AssetSpec):
+                result.append(v)
+            elif isinstance(v, dict):
+                # Dict with rid/cache keys (e.g., from JSON config)
+                result.append(AssetSpec(**v))
+            elif isinstance(v, DictConfig):
+                # OmegaConf DictConfig from Hydra — may have rid+cache or just rid
+                d = dict(v)
+                if "rid" in d:
+                    result.append(AssetSpec(**d))
+                else:
+                    # Legacy DictConfig with just .rid attribute (AssetRID-style)
+                    result.append(AssetSpec(rid=v.rid, cache=getattr(v, "cache", False)))
+            elif isinstance(v, AssetRID):
+                result.append(AssetSpec(rid=v.rid))
+            elif isinstance(v, str):
+                result.append(AssetSpec(rid=v))
+            else:
+                # Unknown type — try string coercion
+                result.append(AssetSpec(rid=str(v)))
+        return result
 
     @staticmethod
     def load_configuration(path: Path) -> ExecutionConfiguration:
@@ -116,32 +140,14 @@ class ExecutionConfiguration(BaseModel):
             config = json.load(fd)
         return ExecutionConfiguration.model_validate(config)
 
-    # def download_execution_configuration(
-    #     self, configuration_rid: RID
-    # ) -> ExecutionConfiguration:
-    #     """Create an ExecutionConfiguration object from a catalog RID that points to a JSON representation of that
-    #     configuration in hatrac
-    #
-    #     Args:
-    #         configuration_rid: RID that should be to an asset table that refers to an execution configuration
-    #
-    #     Returns:
-    #         A ExecutionConfiguration object for configured by the parameters in the configuration file.
-    #     """
-    #     AssertionError("Not Implemented")
-    #     configuration = self.retrieve_rid(configuration_rid)
-    #     with NamedTemporaryFile("w+", delete=False, suffix=".json") as dest_file:
-    #         hs = HatracStore("https", self.host_name, self.credential)
-    #         hs.get_obj(path=configuration["URL"], destfilename=dest_file.name)
-    #         return ExecutionConfiguration.load_configuration(Path(dest_file.name))
-
 
 @dataclass
 class AssetRID(str):
     """A string subclass representing an asset Resource ID with optional description.
 
-    AssetRID extends str so it can be used directly wherever a string RID is expected,
-    while optionally carrying a description for documentation purposes.
+    .. deprecated::
+        Use :class:`AssetSpec` instead for new code. ``AssetRID`` is retained
+        for backward compatibility.
 
     Attributes:
         rid: The Resource ID string identifying the asset in Deriva.

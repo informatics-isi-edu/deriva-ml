@@ -63,6 +63,10 @@ def __getattr__(name: str) -> type:
         from deriva_ml.asset.aux_classes import AssetSpec
 
         return AssetSpec
+    elif name == "AssetSpecConfig":
+        from deriva_ml.asset.aux_classes import AssetSpecConfig
+
+        return AssetSpecConfig
     elif name == "FeatureValueRecord":
         from deriva_ml.dataset.dataset_bag import FeatureValueRecord
 
@@ -105,6 +109,7 @@ __all__ = [
     "Asset",
     "AssetFilePath",
     "AssetSpec",
+    "AssetSpecConfig",
     # Feature value record for restructure_assets
     "FeatureValueRecord",
     # Schema validation (lazy-loaded)

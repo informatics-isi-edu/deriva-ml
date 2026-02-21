@@ -242,8 +242,8 @@ class Execution:
                 raise DerivaMLException("Dataset specified in execution configuration is not a dataset")
 
         for a in self.configuration.assets:
-            if not self._model.is_asset(self._ml_object.resolve_rid(a).table.name):
-                raise DerivaMLException("Asset specified in execution configuration is not a asset table")
+            if not self._model.is_asset(self._ml_object.resolve_rid(a.rid).table.name):
+                raise DerivaMLException("Asset specified in execution configuration is not an asset table")
 
         schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
         if reload:
@@ -345,7 +345,9 @@ class Execution:
         # Download assets....
         self.update_status(Status.running, "Downloading assets ...")
         self.asset_paths = {}
-        for asset_rid in self.configuration.assets:
+        for asset_spec in self.configuration.assets:
+            asset_rid = asset_spec.rid
+            use_cache = asset_spec.cache
             asset_table = self._ml_object.resolve_rid(asset_rid).table.name
             dest_dir = (
                 execution_root(self._ml_object.working_dir, self.execution_rid) / "downloaded-assets" / asset_table
@@ -356,6 +358,7 @@ class Execution:
                     asset_rid=asset_rid,
                     dest_dir=dest_dir,
                     update_catalog=not (reload or self._dry_run),
+                    use_cache=use_cache,
                 )
             )
 
@@ -673,16 +676,21 @@ class Execution:
         return asset_map
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def download_asset(self, asset_rid: RID, dest_dir: Path, update_catalog=True) -> AssetFilePath:
+    def download_asset(
+        self, asset_rid: RID, dest_dir: Path, update_catalog: bool = True, use_cache: bool = False
+    ) -> AssetFilePath:
         """Download an asset from a URL and place it in a local directory.
 
         Args:
             asset_rid: RID of the asset.
             dest_dir: Destination directory for the asset.
             update_catalog: Whether to update the catalog execution information after downloading.
+            use_cache: If True, check the cache directory for a previously downloaded copy
+                with a matching MD5 checksum before downloading. Cached copies are stored
+                in ``cache_dir/assets/{rid}_{md5}/`` and symlinked into the destination.
 
         Returns:
-            A tuple with the name of the asset table and a Path object to the downloaded asset.
+            An AssetFilePath with the path to the downloaded (or cached) asset file.
         """
 
         asset_table = self._ml_object.resolve_rid(asset_rid).table
@@ -693,8 +701,42 @@ class Execution:
         asset_metadata = {k: v for k, v in asset_record.items() if k in self._model.asset_metadata(asset_table)}
         asset_url = asset_record["URL"]
         asset_filename = dest_dir / asset_record["Filename"]
-        hs = HatracStore("https", self._ml_object.host_name, self._ml_object.credential)
-        hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
+
+        # Check cache before downloading
+        cache_hit = False
+        if use_cache:
+            md5 = asset_record.get("MD5")
+            if md5:
+                asset_cache_dir = self._ml_object.cache_dir / "assets"
+                asset_cache_dir.mkdir(parents=True, exist_ok=True)
+                cache_key = f"{asset_rid}_{md5}"
+                cached_file = asset_cache_dir / cache_key / asset_record["Filename"]
+                if cached_file.exists():
+                    # Cache hit — symlink from cache to destination
+                    self._logger.info(f"Using cached asset {asset_rid} (MD5: {md5})")
+                    if asset_filename.exists() or asset_filename.is_symlink():
+                        asset_filename.unlink()
+                    asset_filename.symlink_to(cached_file)
+                    cache_hit = True
+
+        if not cache_hit:
+            hs = HatracStore("https", self._ml_object.host_name, self._ml_object.credential)
+            hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
+
+            # Store in cache for future use
+            if use_cache:
+                md5 = asset_record.get("MD5")
+                if md5:
+                    asset_cache_dir = self._ml_object.cache_dir / "assets"
+                    asset_cache_dir.mkdir(parents=True, exist_ok=True)
+                    cache_key = f"{asset_rid}_{md5}"
+                    cache_entry_dir = asset_cache_dir / cache_key
+                    cache_entry_dir.mkdir(parents=True, exist_ok=True)
+                    cached_file = cache_entry_dir / asset_record["Filename"]
+                    # Move file to cache, then symlink back
+                    shutil.move(str(asset_filename), str(cached_file))
+                    asset_filename.symlink_to(cached_file)
+                    self._logger.info(f"Cached asset {asset_rid} (MD5: {md5})")
 
         asset_type_table, _col_l, _col_r = self._model.find_association(asset_table, MLVocab.asset_type)
         type_path = self._ml_object.pathBuilder().schemas[asset_type_table.schema.name].tables[asset_type_table.name]

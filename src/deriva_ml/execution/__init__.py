@@ -15,6 +15,9 @@ from deriva_ml.execution.base_config import (
     with_description,
 )
 from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfiguration
+
+# Re-export AssetSpec and AssetSpecConfig from their canonical location
+from deriva_ml.asset.aux_classes import AssetSpec, AssetSpecConfig
 from deriva_ml.execution.model_protocol import DerivaMLModel
 from deriva_ml.execution.multirun_config import (
     MultirunSpec,
@@ -45,6 +48,8 @@ __all__ = [
     "ExecutionConfiguration",
     "Workflow",
     "AssetRID",
+    "AssetSpec",
+    "AssetSpecConfig",
     "run_model",
     "create_model_config",
     "reset_multirun_state",

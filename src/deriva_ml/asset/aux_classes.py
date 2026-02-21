@@ -3,11 +3,13 @@
 This module defines helper classes for asset operations including:
 - AssetFilePath: Extended Path for in-flight asset staging
 - AssetSpec: Specification for asset references in configurations
+- AssetSpecConfig: Hydra-zen config interface for AssetSpec
 """
 
 from pathlib import Path
 from typing import Any
 
+from hydra_zen import hydrated_dataclass
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from deriva_ml.core.definitions import RID
@@ -77,24 +79,48 @@ class AssetSpec(BaseModel):
     """Specification for an asset in execution configurations.
 
     Used to reference assets as inputs to executions, similar to how
-    DatasetSpec is used for datasets.
+    DatasetSpec is used for datasets. Supports optional checksum-based
+    caching for large assets like model weights.
 
     Attributes:
         rid: Resource Identifier of the asset.
         asset_role: Role of the asset ("Input" or "Output"). Defaults to "Input".
+        cache: If True, cache the downloaded asset by MD5 checksum in the
+            DerivaML cache directory. Cached assets are reused across executions
+            when the checksum matches, avoiding repeated downloads of large files.
 
     Example:
         >>> spec = AssetSpec(rid="3JSE")
-        >>> spec = AssetSpec(rid="3JSE", asset_role="Input")
+        >>> spec = AssetSpec(rid="3JSE", cache=True)  # enable caching
     """
 
     rid: RID
     asset_role: str = "Input"
+    cache: bool = False
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="before")
     @classmethod
-    def _check_bare_rid(cls, data: Any) -> dict[str, str]:
+    def _check_bare_rid(cls, data: Any) -> dict[str, str | bool]:
         """Allow bare RID string as shorthand."""
         return {"rid": data} if isinstance(data, str) else data
+
+
+# Interface for hydra-zen
+@hydrated_dataclass(AssetSpec)
+class AssetSpecConfig:
+    """Hydra-zen configuration interface for AssetSpec.
+
+    Use in hydra-zen store definitions to specify assets with caching:
+
+        >>> from hydra_zen import store
+        >>> asset_store = store(group="assets")
+        >>> asset_store(
+        ...     [AssetSpecConfig(rid="6-EPNR", cache=True)],
+        ...     name="cached_weights",
+        ... )
+    """
+
+    rid: str
+    cache: bool = False
