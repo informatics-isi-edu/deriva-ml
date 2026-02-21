@@ -57,6 +57,7 @@ from jupyter_client.kernelspec import KernelSpecManager
 from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, MLAsset
+from deriva_ml.core.constants import DRY_RUN_RID
 from deriva_ml.execution import Execution, ExecutionConfiguration, Workflow
 
 
@@ -612,6 +613,11 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             execution_rid = execution_config["execution_rid"]
             hostname = execution_config["hostname"]
             catalog_id = execution_config["catalog_id"]
+
+            # In dry run mode, skip restoring execution and uploading outputs
+            if execution_rid == DRY_RUN_RID:
+                print(f"Dry run mode: notebook executed successfully. Output saved to {notebook_output}")
+                return
 
             # Create DerivaML instance to upload results
             ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id, working_dir=tmpdirname)
