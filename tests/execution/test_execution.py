@@ -580,6 +580,208 @@ class TestExecutionAssets:
 
 
 # =============================================================================
+# TestAssetCaching - Asset Cache Tests
+# =============================================================================
+
+
+class TestAssetCaching:
+    """Tests for per-asset checksum-based caching."""
+
+    def test_cache_miss_then_hit(self, basic_execution):
+        """Test that first download caches the asset and second uses the cache."""
+        ml = basic_execution._ml_object
+
+        # Upload an asset
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "weights.bin", "large model weights")
+
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        # First download with use_cache=True (cache miss — downloads and caches)
+        config1 = ExecutionConfiguration(
+            description="Cache Miss Download",
+            workflow=basic_execution.configuration.workflow,
+        )
+        exec1 = ml.create_execution(config1)
+
+        with TemporaryDirectory() as tmpdir1:
+            result1 = exec1.download_asset(
+                asset_rid, Path(tmpdir1), update_catalog=False, use_cache=True
+            )
+            assert result1.exists()
+            assert result1.is_symlink(), "After cache miss, file should be symlinked from cache"
+            with result1.open() as f:
+                assert f.read() == "large model weights"
+
+        # Verify the cache directory was created
+        cache_assets_dir = ml.cache_dir / "assets"
+        assert cache_assets_dir.exists()
+        cache_entries = list(cache_assets_dir.iterdir())
+        assert len(cache_entries) == 1
+        cache_entry = cache_entries[0]
+        assert cache_entry.name.startswith(asset_rid)
+        cached_file = cache_entry / "weights.bin"
+        assert cached_file.exists()
+        assert not cached_file.is_symlink(), "Cached file itself should not be a symlink"
+        with cached_file.open() as f:
+            assert f.read() == "large model weights"
+
+        # Second download with use_cache=True (cache hit — symlinks without download)
+        config2 = ExecutionConfiguration(
+            description="Cache Hit Download",
+            workflow=basic_execution.configuration.workflow,
+        )
+        exec2 = ml.create_execution(config2)
+
+        with TemporaryDirectory() as tmpdir2:
+            result2 = exec2.download_asset(
+                asset_rid, Path(tmpdir2), update_catalog=False, use_cache=True
+            )
+            assert result2.exists()
+            assert result2.is_symlink(), "Cache hit should produce a symlink"
+            # Symlink should point to the same cached file
+            # Use Path() to avoid AssetFilePath.resolve() subclass issue
+            assert Path(result2).resolve() == cached_file.resolve()
+            with result2.open() as f:
+                assert f.read() == "large model weights"
+
+    def test_no_cache_by_default(self, basic_execution):
+        """Test that assets are not cached when use_cache=False."""
+        ml = basic_execution._ml_object
+
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "ephemeral.txt", "not cached")
+
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        config = ExecutionConfiguration(
+            description="No Cache Download",
+            workflow=basic_execution.configuration.workflow,
+        )
+        dl_execution = ml.create_execution(config)
+
+        with TemporaryDirectory() as tmpdir:
+            result = dl_execution.download_asset(
+                asset_rid, Path(tmpdir), update_catalog=False, use_cache=False
+            )
+            assert result.exists()
+            assert not result.is_symlink(), "Without cache, file should be a regular file"
+            with result.open() as f:
+                assert f.read() == "not cached"
+
+        # Verify no cache directory was created for assets
+        cache_assets_dir = ml.cache_dir / "assets"
+        if cache_assets_dir.exists():
+            assert len(list(cache_assets_dir.iterdir())) == 0
+
+    def test_cache_via_execution_configuration(self, basic_execution):
+        """Test that AssetSpec(cache=True) in ExecutionConfiguration triggers caching."""
+        from deriva_ml.asset.aux_classes import AssetSpec
+
+        ml = basic_execution._ml_object
+
+        # Upload an asset
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "config_cached.txt", "cached via config")
+
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        # Create execution with AssetSpec(cache=True) in the config
+        config = ExecutionConfiguration(
+            description="Config Cache Test",
+            workflow=basic_execution.configuration.workflow,
+            assets=[AssetSpec(rid=asset_rid, cache=True)],
+        )
+        cache_execution = ml.create_execution(config)
+
+        # The asset should have been downloaded and cached during initialization
+        assert "Execution_Asset" in cache_execution.asset_paths
+        asset_path = cache_execution.asset_paths["Execution_Asset"][0]
+        assert asset_path.exists()
+        assert asset_path.is_symlink(), "Asset from config with cache=True should be symlinked"
+        with asset_path.open() as f:
+            assert f.read() == "cached via config"
+
+        # Verify cache was populated
+        cache_assets_dir = ml.cache_dir / "assets"
+        assert cache_assets_dir.exists()
+        cache_entries = list(cache_assets_dir.iterdir())
+        assert len(cache_entries) == 1
+
+    def test_uncached_asset_in_config(self, basic_execution):
+        """Test that plain RID strings in ExecutionConfiguration do not cache."""
+        ml = basic_execution._ml_object
+
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "plain_rid.txt", "not cached")
+
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        # Create execution with plain RID string (no caching)
+        config = ExecutionConfiguration(
+            description="Plain RID Test",
+            workflow=basic_execution.configuration.workflow,
+            assets=[asset_rid],
+        )
+        plain_execution = ml.create_execution(config)
+
+        assert "Execution_Asset" in plain_execution.asset_paths
+        asset_path = plain_execution.asset_paths["Execution_Asset"][0]
+        assert asset_path.exists()
+        assert not asset_path.is_symlink(), "Plain RID should not produce a symlink"
+
+        # Verify no asset cache was created
+        cache_assets_dir = ml.cache_dir / "assets"
+        if cache_assets_dir.exists():
+            assert len(list(cache_assets_dir.iterdir())) == 0
+
+    def test_mixed_cached_and_uncached(self, basic_execution):
+        """Test mixed AssetSpec(cache=True) and plain RIDs in same execution."""
+        from deriva_ml.asset.aux_classes import AssetSpec
+
+        ml = basic_execution._ml_object
+
+        # Upload two assets
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "cached.txt", "I am cached")
+            create_test_asset(execution, "uncached.txt", "I am not cached")
+
+        uploaded = basic_execution.upload_execution_outputs()
+        cached_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+        uncached_rid = uploaded["deriva-ml/Execution_Asset"][1].asset_rid
+
+        # Create execution with mixed assets
+        config = ExecutionConfiguration(
+            description="Mixed Cache Test",
+            workflow=basic_execution.configuration.workflow,
+            assets=[
+                AssetSpec(rid=cached_rid, cache=True),
+                uncached_rid,  # plain string
+            ],
+        )
+        mixed_execution = ml.create_execution(config)
+
+        paths = mixed_execution.asset_paths["Execution_Asset"]
+        assert len(paths) == 2
+
+        # Find which path corresponds to which RID
+        cached_path = next(p for p in paths if p.asset_rid == cached_rid)
+        uncached_path = next(p for p in paths if p.asset_rid == uncached_rid)
+
+        assert cached_path.is_symlink(), "Cached asset should be a symlink"
+        assert not uncached_path.is_symlink(), "Uncached asset should be a regular file"
+
+        # Verify only one cache entry was created
+        cache_assets_dir = ml.cache_dir / "assets"
+        assert cache_assets_dir.exists()
+        assert len(list(cache_assets_dir.iterdir())) == 1
+
+
+# =============================================================================
 # TestExecutionDatasets - Dataset Operations Tests
 # =============================================================================
 
