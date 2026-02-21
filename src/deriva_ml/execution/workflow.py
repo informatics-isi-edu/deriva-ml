@@ -420,8 +420,8 @@ class Workflow(BaseModel):
                 capture_output=True,
             ).returncode:
                 logger.warning("nbstripout is not installed in repository. Please run nbstripout --install")
-        except subprocess.CalledProcessError:
-            logger.error("nbstripout is not found.")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            logger.warning("nbstripout is not found. Please install it with: pip install nbstripout")
 
     @staticmethod
     def _get_notebook_path() -> Path | None:

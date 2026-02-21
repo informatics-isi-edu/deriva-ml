@@ -532,7 +532,7 @@ def run_notebook(
     )
 
     # Create execution context (downloads inputs)
-    execution = Execution(configuration=exec_config, ml_object=ml)
+    execution = Execution(configuration=exec_config, ml_object=ml, dry_run=config.dry_run)
 
     return ml, execution, config
 

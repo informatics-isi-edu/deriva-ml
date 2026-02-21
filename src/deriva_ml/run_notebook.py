@@ -518,12 +518,16 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         for name, spec in ksm.get_all_specs().items():
             kernel_json = spec.get("spec", {})
             argv = kernel_json.get("argv", [])
-            # Check each argument for the Python executable path
+            # Check if the kernel's Python executable lives inside our venv.
+            # We compare the unresolved path prefix rather than resolving symlinks,
+            # because uv-managed venvs all symlink to the same Python binary
+            # and would otherwise all match each other.
             for arg in argv:
                 try:
-                    if Path(arg).resolve() == venv_path.joinpath("bin", "python").resolve():
+                    arg_path = Path(arg)
+                    if arg_path.is_relative_to(venv_path):
                         return name
-                except Exception:
+                except (TypeError, ValueError):
                     continue
         return None
 
