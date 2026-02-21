@@ -641,8 +641,7 @@ class TestAssetCaching:
             assert result2.exists()
             assert result2.is_symlink(), "Cache hit should produce a symlink"
             # Symlink should point to the same cached file
-            # Use Path() to avoid AssetFilePath.resolve() subclass issue
-            assert Path(result2).resolve() == cached_file.resolve()
+            assert result2.resolve() == cached_file.resolve()
             with result2.open() as f:
                 assert f.read() == "large model weights"
 

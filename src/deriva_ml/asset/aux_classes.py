@@ -68,6 +68,16 @@ class AssetFilePath(Path):
         self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
         self.asset_rid = asset_rid
 
+    def with_segments(self, *pathsegments):
+        """Return a plain Path for derived path operations.
+
+        Path methods like resolve(), with_name(), parent, etc. internally call
+        type(self)(*args) to create new path objects. Since AssetFilePath requires
+        extra constructor arguments, this would fail. Returning a plain Path
+        avoids the issue while preserving correct path behavior.
+        """
+        return Path(*pathsegments)
+
     # Backward compatibility alias
     @property
     def asset_name(self) -> str:
