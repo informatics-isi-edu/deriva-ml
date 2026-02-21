@@ -359,8 +359,8 @@ class Execution:
                 )
             )
 
-        # Save configuration details for later upload
-        if not reload:
+        # Save configuration details and upload (skip in dry_run mode)
+        if not reload and not self._dry_run:
             # Save DerivaML configuration with Deriva_Config type
             cfile = self.asset_file_path(
                 asset_name=MLAsset.execution_metadata,
