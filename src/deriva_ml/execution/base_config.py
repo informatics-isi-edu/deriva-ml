@@ -400,10 +400,15 @@ def load_configs(package_name: str = "configs") -> list[str]:
 
     package_dir = Path(package.__file__).parent
 
-    # Collect module names
+    # Collect module names, recursing into subpackages
     modules_to_load = []
     for module_info in pkgutil.iter_modules([str(package_dir)]):
-        modules_to_load.append(module_info.name)
+        if module_info.ispkg:
+            # Recurse into subpackages (e.g., configs/dev/)
+            sub_loaded = load_configs(f"{package_name}.{module_info.name}")
+            loaded_modules.extend(sub_loaded)
+        else:
+            modules_to_load.append(module_info.name)
 
     # Sort modules but ensure 'experiments' is loaded last
     modules_to_load.sort()
@@ -412,8 +417,9 @@ def load_configs(package_name: str = "configs") -> list[str]:
         modules_to_load.append("experiments")
 
     for module_name in modules_to_load:
-        importlib.import_module(f"{package_name}.{module_name}")
-        loaded_modules.append(module_name)
+        full_name = f"{package_name}.{module_name}"
+        importlib.import_module(full_name)
+        loaded_modules.append(full_name)
 
     return sorted(loaded_modules)
 
