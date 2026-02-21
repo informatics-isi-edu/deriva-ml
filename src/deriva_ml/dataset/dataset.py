@@ -1416,16 +1416,11 @@ class Dataset:
         Downloads a dataset to the local file system. If the dataset has a version set, that version is used.
         If the dataset has a version and a version is provided, the version specified takes precedence.
 
-        The exported bag contains only the data reachable from this dataset's members. When the
-        catalog schema has foreign key paths that cross through other dataset element types
-        (tables with ``Dataset_X`` association tables), those paths are truncated at element-type
-        boundaries if that element type has no members in this dataset. For example, if a dataset
-        contains only ``CGM_Blood_Glucose`` records and those records reference ``Observation`` via
-        a foreign key, but ``Observation`` is itself a dataset element type with no members in this
-        dataset, the export will not traverse through ``Observation`` into further tables like
-        ``Image`` or ``Image_Diagnosis``. This prevents expensive multi-table joins on snapshot
-        catalogs. Related records from other element types are included only when they are explicit
-        members of the dataset, reached through their own association paths.
+        The exported bag contains all data reachable from this dataset's members by following
+        foreign key relationships (both incoming and outgoing). Starting from each member element
+        type, the export traverses all FK-connected tables, with vocabulary tables acting as
+        natural path terminators. Only paths starting from element types that have members in
+        this dataset are included.
 
         Args:
             version: Dataset version to download. If not specified, the version must be set in the dataset.

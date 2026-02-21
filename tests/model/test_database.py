@@ -3,6 +3,7 @@ from pprint import pformat
 from deriva.core.datapath import Any
 
 from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.execution import ExecutionConfiguration
 from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 from tests.test_utils import DatasetDescription, DerivaML, MLDatasetCatalog
 
@@ -58,9 +59,6 @@ class TestDataBaseModel:
             ds_path = ds.path.link(ds_ds).filter(ds_ds.Dataset == Any(*dataset_rids)).link(ds)
             subject_path = ds.path.link(ds_subject).filter(ds_subject.Dataset == Any(*dataset_rids)).link(subject)
             image_path = ds.path.link(ds_image).filter(ds_image.Dataset == Any(*dataset_rids)).link(image)
-            # Note: Cross-element-type paths (e.g., Dataset→Image→Subject) are no longer
-            # included in bag exports since the element-type boundary fix. The bag only
-            # contains data reachable through direct dataset association paths.
             dataset_path_1 = ds.path.filter(ds.RID == Any(*dataset_rids))
             datasets = list(ds_path.entities().fetch()) + list(dataset_path_1.entities().fetch())
             subjects = list(subject_path.entities().fetch())
@@ -143,3 +141,86 @@ class TestDataBaseModel:
         print("compare")
         self.compare_catalogs(ml_instance, dataset_test, current_spec)
         self.compare_catalogs(ml_instance, dataset_test, new_spec)
+
+    def test_fk_traversal_with_explicit_images(self, dataset_test):
+        """Test that bag includes FK-reachable images from Subject members plus explicit Image members.
+
+        Creates a dataset with:
+        - 2 Subject members (each has 1 Image via Image.Subject FK)
+        - 2 explicit Image members: one already FK-reachable from a Subject member,
+          and one whose Subject is NOT in the dataset
+
+        The bag should contain:
+        - 2 subjects (explicit members)
+        - 3 images: 2 FK-reachable from subjects + 1 extra explicit image
+          (the other explicit image overlaps with an FK-reachable one)
+        """
+        ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
+        pb = ml_instance.pathBuilder()
+        domain = ml_instance.default_schema
+
+        # Get all subjects and images from catalog
+        all_subjects = list(pb.schemas[domain].Subject.entities().fetch())
+        all_images = list(pb.schemas[domain].Image.entities().fetch())
+        assert len(all_subjects) >= 4, f"Need at least 4 subjects, got {len(all_subjects)}"
+        assert len(all_images) >= 4, f"Need at least 4 images, got {len(all_images)}"
+
+        # Pick 2 subjects to be dataset members
+        subject_a = all_subjects[0]
+        subject_b = all_subjects[1]
+        subject_member_rids = [subject_a["RID"], subject_b["RID"]]
+
+        # Find images linked to these subjects (FK-reachable)
+        image_for_a = [i for i in all_images if i["Subject"] == subject_a["RID"]]
+        image_for_b = [i for i in all_images if i["Subject"] == subject_b["RID"]]
+        assert image_for_a, f"Subject {subject_a['RID']} has no images"
+        assert image_for_b, f"Subject {subject_b['RID']} has no images"
+
+        # Pick a subject NOT in the dataset and find its image
+        subject_c = all_subjects[2]
+        assert subject_c["RID"] not in subject_member_rids
+        image_for_c = [i for i in all_images if i["Subject"] == subject_c["RID"]]
+        assert image_for_c, f"Subject {subject_c['RID']} has no images"
+
+        # Explicit Image members:
+        # 1. image_for_a[0] — already FK-reachable from subject_a (overlap)
+        # 2. image_for_c[0] — NOT FK-reachable (subject_c not in dataset)
+        explicit_image_rids = [image_for_a[0]["RID"], image_for_c[0]["RID"]]
+
+        # Create the dataset
+        workflow = ml_instance.create_workflow(
+            name="FK Traversal Test", workflow_type="Test Workflow"
+        )
+        config = ExecutionConfiguration(workflow=workflow)
+        with ml_instance.create_execution(config) as execution:
+            dataset = execution.create_dataset(
+                dataset_types=["Complete"],
+                description="Test FK traversal with explicit images",
+            )
+            dataset.add_dataset_members(
+                {"Subject": subject_member_rids, "Image": explicit_image_rids},
+                description="Subjects + mixed explicit images",
+            )
+
+        # Download the bag
+        version = str(dataset.current_version)
+        bag_spec = DatasetSpec(rid=dataset.dataset_rid, version=version)
+        bag = ml_instance.download_dataset_bag(bag_spec)
+        db = DerivaMLDatabase(bag.model)
+
+        # Verify subjects in bag
+        bag_subjects = list(db.get_table_as_dict("Subject"))
+        bag_subject_rids = {s["RID"] for s in bag_subjects}
+        assert bag_subject_rids >= set(subject_member_rids), (
+            f"Bag missing subject members: {set(subject_member_rids) - bag_subject_rids}"
+        )
+
+        # Verify images in bag
+        bag_images = list(db.get_table_as_dict("Image"))
+        bag_image_rids = {i["RID"] for i in bag_images}
+
+        # Expected images: FK-reachable from subject_a and subject_b, plus explicit image_for_c
+        expected_image_rids = {image_for_a[0]["RID"], image_for_b[0]["RID"], image_for_c[0]["RID"]}
+        assert bag_image_rids >= expected_image_rids, (
+            f"Bag missing expected images: {expected_image_rids - bag_image_rids}"
+        )
