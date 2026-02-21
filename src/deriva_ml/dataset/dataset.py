@@ -1815,11 +1815,13 @@ class Dataset:
                     pass
 
         if failed_queries:
-            self._logger.warning(
-                "Bag created with %d failed queries (data will be missing): %s",
-                len(failed_queries),
-                failed_queries,
+            msg = (
+                f"Bag created with {len(failed_queries)} failed queries "
+                f"(data will be missing): {failed_queries}"
             )
+            self._logger.warning(msg)
+            import warnings
+            warnings.warn(msg, stacklevel=2)
 
         # Write fetch.txt for remote asset references.
         # BDBag's materialize() handles directory creation for fetch targets.
