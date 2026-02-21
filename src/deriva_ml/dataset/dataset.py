@@ -1642,11 +1642,11 @@ class Dataset:
         """Create a dataset bag using client-side download.
 
         Executes ERMrest queries directly using ErmrestCatalog.get_as_file() with
-        paged query support, building a BDBag from the results. Unlike DerivaDownload,
-        this method is tolerant of individual query failures — if a query times out
-        on the snapshot catalog (common for large multi-table joins), it logs a warning
-        and continues with remaining queries. The resulting bag contains all data that
-        was successfully retrieved.
+        paged query support, building a BDBag from the results.
+
+        If any CSV data query fails (e.g., due to server-side query timeouts on deep
+        multi-table joins), the method raises a DerivaMLException listing the failed
+        tables and suggesting that the user add those records as direct dataset members.
 
         Args:
             version: The dataset version to export.
@@ -1654,6 +1654,9 @@ class Dataset:
 
         Returns:
             str: A file:// URI pointing to the generated bag zip archive.
+
+        Raises:
+            DerivaMLException: If any data query fails during export.
         """
         import csv
         import codecs
@@ -1815,13 +1818,19 @@ class Dataset:
                     pass
 
         if failed_queries:
-            msg = (
-                f"Bag created with {len(failed_queries)} failed queries "
-                f"(data will be missing): {failed_queries}"
+            # Extract table names from output paths (format: "schema/table")
+            failed_tables = [q.rsplit("/", 1)[-1] if "/" in q else q for q in failed_queries]
+            raise DerivaMLException(
+                f"Dataset bag export failed: {len(failed_queries)} queries timed out or "
+                f"failed for tables: {failed_tables}. "
+                f"This typically happens when deep multi-table joins exceed server query "
+                f"time limits. To fix this, add the desired records as direct dataset "
+                f"members using add_dataset_members() with the relevant table's RIDs. "
+                f"For example, if Image data is missing, register Image as a dataset "
+                f"element type (add_dataset_element_type('Image')) and add Image RIDs "
+                f"as members so they are exported via a direct association path rather "
+                f"than a deep FK join. Failed paths: {failed_queries}"
             )
-            self._logger.warning(msg)
-            import warnings
-            warnings.warn(msg, stacklevel=2)
 
         # Write fetch.txt for remote asset references.
         # BDBag's materialize() handles directory creation for fetch targets.
