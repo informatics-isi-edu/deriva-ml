@@ -308,6 +308,8 @@ def run_model(
     model_config: Any,
     dry_run: bool = False,
     ml_class: type["DerivaML"] | None = None,
+    upload_timeout: int = 600,
+    upload_chunk_size: int = 50_000_000,
 ) -> None:
     """
     Execute a machine learning model within a DerivaML execution context.
@@ -360,6 +362,15 @@ def run_model(
         The DerivaML class (or subclass) to instantiate. If None, uses the
         base DerivaML class. Use this to instantiate domain-specific classes
         like EyeAI or GUDMAP.
+
+    upload_timeout : int, optional
+        Read timeout in seconds for each chunk upload. Default is 600 (10 min).
+        Increase for large files on slow connections (e.g., 1800 for 30 min).
+        The connect timeout is always 6 seconds.
+
+    upload_chunk_size : int, optional
+        Chunk size in bytes for hatrac uploads. Default is 50000000 (50 MB).
+        Larger chunks reduce overhead but require more memory.
 
     Returns
     -------
@@ -494,7 +505,10 @@ def run_model(
     # After the model completes, upload any output files (metrics, predictions,
     # model checkpoints) to the Deriva catalog for permanent storage.
     if not dry_run:
-        uploaded_assets = execution.upload_execution_outputs()
+        uploaded_assets = execution.upload_execution_outputs(
+            timeout=(6, upload_timeout),
+            chunk_size=upload_chunk_size,
+        )
 
         # Print summary of uploaded assets
         total_files = sum(len(files) for files in uploaded_assets.values())
