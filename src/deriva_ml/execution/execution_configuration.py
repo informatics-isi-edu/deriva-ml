@@ -11,10 +11,10 @@ It includes:
 The module supports both direct parameter specification and JSON-based configuration files.
 
 Typical usage example:
+    >>> workflow = ml.lookup_workflow_by_url("https://github.com/my-org/my-repo")
     >>> config = ExecutionConfiguration(
-    ...     workflow="analysis_workflow",
+    ...     workflow=workflow,
     ...     datasets=[DatasetSpec(rid="1-abc123", version="1.0.0")],
-    ...     parameters={"threshold": 0.5},
     ...     description="Process sample data"
     ... )
     >>> execution = ml.create_execution(config)
@@ -53,7 +53,10 @@ class ExecutionConfiguration(BaseModel):
             - An ``AssetSpec(rid=..., cache=True)`` for checksum-based caching
         workflow (Workflow | None): Workflow object defining the computational process.
             Use ``ml.lookup_workflow(rid)`` or ``ml.lookup_workflow_by_url(url)`` to get
-            a Workflow object from a RID or URL.
+            a Workflow object from a RID or URL. Defaults to ``None``, which means the
+            workflow must be provided via the ``workflow`` parameter of
+            ``ml.create_execution()`` instead. If no workflow is specified in either
+            place, a ``DerivaMLException`` is raised at execution creation time.
         description (str): Description of execution purpose (supports Markdown).
         argv (list[str]): Command line arguments used to start execution.
         config_choices (dict[str, str]): Hydra config group choices that were selected.

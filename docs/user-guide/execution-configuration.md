@@ -220,9 +220,162 @@ exe.asset_file_path("Model", "continued_model.pt")
 exe.upload_execution_outputs()
 ```
 
-## Workflow Types
+## Workflows
 
-Workflows are categorized by type from the `Workflow_Type` vocabulary:
+A **Workflow** represents a reusable computational process or analysis pipeline. Workflows
+are a key part of DerivaML's provenance model — every execution is linked to exactly one
+workflow, which records *what code* was run.
+
+### Workflow, Execution, and Workflow Type
+
+These three concepts form a hierarchy:
+
+- **Workflow Type** — A controlled vocabulary term that categorizes workflows (e.g., "Training",
+  "Inference"). Managed in the `Workflow_Type` vocabulary table.
+- **Workflow** — A reusable definition of a computational process. It records the source code
+  location (URL), Git checksum, version, and type. A single workflow can be used by many
+  executions.
+- **Execution** — A specific run of a workflow at a particular time, with particular inputs
+  and outputs. Each execution references exactly one workflow.
+
+```
+Workflow_Type (vocabulary)
+  └── Workflow (reusable definition)
+        └── Execution (one specific run)
+        └── Execution (another run)
+        └── ...
+```
+
+### Creating a Workflow
+
+Use `ml.create_workflow()` to create a new workflow. This validates the workflow type
+against the catalog vocabulary and returns a `Workflow` object:
+
+```python
+workflow = ml.create_workflow(
+    name="ResNet50 Training",
+    workflow_type="Training",
+    description="Fine-tune ResNet50 on medical images"
+)
+```
+
+The returned `Workflow` object is not yet registered in the catalog. Registration
+happens automatically when you pass it to `ml.create_execution()`, or you can
+register it explicitly with `ml.add_workflow(workflow)`.
+
+### Automatic Source Code Detection
+
+When a `Workflow` object is created (either via `ml.create_workflow()` or the `Workflow`
+constructor), DerivaML automatically detects the source code that is creating the workflow
+and records it for provenance. The detection works differently depending on the execution
+environment.
+
+#### Python Scripts
+
+When running from a Python script (e.g., `python train.py` or `uv run deriva-ml-run`),
+DerivaML identifies the script file, constructs a GitHub blob URL that includes the
+current commit hash, and computes a Git object hash of the file content:
+
+```
+URL:      https://github.com/org/repo/blob/a1b2c3d/src/models/train.py
+Checksum: e5f6a7b8c9d0...  (git hash-object of file content)
+Version:  0.3.1             (from setuptools-scm or pyproject.toml)
+```
+
+If the script has uncommitted changes, DerivaML issues a warning. The URL still points
+to the last committed version, so the checksum may not match the code that actually ran.
+Committing before running ensures reproducibility.
+
+#### Jupyter Notebooks
+
+When running inside a Jupyter notebook, DerivaML identifies the notebook file by
+querying the running Jupyter server for the current kernel's notebook path. The
+checksum is computed after stripping cell outputs with `nbstripout`, so re-running
+a notebook without code changes produces the same checksum regardless of output
+differences.
+
+For notebooks launched via `deriva-ml-run-notebook`, the notebook path and URL are
+passed through environment variables (`DERIVA_ML_WORKFLOW_URL`,
+`DERIVA_ML_WORKFLOW_CHECKSUM`) so that detection works even when the notebook is
+executed by a separate process.
+
+To ensure clean checksums, install `nbstripout` in your repository:
+
+```bash
+pip install nbstripout
+nbstripout --install
+```
+
+#### Docker Containers
+
+When running inside a Docker container (with `DERIVA_MCP_IN_DOCKER=true`), there is
+no local Git repository. Instead, DerivaML reads provenance from environment variables
+set at image build time:
+
+| Variable | Purpose |
+|----------|---------|
+| `DERIVA_MCP_IMAGE_NAME` | Docker image name (e.g., `ghcr.io/org/repo`) |
+| `DERIVA_MCP_IMAGE_DIGEST` | Image digest (`sha256:...`) used as checksum |
+| `DERIVA_MCP_GIT_COMMIT` | Git commit hash at build time (fallback checksum) |
+| `DERIVA_MCP_VERSION` | Semantic version of the image |
+
+#### Overriding Detection
+
+You can bypass automatic detection by setting the `url` and `checksum` fields
+explicitly when constructing a `Workflow`:
+
+```python
+workflow = Workflow(
+    name="Custom Pipeline",
+    workflow_type="Training",
+    url="https://github.com/org/repo/blob/main/pipeline.py",
+    checksum="abc123def456",
+)
+```
+
+Or by setting environment variables before the workflow is created:
+
+```bash
+export DERIVA_ML_WORKFLOW_URL="https://github.com/org/repo/blob/main/pipeline.py"
+export DERIVA_ML_WORKFLOW_CHECKSUM="abc123def456"
+```
+
+### Reusing Existing Workflows
+
+If a workflow with the same URL or checksum already exists in the catalog,
+`ml.add_workflow()` returns the existing workflow's RID rather than creating a duplicate.
+This means running the same committed script multiple times reuses the same workflow record.
+
+You can also look up existing workflows directly:
+
+```python
+# Look up by RID
+workflow = ml.lookup_workflow("2-ABC1")
+
+# Look up by URL or Git checksum
+workflow = ml.lookup_workflow_by_url("https://github.com/org/repo/blob/abc123/train.py")
+
+# List all workflows in the catalog
+all_workflows = ml.find_workflows()
+for w in all_workflows:
+    print(f"{w.name} ({w.workflow_type}): {w.url}")
+```
+
+### Updating Workflow Properties
+
+Workflows retrieved from the catalog (via `lookup_workflow`, `lookup_workflow_by_url`, or
+`find_workflows`) are *bound* to the catalog. You can update their `description` and
+`workflow_type` properties, and the changes are written to the catalog immediately:
+
+```python
+workflow = ml.lookup_workflow("2-ABC1")
+workflow.description = "Updated: now includes data augmentation"
+workflow.workflow_type = "Training"  # Must be a valid Workflow_Type term
+```
+
+### Workflow Types
+
+Workflow types are controlled vocabulary terms that categorize workflows. Common types include:
 
 | Type | Description |
 |------|-------------|
@@ -232,7 +385,7 @@ Workflows are categorized by type from the `Workflow_Type` vocabulary:
 | Evaluation | Model evaluation and metrics |
 | Annotation | Adding labels or features |
 
-Add custom workflow types:
+These are not fixed — add custom types for your project:
 
 ```python
 ml.add_term(
@@ -241,6 +394,33 @@ ml.add_term(
     description="Workflows that augment training data"
 )
 ```
+
+The workflow type must exist in the catalog *before* creating a workflow that uses it.
+`ml.create_workflow()` validates this and raises a `DerivaMLException` if the type is
+not found.
+
+### Providing the Workflow to an Execution
+
+A workflow must be provided when creating an execution. There are two ways:
+
+```python
+# Option 1: In the ExecutionConfiguration
+config = ExecutionConfiguration(
+    workflow=workflow,
+    description="Training run",
+    datasets=[DatasetSpec(rid="1-ABC")],
+)
+exe = ml.create_execution(config)
+
+# Option 2: As a separate argument to create_execution
+config = ExecutionConfiguration(
+    description="Training run",
+    datasets=[DatasetSpec(rid="1-ABC")],
+)
+exe = ml.create_execution(config, workflow=workflow)
+```
+
+If no workflow is provided in either place, a `DerivaMLException` is raised.
 
 ## Complete Example
 

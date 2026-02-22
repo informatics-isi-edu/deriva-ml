@@ -82,8 +82,19 @@ class Workflow(BaseModel):
         checksum (str | None): Git hash of workflow source code.
         is_notebook (bool): Whether workflow is a Jupyter notebook.
 
+    Note:
+        The recommended way to create a Workflow is via :meth:`DerivaML.create_workflow()
+        <deriva_ml.DerivaML.create_workflow>`, which validates the workflow type against
+        the catalog vocabulary::
+
+            >>> workflow = ml.create_workflow(
+            ...     name="RNA Analysis",
+            ...     workflow_type="python_notebook",
+            ...     description="RNA sequence analysis"
+            ... )
+
     Example:
-        Create a workflow programmatically::
+        Create a workflow directly (without catalog validation)::
 
             >>> workflow = Workflow(
             ...     name="RNA Analysis",
