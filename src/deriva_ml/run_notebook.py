@@ -619,8 +619,14 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 print(f"Dry run mode: notebook executed successfully. Output saved to {notebook_output}")
                 return
 
-            # Create DerivaML instance to upload results
-            ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id, working_dir=tmpdirname)
+            # Create DerivaML instance to upload results.
+            # Use the default working directory (not tmpdirname) so that we share
+            # the same asset staging area as the notebook subprocess. The notebook
+            # registers output files via asset_file_path() into the default working
+            # dir; if we used a different working_dir here, upload_execution_outputs()
+            # would only see the .ipynb/.md files we register below, missing any
+            # assets the notebook itself created (e.g., training_curves.png).
+            ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id)
             workflow_rid = ml_instance.retrieve_rid(execution_config["execution_rid"])["Workflow"]
 
             # Look up the workflow object from the RID
