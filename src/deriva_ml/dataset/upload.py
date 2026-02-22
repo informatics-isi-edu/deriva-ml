@@ -307,15 +307,14 @@ def bulk_upload_configuration(
     }
 
 
-# Default timeout for large file uploads in seconds
-# The requests timeout tuple is (connect_timeout, read_timeout), but this doesn't
-# cover write operations. We also need to set socket.setdefaulttimeout() for writes.
-DEFAULT_UPLOAD_TIMEOUT = (6, 600)
-
-# Socket timeout for write operations (in seconds)
-# This is needed because requests timeout only covers connect and read, not write.
-# For large chunk uploads, the socket write can take significant time.
-DEFAULT_SOCKET_TIMEOUT = 600.0
+# Default timeout for large file uploads in seconds.
+# The requests timeout tuple is (connect_timeout, read_timeout).
+# IMPORTANT: urllib3 applies connect_timeout to the socket via sock.settimeout()
+# *before* sending the request body. This means connect_timeout also acts as the
+# write timeout for each chunk. For large chunk uploads (e.g. 50 MB), the write
+# can take significant time, so connect_timeout must be large enough to cover
+# the time to send a full chunk over the network.
+DEFAULT_UPLOAD_TIMEOUT = (600, 600)
 
 
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -338,9 +337,10 @@ def upload_directory(
             Called with UploadProgress objects containing file information and progress.
         max_retries: Maximum number of retry attempts for failed uploads (default: 3).
         retry_delay: Initial delay in seconds between retries, doubles with each attempt (default: 5.0).
-        timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (6, 600)
-            which allows up to 10 minutes for each chunk upload. Increase read_timeout for
-            very large files on slow connections.
+        timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (600, 600).
+            Note: urllib3 uses connect_timeout as the socket timeout during request body
+            writes, so it must be large enough for a full chunk upload. Both values should
+            be set generously for large file uploads.
         chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
             large files will be uploaded in chunks of this size.
 

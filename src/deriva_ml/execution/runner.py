@@ -364,9 +364,10 @@ def run_model(
         like EyeAI or GUDMAP.
 
     upload_timeout : int, optional
-        Read timeout in seconds for each chunk upload. Default is 600 (10 min).
-        Increase for large files on slow connections (e.g., 1800 for 30 min).
-        The connect timeout is always 6 seconds.
+        Timeout in seconds for each chunk upload. Default is 600 (10 min).
+        This value is used as both the connect and read timeout. Since urllib3
+        uses the connect timeout for socket writes, it must be large enough
+        to send a full chunk over the network.
 
     upload_chunk_size : int, optional
         Chunk size in bytes for hatrac uploads. Default is 50000000 (50 MB).
@@ -506,7 +507,7 @@ def run_model(
     # model checkpoints) to the Deriva catalog for permanent storage.
     if not dry_run:
         uploaded_assets = execution.upload_execution_outputs(
-            timeout=(6, upload_timeout),
+            timeout=(upload_timeout, upload_timeout),
             chunk_size=upload_chunk_size,
         )
 

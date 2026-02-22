@@ -393,31 +393,37 @@ not be sufficient. `upload_execution_outputs()` accepts parameters to control up
 behavior:
 
 ```python
-# Default behavior (25 MB chunks, 10 min timeout per chunk, 3 retries)
+# Default behavior (50 MB chunks, 10 min timeout per chunk, 3 retries)
 exe.upload_execution_outputs()
 
 # Increase timeout for large files on slow connections (30 min per chunk)
-exe.upload_execution_outputs(timeout=(6, 1800))
+exe.upload_execution_outputs(timeout=(1800, 1800))
 
-# Use larger chunks to reduce overhead (50 MB chunks)
-exe.upload_execution_outputs(chunk_size=50 * 1024 * 1024)
+# Use smaller chunks if timeouts persist (25 MB chunks)
+exe.upload_execution_outputs(chunk_size=25 * 1024 * 1024)
 
 # More retries with longer initial delay
 exe.upload_execution_outputs(max_retries=5, retry_delay=10.0)
 
 # Combined: large file on slow connection
 exe.upload_execution_outputs(
-    timeout=(6, 1800),          # 30 min read timeout per chunk
-    chunk_size=50 * 1024 * 1024, # 50 MB chunks
+    timeout=(1800, 1800),        # 30 min per chunk (both write and read)
+    chunk_size=25 * 1024 * 1024, # 25 MB chunks (smaller = faster per chunk)
     max_retries=5,               # 5 retry attempts
     retry_delay=10.0,            # 10s initial delay (doubles each retry)
 )
 ```
 
+!!! note
+    The timeout tuple is `(connect_timeout, read_timeout)`. However, urllib3 uses
+    `connect_timeout` as the socket timeout when **writing** the request body (uploading
+    chunk data). Both values should be set large enough for a full chunk to be
+    transferred over your network.
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `timeout` | `(6, 600)` | `(connect_timeout, read_timeout)` in seconds per chunk |
-| `chunk_size` | 25 MB | Chunk size in bytes for hatrac uploads |
+| `timeout` | `(600, 600)` | `(connect_timeout, read_timeout)` in seconds per chunk |
+| `chunk_size` | 50 MB | Chunk size in bytes for hatrac uploads |
 | `max_retries` | `3` | Maximum retry attempts for failed uploads |
 | `retry_delay` | `5.0` | Initial delay between retries (doubles each attempt) |
 
