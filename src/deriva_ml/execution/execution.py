@@ -615,7 +615,12 @@ class Execution:
             )
 
     def _upload_execution_dirs(
-        self, progress_callback: Callable[[UploadProgress], None] | None = None
+        self,
+        progress_callback: Callable[[UploadProgress], None] | None = None,
+        max_retries: int = 3,
+        retry_delay: float = 5.0,
+        timeout: tuple[int, int] | None = None,
+        chunk_size: int | None = None,
     ) -> dict[str, list[AssetFilePath]]:
         """Upload execution assets at _working_dir/Execution_asset.
 
@@ -626,6 +631,13 @@ class Execution:
         Args:
             progress_callback: Optional callback function to receive upload progress updates.
                 Called with UploadProgress objects containing file information and progress.
+            max_retries: Maximum number of retry attempts for failed uploads (default: 3).
+            retry_delay: Initial delay in seconds between retries, doubles with each attempt (default: 5.0).
+            timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (6, 600)
+                which allows up to 10 minutes for each chunk upload. Increase read_timeout for
+                very large files on slow connections.
+            chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
+                large files will be uploaded in chunks of this size.
 
         Returns:
           dict: Results of the upload operation.
@@ -636,7 +648,15 @@ class Execution:
 
         try:
             self.update_status(Status.running, "Uploading execution files...")
-            results = upload_directory(self._model, self._asset_root, progress_callback=progress_callback)
+            results = upload_directory(
+                self._model,
+                self._asset_root,
+                progress_callback=progress_callback,
+                max_retries=max_retries,
+                retry_delay=retry_delay,
+                timeout=timeout,
+                chunk_size=chunk_size,
+            )
         except (RuntimeError, DerivaMLException) as e:
             error = format_exception(e)
             self.update_status(Status.failed, error)
@@ -801,7 +821,13 @@ class Execution:
         return {path_to_asset(p): r for p, r in results.items()}
 
     def upload_execution_outputs(
-        self, clean_folder: bool | None = None, progress_callback: Callable[[UploadProgress], None] | None = None
+        self,
+        clean_folder: bool | None = None,
+        progress_callback: Callable[[UploadProgress], None] | None = None,
+        max_retries: int = 3,
+        retry_delay: float = 5.0,
+        timeout: tuple[int, int] | None = None,
+        chunk_size: int | None = None,
     ) -> dict[str, list[AssetFilePath]]:
         """Uploads all outputs from the execution to the catalog.
 
@@ -820,6 +846,13 @@ class Execution:
             progress_callback: Optional callback function to receive upload progress updates.
                 Called with UploadProgress objects containing file name, bytes uploaded,
                 total bytes, percent complete, phase, and status message.
+            max_retries: Maximum number of retry attempts for failed uploads (default: 3).
+            retry_delay: Initial delay in seconds between retries, doubles with each attempt (default: 5.0).
+            timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (6, 600)
+                which allows up to 10 minutes for each chunk upload. Increase read_timeout for
+                very large files on slow connections.
+            chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
+                large files will be uploaded in chunks of this size.
 
         Returns:
             dict[str, list[AssetFilePath]]: Mapping of asset types to their file paths.
@@ -838,6 +871,9 @@ class Execution:
             ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
             >>> outputs = execution.upload_execution_outputs(progress_callback=my_callback)
             >>>
+            >>> # Upload large files with increased timeout (30 min per chunk)
+            >>> outputs = execution.upload_execution_outputs(timeout=(6, 1800))
+            >>>
             >>> # Override cleanup setting for this execution
             >>> outputs = execution.upload_execution_outputs(clean_folder=False)  # Keep files
         """
@@ -849,7 +885,13 @@ class Execution:
             clean_folder = getattr(self._ml_object, 'clean_execution_dir', True)
 
         try:
-            self.uploaded_assets = self._upload_execution_dirs(progress_callback=progress_callback)
+            self.uploaded_assets = self._upload_execution_dirs(
+                progress_callback=progress_callback,
+                max_retries=max_retries,
+                retry_delay=retry_delay,
+                timeout=timeout,
+                chunk_size=chunk_size,
+            )
             self.update_status(Status.completed, "Successfully end the execution.")
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)

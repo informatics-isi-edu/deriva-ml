@@ -66,7 +66,9 @@ the same workflow.
 
 When using the hydra-zen configuration system (via `deriva-ml-run` or
 `deriva-ml-run-notebook`), you typically do not call `create_workflow()` at all.
-Instead, you define a workflow configuration and the framework handles the rest:
+Instead, you define a workflow configuration and the framework handles the rest.
+See [Running Models and Notebooks](running-models-and-notebooks.md) for the
+complete guide to setting up and running with these tools.
 
 ```python
 # In your configs/workflow.py
@@ -383,6 +385,41 @@ exe.upload_execution_outputs()
 2. You can inspect outputs before uploading
 3. Partial uploads can be retried if they fail
 4. Even failed executions should upload partial results
+
+### Tuning Uploads for Large Files
+
+When uploading large files (e.g., model checkpoints > 1 GB), the default timeouts may
+not be sufficient. `upload_execution_outputs()` accepts parameters to control upload
+behavior:
+
+```python
+# Default behavior (25 MB chunks, 10 min timeout per chunk, 3 retries)
+exe.upload_execution_outputs()
+
+# Increase timeout for large files on slow connections (30 min per chunk)
+exe.upload_execution_outputs(timeout=(6, 1800))
+
+# Use larger chunks to reduce overhead (50 MB chunks)
+exe.upload_execution_outputs(chunk_size=50 * 1024 * 1024)
+
+# More retries with longer initial delay
+exe.upload_execution_outputs(max_retries=5, retry_delay=10.0)
+
+# Combined: large file on slow connection
+exe.upload_execution_outputs(
+    timeout=(6, 1800),          # 30 min read timeout per chunk
+    chunk_size=50 * 1024 * 1024, # 50 MB chunks
+    max_retries=5,               # 5 retry attempts
+    retry_delay=10.0,            # 10s initial delay (doubles each retry)
+)
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `timeout` | `(6, 600)` | `(connect_timeout, read_timeout)` in seconds per chunk |
+| `chunk_size` | 25 MB | Chunk size in bytes for hatrac uploads |
+| `max_retries` | `3` | Maximum retry attempts for failed uploads |
+| `retry_delay` | `5.0` | Initial delay between retries (doubles each attempt) |
 
 ## Registering Output Files
 

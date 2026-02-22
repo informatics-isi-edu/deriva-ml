@@ -49,7 +49,10 @@ nav:
       - File Assets: user-guide/file-assets.md
       - Catalog Annotations: user-guide/annotations.md
       - Configuring an Execution: user-guide/execution-configuration.md
-      - Using DerivaML with Jupiter Notebooks: user-guide/notebooks.md
+      - Hydra-zen Configuration: user-guide/hydra-zen-configuration.md
+      - Running Models and Notebooks: user-guide/running-models-and-notebooks.md
+      - Using DerivaML with Jupyter Notebooks: user-guide/notebooks.md
+      - CLI Reference: user-guide/cli-reference.md
   - Sample Notebooks:
       - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
       - Execution: 'Notebooks/DerivaML Execution.ipynb'

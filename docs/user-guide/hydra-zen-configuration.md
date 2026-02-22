@@ -258,7 +258,12 @@ def train(cfg: AppConfig):
 
 ## Using with Hydra CLI
 
-When using Hydra's CLI, you can override configurations from the command line:
+DerivaML provides [`deriva-ml-run`](cli-reference.md#deriva-ml-run) which handles
+Hydra configuration composition, config module loading, and execution tracking
+automatically. See [Running Models and Notebooks](running-models-and-notebooks.md)
+for the recommended workflow.
+
+The examples below show the underlying Hydra CLI patterns for reference:
 
 ```bash
 # Use default config
@@ -275,6 +280,12 @@ python train.py --multirun +datasets=training_v1,training_v2
 ```
 
 ## Example: Complete ML Script
+
+!!! note
+    In practice, `create_model_config()` and `deriva-ml-run` handle the
+    boilerplate shown below automatically. See
+    [Running Models and Notebooks](running-models-and-notebooks.md) for the
+    recommended approach.
 
 ```python
 """train.py - Example training script with hydra-zen configuration."""
@@ -712,7 +723,10 @@ Examples:
 
 ## Related Documentation
 
+- [Running Models and Notebooks](running-models-and-notebooks.md) — Practical guide for project setup and CLI usage
+- [CLI Reference](cli-reference.md) — All DerivaML command-line tools
+- [Execution Configuration](execution-configuration.md) — Execution lifecycle and workflows
+- [Using Jupyter Notebooks](notebooks.md) — Notebook reproducibility guidelines
+- [Datasets](datasets.md)
 - [Hydra-zen Documentation](https://mit-ll-responsible-ai.github.io/hydra-zen/)
 - [Hydra Documentation](https://hydra.cc/docs/intro/)
-- [Execution Configuration](execution-configuration.md)
-- [Datasets](datasets.md)
