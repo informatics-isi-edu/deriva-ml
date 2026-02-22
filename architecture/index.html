@@ -1,0 +1,2270 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/architecture/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+    
+    
+      
+        <title>DerivaML System Architecture - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#derivaml-system-architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              DerivaML System Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview of DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/deriva_ml_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installing deriva-ml
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/identifiers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identifying things in deriva-ml
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/file-assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    File Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/annotations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/execution-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring an Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/hydra-zen-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hydra-zen Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/running-models-and-notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Models and Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using DerivaML with Jupyter Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Library Documentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Library Documentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-docs/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-descriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Descriptions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component Descriptions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#storage-layer-deriva-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Layer: Deriva Catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-access-layer-deriva-py" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Access Layer: deriva-py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-layer-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow Layer: deriva-ml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-layer-hydra-zen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Layer: Hydra-zen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ai-integration-layer-deriva-ml-mcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI Integration Layer: deriva-ml-mcp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user-interface-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        User Interface Layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workflow-running-an-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow: Running an Experiment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workflow-ai-assisted-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow: AI-Assisted Development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dataset-versioning-and-bdbags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Versioning and BDBags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provenance-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provenance Chain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration System
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-organization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Organization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="derivaml-system-architecture">DerivaML System Architecture</h1>
+<p>This document describes the architecture of the DerivaML ecosystem, including all components and their relationships.</p>
+<h2 id="system-overview">System Overview</h2>
+<p>DerivaML is a comprehensive platform for reproducible machine learning workflows. It combines scientific data management (Deriva), ML workflow orchestration (deriva-ml), AI-assisted development (MCP server + Claude Code), and configuration management (Hydra-zen) into a unified system that captures complete provenance for all experiments.</p>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph &quot;User Interface Layer&quot;
+        CC[Claude Code&lt;br/&gt;AI Assistant]
+        CLI[deriva-ml-run&lt;br/&gt;CLI]
+        NB[Jupyter&lt;br/&gt;Notebooks]
+        CH[Chaise&lt;br/&gt;Web UI]
+    end
+
+    subgraph &quot;AI Integration Layer&quot;
+        MCP[deriva-ml-mcp&lt;br/&gt;MCP Server]
+    end
+
+    subgraph &quot;Workflow Layer&quot;
+        DML[deriva-ml&lt;br/&gt;Python Library]
+        HZ[Hydra-zen&lt;br/&gt;Configuration]
+    end
+
+    subgraph &quot;Data Access Layer&quot;
+        DPY[deriva-py&lt;br/&gt;Python Client]
+    end
+
+    subgraph &quot;Storage Layer&quot;
+        subgraph &quot;Deriva Catalog&quot;
+            PG[(PostgreSQL&lt;br/&gt;Database)]
+            ER[ERMrest&lt;br/&gt;REST API]
+            HT[Hatrac&lt;br/&gt;File Store]
+        end
+    end
+
+    CC --&gt; MCP
+    MCP --&gt; DML
+    CLI --&gt; HZ
+    CLI --&gt; DML
+    NB --&gt; DML
+    CH --&gt; ER
+    DML --&gt; DPY
+    HZ --&gt; DML
+    DPY --&gt; ER
+    DPY --&gt; HT
+    ER --&gt; PG
+</code></pre>
+<h2 id="component-descriptions">Component Descriptions</h2>
+<h3 id="storage-layer-deriva-catalog">Storage Layer: Deriva Catalog</h3>
+<p>The Deriva catalog provides the persistent storage foundation:</p>
+<ul>
+<li><strong>PostgreSQL Database</strong>: Stores all structured data including datasets, executions, features, and vocabularies</li>
+<li><strong>ERMrest</strong>: Entity-Relationship Mapping REST API that provides a RESTful interface to the database with fine-grained access control</li>
+<li><strong>Hatrac</strong>: Object storage service for large files (images, model weights, prediction outputs)</li>
+<li><strong>Chaise</strong>: Web-based user interface for browsing and editing catalog data</li>
+</ul>
+<h3 id="data-access-layer-deriva-py">Data Access Layer: deriva-py</h3>
+<p>The <code>deriva-py</code> library provides Python bindings for Deriva services:</p>
+<ul>
+<li>ERMrest client for database operations (CRUD, queries, schema management)</li>
+<li>Hatrac client for file upload/download</li>
+<li>Authentication via Globus</li>
+<li>BDBag support for reproducible data packaging</li>
+</ul>
+<h3 id="workflow-layer-deriva-ml">Workflow Layer: deriva-ml</h3>
+<p>The <code>deriva-ml</code> library provides ML-specific abstractions:</p>
+<ul>
+<li><strong>DerivaML</strong>: Main class connecting to catalogs and orchestrating workflows</li>
+<li><strong>Execution</strong>: Tracks individual experiment runs with inputs, outputs, and status</li>
+<li><strong>Dataset</strong>: Versioned collections of data with semantic versioning</li>
+<li><strong>Workflow</strong>: Reusable workflow definitions linked to source code</li>
+<li><strong>Feature</strong>: Maps vocabulary terms to domain records (labels, annotations)</li>
+<li><strong>Asset</strong>: Files with metadata (images, model weights, predictions)</li>
+</ul>
+<h3 id="configuration-layer-hydra-zen">Configuration Layer: Hydra-zen</h3>
+<p>Hydra-zen provides Python-first configuration management:</p>
+<ul>
+<li>Configuration as code (no YAML files)</li>
+<li>Runtime composition and overrides</li>
+<li>Multirun support for hyperparameter sweeps</li>
+<li>Automatic config tracking for reproducibility</li>
+</ul>
+<h3 id="ai-integration-layer-deriva-ml-mcp">AI Integration Layer: deriva-ml-mcp</h3>
+<p>The MCP (Model Context Protocol) server exposes DerivaML operations to AI assistants:</p>
+<ul>
+<li>60+ tools for catalog operations</li>
+<li>Resources for read-only access to schema and data</li>
+<li>Prompts for guided workflows</li>
+<li>Secure credential handling (never exposed to AI)</li>
+</ul>
+<h3 id="user-interface-layer">User Interface Layer</h3>
+<p>Multiple interfaces for different use cases:</p>
+<ul>
+<li><strong>Claude Code</strong>: AI-powered development assistant using MCP tools</li>
+<li><strong>deriva-ml-run</strong>: Command-line interface for running experiments</li>
+<li><strong>Jupyter Notebooks</strong>: Interactive analysis with <code>run_notebook()</code> API</li>
+<li><strong>Chaise</strong>: Web UI for browsing and editing data</li>
+</ul>
+<h2 id="data-model">Data Model</h2>
+<p>The core entities and their relationships:</p>
+<pre><code class="language-mermaid">erDiagram
+    Workflow ||--o{ Execution : &quot;has many&quot;
+    Execution ||--o{ Dataset : &quot;uses (input)&quot;
+    Execution ||--o{ Dataset : &quot;produces (output)&quot;
+    Execution ||--o{ Asset : &quot;uses (input)&quot;
+    Execution ||--o{ Asset : &quot;produces (output)&quot;
+    Dataset ||--o{ Dataset_Version : &quot;has versions&quot;
+    Dataset ||--o{ Dataset : &quot;contains (nested)&quot;
+    Dataset }o--o{ Domain_Record : &quot;contains members&quot;
+    Feature ||--o{ Feature_Value : &quot;has values&quot;
+    Feature_Value }o--|| Domain_Record : &quot;labels&quot;
+    Feature_Value }o--|| Vocabulary_Term : &quot;uses term&quot;
+    Workflow }o--|| Workflow_Type : &quot;has type&quot;
+    Dataset }o--o{ Dataset_Type : &quot;has types&quot;
+
+    Workflow {
+        RID rid PK
+        string name
+        string url
+        string checksum
+        string workflow_type FK
+    }
+
+    Execution {
+        RID rid PK
+        string workflow FK
+        string status
+        string description
+        timestamp start_time
+        timestamp end_time
+    }
+
+    Dataset {
+        RID rid PK
+        string description
+        string version FK
+        boolean deleted
+    }
+
+    Dataset_Version {
+        RID rid PK
+        RID dataset FK
+        string version
+        string snapshot
+        string minid
+    }
+
+    Asset {
+        RID rid PK
+        string filename
+        string url
+        string md5
+        int length
+    }
+
+    Feature {
+        RID rid PK
+        string name
+        string target_table
+        string vocabulary
+    }
+
+    Feature_Value {
+        RID rid PK
+        RID feature FK
+        RID target FK
+        string term FK
+    }
+</code></pre>
+<h2 id="workflow-running-an-experiment">Workflow: Running an Experiment</h2>
+<p>The typical flow for running an ML experiment:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant CLI as deriva-ml-run
+    participant Hydra as Hydra-zen
+    participant DML as deriva-ml
+    participant Catalog as Deriva Catalog
+
+    User-&gt;&gt;CLI: deriva-ml-run +experiment=cifar10_quick
+    CLI-&gt;&gt;Hydra: Load and compose configs
+    Hydra-&gt;&gt;CLI: Resolved configuration
+    CLI-&gt;&gt;DML: run_model(config)
+
+    DML-&gt;&gt;Catalog: Create Workflow record
+    DML-&gt;&gt;Catalog: Create Execution record
+    DML-&gt;&gt;Catalog: Link input Datasets
+
+    DML-&gt;&gt;Catalog: Download Dataset (BDBag)
+    Catalog--&gt;&gt;DML: Dataset files
+
+    Note over DML: Execute model code
+
+    DML-&gt;&gt;Catalog: Upload output files (Hatrac)
+    DML-&gt;&gt;Catalog: Create Asset records
+    DML-&gt;&gt;Catalog: Record Feature values
+    DML-&gt;&gt;Catalog: Update Execution status
+
+    DML--&gt;&gt;CLI: Execution complete
+    CLI--&gt;&gt;User: Results summary
+</code></pre>
+<h2 id="workflow-ai-assisted-development">Workflow: AI-Assisted Development</h2>
+<p>Using Claude Code with the MCP server:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant Claude as Claude Code
+    participant MCP as deriva-ml-mcp
+    participant DML as deriva-ml
+    participant Catalog as Deriva Catalog
+
+    User-&gt;&gt;Claude: &quot;List my datasets&quot;
+    Claude-&gt;&gt;MCP: connect_catalog(host, catalog_id)
+    MCP-&gt;&gt;DML: DerivaML(host, catalog_id)
+    DML-&gt;&gt;Catalog: Authenticate (Globus)
+    Catalog--&gt;&gt;DML: Session established
+    DML--&gt;&gt;MCP: Connected
+    MCP--&gt;&gt;Claude: Connection confirmed
+
+    Claude-&gt;&gt;MCP: find_datasets()
+    MCP-&gt;&gt;DML: ml.find_datasets()
+    DML-&gt;&gt;Catalog: Query Dataset table
+    Catalog--&gt;&gt;DML: Dataset records
+    DML--&gt;&gt;MCP: Dataset list
+    MCP--&gt;&gt;Claude: JSON results
+
+    Claude--&gt;&gt;User: &quot;You have 13 datasets...&quot;
+</code></pre>
+<h2 id="dataset-versioning-and-bdbags">Dataset Versioning and BDBags</h2>
+<p>Datasets support semantic versioning for reproducibility:</p>
+<pre><code class="language-mermaid">flowchart LR
+    subgraph &quot;Catalog State&quot;
+        D[Dataset&lt;br/&gt;RID: ABC]
+        V1[Version 0.1.0&lt;br/&gt;Snapshot: T1]
+        V2[Version 0.2.0&lt;br/&gt;Snapshot: T2]
+        V3[Version 1.0.0&lt;br/&gt;Snapshot: T3]
+    end
+
+    subgraph &quot;BDBag Export&quot;
+        B1[BDBag v0.1.0]
+        B2[BDBag v0.2.0]
+        B3[BDBag v1.0.0]
+    end
+
+    subgraph &quot;External Storage&quot;
+        S3[S3 Bucket]
+        MINID[MINID Registry]
+    end
+
+    D --&gt; V1
+    D --&gt; V2
+    D --&gt; V3
+
+    V1 -.-&gt; B1
+    V2 -.-&gt; B2
+    V3 -.-&gt; B3
+
+    B3 --&gt; S3
+    S3 --&gt; MINID
+</code></pre>
+<p><strong>Version semantics:</strong>
+- <strong>Major</strong>: Breaking changes to dataset structure
+- <strong>Minor</strong>: New data added (members, types, features)
+- <strong>Patch</strong>: Metadata corrections</p>
+<p><strong>BDBag features:</strong>
+- Self-describing archive format
+- Cryptographic checksums for integrity
+- Remote file references for large assets
+- MINID registration for permanent identifiers</p>
+<h2 id="provenance-chain">Provenance Chain</h2>
+<p>Complete provenance tracking from code to results:</p>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph &quot;Code Provenance&quot;
+        GH[GitHub Repository]
+        COMMIT[Git Commit SHA]
+        URL[Blob URL]
+    end
+
+    subgraph &quot;Workflow Record&quot;
+        WF[Workflow]
+        WT[Workflow Type]
+    end
+
+    subgraph &quot;Execution Record&quot;
+        EX[Execution]
+        CFG[Config Choices]
+        PARAMS[Parameters]
+    end
+
+    subgraph &quot;Input Provenance&quot;
+        DS_IN[Input Datasets]
+        AS_IN[Input Assets]
+        VER[Dataset Versions]
+    end
+
+    subgraph &quot;Output Provenance&quot;
+        DS_OUT[Output Datasets]
+        AS_OUT[Output Assets]
+        FV[Feature Values]
+    end
+
+    GH --&gt; COMMIT
+    COMMIT --&gt; URL
+    URL --&gt; WF
+    WT --&gt; WF
+    WF --&gt; EX
+    CFG --&gt; EX
+    PARAMS --&gt; EX
+    DS_IN --&gt; EX
+    AS_IN --&gt; EX
+    VER --&gt; DS_IN
+    EX --&gt; DS_OUT
+    EX --&gt; AS_OUT
+    EX --&gt; FV
+</code></pre>
+<h2 id="configuration-system">Configuration System</h2>
+<p>Hydra-zen configuration hierarchy:</p>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph &quot;Config Modules (src/configs/)&quot;
+        DERIVA[deriva.py&lt;br/&gt;Connection configs]
+        DATASETS[datasets.py&lt;br/&gt;Dataset specs]
+        ASSETS[assets.py&lt;br/&gt;Asset RIDs]
+        MODEL[cifar10_cnn.py&lt;br/&gt;Model configs]
+        EXP[experiments.py&lt;br/&gt;Experiment presets]
+        MULTI[multiruns.py&lt;br/&gt;Sweep configs]
+    end
+
+    subgraph &quot;Hydra Store&quot;
+        STORE[hydra-zen store]
+    end
+
+    subgraph &quot;Runtime&quot;
+        CLI[CLI Overrides]
+        COMPOSED[Composed Config]
+        MODEL_FN[Model Function]
+    end
+
+    DERIVA --&gt; STORE
+    DATASETS --&gt; STORE
+    ASSETS --&gt; STORE
+    MODEL --&gt; STORE
+    EXP --&gt; STORE
+    MULTI --&gt; STORE
+
+    STORE --&gt; COMPOSED
+    CLI --&gt; COMPOSED
+    COMPOSED --&gt; MODEL_FN
+</code></pre>
+<p><strong>Configuration groups:</strong>
+- <code>deriva_ml</code>: Connection settings (hostname, catalog_id)
+- <code>datasets</code>: Dataset specifications with RID and version
+- <code>assets</code>: Asset RID lists for pre-trained weights, etc.
+- <code>model_config</code>: Model hyperparameters
+- <code>experiment</code>: Preset combinations of all settings
+- <code>multirun</code>: Parameter sweep definitions</p>
+<h2 id="schema-organization">Schema Organization</h2>
+<p>The catalog uses multiple schemas for organization:</p>
+<pre><code class="language-mermaid">flowchart TB
+    subgraph &quot;deriva-ml Schema&quot;
+        DS[Dataset]
+        DV[Dataset_Version]
+        EX[Execution]
+        WF[Workflow]
+        FT[Feature]
+        FV[Feature_Value]
+    end
+
+    subgraph &quot;Domain Schema (e.g., cifar10)&quot;
+        IMG[Image]
+        IC[Image_Class&lt;br/&gt;Vocabulary]
+        ICF[Image_Classification&lt;br/&gt;Feature]
+    end
+
+    subgraph &quot;Association Tables&quot;
+        DE[Dataset_Execution]
+        DD[Dataset_Dataset]
+        DI[Dataset_Image]
+        EA[Execution_Asset]
+    end
+
+    DS --&gt; DE
+    EX --&gt; DE
+    DS --&gt; DD
+    DS --&gt; DI
+    IMG --&gt; DI
+    EX --&gt; EA
+
+    FT --&gt; FV
+    IC --&gt; FV
+    IMG --&gt; FV
+</code></pre>
+<h2 id="security-model">Security Model</h2>
+<p>Authentication and authorization flow:</p>
+<pre><code class="language-mermaid">flowchart LR
+    subgraph &quot;Client&quot;
+        USER[User]
+        APP[Application]
+        CRED[Local Credentials]
+    end
+
+    subgraph &quot;Authentication&quot;
+        GLOBUS[Globus Auth]
+        TOKEN[Access Token]
+    end
+
+    subgraph &quot;Deriva Services&quot;
+        ER[ERMrest]
+        HT[Hatrac]
+        ACL[ACL Policies]
+    end
+
+    USER --&gt; GLOBUS
+    GLOBUS --&gt; TOKEN
+    TOKEN --&gt; CRED
+    APP --&gt; CRED
+    CRED --&gt; ER
+    CRED --&gt; HT
+    ACL --&gt; ER
+    ACL --&gt; HT
+</code></pre>
+<p><strong>Security features:</strong>
+- Globus authentication with local token caching
+- Fine-grained ACLs at table, row, and column level
+- MCP server never exposes credentials to AI
+- Docker isolation for containerized deployments</p>
+<h2 id="summary">Summary</h2>
+<p>The DerivaML ecosystem provides:</p>
+<ol>
+<li><strong>Reproducibility</strong>: Complete provenance from code to results</li>
+<li><strong>Versioning</strong>: Semantic versioning for datasets with BDBag export</li>
+<li><strong>Flexibility</strong>: Multiple interfaces (CLI, notebooks, AI assistant, web)</li>
+<li><strong>Scalability</strong>: Handles large datasets with remote file references</li>
+<li><strong>Security</strong>: Fine-grained access control with Globus authentication</li>
+<li><strong>Discoverability</strong>: AI-assisted exploration and development</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
