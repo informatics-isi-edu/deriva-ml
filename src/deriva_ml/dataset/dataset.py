@@ -1464,7 +1464,7 @@ class Dataset:
                 "Configure s3_bucket when creating the DerivaML instance to enable MINID support."
             )
 
-        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid)
+        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid, exclude_tables=exclude_tables)
 
         bag_path = (
             self._materialize_dataset_bag(minid, use_minid=use_minid)
@@ -1574,7 +1574,7 @@ class Dataset:
         bdb.validate_bag_structure(bag_path)
         return Path(bag_path)
 
-    def _create_dataset_minid(self, version: DatasetVersion, use_minid=True) -> str:
+    def _create_dataset_minid(self, version: DatasetVersion, use_minid=True, exclude_tables: set[str] | None = None) -> str:
         """Create a new MINID (Minimal Viable Identifier) for the dataset.
 
         This method generates a BDBag export of the dataset and optionally
@@ -1861,6 +1861,7 @@ class Dataset:
         version: DatasetVersion,
         create: bool,
         use_minid: bool,
+        exclude_tables: set[str] | None = None,
     ) -> DatasetMinid | None:
         """Get or create a MINID for the specified dataset version.
 
@@ -1898,7 +1899,7 @@ class Dataset:
                 raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
             if use_minid:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
-            minid_url = self._create_dataset_minid(version, use_minid=use_minid)
+            minid_url = self._create_dataset_minid(version, use_minid=use_minid, exclude_tables=exclude_tables)
 
         # Return based on MINID usage
         if use_minid:
