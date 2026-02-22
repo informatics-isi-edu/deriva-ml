@@ -253,6 +253,48 @@ class TestDenormalizeSchemaGraph:
         for path in paths:
             assert path[0].name == "Dataset", "All paths should start from Dataset table"
 
+    def test_schema_path_exclude_tables(self, dataset_test, tmp_path):
+        """Test that exclude_tables prunes branches from FK graph traversal.
+
+        When exclude_tables is provided, _schema_to_paths should skip those tables
+        and all paths that would pass through them.
+        """
+        hostname = dataset_test.catalog.hostname
+        catalog_id = dataset_test.catalog.catalog_id
+        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
+
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Get all paths without exclusion
+        all_paths = bag.model._schema_to_paths()
+
+        # Find a table name that appears in at least one path (not Dataset itself)
+        table_names_in_paths = {
+            table.name
+            for path in all_paths
+            for table in path
+            if table.name != "Dataset"
+        }
+        assert len(table_names_in_paths) > 0, "Expected tables in paths besides Dataset"
+
+        # Pick a table to exclude
+        exclude_name = next(iter(table_names_in_paths))
+        excluded_paths = bag.model._schema_to_paths(exclude_tables={exclude_name})
+
+        # Excluded table should not appear in any path (except if it's the root)
+        for path in excluded_paths:
+            for table in path[1:]:  # Skip root (Dataset)
+                assert table.name != exclude_name, (
+                    f"Excluded table '{exclude_name}' found in path: {[t.name for t in path]}"
+                )
+
+        # Excluded paths should be a subset of all paths (fewer or equal)
+        assert len(excluded_paths) <= len(all_paths), (
+            "Excluding tables should not produce more paths"
+        )
+
     def test_prepare_wide_table_validation(self, dataset_test, tmp_path):
         """Test that _prepare_wide_table validates table existence.
 

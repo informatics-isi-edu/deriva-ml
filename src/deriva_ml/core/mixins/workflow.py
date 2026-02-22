@@ -220,6 +220,7 @@ class WorkflowMixin:
         for w in workflow_path.path.entities().fetch():
             if w['URL'] == url_or_checksum or w['Checksum'] == url_or_checksum:
                 workflow_rid = w['RID']
+                break
 
         return workflow_rid
 

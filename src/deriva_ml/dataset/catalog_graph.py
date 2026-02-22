@@ -35,6 +35,10 @@ class CatalogGraph:
             Required for MINID functionality. If None, MINID features are disabled.
         use_minid: Whether to use MINID service for persistent identification.
             Only effective when s3_bucket is provided.
+        exclude_tables: Optional set of table names to exclude from FK path traversal.
+            Tables in this set will not be visited during schema graph walking, pruning
+            branches that pass through them. Useful for avoiding query timeouts caused
+            by expensive joins through large or unnecessary tables.
     """
 
     def __init__(
@@ -42,6 +46,7 @@ class CatalogGraph:
         ml_instance: DerivaMLCatalog,
         s3_bucket: str | None = None,
         use_minid: bool = True,
+        exclude_tables: set[str] | None = None,
     ):
         self._ml_schema = ml_instance.ml_schema
         self._ml_instance = ml_instance
@@ -49,6 +54,7 @@ class CatalogGraph:
         # MINID only works if S3 bucket is configured
         self._use_minid = use_minid and s3_bucket is not None
         self._dataset_table = ml_instance._dataset_table
+        self._exclude_tables = exclude_tables or set()
 
     def _export_annotation(
         self,
@@ -421,7 +427,7 @@ class CatalogGraph:
 
         # Get the paths through the schema and filter out all the dataset paths not used by this dataset.
         paths = set()
-        for p in self._ml_instance.model._schema_to_paths():
+        for p in self._ml_instance.model._schema_to_paths(exclude_tables=self._exclude_tables):
             tp = tuple(p)
             if (len(p) == 1) or (p[1] not in dataset_association_tables) or (p[1] in included_associations):
                 paths.add(tp)

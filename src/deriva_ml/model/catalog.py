@@ -655,17 +655,22 @@ class DerivaModel:
         self,
         root: Table | None = None,
         path: list[Table] | None = None,
+        exclude_tables: set[str] | None = None,
     ) -> list[list[Table]]:
         """Return a list of paths through the schema graph.
 
         Args:
             root: The root table to start from.
             path: The current path being built.
+            exclude_tables: Optional set of table names to skip during traversal.
+                Tables in this set will not be visited, effectively pruning branches
+                of the FK graph that pass through them.
 
         Returns:
             A list of paths through the schema graph.
         """
         path = path or []
+        exclude_tables = exclude_tables or set()
 
         root = root or self.model.schemas[self.ml_schema].tables["Dataset"]
         path = path.copy() if path else []
@@ -700,6 +705,8 @@ class DerivaModel:
             #        if child.name in {"Dataset_Execution", "Dataset_Dataset", "Execution"}:
             if child.name in {"Dataset_Dataset", "Execution"}:
                 continue
+            if child.name in exclude_tables:
+                continue
             if child == parent:
                 # Don't loop back via referred_by
                 continue
@@ -708,7 +715,7 @@ class DerivaModel:
             if child in path:
                 raise DerivaMLException(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}")
 
-            paths.extend(self._schema_to_paths(child, path))
+            paths.extend(self._schema_to_paths(child, path, exclude_tables))
         return paths
 
     def create_table(self, table_def: TableDefinition, schema: str | None = None) -> Table:

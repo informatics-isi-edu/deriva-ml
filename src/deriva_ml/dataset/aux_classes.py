@@ -200,12 +200,16 @@ class DatasetSpec(BaseModel):
         rid (RID): A dataset_table RID
         materialize (bool): If False do not materialize datasets, only download table data, no assets.  Defaults to True
         version (DatasetVersion): The version of the dataset.  Should follow semantic versioning.
+        exclude_tables (set[str] | None): Optional set of table names to exclude from FK path
+            traversal during bag export. Tables in this set will not be visited, pruning branches
+            of the FK graph. Useful for avoiding query timeouts on large tables.
     """
 
     rid: RID
     version: DatasetVersion | conlist(item_type=int, min_length=3, max_length=3) | tuple[int, int, int] | str
     materialize: bool = True
     description: str = ""
+    exclude_tables: set[str] | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -239,3 +243,4 @@ class DatasetSpecConfig:
     version: str
     materialize: bool = True
     description: str = ""
+    exclude_tables: list[str] | None = None

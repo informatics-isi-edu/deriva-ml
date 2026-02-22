@@ -410,6 +410,7 @@ class WritableDataset(DatasetLike, Protocol):
         self,
         version: DatasetVersion | str | None = None,
         use_minid: bool = False,
+        exclude_tables: set[str] | None = None,
     ) -> Any:
         """Download the dataset as a BDBag.
 
@@ -417,6 +418,8 @@ class WritableDataset(DatasetLike, Protocol):
             version: Optional version to download. Defaults to current version.
             use_minid: If True, upload the bag to S3 and create a MINID.
                 Requires s3_bucket to be configured on the catalog. Defaults to False.
+            exclude_tables: Optional set of table names to exclude from FK path traversal
+                during bag export. Useful for avoiding query timeouts on large tables.
 
         Returns:
             DatasetBag containing the downloaded data.

@@ -234,4 +234,5 @@ class DatasetMixin:
             version=dataset.version,
             materialize=dataset.materialize,
             use_minid=self.use_minid,
+            exclude_tables=dataset.exclude_tables,
         )

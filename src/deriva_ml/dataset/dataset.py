@@ -1410,6 +1410,7 @@ class Dataset:
         version: DatasetVersion | str,
         materialize: bool = True,
         use_minid: bool = False,
+        exclude_tables: set[str] | None = None,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and optionally creates a MINID.
 
@@ -1427,6 +1428,10 @@ class Dataset:
             materialize: If True, materialize the dataset after downloading.
             use_minid: If True, upload the bag to S3 and create a MINID for the dataset.
                 Requires s3_bucket to be configured on the catalog. Defaults to False.
+            exclude_tables: Optional set of table names to exclude from FK path traversal
+                during bag export. Tables in this set will not be visited, pruning branches
+                of the FK graph that pass through them. Useful for avoiding query timeouts
+                caused by expensive joins through large or unnecessary tables.
 
         Returns:
             DatasetBag: Object containing:
@@ -1445,6 +1450,9 @@ class Dataset:
             Download with MINID (requires s3_bucket configured):
                 >>> # Catalog must be created with s3_bucket="s3://my-bucket"
                 >>> bag = dataset.download_dataset_bag(version="1.0.0", use_minid=True)
+
+            Exclude tables that cause query timeouts:
+                >>> bag = dataset.download_dataset_bag(version="1.0.0", exclude_tables={"Process"})
         """
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
@@ -1591,6 +1599,7 @@ class Dataset:
                 version_snapshot_catalog,
                 s3_bucket=self._ml_instance.s3_bucket,
                 use_minid=use_minid,
+                exclude_tables=exclude_tables,
             )
             spec = downloader.generate_dataset_download_spec(self)
             with spec_file.open("w", encoding="utf-8") as ds:
