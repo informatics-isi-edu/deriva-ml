@@ -258,9 +258,9 @@ def train(cfg: AppConfig):
 
 ## Using with Hydra CLI
 
-DerivaML provides [`deriva-ml-run`](cli-reference.md#deriva-ml-run) which handles
+DerivaML provides [`deriva-ml-run`](../cli-reference.md#deriva-ml-run) which handles
 Hydra configuration composition, config module loading, and execution tracking
-automatically. See [Running Models and Notebooks](running-models-and-notebooks.md)
+automatically. See [Running Models and Notebooks](../workflows/running-models.md)
 for the recommended workflow.
 
 The examples below show the underlying Hydra CLI patterns for reference:
@@ -284,7 +284,7 @@ python train.py --multirun +datasets=training_v1,training_v2
 !!! note
     In practice, `create_model_config()` and `deriva-ml-run` handle the
     boilerplate shown below automatically. See
-    [Running Models and Notebooks](running-models-and-notebooks.md) for the
+    [Running Models and Notebooks](../workflows/running-models.md) for the
     recommended approach.
 
 ```python
@@ -723,10 +723,10 @@ Examples:
 
 ## Related Documentation
 
-- [Running Models and Notebooks](running-models-and-notebooks.md) — Practical guide for project setup and CLI usage
-- [CLI Reference](cli-reference.md) — All DerivaML command-line tools
-- [Execution Configuration](execution-configuration.md) — Execution lifecycle and workflows
-- [Using Jupyter Notebooks](notebooks.md) — Notebook reproducibility guidelines
-- [Datasets](datasets.md)
+- [Running Models and Notebooks](../workflows/running-models.md) — Practical guide for project setup and CLI usage
+- [CLI Reference](../cli-reference.md) — All DerivaML command-line tools
+- [Execution Configuration](../workflows/execution-lifecycle.md) — Execution lifecycle and workflows
+- [Git Workflow and Versioning](../workflows/git-and-versioning.md) — Reproducibility guidelines
+- [Datasets](../concepts/datasets.md)
 - [Hydra-zen Documentation](https://mit-ll-responsible-ai.github.io/hydra-zen/)
 - [Hydra Documentation](https://hydra.cc/docs/intro/)

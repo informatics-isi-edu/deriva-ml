@@ -67,8 +67,8 @@ the same workflow.
 When using the hydra-zen configuration system (via `deriva-ml-run` or
 `deriva-ml-run-notebook`), you typically do not call `create_workflow()` at all.
 Instead, you define a workflow configuration and the framework handles the rest.
-See [Running Models and Notebooks](running-models-and-notebooks.md) for the
-complete guide to setting up and running with these tools.
+See [Running Models](running-models.md) for the complete guide to setting up
+and running with these tools.
 
 ```python
 # In your configs/workflow.py

@@ -86,7 +86,7 @@ uv run deriva-ml-run +multirun=lr_sweep
 uv run deriva-ml-run +multirun=lr_sweep model_config.epochs=5
 ```
 
-**See also:** [Running Models and Notebooks](running-models-and-notebooks.md)
+**See also:** [Running Models](workflows/running-models.md)
 
 ---
 
@@ -161,8 +161,8 @@ uv run deriva-ml-run-notebook notebooks/analysis.ipynb \
     --host prod.example.org --catalog 100
 ```
 
-**See also:** [Running Models and Notebooks](running-models-and-notebooks.md),
-[Using Jupyter Notebooks](notebooks.md)
+**See also:** [Running Models](workflows/running-models.md),
+[Notebook Configuration](configuration/notebooks.md)
 
 ---
 

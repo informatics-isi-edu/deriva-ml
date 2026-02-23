@@ -39,20 +39,27 @@ plugins:
 
 nav:
   - Home: index.md
-  - User Guide:
-      - Overview of DerivaML: user-guide/overview.md
-      - DerivaML Structure: user-guide/deriva_ml_structure.md
-      - Installing deriva-ml: user-guide/install.md
-      - Identifying things in deriva-ml: user-guide/identifiers.md
-      - Datasets: user-guide/datasets.md
-      - Features: user-guide/features.md
-      - File Assets: user-guide/file-assets.md
-      - Catalog Annotations: user-guide/annotations.md
-      - Configuring an Execution: user-guide/execution-configuration.md
-      - Hydra-zen Configuration: user-guide/hydra-zen-configuration.md
-      - Running Models and Notebooks: user-guide/running-models-and-notebooks.md
-      - Using DerivaML with Jupyter Notebooks: user-guide/notebooks.md
-      - CLI Reference: user-guide/cli-reference.md
+  - Getting Started:
+      - Quick Start: getting-started/quick-start.md
+      - Installation: getting-started/install.md
+      - Project Setup: getting-started/project-setup.md
+  - Concepts:
+      - Architecture Overview: concepts/overview.md
+      - Identifiers: concepts/identifiers.md
+      - Datasets: concepts/datasets.md
+      - Features: concepts/features.md
+      - File Assets: concepts/file-assets.md
+      - Catalog Annotations: concepts/annotations.md
+  - Configuration:
+      - Overview: configuration/overview.md
+      - Configuration Groups: configuration/groups.md
+      - Experiments and Multiruns: configuration/experiments.md
+      - Notebook Configuration: configuration/notebooks.md
+  - Running Workflows:
+      - Execution Lifecycle: workflows/execution-lifecycle.md
+      - Running Models: workflows/running-models.md
+      - Git Workflow and Versioning: workflows/git-and-versioning.md
+  - CLI Reference: cli-reference.md
   - Sample Notebooks:
       - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
       - Execution: 'Notebooks/DerivaML Execution.ipynb'

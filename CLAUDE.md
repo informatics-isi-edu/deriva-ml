@@ -206,7 +206,7 @@ config = ExecutionConfiguration(
 Use `builds()` with `populate_full_signature=True` for hydra-zen integration.
 Use `zen_partial=True` for model functions that receive execution context at runtime.
 
-See `docs/user-guide/hydra-zen-configuration.md` for complete documentation.
+See `docs/configuration/overview.md` for complete documentation.
 
 ## Best Practices & Patterns
 
