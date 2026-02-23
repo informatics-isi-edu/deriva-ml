@@ -143,6 +143,7 @@ See Also
 from __future__ import annotations
 
 import atexit
+import inspect
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -299,6 +300,51 @@ def _create_parent_execution(
     logging.info(f"Created parent execution: {parent_execution.execution_rid}")
 
 
+def _resolve_model_source(model_config: Any) -> Path | None:
+    """Extract the source file path of the model function from a hydra-zen config.
+
+    When run_model is invoked via the `deriva-ml-run` CLI, the Workflow object
+    is created during Hydra's config resolution phase — before the user's model
+    function is on the call stack. This means the automatic caller detection in
+    find_caller.py picks up the CLI entry point (.venv/bin/deriva-ml-run) instead
+    of the actual model file.
+
+    This function extracts the model function from the hydra-zen partial config
+    and returns its source file path, which can be used to correct the workflow URL.
+
+    Args:
+        model_config: A hydra-zen instantiated config — typically a functools.partial
+            wrapping the user's model function.
+
+    Returns:
+        Path to the model function's source file, or None if it cannot be determined.
+    """
+    import functools
+
+    try:
+        # model_config is typically a functools.partial from zen_partial=True
+        func = model_config
+        # Unwrap any layers of functools.partial
+        while isinstance(func, functools.partial):
+            func = func.func
+
+        if not callable(func):
+            return None
+
+        source_file = inspect.getfile(func)
+        source_path = Path(source_file).resolve()
+
+        # Verify the file actually exists and is a real source file
+        if source_path.exists() and source_path.suffix == ".py":
+            return source_path
+
+    except (TypeError, OSError):
+        # inspect.getfile can raise TypeError for builtins or OSError
+        pass
+
+    return None
+
+
 def run_model(
     deriva_ml: "DerivaMLConfig",
     datasets: list["DatasetSpec"],
@@ -415,6 +461,27 @@ def run_model(
         ml_class = DerivaML
 
     ml_instance = ml_class.instantiate(deriva_ml)
+
+    # ---------------------------------------------------------------------------
+    # Correct workflow URL from model function source
+    # ---------------------------------------------------------------------------
+    # When run via `deriva-ml-run`, the Workflow object is created during Hydra
+    # config resolution — before the model function is on the call stack. This
+    # causes find_caller.py to pick up the CLI entry point (e.g.,
+    # .venv/bin/deriva-ml-run) instead of the actual model file. Here we extract
+    # the model function's source file and recompute the workflow URL.
+    model_source = _resolve_model_source(model_config)
+    if model_source is not None:
+        try:
+            from deriva_ml.execution.workflow import Workflow as _Wf
+
+            new_url, new_checksum = _Wf.get_url_and_checksum(model_source)
+            new_git_root = _Wf._get_git_root(model_source)
+            workflow.url = new_url
+            workflow.checksum = new_checksum
+            workflow.git_root = new_git_root
+        except Exception:
+            pass  # Keep the original URL if recomputation fails
 
     # ---------------------------------------------------------------------------
     # Handle multirun mode - create parent execution on first job

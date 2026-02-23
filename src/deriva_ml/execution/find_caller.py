@@ -100,6 +100,8 @@ _SYSTEM_MODULE_PREFIXES = (
     "hydra",
     "hydra_zen",
     "omegaconf",
+    # Pydantic model validators (triggered during config resolution)
+    "pydantic",
 )
 
 
@@ -129,6 +131,13 @@ def _top_user_frame() -> Optional[FrameType]:
         "/hydra/",
         "/hydra_zen/",
         "/omegaconf/",
+        # Pydantic model validators (triggered during config resolution)
+        "/pydantic/",
+        # Virtual environment console scripts (e.g., .venv/bin/deriva-ml-run)
+        "/.venv/bin/",
+        "/.venv/Scripts/",  # Windows
+        "/venv/bin/",
+        "/venv/Scripts/",
     )
 
     f = inspect.currentframe()
@@ -272,6 +281,11 @@ def _get_calling_module() -> str:
             # DerivaML CLI entry points - skip to find user's model code
             "/deriva_ml/run_model.py",
             "/deriva_ml/run_notebook.py",
+            # Virtual environment console scripts
+            "/.venv/bin/",
+            "/.venv/scripts/",
+            "/venv/bin/",
+            "/venv/scripts/",
         )
         return any(m in pn for m in tooling_markers)
 
