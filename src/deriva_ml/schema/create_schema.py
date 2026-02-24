@@ -416,14 +416,45 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     workflow_type = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.workflow_type]
     workflow_type.insert(
         [
-            {"Name": "Training", "Description": "Model training workflow"},
-            {"Name": "Testing", "Description": "Model testing and evaluation workflow"},
-            {"Name": "Prediction", "Description": "Model inference and prediction workflow"},
-            {"Name": "Feature_Creation", "Description": "Feature extraction or engineering workflow"},
-            {"Name": "Visualization", "Description": "Data or results visualization workflow"},
-            {"Name": "Analysis", "Description": "Data analysis workflow"},
-            {"Name": "Ingest", "Description": "Data ingestion and loading workflow"},
-            {"Name": "Data_Cleaning", "Description": "Data cleaning and preprocessing workflow"},
+            {
+                "Name": "Training",
+                "Description": "Model training and fine-tuning workflows.",
+            },
+            {
+                "Name": "Testing",
+                "Description": "Workflows that evaluate model performance on held-out data, computing metrics "
+                "such as accuracy, AUC, confusion matrices, and per-class statistics.",
+            },
+            {
+                "Name": "Prediction",
+                "Description": "Workflows that apply a trained model to new data to generate predictions, "
+                "probability scores, or classification labels.",
+            },
+            {
+                "Name": "Feature_Creation",
+                "Description": "Workflows that extract or engineer features from raw data, producing structured "
+                "feature values linked to source records (e.g., CGM time-series features, image quality scores).",
+            },
+            {
+                "Name": "Visualization",
+                "Description": "Workflows that produce visual analyses of data or model results, including plots, "
+                "charts, dimensionality reduction projections (UMAP, PCA), and summary dashboards.",
+            },
+            {
+                "Name": "Analysis",
+                "Description": "Computational analysis workflows that combine and analyze data from multiple "
+                "sources without training a model.",
+            },
+            {
+                "Name": "Ingest",
+                "Description": "Workflows that load external data into the catalog, including file upload, "
+                "record creation, and initial metadata population from source systems.",
+            },
+            {
+                "Name": "Data_Cleaning",
+                "Description": "Workflows that clean and preprocess raw data, including standardizing formats, "
+                "handling missing values, normalizing text, and filtering invalid records.",
+            },
         ],
         defaults={"ID", "URI"},
     )
