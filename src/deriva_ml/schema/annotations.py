@@ -299,6 +299,25 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 [schema, "Workflow_RCB_fkey"],
                 [schema, "Workflow_RMB_fkey"],
             ],
+            "filter": {
+                "and": [
+                    {"source": "RID"},
+                    {"source": "Name"},
+                    {"source": "Description"},
+                    {
+                        "source": [
+                            {"inbound": [schema, "Workflow_Workflow_Type_Workflow_fkey"]},
+                            {"outbound": [schema, "Workflow_Workflow_Type_Workflow_Type_fkey"]},
+                            "RID",
+                        ],
+                        "markdown_name": "Workflow Types",
+                    },
+                    {
+                        "source": [{"outbound": [schema, "Workflow_RCB_fkey"]}, "RID"],
+                        "markdown_name": "Created By",
+                    },
+                ],
+            },
         },
     }
 
