@@ -277,18 +277,11 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 },
                 "Checksum",
                 "Version",
-                {
-                    "source": [
-                        {"inbound": [schema, "Workflow_Workflow_Type_Workflow_fkey"]},
-                        {"outbound": [schema, "Workflow_Workflow_Type_Workflow_Type_fkey"]},
-                        "RID",
-                    ],
-                    "markdown_name": "Workflow Types",
-                },
-            ]
-        },
-        deriva_tags.visible_foreign_keys: {
+            ],
             "detailed": [
+                "RID",
+                "Name",
+                "Description",
                 {
                     "source": [
                         {"inbound": [schema, "Workflow_Workflow_Type_Workflow_fkey"]},
@@ -297,7 +290,15 @@ def generate_annotation(model: Model, schema: str) -> dict:
                     ],
                     "markdown_name": "Workflow Types",
                 },
-            ]
+                {
+                    "display": {"markdown_pattern": "[{{{URL}}}]({{{URL}}})"},
+                    "markdown_name": "URL",
+                },
+                "Checksum",
+                "Version",
+                [schema, "Workflow_RCB_fkey"],
+                [schema, "Workflow_RMB_fkey"],
+            ],
         },
     }
 
