@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import requests
-from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_validator
 from requests import RequestException
 
-from deriva_ml.core.definitions import RID
+from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.find_caller import _get_calling_module
 
@@ -70,9 +70,10 @@ class Workflow(BaseModel):
     Attributes:
         name (str): Human-readable name of the workflow.
         url (str): URI to the workflow source code (typically a GitHub URL).
-        workflow_type (str): Type of workflow (must be a controlled vocabulary term).
+        workflow_type (str | list[str]): Type(s) of workflow (must be controlled vocabulary terms).
+            Accepts a single string or a list of strings. Internally normalized to a list.
             When the workflow is bound to a writable catalog, setting this property
-            will update the catalog record. The new value must be a valid term from
+            will update the catalog record. The new values must be valid terms from
             the Workflow_Type vocabulary.
         version (str | None): Version identifier (semantic versioning).
         description (str | None): Description of workflow purpose and behavior.
@@ -128,7 +129,7 @@ class Workflow(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
-    workflow_type: str
+    workflow_type: str | list[str]
     description: str | None = None
     url: str | None = None
     version: str | None = None
@@ -139,6 +140,14 @@ class Workflow(BaseModel):
 
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
     _logger: logging.Logger = PrivateAttr(default=10)
+
+    @field_validator("workflow_type", mode="before")
+    @classmethod
+    def _normalize_workflow_type(cls, v: str | list[str]) -> list[str]:
+        """Normalize workflow_type to always be a list of strings."""
+        if isinstance(v, str):
+            return [v]
+        return list(v)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Override setattr to intercept description and workflow_type updates.
@@ -175,7 +184,10 @@ class Workflow(BaseModel):
             if name == "description":
                 self._update_description_in_catalog(value)
             elif name == "workflow_type":
-                self._update_workflow_type_in_catalog(value)
+                # Normalize to list
+                if isinstance(value, str):
+                    value = [value]
+                self._update_workflow_types_in_catalog(value)
         super().__setattr__(name, value)
 
     def _check_writable_catalog(self, operation: str) -> None:
@@ -224,31 +236,139 @@ class Workflow(BaseModel):
         workflow_path = pb.schemas[self._ml_instance.ml_schema].Workflow
         workflow_path.update([{"RID": self.rid, "Description": new_description}])
 
-    def _update_workflow_type_in_catalog(self, new_workflow_type: str) -> None:
-        """Update the workflow_type field in the catalog.
+    def _get_workflow_type_association_table(self):
+        """Get the association table for workflow types.
 
-        This internal method is called when the workflow_type property is set
-        on a catalog-bound Workflow object. The new workflow type must be a valid
-        term from the Workflow_Type vocabulary.
+        Returns:
+            Tuple of (table_name, table_path) for the Workflow-Workflow_Type association table.
+        """
+        atable_name = "Workflow_Workflow_Type"
+        pb = self._ml_instance.pathBuilder()
+        atable_path = pb.schemas[self._ml_instance.ml_schema].tables[atable_name]
+        return atable_name, atable_path
+
+    @property
+    def workflow_types(self) -> list[str]:
+        """Get the workflow types from the catalog.
+
+        This property fetches the current workflow types directly from the catalog,
+        ensuring consistency when multiple Workflow instances reference the same
+        workflow or when types are modified externally.
+
+        When not bound to a catalog, returns the local ``workflow_type`` field.
+
+        Returns:
+            List of workflow type term names from the Workflow_Type vocabulary.
+        """
+        if self._ml_instance is not None:
+            _, atable_path = self._get_workflow_type_association_table()
+            wt_types = (
+                atable_path.filter(atable_path.Workflow == self.rid)
+                .attributes(atable_path.Workflow_Type)
+                .fetch()
+            )
+            return [wt[MLVocab.workflow_type] for wt in wt_types]
+        return list(self.workflow_type)
+
+    def add_workflow_type(self, workflow_type: str | VocabularyTerm) -> None:
+        """Add a workflow type to this workflow.
+
+        Adds a type term to this workflow if it's not already present. The term must
+        exist in the Workflow_Type vocabulary.
 
         Args:
-            new_workflow_type: The new workflow type (must be a valid vocabulary term).
+            workflow_type: Term name (string) or VocabularyTerm object from Workflow_Type vocabulary.
 
         Raises:
             DerivaMLException: If the workflow is not registered (no RID),
-                the catalog is read-only (a snapshot), or the workflow_type
+                the catalog is read-only, or the term doesn't exist.
+        """
+        self._check_writable_catalog("add workflow_type")
+
+        if isinstance(workflow_type, VocabularyTerm):
+            vocab_term = workflow_type
+        else:
+            vocab_term = self._ml_instance.lookup_term(MLVocab.workflow_type, workflow_type)
+
+        if vocab_term.name in self.workflow_types:
+            return
+
+        _, atable_path = self._get_workflow_type_association_table()
+        atable_path.insert([{MLVocab.workflow_type: vocab_term.name, "Workflow": self.rid}])
+
+    def remove_workflow_type(self, workflow_type: str | VocabularyTerm) -> None:
+        """Remove a workflow type from this workflow.
+
+        Removes a type term from this workflow if it's currently associated.
+
+        Args:
+            workflow_type: Term name (string) or VocabularyTerm object from Workflow_Type vocabulary.
+
+        Raises:
+            DerivaMLException: If the workflow is not registered (no RID),
+                the catalog is read-only, or the term doesn't exist.
+        """
+        self._check_writable_catalog("remove workflow_type")
+
+        if isinstance(workflow_type, VocabularyTerm):
+            vocab_term = workflow_type
+        else:
+            vocab_term = self._ml_instance.lookup_term(MLVocab.workflow_type, workflow_type)
+
+        if vocab_term.name not in self.workflow_types:
+            return
+
+        _, atable_path = self._get_workflow_type_association_table()
+        atable_path.filter(
+            (atable_path.Workflow == self.rid) & (atable_path.Workflow_Type == vocab_term.name)
+        ).delete()
+
+    def add_workflow_types(self, workflow_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
+        """Add one or more workflow types to this workflow.
+
+        Args:
+            workflow_types: Single term or list of terms. Can be strings (term names)
+                or VocabularyTerm objects.
+
+        Raises:
+            DerivaMLException: If any term doesn't exist in the Workflow_Type vocabulary.
+        """
+        types_to_add = [workflow_types] if not isinstance(workflow_types, list) else workflow_types
+
+        for term in types_to_add:
+            self.add_workflow_type(term)
+
+    def _update_workflow_types_in_catalog(self, new_workflow_types: list[str]) -> None:
+        """Replace all workflow types in the catalog with the given list.
+
+        This internal method is called when the workflow_type property is set
+        on a catalog-bound Workflow object. Each new type must be a valid
+        term from the Workflow_Type vocabulary.
+
+        Args:
+            new_workflow_types: List of new workflow type names.
+
+        Raises:
+            DerivaMLException: If the workflow is not registered (no RID),
+                the catalog is read-only (a snapshot), or any workflow_type
                 is not a valid vocabulary term.
         """
         self._check_writable_catalog("update workflow_type")
 
-        # Validate that the new workflow type exists in vocabulary
-        from deriva_ml.core.definitions import MLVocab
-        self._ml_instance.lookup_term(MLVocab.workflow_type, new_workflow_type)
+        # Validate all new types exist in vocabulary
+        for wt in new_workflow_types:
+            self._ml_instance.lookup_term(MLVocab.workflow_type, wt)
 
-        # Update the catalog record
-        pb = self._ml_instance.pathBuilder()
-        workflow_path = pb.schemas[self._ml_instance.ml_schema].Workflow
-        workflow_path.update([{"RID": self.rid, "Workflow_Type": new_workflow_type}])
+        # Delete all existing type associations
+        _, atable_path = self._get_workflow_type_association_table()
+        atable_path.filter(atable_path.Workflow == self.rid).delete()
+
+        # Insert new type associations
+        if new_workflow_types:
+            atable_path.insert([
+                {MLVocab.workflow_type: wt, "Workflow": self.rid}
+                for wt in new_workflow_types
+            ])
 
     @model_validator(mode="after")
     def setup_url_checksum(self) -> "Workflow":
