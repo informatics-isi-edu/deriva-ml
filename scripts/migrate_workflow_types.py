@@ -123,6 +123,14 @@ def step2_copy_types_to_association(
         print("  [SKIP] No workflows have Workflow_Type values to migrate")
         return 0
 
+    if dry_run:
+        print(f"  [DRY RUN] Would create {len(workflows_with_type)} association rows:")
+        for w in workflows_with_type[:5]:
+            print(f"    Workflow {w['RID']} -> {w['Workflow_Type']}")
+        if len(workflows_with_type) > 5:
+            print(f"    ... and {len(workflows_with_type) - 5} more")
+        return len(workflows_with_type)
+
     pb = catalog.getPathBuilder()
     assoc_path = pb.schemas[ml_schema].Workflow_Workflow_Type
 
@@ -146,12 +154,6 @@ def step2_copy_types_to_association(
     if not rows_to_insert:
         print(f"  [SKIP] All {len(workflows_with_type)} associations already exist")
         return 0
-
-    if dry_run:
-        print(f"  [DRY RUN] Would create {len(rows_to_insert)} association rows:")
-        for row in rows_to_insert:
-            print(f"    Workflow {row['Workflow']} -> {row['Workflow_Type']}")
-        return len(rows_to_insert)
 
     assoc_path.insert(rows_to_insert)
     print(f"  [OK] Created {len(rows_to_insert)} association rows")
