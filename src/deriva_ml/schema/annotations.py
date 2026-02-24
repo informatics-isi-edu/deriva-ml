@@ -286,7 +286,19 @@ def generate_annotation(model: Model, schema: str) -> dict:
                     "markdown_name": "Workflow Types",
                 },
             ]
-        }
+        },
+        deriva_tags.visible_foreign_keys: {
+            "detailed": [
+                {
+                    "source": [
+                        {"inbound": [schema, "Workflow_Workflow_Type_Workflow_fkey"]},
+                        {"outbound": [schema, "Workflow_Workflow_Type_Workflow_Type_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Workflow Types",
+                },
+            ]
+        },
     }
 
     execution_annotation = {
