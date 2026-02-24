@@ -305,21 +305,25 @@ class ExecutionMixin:
             workflow_rid = workflow.rid if isinstance(workflow, WorkflowClass) else workflow
             filtered_path = filtered_path.filter(execution_path.Workflow == workflow_rid)
 
-        # Filter by workflow type - need to join with Workflow table
+        # Filter by workflow type - find workflows with matching type, then filter executions
+        matching_workflow_rids: set[str] | None = None
         if workflow_type:
-            workflow_path = pb.schemas[self.ml_schema].Workflow
-            # Link to workflows with matching type
-            filtered_path = (
-                filtered_path
-                .link(workflow_path, on=(execution_path.Workflow == workflow_path.RID))
-                .filter(workflow_path.Workflow_Type == workflow_type)
-            )
+            wt_assoc = pb.schemas[self.ml_schema].Workflow_Workflow_Type
+            matching_workflow_rids = {
+                row["Workflow"]
+                for row in wt_assoc.filter(wt_assoc.Workflow_Type == workflow_type).entities().fetch()
+            }
+            if not matching_workflow_rids:
+                return  # No workflows match this type, so no executions
 
         if status:
             filtered_path = filtered_path.filter(execution_path.Status == status.value)
 
         # Create ExecutionRecord objects
         for exec_record in filtered_path.entities().fetch():
+            # If filtering by workflow type, check the execution's workflow is in the matching set
+            if matching_workflow_rids is not None and exec_record.get("Workflow") not in matching_workflow_rids:
+                continue
             yield self.lookup_execution(exec_record["RID"])
 
     def lookup_experiment(self, execution_rid: RID) -> "Experiment":

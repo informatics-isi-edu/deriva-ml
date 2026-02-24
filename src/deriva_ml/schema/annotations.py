@@ -279,15 +279,22 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 "Version",
                 {
                     "source": [
-                        {"outbound": [schema, "Workflow_Workflow_Type_fkey"]},
+                        {"inbound": [schema, "Workflow_Workflow_Type_Workflow_fkey"]},
+                        {"outbound": [schema, "Workflow_Workflow_Type_Workflow_Type_fkey"]},
                         "RID",
-                    ]
+                    ],
+                    "markdown_name": "Workflow Types",
                 },
             ]
         }
     }
 
     execution_annotation = {
+        deriva_tags.table_display: {
+            "*": {
+                "row_order": [{"column": "RCT", "descending": True}],
+            },
+        },
         deriva_tags.visible_columns: {
             "*": [
                 "RID",

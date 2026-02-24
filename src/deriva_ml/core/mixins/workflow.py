@@ -43,6 +43,24 @@ class WorkflowMixin:
     pathBuilder: Callable[[], Any]
     lookup_term: Callable[[str, str], VocabularyTerm]
 
+    def _get_workflow_types_for_rid(self, workflow_rid: RID) -> list[str]:
+        """Get workflow types for a workflow RID from the association table.
+
+        Args:
+            workflow_rid: RID of the workflow.
+
+        Returns:
+            List of workflow type term names.
+        """
+        pb = self.pathBuilder()
+        assoc_path = pb.schemas[self.ml_schema].Workflow_Workflow_Type
+        types = (
+            assoc_path.filter(assoc_path.Workflow == workflow_rid)
+            .attributes(assoc_path.Workflow_Type)
+            .fetch()
+        )
+        return [t["Workflow_Type"] for t in types]
+
     def find_workflows(self) -> list[Workflow]:
         """Find all workflows in the catalog.
 
@@ -54,7 +72,7 @@ class WorkflowMixin:
             list[Workflow]: List of workflow objects, each containing:
                 - name: Workflow name
                 - url: Source code URL
-                - workflow_type: Type of workflow
+                - workflow_type: Type(s) of workflow
                 - version: Version identifier
                 - description: Workflow description
                 - rid: Resource identifier
@@ -77,10 +95,11 @@ class WorkflowMixin:
         workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
         workflows = []
         for w in workflow_path.entities().fetch():
+            workflow_types = self._get_workflow_types_for_rid(w["RID"])
             workflow = Workflow(
                 name=w["Name"],
                 url=w["URL"],
-                workflow_type=w["Workflow_Type"],
+                workflow_type=workflow_types,
                 version=w["Version"],
                 description=w["Description"],
                 rid=w["RID"],
@@ -126,17 +145,22 @@ class WorkflowMixin:
         ml_schema_path = self.pathBuilder().schemas[self.ml_schema]
 
         try:
-            # Create a workflow record
+            # Create a workflow record (without Workflow_Type column)
             workflow_record = {
                 "URL": workflow.url,
                 "Name": workflow.name,
                 "Description": workflow.description,
                 "Checksum": workflow.checksum,
                 "Version": workflow.version,
-                MLVocab.workflow_type: self.lookup_term(MLVocab.workflow_type, workflow.workflow_type).name,
             }
             # Insert a workflow and get its RID
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]["RID"]
+
+            # Insert workflow type associations
+            assoc_path = ml_schema_path.Workflow_Workflow_Type
+            for wt in workflow.workflow_type:
+                type_name = self.lookup_term(MLVocab.workflow_type, wt).name
+                assoc_path.insert([{"Workflow": workflow_rid, MLVocab.workflow_type: type_name}])
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(f"Failed to insert workflow. Error: {error}")
@@ -192,10 +216,11 @@ class WorkflowMixin:
             raise DerivaMLException(f"Workflow with RID '{rid}' not found in the catalog")
 
         w = records[0]
+        workflow_types = self._get_workflow_types_for_rid(w["RID"])
         workflow = Workflow(
             name=w["Name"],
             url=w["URL"],
-            workflow_type=w["Workflow_Type"],
+            workflow_type=workflow_types,
             version=w["Version"],
             description=w["Description"],
             rid=w["RID"],
@@ -290,23 +315,24 @@ class WorkflowMixin:
         # Use lookup_workflow to get the full object with catalog binding
         return self.lookup_workflow(rid)
 
-    def create_workflow(self, name: str, workflow_type: str, description: str = "") -> Workflow:
+    def create_workflow(self, name: str, workflow_type: str | list[str], description: str = "") -> Workflow:
         """Creates a new workflow definition.
 
-        Creates a Workflow object that represents a computational process or analysis pipeline. The workflow type
-        must be a term from the controlled vocabulary. This method is typically used to define new analysis
+        Creates a Workflow object that represents a computational process or analysis pipeline. The workflow type(s)
+        must be terms from the controlled vocabulary. This method is typically used to define new analysis
         workflows before execution.
 
         Args:
             name: Name of the workflow.
-            workflow_type: Type of workflow (must exist in workflow_type vocabulary).
+            workflow_type: Type(s) of workflow (must exist in workflow_type vocabulary).
+                Can be a single string or a list of strings.
             description: Description of what the workflow does.
 
         Returns:
             Workflow: New workflow object ready for registration.
 
         Raises:
-            DerivaMLException: If workflow_type is not in the vocabulary.
+            DerivaMLException: If any workflow_type is not in the vocabulary.
 
         Examples:
             >>> workflow = ml.create_workflow(
@@ -315,9 +341,19 @@ class WorkflowMixin:
             ...     description="RNA sequence analysis pipeline"
             ... )
             >>> rid = ml.add_workflow(workflow)
+
+            Multiple types::
+
+                >>> workflow = ml.create_workflow(
+                ...     name="Training Pipeline",
+                ...     workflow_type=["Training", "Embedding"],
+                ...     description="Combined training and embedding pipeline"
+                ... )
         """
-        # Validate workflow type exists in vocabulary
-        self.lookup_term(MLVocab.workflow_type, workflow_type)
+        # Normalize to list and validate each type exists in vocabulary
+        types = [workflow_type] if isinstance(workflow_type, str) else workflow_type
+        for wt in types:
+            self.lookup_term(MLVocab.workflow_type, wt)
 
         # Create and return a new workflow object
         return Workflow(name=name, workflow_type=workflow_type, description=description)

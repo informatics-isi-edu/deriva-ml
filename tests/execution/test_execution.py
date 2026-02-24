@@ -228,7 +228,7 @@ class TestWorkflow:
 
         assert workflow is not None
         assert workflow.name == "API Test Workflow"
-        assert workflow.workflow_type == "Test Workflow"
+        assert workflow.workflow_type == ["Test Workflow"]
         assert workflow.description == "Created via API"
 
         # add_workflow adds it to the catalog (or returns existing if same URL/checksum)
@@ -240,6 +240,134 @@ class TestWorkflow:
         assert len(workflows) >= 1
         # Verify our workflow RID is in the catalog
         assert workflow_rid in [w.rid for w in workflows]
+
+    def test_workflow_multiple_types(self, test_ml):
+        """Test creating a workflow with multiple types."""
+        ml = test_ml
+        ml.add_term(vc.workflow_type, "Training", description="Training workflow")
+        ml.add_term(vc.workflow_type, "Embedding", description="Embedding workflow")
+
+        workflow = ml.create_workflow(
+            name="Multi-Type Workflow",
+            workflow_type=["Training", "Embedding"],
+            description="A workflow with multiple types",
+        )
+
+        assert workflow.workflow_type == ["Training", "Embedding"]
+
+        # Add to catalog and verify
+        workflow_rid = ml.add_workflow(workflow)
+        looked_up = ml.lookup_workflow(workflow_rid)
+        assert sorted(looked_up.workflow_type) == ["Embedding", "Training"]
+
+    def test_workflow_types_property(self, test_ml):
+        """Test workflow_types property returns live list from catalog."""
+        ml = test_ml
+        ml.add_term(vc.workflow_type, "Training", description="Training workflow")
+        ml.add_term(vc.workflow_type, "Embedding", description="Embedding workflow")
+
+        workflow = ml.create_workflow(
+            name="Types Property Test",
+            workflow_type=["Training", "Embedding"],
+        )
+        workflow_rid = ml.add_workflow(workflow)
+        looked_up = ml.lookup_workflow(workflow_rid)
+
+        # workflow_types property should query association table
+        types = looked_up.workflow_types
+        assert sorted(types) == ["Embedding", "Training"]
+
+    def test_workflow_add_remove_type(self, test_ml):
+        """Test add_workflow_type and remove_workflow_type on catalog-bound workflow."""
+        ml = test_ml
+        ml.add_term(vc.workflow_type, "Training", description="Training workflow")
+        ml.add_term(vc.workflow_type, "Embedding", description="Embedding workflow")
+        ml.add_term(vc.workflow_type, "Inference", description="Inference workflow")
+
+        workflow = ml.create_workflow(
+            name="Add Remove Type Test",
+            workflow_type="Training",
+        )
+        workflow_rid = ml.add_workflow(workflow)
+        looked_up = ml.lookup_workflow(workflow_rid)
+
+        assert looked_up.workflow_types == ["Training"]
+
+        # Add a type
+        looked_up.add_workflow_type("Embedding")
+        assert sorted(looked_up.workflow_types) == ["Embedding", "Training"]
+
+        # Add another
+        looked_up.add_workflow_type("Inference")
+        assert sorted(looked_up.workflow_types) == ["Embedding", "Inference", "Training"]
+
+        # Remove a type
+        looked_up.remove_workflow_type("Embedding")
+        assert sorted(looked_up.workflow_types) == ["Inference", "Training"]
+
+        # Idempotent add (already present)
+        looked_up.add_workflow_type("Training")
+        assert sorted(looked_up.workflow_types) == ["Inference", "Training"]
+
+        # Idempotent remove (not present)
+        looked_up.remove_workflow_type("Embedding")
+        assert sorted(looked_up.workflow_types) == ["Inference", "Training"]
+
+    def test_workflow_single_type_backward_compat(self, test_ml):
+        """Test that single string workflow_type still works."""
+        ml = test_ml
+        ml.add_term(vc.workflow_type, "Training", description="Training workflow")
+
+        workflow = ml.create_workflow(
+            name="Single Type Test",
+            workflow_type="Training",
+        )
+        # Pydantic validator normalizes to list
+        assert workflow.workflow_type == ["Training"]
+
+        workflow_rid = ml.add_workflow(workflow)
+        looked_up = ml.lookup_workflow(workflow_rid)
+        assert looked_up.workflow_types == ["Training"]
+        assert looked_up.workflow_type == ["Training"]
+
+    def test_find_executions_by_workflow_type(self, test_ml):
+        """Test filtering executions by workflow type through association table."""
+        ml = test_ml
+        ml.add_term(vc.workflow_type, "Training", description="Training workflow")
+        ml.add_term(vc.workflow_type, "Embedding", description="Embedding workflow")
+
+        from deriva_ml.execution.execution import ExecutionConfiguration
+        from deriva_ml.execution.workflow import Workflow
+
+        # Create workflows with distinct URLs so add_workflow doesn't deduplicate
+        wf_training = Workflow(
+            name="Training WF",
+            workflow_type="Training",
+            url="https://example.com/training_wf.py",
+            checksum="training_checksum_123",
+        )
+        wf_embedding = Workflow(
+            name="Embedding WF",
+            workflow_type="Embedding",
+            url="https://example.com/embedding_wf.py",
+            checksum="embedding_checksum_456",
+        )
+
+        config1 = ExecutionConfiguration(description="Train Run", workflow=wf_training)
+        exec1 = ml.create_execution(config1)
+
+        config2 = ExecutionConfiguration(description="Embed Run", workflow=wf_embedding)
+        exec2 = ml.create_execution(config2)
+
+        # Filter by workflow type
+        training_execs = list(ml.find_executions(workflow_type="Training"))
+        assert len(training_execs) >= 1
+        assert any(e.execution_rid == exec1.execution_rid for e in training_execs)
+        assert not any(e.execution_rid == exec2.execution_rid for e in training_execs)
+
+        embedding_execs = list(ml.find_executions(workflow_type="Embedding"))
+        assert len(embedding_execs) >= 1
+        assert any(e.execution_rid == exec2.execution_rid for e in embedding_execs)
 
 
 # =============================================================================

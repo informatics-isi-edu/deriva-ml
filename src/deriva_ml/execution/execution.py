@@ -230,8 +230,9 @@ class Execution:
                 "Use ml.lookup_workflow(rid) or ml.lookup_workflow_by_url(url) to get a Workflow object."
             )
 
-        # Validate workflow type and register in catalog
-        self._ml_object.lookup_term(MLVocab.workflow_type, self.configuration.workflow.workflow_type)
+        # Validate workflow type(s) and register in catalog
+        for wt in self.configuration.workflow.workflow_type:
+            self._ml_object.lookup_term(MLVocab.workflow_type, wt)
         self.workflow_rid = (
             self._ml_object.add_workflow(self.configuration.workflow) if not self._dry_run else DRY_RUN_RID
         )

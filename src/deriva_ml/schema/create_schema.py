@@ -244,11 +244,21 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
             annotations=annotations if annotations else {},
         )
     )
-    workflow_table.create_reference(
-        schema.create_table(
-            VocabularyTableDef(name=MLVocab.workflow_type, curie_template=f"{schema.name}:{{RID}}")
+
+    workflow_type_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.workflow_type, curie_template=f"{schema.name}:{{RID}}")
+    )
+
+    # Association table for Workflow <-> Workflow_Type
+    schema.create_table(
+        Table.define_association(
+            associates=[
+                ("Workflow", workflow_table),
+                (MLVocab.workflow_type, workflow_type_table),
+            ]
         )
     )
+
     return workflow_table
 
 
@@ -400,6 +410,21 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     dataset_type = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.dataset_type]
     dataset_type.insert(
         [{"Name": "File", "Description": "A dataset that contains file assets."}],
+        defaults={"ID", "URI"},
+    )
+
+    workflow_type = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.workflow_type]
+    workflow_type.insert(
+        [
+            {"Name": "Training", "Description": "Model training workflow"},
+            {"Name": "Testing", "Description": "Model testing and evaluation workflow"},
+            {"Name": "Prediction", "Description": "Model inference and prediction workflow"},
+            {"Name": "Feature_Creation", "Description": "Feature extraction or engineering workflow"},
+            {"Name": "Visualization", "Description": "Data or results visualization workflow"},
+            {"Name": "Analysis", "Description": "Data analysis workflow"},
+            {"Name": "Ingest", "Description": "Data ingestion and loading workflow"},
+            {"Name": "Data_Cleaning", "Description": "Data cleaning and preprocessing workflow"},
+        ],
         defaults={"ID", "URI"},
     )
 

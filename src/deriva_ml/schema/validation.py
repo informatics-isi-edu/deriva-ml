@@ -245,7 +245,6 @@ EXPECTED_TABLE_COLUMNS: dict[str, dict[str, tuple[str, bool]]] = {
         "URL": ("ermrest_uri", True),
         "Checksum": ("text", True),
         "Version": ("text", True),
-        "Workflow_Type": ("text", True),  # FK column
     },
     MLTable.execution: {
         "Workflow": ("text", True),
@@ -321,6 +320,16 @@ EXPECTED_VOCABULARY_TERMS: dict[str, list[str]] = {
     MLVocab.dataset_type: [
         "File",
     ],
+    MLVocab.workflow_type: [
+        "Training",
+        "Testing",
+        "Prediction",
+        "Feature_Creation",
+        "Visualization",
+        "Analysis",
+        "Ingest",
+        "Data_Cleaning",
+    ],
 }
 
 # Expected association tables
@@ -336,6 +345,7 @@ EXPECTED_ASSOCIATION_TABLES: list[str] = [
     "Execution_Asset_Execution",
     "File_Asset_Type",
     "File_Execution",
+    "Workflow_Workflow_Type",
 ]
 
 # System columns present in all tables
