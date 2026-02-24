@@ -325,10 +325,15 @@ EXPECTED_VOCABULARY_TERMS: dict[str, list[str]] = {
         "Testing",
         "Prediction",
         "Feature_Creation",
+        "Embedding",
         "Visualization",
         "Analysis",
         "Ingest",
         "Data_Cleaning",
+        "Dataset_Management",
+        "VGG19",
+        "RETFound",
+        "Multimodal",
     ],
 }
 

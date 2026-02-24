@@ -455,6 +455,26 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
                 "Description": "Workflows that clean and preprocess raw data, including standardizing formats, "
                 "handling missing values, normalizing text, and filtering invalid records.",
             },
+            {
+                "Name": "Embedding",
+                "Description": "Workflows that generate embedding vectors from input data using foundation models.",
+            },
+            {
+                "Name": "Dataset_Management",
+                "Description": "Workflows that create, split, version, or manage datasets.",
+            },
+            {
+                "Name": "VGG19",
+                "Description": "VGG19 convolutional neural network for image classification.",
+            },
+            {
+                "Name": "RETFound",
+                "Description": "RETFound vision transformer (ViT-Large) foundation model for retinal images.",
+            },
+            {
+                "Name": "Multimodal",
+                "Description": "Workflows combining multiple data modalities (e.g., imaging + clinical records).",
+            },
         ],
         defaults={"ID", "URI"},
     )
