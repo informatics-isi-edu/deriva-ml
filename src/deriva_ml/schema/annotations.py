@@ -44,6 +44,7 @@ def catalog_annotation(model: DerivaModel) -> None:
             "shareCiteAcls": True,
             "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
             "resolverImplicitCatalog": False,
+            "showWriterEmptyRelatedOnLoad": False,
             "navbarMenu": {
                 "newTab": False,
                 "children": [
@@ -222,6 +223,25 @@ def asset_annotation(asset_table: Table):
             column,
         )
 
+    asset_type_source = {
+        "source": [
+            {
+                "inbound": [
+                    schema,
+                    f"{asset_name}_Asset_Type_{asset_name}_fkey",
+                ]
+            },
+            {
+                "outbound": [
+                    schema,
+                    f"{asset_name}_Asset_Type_Asset_Type_fkey",
+                ]
+            },
+            "RID",
+        ],
+        "markdown_name": "Asset Types",
+    }
+
     annotations = {
         deriva_tags.table_display: {"row_name": {"row_markdown_pattern": "{{{Filename}}}"}},
         deriva_tags.visible_columns: {
@@ -236,24 +256,21 @@ def asset_annotation(asset_table: Table):
                 "Description",
                 "Length",
                 "MD5",
-                {
-                    "source": [
-                        {
-                            "inbound": [
-                                schema,
-                                f"{asset_name}_Asset_Type_{asset_name}_fkey",
-                            ]
-                        },
-                        {
-                            "outbound": [
-                                schema,
-                                f"{asset_name}_Asset_Type_Asset_Type_fkey",
-                            ]
-                        },
-                        "RID",
-                    ],
-                    "markdown_name": "Asset Types",
-                },
+                asset_type_source,
+            ]
+            + [fkey_column(c) for c in asset_metadata],
+            "detailed": [
+                "RID",
+                "Filename",
+                "Description",
+                asset_type_source,
+                "URL",
+                "Length",
+                "MD5",
+                "RCT",
+                "RMT",
+                [schema, f"{asset_name}_RCB_fkey"],
+                [schema, f"{asset_name}_RMB_fkey"],
             ]
             + [fkey_column(c) for c in asset_metadata],
         },
@@ -264,18 +281,18 @@ def asset_annotation(asset_table: Table):
 
 def generate_annotation(model: Model, schema: str) -> dict:
     workflow_annotation = {
+        deriva_tags.table_display: {
+            "*": {
+                "row_order": [{"column": "RCT", "descending": True}],
+            },
+        },
         deriva_tags.visible_columns: {
             "*": [
                 "RID",
-                [schema, "Workflow_RCB_fkey"],
-                [schema, "Workflow_RMB_fkey"],
                 "Name",
+                [schema, "Workflow_RCB_fkey"],
+                "RCT",
                 "Description",
-                {
-                    "display": {"markdown_pattern": "[{{{URL}}}]({{{URL}}})"},
-                    "markdown_name": "URL",
-                },
-                "Checksum",
                 "Version",
             ],
             "detailed": [
