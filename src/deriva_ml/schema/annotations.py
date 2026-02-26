@@ -294,8 +294,8 @@ def asset_annotation(asset_table: Table):
     asset_table.annotations.update(annotations)
 
     # Enable file preview for text-based files uploaded as application/octet-stream
-    # (e.g., uv.lock, .toml, .yaml). Merges into the existing asset annotation on
-    # the URL column that was set by AssetTableDef.
+    # (e.g., uv.lock, .toml). Merges into the existing asset annotation on the URL
+    # column that was set by AssetTableDef.
     url_col = asset_table.columns["URL"]
     url_annotation = url_col.annotations.get(deriva_tags.asset, {})
     url_annotation["display"] = {
