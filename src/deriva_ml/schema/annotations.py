@@ -273,6 +273,22 @@ def asset_annotation(asset_table: Table):
                 [schema, f"{asset_name}_RMB_fkey"],
             ]
             + [fkey_column(c) for c in asset_metadata],
+            "filter": {
+                "and": [
+                    {"source": "RID"},
+                    {"source": "Filename"},
+                    {"source": "Description"},
+                    asset_type_source,
+                    {
+                        "source": [{"outbound": [schema, f"{asset_name}_RCB_fkey"]}, "RID"],
+                        "markdown_name": "Created By",
+                    },
+                    {
+                        "source": [{"outbound": [schema, f"{asset_name}_RMB_fkey"]}, "RID"],
+                        "markdown_name": "Modified By",
+                    },
+                ]
+            },
         },
     }
     asset_table.annotations.update(annotations)
