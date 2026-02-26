@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+import logging
 
 # Standard library imports
 from collections import Counter, defaultdict
@@ -47,6 +48,7 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
+logger = logging.getLogger(__name__)
 
 # Define common types:
 TableInput: TypeAlias = str | Table
@@ -686,7 +688,14 @@ class DerivaModel:
             arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
             domain_tables = [t for t in arc_list if self.is_domain_schema(t.schema.name)]
             if multiple_columns := [c for c, cnt in Counter(domain_tables).items() if cnt > 1]:
-                raise DerivaMLException(f"Ambiguous relationship in {table.name} {multiple_columns}")
+                # Skip ambiguous tables rather than failing — complex schemas (e.g., cloned
+                # catalogs) can have multiple FKs between the same pair of tables.
+                ambiguous_set = set(multiple_columns)
+                logger.warning(
+                    f"Ambiguous relationship in {table.name} to {[t.name for t in ambiguous_set]}, "
+                    f"skipping ambiguous tables in path traversal"
+                )
+                arc_list = [t for t in arc_list if t not in ambiguous_set]
             return set(arc_list)
 
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
@@ -713,7 +722,10 @@ class DerivaModel:
             if is_nested_dataset_loopback(root, child):
                 continue
             if child in path:
-                raise DerivaMLException(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}")
+                # Skip cyclic paths rather than failing — complex schemas (e.g., cloned
+                # catalogs) can have FK cycles through domain tables.
+                logger.warning(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}, skipping")
+                continue
 
             paths.extend(self._schema_to_paths(child, path, exclude_tables))
         return paths
