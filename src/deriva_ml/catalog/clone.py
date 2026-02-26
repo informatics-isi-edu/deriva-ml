@@ -1832,7 +1832,7 @@ async def _create_ml_workspace_async(
     dst_cred: dict | None,
     truncate_oversized: bool,
     page_size: int = 1000,
-    table_concurrency: int = 2,
+    table_concurrency: int = 1,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> dict[str, int]:
     """Async implementation of data copying phase.
@@ -1919,7 +1919,7 @@ def create_ml_workspace(
     prune_hidden_fkeys: bool = False,
     truncate_oversized: bool = False,
     reinitialize_dataset_versions: bool = True,
-    table_concurrency: int = 2,
+    table_concurrency: int = 1,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> CloneCatalogResult:
     """Create an ML workspace by cloning data reachable from a root RID.
