@@ -1832,6 +1832,7 @@ async def _create_ml_workspace_async(
     dst_cred: dict | None,
     truncate_oversized: bool,
     page_size: int = 1000,
+    table_concurrency: int = 2,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> dict[str, int]:
     """Async implementation of data copying phase.
@@ -1876,13 +1877,10 @@ async def _create_ml_workspace_async(
             if progress_callback:
                 progress_callback("Filling uncovered tables", 50.0)
 
-            # Use lower concurrency for localhost to avoid 503s
-            concurrency = 1 if dest_hostname == "localhost" else 5
-
-            logger.info(f"Filling {len(fill_tables)} uncovered tables (concurrency={concurrency})")
+            logger.info(f"Filling {len(fill_tables)} uncovered tables (concurrency={table_concurrency})")
             fill_results = await copy_tables_concurrent_async(
                 src_wrapper, dst_async, fill_tables,
-                table_concurrency=concurrency,
+                table_concurrency=table_concurrency,
                 page_size=10000,
             )
             rows_by_table.update(fill_results)
@@ -1921,6 +1919,7 @@ def create_ml_workspace(
     prune_hidden_fkeys: bool = False,
     truncate_oversized: bool = False,
     reinitialize_dataset_versions: bool = True,
+    table_concurrency: int = 2,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> CloneCatalogResult:
     """Create an ML workspace by cloning data reachable from a root RID.
@@ -1956,6 +1955,8 @@ def create_ml_workspace(
         prune_hidden_fkeys: If True, prune FKs with hidden reference data.
         truncate_oversized: If True, truncate values exceeding index size limits.
         reinitialize_dataset_versions: If True, reinitialize dataset versions.
+        table_concurrency: Maximum number of tables to copy concurrently
+            during the fill phase. Lower values reduce server load. Default: 2.
         progress_callback: Optional callback(message, percent_complete) for
             progress reporting (e.g., from MCP tools).
 
@@ -2206,6 +2207,7 @@ def create_ml_workspace(
                 src_cred=src_cred,
                 dst_cred=dst_cred,
                 truncate_oversized=truncate_oversized,
+                table_concurrency=table_concurrency,
                 progress_callback=progress_callback,
             )
         )
