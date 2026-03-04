@@ -304,26 +304,30 @@ class FeatureMixin:
         return self.model.lookup_feature(table, feature_name)
 
     def find_features(self, table: str | Table | None = None) -> list[Feature]:
-        """Find features in the catalog.
+        """Find feature definitions in the schema.
 
-        Catalog-level operation to find feature definitions. If a table is specified,
-        returns only features for that table. If no table is specified, returns all
-        features across all tables in the catalog.
+        Discovers features by inspecting the catalog schema for association tables
+        that have ``Feature_Name`` and ``Execution`` columns. Returns Feature objects
+        describing each feature's structure (target table, term/asset/value columns),
+        not the feature values themselves.
+
+        Use ``fetch_table_features`` or ``list_feature_values`` to retrieve actual
+        feature values.
 
         Args:
-            table: Optional table to find features for. If None, returns all features
-                in the catalog.
+            table: Optional table to find features for. If None, returns all feature
+                definitions across all tables.
 
         Returns:
-            A list of Feature instances describing the features.
+            A list of Feature instances describing the feature definitions.
 
         Examples:
-            Find all features in the catalog:
+            Find all feature definitions:
                 >>> all_features = ml.find_features()
                 >>> for f in all_features:
                 ...     print(f"{f.target_table.name}.{f.feature_name}")
 
-            Find features for a specific table:
+            Find features defined on a specific table:
                 >>> image_features = ml.find_features("Image")
                 >>> print([f.feature_name for f in image_features])
         """
