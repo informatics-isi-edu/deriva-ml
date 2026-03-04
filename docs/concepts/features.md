@@ -162,16 +162,149 @@ After upload, querying the feature values returns asset RIDs rather than file pa
 
 ## Querying Feature Values
 
-### List All Values for a Feature
+DerivaML provides several methods for retrieving feature values, from simple single-feature
+queries to bulk retrieval with deduplication.
+
+### Fetch All Features for a Table
+
+`fetch_table_features()` retrieves all feature values for a table in a single call,
+grouped by feature name. This is the most efficient way to get a complete picture of
+the annotations on a table.
+
+```python
+from deriva_ml.feature import FeatureRecord
+
+# Get all features for Image — returns a dict keyed by feature name
+features = ml.fetch_table_features("Image")
+for name, records in features.items():
+    print(f"{name}: {len(records)} values")
+
+# Get just one feature
+features = ml.fetch_table_features("Image", feature_name="Diagnosis")
+diagnosis_records = features["Diagnosis"]
+```
+
+Each record is a typed Pydantic model with attributes matching the feature's columns:
+
+```python
+for record in diagnosis_records:
+    print(f"Image: {record.Image}")
+    print(f"Diagnosis: {record.Diagnosis_Type}")
+    print(f"Created by: {record.Execution}")
+    print(f"Created at: {record.RCT}")
+```
+
+Convert results to a pandas DataFrame for analysis:
+
+```python
+import pandas as pd
+
+df = pd.DataFrame([r.model_dump() for r in diagnosis_records])
+```
+
+### List Values for a Single Feature
+
+`list_feature_values()` is a convenience wrapper when you only need one feature.
+It returns a flat list instead of a dictionary.
 
 ```python
 # Get all diagnosis values across all images
-values = ml.list_feature_values("Image", "Diagnosis")
-for v in values:
-    print(f"Image {v['Image']}: {v['Diagnosis']} (by Execution {v['Execution']})")
+for v in ml.list_feature_values("Image", "Diagnosis"):
+    print(f"Image {v.Image}: {v.Diagnosis_Type} (by Execution {v.Execution})")
 ```
 
-### Find Features on a Table
+### Resolving Multiple Values with Selectors
+
+When the same object has multiple values for a feature — for example, labels from
+different annotators or predictions from successive model runs — you can pass a
+**selector** function to pick one value per object.
+
+A selector is any callable with signature `(list[FeatureRecord]) -> FeatureRecord`.
+It receives all records for a single target object and returns the one to keep.
+
+#### Built-in: `select_newest`
+
+`FeatureRecord.select_newest` picks the record with the most recent `RCT` (Row Creation
+Time). This is the most common selector.
+
+```python
+from deriva_ml.feature import FeatureRecord
+
+# Deduplicate to one value per image, keeping the newest
+features = ml.fetch_table_features(
+    "Image",
+    feature_name="Diagnosis",
+    selector=FeatureRecord.select_newest,
+)
+
+# Also works with list_feature_values
+newest_values = list(ml.list_feature_values(
+    "Image", "Diagnosis",
+    selector=FeatureRecord.select_newest,
+))
+```
+
+#### Custom Selectors
+
+Write your own selector for domain-specific logic:
+
+```python
+# Pick the record with the highest confidence score
+def select_highest_confidence(records):
+    return max(records, key=lambda r: getattr(r, "Confidence", 0))
+
+features = ml.fetch_table_features(
+    "Image",
+    feature_name="Diagnosis",
+    selector=select_highest_confidence,
+)
+```
+
+### Selecting by Workflow
+
+`select_by_workflow()` filters feature records to those produced by a specific workflow
+or workflow type, then returns the newest match. This is useful when you have labels
+from multiple sources (e.g., manual annotation vs. model inference) and want to use
+values from a particular one.
+
+Unlike `select_newest`, this method requires catalog access to look up executions,
+so it cannot be passed as a `selector` argument. Instead, call it directly on a
+group of records.
+
+```python
+from collections import defaultdict
+
+# Get all classification values
+all_values = list(ml.list_feature_values("Image", "Classification"))
+
+# Group by image
+by_image = defaultdict(list)
+for v in all_values:
+    by_image[v.Image].append(v)
+
+# Select the newest value from any "Model_Inference" workflow type
+selected = {}
+for image_rid, records in by_image.items():
+    selected[image_rid] = ml.select_by_workflow(records, "Model_Inference")
+```
+
+The `workflow` argument accepts either a Workflow RID or a Workflow_Type name.
+DerivaML auto-detects which one you provided:
+
+```python
+# By workflow type name — selects from any workflow of this type
+record = ml.select_by_workflow(records, "Training")
+
+# By specific workflow RID — selects from executions of this exact workflow
+record = ml.select_by_workflow(records, "2-ABC1")
+```
+
+If no records match the specified workflow, a `DerivaMLException` is raised.
+
+### Find Feature Definitions
+
+These methods inspect the catalog schema to discover what features exist. They return
+`Feature` objects describing the feature structure, not feature values.
 
 ```python
 # What features are defined for images?
@@ -185,12 +318,25 @@ all_features = ml.find_features()
 
 ### Get Feature Structure
 
+`lookup_feature()` returns a `Feature` schema descriptor for a single feature. Use it
+to inspect what columns a feature has and what types of values it accepts.
+
 ```python
 # Examine a specific feature's structure
 feature = ml.lookup_feature("Image", "Diagnosis")
 print(f"Target: {feature.target_table.name}")
 print(f"Feature table: {feature.feature_table.name}")
-print(f"Columns: {[c.name for c in feature.feature_table.columns]}")
+print(f"Term columns: {[c.name for c in feature.term_columns]}")
+print(f"Asset columns: {[c.name for c in feature.asset_columns]}")
+print(f"Value columns: {[c.name for c in feature.value_columns]}")
+```
+
+The `Feature` object also provides `feature_record_class()`, which returns the
+dynamically generated Pydantic model for constructing new feature records:
+
+```python
+DiagnosisRecord = feature.feature_record_class()
+# Equivalent to: DiagnosisRecord = ml.feature_record_class("Image", "Diagnosis")
 ```
 
 ## Feature Tables
@@ -243,11 +389,38 @@ A single object can have multiple values for the same feature. This is common wh
 
 ```python
 # Get all values for a specific image
-values = ml.list_feature_values("Image", "Diagnosis")
-image_values = [v for v in values if v["Image"] == image_rid]
+values = list(ml.list_feature_values("Image", "Diagnosis"))
+image_values = [v for v in values if v.Image == image_rid]
 
 for v in image_values:
-    print(f"Value: {v['Diagnosis_Type']} from Execution {v['Execution']}")
+    print(f"Value: {v.Diagnosis_Type} from Execution {v.Execution} at {v.RCT}")
+```
+
+### Deduplicating Values
+
+Use a selector to keep one value per object (see [Resolving Multiple Values with Selectors](#resolving-multiple-values-with-selectors) above):
+
+```python
+from deriva_ml.feature import FeatureRecord
+
+# Keep only the newest value per image
+newest = list(ml.list_feature_values(
+    "Image", "Diagnosis",
+    selector=FeatureRecord.select_newest,
+))
+
+# Or keep values from a specific workflow
+from collections import defaultdict
+
+all_values = list(ml.list_feature_values("Image", "Diagnosis"))
+by_image = defaultdict(list)
+for v in all_values:
+    by_image[v.Image].append(v)
+
+from_training = {
+    img: ml.select_by_workflow(recs, "Manual_Annotation")
+    for img, recs in by_image.items()
+}
 ```
 
 ### Resolving Multiple Values in restructure_assets
@@ -314,3 +487,17 @@ Feature values are included when you:
 3. **Version a dataset**: Feature values at that version are preserved via catalog snapshots
 
 This ensures ML workflows have access to the labels and annotations associated with dataset elements.
+
+The same query methods work on dataset bags for offline access:
+
+```python
+bag = ml.download_dataset_bag(DatasetSpec(rid=dataset_rid, version="1.2.0"))
+
+# fetch_table_features and list_feature_values work on bags
+features = bag.fetch_table_features("Image")
+values = list(bag.list_feature_values("Image", "Diagnosis",
+                                       selector=FeatureRecord.select_newest))
+```
+
+Note that `select_by_workflow` is not available on dataset bags since it requires
+live catalog access to look up workflow and execution records.
