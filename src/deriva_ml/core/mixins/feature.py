@@ -265,31 +265,39 @@ class FeatureMixin:
             return False
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
-        """Retrieve a Feature object describing a feature's structure.
+        """Look up a feature definition by table and name.
 
-        Returns a Feature object that provides metadata about a feature
-        definition, including its target table, the association table that
-        stores values, and the roles of each column (vocabulary terms, asset
-        references, or direct value columns).
+        Returns a ``Feature`` object that describes the **schema structure**
+        of a feature — not the feature values themselves. A Feature is a
+        schema-level descriptor derived by inspecting the catalog's
+        association tables. It tells you:
 
-        The Feature object is useful for:
+        - **What table the feature annotates** (``target_table``) — e.g., Image
+        - **Where values are stored** (``feature_table``) — the association
+          table linking targets to values and executions
+        - **What kind of values it holds**, classified by column role:
 
-        - Inspecting what columns a feature has: ``feature.term_columns``,
-          ``feature.asset_columns``, ``feature.value_columns``
-        - Getting a Pydantic model for creating new records:
-          ``feature.feature_record_class()``
-        - Understanding the feature's storage:
-          ``feature.feature_table.name``
+          - ``term_columns``: columns referencing controlled vocabulary
+            tables (e.g., a ``Diagnosis_Type`` column pointing to a
+            vocabulary of diagnosis terms)
+          - ``asset_columns``: columns referencing asset tables (e.g., a
+            ``Segmentation_Mask`` column)
+          - ``value_columns``: columns holding direct values like floats,
+            ints, or text (e.g., a ``confidence`` score)
+
+        The Feature object also provides ``feature_record_class()``, which
+        returns a dynamically generated Pydantic model for constructing
+        validated feature records to insert into the catalog.
+
+        To retrieve actual feature **values**, use ``fetch_table_features``
+        or ``list_feature_values`` instead.
 
         Args:
             table: The table the feature is defined on (name or Table object).
             feature_name: Name of the feature to look up.
 
         Returns:
-            Feature: An object representing the feature definition with
-            attributes ``feature_name``, ``target_table``, ``feature_table``,
-            ``feature_columns``, ``term_columns``, ``asset_columns``, and
-            ``value_columns``.
+            A Feature schema descriptor.
 
         Raises:
             DerivaMLException: If the feature doesn't exist on the specified
@@ -300,6 +308,7 @@ class FeatureMixin:
             >>> print(f"Feature: {feature.feature_name}")
             >>> print(f"Stored in: {feature.feature_table.name}")
             >>> print(f"Term columns: {[c.name for c in feature.term_columns]}")
+            >>> print(f"Value columns: {[c.name for c in feature.value_columns]}")
         """
         return self.model.lookup_feature(table, feature_name)
 
