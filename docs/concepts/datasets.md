@@ -606,8 +606,8 @@ When an asset has multiple values for the same feature (e.g., labeled by differe
 from deriva_ml.dataset.dataset_bag import FeatureValueRecord
 
 def select_latest_execution(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-    """Select the feature value from the most recent execution."""
-    return max(records, key=lambda r: r.execution_rid or "")
+    """Select the feature value with the most recent creation time."""
+    return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
 
 def select_by_confidence(records: list[FeatureValueRecord]) -> FeatureValueRecord:
     """Select the feature value with highest confidence from raw record."""

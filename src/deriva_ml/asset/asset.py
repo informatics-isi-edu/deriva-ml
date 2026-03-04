@@ -208,35 +208,56 @@ class Asset:
     def find_features(self) -> list["Feature"]:
         """Find all features defined on this asset's table.
 
+        Returns Feature objects for every feature associated with this asset's
+        table. Each Feature provides metadata about the feature definition —
+        its name, column roles (terms, assets, values), and the association
+        table that stores values.
+
         Returns:
             List of Feature objects defined on this asset's table.
 
         Example:
             >>> features = asset.find_features()
             >>> for f in features:
-            ...     print(f"Feature: {f.feature_name}")
+            ...     print(f"{f.feature_name}: "
+            ...           f"{[c.name for c in f.term_columns]} terms")
         """
         return self._ml_instance.find_features(self.asset_table)
 
     def list_feature_values(self, feature_name: str) -> list["FeatureRecord"]:
-        """Get feature values for this specific asset.
+        """Get all feature values for this specific asset.
+
+        Returns all values for the named feature across the entire asset table
+        (not filtered to this asset). To get values for just this asset,
+        filter by the target column::
+
+            values = [v for v in asset.list_feature_values("Quality")
+                      if v.Image == asset.asset_rid]
+
+        Each returned FeatureRecord is a dynamically-generated Pydantic model
+        with typed fields matching the feature's definition, including
+        ``Execution`` (provenance), ``RCT`` (creation timestamp), and all
+        feature-specific columns (vocabulary terms, asset references, or
+        value columns).
 
         Args:
-            feature_name: Name of the feature to query.
+            feature_name: Name of the feature to query (e.g.,
+                ``"Classification"``, ``"Quality"``).
 
         Returns:
-            List of FeatureRecord instances for this asset. Each record has:
-                - Execution: RID of the execution that created this feature value
-                - Feature_Name: Name of the feature
-                - All feature-specific columns as typed attributes
-                - model_dump() method to convert back to a dictionary
+            List of FeatureRecord instances. Each record has:
+
+            - ``Execution``: RID of the execution that created this value
+            - ``Feature_Name``: Name of the feature
+            - ``RCT``: Row Creation Time (ISO 8601 timestamp)
+            - Feature-specific columns as typed attributes
+            - ``model_dump()``: Convert to a dictionary
 
         Example:
-            >>> values = asset.list_feature_values("quality_score")
+            >>> values = asset.list_feature_values("Quality")
             >>> for v in values:
-            ...     print(f"Score: {v.Score}, Execution: {v.Execution}")
-            >>> # Or convert to dict:
-            >>> dicts = [v.model_dump() for v in values]
+            ...     print(f"Image: {v.Image}, Score: {v.Score}, "
+            ...           f"Execution: {v.Execution}")
         """
         return list(self._ml_instance.list_feature_values(self.asset_table, feature_name))
 

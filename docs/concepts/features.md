@@ -258,8 +258,8 @@ When restructuring assets by a feature that has multiple values, you can provide
 from deriva_ml.dataset.dataset_bag import FeatureValueRecord
 
 def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-    """Select the value from the most recent execution."""
-    return max(records, key=lambda r: r.execution_rid or "")
+    """Select the value with the most recent creation time."""
+    return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
 
 bag.restructure_assets(
     asset_table="Image",

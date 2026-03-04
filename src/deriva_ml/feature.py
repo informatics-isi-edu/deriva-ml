@@ -31,33 +31,84 @@ if TYPE_CHECKING:
 class FeatureRecord(BaseModel):
     """Base class for dynamically generated feature record models.
 
-    This class serves as the base for pydantic models that represent feature records. Each feature record
-    contains the values and metadata associated with a feature instance.
+    This class serves as the base for pydantic models that represent feature
+    records. Each feature record contains the values and metadata associated
+    with a feature instance. Subclasses are created dynamically by
+    ``Feature.feature_record_class()`` with fields corresponding to the
+    feature's vocabulary terms, asset references, and metadata columns.
+
+    Feature records are returned by ``list_feature_values()`` and
+    ``fetch_table_features()``. They can also be constructed manually and
+    passed to ``Execution.add_features()`` to insert new values into the
+    catalog.
+
+    **Handling multiple values per target:**
+
+    When the same target object (e.g., an Image) has multiple feature values
+    — for example, labels from different annotators or model runs — use
+    a ``selector`` function to choose one. Pass it to ``fetch_table_features``
+    or ``list_feature_values``. A selector receives a list of FeatureRecord
+    instances for the same target and returns the selected one::
+
+        # Built-in: pick the most recently created record
+        features = ml.fetch_table_features(
+            "Image", selector=FeatureRecord.select_newest
+        )
+
+        # Custom: pick the record with highest confidence
+        def select_best(records):
+            return max(records, key=lambda r: getattr(r, "Confidence", 0))
+
+        features = ml.fetch_table_features("Image", selector=select_best)
 
     Attributes:
-        Execution (Optional[str]): RID of the execution that created this feature record.
+        Execution (Optional[str]): RID of the execution that created this
+            feature record. Links to the ``Execution`` table for provenance
+            tracking — use this to trace which workflow run produced this value.
         Feature_Name (str): Name of the feature this record belongs to.
-        feature (ClassVar[Optional[Feature]]): Reference to the Feature object that created this record.
-
-    Example:
-        >>> class GeneFeature(FeatureRecord):
-        ...     value: str
-        ...     confidence: float
-        >>> record = GeneFeature(
-        ...     Feature_Name="expression",
-        ...     value="high",
-        ...     confidence=0.95
-        ... )
+        RCT (Optional[str]): Row Creation Time — an ISO 8601 timestamp string
+            (e.g., ``"2024-06-15T10:30:00.000000+00:00"``). Populated
+            automatically when reading from the catalog or a dataset bag.
+            Used by ``select_newest`` to determine recency.
+        feature (ClassVar[Optional[Feature]]): Reference to the Feature
+            definition object. Provides access to the feature's column
+            metadata, target table, and vocabulary/asset column sets.
     """
 
     # model_dump of this feature should be compatible with feature table columns.
     Execution: Optional[str] = None
     Feature_Name: str
+    RCT: Optional[str] = None
     feature: ClassVar[Optional["Feature"]] = None
 
     class Config:
         arbitrary_types_allowed = True
         extra = "forbid"
+
+    @staticmethod
+    def select_newest(records: list["FeatureRecord"]) -> "FeatureRecord":
+        """Select the feature record with the most recent creation time.
+
+        Uses the RCT (Row Creation Time) field to determine recency. RCT is
+        an ISO 8601 timestamp string, so lexicographic comparison correctly
+        identifies the most recent record. Records with ``None`` RCT are
+        treated as older than any timestamped record.
+
+        This method is designed to be passed directly as the ``selector``
+        argument to ``fetch_table_features`` or ``list_feature_values``::
+
+            features = ml.fetch_table_features(
+                "Image", selector=FeatureRecord.select_newest
+            )
+
+        Args:
+            records: List of FeatureRecord instances for the same target
+                object. Must be non-empty.
+
+        Returns:
+            The FeatureRecord with the latest RCT value.
+        """
+        return max(records, key=lambda r: r.RCT or "")
 
     @classmethod
     def feature_columns(cls) -> set[Column]:

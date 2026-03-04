@@ -1219,7 +1219,7 @@ class Execution:
         with Path(json_path).open("a", encoding="utf-8") as file:
             for feature in features:
                 feature.Execution = self.execution_rid
-                file.write(json.dumps(feature.model_dump(mode="json")) + "\n")
+                file.write(json.dumps(feature.model_dump(mode="json", exclude={"RCT"})) + "\n")
 
     def list_input_datasets(self) -> list[Dataset]:
         """List all datasets that were inputs to this execution.

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+from collections import defaultdict
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
@@ -55,6 +56,8 @@ class FeatureMixin:
     pathBuilder: Callable[[], Any]
     add_term: Callable[..., VocabularyTerm]
     apply_catalog_annotations: Callable[[], None]
+    lookup_workflow: Callable[..., Any]
+    find_executions: Callable[..., Iterable[Any]]
 
     def create_feature(
         self,
@@ -262,25 +265,41 @@ class FeatureMixin:
             return False
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
-        """Retrieves a Feature object.
+        """Retrieve a Feature object describing a feature's structure.
 
-        Looks up and returns a Feature object that provides an interface to work with an existing feature
-        definition in the catalog.
+        Returns a Feature object that provides metadata about a feature
+        definition, including its target table, the association table that
+        stores values, and the roles of each column (vocabulary terms, asset
+        references, or direct value columns).
+
+        The Feature object is useful for:
+
+        - Inspecting what columns a feature has: ``feature.term_columns``,
+          ``feature.asset_columns``, ``feature.value_columns``
+        - Getting a Pydantic model for creating new records:
+          ``feature.feature_record_class()``
+        - Understanding the feature's storage:
+          ``feature.feature_table.name``
 
         Args:
-            table: The table containing the feature, either as name or Table object.
+            table: The table the feature is defined on (name or Table object).
             feature_name: Name of the feature to look up.
 
         Returns:
-            Feature: An object representing the feature and its implementation.
+            Feature: An object representing the feature definition with
+            attributes ``feature_name``, ``target_table``, ``feature_table``,
+            ``feature_columns``, ``term_columns``, ``asset_columns``, and
+            ``value_columns``.
 
         Raises:
-            DerivaMLException: If the feature doesn't exist in the specified table.
+            DerivaMLException: If the feature doesn't exist on the specified
+                table.
 
         Example:
-            >>> feature = ml.lookup_feature("samples", "expression_level")
-            >>> print(feature.feature_name)
-            'expression_level'
+            >>> feature = ml.lookup_feature("Image", "Classification")
+            >>> print(f"Feature: {feature.feature_name}")
+            >>> print(f"Stored in: {feature.feature_table.name}")
+            >>> print(f"Term columns: {[c.name for c in feature.term_columns]}")
         """
         return self.model.lookup_feature(table, feature_name)
 
@@ -310,56 +329,288 @@ class FeatureMixin:
         """
         return list(self.model.find_features(table))
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_feature_values(
-        self, table: Table | str, feature_name: str
-    ) -> Iterable[FeatureRecord]:
-        """Retrieves all values for a feature as typed FeatureRecord instances.
+    def fetch_table_features(
+        self,
+        table: Table | str,
+        feature_name: str | None = None,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord] | None = None,
+    ) -> dict[str, list[FeatureRecord]]:
+        """Fetch all feature values for a table, grouped by feature name.
 
-        Returns an iterator of dynamically-generated FeatureRecord objects for each
-        feature value. Each record is an instance of a Pydantic model specific to
-        this feature, with typed attributes for all columns including the Execution
-        that created the feature value.
+        Returns a dictionary mapping feature names to lists of FeatureRecord
+        instances. This is useful for retrieving all annotations on a table
+        in a single call — for example, getting all classification labels,
+        quality scores, and bounding boxes for a set of images at once.
+
+        **Selector for resolving multiple values:**
+
+        An asset may have multiple values for the same feature — for example,
+        labels from different annotators, or predictions from successive model
+        runs. When a ``selector`` is provided, records are grouped by target
+        RID and the selector is called once per group to pick a single value.
+        Groups with only one record are passed through unchanged.
+
+        A selector is any callable with signature
+        ``(list[FeatureRecord]) -> FeatureRecord``. Built-in selectors:
+
+        - ``FeatureRecord.select_newest`` — picks the record with the most
+          recent ``RCT`` (Row Creation Time).
+
+        Custom selector example::
+
+            def select_highest_confidence(records):
+                return max(records, key=lambda r: getattr(r, "Confidence", 0))
+
+        For workflow-aware selection, see ``select_by_workflow()``.
 
         Args:
-            table: The table containing the feature, either as name or Table object.
-            feature_name: Name of the feature to retrieve values for.
+            table: The table to fetch features for (name or Table object).
+            feature_name: If provided, only fetch values for this specific
+                feature. If ``None``, fetch all features on the table.
+            selector: Optional function to select among multiple feature values
+                for the same target object. Receives a list of FeatureRecord
+                instances (all for the same target RID) and returns the selected
+                one.
 
         Returns:
-            Iterable[FeatureRecord]: An iterator of FeatureRecord instances.
-                Each instance has:
-                - Execution: RID of the execution that created this feature value
-                - Feature_Name: Name of the feature
-                - All feature-specific columns as typed attributes
-                - model_dump() method to convert back to a dictionary
+            dict[str, list[FeatureRecord]]: Keys are feature names, values are
+            lists of FeatureRecord instances. When a selector is provided, each
+            target object appears at most once per feature.
 
         Raises:
-            DerivaMLException: If the feature doesn't exist or cannot be accessed.
+            DerivaMLException: If a specified ``feature_name`` doesn't exist
+                on the table.
 
-        Example:
-            >>> # Get typed feature records
-            >>> for record in ml.list_feature_values("Image", "Quality"):
-            ...     print(f"Image {record.Image}: {record.ImageQuality}")
-            ...     print(f"Created by execution: {record.Execution}")
+        Examples:
+            Fetch all features for a table::
 
-            >>> # Convert records to dictionaries
-            >>> records = list(ml.list_feature_values("Image", "Quality"))
-            >>> dicts = [r.model_dump() for r in records]
+                >>> features = ml.fetch_table_features("Image")
+                >>> for name, records in features.items():
+                ...     print(f"{name}: {len(records)} values")
+
+            Fetch a single feature with newest-value selection::
+
+                >>> features = ml.fetch_table_features(
+                ...     "Image",
+                ...     feature_name="Classification",
+                ...     selector=FeatureRecord.select_newest,
+                ... )
+
+            Convert results to a DataFrame::
+
+                >>> features = ml.fetch_table_features("Image", feature_name="Quality")
+                >>> import pandas as pd
+                >>> df = pd.DataFrame([r.model_dump() for r in features["Quality"]])
         """
-        # Get table and feature
         table = self.model.name_to_table(table)
-        feature = self.lookup_feature(table, feature_name)
+        features = self.find_features(table)
+        if feature_name is not None:
+            features = [f for f in features if f.feature_name == feature_name]
+            if not features:
+                raise DerivaMLException(
+                    f"Feature '{feature_name}' not found on table '{table.name}'."
+                )
 
-        # Get the dynamically-generated FeatureRecord subclass for this feature
-        record_class = feature.feature_record_class()
+        result: dict[str, list[FeatureRecord]] = {}
 
-        # Build and execute query for feature values
-        pb = self.pathBuilder()
-        raw_values = pb.schemas[feature.feature_table.schema.name].tables[feature.feature_table.name].entities().fetch()
-
-        for raw_value in raw_values:
-            # Create a record instance from the raw dictionary
-            # Filter to only include fields that the record class expects
+        for feat in features:
+            record_class = feat.feature_record_class()
             field_names = set(record_class.model_fields.keys())
-            filtered_data = {k: v for k, v in raw_value.items() if k in field_names}
-            yield record_class(**filtered_data)
+            target_col = feat.target_table.name
+
+            # Query all feature values
+            pb = self.pathBuilder()
+            raw_values = (
+                pb.schemas[feat.feature_table.schema.name]
+                .tables[feat.feature_table.name]
+                .entities()
+                .fetch()
+            )
+
+            records: list[FeatureRecord] = []
+            for raw_value in raw_values:
+                filtered_data = {k: v for k, v in raw_value.items() if k in field_names}
+                records.append(record_class(**filtered_data))
+
+            if selector and records:
+                # Group by target RID and apply selector
+                grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+                for rec in records:
+                    target_rid = getattr(rec, target_col, None)
+                    if target_rid is not None:
+                        grouped[target_rid].append(rec)
+                records = [
+                    selector(group) if len(group) > 1 else group[0]
+                    for group in grouped.values()
+                ]
+
+            result[feat.feature_name] = records
+
+        return result
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def list_feature_values(
+        self,
+        table: Table | str,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord] | None = None,
+    ) -> Iterable[FeatureRecord]:
+        """Retrieve all values for a single feature as typed FeatureRecord instances.
+
+        Convenience wrapper around ``fetch_table_features()`` for the common
+        case of querying a single feature by name. Returns a flat list of
+        FeatureRecord objects — one per feature value (or one per target object
+        when a ``selector`` is provided).
+
+        Each returned record is a dynamically-generated Pydantic model with
+        typed fields matching the feature's definition. For example, an
+        ``Image_Classification`` feature might produce records with fields
+        ``Image`` (str), ``Image_Class`` (str), ``Execution`` (str),
+        ``RCT`` (str), and ``Feature_Name`` (str).
+
+        Args:
+            table: The table the feature is defined on (name or Table object).
+            feature_name: Name of the feature to retrieve values for.
+            selector: Optional function to resolve multiple values per target.
+                See ``fetch_table_features`` for details on how selectors work.
+                Use ``FeatureRecord.select_newest`` to pick the most recently
+                created value.
+
+        Returns:
+            Iterable[FeatureRecord]: FeatureRecord instances with:
+
+            - ``Execution``: RID of the execution that created this value
+            - ``Feature_Name``: Name of the feature
+            - ``RCT``: Row Creation Time (ISO 8601 timestamp)
+            - Feature-specific columns as typed attributes (vocabulary terms,
+              asset references, or value columns depending on the feature)
+            - ``model_dump()``: Convert to a dictionary
+
+        Raises:
+            DerivaMLException: If the feature doesn't exist on the table.
+
+        Examples:
+            Get typed feature records::
+
+                >>> for record in ml.list_feature_values("Image", "Quality"):
+                ...     print(f"Image {record.Image}: {record.ImageQuality}")
+                ...     print(f"Created by execution: {record.Execution}")
+
+            Select newest when multiple values exist::
+
+                >>> records = list(ml.list_feature_values(
+                ...     "Image", "Quality",
+                ...     selector=FeatureRecord.select_newest,
+                ... ))
+
+            Convert to a list of dicts::
+
+                >>> dicts = [r.model_dump() for r in
+                ...          ml.list_feature_values("Image", "Classification")]
+        """
+        result = self.fetch_table_features(table, feature_name=feature_name, selector=selector)
+        return result.get(feature_name, [])
+
+    def select_by_workflow(
+        self,
+        records: list[FeatureRecord],
+        workflow: str,
+    ) -> FeatureRecord:
+        """Select the newest feature record created by a specific workflow.
+
+        Filters a list of FeatureRecord instances to only those whose
+        ``Execution`` was created by a matching workflow, then returns the
+        newest match by RCT. This is useful when multiple model runs or
+        annotators have labeled the same data and you want to use values
+        from a particular workflow.
+
+        **Resolution chain:**
+
+        The ``workflow`` argument is first tried as a Workflow RID. If no
+        workflow is found with that RID, it is treated as a Workflow_Type
+        name (e.g., ``"Training"``, ``"Feature_Creation"``). The resolution
+        chain is:
+
+        1. ``workflow`` → ``Workflow.RID`` → all Executions for that workflow
+        2. ``workflow`` → ``Workflow_Type.Name`` → all Workflows of that type
+           → all Executions for those workflows
+
+        Matching records are then filtered by ``Execution`` and the newest
+        (by RCT) is returned.
+
+        Note: Unlike ``FeatureRecord.select_newest``, this method cannot be
+        passed directly as a ``selector`` argument because it requires catalog
+        access. Call it directly on a list of records instead.
+
+        Args:
+            records: List of FeatureRecord instances to select from. Typically
+                all values for a single target object from one feature.
+            workflow: Either a Workflow RID (e.g., ``"2-ABC1"``) or a
+                Workflow_Type name (e.g., ``"Training"``). Auto-detected:
+                tries RID lookup first, falls back to type name.
+
+        Returns:
+            The newest FeatureRecord whose execution matches the workflow.
+
+        Raises:
+            DerivaMLException: If no workflows match the given identifier,
+                no executions exist for the matched workflow(s), or no
+                records in the input list were created by matching executions.
+
+        Examples:
+            Select the newest label from any Training workflow::
+
+                >>> all_values = ml.list_feature_values("Image", "Classification")
+                >>> from collections import defaultdict
+                >>> by_image = defaultdict(list)
+                >>> for v in all_values:
+                ...     by_image[v.Image].append(v)
+                >>> selected = {
+                ...     img: ml.select_by_workflow(recs, "Training")
+                ...     for img, recs in by_image.items()
+                ... }
+
+            Select by a specific workflow RID::
+
+                >>> record = ml.select_by_workflow(records, "2-ABC1")
+        """
+        # Determine matching execution RIDs
+        matching_execution_rids: set[str] = set()
+
+        # Try as a Workflow RID first
+        try:
+            wf = self.lookup_workflow(workflow)
+            # Found a workflow — get all executions for this workflow
+            for exec_record in self.find_executions(workflow=wf):
+                matching_execution_rids.add(exec_record.execution_rid)
+        except DerivaMLException:
+            # Not a valid workflow RID — treat as Workflow_Type name
+            pb = self.pathBuilder()
+            wt_assoc = pb.schemas[self.ml_schema].Workflow_Workflow_Type
+            matching_workflows = {
+                row["Workflow"]
+                for row in wt_assoc.filter(
+                    wt_assoc.Workflow_Type == workflow
+                ).entities().fetch()
+            }
+            if not matching_workflows:
+                raise DerivaMLException(
+                    f"No workflows found for workflow type '{workflow}'."
+                )
+            for exec_record in self.find_executions():
+                if exec_record.workflow_rid in matching_workflows:
+                    matching_execution_rids.add(exec_record.execution_rid)
+
+        if not matching_execution_rids:
+            raise DerivaMLException(
+                f"No executions found for workflow '{workflow}'."
+            )
+
+        # Filter records to those matching the workflow's executions
+        filtered = [r for r in records if r.Execution in matching_execution_rids]
+        if not filtered:
+            raise DerivaMLException(
+                f"No feature records match workflow '{workflow}'."
+            )
+
+        return FeatureRecord.select_newest(filtered)

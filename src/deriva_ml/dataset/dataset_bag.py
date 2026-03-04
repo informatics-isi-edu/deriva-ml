@@ -67,37 +67,53 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 @dataclass
 class FeatureValueRecord:
-    """A feature value record with execution provenance.
+    """A simplified feature value record used internally by ``restructure_assets``.
 
-    This class represents a single feature value assigned to an asset,
-    including the execution that created it. Used by restructure_assets
-    when a value_selector function needs to choose between multiple
-    feature values for the same asset.
+    This is a lightweight dataclass (not a Pydantic model) that wraps a single
+    feature value together with its execution provenance and the raw record
+    data. It is used specifically by the ``restructure_assets`` method and its
+    ``value_selector`` parameter — it is *not* the same as ``FeatureRecord``,
+    which is the typed Pydantic model used by ``list_feature_values`` and
+    ``fetch_table_features``.
 
-    The raw_record attribute contains the complete feature table row as
-    a dictionary, which can be used to access all columns including any
-    additional metadata or columns beyond the primary value.
+    **When to use which:**
+
+    - ``FeatureRecord`` — returned by ``list_feature_values()`` and
+      ``fetch_table_features()``. A typed Pydantic model with named attributes
+      for each feature column. Use ``selector`` parameter with these.
+    - ``FeatureValueRecord`` — used only by ``restructure_assets()``'s
+      ``value_selector`` parameter. A simpler dataclass with a generic
+      ``value`` field and a ``raw_record`` dict for accessing all columns.
+
+    The ``raw_record`` attribute contains the complete feature table row as
+    a dictionary, including system columns like ``RCT`` (Row Creation Time)
+    that can be used for ordering.
 
     Attributes:
         target_rid: RID of the asset/entity this feature value applies to.
         feature_name: Name of the feature.
-        value: The feature value (typically a vocabulary term name).
-        execution_rid: RID of the execution that created this feature value, if any.
-            Use this to distinguish between values from different executions.
-        raw_record: The complete raw record from the feature table as a dictionary.
-            Access all columns via dict keys, e.g., record.raw_record["MyColumn"].
+        value: The resolved feature value (typically a vocabulary term name).
+        execution_rid: RID of the execution that created this feature value,
+            if any. Use this to distinguish between values from different
+            executions or model runs.
+        raw_record: The complete raw record from the feature table as a
+            dictionary. Includes all columns — system columns like ``RCT``
+            and ``RID``, the target column, ``Execution``, and all
+            feature-specific columns. Access via dict keys, e.g.,
+            ``record.raw_record["RCT"]``.
 
     Example:
         Using a value_selector to choose the most recent feature value::
 
-            def select_by_execution(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-                # Select value from most recent execution (assuming RIDs are sortable)
-                return max(records, key=lambda r: r.execution_rid or "")
+            def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+                # Select value with the most recent creation time (RCT is an
+                # ISO 8601 timestamp, so lexicographic comparison works)
+                return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
 
             bag.restructure_assets(
                 output_dir="./ml_data",
                 group_by=["Diagnosis"],
-                value_selector=select_by_execution,
+                value_selector=select_latest,
             )
 
         Accessing raw record data::
@@ -463,70 +479,212 @@ class DatasetBag:
         return dict(members)
 
     def find_features(self, table: str | Table) -> Iterable[Feature]:
-        """Find features for a table.
+        """Find all features defined on a table within this dataset bag.
+
+        Features are measurable properties associated with records in a table,
+        stored as association tables linking the target table to vocabulary
+        terms, assets, or metadata columns. This method discovers all such
+        feature definitions for the given table.
+
+        Each returned ``Feature`` object provides:
+
+        - ``feature_name``: The feature's name (e.g., ``"Classification"``)
+        - ``target_table``: The table the feature applies to
+        - ``feature_table``: The association table storing feature values
+        - ``term_columns``, ``asset_columns``, ``value_columns``: Column role sets
+        - ``feature_record_class()``: A Pydantic model for reading/writing values
 
         Args:
-            table: The table to find features for.
+            table: The table to find features for (name or Table object).
 
         Returns:
-            An iterable of Feature instances.
+            An iterable of Feature instances describing each feature
+            defined on the table.
+
+        Example:
+            >>> for f in bag.find_features("Image"):
+            ...     print(f"{f.feature_name}: {len(f.term_columns)} terms, "
+            ...           f"{len(f.value_columns)} value columns")
         """
         return self.model.find_features(table)
 
-    def list_feature_values(
-        self, table: Table | str, feature_name: str
-    ) -> Iterable[FeatureRecord]:
-        """Retrieves all values for a feature as typed FeatureRecord instances.
+    def fetch_table_features(
+        self,
+        table: Table | str,
+        feature_name: str | None = None,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord] | None = None,
+    ) -> dict[str, list[FeatureRecord]]:
+        """Fetch all feature values for a table, grouped by feature name.
 
-        Returns an iterator of dynamically-generated FeatureRecord objects for each
-        feature value. Each record is an instance of a Pydantic model specific to
-        this feature, with typed attributes for all columns including the Execution
-        that created the feature value.
+        Queries the local SQLite database within this dataset bag and returns
+        a dictionary mapping feature names to lists of FeatureRecord instances.
+        This is useful for retrieving all annotations on a table in a single
+        call — for example, getting all classification labels, quality scores,
+        and bounding boxes for a set of images at once.
+
+        **Selector for resolving multiple values:**
+
+        An asset may have multiple values for the same feature — for example,
+        labels from different annotators or model runs. When a ``selector`` is
+        provided, records are grouped by target RID and the selector is called
+        once per group to pick a single value. Groups with only one record
+        are passed through unchanged.
+
+        A selector is any callable with signature
+        ``(list[FeatureRecord]) -> FeatureRecord``. Built-in selectors:
+
+        - ``FeatureRecord.select_newest`` — picks the record with the most
+          recent ``RCT`` (Row Creation Time).
+
+        Custom selector example::
+
+            def select_highest_confidence(records):
+                return max(records, key=lambda r: getattr(r, "Confidence", 0))
 
         Args:
-            table: The table containing the feature, either as name or Table object.
-            feature_name: Name of the feature to retrieve values for.
+            table: The table to fetch features for (name or Table object).
+            feature_name: If provided, only fetch values for this specific
+                feature. If ``None``, fetch all features on the table.
+            selector: Optional function to select among multiple feature values
+                for the same target object. Receives a list of FeatureRecord
+                instances (all for the same target RID) and returns the selected
+                one.
 
         Returns:
-            Iterable[FeatureRecord]: An iterator of FeatureRecord instances.
-                Each instance has:
-                - Execution: RID of the execution that created this feature value
-                - Feature_Name: Name of the feature
-                - All feature-specific columns as typed attributes
-                - model_dump() method to convert back to a dictionary
+            dict[str, list[FeatureRecord]]: Keys are feature names, values are
+            lists of FeatureRecord instances. When a selector is provided, each
+            target object appears at most once per feature.
 
         Raises:
-            DerivaMLException: If the feature doesn't exist or cannot be accessed.
+            DerivaMLException: If a specified ``feature_name`` doesn't exist
+                on the table.
 
-        Example:
-            >>> # Get typed feature records
-            >>> for record in bag.list_feature_values("Image", "Quality"):
-            ...     print(f"Image {record.Image}: {record.ImageQuality}")
-            ...     print(f"Created by execution: {record.Execution}")
+        Examples:
+            Fetch all features for a table::
 
-            >>> # Convert records to dictionaries
-            >>> records = list(bag.list_feature_values("Image", "Quality"))
-            >>> dicts = [r.model_dump() for r in records]
+                >>> features = bag.fetch_table_features("Image")
+                >>> for name, records in features.items():
+                ...     print(f"{name}: {len(records)} values")
+
+            Fetch a single feature with newest-value selection::
+
+                >>> features = bag.fetch_table_features(
+                ...     "Image",
+                ...     feature_name="Classification",
+                ...     selector=FeatureRecord.select_newest,
+                ... )
+
+            Convert results to a DataFrame::
+
+                >>> features = bag.fetch_table_features("Image", feature_name="Quality")
+                >>> import pandas as pd
+                >>> df = pd.DataFrame([r.model_dump() for r in features["Quality"]])
         """
-        # Get table and feature
-        feature = self.model.lookup_feature(table, feature_name)
+        features = list(self.find_features(table))
+        if feature_name is not None:
+            features = [f for f in features if f.feature_name == feature_name]
+            if not features:
+                table_name = table if isinstance(table, str) else table.name
+                raise DerivaMLException(
+                    f"Feature '{feature_name}' not found on table '{table_name}'."
+                )
 
-        # Get the dynamically-generated FeatureRecord subclass for this feature
-        record_class = feature.feature_record_class()
+        result: dict[str, list[FeatureRecord]] = {}
 
-        # Query raw values from SQLite
-        feature_table = self.model.find_table(feature.feature_table.name)
-        with Session(self.engine) as session:
-            sql_cmd = select(feature_table)
-            result = session.execute(sql_cmd)
-            rows = [dict(row._mapping) for row in result]
-
-        # Convert to typed records
-        for raw_value in rows:
-            # Filter to only include fields that the record class expects
+        for feat in features:
+            record_class = feat.feature_record_class()
             field_names = set(record_class.model_fields.keys())
-            filtered_data = {k: v for k, v in raw_value.items() if k in field_names}
-            yield record_class(**filtered_data)
+            target_col = feat.target_table.name
+
+            # Query raw values from SQLite
+            feature_table = self.model.find_table(feat.feature_table.name)
+            with Session(self.engine) as session:
+                sql_cmd = select(feature_table)
+                sql_result = session.execute(sql_cmd)
+                rows = [dict(row._mapping) for row in sql_result]
+
+            records: list[FeatureRecord] = []
+            for raw_value in rows:
+                filtered_data = {k: v for k, v in raw_value.items() if k in field_names}
+                records.append(record_class(**filtered_data))
+
+            if selector and records:
+                # Group by target RID and apply selector
+                grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+                for rec in records:
+                    target_rid = getattr(rec, target_col, None)
+                    if target_rid is not None:
+                        grouped[target_rid].append(rec)
+                records = [
+                    selector(group) if len(group) > 1 else group[0]
+                    for group in grouped.values()
+                ]
+
+            result[feat.feature_name] = records
+
+        return result
+
+    def list_feature_values(
+        self,
+        table: Table | str,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord] | None = None,
+    ) -> Iterable[FeatureRecord]:
+        """Retrieve all values for a single feature as typed FeatureRecord instances.
+
+        Convenience wrapper around ``fetch_table_features()`` for the common
+        case of querying a single feature by name. Returns a flat list of
+        FeatureRecord objects — one per feature value (or one per target object
+        when a ``selector`` is provided).
+
+        Each returned record is a dynamically-generated Pydantic model with
+        typed fields matching the feature's definition. For example, an
+        ``Image_Classification`` feature might produce records with fields
+        ``Image`` (str), ``Image_Class`` (str), ``Execution`` (str),
+        ``RCT`` (str), and ``Feature_Name`` (str).
+
+        Args:
+            table: The table the feature is defined on (name or Table object).
+            feature_name: Name of the feature to retrieve values for.
+            selector: Optional function to resolve multiple values per target.
+                See ``fetch_table_features`` for details on how selectors work.
+                Use ``FeatureRecord.select_newest`` to pick the most recently
+                created value.
+
+        Returns:
+            Iterable[FeatureRecord]: FeatureRecord instances with:
+
+            - ``Execution``: RID of the execution that created this value
+            - ``Feature_Name``: Name of the feature
+            - ``RCT``: Row Creation Time (ISO 8601 timestamp)
+            - Feature-specific columns as typed attributes (vocabulary terms,
+              asset references, or value columns depending on the feature)
+            - ``model_dump()``: Convert to a dictionary
+
+        Raises:
+            DerivaMLException: If the feature doesn't exist on the table.
+
+        Examples:
+            Get typed feature records::
+
+                >>> for record in bag.list_feature_values("Image", "Quality"):
+                ...     print(f"Image {record.Image}: {record.ImageQuality}")
+                ...     print(f"Created by execution: {record.Execution}")
+
+            Select newest when multiple values exist::
+
+                >>> records = list(bag.list_feature_values(
+                ...     "Image", "Quality",
+                ...     selector=FeatureRecord.select_newest,
+                ... ))
+
+            Convert to a list of dicts::
+
+                >>> dicts = [r.model_dump() for r in
+                ...          bag.list_feature_values("Image", "Classification")]
+        """
+        result = self.fetch_table_features(table, feature_name=feature_name, selector=selector)
+        return result.get(feature_name, [])
 
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of elements that can be contained in datasets.
@@ -1451,8 +1609,8 @@ class DatasetBag:
             Handle multiple feature values with a selector::
 
                 def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-                    # Select value from most recent execution
-                    return max(records, key=lambda r: r.execution_rid or "")
+                    # Select value with the most recent creation time
+                    return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
 
                 bag.restructure_assets(
                     output_dir="./ml_data",
