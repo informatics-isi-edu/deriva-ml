@@ -118,6 +118,7 @@ class DatasetHistory(BaseModel):
     execution_rid: Optional[RID] = None
     description: str | None = ""
     minid: str | None = None
+    spec_hash: str | None = None
     snapshot: str | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

@@ -494,6 +494,7 @@ class Dataset:
             DatasetHistory(
                 dataset_version=DatasetVersion.parse(v["Version"]),
                 minid=v["Minid"],
+                spec_hash=v.get("Minid_Spec_Hash"),
                 snapshot=v["Snapshot"],
                 dataset_rid=self.dataset_rid,
                 version_rid=v["RID"],
@@ -1589,7 +1590,14 @@ class Dataset:
         staging_dir.rename(bag_dir)
         return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
 
-    def _create_dataset_minid(self, version: DatasetVersion, use_minid=True, exclude_tables: set[str] | None = None) -> str:
+    def _create_dataset_minid(
+        self,
+        version: DatasetVersion,
+        use_minid: bool = True,
+        exclude_tables: set[str] | None = None,
+        spec: dict | None = None,
+        spec_hash: str | None = None,
+    ) -> str:
         """Create a new MINID (Minimal Viable Identifier) for the dataset.
 
         This method generates a BDBag export of the dataset and optionally
@@ -1600,23 +1608,34 @@ class Dataset:
             version: The dataset version to create a MINID for.
             use_minid: If True, register with MINID service and upload to S3.
                 If False, just generate the bag and return a local URL.
+            exclude_tables: Optional set of table names to exclude from FK traversal.
+            spec: Optional pre-computed download spec dict. If None, the spec is
+                generated from the snapshot catalog.
+            spec_hash: Optional pre-computed SHA-256 hash of the spec. If None and
+                spec is provided, it is computed from the spec.
 
         Returns:
             str: URL to the MINID landing page (if use_minid=True) or
                 the direct bag download URL.
         """
+        import hashlib
+
         with TemporaryDirectory() as tmp_dir:
-            # Generate a download specification file for the current catalog schema. By default, this spec
-            # will generate a minid and place the bag into S3 storage.
+            # Generate spec if not supplied (allows callers to reuse a spec they already computed).
+            if spec is None:
+                version_snapshot_catalog = self._version_snapshot_catalog(version)
+                downloader = CatalogGraph(
+                    version_snapshot_catalog,
+                    s3_bucket=self._ml_instance.s3_bucket,
+                    use_minid=use_minid,
+                    exclude_tables=exclude_tables,
+                )
+                spec = downloader.generate_dataset_download_spec(self)
+
+            if spec_hash is None:
+                spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
+
             spec_file = Path(tmp_dir) / "download_spec.json"
-            version_snapshot_catalog = self._version_snapshot_catalog(version)
-            downloader = CatalogGraph(
-                version_snapshot_catalog,
-                s3_bucket=self._ml_instance.s3_bucket,
-                use_minid=use_minid,
-                exclude_tables=exclude_tables,
-            )
-            spec = downloader.generate_dataset_download_spec(self)
             with spec_file.open("w", encoding="utf-8") as ds:
                 json.dump(spec, ds)
 
@@ -1649,12 +1668,12 @@ class Dataset:
                     DerivaDownloadTimeoutError,
                 ) as e:
                     raise DerivaMLException(format_exception(e))
-                # Update version table with MINID.
+                # Update version table with MINID and spec hash.
                 version_path = (
                     self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
                 )
                 version_rid = [h for h in self.dataset_history() if h.dataset_version == version][0].version_rid
-                version_path.update([{"RID": version_rid, "Minid": minid_page_url}])
+                version_path.update([{"RID": version_rid, "Minid": minid_page_url, "Minid_Spec_Hash": spec_hash}])
                 return minid_page_url
             else:
                 # Client-side download: runs queries locally with paged query support
@@ -1908,17 +1927,45 @@ class Dataset:
 
         # Check or create MINID
         minid_url = version_record.minid
-        # If we either don't have a MINID, or we have a MINID, but we don't want to use it, generate a new one.
-        if (not minid_url) or (not use_minid):
+
+        if use_minid:
+            # For MINID-based downloads, check whether the stored bag is still current by comparing
+            # the spec hash. Generate the spec now (once) so we can compare and potentially reuse it.
+            import hashlib
+            version_snapshot_catalog = self._version_snapshot_catalog(version)
+            downloader = CatalogGraph(
+                version_snapshot_catalog,
+                s3_bucket=self._ml_instance.s3_bucket,
+                use_minid=use_minid,
+                exclude_tables=exclude_tables,
+            )
+            spec = downloader.generate_dataset_download_spec(self)
+            current_spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
+
+            if minid_url and version_record.spec_hash == current_spec_hash:
+                # Stored MINID was generated from the same spec — bag content is still valid.
+                return self._fetch_minid_metadata(version, minid_url)
+
+            # No MINID, or spec has changed (schema/traversal/exclude_tables updated).
             if not create:
                 raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-            if use_minid:
+            if minid_url:
+                self._logger.info(
+                    "Spec hash changed for dataset %s version %s — regenerating MINID bag.",
+                    self.dataset_rid, version,
+                )
+            else:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
-            minid_url = self._create_dataset_minid(version, use_minid=use_minid, exclude_tables=exclude_tables)
-
-        # Return based on MINID usage
-        if use_minid:
+            minid_url = self._create_dataset_minid(
+                version, use_minid=True, exclude_tables=exclude_tables,
+                spec=spec, spec_hash=current_spec_hash,
+            )
             return self._fetch_minid_metadata(version, minid_url)
+
+        # use_minid=False: always regenerate bag client-side (caching handled by sha256 in _download_dataset_minid).
+        if not create and not minid_url:
+            raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
+        minid_url = self._create_dataset_minid(version, use_minid=False, exclude_tables=exclude_tables)
         return DatasetMinid(
             dataset_version=version,
             RID=f"{self.dataset_rid}@{version_record.snapshot}",

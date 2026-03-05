@@ -95,6 +95,12 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None) 
             ColumnDef("Execution", BuiltinType.text, comment="RID of execution"),
             ColumnDef("Minid", BuiltinType.text, comment="URL to MINID for dataset"),
             ColumnDef(
+                name="Minid_Spec_Hash",
+                type=BuiltinType.text,
+                comment="SHA-256 hash of the download spec used to generate the MINID bag. "
+                        "Used to detect stale MINIDs when the schema or traversal paths change.",
+            ),
+            ColumnDef(
                 name="Snapshot",
                 type=BuiltinType.text,
                 comment="Catalog Snapshot ID for dataset",
