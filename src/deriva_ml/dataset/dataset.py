@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 from collections import defaultdict
 
 # Standard library imports
@@ -1570,9 +1571,23 @@ class Dataset:
                 if bag_dir.exists():
                     self._logger.info(f"Using cached bag for  {minid.dataset_rid} Version:{minid.dataset_version}")
                     return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
-            bag_path = bdb.extract_bag(archive_path, bag_dir.as_posix())
-        bdb.validate_bag_structure(bag_path)
-        return Path(bag_path)
+
+            # Extract to a staging directory first so the cache is only populated on success.
+            # This prevents partial/corrupt caches if extraction or validation fails.
+            staging_dir = self._ml_instance.cache_dir / f"{bag_dir.name}_staging"
+            if staging_dir.exists():
+                shutil.rmtree(staging_dir)
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                extracted_bag_path = bdb.extract_bag(archive_path, staging_dir.as_posix())
+                bdb.validate_bag_structure(extracted_bag_path)
+            except Exception:
+                shutil.rmtree(staging_dir, ignore_errors=True)
+                raise
+
+        # Move to final cache location only after successful extract + validate.
+        staging_dir.rename(bag_dir)
+        return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
 
     def _create_dataset_minid(self, version: DatasetVersion, use_minid=True, exclude_tables: set[str] | None = None) -> str:
         """Create a new MINID (Minimal Viable Identifier) for the dataset.
@@ -1927,6 +1942,36 @@ class Dataset:
         r.raise_for_status()
         return DatasetMinid(dataset_version=version, **r.json())
 
+    @staticmethod
+    def _bag_is_fully_materialized(bag_path: Path) -> bool:
+        """Check whether all fetch.txt entries have been downloaded locally.
+
+        Uses bdbag's validate_bag_structure for a quick structural check, then
+        verifies that every file referenced in fetch.txt is present on disk.
+
+        Args:
+            bag_path: Path to the BDBag directory.
+
+        Returns:
+            True if the bag has no fetch.txt or all fetch.txt entries exist locally.
+            False if any referenced file is missing.
+        """
+        try:
+            bdb.validate_bag_structure(bag_path.as_posix())
+        except Exception:
+            return False
+        fetch_file = bag_path / "fetch.txt"
+        if not fetch_file.exists():
+            return True
+        with fetch_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split("\t")
+                if len(parts) >= 3:
+                    rel_path = parts[2]
+                    if not (bag_path / rel_path).exists():
+                        return False
+        return True
+
     def _materialize_dataset_bag(
         self,
         minid: DatasetMinid,
@@ -1984,22 +2029,35 @@ class Dataset:
         bag_dir = bag_path.parent
         validated_check = bag_dir / "validated_check.txt"
 
-        # If this bag has already been validated, our work is done.  Otherwise, materialize the bag.
-        if not validated_check.exists():
-            self._logger.info(f"Materializing bag {minid.dataset_rid} Version:{minid.dataset_version}")
-            # Ensure parent directories exist for all fetch entries
-            fetch_file = bag_path / "fetch.txt"
-            if fetch_file.exists():
-                with fetch_file.open("r", encoding="utf-8") as f:
-                    for line in f:
-                        parts = line.strip().split("\t")
-                        if len(parts) >= 3:
-                            rel_path = parts[2]
-                            (bag_path / rel_path).parent.mkdir(parents=True, exist_ok=True)
-            bdb.materialize(
-                bag_path.as_posix(),
-                fetch_callback=fetch_progress_callback,
-                validation_callback=validation_progress_callback,
-            )
-            validated_check.touch()
+        # If this bag has already been validated, verify completeness using bdbag before trusting the cache.
+        # This guards against caches that were marked valid but have missing fetch.txt assets.
+        if validated_check.exists():
+            if self._bag_is_fully_materialized(bag_path):
+                self._logger.info(
+                    f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} verified as complete."
+                )
+                return Path(bag_path)
+            else:
+                self._logger.warning(
+                    f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} is incomplete "
+                    f"(fetch.txt entries missing). Re-materializing."
+                )
+                validated_check.unlink(missing_ok=True)
+
+        self._logger.info(f"Materializing bag {minid.dataset_rid} Version:{minid.dataset_version}")
+        # Ensure parent directories exist for all fetch entries
+        fetch_file = bag_path / "fetch.txt"
+        if fetch_file.exists():
+            with fetch_file.open("r", encoding="utf-8") as f:
+                for line in f:
+                    parts = line.strip().split("\t")
+                    if len(parts) >= 3:
+                        rel_path = parts[2]
+                        (bag_path / rel_path).parent.mkdir(parents=True, exist_ok=True)
+        bdb.materialize(
+            bag_path.as_posix(),
+            fetch_callback=fetch_progress_callback,
+            validation_callback=validation_progress_callback,
+        )
+        validated_check.touch()
         return Path(bag_path)
