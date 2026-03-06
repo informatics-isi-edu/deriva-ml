@@ -134,6 +134,62 @@ class FeatureValueRecord:
                 f"execution_rid='{self.execution_rid}')")
 
 
+# ---------------------------------------------------------------------------
+# Built-in value selectors for use with restructure_assets()
+# ---------------------------------------------------------------------------
+
+def select_majority_vote(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    """Select the most common label; break ties by the most recent RCT.
+
+    Use this when the same asset has been annotated by multiple executions and
+    you want the label that the majority of annotators agreed on.  Ties (equal
+    vote counts) are broken by choosing the record with the latest ``RCT``
+    (Row Creation Time) timestamp — ISO-8601 strings compare lexicographically.
+
+    Args:
+        records: Non-empty list of conflicting feature value records for one asset.
+
+    Returns:
+        The record whose ``value`` appears most often across all records.
+    """
+    from collections import Counter
+    counts = Counter(r.value for r in records)
+    max_count = max(counts.values())
+    majority_values = {v for v, c in counts.items() if c == max_count}
+    candidates = [r for r in records if r.value in majority_values]
+    return max(candidates, key=lambda r: r.raw_record.get("RCT", "") or "")
+
+
+def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    """Select the most recently created feature value (highest RCT).
+
+    Use this when you trust the most recent annotation more than earlier ones
+    (e.g. a relabelling pass that corrects earlier mistakes).
+
+    Args:
+        records: Non-empty list of conflicting feature value records for one asset.
+
+    Returns:
+        The record with the latest ``RCT`` (Row Creation Time) timestamp.
+    """
+    return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
+
+
+def select_first(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    """Select the earliest created feature value (lowest RCT).
+
+    Use this when you want to preserve the original annotation and ignore later
+    revisions.
+
+    Args:
+        records: Non-empty list of conflicting feature value records for one asset.
+
+    Returns:
+        The record with the earliest ``RCT`` (Row Creation Time) timestamp.
+    """
+    return min(records, key=lambda r: r.raw_record.get("RCT", "") or "")
+
+
 class DatasetBag:
     """Read-only interface to a downloaded dataset bag.
 

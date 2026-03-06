@@ -1,6 +1,12 @@
 from .aux_classes import DatasetSpec, DatasetSpecConfig, DatasetVersion, VersionPart
 from .dataset import Dataset
-from .dataset_bag import DatasetBag, FeatureValueRecord
+from .dataset_bag import (
+    DatasetBag,
+    FeatureValueRecord,
+    select_first,
+    select_latest,
+    select_majority_vote,
+)
 from .split import (
     SelectionFunction,
     random_split,
@@ -18,6 +24,9 @@ __all__ = [
     "SelectionFunction",
     "VersionPart",
     "random_split",
+    "select_first",
+    "select_latest",
+    "select_majority_vote",
     "split_dataset",
     "stratified_split",
 ]
