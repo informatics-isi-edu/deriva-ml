@@ -1656,6 +1656,26 @@ class DatasetBag:
                 # Creates:
                 # ./prediction_data/testing/Unknown/image1.jpg
                 # ./prediction_data/testing/Unknown/image2.jpg
+
+            Convert DICOM files to PNG during restructuring::
+
+                from PIL import Image as PILImage
+
+                def oct_to_png(src: Path, dest: Path) -> Path:
+                    img = load_oct_dcm(str(src))
+                    out = dest.with_suffix(".png")
+                    PILImage.fromarray((img * 255).astype(np.uint8)).save(out)
+                    return out
+
+                manifest = bag.restructure_assets(
+                    output_dir="./ml_data",
+                    asset_table="OCT_DICOM",
+                    group_by=["Image_Diagnosis.Diagnosis_Image"],
+                    type_to_dir_map={"Training": "train", "Testing": "test"},
+                    file_transformer=oct_to_png,
+                )
+                # manifest maps each source .dcm Path to its output .png Path:
+                # Path(".../bag/OCT/image1.dcm") -> Path("./ml_data/train/Normal/image1.png")
         """
         logger = logging.getLogger("deriva_ml")
         group_by = group_by or []
