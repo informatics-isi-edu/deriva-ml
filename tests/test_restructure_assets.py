@@ -199,6 +199,36 @@ def test_transformer_replaces_symlink_copy_logic(tmp_path: Path, src_file: Path)
     assert actual.read_bytes() == b"converted"
 
 
+def test_split_parent_transparent_in_type_path(tmp_path: Path, src_file: Path) -> None:
+    """Split-type parent datasets are transparent: their type doesn't add a path component.
+
+    When a type_to_dir_map is provided and a dataset's type is NOT in the map
+    (e.g. "Split"), that dataset is treated as a structural container and does
+    not contribute a directory component. Its children (Training, Testing) still
+    get their own clean paths via their own types.
+    """
+    out_dir = tmp_path / "output"
+    SPLIT_RID = "1-SPL"
+    TRAIN_RID = "1-TRN"
+
+    assets = [{"RID": ASSET_RID, "Filename": str(src_file)}]
+    bag = _make_bag(tmp_path, assets)
+    bag._build_dataset_type_path_map.return_value = {TRAIN_RID: ["train"]}
+    bag._get_asset_dataset_mapping.return_value = {ASSET_RID: TRAIN_RID}
+
+    manifest = _call(
+        bag, out_dir,
+        type_to_dir_map={"Training": "train", "Testing": "test"},
+    )
+
+    assert len(manifest) == 1
+    actual = manifest[src_file]
+    # Relative path from output_dir should be train/filename, NOT split/train/filename
+    rel = actual.relative_to(out_dir)
+    assert rel.parts[0] == "train", f"Expected first dir 'train', got {rel}"
+    assert len(rel.parts) == 2, f"Expected 2 path parts (dir/file), got {rel.parts}"
+
+
 def test_transformer_multiple_assets(tmp_path: Path) -> None:
     """Transformer is called once per asset; manifest has one entry per asset."""
     src_dir = tmp_path / "source"

@@ -1193,7 +1193,13 @@ class DatasetBag:
             visited.add(dataset.dataset_rid)
 
             current_type = type_selector(dataset.dataset_types)
-            current_path = parent_path + [current_type]
+            # None means this dataset's type is structural/container (e.g. "Split")
+            # and should not contribute a path component — traverse children
+            # with the same parent_path so they get clean paths.
+            if current_type is None:
+                current_path = parent_path
+            else:
+                current_path = parent_path + [current_type]
             type_paths[dataset.dataset_rid] = current_path
 
             for child in dataset.list_dataset_children():
@@ -1753,10 +1759,14 @@ class DatasetBag:
             logger.info(f"Auto-detected asset table: {asset_table}")
 
         # Step 1: Build dataset type path map with directory name mapping
-        def map_type_to_dir(types: list[str]) -> str:
+        def map_type_to_dir(types: list[str]) -> str | None:
             """Map dataset types to directory name using type_to_dir_map.
 
             If dataset has no types, treat it as Testing (prediction use case).
+            Returns None when the type is not in type_to_dir_map, signalling
+            that this dataset is a structural container (e.g. a Split parent)
+            and should not contribute a path component. Its children will
+            still be traversed and their own types will determine the path.
             """
             if not types:
                 # No types defined - treat as Testing for prediction scenarios
@@ -1765,7 +1775,10 @@ class DatasetBag:
                 selected_type = type_selector(types)
             else:
                 selected_type = types[0]
-            return type_to_dir_map.get(selected_type, selected_type.lower())
+            if selected_type in type_to_dir_map:
+                return type_to_dir_map[selected_type]
+            # Type not explicitly mapped — treat as transparent container
+            return None
 
         type_path_map = self._build_dataset_type_path_map(map_type_to_dir)
 
