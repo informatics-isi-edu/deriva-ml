@@ -291,12 +291,13 @@ class TestRestructureAssets:
     def test_restructure_split_with_training_testing_children(self, dataset_test, tmp_path):
         """Test that Split parent with Training/Testing children creates correct structure.
 
-        When a Split dataset contains Training and Testing child datasets, assets
-        should be organized under split/training/ and split/testing/ directories,
-        NOT all under split/ directly.
+        "Split" is not in the default type_to_dir_map so it is treated as a
+        transparent structural container.  Assets should be placed directly under
+        training/ and testing/ (depth 1 from output_dir), NOT under
+        split/training/ or split/testing/ (depth 2).
 
-        This tests that assets are mapped to their leaf (most specific) dataset,
-        not the parent dataset.
+        This also tests that assets are mapped to their leaf (most specific)
+        dataset, not the parent dataset.
         """
         ml = dataset_test.ml_instance
 
@@ -348,29 +349,29 @@ class TestRestructureAssets:
 
         assert output_dir.exists()
 
-        # Check that training and testing subdirectories exist under split
-        # The structure should be: split/training/*.jpg and split/testing/*.jpg
+        # Structure should be: training/<file> and testing/<file> (depth 1).
+        # "Split" is transparent so there must be NO "split/" prefix.
         all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
         assert len(all_files) == 4, f"Expected 4 files, got {len(all_files)}"
 
-        # Group files by their parent directory name
-        file_dirs = {}
+        file_dirs: dict[str, list[str]] = {}
         for f in all_files:
             relative = f.relative_to(output_dir)
-            # Expected: split/training/file.jpg or split/testing/file.jpg
-            if len(relative.parts) >= 2:
-                parent_dir = relative.parts[-2]  # training or testing
-                if parent_dir not in file_dirs:
-                    file_dirs[parent_dir] = []
-                file_dirs[parent_dir].append(f.name)
+            # Must be exactly 2 parts: <type_dir>/<filename> — no "split/" prefix
+            assert len(relative.parts) == 2, (
+                f"Expected path depth of 2 (type_dir/file), got {relative} "
+                f"(Split parent must be transparent, not add a directory component)"
+            )
+            parent_dir = relative.parts[0]  # "training" or "testing"
+            file_dirs.setdefault(parent_dir, []).append(f.name)
 
         # Should have both training and testing directories with files
         assert "training" in file_dirs, (
-            f"Expected 'training' subdirectory, got directories: {list(file_dirs.keys())}. "
+            f"Expected 'training' subdirectory, got: {list(file_dirs.keys())}. "
             f"All files: {[str(f.relative_to(output_dir)) for f in all_files]}"
         )
         assert "testing" in file_dirs, (
-            f"Expected 'testing' subdirectory, got directories: {list(file_dirs.keys())}. "
+            f"Expected 'testing' subdirectory, got: {list(file_dirs.keys())}. "
             f"All files: {[str(f.relative_to(output_dir)) for f in all_files]}"
         )
 

@@ -229,6 +229,36 @@ def test_split_parent_transparent_in_type_path(tmp_path: Path, src_file: Path) -
     assert len(rel.parts) == 2, f"Expected 2 path parts (dir/file), got {rel.parts}"
 
 
+def test_split_parent_transparent_with_default_type_map(tmp_path: Path, src_file: Path) -> None:
+    """Split-type parent is transparent even when using the default type_to_dir_map.
+
+    The default map contains Training->training and Testing->testing but NOT Split.
+    Passing type_to_dir_map=None (the default) should therefore also make a
+    Split-typed dataset transparent — its children land directly under
+    training/ or testing/, not under split/training/ or split/testing/.
+    """
+    out_dir = tmp_path / "output"
+    TRAIN_RID = "1-TRN"
+
+    assets = [{"RID": ASSET_RID, "Filename": str(src_file)}]
+    bag = _make_bag(tmp_path, assets)
+    # Simulate: Split parent has no path component; Training child maps to ["training"]
+    bag._build_dataset_type_path_map.return_value = {TRAIN_RID: ["training"]}
+    bag._get_asset_dataset_mapping.return_value = {ASSET_RID: TRAIN_RID}
+
+    # Call without explicit type_to_dir_map — uses the built-in default
+    manifest = _call(bag, out_dir)
+
+    assert len(manifest) == 1
+    actual = manifest[src_file]
+    rel = actual.relative_to(out_dir)
+    assert rel.parts[0] == "training", f"Expected first dir 'training', got {rel}"
+    assert len(rel.parts) == 2, (
+        f"Expected exactly 2 path parts (training/file), got {rel.parts}. "
+        f"'split/' must not appear as a prefix when using the default type map."
+    )
+
+
 def test_transformer_multiple_assets(tmp_path: Path) -> None:
     """Transformer is called once per asset; manifest has one entry per asset."""
     src_dir = tmp_path / "source"
