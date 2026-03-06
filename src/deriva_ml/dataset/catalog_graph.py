@@ -417,10 +417,19 @@ class CatalogGraph:
             dataset_elements = [
                 self._ml_instance.model.name_to_table(e) for e, m in dataset.list_dataset_members().items() if m
             ]
-            # included_associations: only association tables whose target element type has members
+            # included_associations: association tables whose target element type has members,
+            # plus association tables whose target is a vocabulary (e.g., Dataset_Dataset_Type).
+            # Vocabulary-targeting associations carry dataset metadata and must always be included.
+            vocab_tables = {
+                table
+                for s in self._ml_instance.model.schemas.values()
+                for table in s.tables.values()
+                if self._ml_instance.model.is_vocabulary(table)
+            }
             included_associations = [
                 a.table for a in dataset_table.find_associations()
                 if any(fk.pk_table in dataset_elements for fk in a.other_fkeys)
+                or any(fk.pk_table in vocab_tables for fk in a.other_fkeys)
             ]
         else:
             included_associations = dataset_association_tables
