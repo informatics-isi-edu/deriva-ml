@@ -1495,7 +1495,8 @@ class DatasetBag:
         type_to_dir_map: dict[str, str] | None = None,
         enforce_vocabulary: bool = True,
         value_selector: Callable[[list[FeatureValueRecord]], FeatureValueRecord] | None = None,
-    ) -> Path:
+        file_transformer: Callable[[Path, Path], Path] | None = None,
+    ) -> dict[Path, Path]:
         """Restructure downloaded assets into a directory hierarchy.
 
         Creates a directory structure organizing assets by dataset types and
@@ -1547,7 +1548,8 @@ class DatasetBag:
 
             use_symlinks: If True (default), create symlinks to original files.
                 If False, copy files. Symlinks save disk space but require
-                the original bag to remain in place.
+                the original bag to remain in place. Ignored when
+                ``file_transformer`` is provided.
             type_selector: Function to select type when dataset has multiple types.
                 Receives list of type names, returns selected type name.
                 Defaults to selecting first type or "unknown" if no types.
@@ -1567,9 +1569,34 @@ class DatasetBag:
                 feature_name, value, execution_rid, and raw_record) and returns
                 the selected FeatureValueRecord. Use execution_rid to distinguish
                 between values from different executions.
+            file_transformer: Optional callable invoked instead of the default
+                symlink/copy step. Receives ``(src_path, dest_path)`` where
+                ``dest_path`` is the suggested destination (preserving the original
+                filename and extension). The transformer is responsible for writing
+                the output file — it may change the extension or format — and must
+                return the actual ``Path`` it wrote. When provided, ``use_symlinks``
+                is ignored.
+
+                Example — convert DICOM to PNG on placement::
+
+                    def oct_to_png(src: Path, dest: Path) -> Path:
+                        img = load_oct_dcm(str(src))
+                        out = dest.with_suffix(".png")
+                        PILImage.fromarray((img * 255).astype(np.uint8)).save(out)
+                        return out
+
+                    bag.restructure_assets(
+                        output_dir="./ml_data",
+                        group_by=["Diagnosis"],
+                        file_transformer=oct_to_png,
+                    )
 
         Returns:
-            Path to the output directory.
+            Manifest dict mapping each source ``Path`` to the actual output
+            ``Path`` written. When no ``file_transformer`` is provided, source
+            and output paths differ only in directory location. When a
+            transformer is provided, the output path may also differ in name
+            or extension.
 
         Raises:
             DerivaMLException: If asset_table cannot be determined (multiple
@@ -1580,7 +1607,7 @@ class DatasetBag:
         Examples:
             Basic restructuring with auto-detected asset table::
 
-                bag.restructure_assets(
+                manifest = bag.restructure_assets(
                     output_dir="./ml_data",
                     group_by=["Diagnosis"],
                 )
@@ -1590,7 +1617,7 @@ class DatasetBag:
 
             Custom type-to-directory mapping::
 
-                bag.restructure_assets(
+                manifest = bag.restructure_assets(
                     output_dir="./ml_data",
                     group_by=["Diagnosis"],
                     type_to_dir_map={"Training": "train", "Testing": "test"},
@@ -1601,7 +1628,7 @@ class DatasetBag:
 
             Select specific feature column for multi-term features::
 
-                bag.restructure_assets(
+                manifest = bag.restructure_assets(
                     output_dir="./ml_data",
                     group_by=["Classification.Label"],  # Use Label column
                 )
@@ -1612,7 +1639,7 @@ class DatasetBag:
                     # Select value with the most recent creation time
                     return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
 
-                bag.restructure_assets(
+                manifest = bag.restructure_assets(
                     output_dir="./ml_data",
                     group_by=["Diagnosis"],
                     value_selector=select_latest,
@@ -1622,7 +1649,7 @@ class DatasetBag:
 
                 # Dataset has no type - treated as Testing
                 # Assets have no labels - placed in Unknown directory
-                bag.restructure_assets(
+                manifest = bag.restructure_assets(
                     output_dir="./prediction_data",
                     group_by=["Diagnosis"],
                 )
@@ -1680,9 +1707,11 @@ class DatasetBag:
         # even if the dataset only contains Subjects directly.
         assets = self._get_reachable_assets(asset_table)
 
+        manifest: dict[Path, Path] = {}
+
         if not assets:
             logger.warning(f"No assets found in table '{asset_table}'")
-            return output_dir
+            return manifest
 
         # Step 5: Process each asset
         for asset in assets:
@@ -1711,24 +1740,33 @@ class DatasetBag:
             target_dir = output_dir.joinpath(*type_path, *group_path)
             target_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create link or copy
+            # Suggested destination preserves the original filename
             target_path = target_dir / source_path.name
 
-            # Handle existing files
+            # Handle existing files at the suggested destination
             if target_path.exists() or target_path.is_symlink():
                 target_path.unlink()
 
-            if use_symlinks:
+            if file_transformer is not None:
+                # Transformer is responsible for writing the output file.
+                # It receives the suggested dest and returns the actual path written,
+                # which may differ in name or extension (e.g. DICOM -> PNG).
+                actual_path = file_transformer(source_path, target_path)
+            elif use_symlinks:
                 try:
                     target_path.symlink_to(source_path.resolve())
                 except OSError as e:
                     # Fall back to copy on platforms that don't support symlinks
                     logger.warning(f"Symlink failed, falling back to copy: {e}")
                     shutil.copy2(source_path, target_path)
+                actual_path = target_path
             else:
                 shutil.copy2(source_path, target_path)
+                actual_path = target_path
 
-        return output_dir
+            manifest[source_path] = actual_path
+
+        return manifest
 
 
 # Note: validate_call decorators with Self return types were removed because
