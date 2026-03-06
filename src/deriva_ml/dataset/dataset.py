@@ -1475,7 +1475,9 @@ class Dataset:
         )
         from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
         db_model = DatabaseModel(minid, bag_path, self._ml_instance.working_dir)
-        return DerivaMLDatabase(db_model).lookup_dataset(self.dataset_rid)
+        return DerivaMLDatabase(db_model).lookup_dataset(
+            self.dataset_rid, dataset_types=list(self.dataset_types)
+        )
 
     def _version_snapshot_catalog(self, dataset_version: DatasetVersion | str | None) -> DerivaMLCatalog:
         """Get a catalog instance bound to a specific version's snapshot.

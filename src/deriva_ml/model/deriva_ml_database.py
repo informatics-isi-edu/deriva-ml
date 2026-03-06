@@ -97,13 +97,20 @@ class DerivaMLDatabase:
     # ==================== Read Operations (Supported) ====================
 
     def lookup_dataset(
-        self, dataset: RID | DatasetSpec, deleted: bool = False
+        self, dataset: RID | DatasetSpec, deleted: bool = False,
+        dataset_types: list[str] | None = None,
     ) -> DatasetBag:
         """Look up a dataset by RID or spec.
 
         Args:
             dataset: Dataset RID or DatasetSpec to look up.
             deleted: Whether to include deleted datasets (ignored for bags).
+            dataset_types: Optional override for dataset types. When provided,
+                these types are used instead of querying the SQLite database.
+                This is needed because ``Dataset_Dataset_Type`` is not always
+                included in bag exports (it's not reachable via FK paths from
+                member element types), so the caller can supply the known types
+                from the live catalog.
 
         Returns:
             DatasetBag for the specified dataset.
@@ -127,20 +134,23 @@ class DerivaMLDatabase:
         if not dataset_record:
             raise DerivaMLException(f"Dataset {rid} not found in bag")
 
-        # Get dataset types from association table
-        atable = f"Dataset_{MLVocab.dataset_type.value}"
-        ds_types = [
-            t[MLVocab.dataset_type.value]
-            for t in self._database_model._get_table_contents(atable)
-            if t["Dataset"] == rid
-        ]
+        # Use caller-supplied types if provided; otherwise query the association table.
+        # Note: Dataset_Dataset_Type is often absent from bag exports (not reachable via FK
+        # paths from member element types), so the caller must supply types when known.
+        if dataset_types is None:
+            atable = f"Dataset_{MLVocab.dataset_type.value}"
+            dataset_types = [
+                t[MLVocab.dataset_type.value]
+                for t in self._database_model._get_table_contents(atable)
+                if t["Dataset"] == rid
+            ]
 
         return DatasetBag(
             catalog=self,
             dataset_rid=rid,
             description=dataset_record.get("Description", ""),
             execution_rid=(self._database_model._get_dataset_execution(rid) or {}).get("Execution"),
-            dataset_types=ds_types,
+            dataset_types=dataset_types,
         )
 
     def find_datasets(self, deleted: bool = False) -> Iterable[DatasetBag]:
