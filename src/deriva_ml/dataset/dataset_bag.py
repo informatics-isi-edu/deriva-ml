@@ -1799,7 +1799,21 @@ class DatasetBag:
 
             source_path = Path(filename)
             if not source_path.exists():
-                logger.warning(f"Asset file not found: {source_path}")
+                # Filename may be a bare basename stored in the SQLite cache
+                # before image materialization.  Fall back to the canonical
+                # BDBag asset layout: data/asset/{RID}/{table}/{filename}.
+                try:
+                    bag_root = Path(self._catalog._database_model.bag_path)
+                    source_path = (
+                        bag_root / "data" / "asset"
+                        / asset.get("RID", "") / asset_table
+                        / Path(filename).name
+                    )
+                except AttributeError:
+                    pass  # catalog doesn't have _database_model (e.g. in tests)
+
+            if not source_path.exists():
+                logger.warning(f"Asset file not found: {filename}")
                 continue
 
             # Get dataset type path
