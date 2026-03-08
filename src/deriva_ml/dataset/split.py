@@ -1,16 +1,17 @@
 """Generic dataset splitting for DerivaML.
 
-This module provides functions to split a DerivaML dataset into training
-and testing subsets with full provenance tracking. It works with any
-DerivaML catalog and any registered element type.
+This module provides functions to split a DerivaML dataset into training,
+testing, and optionally validation subsets with full provenance tracking.
+It works with any DerivaML catalog and any registered element type.
 
 The splitting API follows scikit-learn conventions (``test_size``,
-``train_size``, ``shuffle``, ``seed``, ``stratify``) while integrating
-with DerivaML's dataset hierarchy, execution provenance, and versioning.
+``train_size``, ``val_size``, ``shuffle``, ``seed``, ``stratify``) while
+integrating with DerivaML's dataset hierarchy, execution provenance, and
+versioning.
 
 Splitting Strategies:
     Random (default):
-        Shuffles members and splits at the train_size boundary.
+        Shuffles members and splits at the partition boundaries.
         No denormalization required.
 
     Stratified:
@@ -31,6 +32,15 @@ Example:
         ml = DerivaML("localhost", "9")
         result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
 
+    Three-way train/val/test split::
+
+        result = split_dataset(
+            ml, "28D0",
+            test_size=0.2,
+            val_size=0.1,
+            seed=42,
+        )
+
     Stratified split::
 
         result = split_dataset(
@@ -42,9 +52,9 @@ Example:
 
     Custom selection function::
 
-        def my_selector(df, train_size, test_size, seed):
+        def my_selector(df, partition_sizes, seed):
             # Custom logic...
-            return train_indices, test_indices
+            return {"Training": train_indices, "Testing": test_indices}
 
         result = split_dataset(
             ml, "28D0",
@@ -64,10 +74,11 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
@@ -78,85 +89,119 @@ logger = logging.getLogger("deriva_ml")
 
 
 # =============================================================================
+# Result Models
+# =============================================================================
+
+
+class PartitionInfo(BaseModel):
+    """Information about a single partition (Training, Testing, or Validation)."""
+
+    rid: str
+    version: str
+    count: int
+
+
+class SplitResult(BaseModel):
+    """Result of a dataset split operation."""
+
+    source: str
+    split: PartitionInfo
+    training: PartitionInfo
+    testing: PartitionInfo
+    validation: PartitionInfo | None = None
+    strategy: str
+    element_table: str
+    seed: int
+    dry_run: bool = False
+
+
+# =============================================================================
 # Selection Function Protocol and Built-in Implementations
 # =============================================================================
 
 
 @runtime_checkable
 class SelectionFunction(Protocol):
-    """Protocol for custom train/test selection functions.
+    """Protocol for custom partition selection functions.
 
     A selection function receives the denormalized dataset DataFrame and
-    returns a tuple of ``(train_indices, test_indices)`` as integer arrays
-    indexing into the DataFrame rows.
+    returns a dict mapping partition names to integer index arrays into
+    the DataFrame rows.
 
     The function is responsible for:
 
-    - Deciding which records go into training vs testing
-    - Ensuring the sizes match the requested train_size/test_size
+    - Deciding which records go into each partition
+    - Ensuring the sizes match the requested partition_sizes
     - Implementing any balancing or stratification logic
 
     Args:
         df: Denormalized DataFrame from ``dataset.denormalize_as_dataframe()``.
             Columns are prefixed with table names (e.g., ``Image_RID``,
             ``Image_Classification_Image_Class``).
-        train_size: Number of records for the training set.
-        test_size: Number of records for the testing set.
+        partition_sizes: Dict mapping partition names (e.g., "Training",
+            "Testing", "Validation") to the number of records for each.
         seed: Random seed for reproducibility.
 
     Returns:
-        Tuple of ``(train_indices, test_indices)`` as numpy arrays of
-        integer indices into the DataFrame.
+        Dict mapping partition names to numpy arrays of integer indices
+        into the DataFrame.
 
     Example:
-        >>> def balanced_selector(df, train_size, test_size, seed):
+        >>> def balanced_selector(df, partition_sizes, seed):
         ...     rng = np.random.default_rng(seed)
         ...     # ... balance classes ...
-        ...     return train_indices, test_indices
+        ...     return {"Training": train_indices, "Testing": test_indices}
     """
 
     def __call__(
         self,
         df: pd.DataFrame,
-        train_size: int,
-        test_size: int,
+        partition_sizes: dict[str, int],
         seed: int,
-    ) -> tuple[np.ndarray, np.ndarray]: ...
+    ) -> dict[str, np.ndarray]: ...
 
 
 def random_split(
     df: pd.DataFrame,
-    train_size: int,
-    test_size: int,
+    partition_sizes: dict[str, int],
     seed: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Random train/test split.
+) -> dict[str, np.ndarray]:
+    """Random split into N partitions.
 
-    Shuffles the DataFrame indices and splits at the train_size boundary.
+    Shuffles the DataFrame indices and splits at partition boundaries.
 
     Args:
         df: Source DataFrame.
-        train_size: Number of training records.
-        test_size: Number of testing records.
+        partition_sizes: Dict mapping partition names to counts.
         seed: Random seed for reproducibility.
 
     Returns:
-        Tuple of ``(train_indices, test_indices)``.
+        Dict mapping partition names to index arrays.
     """
     rng = np.random.default_rng(seed)
-    total_needed = train_size + test_size
+    total_needed = sum(partition_sizes.values())
     indices = np.arange(len(df))
     rng.shuffle(indices)
     indices = indices[:total_needed]
-    return indices[:train_size], indices[train_size : train_size + test_size]
+
+    result = {}
+    offset = 0
+    for name, size in partition_sizes.items():
+        result[name] = indices[offset : offset + size]
+        offset += size
+    return result
 
 
 def stratified_split(stratify_column: str) -> SelectionFunction:
     """Create a stratified selection function.
 
     Returns a selection function that maintains the class distribution
-    of the specified column across train and test sets. Delegates to
+    of the specified column across all partitions. Delegates to
     scikit-learn's ``train_test_split`` for the actual stratification.
+
+    For two-way splits, performs a single stratified split. For three-way
+    splits (Training/Validation/Testing), first separates the test set,
+    then splits the remainder into training and validation.
 
     Args:
         stratify_column: Column name in the denormalized DataFrame to
@@ -167,18 +212,17 @@ def stratified_split(stratify_column: str) -> SelectionFunction:
 
     Example:
         >>> selector = stratified_split("Image_Classification_Image_Class")
-        >>> train_idx, test_idx = selector(df, 400, 100, seed=42)
+        >>> partitions = selector(df, {"Training": 400, "Testing": 100}, seed=42)
     """
 
     def _stratified_split(
         df: pd.DataFrame,
-        train_size: int,
-        test_size: int,
+        partition_sizes: dict[str, int],
         seed: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         from sklearn.model_selection import train_test_split as sklearn_split
 
-        total_needed = train_size + test_size
+        total_needed = sum(partition_sizes.values())
         if total_needed > len(df):
             raise ValueError(
                 f"Requested {total_needed} samples but dataset has {len(df)} records"
@@ -206,16 +250,51 @@ def stratified_split(stratify_column: str) -> SelectionFunction:
             subset_indices = indices
             sub_df = df
 
-        # Split the subset into train/test with stratification
-        test_fraction = test_size / total_needed
-        train_idx, test_idx = sklearn_split(
-            np.arange(len(sub_df)),
-            test_size=test_fraction,
-            stratify=sub_df[stratify_column].values,
-            random_state=seed,
-        )
+        # Partition names in the order we'll peel them off
+        partition_names = list(partition_sizes.keys())
 
-        return subset_indices[train_idx], subset_indices[test_idx]
+        if len(partition_names) == 2:
+            # Two-way split: single stratified split
+            test_name = partition_names[1]
+            train_name = partition_names[0]
+            test_fraction = partition_sizes[test_name] / total_needed
+            train_idx, test_idx = sklearn_split(
+                np.arange(len(sub_df)),
+                test_size=test_fraction,
+                stratify=sub_df[stratify_column].values,
+                random_state=seed,
+            )
+            return {
+                train_name: subset_indices[train_idx],
+                test_name: subset_indices[test_idx],
+            }
+        else:
+            # Three-way split: peel off Testing first, then split remainder
+            # into Training and Validation.
+            test_size = partition_sizes["Testing"]
+            test_fraction = test_size / total_needed
+            remainder_idx, test_idx = sklearn_split(
+                np.arange(len(sub_df)),
+                test_size=test_fraction,
+                stratify=sub_df[stratify_column].values,
+                random_state=seed,
+            )
+
+            remainder_df = sub_df.iloc[remainder_idx]
+            remainder_total = partition_sizes["Training"] + partition_sizes["Validation"]
+            val_fraction = partition_sizes["Validation"] / remainder_total
+            train_idx, val_idx = sklearn_split(
+                np.arange(len(remainder_df)),
+                test_size=val_fraction,
+                stratify=remainder_df[stratify_column].values,
+                random_state=seed,
+            )
+
+            return {
+                "Training": subset_indices[remainder_idx[train_idx]],
+                "Validation": subset_indices[remainder_idx[val_idx]],
+                "Testing": subset_indices[test_idx],
+            }
 
     return _stratified_split
 
@@ -228,61 +307,76 @@ def stratified_split(stratify_column: str) -> SelectionFunction:
 def _resolve_sizes(
     total: int,
     test_size: float | int,
-    train_size: float | int | None,
-) -> tuple[int, int]:
+    train_size: float | int | None = None,
+    val_size: float | int | None = None,
+) -> dict[str, int]:
     """Convert fractional or absolute sizes to absolute counts.
 
     Follows scikit-learn's convention: if both are fractions, they should
-    sum to <= 1.0. If one is None, it's computed as the complement.
+    sum to <= 1.0. If train_size is None, it's computed as the complement.
 
     Args:
         total: Total number of records in the dataset.
         test_size: Fraction (0-1) or absolute count of test samples.
         train_size: Fraction (0-1) or absolute count of train samples,
-            or None for complement of test_size.
+            or None for complement of test_size (minus val_size if provided).
+        val_size: Fraction (0-1) or absolute count of validation samples,
+            or None for no validation split.
 
     Returns:
-        Tuple of ``(train_count, test_count)`` as integers.
+        Dict mapping partition names ("Training", "Testing", and optionally
+        "Validation") to integer counts.
 
     Raises:
         ValueError: If sizes are invalid or exceed total.
     """
-    # Convert test_size
-    if isinstance(test_size, float) and 0 < test_size < 1:
-        test_count = int(round(total * test_size))
-    elif isinstance(test_size, (int, float)) and test_size >= 1:
-        test_count = int(test_size)
-    else:
-        raise ValueError(
-            f"test_size must be a float in (0, 1) or an int >= 1, got {test_size}"
-        )
 
-    # Convert train_size
+    def _to_count(size: float | int, name: str) -> int:
+        if isinstance(size, float) and 0 < size < 1:
+            return int(round(total * size))
+        elif isinstance(size, (int, float)) and size >= 1:
+            return int(size)
+        else:
+            raise ValueError(
+                f"{name} must be a float in (0, 1) or an int >= 1, got {size}"
+            )
+
+    test_count = _to_count(test_size, "test_size")
+
+    val_count = 0
+    if val_size is not None:
+        val_count = _to_count(val_size, "val_size")
+
     if train_size is None:
-        train_count = total - test_count
-    elif isinstance(train_size, float) and 0 < train_size < 1:
-        train_count = int(round(total * train_size))
-    elif isinstance(train_size, (int, float)) and train_size >= 1:
-        train_count = int(train_size)
+        train_count = total - test_count - val_count
     else:
+        train_count = _to_count(train_size, "train_size")
+
+    if train_count + test_count + val_count > total:
         raise ValueError(
-            f"train_size must be a float in (0, 1), an int >= 1, or None, "
-            f"got {train_size}"
+            f"Requested train_size={train_count} + test_size={test_count}"
+            + (f" + val_size={val_count}" if val_size is not None else "")
+            + f" = {train_count + test_count + val_count}"
+            + f" exceeds total dataset size of {total}"
         )
 
-    if train_count + test_count > total:
+    if train_count <= 0:
         raise ValueError(
-            f"Requested train_size={train_count} + test_size={test_count} = "
-            f"{train_count + test_count} exceeds total dataset size of {total}"
+            f"Training set must have at least 1 sample. Got train_size={train_count}"
+        )
+    if test_count <= 0:
+        raise ValueError(
+            f"Test set must have at least 1 sample. Got test_size={test_count}"
+        )
+    if val_size is not None and val_count <= 0:
+        raise ValueError(
+            f"Validation set must have at least 1 sample. Got val_size={val_count}"
         )
 
-    if train_count <= 0 or test_count <= 0:
-        raise ValueError(
-            f"Both train and test must have at least 1 sample. "
-            f"Got train_size={train_count}, test_size={test_count}"
-        )
-
-    return train_count, test_count
+    result = {"Training": train_count, "Testing": test_count}
+    if val_size is not None:
+        result["Validation"] = val_count
+    return result
 
 
 # =============================================================================
@@ -316,6 +410,7 @@ def _ensure_dataset_types(ml: DerivaML) -> None:
     required_types = {
         "Training": "A dataset subset used for model training",
         "Testing": "A dataset subset used for model testing/evaluation",
+        "Validation": "A dataset subset used for model validation during training",
         "Split": "A dataset that contains nested dataset splits",
         "Labeled": "A dataset containing records with ground truth labels",
         "Unlabeled": "A dataset containing records without ground truth labels",
@@ -349,6 +444,7 @@ def split_dataset(
     # scikit-learn compatible parameters
     test_size: float | int = 0.2,
     train_size: float | int | None = None,
+    val_size: float | int | None = None,
     shuffle: bool = True,
     seed: int = 42,
     stratify_by_column: str | None = None,
@@ -356,18 +452,20 @@ def split_dataset(
     split_description: str = "",
     training_types: list[str] | None = None,
     testing_types: list[str] | None = None,
+    validation_types: list[str] | None = None,
     element_table: str | None = None,
     include_tables: list[str] | None = None,
     selection_fn: SelectionFunction | None = None,
     workflow_type: str = "Dataset_Split",
     dry_run: bool = False,
-) -> dict[str, str]:
-    """Split a DerivaML dataset into training and testing subsets.
+) -> SplitResult:
+    """Split a DerivaML dataset into training, testing, and optionally validation subsets.
 
     Creates a new dataset hierarchy in the catalog::
 
         Split (parent, type: "Split")
         +-- Training (child, type: "Training", + training_types)
+        +-- Validation (child, type: "Validation", + validation_types)  # if val_size
         +-- Testing (child, type: "Testing", + testing_types)
 
     All operations are performed within an execution context for
@@ -383,7 +481,11 @@ def split_dataset(
             If int, absolute number of test samples. Default: 0.2.
         train_size: If float (0-1), fraction of data for training.
             If int, absolute number of training samples.
-            If None, complement of test_size. Default: None.
+            If None, complement of test_size (and val_size). Default: None.
+        val_size: If float (0-1), fraction of data for validation.
+            If int, absolute number of validation samples.
+            If None, no validation split is created (two-way split).
+            Default: None.
         shuffle: Whether to shuffle before splitting. Default: True.
             Ignored when using stratified or custom selection functions
             (they handle their own shuffling).
@@ -397,6 +499,9 @@ def split_dataset(
             beyond "Training" (e.g., ``["Labeled"]``). Default: None.
         testing_types: Additional dataset types for the testing set
             beyond "Testing" (e.g., ``["Labeled"]``). Default: None.
+        validation_types: Additional dataset types for the validation set
+            beyond "Validation" (e.g., ``["Labeled"]``). Default: None.
+            Ignored when val_size is None.
         element_table: Name of the element table to split (e.g., "Image").
             If None, auto-detected from the source dataset's members.
         include_tables: Tables to include when denormalizing for the
@@ -409,17 +514,8 @@ def split_dataset(
         dry_run: If True, return what would happen without modifying catalog.
 
     Returns:
-        Dictionary with keys:
-
-        - ``split``: RID of the parent Split dataset
-        - ``split_version``: Version string of the Split dataset
-        - ``training``: RID of the Training dataset
-        - ``training_version``: Version string of the Training dataset
-        - ``testing``: RID of the Testing dataset
-        - ``testing_version``: Version string of the Testing dataset
-        - ``source``: RID of the source dataset
-        - ``train_count``: Number of training samples
-        - ``test_count``: Number of testing samples
+        SplitResult with partition info for split, training, testing,
+        and optionally validation datasets.
 
     Raises:
         ValueError: If sizes are invalid, dataset has no members, or
@@ -433,8 +529,18 @@ def split_dataset(
 
             ml = DerivaML("localhost", "9")
             result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
-            print(f"Training: {result['training']} ({result['train_count']} samples)")
-            print(f"Testing:  {result['testing']} ({result['test_count']} samples)")
+            print(f"Training: {result.training.rid} ({result.training.count} samples)")
+            print(f"Testing:  {result.testing.rid} ({result.testing.count} samples)")
+
+        Three-way train/val/test split::
+
+            result = split_dataset(
+                ml, "28D0",
+                test_size=0.2,
+                val_size=0.1,
+                seed=42,
+            )
+            print(f"Validation: {result.validation.rid} ({result.validation.count} samples)")
 
         Fixed-count split with labeled types::
 
@@ -460,19 +566,20 @@ def split_dataset(
 
             import numpy as np
 
-            def balanced_selector(df, train_size, test_size, seed):
+            def balanced_selector(df, partition_sizes, seed):
                 rng = np.random.default_rng(seed)
                 label_col = "Image_Classification_Image_Class"
                 classes = df[label_col].unique()
-                train_idx, test_idx = [], []
+                result = {name: [] for name in partition_sizes}
                 for cls in classes:
                     cls_indices = df.index[df[label_col] == cls].to_numpy()
                     rng.shuffle(cls_indices)
-                    per_class_train = train_size // len(classes)
-                    per_class_test = test_size // len(classes)
-                    train_idx.extend(cls_indices[:per_class_train])
-                    test_idx.extend(cls_indices[per_class_train:per_class_train + per_class_test])
-                return np.array(train_idx), np.array(test_idx)
+                    offset = 0
+                    for name, size in partition_sizes.items():
+                        per_class = size // len(classes)
+                        result[name].extend(cls_indices[offset:offset + per_class])
+                        offset += per_class
+                return {name: np.array(idx) for name, idx in result.items()}
 
             result = split_dataset(
                 ml, "28D0",
@@ -488,18 +595,17 @@ def split_dataset(
                 test_size=0.2,
                 dry_run=True,
             )
-            print(f"Would create: {result['train_count']} train, "
-                  f"{result['test_count']} test")
+            print(f"Would create: {result.training.count} train, "
+                  f"{result.testing.count} test")
 
         Use returned RIDs to create a hydra-zen configuration::
 
             from deriva_ml.dataset import DatasetSpecConfig
 
             result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
-            # Use the split dataset in a configuration
             split_config = DatasetSpecConfig(
-                rid=result["split"],
-                version=result["split_version"],
+                rid=result.split.rid,
+                version=result.split.version,
             )
     """
     # -------------------------------------------------------------------------
@@ -566,11 +672,12 @@ def split_dataset(
     # -------------------------------------------------------------------------
     # Compute absolute sizes
     # -------------------------------------------------------------------------
-    train_count, test_count = _resolve_sizes(total, test_size, train_size)
-    logger.info(f"Split sizes: train={train_count}, test={test_count} (total={total})")
+    partition_sizes = _resolve_sizes(total, test_size, train_size, val_size)
+    size_summary = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
+    logger.info(f"Split sizes: {size_summary} (total={total})")
 
     # -------------------------------------------------------------------------
-    # Determine selection strategy and get train/test RIDs
+    # Determine selection strategy and get partition RIDs
     # -------------------------------------------------------------------------
     use_denormalization = stratify_by_column is not None or selection_fn is not None
 
@@ -588,7 +695,7 @@ def split_dataset(
             logger.info("Using custom selection function")
             selector = selection_fn
 
-        train_indices, test_indices = selector(df, train_count, test_count, seed)
+        partition_indices = selector(df, partition_sizes, seed)
 
         # Map indices back to RIDs
         rid_column = f"{element_table}_RID"
@@ -600,8 +707,10 @@ def split_dataset(
                     f"Available columns: {list(df.columns)}"
                 )
 
-        train_rids = df.iloc[train_indices][rid_column].tolist()
-        test_rids = df.iloc[test_indices][rid_column].tolist()
+        partition_rids = {
+            name: df.iloc[indices][rid_column].tolist()
+            for name, indices in partition_indices.items()
+        }
 
     else:
         all_rids = [record["RID"] for record in member_records]
@@ -612,35 +721,56 @@ def split_dataset(
             rng.shuffle(indices)
             all_rids = [all_rids[i] for i in indices]
 
-        train_rids = all_rids[:train_count]
-        test_rids = all_rids[train_count : train_count + test_count]
+        partition_rids = {}
+        offset = 0
+        for name, size in partition_sizes.items():
+            partition_rids[name] = all_rids[offset : offset + size]
+            offset += size
 
-    logger.info(
-        f"Selected {len(train_rids)} training and {len(test_rids)} testing RIDs"
+    for name, rids in partition_rids.items():
+        logger.info(f"Selected {len(rids)} {name} RIDs")
+
+    # -------------------------------------------------------------------------
+    # Compute strategy description
+    # -------------------------------------------------------------------------
+    strategy_desc = (
+        f"stratified by {stratify_by_column}" if stratify_by_column else "random"
     )
+    if selection_fn:
+        strategy_desc = "custom selection function"
 
     # -------------------------------------------------------------------------
     # Dry run
     # -------------------------------------------------------------------------
     if dry_run:
-        strategy = (
-            f"stratified by {stratify_by_column}" if stratify_by_column else "random"
+        result = SplitResult(
+            source=source_dataset_rid,
+            split=PartitionInfo(rid="(dry run)", version="(dry run)", count=0),
+            training=PartitionInfo(
+                rid="(dry run)",
+                version="(dry run)",
+                count=partition_sizes["Training"],
+            ),
+            testing=PartitionInfo(
+                rid="(dry run)",
+                version="(dry run)",
+                count=partition_sizes["Testing"],
+            ),
+            validation=(
+                PartitionInfo(
+                    rid="(dry run)",
+                    version="(dry run)",
+                    count=partition_sizes["Validation"],
+                )
+                if "Validation" in partition_sizes
+                else None
+            ),
+            strategy=strategy_desc,
+            element_table=element_table,
+            seed=seed,
+            dry_run=True,
         )
-        if selection_fn:
-            strategy = "custom selection function"
-        return {
-            "split": "(dry run)",
-            "split_version": "(dry run)",
-            "training": "(dry run)",
-            "training_version": "(dry run)",
-            "testing": "(dry run)",
-            "testing_version": "(dry run)",
-            "source": source_dataset_rid,
-            "train_count": train_count,
-            "test_count": test_count,
-            "strategy": strategy,
-            "element_table": element_table,
-        }
+        return result
 
     # -------------------------------------------------------------------------
     # Ensure vocabulary terms exist
@@ -651,22 +781,17 @@ def split_dataset(
     # -------------------------------------------------------------------------
     # Create execution and dataset hierarchy
     # -------------------------------------------------------------------------
-    strategy_desc = (
-        f"stratified by {stratify_by_column}" if stratify_by_column else "random"
-    )
-    if selection_fn:
-        strategy_desc = "custom selection function"
-
+    partitions_desc = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
     auto_description = (
-        f"Train/test split of dataset {source_dataset_rid} "
-        f"({strategy_desc}, train={train_count}, test={test_count}, seed={seed})"
+        f"Split of dataset {source_dataset_rid} "
+        f"({strategy_desc}, {partitions_desc}, seed={seed})"
     )
 
     logger.info("Creating workflow and execution...")
     workflow = ml.create_workflow(
         name=f"Dataset Split: {source_dataset_rid}",
         workflow_type=workflow_type,
-        description="Split dataset into training and testing subsets",
+        description="Split dataset into training/testing/validation subsets",
     )
 
     config = ExecutionConfiguration(
@@ -676,6 +801,7 @@ def split_dataset(
 
     train_types = ["Training"] + (training_types or [])
     test_types = ["Testing"] + (testing_types or [])
+    val_types = ["Validation"] + (validation_types or []) if val_size is not None else []
 
     with ml.create_execution(config) as exe:
         logger.info(f"  Execution RID: {exe.execution_rid}")
@@ -685,8 +811,8 @@ def split_dataset(
             "source_dataset_rid": source_dataset_rid,
             "test_size": test_size,
             "train_size": train_size,
-            "train_count": train_count,
-            "test_count": test_count,
+            "val_size": val_size,
+            "partition_sizes": partition_sizes,
             "shuffle": shuffle,
             "seed": seed,
             "stratify_by_column": stratify_by_column,
@@ -694,6 +820,7 @@ def split_dataset(
             "include_tables": include_tables,
             "training_types": train_types,
             "testing_types": test_types,
+            "validation_types": val_types if val_types else None,
             "strategy": strategy_desc,
         }
         params_file = Path(exe.working_dir) / "split_config.json"
@@ -710,70 +837,102 @@ def split_dataset(
         # Create Training dataset
         training_ds = exe.create_dataset(
             description=(
-                f"Training subset ({train_count} samples) of {source_dataset_rid} "
-                f"({strategy_desc}, seed={seed})"
+                f"Training subset ({partition_sizes['Training']} samples) of "
+                f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
             ),
             dataset_types=train_types,
         )
         logger.info(f"  Created Training dataset: {training_ds.dataset_rid}")
 
+        # Create Validation dataset (if requested)
+        validation_ds = None
+        if val_size is not None:
+            validation_ds = exe.create_dataset(
+                description=(
+                    f"Validation subset ({partition_sizes['Validation']} samples) of "
+                    f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
+                ),
+                dataset_types=val_types,
+            )
+            logger.info(f"  Created Validation dataset: {validation_ds.dataset_rid}")
+
         # Create Testing dataset
         testing_ds = exe.create_dataset(
             description=(
-                f"Testing subset ({test_count} samples) of {source_dataset_rid} "
-                f"({strategy_desc}, seed={seed})"
+                f"Testing subset ({partition_sizes['Testing']} samples) of "
+                f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
             ),
             dataset_types=test_types,
         )
         logger.info(f"  Created Testing dataset: {testing_ds.dataset_rid}")
 
         # Link children to parent
-        split_ds.add_dataset_members(
-            [training_ds.dataset_rid, testing_ds.dataset_rid], validate=False
-        )
-        logger.info("  Linked Training and Testing to Split dataset")
+        child_rids = [training_ds.dataset_rid, testing_ds.dataset_rid]
+        if validation_ds is not None:
+            child_rids.insert(1, validation_ds.dataset_rid)
+        split_ds.add_dataset_members(child_rids, validate=False)
+        logger.info("  Linked child datasets to Split dataset")
 
-        # Add members to training dataset
-        logger.info(f"  Adding {len(train_rids)} members to Training dataset...")
+        # Add members to each partition
         batch_size = 500
-        for i in range(0, len(train_rids), batch_size):
-            batch = train_rids[i : i + batch_size]
-            training_ds.add_dataset_members({element_table: batch}, validate=False)
-            added = min(i + batch_size, len(train_rids))
-            if added % 2000 == 0 or added >= len(train_rids):
-                logger.info(f"    Added {added}/{len(train_rids)}")
-
-        # Add members to testing dataset
-        logger.info(f"  Adding {len(test_rids)} members to Testing dataset...")
-        for i in range(0, len(test_rids), batch_size):
-            batch = test_rids[i : i + batch_size]
-            testing_ds.add_dataset_members({element_table: batch}, validate=False)
-            added = min(i + batch_size, len(test_rids))
-            if added % 2000 == 0 or added >= len(test_rids):
-                logger.info(f"    Added {added}/{len(test_rids)}")
+        for part_name, ds in [
+            ("Training", training_ds),
+            ("Validation", validation_ds),
+            ("Testing", testing_ds),
+        ]:
+            if ds is None:
+                continue
+            rids = partition_rids[part_name]
+            logger.info(f"  Adding {len(rids)} members to {part_name} dataset...")
+            for i in range(0, len(rids), batch_size):
+                batch = rids[i : i + batch_size]
+                ds.add_dataset_members({element_table: batch}, validate=False)
+                added = min(i + batch_size, len(rids))
+                if added % 2000 == 0 or added >= len(rids):
+                    logger.info(f"    Added {added}/{len(rids)}")
 
     # Upload execution outputs (after context manager exits)
     logger.info("Uploading execution outputs...")
     exe.upload_execution_outputs(clean_folder=True)
 
     # -------------------------------------------------------------------------
-    # Build result with versions
+    # Build result
     # -------------------------------------------------------------------------
     split_ds_info = ml.lookup_dataset(split_ds.dataset_rid)
     training_ds_info = ml.lookup_dataset(training_ds.dataset_rid)
     testing_ds_info = ml.lookup_dataset(testing_ds.dataset_rid)
 
-    return {
-        "split": split_ds.dataset_rid,
-        "split_version": str(split_ds_info.current_version),
-        "training": training_ds.dataset_rid,
-        "training_version": str(training_ds_info.current_version),
-        "testing": testing_ds.dataset_rid,
-        "testing_version": str(testing_ds_info.current_version),
-        "source": source_dataset_rid,
-        "train_count": train_count,
-        "test_count": test_count,
-    }
+    validation_info = None
+    if validation_ds is not None:
+        validation_ds_info = ml.lookup_dataset(validation_ds.dataset_rid)
+        validation_info = PartitionInfo(
+            rid=validation_ds.dataset_rid,
+            version=str(validation_ds_info.current_version),
+            count=partition_sizes["Validation"],
+        )
+
+    return SplitResult(
+        source=source_dataset_rid,
+        split=PartitionInfo(
+            rid=split_ds.dataset_rid,
+            version=str(split_ds_info.current_version),
+            count=0,
+        ),
+        training=PartitionInfo(
+            rid=training_ds.dataset_rid,
+            version=str(training_ds_info.current_version),
+            count=partition_sizes["Training"],
+        ),
+        testing=PartitionInfo(
+            rid=testing_ds.dataset_rid,
+            version=str(testing_ds_info.current_version),
+            count=partition_sizes["Testing"],
+        ),
+        validation=validation_info,
+        strategy=strategy_desc,
+        element_table=element_table,
+        seed=seed,
+    )
 
 
 # =============================================================================
@@ -785,7 +944,8 @@ def main() -> int:
     """CLI entry point for ``deriva-ml-split-dataset``.
 
     Parses command-line arguments, connects to a DerivaML catalog, and
-    splits the specified dataset into training and testing subsets.
+    splits the specified dataset into training, testing, and optionally
+    validation subsets.
 
     Returns:
         Exit code: 0 for success, 1 for failure.
@@ -795,13 +955,17 @@ def main() -> int:
     import textwrap
 
     parser = argparse.ArgumentParser(
-        description="Split a DerivaML dataset into training/testing subsets",
+        description="Split a DerivaML dataset into training/testing/validation subsets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""\
         Examples:
             # Simple random 80/20 split
             deriva-ml-split-dataset --hostname localhost --catalog-id 9 \\
                 --dataset-rid 28D0
+
+            # Three-way train/val/test split
+            deriva-ml-split-dataset --hostname localhost --catalog-id 9 \\
+                --dataset-rid 28D0 --val-size 0.1
 
             # Stratified split by class label
             deriva-ml-split-dataset --hostname localhost --catalog-id 9 \\
@@ -853,6 +1017,11 @@ def main() -> int:
         "(default: complement of test-size)",
     )
     parser.add_argument(
+        "--val-size", type=float, default=None,
+        help="Validation set size as fraction (0-1) or absolute count "
+        "(default: None, no validation split)",
+    )
+    parser.add_argument(
         "--no-shuffle", action="store_true",
         help="Do not shuffle before splitting",
     )
@@ -884,6 +1053,11 @@ def main() -> int:
     parser.add_argument(
         "--testing-types", default="Labeled",
         help="Comma-separated additional dataset types for testing set "
+        "(default: Labeled)",
+    )
+    parser.add_argument(
+        "--validation-types", default="Labeled",
+        help="Comma-separated additional dataset types for validation set "
         "(default: Labeled)",
     )
     parser.add_argument(
@@ -943,6 +1117,10 @@ def main() -> int:
             [t.strip() for t in args.testing_types.split(",")]
             if args.testing_types else None
         )
+        validation_types = (
+            [t.strip() for t in args.validation_types.split(",")]
+            if args.validation_types else None
+        )
 
         # Run the split
         result = split_dataset(
@@ -950,12 +1128,14 @@ def main() -> int:
             source_dataset_rid=args.dataset_rid,
             test_size=args.test_size,
             train_size=args.train_size,
+            val_size=args.val_size,
             shuffle=not args.no_shuffle,
             seed=args.seed,
             stratify_by_column=args.stratify_by_column,
             split_description=args.description,
             training_types=training_types,
             testing_types=testing_types,
+            validation_types=validation_types,
             element_table=args.element_table,
             include_tables=include_tables,
             workflow_type=args.workflow_type,
@@ -967,28 +1147,39 @@ def main() -> int:
             print(f"\n{'='*60}")
             print("  DRY RUN - No changes will be made")
             print(f"{'='*60}")
-            print(f"  Source dataset:  {result['source']}")
-            print(f"  Element table:   {result.get('element_table', 'auto-detect')}")
-            print(f"  Strategy:        {result.get('strategy', 'random')}")
-            print(f"  Seed:            {args.seed}")
-            print(f"  Training size:   {result['train_count']}")
-            print(f"  Testing size:    {result['test_count']}")
+            print(f"  Source dataset:  {result.source}")
+            print(f"  Element table:   {result.element_table}")
+            print(f"  Strategy:        {result.strategy}")
+            print(f"  Seed:            {result.seed}")
+            print(f"  Training size:   {result.training.count}")
+            if result.validation:
+                print(f"  Validation size: {result.validation.count}")
+            print(f"  Testing size:    {result.testing.count}")
             print(f"{'='*60}\n")
         else:
             print(f"\n{'='*60}")
             print("  SPLIT COMPLETE")
             print(f"{'='*60}")
-            print(f"  Source dataset:  {result['source']}")
-            print(f"  Split dataset:   {result['split']} (v{result['split_version']})")
-            print(f"  Training:        {result['training']} (v{result['training_version']})")
-            print(f"  Testing:         {result['testing']} (v{result['testing_version']})")
+            print(f"  Source dataset:  {result.source}")
+            print(f"  Split dataset:   {result.split.rid} (v{result.split.version})")
+            print(f"  Training:        {result.training.rid} (v{result.training.version})")
+            if result.validation:
+                print(f"  Validation:      {result.validation.rid} (v{result.validation.version})")
+            print(f"  Testing:         {result.testing.rid} (v{result.testing.version})")
 
             if args.show_urls:
                 print()
                 print("  Chaise URLs:")
-                for name in ["split", "training", "testing"]:
+                for name, info in [
+                    ("split", result.split),
+                    ("training", result.training),
+                    ("validation", result.validation),
+                    ("testing", result.testing),
+                ]:
+                    if info is None:
+                        continue
                     try:
-                        url = ml.cite(result[name], current=True)
+                        url = ml.cite(info.rid, current=True)
                         print(f"    {name}: {url}")
                     except Exception:
                         pass

@@ -8,7 +8,9 @@ from .dataset_bag import (
     select_majority_vote,
 )
 from .split import (
+    PartitionInfo,
     SelectionFunction,
+    SplitResult,
     random_split,
     split_dataset,
     stratified_split,
@@ -21,7 +23,9 @@ __all__ = [
     "DatasetBag",
     "DatasetVersion",
     "FeatureValueRecord",
+    "PartitionInfo",
     "SelectionFunction",
+    "SplitResult",
     "VersionPart",
     "random_split",
     "select_first",

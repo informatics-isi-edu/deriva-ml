@@ -415,7 +415,15 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     )
     dataset_type = catalog.getPathBuilder().schemas[schema_name].tables[MLVocab.dataset_type]
     dataset_type.insert(
-        [{"Name": "File", "Description": "A dataset that contains file assets."}],
+        [
+            {"Name": "File", "Description": "A dataset that contains file assets."},
+            {"Name": "Training", "Description": "A dataset subset used for model training."},
+            {"Name": "Testing", "Description": "A dataset subset used for model testing/evaluation."},
+            {"Name": "Validation", "Description": "A dataset subset used for model validation during training."},
+            {"Name": "Split", "Description": "A dataset that contains nested dataset splits."},
+            {"Name": "Labeled", "Description": "A dataset containing records with ground truth labels."},
+            {"Name": "Unlabeled", "Description": "A dataset containing records without ground truth labels."},
+        ],
         defaults={"ID", "URI"},
     )
 

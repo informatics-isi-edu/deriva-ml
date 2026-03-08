@@ -177,6 +177,9 @@ def create_demo_datasets(execution: Execution) -> DatasetDescription:
     _testing_rid = ml_instance.add_term(
         "Dataset_Type", "Testing", synonyms=["Test", "test", "testing"], description="A testing set"
     )
+    _validation_rid = ml_instance.add_term(
+        "Dataset_Type", "Validation", synonyms=["Val", "val", "validation"], description="A validation set"
+    )
 
     table_path = ml_instance.domain_path().tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]

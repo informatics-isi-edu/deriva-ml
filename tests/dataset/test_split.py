@@ -15,7 +15,9 @@ import pytest
 
 from deriva_ml import DerivaML, MLVocab
 from deriva_ml.dataset.split import (
+    PartitionInfo,
     SelectionFunction,
+    SplitResult,
     _resolve_sizes,
     random_split,
     split_dataset,
@@ -42,33 +44,28 @@ class TestResolveSizes:
 
     def test_fraction_test_size(self):
         """Test fractional test_size with complement train_size."""
-        train, test = _resolve_sizes(100, test_size=0.2, train_size=None)
-        assert test == 20
-        assert train == 80
+        result = _resolve_sizes(100, test_size=0.2, train_size=None)
+        assert result == {"Training": 80, "Testing": 20}
 
     def test_integer_test_size(self):
         """Test absolute integer test_size."""
-        train, test = _resolve_sizes(100, test_size=30, train_size=None)
-        assert test == 30
-        assert train == 70
+        result = _resolve_sizes(100, test_size=30, train_size=None)
+        assert result == {"Training": 70, "Testing": 30}
 
     def test_both_fractions(self):
         """Test both sizes as fractions."""
-        train, test = _resolve_sizes(100, test_size=0.3, train_size=0.5)
-        assert test == 30
-        assert train == 50
+        result = _resolve_sizes(100, test_size=0.3, train_size=0.5)
+        assert result == {"Training": 50, "Testing": 30}
 
     def test_both_integers(self):
         """Test both sizes as absolute integers."""
-        train, test = _resolve_sizes(100, test_size=20, train_size=60)
-        assert test == 20
-        assert train == 60
+        result = _resolve_sizes(100, test_size=20, train_size=60)
+        assert result == {"Training": 60, "Testing": 20}
 
     def test_fraction_rounding(self):
         """Test that fractional sizes round correctly."""
-        train, test = _resolve_sizes(10, test_size=0.3, train_size=None)
-        assert test == 3
-        assert train == 7
+        result = _resolve_sizes(10, test_size=0.3, train_size=None)
+        assert result == {"Training": 7, "Testing": 3}
 
     def test_exceeds_total_raises(self):
         """Test that sizes exceeding total raise ValueError."""
@@ -87,15 +84,49 @@ class TestResolveSizes:
 
     def test_small_dataset(self):
         """Test with a very small dataset."""
-        train, test = _resolve_sizes(2, test_size=1, train_size=1)
-        assert test == 1
-        assert train == 1
+        result = _resolve_sizes(2, test_size=1, train_size=1)
+        assert result == {"Training": 1, "Testing": 1}
 
     def test_train_size_complement(self):
         """Test that train_size=None gives the full complement."""
-        train, test = _resolve_sizes(1000, test_size=0.1, train_size=None)
-        assert test == 100
-        assert train == 900
+        result = _resolve_sizes(1000, test_size=0.1, train_size=None)
+        assert result == {"Training": 900, "Testing": 100}
+
+    def test_three_way_fractions(self):
+        """Test three-way split with fractional sizes."""
+        result = _resolve_sizes(100, test_size=0.2, val_size=0.1)
+        assert result == {"Training": 70, "Testing": 20, "Validation": 10}
+
+    def test_three_way_integers(self):
+        """Test three-way split with absolute sizes."""
+        result = _resolve_sizes(100, test_size=20, val_size=10, train_size=60)
+        assert result == {"Training": 60, "Testing": 20, "Validation": 10}
+
+    def test_three_way_complement(self):
+        """Test three-way split with train_size as complement."""
+        result = _resolve_sizes(100, test_size=20, val_size=10)
+        assert result == {"Training": 70, "Testing": 20, "Validation": 10}
+
+    def test_three_way_exceeds_total_raises(self):
+        """Test that three-way sizes exceeding total raise ValueError."""
+        with pytest.raises(ValueError, match="exceeds total dataset size"):
+            _resolve_sizes(100, test_size=50, val_size=30, train_size=30)
+
+    def test_val_size_zero_raises(self):
+        """Test that zero val_size raises ValueError."""
+        with pytest.raises(ValueError):
+            _resolve_sizes(100, test_size=0.2, val_size=0.0)
+
+    def test_no_val_size_returns_two_partitions(self):
+        """Test that val_size=None returns only Training and Testing."""
+        result = _resolve_sizes(100, test_size=0.2)
+        assert "Validation" not in result
+        assert set(result.keys()) == {"Training", "Testing"}
+
+    def test_val_size_returns_three_partitions(self):
+        """Test that val_size provided returns three partitions."""
+        result = _resolve_sizes(100, test_size=0.2, val_size=0.1)
+        assert set(result.keys()) == {"Training", "Testing", "Validation"}
 
 
 # =============================================================================
@@ -109,50 +140,79 @@ class TestRandomSplit:
     def test_correct_sizes(self):
         """Test that output arrays have correct sizes."""
         df = pd.DataFrame({"x": range(100)})
-        train_idx, test_idx = random_split(df, train_size=70, test_size=30, seed=42)
-        assert len(train_idx) == 70
-        assert len(test_idx) == 30
+        result = random_split(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        assert len(result["Training"]) == 70
+        assert len(result["Testing"]) == 30
 
     def test_no_overlap(self):
         """Test that train and test indices don't overlap."""
         df = pd.DataFrame({"x": range(100)})
-        train_idx, test_idx = random_split(df, train_size=70, test_size=30, seed=42)
-        assert len(set(train_idx) & set(test_idx)) == 0
+        result = random_split(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        assert len(set(result["Training"]) & set(result["Testing"])) == 0
 
     def test_deterministic(self):
         """Test that same seed produces same result."""
         df = pd.DataFrame({"x": range(100)})
-        train1, test1 = random_split(df, train_size=70, test_size=30, seed=42)
-        train2, test2 = random_split(df, train_size=70, test_size=30, seed=42)
-        np.testing.assert_array_equal(train1, train2)
-        np.testing.assert_array_equal(test1, test2)
+        r1 = random_split(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        r2 = random_split(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        np.testing.assert_array_equal(r1["Training"], r2["Training"])
+        np.testing.assert_array_equal(r1["Testing"], r2["Testing"])
 
     def test_different_seeds(self):
         """Test that different seeds produce different results."""
         df = pd.DataFrame({"x": range(100)})
-        train1, _ = random_split(df, train_size=70, test_size=30, seed=42)
-        train2, _ = random_split(df, train_size=70, test_size=30, seed=99)
-        assert not np.array_equal(train1, train2)
+        r1 = random_split(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        r2 = random_split(df, partition_sizes={"Training": 70, "Testing": 30}, seed=99)
+        assert not np.array_equal(r1["Training"], r2["Training"])
 
     def test_subset_of_total(self):
         """Test splitting a subset of a larger dataset."""
         df = pd.DataFrame({"x": range(100)})
-        train_idx, test_idx = random_split(df, train_size=20, test_size=10, seed=42)
-        assert len(train_idx) == 20
-        assert len(test_idx) == 10
-        all_indices = np.concatenate([train_idx, test_idx])
+        result = random_split(df, partition_sizes={"Training": 20, "Testing": 10}, seed=42)
+        assert len(result["Training"]) == 20
+        assert len(result["Testing"]) == 10
+        all_indices = np.concatenate([result["Training"], result["Testing"]])
         assert all(0 <= i < 100 for i in all_indices)
 
     def test_valid_indices(self):
         """Test that all indices are valid DataFrame indices."""
         df = pd.DataFrame({"x": range(50)})
-        train_idx, test_idx = random_split(df, train_size=30, test_size=20, seed=42)
-        all_idx = np.concatenate([train_idx, test_idx])
+        result = random_split(df, partition_sizes={"Training": 30, "Testing": 20}, seed=42)
+        all_idx = np.concatenate([result["Training"], result["Testing"]])
         assert all(0 <= i < len(df) for i in all_idx)
 
     def test_conforms_to_protocol(self):
         """Test that random_split conforms to SelectionFunction protocol."""
         assert isinstance(random_split, SelectionFunction)
+
+    def test_three_way_split(self):
+        """Test three-way random split."""
+        df = pd.DataFrame({"x": range(100)})
+        result = random_split(
+            df,
+            partition_sizes={"Training": 60, "Validation": 20, "Testing": 20},
+            seed=42,
+        )
+        assert len(result["Training"]) == 60
+        assert len(result["Validation"]) == 20
+        assert len(result["Testing"]) == 20
+
+        # No overlap between any pair
+        all_sets = [set(result[k]) for k in result]
+        for i in range(len(all_sets)):
+            for j in range(i + 1, len(all_sets)):
+                assert len(all_sets[i] & all_sets[j]) == 0
+
+    def test_three_way_valid_indices(self):
+        """Test that all indices in three-way split are valid."""
+        df = pd.DataFrame({"x": range(50)})
+        result = random_split(
+            df,
+            partition_sizes={"Training": 30, "Validation": 10, "Testing": 10},
+            seed=42,
+        )
+        all_idx = np.concatenate(list(result.values()))
+        assert all(0 <= i < len(df) for i in all_idx)
 
 
 # =============================================================================
@@ -171,9 +231,9 @@ class TestStratifiedSplit:
             "value": range(100),
         })
         selector = stratified_split("label")
-        train_idx, test_idx = selector(df, train_size=70, test_size=30, seed=42)
-        assert len(train_idx) == 70
-        assert len(test_idx) == 30
+        result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        assert len(result["Training"]) == 70
+        assert len(result["Testing"]) == 30
 
     def test_maintains_distribution(self):
         """Test that class distribution is preserved."""
@@ -182,18 +242,14 @@ class TestStratifiedSplit:
             "value": range(100),
         })
         selector = stratified_split("label")
-        train_idx, test_idx = selector(df, train_size=80, test_size=20, seed=42)
+        result = selector(df, partition_sizes={"Training": 80, "Testing": 20}, seed=42)
 
-        train_labels = df.iloc[train_idx]["label"]
-        test_labels = df.iloc[test_idx]["label"]
+        train_labels = df.iloc[result["Training"]]["label"]
+        test_labels = df.iloc[result["Testing"]]["label"]
 
-        # With 60/40 distribution and 80/20 split:
-        # Train should have ~48 A and ~32 B
-        # Test should have ~12 A and ~8 B
         train_a_frac = (train_labels == "A").sum() / len(train_labels)
         test_a_frac = (test_labels == "A").sum() / len(test_labels)
 
-        # Class distribution should be approximately preserved (within 10%)
         assert abs(train_a_frac - 0.6) < 0.1
         assert abs(test_a_frac - 0.6) < 0.1
 
@@ -203,8 +259,8 @@ class TestStratifiedSplit:
             "label": ["A"] * 50 + ["B"] * 50,
         })
         selector = stratified_split("label")
-        train_idx, test_idx = selector(df, train_size=70, test_size=30, seed=42)
-        assert len(set(train_idx) & set(test_idx)) == 0
+        result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        assert len(set(result["Training"]) & set(result["Testing"])) == 0
 
     def test_deterministic(self):
         """Test that same seed produces same result."""
@@ -212,24 +268,24 @@ class TestStratifiedSplit:
             "label": ["A"] * 50 + ["B"] * 50,
         })
         selector = stratified_split("label")
-        train1, test1 = selector(df, train_size=70, test_size=30, seed=42)
-        train2, test2 = selector(df, train_size=70, test_size=30, seed=42)
-        np.testing.assert_array_equal(sorted(train1), sorted(train2))
-        np.testing.assert_array_equal(sorted(test1), sorted(test2))
+        r1 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        r2 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        np.testing.assert_array_equal(sorted(r1["Training"]), sorted(r2["Training"]))
+        np.testing.assert_array_equal(sorted(r1["Testing"]), sorted(r2["Testing"]))
 
     def test_missing_column_raises(self):
         """Test that missing stratification column raises ValueError."""
         df = pd.DataFrame({"x": range(10)})
         selector = stratified_split("nonexistent")
         with pytest.raises(ValueError, match="not found in denormalized DataFrame"):
-            selector(df, train_size=7, test_size=3, seed=42)
+            selector(df, partition_sizes={"Training": 7, "Testing": 3}, seed=42)
 
     def test_exceeds_total_raises(self):
         """Test that requesting more than available raises ValueError."""
         df = pd.DataFrame({"label": ["A"] * 5 + ["B"] * 5})
         selector = stratified_split("label")
         with pytest.raises(ValueError, match="Requested .* samples but dataset has"):
-            selector(df, train_size=8, test_size=5, seed=42)
+            selector(df, partition_sizes={"Training": 8, "Testing": 5}, seed=42)
 
     def test_subset_of_total(self):
         """Test stratified split with fewer samples than total."""
@@ -237,9 +293,9 @@ class TestStratifiedSplit:
             "label": ["A"] * 50 + ["B"] * 50,
         })
         selector = stratified_split("label")
-        train_idx, test_idx = selector(df, train_size=30, test_size=10, seed=42)
-        assert len(train_idx) == 30
-        assert len(test_idx) == 10
+        result = selector(df, partition_sizes={"Training": 30, "Testing": 10}, seed=42)
+        assert len(result["Training"]) == 30
+        assert len(result["Testing"]) == 10
 
     def test_conforms_to_protocol(self):
         """Test that returned function conforms to SelectionFunction protocol."""
@@ -252,15 +308,53 @@ class TestStratifiedSplit:
             "label": ["A"] * 30 + ["B"] * 30 + ["C"] * 30 + ["D"] * 10,
         })
         selector = stratified_split("label")
-        train_idx, test_idx = selector(df, train_size=80, test_size=20, seed=42)
-        assert len(train_idx) == 80
-        assert len(test_idx) == 20
+        result = selector(df, partition_sizes={"Training": 80, "Testing": 20}, seed=42)
+        assert len(result["Training"]) == 80
+        assert len(result["Testing"]) == 20
 
         # All classes should be represented in both splits
-        train_classes = set(df.iloc[train_idx]["label"])
-        test_classes = set(df.iloc[test_idx]["label"])
+        train_classes = set(df.iloc[result["Training"]]["label"])
+        test_classes = set(df.iloc[result["Testing"]]["label"])
         assert train_classes == {"A", "B", "C", "D"}
         assert test_classes == {"A", "B", "C", "D"}
+
+    def test_three_way_split(self):
+        """Test three-way stratified split."""
+        df = pd.DataFrame({
+            "label": ["A"] * 60 + ["B"] * 40,
+        })
+        selector = stratified_split("label")
+        result = selector(
+            df,
+            partition_sizes={"Training": 60, "Validation": 20, "Testing": 20},
+            seed=42,
+        )
+        assert len(result["Training"]) == 60
+        assert len(result["Validation"]) == 20
+        assert len(result["Testing"]) == 20
+
+        # No overlap between any pair
+        all_sets = [set(result[k]) for k in result]
+        for i in range(len(all_sets)):
+            for j in range(i + 1, len(all_sets)):
+                assert len(all_sets[i] & all_sets[j]) == 0
+
+    def test_three_way_maintains_distribution(self):
+        """Test that three-way split preserves class distribution."""
+        df = pd.DataFrame({
+            "label": ["A"] * 60 + ["B"] * 40,
+        })
+        selector = stratified_split("label")
+        result = selector(
+            df,
+            partition_sizes={"Training": 60, "Validation": 20, "Testing": 20},
+            seed=42,
+        )
+
+        for name in ["Training", "Validation", "Testing"]:
+            labels = df.iloc[result[name]]["label"]
+            a_frac = (labels == "A").sum() / len(labels)
+            assert abs(a_frac - 0.6) < 0.15, f"{name} has A fraction {a_frac}, expected ~0.6"
 
 
 # =============================================================================
@@ -338,19 +432,18 @@ class TestSplitDataset:
             seed=42,
         )
 
-        assert "split" in result
-        assert "training" in result
-        assert "testing" in result
-        assert result["source"] == source_rid
-        assert result["train_count"] == 9
-        assert result["test_count"] == 3
+        assert isinstance(result, SplitResult)
+        assert result.source == source_rid
+        assert result.training.count == 9
+        assert result.testing.count == 3
+        assert result.validation is None
 
         # Verify the datasets were actually created
-        split_ds = ml.lookup_dataset(result["split"])
+        split_ds = ml.lookup_dataset(result.split.rid)
         assert split_ds is not None
-        training_ds = ml.lookup_dataset(result["training"])
+        training_ds = ml.lookup_dataset(result.training.rid)
         assert training_ds is not None
-        testing_ds = ml.lookup_dataset(result["testing"])
+        testing_ds = ml.lookup_dataset(result.testing.rid)
         assert testing_ds is not None
 
     def test_split_creates_hierarchy(self, test_ml):
@@ -361,11 +454,11 @@ class TestSplitDataset:
         result = split_dataset(ml, source_rid, test_size=3, seed=42)
 
         # Verify parent-child relationships
-        split_ds = ml.lookup_dataset(result["split"])
+        split_ds = ml.lookup_dataset(result.split.rid)
         children = split_ds.list_dataset_children()
         child_rids = {c.dataset_rid for c in children}
-        assert result["training"] in child_rids
-        assert result["testing"] in child_rids
+        assert result.training.rid in child_rids
+        assert result.testing.rid in child_rids
 
     def test_split_member_counts(self, test_ml):
         """Test that train and test datasets have correct member counts."""
@@ -380,12 +473,12 @@ class TestSplitDataset:
         )
 
         # Check training dataset members
-        training_ds = ml.lookup_dataset(result["training"])
+        training_ds = ml.lookup_dataset(result.training.rid)
         train_members = training_ds.list_dataset_members()
         assert len(train_members.get("SplitTestItem", [])) == 8
 
         # Check testing dataset members
-        testing_ds = ml.lookup_dataset(result["testing"])
+        testing_ds = ml.lookup_dataset(result.testing.rid)
         test_members = testing_ds.list_dataset_members()
         assert len(test_members.get("SplitTestItem", [])) == 4
 
@@ -396,8 +489,8 @@ class TestSplitDataset:
 
         result = split_dataset(ml, source_rid, test_size=4, seed=42)
 
-        training_ds = ml.lookup_dataset(result["training"])
-        testing_ds = ml.lookup_dataset(result["testing"])
+        training_ds = ml.lookup_dataset(result.training.rid)
+        testing_ds = ml.lookup_dataset(result.testing.rid)
 
         train_rids = {
             r["RID"] for r in training_ds.list_dataset_members().get("SplitTestItem", [])
@@ -414,7 +507,7 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result1 = split_dataset(ml, source_rid, test_size=4, seed=42)
-        training_ds1 = ml.lookup_dataset(result1["training"])
+        training_ds1 = ml.lookup_dataset(result1.training.rid)
         train_rids1 = {
             r["RID"]
             for r in training_ds1.list_dataset_members().get("SplitTestItem", [])
@@ -422,7 +515,7 @@ class TestSplitDataset:
 
         # Create another split with same parameters on same source
         result2 = split_dataset(ml, source_rid, test_size=4, seed=42)
-        training_ds2 = ml.lookup_dataset(result2["training"])
+        training_ds2 = ml.lookup_dataset(result2.training.rid)
         train_rids2 = {
             r["RID"]
             for r in training_ds2.list_dataset_members().get("SplitTestItem", [])
@@ -443,9 +536,9 @@ class TestSplitDataset:
             testing_types=["Labeled"],
         )
 
-        split_ds = ml.lookup_dataset(result["split"])
-        training_ds = ml.lookup_dataset(result["training"])
-        testing_ds = ml.lookup_dataset(result["testing"])
+        split_ds = ml.lookup_dataset(result.split.rid)
+        training_ds = ml.lookup_dataset(result.training.rid)
+        testing_ds = ml.lookup_dataset(result.testing.rid)
 
         assert "Split" in split_ds.dataset_types
         assert "Training" in training_ds.dataset_types
@@ -468,13 +561,14 @@ class TestSplitDataset:
             dry_run=True,
         )
 
-        # Dry run should not create new datasets
-        assert result["split"] == "(dry run)"
-        assert result["training"] == "(dry run)"
-        assert result["testing"] == "(dry run)"
-        assert result["source"] == source_rid
-        assert result["train_count"] == 8
-        assert result["test_count"] == 4
+        assert isinstance(result, SplitResult)
+        assert result.dry_run is True
+        assert result.split.rid == "(dry run)"
+        assert result.training.rid == "(dry run)"
+        assert result.testing.rid == "(dry run)"
+        assert result.source == source_rid
+        assert result.training.count == 8
+        assert result.testing.count == 4
 
         # Verify no new datasets were created
         current_datasets = list(ml.find_datasets())
@@ -487,13 +581,17 @@ class TestSplitDataset:
 
         def first_n_selector(
             df: pd.DataFrame,
-            train_size: int,
-            test_size: int,
+            partition_sizes: dict[str, int],
             seed: int,
-        ) -> tuple[np.ndarray, np.ndarray]:
-            """Deterministic selector: first N for train, next M for test."""
+        ) -> dict[str, np.ndarray]:
+            """Deterministic selector: allocate indices in order."""
             indices = np.arange(len(df))
-            return indices[:train_size], indices[train_size : train_size + test_size]
+            result = {}
+            offset = 0
+            for name, size in partition_sizes.items():
+                result[name] = indices[offset : offset + size]
+                offset += size
+            return result
 
         result = split_dataset(
             ml, source_rid,
@@ -503,16 +601,16 @@ class TestSplitDataset:
             include_tables=["SplitTestItem"],
         )
 
-        assert result["train_count"] == 8
-        assert result["test_count"] == 4
+        assert result.training.count == 8
+        assert result.testing.count == 4
 
     def test_mutually_exclusive_params(self, test_ml):
         """Test that stratify_by_column and selection_fn are mutually exclusive."""
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        def dummy_fn(df, train_size, test_size, seed):
-            return np.array([0]), np.array([1])
+        def dummy_fn(df, partition_sizes, seed):
+            return {"Training": np.array([0]), "Testing": np.array([1])}
 
         with pytest.raises(ValueError, match="mutually exclusive"):
             split_dataset(
@@ -540,8 +638,8 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        def dummy_fn(df, train_size, test_size, seed):
-            return np.array([0]), np.array([1])
+        def dummy_fn(df, partition_sizes, seed):
+            return {"Training": np.array([0]), "Testing": np.array([1])}
 
         with pytest.raises(ValueError, match="include_tables is required"):
             split_dataset(
@@ -581,7 +679,7 @@ class TestSplitDataset:
         result = split_dataset(ml, source_rid, test_size=4, seed=42)
 
         # The split dataset should have execution history
-        split_ds = ml.lookup_dataset(result["split"])
+        split_ds = ml.lookup_dataset(result.split.rid)
         history = split_ds.dataset_history()
         assert len(history) > 0
 
@@ -592,12 +690,9 @@ class TestSplitDataset:
 
         result = split_dataset(ml, source_rid, test_size=4, seed=42)
 
-        assert "split_version" in result
-        assert "training_version" in result
-        assert "testing_version" in result
         # Versions should be valid semver-like strings
-        for key in ["split_version", "training_version", "testing_version"]:
-            parts = str(result[key]).split(".")
+        for info in [result.split, result.training, result.testing]:
+            parts = str(info.version).split(".")
             assert len(parts) == 3
 
     def test_no_shuffle(self, test_ml):
@@ -612,5 +707,125 @@ class TestSplitDataset:
             seed=42,
         )
 
-        assert result["train_count"] == 8
-        assert result["test_count"] == 4
+        assert result.training.count == 8
+        assert result.testing.count == 4
+
+    # =========================================================================
+    # Three-way split integration tests
+    # =========================================================================
+
+    def test_three_way_split(self, test_ml):
+        """Test three-way train/val/test split."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(
+            ml, source_rid,
+            test_size=2,
+            val_size=2,
+            seed=42,
+        )
+
+        assert isinstance(result, SplitResult)
+        assert result.training.count == 8
+        assert result.validation is not None
+        assert result.validation.count == 2
+        assert result.testing.count == 2
+
+        # Verify all three datasets were created
+        assert ml.lookup_dataset(result.training.rid) is not None
+        assert ml.lookup_dataset(result.validation.rid) is not None
+        assert ml.lookup_dataset(result.testing.rid) is not None
+
+    def test_three_way_hierarchy(self, test_ml):
+        """Test that three-way split creates correct parent-child hierarchy."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(
+            ml, source_rid,
+            test_size=2,
+            val_size=2,
+            seed=42,
+        )
+
+        split_ds = ml.lookup_dataset(result.split.rid)
+        children = split_ds.list_dataset_children()
+        child_rids = {c.dataset_rid for c in children}
+        assert result.training.rid in child_rids
+        assert result.validation.rid in child_rids
+        assert result.testing.rid in child_rids
+        assert len(child_rids) == 3
+
+    def test_three_way_no_overlap(self, test_ml):
+        """Test that all three partitions have no overlapping members."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(
+            ml, source_rid,
+            test_size=2,
+            val_size=2,
+            seed=42,
+        )
+
+        train_rids = {
+            r["RID"] for r in
+            ml.lookup_dataset(result.training.rid).list_dataset_members().get("SplitTestItem", [])
+        }
+        val_rids = {
+            r["RID"] for r in
+            ml.lookup_dataset(result.validation.rid).list_dataset_members().get("SplitTestItem", [])
+        }
+        test_rids = {
+            r["RID"] for r in
+            ml.lookup_dataset(result.testing.rid).list_dataset_members().get("SplitTestItem", [])
+        }
+
+        assert len(train_rids & val_rids) == 0
+        assert len(train_rids & test_rids) == 0
+        assert len(val_rids & test_rids) == 0
+
+    def test_three_way_types(self, test_ml):
+        """Test that three-way split applies correct dataset types."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(
+            ml, source_rid,
+            test_size=2,
+            val_size=2,
+            seed=42,
+            training_types=["Labeled"],
+            validation_types=["Labeled"],
+            testing_types=["Labeled"],
+        )
+
+        training_ds = ml.lookup_dataset(result.training.rid)
+        validation_ds = ml.lookup_dataset(result.validation.rid)
+        testing_ds = ml.lookup_dataset(result.testing.rid)
+
+        assert "Training" in training_ds.dataset_types
+        assert "Labeled" in training_ds.dataset_types
+        assert "Validation" in validation_ds.dataset_types
+        assert "Labeled" in validation_ds.dataset_types
+        assert "Testing" in testing_ds.dataset_types
+        assert "Labeled" in testing_ds.dataset_types
+
+    def test_three_way_dry_run(self, test_ml):
+        """Test three-way dry run includes validation info."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(
+            ml, source_rid,
+            test_size=2,
+            val_size=2,
+            seed=42,
+            dry_run=True,
+        )
+
+        assert result.dry_run is True
+        assert result.validation is not None
+        assert result.validation.count == 2
+        assert result.validation.rid == "(dry run)"

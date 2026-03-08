@@ -140,11 +140,13 @@ parents = training_dataset.list_dataset_parents()
 
 ## Splitting Datasets
 
-A common ML workflow is splitting a dataset into training and testing subsets. DerivaML provides the [`split_dataset`][deriva_ml.dataset.split.split_dataset] function for this, with full provenance tracking. The API follows scikit-learn conventions (`test_size`, `train_size`, `shuffle`, `seed`, `stratify`) while creating a proper dataset hierarchy in the catalog.
+A common ML workflow is splitting a dataset into training, testing, and optionally validation subsets. DerivaML provides the [`split_dataset`][deriva_ml.dataset.split.split_dataset] function for this, with full provenance tracking. The API follows scikit-learn conventions (`test_size`, `train_size`, `val_size`, `shuffle`, `seed`, `stratify`) while creating a proper dataset hierarchy in the catalog.
 
 ### How Splitting Works
 
-`split_dataset` creates a three-level dataset hierarchy:
+`split_dataset` creates a dataset hierarchy with child datasets for each partition:
+
+**Two-way split** (default, when `val_size` is not provided):
 
 ```
 Split (parent, type: "Split")
@@ -152,7 +154,18 @@ Split (parent, type: "Split")
 └── Testing (child, type: "Testing")
 ```
 
+**Three-way split** (when `val_size` is provided):
+
+```
+Split (parent, type: "Split")
+├── Training (child, type: "Training")
+├── Validation (child, type: "Validation")
+└── Testing (child, type: "Testing")
+```
+
 The entire operation is performed within an execution context, so the split is fully traceable back to the source dataset, the parameters used, and the code that ran it.
+
+The result is returned as a [`SplitResult`][deriva_ml.dataset.split.SplitResult] object with typed [`PartitionInfo`][deriva_ml.dataset.split.PartitionInfo] fields for each partition.
 
 ### Simple Random Split
 
@@ -164,9 +177,9 @@ from deriva_ml.dataset.split import split_dataset
 # 80/20 random split (default)
 result = split_dataset(ml, source_dataset_rid, test_size=0.2, seed=42)
 
-print(f"Split:    {result['split']}")
-print(f"Training: {result['training']} ({result['train_count']} samples)")
-print(f"Testing:  {result['testing']} ({result['test_count']} samples)")
+print(f"Split:    {result.split.rid} (v{result.split.version})")
+print(f"Training: {result.training.rid} ({result.training.count} samples)")
+print(f"Testing:  {result.testing.rid} ({result.testing.count} samples)")
 ```
 
 You can also specify absolute counts instead of fractions:
@@ -181,37 +194,60 @@ result = split_dataset(
 )
 ```
 
+### Three-Way Train/Validation/Test Split
+
+For supervised learning tasks that require a separate validation set during training, provide `val_size`:
+
+```python
+# 70/10/20 train/val/test split
+result = split_dataset(
+    ml, source_dataset_rid,
+    test_size=0.2,
+    val_size=0.1,
+    seed=42,
+)
+
+print(f"Training:   {result.training.rid} ({result.training.count} samples)")
+print(f"Validation: {result.validation.rid} ({result.validation.count} samples)")
+print(f"Testing:    {result.testing.rid} ({result.testing.count} samples)")
+```
+
+When `val_size` is `None` (the default), a two-way split is created and `result.validation` is `None`.
+
 ### Labeled Splits
 
-When your experiment needs ground truth labels in both training and testing sets (for evaluation, ROC curves, etc.), add the `"Labeled"` dataset type:
+When your experiment needs ground truth labels in all partitions (for evaluation, ROC curves, etc.), add the `"Labeled"` dataset type:
 
 ```python
 result = split_dataset(
     ml, source_dataset_rid,
     test_size=0.2,
+    val_size=0.1,
     seed=42,
     training_types=["Labeled"],
+    validation_types=["Labeled"],
     testing_types=["Labeled"],
 )
 ```
 
-This creates Training and Testing datasets with both their default type and the additional `"Labeled"` type, making them easy to discover and distinguish from unlabeled splits.
+This creates each partition dataset with both its default type (e.g., "Training") and the additional `"Labeled"` type, making them easy to discover and distinguish from unlabeled splits.
 
 ### Stratified Splitting
 
-Stratified splitting maintains the class distribution of a column across both splits. This requires denormalizing the dataset to access the column values:
+Stratified splitting maintains the class distribution of a column across all partitions. This requires denormalizing the dataset to access the column values:
 
 ```python
 result = split_dataset(
     ml, source_dataset_rid,
     test_size=0.2,
+    val_size=0.1,
     seed=42,
     stratify_by_column="Image_Classification_Image_Class",
     include_tables=["Image", "Image_Classification"],
 )
 ```
 
-The `stratify_by_column` uses the denormalized column name format: `{TableName}_{ColumnName}`. The `include_tables` parameter specifies which tables to join during denormalization.
+The `stratify_by_column` uses the denormalized column name format: `{TableName}_{ColumnName}`. The `include_tables` parameter specifies which tables to join during denormalization. Stratification works with both two-way and three-way splits.
 
 !!! note
     Stratified splitting requires scikit-learn to be installed. It is imported lazily, so the base `split_dataset` function works without it for random splits.
@@ -223,20 +259,21 @@ For advanced splitting logic (balanced sampling, filtered subsets, etc.), provid
 ```python
 import numpy as np
 
-def balanced_selector(df, train_size, test_size, seed):
-    """Select equal numbers from each class."""
+def balanced_selector(df, partition_sizes, seed):
+    """Select equal numbers from each class for each partition."""
     rng = np.random.default_rng(seed)
     label_col = "Image_Classification_Image_Class"
     classes = df[label_col].unique()
-    train_idx, test_idx = [], []
+    result = {name: [] for name in partition_sizes}
     for cls in classes:
         cls_indices = df.index[df[label_col] == cls].to_numpy()
         rng.shuffle(cls_indices)
-        per_class_train = train_size // len(classes)
-        per_class_test = test_size // len(classes)
-        train_idx.extend(cls_indices[:per_class_train])
-        test_idx.extend(cls_indices[per_class_train:per_class_train + per_class_test])
-    return np.array(train_idx), np.array(test_idx)
+        offset = 0
+        for name, size in partition_sizes.items():
+            per_class = size // len(classes)
+            result[name].extend(cls_indices[offset:offset + per_class])
+            offset += per_class
+    return {name: np.array(idx) for name, idx in result.items()}
 
 result = split_dataset(
     ml, source_dataset_rid,
@@ -246,7 +283,7 @@ result = split_dataset(
 )
 ```
 
-A selection function must conform to the [`SelectionFunction`][deriva_ml.dataset.split.SelectionFunction] protocol: it receives a DataFrame, train/test sizes, and a seed, and returns `(train_indices, test_indices)` as numpy arrays.
+A selection function must conform to the [`SelectionFunction`][deriva_ml.dataset.split.SelectionFunction] protocol: it receives a DataFrame, a dict mapping partition names to sizes, and a seed, and returns a dict mapping partition names to numpy index arrays.
 
 ### Dry Run
 
@@ -256,10 +293,12 @@ Use `dry_run=True` to preview what would happen without modifying the catalog:
 result = split_dataset(
     ml, source_dataset_rid,
     test_size=0.2,
+    val_size=0.1,
     dry_run=True,
 )
-print(f"Would create: {result['train_count']} train, {result['test_count']} test")
-print(f"Strategy: {result['strategy']}")
+print(f"Would create: {result.training.count} train, "
+      f"{result.validation.count} val, {result.testing.count} test")
+print(f"Strategy: {result.strategy}")
 ```
 
 ### Command-Line Interface
@@ -270,6 +309,10 @@ The `deriva-ml-split-dataset` CLI provides the same functionality from the comma
 # Simple random split
 deriva-ml-split-dataset --hostname localhost --catalog-id 9 \
     --dataset-rid 28D0 --test-size 0.2
+
+# Three-way split
+deriva-ml-split-dataset --hostname localhost --catalog-id 9 \
+    --dataset-rid 28D0 --test-size 0.2 --val-size 0.1
 
 # Stratified split
 deriva-ml-split-dataset --hostname localhost --catalog-id 9 \
