@@ -521,6 +521,24 @@ def run_notebook(
         hydra_runtime_output_dir=hydra_output_dir,
     )
 
+    # Validate that all config RIDs exist in the catalog before proceeding.
+    from deriva_ml.core.validation import validate_execution_config
+
+    _datasets = config.datasets if config.datasets else []
+    _assets = config.assets if config.assets else []
+    validation_result = validate_execution_config(ml, _datasets, _assets)
+    if not validation_result.is_valid:
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        raise DerivaMLException(
+            f"Notebook config validation failed:\n{validation_result}"
+        )
+    if validation_result.warnings:
+        import logging as _logging
+
+        for warning in validation_result.warnings:
+            _logging.warning(warning)
+
     # Create workflow
     actual_workflow_name = workflow_name or config_name.replace("_", " ").title()
     workflow = ml.create_workflow(

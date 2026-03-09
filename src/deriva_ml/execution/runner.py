@@ -463,6 +463,25 @@ def run_model(
     ml_instance = ml_class.instantiate(deriva_ml)
 
     # ---------------------------------------------------------------------------
+    # Validate that all config RIDs exist in the catalog
+    # ---------------------------------------------------------------------------
+    # Check dataset RIDs, versions, and asset RIDs before creating an execution
+    # or downloading any data. This catches typos, wrong catalogs, and stale
+    # versions early with clear error messages.
+    from deriva_ml.core.validation import validate_execution_config
+
+    validation_result = validate_execution_config(ml_instance, datasets, assets)
+    if not validation_result.is_valid:
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        raise DerivaMLException(
+            f"Execution config validation failed:\n{validation_result}"
+        )
+    if validation_result.warnings:
+        for warning in validation_result.warnings:
+            logging.warning(warning)
+
+    # ---------------------------------------------------------------------------
     # Correct workflow URL from model function source
     # ---------------------------------------------------------------------------
     # When run via `deriva-ml-run`, the Workflow object is created during Hydra

@@ -68,6 +68,7 @@ __all__ = [
     "ValidationResult",
     "validate_rids",
     "validate_vocabulary_terms",
+    "validate_execution_config",
 ]
 
 
@@ -387,3 +388,84 @@ def validate_vocabulary_terms(
         result.add_error(f"Failed to validate vocabulary '{vocabulary_name}': {e}")
 
     return result
+
+
+def validate_execution_config(
+    ml: "DerivaML",
+    datasets: list[Any],
+    assets: list[Any],
+) -> ValidationResult:
+    """Validate that all dataset and asset RIDs in a resolved execution config exist in the catalog.
+
+    This is called automatically by run_model() after Hydra config resolution and
+    catalog connection, but before creating the execution or downloading any data.
+    It catches configuration errors (typos in RIDs, wrong catalog, missing versions)
+    early with clear messages.
+
+    Parameters
+    ----------
+    ml : DerivaML
+        Connected DerivaML instance.
+    datasets : list
+        Resolved dataset specifications (DatasetSpec objects or dicts with rid/version).
+    assets : list
+        Resolved asset specifications (AssetSpec objects, dicts, or bare RID strings).
+
+    Returns
+    -------
+    ValidationResult
+        Validation result with errors for missing RIDs or versions, and warnings
+        for stale versions.
+
+    Example
+    -------
+    >>> result = validate_execution_config(ml, datasets, assets)
+    >>> if not result.is_valid:
+    ...     raise DerivaMLException(f"Config validation failed:\\n{result}")
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Extract dataset RIDs and versions
+    dataset_rids: list[str] = []
+    dataset_versions: dict[str, str] = {}
+
+    for ds in datasets:
+        rid = getattr(ds, "rid", None) or (ds.get("rid") if isinstance(ds, dict) else None)
+        if rid is None:
+            continue
+        rid = str(rid)
+        dataset_rids.append(rid)
+
+        # Extract version
+        version = getattr(ds, "version", None) or (ds.get("version") if isinstance(ds, dict) else None)
+        if version is not None:
+            dataset_versions[rid] = str(version)
+
+    # Extract asset RIDs
+    asset_rids: list[str] = []
+    for a in assets:
+        if isinstance(a, str):
+            asset_rids.append(a)
+        else:
+            rid = getattr(a, "rid", None) or (a.get("rid") if isinstance(a, dict) else None)
+            if rid is not None:
+                asset_rids.append(str(rid))
+
+    if not dataset_rids and not asset_rids:
+        return ValidationResult()
+
+    logger.info(
+        "Validating execution config: %d dataset(s), %d asset(s)",
+        len(dataset_rids),
+        len(asset_rids),
+    )
+
+    return validate_rids(
+        ml,
+        dataset_rids=dataset_rids or None,
+        asset_rids=asset_rids or None,
+        dataset_versions=dataset_versions or None,
+        warn_missing_descriptions=False,
+    )
