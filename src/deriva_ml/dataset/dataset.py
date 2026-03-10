@@ -1413,6 +1413,7 @@ class Dataset:
         materialize: bool = True,
         use_minid: bool = False,
         exclude_tables: set[str] | None = None,
+        timeout: tuple[int, int] | None = None,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and optionally creates a MINID.
 
@@ -1434,6 +1435,9 @@ class Dataset:
                 during bag export. Tables in this set will not be visited, pruning branches
                 of the FK graph that pass through them. Useful for avoiding query timeouts
                 caused by expensive joins through large or unnecessary tables.
+            timeout: Optional (connect_timeout, read_timeout) in seconds for network
+                requests. Defaults to (10, 610). Increase read_timeout for large datasets
+                with deep FK joins that need more time to complete.
 
         Returns:
             DatasetBag: Object containing:
@@ -1656,7 +1660,7 @@ class Dataset:
                         config_file=spec_file,
                         output_dir=tmp_dir,
                         defer_download=True,
-                        timeout=(10, 610),
+                        timeout=timeout or (10, 610),
                         envars={"RID": self.dataset_rid},
                     )
                     minid_page_url = exporter.export()[0]
@@ -1679,9 +1683,11 @@ class Dataset:
                 # Client-side download: runs queries locally with paged query support
                 # for automatic retry on query timeout errors. This avoids server-side
                 # export lock contention and gives better control over query execution.
-                return self._create_dataset_bag_client(version, spec)
+                return self._create_dataset_bag_client(version, spec, timeout=timeout)
 
-    def _create_dataset_bag_client(self, version: DatasetVersion, spec: dict) -> str:
+    def _create_dataset_bag_client(
+        self, version: DatasetVersion, spec: dict, timeout: tuple[int, int] | None = None
+    ) -> str:
         """Create a dataset bag using client-side download.
 
         Executes ERMrest queries directly using ErmrestCatalog.get_as_file() with
@@ -1705,15 +1711,19 @@ class Dataset:
         import codecs
         import uuid
 
-        from deriva.core import DerivaServer, get_credential
+        from deriva.core import DerivaServer, get_credential, DEFAULT_SESSION_CONFIG
 
         snapshot_catalog_id = self._version_snapshot_catalog_id(version)
         hostname = self._ml_instance.catalog.deriva_server.server
         protocol = self._ml_instance.catalog.deriva_server.scheme
 
-        # Connect to the snapshot catalog
+        # Connect to the snapshot catalog with optional custom timeout
         credentials = get_credential(hostname)
-        server = DerivaServer(protocol, hostname, credentials=credentials)
+        session_config = None
+        if timeout:
+            session_config = dict(DEFAULT_SESSION_CONFIG)
+            session_config["timeout"] = timeout
+        server = DerivaServer(protocol, hostname, credentials=credentials, session_config=session_config)
         catalog = server.connect_ermrest(snapshot_catalog_id)
 
         # Build bag in a persistent directory (survives for _download_dataset_minid)

@@ -204,6 +204,9 @@ class DatasetSpec(BaseModel):
         exclude_tables (set[str] | None): Optional set of table names to exclude from FK path
             traversal during bag export. Tables in this set will not be visited, pruning branches
             of the FK graph. Useful for avoiding query timeouts on large tables.
+        timeout (tuple[int, int] | None): Optional (connect_timeout, read_timeout) in seconds
+            for network requests during bag download. Defaults to (10, 610) if not specified.
+            Increase read_timeout for large datasets with deep FK joins.
     """
 
     rid: RID
@@ -211,6 +214,7 @@ class DatasetSpec(BaseModel):
     materialize: bool = True
     description: str = ""
     exclude_tables: set[str] | None = None
+    timeout: tuple[int, int] | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -245,3 +249,4 @@ class DatasetSpecConfig:
     materialize: bool = True
     description: str = ""
     exclude_tables: list[str] | None = None
+    timeout: list[int] | None = None
