@@ -25,6 +25,7 @@ dependencies = [
     "nbstripout",
     "hydra_zen",
     "SQLAlchemy",
+    "textual>=3.0",
 ]
 
 [project.scripts]
@@ -39,6 +40,7 @@ create-demo-catalog = "deriva_ml.demo_catalog:main"
 
 deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
 deriva-ml-split-dataset = "deriva_ml.dataset.split:main"
+deriva-ml-storage = "deriva_ml.cache_tui:main"
 
 [project.optional-dependencies]
 
