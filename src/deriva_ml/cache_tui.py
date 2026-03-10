@@ -596,6 +596,11 @@ def main() -> None:
         help="Non-interactive listing (cache, executions, or all). Defaults to all.",
     )
     parser.add_argument(
+        "--sort", choices=["size", "location", "type", "modified"],
+        default=None,
+        help="Sort order for --list (default: location). Implies --list if not set.",
+    )
+    parser.add_argument(
         "--delete", metavar="RID", nargs="+",
         help="Delete entries matching dataset or execution RID(s)",
     )
@@ -605,16 +610,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # --sort implies --list
+    if args.sort and args.list is None:
+        args.list = "all"
+
     if args.delete:
         _cli_delete(args.delete, confirm=args.yes)
     elif args.list is not None:
-        _cli_list(args.list)
+        _cli_list(args.list, sort=args.sort or "location")
     else:
         app = CacheTUI()
         app.run()
 
 
-def _cli_list(filter_type: str = "all") -> None:
+def _cli_list(filter_type: str = "all", sort: str = "location") -> None:
     """Non-interactive listing of storage entries."""
     entries = discover_entries()
 
@@ -623,19 +632,25 @@ def _cli_list(filter_type: str = "all") -> None:
     elif filter_type == "executions":
         entries = [e for e in entries if e.category == "execution"]
 
-    entries.sort(key=lambda e: e.size_bytes, reverse=True)
+    if sort == "size":
+        entries.sort(key=lambda e: e.size_bytes, reverse=True)
+    elif sort == "type":
+        entries.sort(key=lambda e: (e.category, -e.size_bytes))
+    elif sort == "modified":
+        entries.sort(key=lambda e: (e.modified or datetime.min), reverse=True)
+    else:  # location (default) — group by location, then size within group
+        entries.sort(key=lambda e: (e.parent_label, -e.size_bytes))
+
     total = sum(e.size_bytes for e in entries)
 
-    current_parent = ""
+    print(f"\n  {'Location':30s} {'RID':30s} {'Type':12s} {'Size':>10s}  {'Items':>6s}  {'Modified':16s}")
+    print(f"  {'-' * 30} {'-' * 30} {'-' * 12} {'-' * 10}  {'-' * 6}  {'-' * 16}")
     for entry in entries:
-        if entry.parent_label != current_parent:
-            current_parent = entry.parent_label
-            print(f"\n=== {current_parent} ===")
         print(
-            f"  {entry.label:40s} {entry.category:12s} "
-            f"{entry.size:>10s}  ({entry.item_count} items)  {entry.modified_str}"
+            f"  {entry.parent_label:30s} {entry.label:30s} {entry.category:12s} "
+            f"{entry.size:>10s}  {entry.item_count:>6d}  {entry.modified_str}"
         )
-    print(f"\nTotal: {_human_readable_size(total)} across {len(entries)} entries")
+    print(f"\n  Total: {_human_readable_size(total)} across {len(entries)} entries")
 
 
 def _cli_delete(rids: list[str], confirm: bool = False) -> None:
