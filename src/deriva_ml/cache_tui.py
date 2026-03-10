@@ -142,10 +142,24 @@ def discover_entries() -> list[DirectoryEntry]:
     if not default_root.exists():
         return entries
 
+    def _is_rid_hash_dir(name: str) -> tuple[str, str] | None:
+        """Check if directory name matches {RID}_{hash} pattern. Returns (rid, hash) or None."""
+        if "_" not in name:
+            return None
+        rid, _, hexpart = name.rpartition("_")
+        if len(hexpart) >= 40 and all(c in "0123456789abcdef" for c in hexpart):
+            return (rid, hexpart)
+        return None
+
     def _scan_workdir(workdir: Path, parent_label: str) -> None:
         """Scan a working directory for deletable entries."""
         if not workdir.is_dir():
             return
+
+        # Collect all {RID}_{hash} items (from cache/ and top-level) for unified
+        # RID counting and disambiguation across both locations.
+        rid_hash_items: list[tuple[Path, str, int, int, datetime | None, str]] = []
+        rid_counts: dict[str, int] = {}
 
         for entry in sorted(workdir.iterdir()):
             if not entry.is_dir() or entry.name.startswith("."):
@@ -160,41 +174,14 @@ def discover_entries() -> list[DirectoryEntry]:
             file_count = _dir_file_count(entry)
 
             if entry.name == "cache":
-                # Collect cache entries, then disambiguate duplicate RIDs
-                cache_items: list[tuple[Path, str]] = []
-                rid_counts: dict[str, int] = {}
                 for cache_entry in sorted(entry.iterdir()):
-                    if cache_entry.is_dir() and "_" in cache_entry.name:
-                        rid = cache_entry.name.rsplit("_", 1)[0]
-                        cache_items.append((cache_entry, rid))
+                    if cache_entry.is_dir() and _is_rid_hash_dir(cache_entry.name):
+                        rid = _is_rid_hash_dir(cache_entry.name)[0]
+                        ce_size = _dir_size(cache_entry)
+                        ce_mtime = _dir_mtime(cache_entry)
+                        ce_count = _dir_file_count(cache_entry)
+                        rid_hash_items.append((cache_entry, rid, ce_size, ce_count, ce_mtime, "dataset"))
                         rid_counts[rid] = rid_counts.get(rid, 0) + 1
-
-                for cache_entry, rid in cache_items:
-                    ce_size = _dir_size(cache_entry)
-                    ce_mtime = _dir_mtime(cache_entry)
-
-                    # Disambiguate if multiple entries share the same RID
-                    if rid_counts[rid] > 1:
-                        version = _cache_entry_version(cache_entry, rid)
-                        if version:
-                            label = f"{rid} (v{version})"
-                        elif ce_mtime:
-                            label = f"{rid} ({ce_mtime.strftime('%Y-%m-%d %H:%M')})"
-                        else:
-                            label = f"{rid}"
-                    else:
-                        label = rid
-
-                    entries.append(DirectoryEntry(
-                        path=cache_entry,
-                        label=label,
-                        category="dataset",
-                        size_bytes=ce_size,
-                        item_count=_dir_file_count(cache_entry),
-                        modified=ce_mtime,
-                        parent_label=parent_label,
-                        rid=rid,
-                    ))
             elif entry.name == "deriva-ml":
                 exec_dir = entry / "execution"
                 if exec_dir.exists():
@@ -224,15 +211,46 @@ def discover_entries() -> list[DirectoryEntry]:
                         parent_label=parent_label,
                     ))
             else:
-                entries.append(DirectoryEntry(
-                    path=entry,
-                    label=entry.name,
-                    category="other",
-                    size_bytes=size,
-                    item_count=file_count,
-                    modified=mtime,
-                    parent_label=parent_label,
-                ))
+                # Check for {RID}_{hash} pattern (dataset snapshot dirs)
+                parsed = _is_rid_hash_dir(entry.name)
+                if parsed:
+                    rid = parsed[0]
+                    rid_hash_items.append((entry, rid, size, file_count, mtime, "dataset"))
+                    rid_counts[rid] = rid_counts.get(rid, 0) + 1
+                else:
+                    entries.append(DirectoryEntry(
+                        path=entry,
+                        label=entry.name,
+                        category="other",
+                        size_bytes=size,
+                        item_count=file_count,
+                        modified=mtime,
+                        parent_label=parent_label,
+                    ))
+
+        # Second pass: create entries for all {RID}_{hash} items with disambiguation
+        for item_path, rid, item_size, item_count, item_mtime, category in rid_hash_items:
+            if rid_counts[rid] > 1:
+                version = _cache_entry_version(item_path, rid)
+                if version:
+                    label = f"{rid} (v{version})"
+                elif item_mtime:
+                    label = f"{rid} ({item_mtime.strftime('%Y-%m-%d %H:%M')})"
+                else:
+                    label = rid
+            else:
+                label = rid
+
+            entries.append(DirectoryEntry(
+                path=item_path,
+                label=label,
+                category=category,
+                size_bytes=item_size,
+                item_count=item_count,
+                modified=item_mtime,
+                parent_label=parent_label,
+                rid=rid,
+            ))
 
     # Scan two levels: hostname/catalog_id
     for host_dir in sorted(default_root.iterdir()):
