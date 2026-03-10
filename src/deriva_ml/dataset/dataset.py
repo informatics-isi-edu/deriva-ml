@@ -95,6 +95,7 @@ from deriva_ml.dataset.aux_classes import (
 )
 from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.model.catalog import ASSET_COLUMNS
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
@@ -1413,6 +1414,7 @@ class Dataset:
         materialize: bool = True,
         use_minid: bool = False,
         exclude_tables: set[str] | None = None,
+        timeout: tuple[int, int] | None = None,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and optionally creates a MINID.
 
@@ -1434,6 +1436,9 @@ class Dataset:
                 during bag export. Tables in this set will not be visited, pruning branches
                 of the FK graph that pass through them. Useful for avoiding query timeouts
                 caused by expensive joins through large or unnecessary tables.
+            timeout: Optional (connect_timeout, read_timeout) in seconds for network
+                requests. Defaults to (10, 610). Increase read_timeout for large datasets
+                with deep FK joins that need more time to complete.
 
         Returns:
             DatasetBag: Object containing:
@@ -1476,6 +1481,160 @@ class Dataset:
         from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
         db_model = DatabaseModel(minid, bag_path, self._ml_instance.working_dir)
         return DerivaMLDatabase(db_model).lookup_dataset(self.dataset_rid)
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def estimate_bag_size(
+        self,
+        version: DatasetVersion | str,
+        exclude_tables: set[str] | None = None,
+    ) -> dict[str, Any]:
+        """Estimate the size of a dataset bag before downloading.
+
+        Generates the same download specification used by download_dataset_bag,
+        then runs COUNT and SUM(Length) queries against the snapshot catalog
+        using the same filtered query paths. This gives an accurate preview of
+        what a download will contain and how large it will be.
+
+        Args:
+            version: Dataset version to estimate.
+            exclude_tables: Optional set of table names to exclude from FK path
+                traversal, same as in download_dataset_bag.
+
+        Returns:
+            dict with keys:
+                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
+                - total_rows: total row count across all tables
+                - total_asset_bytes: total size of asset files in bytes
+                - total_asset_size: human-readable size string (e.g., "1.2 GB")
+        """
+        if isinstance(version, str):
+            version = DatasetVersion.parse(version)
+
+        # Generate the download spec (same as download_dataset_bag would)
+        version_snapshot_catalog = self._version_snapshot_catalog(version)
+        graph = CatalogGraph(
+            version_snapshot_catalog,
+            exclude_tables=exclude_tables,
+        )
+        spec = graph.generate_dataset_download_spec(self)
+
+        # Connect to the snapshot catalog for queries
+        snapshot_catalog_id = self._version_snapshot_catalog_id(version)
+        from deriva.core import DerivaServer, get_credential
+
+        hostname = self._ml_instance.catalog.deriva_server.server
+        protocol = self._ml_instance.catalog.deriva_server.scheme
+        credentials = get_credential(hostname)
+        server = DerivaServer(protocol, hostname, credentials=credentials)
+        catalog = server.connect_ermrest(snapshot_catalog_id)
+
+        # Resolve the RID environment variable
+        envars = {"RID": self.dataset_rid}
+
+        table_estimates: dict[str, dict[str, Any]] = {}
+        total_rows = 0
+        total_asset_bytes = 0
+
+        query_processors = spec.get("catalog", {}).get("query_processors", [])
+        for qp in query_processors:
+            processor = qp.get("processor", "")
+            params = qp.get("processor_params", {})
+
+            if processor == "csv":
+                # Data table query — count rows using the same filtered path
+                query_path = params.get("query_path", "")
+                output_path = params.get("output_path", "")
+                if not query_path:
+                    continue
+                query_path = query_path.format(**envars)
+
+                # Extract table name from output_path (last segment)
+                table_name = output_path.rsplit("/", 1)[-1] if output_path else "unknown"
+
+                # Convert /entity/ path to /aggregate/ path for COUNT
+                try:
+                    agg_path = query_path.replace("/entity/", "/aggregate/", 1)
+                    agg_path += "/cnt:=cnt(RID)"
+                    result = catalog.get(agg_path).json()
+                    row_count = result[0]["cnt"] if result else 0
+                except Exception:
+                    row_count = 0
+
+                if table_name not in table_estimates:
+                    table_estimates[table_name] = {
+                        "row_count": row_count,
+                        "is_asset": False,
+                        "asset_bytes": 0,
+                    }
+                else:
+                    table_estimates[table_name]["row_count"] = row_count
+                total_rows += row_count
+
+            elif processor == "fetch":
+                # Asset fetch query — sum file sizes using the same filtered path
+                query_path = params.get("query_path", "")
+                output_path = params.get("output_path", "")
+                if not query_path:
+                    continue
+                query_path = query_path.format(**envars)
+
+                # Extract table name from output_path (e.g., "asset/{asset_rid}/Image" -> "Image")
+                table_name = output_path.rsplit("/", 1)[-1] if output_path else "unknown"
+
+                # The fetch query path is /attribute/...!/url:=URL,length:=Length,...
+                # Convert to /aggregate/ to sum lengths
+                try:
+                    # Strip the attribute projection to get the base filter path
+                    attr_prefix = "/attribute/"
+                    if attr_prefix in query_path:
+                        base_path = query_path[len(attr_prefix):]
+                        # Remove the projection part (after the last /)
+                        # The projection looks like: /url:=URL,length:=Length,...
+                        # We need the filter part which ends at /!(URL::null::)/
+                        # Find the projection start by looking for the alias assignments
+                        parts = base_path.rsplit("/url:=URL", 1)
+                        filter_path = parts[0] if len(parts) > 1 else base_path
+                        agg_path = f"/aggregate/{filter_path}/total:=sum(Length),cnt:=cnt(RID)"
+                        result = catalog.get(agg_path).json()
+                        asset_bytes = result[0]["total"] or 0 if result else 0
+                        asset_count = result[0]["cnt"] if result else 0
+                    else:
+                        asset_bytes = 0
+                        asset_count = 0
+                except Exception:
+                    asset_bytes = 0
+                    asset_count = 0
+
+                if table_name in table_estimates:
+                    table_estimates[table_name]["is_asset"] = True
+                    table_estimates[table_name]["asset_bytes"] = asset_bytes
+                else:
+                    table_estimates[table_name] = {
+                        "row_count": asset_count,
+                        "is_asset": True,
+                        "asset_bytes": asset_bytes,
+                    }
+                total_asset_bytes += asset_bytes
+
+        return {
+            "tables": table_estimates,
+            "total_rows": total_rows,
+            "total_asset_bytes": total_asset_bytes,
+            "total_asset_size": self._human_readable_size(total_asset_bytes),
+        }
+
+    @staticmethod
+    def _human_readable_size(size_bytes: int) -> str:
+        """Convert bytes to human-readable string."""
+        if size_bytes == 0:
+            return "0 B"
+        units = ["B", "KB", "MB", "GB", "TB"]
+        i = 0
+        size = float(size_bytes)
+        while size >= 1024 and i < len(units) - 1:
+            size /= 1024
+            i += 1
+        return f"{size:.1f} {units[i]}"
 
     def _version_snapshot_catalog(self, dataset_version: DatasetVersion | str | None) -> DerivaMLCatalog:
         """Get a catalog instance bound to a specific version's snapshot.
@@ -1656,7 +1815,7 @@ class Dataset:
                         config_file=spec_file,
                         output_dir=tmp_dir,
                         defer_download=True,
-                        timeout=(10, 610),
+                        timeout=timeout or (10, 610),
                         envars={"RID": self.dataset_rid},
                     )
                     minid_page_url = exporter.export()[0]
@@ -1679,9 +1838,11 @@ class Dataset:
                 # Client-side download: runs queries locally with paged query support
                 # for automatic retry on query timeout errors. This avoids server-side
                 # export lock contention and gives better control over query execution.
-                return self._create_dataset_bag_client(version, spec)
+                return self._create_dataset_bag_client(version, spec, timeout=timeout)
 
-    def _create_dataset_bag_client(self, version: DatasetVersion, spec: dict) -> str:
+    def _create_dataset_bag_client(
+        self, version: DatasetVersion, spec: dict, timeout: tuple[int, int] | None = None
+    ) -> str:
         """Create a dataset bag using client-side download.
 
         Executes ERMrest queries directly using ErmrestCatalog.get_as_file() with
@@ -1705,15 +1866,19 @@ class Dataset:
         import codecs
         import uuid
 
-        from deriva.core import DerivaServer, get_credential
+        from deriva.core import DerivaServer, get_credential, DEFAULT_SESSION_CONFIG
 
         snapshot_catalog_id = self._version_snapshot_catalog_id(version)
         hostname = self._ml_instance.catalog.deriva_server.server
         protocol = self._ml_instance.catalog.deriva_server.scheme
 
-        # Connect to the snapshot catalog
+        # Connect to the snapshot catalog with optional custom timeout
         credentials = get_credential(hostname)
-        server = DerivaServer(protocol, hostname, credentials=credentials)
+        session_config = None
+        if timeout:
+            session_config = dict(DEFAULT_SESSION_CONFIG)
+            session_config["timeout"] = timeout
+        server = DerivaServer(protocol, hostname, credentials=credentials, session_config=session_config)
         catalog = server.connect_ermrest(snapshot_catalog_id)
 
         # Build bag in a persistent directory (survives for _download_dataset_minid)
