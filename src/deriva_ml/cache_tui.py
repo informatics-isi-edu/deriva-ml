@@ -67,6 +67,24 @@ def _dir_mtime(path: Path) -> datetime | None:
         return None
 
 
+def _cache_entry_version(cache_entry_path: Path, rid: str) -> str | None:
+    """Extract dataset version from a cached bag's Dataset.csv."""
+    import csv
+
+    bag_dir = cache_entry_path / f"Dataset_{rid}"
+    dataset_csv = bag_dir / "data" / "Dataset.csv"
+    if dataset_csv.exists():
+        try:
+            with dataset_csv.open(newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get("RID") == rid:
+                        return row.get("Version", None) or None
+        except Exception:
+            pass
+    return None
+
+
 class DirectoryEntry:
     """Represents a deletable directory entry."""
 
@@ -79,6 +97,7 @@ class DirectoryEntry:
         item_count: int,
         modified: datetime | None,
         parent_label: str = "",
+        rid: str | None = None,
     ):
         self.path = path
         self.label = label
@@ -87,6 +106,7 @@ class DirectoryEntry:
         self.item_count = item_count
         self.modified = modified
         self.parent_label = parent_label
+        self.rid = rid
         self.selected = False
 
     @property
@@ -98,6 +118,20 @@ class DirectoryEntry:
         if self.modified is None:
             return ""
         return self.modified.strftime("%Y-%m-%d %H:%M")
+
+    def to_dict(self) -> dict:
+        """Convert to a plain dict for JSON serialization."""
+        return {
+            "rid": self.rid,
+            "label": self.label,
+            "location": self.parent_label,
+            "category": self.category,
+            "size_bytes": self.size_bytes,
+            "size": self.size,
+            "item_count": self.item_count,
+            "modified": self.modified.isoformat() if self.modified else None,
+            "path": str(self.path),
+        }
 
 
 def discover_entries() -> list[DirectoryEntry]:
@@ -126,21 +160,41 @@ def discover_entries() -> list[DirectoryEntry]:
             file_count = _dir_file_count(entry)
 
             if entry.name == "cache":
-                # List individual cache entries
+                # Collect cache entries, then disambiguate duplicate RIDs
+                cache_items: list[tuple[Path, str]] = []
+                rid_counts: dict[str, int] = {}
                 for cache_entry in sorted(entry.iterdir()):
                     if cache_entry.is_dir() and "_" in cache_entry.name:
-                        ce_size = _dir_size(cache_entry)
-                        ce_mtime = _dir_mtime(cache_entry)
                         rid = cache_entry.name.rsplit("_", 1)[0]
-                        entries.append(DirectoryEntry(
-                            path=cache_entry,
-                            label=f"cache/{rid}",
-                            category="cached bag",
-                            size_bytes=ce_size,
-                            item_count=_dir_file_count(cache_entry),
-                            modified=ce_mtime,
-                            parent_label=parent_label,
-                        ))
+                        cache_items.append((cache_entry, rid))
+                        rid_counts[rid] = rid_counts.get(rid, 0) + 1
+
+                for cache_entry, rid in cache_items:
+                    ce_size = _dir_size(cache_entry)
+                    ce_mtime = _dir_mtime(cache_entry)
+
+                    # Disambiguate if multiple entries share the same RID
+                    if rid_counts[rid] > 1:
+                        version = _cache_entry_version(cache_entry, rid)
+                        if version:
+                            label = f"{rid} (v{version})"
+                        elif ce_mtime:
+                            label = f"{rid} ({ce_mtime.strftime('%Y-%m-%d %H:%M')})"
+                        else:
+                            label = f"{rid}"
+                    else:
+                        label = rid
+
+                    entries.append(DirectoryEntry(
+                        path=cache_entry,
+                        label=label,
+                        category="dataset",
+                        size_bytes=ce_size,
+                        item_count=_dir_file_count(cache_entry),
+                        modified=ce_mtime,
+                        parent_label=parent_label,
+                        rid=rid,
+                    ))
             elif entry.name == "deriva-ml":
                 exec_dir = entry / "execution"
                 if exec_dir.exists():
@@ -150,19 +204,20 @@ def discover_entries() -> list[DirectoryEntry]:
                             ex_mtime = _dir_mtime(exec_entry)
                             entries.append(DirectoryEntry(
                                 path=exec_entry,
-                                label=f"execution/{exec_entry.name}",
+                                label=exec_entry.name,
                                 category="execution",
                                 size_bytes=ex_size,
                                 item_count=_dir_file_count(exec_entry),
                                 modified=ex_mtime,
                                 parent_label=parent_label,
+                                rid=exec_entry.name,
                             ))
                 # If there's nothing in execution but the dir exists, offer the whole thing
                 if size > 0 and not (exec_dir.exists() and any(exec_dir.iterdir())):
                     entries.append(DirectoryEntry(
                         path=entry,
                         label="deriva-ml/",
-                        category="execution root",
+                        category="execution",
                         size_bytes=size,
                         item_count=file_count,
                         modified=mtime,
@@ -296,7 +351,7 @@ class CacheTUI(App):
 
         table = self.query_one("#dir-table", DataTable)
         table.cursor_type = "row"
-        table.add_columns("", "Location", "Name", "Category", "Size", "Items", "Modified")
+        table.add_columns("", "Location", "RID", "Type", "Size", "Items", "Modified")
 
         # Load entries
         status = self.query_one("#status-bar", Label)
@@ -546,9 +601,9 @@ def _cli_list(filter_type: str = "all") -> None:
     entries = discover_entries()
 
     if filter_type == "cache":
-        entries = [e for e in entries if e.category == "cached bag"]
+        entries = [e for e in entries if e.category == "dataset"]
     elif filter_type == "executions":
-        entries = [e for e in entries if e.category in ("execution", "execution root")]
+        entries = [e for e in entries if e.category == "execution"]
 
     entries.sort(key=lambda e: e.size_bytes, reverse=True)
     total = sum(e.size_bytes for e in entries)
@@ -569,17 +624,9 @@ def _cli_delete(rids: list[str], confirm: bool = False) -> None:
     """Delete entries matching the given RIDs."""
     entries = discover_entries()
 
-    # Match RIDs against entry labels (cache/{rid}, execution/{rid})
-    matches = []
-    for entry in entries:
-        for rid in rids:
-            if (
-                entry.label == f"cache/{rid}"
-                or entry.label == f"execution/{rid}"
-                or entry.label == rid
-            ):
-                matches.append(entry)
-                break
+    # Match by RID field
+    rid_set = set(rids)
+    matches = [e for e in entries if e.rid in rid_set]
 
     if not matches:
         print(f"No entries found matching: {', '.join(rids)}")
