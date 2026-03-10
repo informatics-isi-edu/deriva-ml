@@ -397,6 +397,53 @@ bag = dataset.download_dataset_bag(version="1.0.0")
 bag = dataset.download_dataset_bag(materialize=True)
 ```
 
+### Download Timeouts
+
+Large datasets with deep foreign key joins may exceed the default server timeout. You can override the connect and read timeouts:
+
+```python
+# Default timeout is (10, 610) seconds — (connect, read)
+bag = dataset.download_dataset_bag(version="1.0.0")
+
+# Increase read timeout for large datasets (e.g., 30 minutes)
+bag = dataset.download_dataset_bag(
+    version="1.0.0",
+    timeout=(10, 1800),
+)
+```
+
+The timeout can also be set in `DatasetSpec` for execution configurations:
+
+```python
+config = ExecutionConfiguration(
+    datasets=[
+        DatasetSpec(rid="1-abc123", version="1.0.0", timeout=(10, 1800)),
+    ],
+    workflow=workflow,
+)
+```
+
+### Estimating Download Size
+
+Before downloading a large dataset, you can estimate its size:
+
+```python
+# Estimate bag size for a specific version
+estimate = dataset.estimate_bag_size(version="1.0.0")
+
+print(f"Total rows: {estimate['total_rows']}")
+print(f"Total asset size: {estimate['total_asset_size']}")  # e.g., "1.2 GB"
+
+# Per-table breakdown
+for table_name, info in estimate['tables'].items():
+    print(f"  {table_name}: {info['row_count']} rows", end="")
+    if info['is_asset']:
+        print(f", {info['asset_bytes']} bytes", end="")
+    print()
+```
+
+This queries the catalog snapshot without downloading any data, so it completes quickly regardless of dataset size. Use it to decide whether to increase the download timeout or to verify that a bag export includes the expected tables.
+
 ### How Bag Export Traverses Related Tables
 
 When exporting a dataset as a BDBag, DerivaML follows foreign key relationships from each member table to include related data (e.g., vocabulary terms, device records). However, it stops traversing when it reaches another **dataset element type** — a table that has its own `Dataset_X` association table — if that element type has no members in this dataset.

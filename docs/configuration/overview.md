@@ -84,6 +84,13 @@ metadata_only = DatasetSpecConfig(
     version="2.0.0",
     materialize=False,     # Only download table data
 )
+
+# Override download timeout for large datasets (connect, read) in seconds
+large_data = DatasetSpecConfig(
+    rid="3GHI",
+    version="1.0.0",
+    timeout=[10, 1800],    # 30-minute read timeout
+)
 ```
 
 | Parameter | Type | Default | Description |
@@ -92,6 +99,7 @@ metadata_only = DatasetSpecConfig(
 | `version` | str | required | Semantic version (e.g., "1.2.0") |
 | `materialize` | bool | True | Download asset files |
 | `description` | str | "" | Description for logging |
+| `timeout` | list[int] | None | Download timeout as `[connect, read]` in seconds. Default: `[10, 610]` |
 
 ### AssetRIDConfig
 
