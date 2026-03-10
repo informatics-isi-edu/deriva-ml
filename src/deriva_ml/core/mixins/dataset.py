@@ -242,3 +242,32 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
             timeout=dataset.timeout,
         )
+
+    def estimate_bag_size(
+        self,
+        dataset: "DatasetSpec",
+    ) -> dict[str, Any]:
+        """Estimate the size of a dataset bag before downloading.
+
+        Generates the same download specification used by download_dataset_bag,
+        then runs COUNT and SUM(Length) queries against the snapshot catalog
+        to preview what a download will contain and how large it will be.
+
+        Args:
+            dataset: Specification of the dataset to estimate, including version
+                and optional exclude_tables.
+
+        Returns:
+            dict with keys:
+                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
+                - total_rows: total row count across all tables
+                - total_asset_bytes: total size of asset files in bytes
+                - total_asset_size: human-readable size string (e.g., "1.2 GB")
+        """
+        if not self.model.is_dataset_rid(dataset.rid):
+            raise DerivaMLTableTypeError("Dataset", dataset.rid)
+        ds = self.lookup_dataset(dataset)
+        return ds.estimate_bag_size(
+            version=dataset.version,
+            exclude_tables=dataset.exclude_tables,
+        )
