@@ -71,8 +71,10 @@ class FeatureRecord(BaseModel):
             automatically when reading from the catalog or a dataset bag.
             Used by ``select_newest`` to determine recency.
         feature (ClassVar[Optional[Feature]]): Reference to the Feature
-            definition object. Provides access to the feature's column
-            metadata, target table, and vocabulary/asset column sets.
+            definition object. Set automatically by ``feature_record_class()``
+            when the dynamic subclass is created. ``None`` on the base class.
+            Provides access to the feature's column metadata, target table,
+            and vocabulary/asset column sets.
     """
 
     # model_dump of this feature should be compatible with feature table columns.
@@ -154,13 +156,13 @@ class Feature:
     Features can include asset references, controlled vocabulary terms, and custom metadata fields.
 
     Attributes:
-        feature_table: Table containing the feature implementation.
-        target_table: Table that the feature is associated with.
-        feature_name: Name of the feature (from Feature_Name column default).
-        feature_columns: Set of columns specific to this feature.
-        asset_columns: Set of columns referencing asset tables.
-        term_columns: Set of columns referencing vocabulary tables.
-        value_columns: Set of columns containing direct values.
+        feature_table (Table): Table containing the feature implementation.
+        target_table (Table): Table that the feature is associated with.
+        feature_name (str): Name of the feature (from Feature_Name column default).
+        feature_columns (set[Column]): All columns specific to this feature.
+        asset_columns (set[Column]): Columns referencing asset tables.
+        term_columns (set[Column]): Columns referencing vocabulary tables.
+        value_columns (set[Column]): Columns containing direct values (not FK references).
 
     Example:
         >>> feature = Feature(association_result, model)
@@ -204,10 +206,15 @@ class Feature:
         self.value_columns = self.feature_columns - (self.asset_columns | self.term_columns)
 
     def feature_record_class(self) -> type[FeatureRecord]:
-        """Create a pydantic model for entries into the specified feature table
+        """Create a dynamically generated Pydantic model class for this feature.
+
+        The returned class is a subclass of FeatureRecord with fields derived from
+        the feature table's columns. Term columns accept vocabulary term names (str),
+        asset columns accept file paths (str | Path), and value columns are typed
+        according to their database column type (int, float, str).
 
         Returns:
-            A Feature class that can be used to create instances of the feature.
+            A FeatureRecord subclass with validated fields matching this feature's schema.
         """
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:

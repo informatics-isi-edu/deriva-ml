@@ -24,7 +24,7 @@ DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
 conf = DerivaMLConf(
     hostname='deriva.example.org',
     catalog_id='42',
-    domain_schema='my_domain',
+    domain_schemas='my_domain',
 )
 
 # Instantiate to get a DerivaMLConfig, then create DerivaML
@@ -47,7 +47,7 @@ DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
 conf = DerivaMLConf(
     hostname='example.org',           # Deriva server hostname
     catalog_id='1',                   # Catalog ID or name
-    domain_schema='my_project',       # Domain schema name
+    domain_schemas='my_project',       # Domain schema name
     working_dir='/shared/workspace',  # Base working directory
     use_minid=True,                   # Use MINID for dataset bags
     check_auth=True,                  # Verify authentication
@@ -58,7 +58,7 @@ conf = DerivaMLConf(
 |-----------|------|---------|-------------|
 | `hostname` | str | required | Deriva server hostname |
 | `catalog_id` | str/int | 1 | Catalog identifier |
-| `domain_schema` | str | None | Domain schema (auto-detected if None) |
+| `domain_schemas` | str \| set[str] | None | Domain schema(s) (auto-detected if None) |
 | `working_dir` | str/Path | None | Base directory for outputs |
 | `ml_schema` | str | "deriva-ml" | ML schema name |
 | `use_minid` | bool | True | Use MINID service for datasets |

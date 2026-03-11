@@ -342,6 +342,44 @@ class FeatureMixin:
         """
         return list(self.model.find_features(table))
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def add_features(self, features: list[FeatureRecord]) -> int:
+        """Add feature values to the catalog in batch.
+
+        Inserts a list of FeatureRecord instances into the appropriate feature table.
+        All records must be from the same feature (i.e., created by the same
+        ``feature_record_class()``). Records are batch-inserted for efficiency.
+
+        Args:
+            features: List of FeatureRecord instances to insert. All must share
+                the same feature definition (same ``feature`` class variable).
+                Create records using the class returned by
+                ``Feature.feature_record_class()``.
+
+        Returns:
+            Number of feature records inserted.
+
+        Raises:
+            ValueError: If features list is empty.
+
+        Example:
+            >>> feature = ml.lookup_feature("Image", "Classification")
+            >>> RecordClass = feature.feature_record_class()
+            >>> records = [
+            ...     RecordClass(Image="1-ABC", Image_Class="Normal", Execution=exe_rid),
+            ...     RecordClass(Image="1-DEF", Image_Class="Abnormal", Execution=exe_rid),
+            ... ]
+            >>> count = ml.add_features(records)
+            >>> print(f"Inserted {count} feature values")
+        """
+        if not features:
+            raise ValueError("features list must not be empty")
+
+        feature_table = features[0].feature.feature_table
+        feature_path = self.pathBuilder().schemas[feature_table.schema.name].tables[feature_table.name]
+        entries = feature_path.insert([f.model_dump() for f in features])
+        return len(list(entries))
+
     def fetch_table_features(
         self,
         table: Table | str,

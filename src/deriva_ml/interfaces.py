@@ -84,7 +84,7 @@ from deriva_ml.model.catalog import DerivaModel
 
 if TYPE_CHECKING:
     from deriva_ml.core.enums import Status
-    from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion
+    from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion, VersionPart
     from deriva_ml.dataset.dataset import Dataset
     from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.execution.workflow import Workflow
@@ -365,11 +365,25 @@ class WritableDataset(DatasetLike, Protocol):
         ...     dataset.increment_dataset_version(VersionPart.minor)
     """
 
-    def add_dataset_members(self, members: list[RID]) -> None:
+    def add_dataset_members(
+        self,
+        members: list[RID] | dict[str, list[RID]],
+        validate: bool = True,
+        description: str | None = "",
+        execution_rid: RID | None = None,
+    ) -> None:
         """Add members to the dataset.
 
+        Members can be provided as a list of RIDs (auto-resolved to their tables)
+        or as a dict mapping table names to RID lists (faster, skips resolution).
+
+        Adding members automatically increments the dataset's minor version.
+
         Args:
-            members: List of RIDs to add to the dataset.
+            members: Either a list of RIDs or a dict mapping table names to RID lists.
+            validate: If True, validate that RIDs exist and tables are element types.
+            description: Optional description for the version increment.
+            execution_rid: Optional execution RID for provenance tracking.
         """
         ...
 
@@ -390,14 +404,14 @@ class WritableDataset(DatasetLike, Protocol):
 
     def increment_dataset_version(
         self,
-        component: Any,
+        component: "VersionPart",
         description: str | None = "",
         execution_rid: RID | None = None,
     ) -> DatasetVersion:
         """Increment the dataset version.
 
         Args:
-            component: Which version component to increment (major, minor, patch).
+            component: Which version component to increment (VersionPart.major, .minor, or .patch).
             description: Optional description of the changes in this version.
             execution_rid: Optional execution RID to associate with this version.
 
@@ -408,18 +422,23 @@ class WritableDataset(DatasetLike, Protocol):
 
     def download_dataset_bag(
         self,
-        version: DatasetVersion | str | None = None,
+        version: DatasetVersion | str,
+        materialize: bool = True,
         use_minid: bool = False,
         exclude_tables: set[str] | None = None,
+        timeout: tuple[int, int] | None = None,
     ) -> Any:
         """Download the dataset as a BDBag.
 
         Args:
-            version: Optional version to download. Defaults to current version.
+            version: Version to download (e.g., "1.0.0"). Required.
+            materialize: If True (default), download all referenced asset files.
+                If False, bag contains only metadata and remote file references.
             use_minid: If True, upload the bag to S3 and create a MINID.
                 Requires s3_bucket to be configured on the catalog. Defaults to False.
             exclude_tables: Optional set of table names to exclude from FK path traversal
                 during bag export. Useful for avoiding query timeouts on large tables.
+            timeout: Optional (connect_timeout, read_timeout) in seconds. Defaults to (10, 610).
 
         Returns:
             DatasetBag containing the downloaded data.
@@ -829,6 +848,20 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
 
         Returns:
             Mapping from each resolved RID to its BatchRidResult.
+        """
+        ...
+
+    def add_features(self, features: list[FeatureRecord]) -> int:
+        """Add feature values to the catalog in batch.
+
+        Inserts a list of FeatureRecord instances into the appropriate feature table.
+        All records must be from the same feature.
+
+        Args:
+            features: List of FeatureRecord instances to insert.
+
+        Returns:
+            Number of feature records inserted.
         """
         ...
 

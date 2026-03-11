@@ -507,6 +507,35 @@ class Execution:
         """
         return self._ml_object
 
+    def add_features(self, features: list[FeatureRecord]) -> int:
+        """Add feature values to the catalog in batch.
+
+        Convenience method that delegates to ``catalog.add_features()``.
+        Automatically sets the ``Execution`` field on each record to this
+        execution's RID if not already set.
+
+        Args:
+            features: List of FeatureRecord instances to insert. All must share
+                the same feature definition. Create records using the class
+                returned by ``Feature.feature_record_class()``.
+
+        Returns:
+            Number of feature records inserted.
+
+        Example:
+            >>> feature = exe.catalog.lookup_feature("Image", "Classification")
+            >>> RecordClass = feature.feature_record_class()
+            >>> records = [
+            ...     RecordClass(Image="1-ABC", Image_Class="Normal"),
+            ...     RecordClass(Image="1-DEF", Image_Class="Abnormal"),
+            ... ]
+            >>> exe.add_features(records)  # Execution RID set automatically
+        """
+        for f in features:
+            if f.Execution is None:
+                f.Execution = self.execution_rid
+        return self._ml_object.add_features(features)
+
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
         """Downloads and materializes a dataset for use in the execution.
