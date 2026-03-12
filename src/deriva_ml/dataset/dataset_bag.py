@@ -341,6 +341,25 @@ class DatasetBag:
         """
         return self._catalog.get_table_as_dict(table)
 
+    def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
+        """Get table contents as a pandas DataFrame.
+
+        Convenience method that wraps get_table_as_dict() to return a DataFrame.
+        Provides access to all rows in a table, not just those belonging to this
+        dataset. For dataset-filtered results, use list_dataset_members() instead.
+
+        Args:
+            table: Name of the table to retrieve (e.g., "Subject", "Image").
+
+        Returns:
+            DataFrame with one row per record in the table.
+
+        Example:
+            >>> df = bag.get_table_as_dataframe("Image")
+            >>> print(df.shape)
+        """
+        return pd.DataFrame(self.get_table_as_dict(table))
+
     @staticmethod
     def _find_relationship_attr(source, target):
         """Find the SQLAlchemy relationship attribute connecting two ORM classes.
