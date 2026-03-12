@@ -192,7 +192,10 @@ def random_split(
     return result
 
 
-def stratified_split(stratify_column: str) -> SelectionFunction:
+def stratified_split(
+    stratify_column: str,
+    missing: str = "error",
+) -> SelectionFunction:
     """Create a stratified selection function.
 
     Returns a selection function that maintains the class distribution
@@ -206,14 +209,35 @@ def stratified_split(stratify_column: str) -> SelectionFunction:
     Args:
         stratify_column: Column name in the denormalized DataFrame to
             stratify by (e.g., ``Image_Classification_Image_Class``).
+        missing: Policy for handling null/NaN values in the stratify column.
+            - ``"error"`` (default): Raise ``ValueError`` if any values
+              are missing. Reports the count and percentage of nulls.
+            - ``"drop"``: Silently exclude rows with missing values from
+              the split. Only rows with valid stratify values are assigned
+              to partitions.
+            - ``"include"``: Treat null/NaN as a distinct class label
+              (``"__missing__"``). Missing-value rows are distributed
+              across partitions proportionally like any other class.
 
     Returns:
         A ``SelectionFunction`` that performs stratified splitting.
 
+    Raises:
+        ValueError: If ``missing="error"`` and the stratify column
+            contains null values.
+
     Example:
         >>> selector = stratified_split("Image_Classification_Image_Class")
         >>> partitions = selector(df, {"Training": 400, "Testing": 100}, seed=42)
+
+        >>> # Drop rows with missing labels
+        >>> selector = stratified_split("Diagnosis_Label", missing="drop")
+        >>> partitions = selector(df, {"Training": 300, "Testing": 100}, seed=42)
     """
+    if missing not in ("error", "drop", "include"):
+        raise ValueError(
+            f"missing must be 'error', 'drop', or 'include', got '{missing}'"
+        )
 
     def _stratified_split(
         df: pd.DataFrame,
@@ -223,16 +247,46 @@ def stratified_split(stratify_column: str) -> SelectionFunction:
         from sklearn.model_selection import train_test_split as sklearn_split
 
         total_needed = sum(partition_sizes.values())
-        if total_needed > len(df):
-            raise ValueError(
-                f"Requested {total_needed} samples but dataset has {len(df)} records"
-            )
 
         if stratify_column not in df.columns:
             available = [c for c in df.columns if not c.startswith("_")]
             raise ValueError(
                 f"Column '{stratify_column}' not found in denormalized DataFrame. "
                 f"Available columns: {available}"
+            )
+
+        # Handle missing values in the stratify column
+        null_mask = df[stratify_column].isna()
+        null_count = null_mask.sum()
+
+        if null_count > 0:
+            null_pct = null_count / len(df) * 100
+            if missing == "error":
+                raise ValueError(
+                    f"Column '{stratify_column}' has {null_count} missing values "
+                    f"({null_pct:.1f}% of {len(df)} rows). "
+                    f"Use stratify_missing='drop' to exclude these rows, "
+                    f"or 'include' to treat nulls as a separate class."
+                )
+            elif missing == "drop":
+                logger.info(
+                    f"Dropping {null_count} rows ({null_pct:.1f}%) with missing "
+                    f"values in '{stratify_column}'"
+                )
+                df = df[~null_mask].reset_index(drop=True)
+            elif missing == "include":
+                logger.info(
+                    f"Treating {null_count} missing values ({null_pct:.1f}%) in "
+                    f"'{stratify_column}' as class '__missing__'"
+                )
+                df = df.copy()
+                df[stratify_column] = df[stratify_column].fillna("__missing__")
+
+        if total_needed > len(df):
+            raise ValueError(
+                f"Requested {total_needed} samples but dataset has {len(df)} records"
+                + (f" (after dropping {null_count} rows with missing values)"
+                   if null_count > 0 and missing == "drop" else "")
             )
 
         indices = np.arange(len(df))
@@ -448,6 +502,7 @@ def split_dataset(
     shuffle: bool = True,
     seed: int = 42,
     stratify_by_column: str | None = None,
+    stratify_missing: str = "error",
     # DerivaML-specific parameters
     split_description: str = "",
     training_types: list[str] | None = None,
@@ -494,6 +549,11 @@ def split_dataset(
             Must be a column in the denormalized DataFrame (prefixed
             with table name, e.g., ``Image_Classification_Image_Class``).
             Mutually exclusive with ``selection_fn``.
+        stratify_missing: Policy for null values in the stratify column.
+            ``"error"`` (default) raises if any nulls exist,
+            ``"drop"`` excludes rows with nulls,
+            ``"include"`` treats nulls as a separate class.
+            Only used when ``stratify_by_column`` is set.
         split_description: Description for the parent Split dataset.
         training_types: Additional dataset types for the training set
             beyond "Training" (e.g., ``["Labeled"]``). Default: None.
@@ -559,6 +619,16 @@ def split_dataset(
                 ml, "28D0",
                 test_size=0.2,
                 stratify_by_column="Image_Classification_Image_Class",
+                include_tables=["Image", "Image_Classification"],
+            )
+
+        Stratified split dropping rows with missing labels::
+
+            result = split_dataset(
+                ml, "28D0",
+                test_size=0.2,
+                stratify_by_column="Image_Classification_Image_Class",
+                stratify_missing="drop",
                 include_tables=["Image", "Image_Classification"],
             )
 
@@ -690,7 +760,7 @@ def split_dataset(
 
         if stratify_by_column:
             logger.info(f"Using stratified split on column: {stratify_by_column}")
-            selector = stratified_split(stratify_by_column)
+            selector = stratified_split(stratify_by_column, missing=stratify_missing)
         else:
             logger.info("Using custom selection function")
             selector = selection_fn
@@ -816,6 +886,7 @@ def split_dataset(
             "shuffle": shuffle,
             "seed": seed,
             "stratify_by_column": stratify_by_column,
+            "stratify_missing": stratify_missing,
             "element_table": element_table,
             "include_tables": include_tables,
             "training_types": train_types,
@@ -1034,6 +1105,14 @@ def main() -> int:
         help="Column name in denormalized DataFrame for stratified splitting "
         "(e.g., Image_Classification_Image_Class). Requires --include-tables.",
     )
+    parser.add_argument(
+        "--stratify-missing",
+        choices=["error", "drop", "include"],
+        default="error",
+        help="Policy for null values in the stratify column: "
+        "'error' (default) raises, 'drop' excludes nulls, "
+        "'include' treats nulls as a separate class.",
+    )
 
     # DerivaML parameters
     parser.add_argument(
@@ -1132,6 +1211,7 @@ def main() -> int:
             shuffle=not args.no_shuffle,
             seed=args.seed,
             stratify_by_column=args.stratify_by_column,
+            stratify_missing=args.stratify_missing,
             split_description=args.description,
             training_types=training_types,
             testing_types=testing_types,

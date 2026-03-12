@@ -19,6 +19,7 @@ dependencies = [
     "pandas-stubs",
     "pyyaml",
     "regex",
+    "scikit-learn",
     "semver>3.0.0",
     "setuptools>=80",
     "setuptools-scm>=8.0",

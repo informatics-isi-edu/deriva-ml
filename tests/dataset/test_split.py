@@ -128,6 +128,31 @@ class TestResolveSizes:
         result = _resolve_sizes(100, test_size=0.2, val_size=0.1)
         assert set(result.keys()) == {"Training", "Testing", "Validation"}
 
+    def test_float_ge_one_treated_as_count(self):
+        """Test that float >= 1.0 is treated as absolute count."""
+        result = _resolve_sizes(100, test_size=20.0, train_size=None)
+        assert result == {"Training": 80, "Testing": 20}
+
+    def test_mixed_fraction_and_integer(self):
+        """Test mixing fraction test_size with integer train_size."""
+        result = _resolve_sizes(100, test_size=0.2, train_size=50)
+        assert result == {"Training": 50, "Testing": 20}
+
+    def test_train_size_zero_remainder_raises(self):
+        """Test that sizes leaving no training samples raise ValueError."""
+        with pytest.raises(ValueError):
+            _resolve_sizes(10, test_size=5, val_size=5)
+
+    def test_three_way_mixed_types(self):
+        """Test three-way split mixing fractions and integers."""
+        result = _resolve_sizes(100, test_size=0.1, val_size=10)
+        assert result == {"Training": 80, "Testing": 10, "Validation": 10}
+
+    def test_negative_val_size_raises(self):
+        """Test that negative val_size raises ValueError."""
+        with pytest.raises(ValueError):
+            _resolve_sizes(100, test_size=0.2, val_size=-5)
+
 
 # =============================================================================
 # Unit Tests: random_split
@@ -213,6 +238,30 @@ class TestRandomSplit:
         )
         all_idx = np.concatenate(list(result.values()))
         assert all(0 <= i < len(df) for i in all_idx)
+
+    def test_single_element_partitions(self):
+        """Test splitting into partitions with a single element each."""
+        df = pd.DataFrame({"x": range(10)})
+        result = random_split(df, partition_sizes={"Training": 1, "Testing": 1}, seed=42)
+        assert len(result["Training"]) == 1
+        assert len(result["Testing"]) == 1
+        assert result["Training"][0] != result["Testing"][0]
+
+    def test_full_dataset_usage(self):
+        """Test that using all elements covers the entire dataset."""
+        df = pd.DataFrame({"x": range(20)})
+        result = random_split(df, partition_sizes={"Training": 14, "Testing": 6}, seed=42)
+        all_idx = set(result["Training"]) | set(result["Testing"])
+        assert all_idx == set(range(20))
+
+    def test_three_way_deterministic(self):
+        """Test that three-way split is deterministic with same seed."""
+        df = pd.DataFrame({"x": range(100)})
+        sizes = {"Training": 60, "Validation": 20, "Testing": 20}
+        r1 = random_split(df, partition_sizes=sizes, seed=42)
+        r2 = random_split(df, partition_sizes=sizes, seed=42)
+        for name in sizes:
+            np.testing.assert_array_equal(r1[name], r2[name])
 
 
 # =============================================================================
@@ -355,6 +404,180 @@ class TestStratifiedSplit:
             labels = df.iloc[result[name]]["label"]
             a_frac = (labels == "A").sum() / len(labels)
             assert abs(a_frac - 0.6) < 0.15, f"{name} has A fraction {a_frac}, expected ~0.6"
+
+    def test_three_way_multiclass_distribution(self):
+        """Test three-way stratified split with many classes preserves distribution."""
+        df = pd.DataFrame({
+            "label": ["A"] * 40 + ["B"] * 30 + ["C"] * 20 + ["D"] * 10,
+        })
+        selector = stratified_split("label")
+        result = selector(
+            df,
+            partition_sizes={"Training": 60, "Validation": 20, "Testing": 20},
+            seed=42,
+        )
+
+        # All classes represented in every partition
+        for name in ["Training", "Validation", "Testing"]:
+            classes = set(df.iloc[result[name]]["label"])
+            assert classes == {"A", "B", "C", "D"}, f"{name} missing classes: {classes}"
+
+    def test_three_way_subset(self):
+        """Test three-way stratified split using a subset of total data."""
+        df = pd.DataFrame({
+            "label": ["A"] * 50 + ["B"] * 50,
+        })
+        selector = stratified_split("label")
+        result = selector(
+            df,
+            partition_sizes={"Training": 30, "Validation": 10, "Testing": 10},
+            seed=42,
+        )
+        assert len(result["Training"]) == 30
+        assert len(result["Validation"]) == 10
+        assert len(result["Testing"]) == 10
+
+        # No overlap between any pair
+        all_sets = [set(result[k]) for k in result]
+        for i in range(len(all_sets)):
+            for j in range(i + 1, len(all_sets)):
+                assert len(all_sets[i] & all_sets[j]) == 0
+
+    def test_different_seeds(self):
+        """Test that different seeds produce different stratified splits."""
+        df = pd.DataFrame({
+            "label": ["A"] * 50 + ["B"] * 50,
+        })
+        selector = stratified_split("label")
+        r1 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        r2 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=99)
+        assert set(r1["Training"]) != set(r2["Training"])
+
+    # =========================================================================
+    # stratify_missing policy tests
+    # =========================================================================
+
+    def test_missing_error_raises_on_nulls(self):
+        """Test that missing='error' (default) raises on null values."""
+        df = pd.DataFrame({
+            "label": ["A"] * 5 + [None] * 3 + ["B"] * 2,
+        })
+        selector = stratified_split("label", missing="error")
+        with pytest.raises(ValueError, match="3 missing values"):
+            selector(df, partition_sizes={"Training": 7, "Testing": 3}, seed=42)
+
+    def test_missing_error_reports_percentage(self):
+        """Test that the error message includes the percentage of nulls."""
+        df = pd.DataFrame({
+            "label": ["A"] * 5 + [None] * 5,
+        })
+        selector = stratified_split("label", missing="error")
+        with pytest.raises(ValueError, match="50.0%"):
+            selector(df, partition_sizes={"Training": 7, "Testing": 3}, seed=42)
+
+    def test_missing_error_no_nulls_succeeds(self):
+        """Test that missing='error' succeeds when no nulls present."""
+        df = pd.DataFrame({
+            "label": ["A"] * 50 + ["B"] * 50,
+        })
+        selector = stratified_split("label", missing="error")
+        result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        assert len(result["Training"]) == 70
+        assert len(result["Testing"]) == 30
+
+    def test_missing_drop_excludes_nulls(self):
+        """Test that missing='drop' excludes rows with null values."""
+        df = pd.DataFrame({
+            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+        })
+        selector = stratified_split("label", missing="drop")
+        result = selector(df, partition_sizes={"Training": 56, "Testing": 24}, seed=42)
+        assert len(result["Training"]) == 56
+        assert len(result["Testing"]) == 24
+
+        # All returned indices should point to non-null rows
+        all_idx = np.concatenate([result["Training"], result["Testing"]])
+        original_df = pd.DataFrame({
+            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+        })
+        # Indices are into the filtered df, so they should all be < 80
+        assert all(0 <= i < 80 for i in all_idx)
+
+    def test_missing_drop_reduces_available(self):
+        """Test that drop reduces available samples, raising if too few."""
+        df = pd.DataFrame({
+            "label": ["A"] * 10 + [None] * 90,
+        })
+        selector = stratified_split("label", missing="drop")
+        with pytest.raises(ValueError, match="Requested .* samples but dataset has 10"):
+            selector(df, partition_sizes={"Training": 8, "Testing": 5}, seed=42)
+
+    def test_missing_include_treats_nulls_as_class(self):
+        """Test that missing='include' treats nulls as a separate class."""
+        df = pd.DataFrame({
+            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+        })
+        selector = stratified_split("label", missing="include")
+        result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
+        assert len(result["Training"]) == 70
+        assert len(result["Testing"]) == 30
+
+        # The null rows (indices 80-99) should be distributed across partitions
+        all_idx = set(np.concatenate([result["Training"], result["Testing"]]))
+        null_indices = set(range(80, 100))
+        assert len(all_idx & null_indices) > 0, "Null rows should be included"
+
+    def test_missing_include_preserves_distribution(self):
+        """Test that include policy distributes nulls proportionally."""
+        df = pd.DataFrame({
+            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+        })
+        selector = stratified_split("label", missing="include")
+        result = selector(df, partition_sizes={"Training": 80, "Testing": 20}, seed=42)
+
+        # Check that __missing__ class is proportionally distributed
+        filled = df.copy()
+        filled["label"] = filled["label"].fillna("__missing__")
+        train_labels = filled.iloc[result["Training"]]["label"]
+        missing_frac = (train_labels == "__missing__").sum() / len(train_labels)
+        assert abs(missing_frac - 0.2) < 0.1, f"Expected ~20% missing, got {missing_frac:.1%}"
+
+    def test_missing_include_three_way(self):
+        """Test include policy with three-way split."""
+        df = pd.DataFrame({
+            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+        })
+        selector = stratified_split("label", missing="include")
+        result = selector(
+            df,
+            partition_sizes={"Training": 60, "Validation": 20, "Testing": 20},
+            seed=42,
+        )
+        assert len(result["Training"]) == 60
+        assert len(result["Validation"]) == 20
+        assert len(result["Testing"]) == 20
+
+        # No overlap
+        all_sets = [set(result[k]) for k in result]
+        for i in range(len(all_sets)):
+            for j in range(i + 1, len(all_sets)):
+                assert len(all_sets[i] & all_sets[j]) == 0
+
+    def test_missing_invalid_policy_raises(self):
+        """Test that an invalid missing policy raises ValueError."""
+        with pytest.raises(ValueError, match="must be 'error', 'drop', or 'include'"):
+            stratified_split("label", missing="ignore")
+
+    def test_missing_drop_with_nan(self):
+        """Test that drop handles both None and np.nan."""
+        df = pd.DataFrame({
+            "label": ["A"] * 30 + ["B"] * 30 + [None] * 10 + [np.nan] * 10,
+            "value": range(80),
+        })
+        selector = stratified_split("label", missing="drop")
+        result = selector(df, partition_sizes={"Training": 42, "Testing": 18}, seed=42)
+        assert len(result["Training"]) == 42
+        assert len(result["Testing"]) == 18
 
 
 # =============================================================================
@@ -829,3 +1052,89 @@ class TestSplitDataset:
         assert result.validation is not None
         assert result.validation.count == 2
         assert result.validation.rid == "(dry run)"
+
+    def test_strategy_field_random(self, test_ml):
+        """Test that result.strategy is 'random' for default splits."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(ml, source_rid, test_size=4, seed=42)
+        assert result.strategy == "random"
+
+    def test_strategy_field_dry_run(self, test_ml):
+        """Test that dry run also reports strategy."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(ml, source_rid, test_size=4, seed=42, dry_run=True)
+        assert result.strategy == "random"
+        assert result.element_table == "SplitTestItem"
+        assert result.seed == 42
+
+    def test_explicit_element_table(self, test_ml):
+        """Test split with explicitly specified element_table."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(
+            ml, source_rid,
+            test_size=4,
+            seed=42,
+            element_table="SplitTestItem",
+        )
+
+        assert result.element_table == "SplitTestItem"
+        assert result.training.count == 8
+        assert result.testing.count == 4
+
+    def test_split_description_passthrough(self, test_ml):
+        """Test that custom split_description is used."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        custom_desc = "My custom split for experiment X"
+        result = split_dataset(
+            ml, source_rid,
+            test_size=4,
+            seed=42,
+            split_description=custom_desc,
+        )
+
+        split_ds = ml.lookup_dataset(result.split.rid)
+        assert split_ds.description == custom_desc
+
+    def test_result_model_completeness(self, test_ml):
+        """Test that SplitResult has all expected fields populated."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = split_dataset(ml, source_rid, test_size=4, seed=42)
+
+        # All fields should be populated
+        assert result.source == source_rid
+        assert result.split.rid
+        assert result.split.version
+        assert result.split.count == 0  # parent has no direct element members
+        assert result.training.rid
+        assert result.training.version
+        assert result.training.count == 8
+        assert result.testing.rid
+        assert result.testing.version
+        assert result.testing.count == 4
+        assert result.validation is None
+        assert result.strategy == "random"
+        assert result.element_table == "SplitTestItem"
+        assert result.seed == 42
+        assert result.dry_run is False
+
+    def test_wrong_element_table_raises(self, test_ml):
+        """Test that specifying a non-existent element table raises ValueError."""
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        with pytest.raises(ValueError, match="no members"):
+            split_dataset(
+                ml, source_rid,
+                test_size=4,
+                element_table="NonExistentTable",
+            )
