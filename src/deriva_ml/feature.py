@@ -112,6 +112,68 @@ class FeatureRecord(BaseModel):
         """
         return max(records, key=lambda r: r.RCT or "")
 
+    @staticmethod
+    def select_by_execution(execution_rid: str):
+        """Return a selector that picks the newest record from a specific execution.
+
+        Creates a selector function that filters records to those produced by
+        the given execution, then returns the newest match by RCT. This is
+        useful when multiple executions have produced values for the same
+        feature and you want results from a specific run.
+
+        Unlike ``select_by_workflow`` (which requires catalog access and lives
+        on the DerivaML class), this selector works purely on the
+        ``Execution`` field of each record and can be passed directly as the
+        ``selector`` argument to ``fetch_table_features`` or
+        ``list_feature_values``::
+
+            features = ml.fetch_table_features(
+                "Image",
+                feature_name="FooBar",
+                selector=FeatureRecord.select_by_execution("3WY2"),
+            )
+
+        Args:
+            execution_rid: RID of the execution to filter by.
+
+        Returns:
+            A selector function ``(list[FeatureRecord]) -> FeatureRecord``
+            suitable for use with ``fetch_table_features`` or
+            ``list_feature_values``.
+
+        Raises:
+            DerivaMLException: If no records in the group match the
+                given execution RID.
+
+        Examples:
+            Select values from a specific execution::
+
+                >>> features = ml.fetch_table_features(
+                ...     "Image",
+                ...     feature_name="Classification",
+                ...     selector=FeatureRecord.select_by_execution("3WY2"),
+                ... )
+
+            Use with list_feature_values::
+
+                >>> values = ml.list_feature_values(
+                ...     "Image", "Classification",
+                ...     selector=FeatureRecord.select_by_execution("3WY2"),
+                ... )
+        """
+
+        def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
+            filtered = [r for r in records if r.Execution == execution_rid]
+            if not filtered:
+                from deriva_ml.core.deriva_ml_exception import DerivaMLException
+
+                raise DerivaMLException(
+                    f"No feature records match execution '{execution_rid}'."
+                )
+            return FeatureRecord.select_newest(filtered)
+
+        return _selector
+
     @classmethod
     def feature_columns(cls) -> set[Column]:
         """Returns all columns specific to this feature.
