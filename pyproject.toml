@@ -26,6 +26,7 @@ dependencies = [
     "nbstripout",
     "hydra_zen",
     "SQLAlchemy",
+    "nest_asyncio",
     "textual>=3.0",
 ]
 

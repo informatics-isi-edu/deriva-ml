@@ -46,6 +46,8 @@ from urllib.parse import urlparse
 
 # Deriva imports
 import deriva.core.utils.hash_utils as hash_utils
+from deriva.core.asyncio import AsyncErmrestCatalog
+from deriva.core.asyncio.async_catalog import AsyncErmrestSnapshot
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
@@ -1495,6 +1497,9 @@ class Dataset:
         using the same filtered query paths. This gives an accurate preview of
         what a download will contain and how large it will be.
 
+        Queries are deduplicated by table name (the same table may appear in
+        multiple FK paths) and executed in parallel for performance.
+
         Args:
             version: Dataset version to estimate.
             exclude_tables: Optional set of table names to exclude from FK path
@@ -1518,22 +1523,31 @@ class Dataset:
         )
         spec = graph.generate_dataset_download_spec(self)
 
-        # Connect to the snapshot catalog for queries
+        # Connect to the snapshot catalog for queries using the async catalog,
+        # which uses httpx.AsyncClient with connection pooling and is safe for
+        # concurrent requests (unlike the sync ErmrestCatalog).
         snapshot_catalog_id = self._version_snapshot_catalog_id(version)
-        from deriva.core import DerivaServer, get_credential
+        from deriva.core import get_credential
 
         hostname = self._ml_instance.catalog.deriva_server.server
         protocol = self._ml_instance.catalog.deriva_server.scheme
         credentials = get_credential(hostname)
-        server = DerivaServer(protocol, hostname, credentials=credentials)
-        catalog = server.connect_ermrest(snapshot_catalog_id)
+
+        # Parse snapshot catalog ID (format: "catalog_id@snaptime" or just "catalog_id")
+        if "@" in snapshot_catalog_id:
+            cat_id, snaptime = snapshot_catalog_id.split("@", 1)
+            catalog = AsyncErmrestSnapshot(protocol, hostname, cat_id, snaptime, credentials)
+        else:
+            catalog = AsyncErmrestCatalog(protocol, hostname, snapshot_catalog_id, credentials)
 
         # Resolve the RID environment variable
         envars = {"RID": self.dataset_rid}
 
-        table_estimates: dict[str, dict[str, Any]] = {}
-        total_rows = 0
-        total_asset_bytes = 0
+        # Collect and deduplicate queries by table name. When the same table is
+        # reachable via multiple FK paths, we only need to query one path per
+        # table (the results are the same rows regardless of traversal path).
+        csv_queries: dict[str, str] = {}  # table_name -> agg_path
+        fetch_queries: dict[str, str] = {}  # table_name -> agg_path
 
         query_processors = spec.get("catalog", {}).get("query_processors", [])
         for qp in query_processors:
@@ -1541,80 +1555,101 @@ class Dataset:
             params = qp.get("processor_params", {})
 
             if processor == "csv":
-                # Data table query — count rows using the same filtered path
                 query_path = params.get("query_path", "")
                 output_path = params.get("output_path", "")
                 if not query_path:
                     continue
                 query_path = query_path.format(**envars)
-
-                # Extract table name from output_path (last segment)
                 table_name = output_path.rsplit("/", 1)[-1] if output_path else "unknown"
 
-                # Convert /entity/ path to /aggregate/ path for COUNT
-                try:
+                if table_name not in csv_queries:
                     agg_path = query_path.replace("/entity/", "/aggregate/", 1)
                     agg_path += "/cnt:=cnt(RID)"
-                    result = catalog.get(agg_path).json()
-                    row_count = result[0]["cnt"] if result else 0
-                except Exception:
-                    row_count = 0
-
-                if table_name not in table_estimates:
-                    table_estimates[table_name] = {
-                        "row_count": row_count,
-                        "is_asset": False,
-                        "asset_bytes": 0,
-                    }
-                else:
-                    table_estimates[table_name]["row_count"] = row_count
-                total_rows += row_count
+                    csv_queries[table_name] = agg_path
 
             elif processor == "fetch":
-                # Asset fetch query — sum file sizes using the same filtered path
                 query_path = params.get("query_path", "")
                 output_path = params.get("output_path", "")
                 if not query_path:
                     continue
                 query_path = query_path.format(**envars)
-
-                # Extract table name from output_path (e.g., "asset/{asset_rid}/Image" -> "Image")
                 table_name = output_path.rsplit("/", 1)[-1] if output_path else "unknown"
 
-                # The fetch query path is /attribute/...!/url:=URL,length:=Length,...
-                # Convert to /aggregate/ to sum lengths
-                try:
-                    # Strip the attribute projection to get the base filter path
+                if table_name not in fetch_queries:
                     attr_prefix = "/attribute/"
                     if attr_prefix in query_path:
                         base_path = query_path[len(attr_prefix):]
-                        # Remove the projection part (after the last /)
-                        # The projection looks like: /url:=URL,length:=Length,...
-                        # We need the filter part which ends at /!(URL::null::)/
-                        # Find the projection start by looking for the alias assignments
                         parts = base_path.rsplit("/url:=URL", 1)
                         filter_path = parts[0] if len(parts) > 1 else base_path
                         agg_path = f"/aggregate/{filter_path}/total:=sum(Length),cnt:=cnt(RID)"
-                        result = catalog.get(agg_path).json()
-                        asset_bytes = result[0]["total"] or 0 if result else 0
-                        asset_count = result[0]["cnt"] if result else 0
-                    else:
-                        asset_bytes = 0
-                        asset_count = 0
-                except Exception:
-                    asset_bytes = 0
-                    asset_count = 0
+                        fetch_queries[table_name] = agg_path
 
-                if table_name in table_estimates:
-                    table_estimates[table_name]["is_asset"] = True
-                    table_estimates[table_name]["asset_bytes"] = asset_bytes
-                else:
-                    table_estimates[table_name] = {
-                        "row_count": asset_count,
-                        "is_asset": True,
-                        "asset_bytes": asset_bytes,
-                    }
-                total_asset_bytes += asset_bytes
+        # Execute all queries concurrently using asyncio.gather
+        import asyncio
+
+        async def _run_csv_query(table_name: str, agg_path: str) -> tuple[str, int]:
+            try:
+                response = await catalog.get_async(agg_path)
+                result = response.json()
+                return table_name, result[0]["cnt"] if result else 0
+            except Exception:
+                return table_name, 0
+
+        async def _run_fetch_query(table_name: str, agg_path: str) -> tuple[str, int, int]:
+            try:
+                response = await catalog.get_async(agg_path)
+                result = response.json()
+                asset_bytes = result[0]["total"] or 0 if result else 0
+                asset_count = result[0]["cnt"] if result else 0
+                return table_name, asset_bytes, asset_count
+            except Exception:
+                return table_name, 0, 0
+
+        async def _run_all_queries():
+            csv_tasks = [_run_csv_query(name, path) for name, path in csv_queries.items()]
+            fetch_tasks = [_run_fetch_query(name, path) for name, path in fetch_queries.items()]
+            csv_results = await asyncio.gather(*csv_tasks)
+            fetch_results = await asyncio.gather(*fetch_tasks)
+            await catalog.close()
+            return csv_results, fetch_results
+
+        # Run the async queries from the sync context
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            # Already inside an event loop (e.g., Jupyter) — use nest_asyncio
+            import nest_asyncio
+            nest_asyncio.apply()
+            csv_results, fetch_results = loop.run_until_complete(_run_all_queries())
+        else:
+            csv_results, fetch_results = asyncio.run(_run_all_queries())
+
+        table_estimates: dict[str, dict[str, Any]] = {}
+        total_rows = 0
+        total_asset_bytes = 0
+
+        for table_name, row_count in csv_results:
+            table_estimates[table_name] = {
+                "row_count": row_count,
+                "is_asset": False,
+                "asset_bytes": 0,
+            }
+            total_rows += row_count
+
+        for table_name, asset_bytes, asset_count in fetch_results:
+            if table_name in table_estimates:
+                table_estimates[table_name]["is_asset"] = True
+                table_estimates[table_name]["asset_bytes"] = asset_bytes
+            else:
+                table_estimates[table_name] = {
+                    "row_count": asset_count,
+                    "is_asset": True,
+                    "asset_bytes": asset_bytes,
+                }
+            total_asset_bytes += asset_bytes
 
         return {
             "tables": table_estimates,
