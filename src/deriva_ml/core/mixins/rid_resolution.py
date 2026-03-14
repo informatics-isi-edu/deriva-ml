@@ -21,8 +21,12 @@ ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
 ResolveRidResult = _ermrest_catalog.ResolveRidResult
 Table = _ermrest_model.Table
 
+import logging
+
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
+
+logger = logging.getLogger("deriva_ml")
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
@@ -181,8 +185,8 @@ class RidResolutionMixin:
                     .attributes(table_path.RID)
                     .fetch()
                 )
-            except Exception:
-                # Table might not support this query, skip it
+            except Exception as e:
+                logger.debug(f"RID resolution query failed for {schema_name}.{table_name}: {e}")
                 continue
 
             # Process found RIDs
