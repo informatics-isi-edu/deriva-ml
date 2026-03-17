@@ -1492,13 +1492,19 @@ class Dataset:
     ) -> dict[str, Any]:
         """Estimate the size of a dataset bag before downloading.
 
-        Generates the same download specification used by download_dataset_bag,
-        then runs COUNT and SUM(Length) queries against the snapshot catalog
-        using the same filtered query paths. This gives an accurate preview of
-        what a download will contain and how large it will be.
+        Uses ``CatalogGraph._aggregate_queries`` to build datapath objects for
+        every FK path that reaches each table, then fetches RID lists from the
+        snapshot catalog and computes the exact union across all paths.
 
-        Queries are deduplicated by table name (the same table may appear in
-        multiple FK paths) and executed in parallel for performance.
+        When the same table is reachable via multiple FK paths, **all** paths
+        are queried and the RID sets are unioned to get the exact row count.
+        For asset tables, ``(RID, Length)`` pairs are fetched and deduplicated
+        by RID so that ``asset_bytes`` reflects the true total.
+
+        Note: this fetches complete RID lists rather than using server-side
+        aggregates, which gives exact union counts but uses O(N) memory where
+        N is the total rows across all paths.  This is suitable for datasets
+        with up to hundreds of thousands of rows per table.
 
         Args:
             version: Dataset version to estimate.
@@ -1515,13 +1521,14 @@ class Dataset:
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
 
-        # Generate the download spec (same as download_dataset_bag would)
+        # Build a CatalogGraph on the version snapshot and collect aggregate
+        # datapath objects grouped by target table.
         version_snapshot_catalog = self._version_snapshot_catalog(version)
         graph = CatalogGraph(
             version_snapshot_catalog,
             exclude_tables=exclude_tables,
         )
-        spec = graph.generate_dataset_download_spec(self)
+        table_queries = graph._aggregate_queries(self)
 
         # Connect to the snapshot catalog for queries using the async catalog,
         # which uses httpx.AsyncClient with connection pooling and is safe for
@@ -1540,78 +1547,54 @@ class Dataset:
         else:
             catalog = AsyncErmrestCatalog(protocol, hostname, snapshot_catalog_id, credentials)
 
-        # Resolve the RID environment variable
-        envars = {"RID": self.dataset_rid}
+        def _extract_path(uri: str) -> str:
+            """Extract the catalog-relative path from a full datapath URI.
 
-        # Collect and deduplicate queries by table name. When the same table is
-        # reachable via multiple FK paths, we only need to query one path per
-        # table (the results are the same rows regardless of traversal path).
-        csv_queries: dict[str, str] = {}  # table_name -> agg_path
-        fetch_queries: dict[str, str] = {}  # table_name -> agg_path
+            Strips the ``https://host/ermrest/catalog/N`` prefix, returning the
+            path starting from ``/aggregate/``, ``/entity/``, ``/attribute/``, etc.
+            """
+            for marker in ("/aggregate/", "/entity/", "/attribute/"):
+                idx = uri.find(marker)
+                if idx >= 0:
+                    return uri[idx:]
+            raise ValueError(f"Cannot extract catalog path from URI: {uri}")
 
-        query_processors = spec.get("catalog", {}).get("query_processors", [])
-        for qp in query_processors:
-            processor = qp.get("processor", "")
-            params = qp.get("processor_params", {})
+        # Build query paths using the datapath API.  For each
+        # (table_name, path_entries) we fetch RID lists (and RID+Length for
+        # assets) so we can compute the exact union across all FK paths.
+        # (table_name, query_path, query_type)
+        query_items: list[tuple[str, str, str]] = []
 
-            if processor == "csv":
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                table_name = output_path.rsplit("/", 1)[-1] if output_path else "unknown"
+        for table_name, path_entries in table_queries.items():
+            for dp, is_asset in path_entries:
+                # Fetch RID list for row-count union
+                rid_rs = dp.attributes(dp.RID)
+                query_items.append((table_name, _extract_path(rid_rs.uri), "csv"))
 
-                if table_name not in csv_queries:
-                    agg_path = query_path.replace("/entity/", "/aggregate/", 1)
-                    agg_path += "/cnt:=cnt(RID)"
-                    csv_queries[table_name] = agg_path
-
-            elif processor == "fetch":
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                table_name = output_path.rsplit("/", 1)[-1] if output_path else "unknown"
-
-                if table_name not in fetch_queries:
-                    attr_prefix = "/attribute/"
-                    if attr_prefix in query_path:
-                        base_path = query_path[len(attr_prefix):]
-                        parts = base_path.rsplit("/url:=URL", 1)
-                        filter_path = parts[0] if len(parts) > 1 else base_path
-                        agg_path = f"/aggregate/{filter_path}/total:=sum(Length),cnt:=cnt(RID)"
-                        fetch_queries[table_name] = agg_path
+                # For assets, fetch RID + Length where URL is not null.
+                # The !(URL::null::) filter has no clean datapath equivalent, so
+                # we build it from the entity path with a literal null-check filter.
+                if is_asset:
+                    entity_path = _extract_path(dp.uri).removeprefix("/entity/")
+                    fetch_path = f"/attribute/{entity_path}/!(URL::null::)/RID,Length"
+                    query_items.append((table_name, fetch_path, "fetch"))
 
         # Execute all queries concurrently using asyncio.gather
         import asyncio
 
-        async def _run_csv_query(table_name: str, agg_path: str) -> tuple[str, int]:
+        async def _run_query(table_name: str, query_path: str, query_type: str) -> tuple[str, str, Any]:
             try:
-                response = await catalog.get_async(agg_path)
-                result = response.json()
-                return table_name, result[0]["cnt"] if result else 0
-            except Exception:
-                return table_name, 0
-
-        async def _run_fetch_query(table_name: str, agg_path: str) -> tuple[str, int, int]:
-            try:
-                response = await catalog.get_async(agg_path)
-                result = response.json()
-                asset_bytes = result[0]["total"] or 0 if result else 0
-                asset_count = result[0]["cnt"] if result else 0
-                return table_name, asset_bytes, asset_count
-            except Exception:
-                return table_name, 0, 0
+                response = await catalog.get_async(query_path)
+                return table_name, query_type, response.json()
+            except Exception as exc:
+                self._logger.debug("estimate_bag_size query failed for %s (%s): %s", table_name, query_path, exc)
+                return table_name, query_type, []
 
         async def _run_all_queries():
-            csv_tasks = [_run_csv_query(name, path) for name, path in csv_queries.items()]
-            fetch_tasks = [_run_fetch_query(name, path) for name, path in fetch_queries.items()]
-            csv_results = await asyncio.gather(*csv_tasks)
-            fetch_results = await asyncio.gather(*fetch_tasks)
+            tasks = [_run_query(name, path, qtype) for name, path, qtype in query_items]
+            results = await asyncio.gather(*tasks)
             await catalog.close()
-            return csv_results, fetch_results
+            return results
 
         # Run the async queries from the sync context
         try:
@@ -1620,36 +1603,60 @@ class Dataset:
             loop = None
 
         if loop and loop.is_running():
-            # Already inside an event loop (e.g., Jupyter) — use nest_asyncio
+            # Already inside an event loop (e.g., Jupyter) -- use nest_asyncio
             import nest_asyncio
             nest_asyncio.apply()
-            csv_results, fetch_results = loop.run_until_complete(_run_all_queries())
+            all_results = loop.run_until_complete(_run_all_queries())
         else:
-            csv_results, fetch_results = asyncio.run(_run_all_queries())
+            all_results = asyncio.run(_run_all_queries())
+
+        # Compute exact union of RIDs across all paths for each table.
+        rids_by_table: dict[str, set[str]] = defaultdict(set)
+        # For assets, collect {RID: Length} across paths (first wins; same asset = same Length).
+        asset_lengths_by_table: dict[str, dict[str, int]] = defaultdict(dict)
+
+        for table_name, query_type, rows in all_results:
+            if query_type == "csv":
+                rids_by_table[table_name].update(r["RID"] for r in rows if "RID" in r)
+            else:  # fetch
+                for r in rows:
+                    rid = r.get("RID")
+                    if rid and rid not in asset_lengths_by_table[table_name]:
+                        asset_lengths_by_table[table_name][rid] = r.get("Length") or 0
+
+        # Determine which tables are assets from the original table_queries
+        asset_tables = {
+            table_name
+            for table_name, entries in table_queries.items()
+            if any(is_asset for _, is_asset in entries)
+        }
 
         table_estimates: dict[str, dict[str, Any]] = {}
         total_rows = 0
         total_asset_bytes = 0
 
-        for table_name, row_count in csv_results:
+        for table_name, rids in rids_by_table.items():
+            row_count = len(rids)
+            is_asset = table_name in asset_tables
+            asset_bytes = sum(asset_lengths_by_table[table_name].values())
             table_estimates[table_name] = {
                 "row_count": row_count,
-                "is_asset": False,
-                "asset_bytes": 0,
+                "is_asset": is_asset,
+                "asset_bytes": asset_bytes,
             }
             total_rows += row_count
-
-        for table_name, asset_bytes, asset_count in fetch_results:
-            if table_name in table_estimates:
-                table_estimates[table_name]["is_asset"] = True
-                table_estimates[table_name]["asset_bytes"] = asset_bytes
-            else:
-                table_estimates[table_name] = {
-                    "row_count": asset_count,
-                    "is_asset": True,
-                    "asset_bytes": asset_bytes,
-                }
             total_asset_bytes += asset_bytes
+
+        # Handle tables that only appear in fetch results (unlikely but safe)
+        for table_name, lengths in asset_lengths_by_table.items():
+            if table_name not in table_estimates:
+                table_estimates[table_name] = {
+                    "row_count": len(lengths),
+                    "is_asset": True,
+                    "asset_bytes": sum(lengths.values()),
+                }
+                total_rows += len(lengths)
+                total_asset_bytes += sum(lengths.values())
 
         return {
             "tables": table_estimates,
@@ -1935,7 +1942,7 @@ class Dataset:
         query_processors = spec.get("catalog", {}).get("query_processors", [])
         failed_queries = []
         skipped_empty = []
-        fetch_entries = []  # (url, length, rel_path, md5) tuples for fetch.txt
+        fetch_entries: dict[str, tuple[str, str, str, str]] = {}  # asset_rid -> (url, length, rel_path, md5)
 
         for qp in query_processors:
             processor_name = qp.get("processor", "")
@@ -2047,8 +2054,11 @@ class Dataset:
                         # Build relative path within bag data directory
                         file_output_path = output_path.format(asset_rid=asset_rid)
                         rel_path = f"data/{file_output_path}/{filename}"
-                        # Add to fetch.txt entries
-                        fetch_entries.append((asset_url, length, rel_path, md5))
+                        # Deduplicate by asset RID — the same asset may be
+                        # reachable via multiple FK paths; keep the first entry
+                        # (all paths produce the same URL and file content).
+                        if asset_rid not in fetch_entries:
+                            fetch_entries[asset_rid] = (asset_url, length, rel_path, md5)
                 except Exception as e:
                     self._logger.warning("Asset query failed for %s: %s", output_path, e)
 
@@ -2080,7 +2090,7 @@ class Dataset:
         if fetch_entries:
             fetch_file = bag_path / "fetch.txt"
             with fetch_file.open("w", encoding="utf-8") as f:
-                for url, length, rel_path, md5 in fetch_entries:
+                for url, length, rel_path, md5 in fetch_entries.values():
                     length_str = str(length) if length else "-"
                     f.write(f"{url}\t{length_str}\t{rel_path}\n")
             self._logger.info("Wrote %d fetch entries for remote assets", len(fetch_entries))
