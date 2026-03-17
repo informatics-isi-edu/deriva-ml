@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from pprint import pformat
 from typing import Any, Callable, Iterator
@@ -10,6 +11,8 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 from deriva_ml.model.catalog import ASSET_COLUMNS
+
+logger = logging.getLogger(__name__)
 
 try:
 
@@ -560,6 +563,66 @@ class CatalogGraph:
         dest_paths = ["/".join([t.name for t in p]) for p in paths]
         target_tables = [p[-1] for p in paths]
         return zip(src_paths, dest_paths, target_tables)
+
+    def _aggregate_queries(
+        self,
+        dataset: DatasetLike | None = None,
+    ) -> dict[str, list[tuple[Any, bool]]]:
+        """Build datapath objects grouped by target table name.
+
+        For each path collected by ``_collect_paths``, constructs a linked
+        datapath (using the same FK-linking logic as ``_table_paths``) filtered
+        on the dataset RID.  Results are grouped by the terminal table name so
+        that callers can issue aggregate queries for every path that reaches a
+        given table.
+
+        Args:
+            dataset: If provided, paths are filtered to this dataset's members.
+
+        Returns:
+            A dict mapping target table name to a list of
+            ``(datapath, is_asset)`` tuples, where *datapath* is the linked
+            pathBuilder object and *is_asset* is ``True`` when the target table
+            contains asset columns (Filename, URL, Length, MD5, Description).
+        """
+        paths = self._collect_paths(dataset and dataset.dataset_rid)
+        pb = self._ml_instance.catalog.getPathBuilder()
+
+        def _pb_table(table: Table):
+            """Look up a pathBuilder table from an ermrest_model Table."""
+            return pb.schemas[table.schema.name].tables[table.name]
+
+        dd_table = _pb_table(
+            self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
+        )
+
+        result: dict[str, list[tuple[Any, bool]]] = defaultdict(list)
+
+        for path in paths:
+            # Build linked datapath with Dataset RID filter on root table
+            ds_table = _pb_table(path[0])
+            if dataset and dataset.dataset_rid:
+                dp = ds_table.filter(ds_table.RID == dataset.dataset_rid)
+            else:
+                dp = ds_table
+
+            prev_table = path[0]
+            for table in path[1:]:
+                pb_table = _pb_table(table)
+                if table.name == "Dataset_Dataset":
+                    dp = dp.link(pb_table)
+                elif table.name == "Dataset" and prev_table.name == "Dataset_Dataset":
+                    # Nested dataset: follow Nested_Dataset FK back to Dataset
+                    dp = dp.link(pb_table, on=(dd_table.Nested_Dataset == pb_table.RID))
+                else:
+                    dp = dp.link(pb_table)
+                prev_table = table
+
+            target_table = path[-1]
+            is_asset = ASSET_COLUMNS.issubset({c.name for c in target_table.columns})
+            result[target_table.name].append((dp, is_asset))
+
+        return dict(result)
 
     def _dataset_nesting_depth(self, dataset: DatasetLike | None = None) -> int:
         """Determine the maximum dataset nesting depth in the current catalog.

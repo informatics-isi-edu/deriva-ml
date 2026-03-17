@@ -1,51 +1,71 @@
-"""Tests for estimate_bag_size, focusing on the accumulation logic.
+"""Tests for estimate_bag_size with exact RID-union semantics.
 
-The key bug was that when the same table appears via multiple FK paths in the
-download spec (e.g., OCT_DICOM reachable both directly and via CGM_Blood_Glucose),
-the second query's results would overwrite the first instead of accumulating.
-If the second query failed silently, the per-table entry would show 0 while
-total_asset_bytes had already counted the successful first query.
+When the same table is reachable via multiple FK paths, estimate_bag_size
+fetches RID lists from each path and computes the exact set union to get
+the true row count.  For asset tables it fetches (RID, Length) pairs and
+deduplicates by RID to get the exact total bytes.
 """
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
+
+class _MockColumn:
+    """Minimal mock column that satisfies datapath aggregate/attribute functions.
+
+    Provides ``_instancename`` so that ``Cnt(_MockColumn('RID'))`` produces
+    the correct ERMrest projection string ``cnt(RID)``.
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+
+    @property
+    def _instancename(self) -> str:
+        return self.name
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def _projection_name(self) -> str:
+        return self.name
 
 
-def _make_spec(query_processors: list[dict]) -> dict:
-    """Build a minimal download spec with the given query processors."""
-    return {
-        "catalog": {
-            "query_processors": [
-                {"processor": "env", "processor_params": {"output_path": "Dataset", "query_path": "/"}},
-            ]
-            + query_processors,
-        }
-    }
+def _make_mock_datapath(uri: str) -> MagicMock:
+    """Create a mock datapath object that supports ``.attributes()`` calls.
+
+    The mock provides ``.RID``, ``.Length``, and ``.URL`` as ``_MockColumn``
+    instances.  ``.attributes()`` returns a result-set whose ``.uri`` replaces
+    ``/entity/`` with ``/attribute/`` and appends the column names.
+    """
+    dp = MagicMock()
+    dp.uri = uri
+    dp.RID = _MockColumn("RID")
+    dp.Length = _MockColumn("Length")
+    dp.URL = _MockColumn("URL")
+
+    def _mock_attributes(*cols):
+        """Build a mock ResultSet with the correct attribute URI."""
+        col_names = ",".join(c._projection_name if hasattr(c, '_projection_name') else str(c) for c in cols)
+        attr_uri = uri.replace("/entity/", "/attribute/") + "/" + col_names
+        rs = MagicMock()
+        rs.uri = attr_uri
+        return rs
+
+    dp.attributes = _mock_attributes
+    return dp
 
 
-def _csv_qp(output_path: str, query_path: str) -> dict:
-    return {
-        "processor": "csv",
-        "processor_params": {
-            "query_path": query_path,
-            "output_path": output_path,
-            "paged_query": True,
-        },
-    }
+def _make_rids(*rids: str) -> list[dict]:
+    """Helper to build a RID-only response list."""
+    return [{"RID": r} for r in rids]
 
 
-def _fetch_qp(table_name: str, query_path: str) -> dict:
-    return {
-        "processor": "fetch",
-        "processor_params": {
-            "query_path": query_path,
-            "output_path": f"asset/{{asset_rid}}/{table_name}",
-        },
-    }
+def _make_asset_rows(*entries: tuple[str, int]) -> list[dict]:
+    """Helper to build a (RID, Length) response list for asset queries."""
+    return [{"RID": rid, "Length": length} for rid, length in entries]
 
 
 def _make_mock_async_catalog(catalog_responses: dict) -> MagicMock:
@@ -67,7 +87,7 @@ def _make_mock_async_catalog(catalog_responses: dict) -> MagicMock:
                 return response
         # Default: return empty result
         response = MagicMock()
-        response.json.return_value = [{"cnt": 0, "total": 0}]
+        response.json.return_value = []
         return response
 
     mock_catalog.get_async = mock_get_async
@@ -75,24 +95,28 @@ def _make_mock_async_catalog(catalog_responses: dict) -> MagicMock:
     return mock_catalog
 
 
-def _run_estimate(spec: dict, catalog_responses: dict) -> dict:
+def _run_estimate(
+    aggregate_queries: dict[str, list[tuple[MagicMock, bool]]],
+    catalog_responses: dict,
+) -> dict:
     """Run estimate_bag_size with mocked internals.
 
     Args:
-        spec: The download spec to use.
-        catalog_responses: Mapping from aggregate query path substring to response JSON.
-            If a value is an Exception, that exception is raised.
+        aggregate_queries: Return value for CatalogGraph._aggregate_queries.
+            Maps table name to list of (mock_datapath, is_asset) tuples.
+        catalog_responses: Mapping from query path substring to response JSON.
+            For csv queries, responses should be RID arrays: [{"RID": "X"}, ...].
+            For fetch queries, responses should be [{RID, Length}, ...].
     """
     from deriva_ml.dataset.dataset import Dataset
 
-    # Mock the Dataset instance — set return values directly on the instance
-    # (patch.object on the class does NOT affect MagicMock instances).
     dataset = MagicMock(spec=Dataset)
     dataset.dataset_rid = "TEST-RID"
     dataset._ml_instance = MagicMock()
     dataset._ml_instance.catalog.deriva_server.server = "test.example.org"
     dataset._ml_instance.catalog.deriva_server.scheme = "https"
     dataset._ml_instance.catalog.catalog_id = "99"
+    dataset._logger = MagicMock()
     dataset._version_snapshot_catalog.return_value = MagicMock()
     dataset._version_snapshot_catalog_id.return_value = "99@2024-01-01T00:00:00"
     dataset._human_readable_size.side_effect = Dataset._human_readable_size
@@ -105,13 +129,15 @@ def _run_estimate(spec: dict, catalog_responses: dict) -> dict:
         patch("deriva_ml.dataset.dataset.AsyncErmrestSnapshot", return_value=mock_catalog),
     ):
         mock_graph = MagicMock()
-        mock_graph.generate_dataset_download_spec.return_value = spec
+        mock_graph._aggregate_queries.return_value = aggregate_queries
         mock_graph_cls.return_value = mock_graph
 
         return Dataset.estimate_bag_size(dataset, "1.0.0")
 
 
-def _run_estimate_counting(spec: dict) -> int:
+def _run_estimate_counting(
+    aggregate_queries: dict[str, list[tuple[MagicMock, bool]]],
+) -> int:
     """Run estimate_bag_size and return the total number of get_async() calls."""
     from deriva_ml.dataset.dataset import Dataset
 
@@ -121,19 +147,20 @@ def _run_estimate_counting(spec: dict) -> int:
     dataset._ml_instance.catalog.deriva_server.server = "test.example.org"
     dataset._ml_instance.catalog.deriva_server.scheme = "https"
     dataset._ml_instance.catalog.catalog_id = "99"
+    dataset._logger = MagicMock()
     dataset._version_snapshot_catalog.return_value = MagicMock()
     dataset._version_snapshot_catalog_id.return_value = "99@2024-01-01T00:00:00"
     dataset._human_readable_size.side_effect = Dataset._human_readable_size
 
     call_count = 0
-
     mock_catalog = MagicMock()
 
     async def counting_get_async(path, **kwargs):
         nonlocal call_count
         call_count += 1
         response = MagicMock()
-        response.json.return_value = [{"cnt": 10, "total": 1000}]
+        # Return a small RID list so the code can process it
+        response.json.return_value = [{"RID": f"R{call_count}", "Length": 1000}]
         return response
 
     mock_catalog.get_async = counting_get_async
@@ -145,7 +172,7 @@ def _run_estimate_counting(spec: dict) -> int:
         patch("deriva_ml.dataset.dataset.AsyncErmrestSnapshot", return_value=mock_catalog),
     ):
         mock_graph = MagicMock()
-        mock_graph.generate_dataset_download_spec.return_value = spec
+        mock_graph._aggregate_queries.return_value = aggregate_queries
         mock_graph_cls.return_value = mock_graph
 
         Dataset.estimate_bag_size(dataset, "1.0.0")
@@ -153,96 +180,116 @@ def _run_estimate_counting(spec: dict) -> int:
     return call_count
 
 
-class TestEstimateBagSizeAccumulation:
-    """Test that duplicate table entries from multiple FK paths are handled correctly."""
+class TestEstimateBagSizeUnionSemantics:
+    """Test that multiple FK paths to the same table use exact RID-union counts."""
 
     def test_single_path_csv_and_fetch(self):
-        """Basic case: one csv + one fetch for the same table."""
-        spec = _make_spec(
-            [
-                _csv_qp("Dataset/Dataset_Image/Image", "/entity/Image/RID={RID}"),
-                _fetch_qp("Image", "/attribute/Image/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-            ]
-        )
+        """Basic case: one path to an asset table."""
+        aggregate_queries = {
+            "Image": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
+            ],
+        }
+        # 100 RIDs for the csv query, 100 (RID, Length) pairs for the fetch query
+        rids = _make_rids(*[f"IMG-{i}" for i in range(100)])
+        assets = _make_asset_rows(*[(f"IMG-{i}", 50) for i in range(100)])
+
         result = _run_estimate(
-            spec,
+            aggregate_queries,
             {
-                "/aggregate/Image/RID=TEST-RID/cnt:=cnt(RID)": [{"cnt": 100}],
-                "/aggregate/Image/RID=TEST-RID/!(URL::null::)/total:=sum(Length),cnt:=cnt(RID)": [
-                    {"total": 5000, "cnt": 100}
-                ],
+                "S:Dataset_Image/S:Image/RID": rids,
+                "S:Dataset_Image/S:Image/!(URL::null::)/RID,Length": assets,
             },
         )
 
         assert result["tables"]["Image"]["row_count"] == 100
-        assert result["tables"]["Image"]["asset_bytes"] == 5000
+        assert result["tables"]["Image"]["asset_bytes"] == 5000  # 100 * 50
         assert result["tables"]["Image"]["is_asset"] is True
         assert result["total_rows"] == 100
         assert result["total_asset_bytes"] == 5000
 
-    def test_duplicate_table_deduplication(self):
-        """Same table via two paths — dedup means only first path is queried."""
-        spec = _make_spec(
-            [
-                _csv_qp("Dataset/Dataset_OCT/OCT_DICOM", "/entity/path1/OCT_DICOM/RID={RID}"),
-                _fetch_qp("OCT_DICOM", "/attribute/path1/OCT_DICOM/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-                _csv_qp("Dataset/Dataset_CGM/CGM/Observation/OCT_DICOM", "/entity/path2/OCT_DICOM/RID={RID}"),
-                _fetch_qp(
-                    "OCT_DICOM", "/attribute/path2/OCT_DICOM/RID={RID}/!(URL::null::)/url:=URL,length:=Length"
-                ),
-            ]
-        )
+    def test_duplicate_table_exact_union(self):
+        """Same table via two paths with overlapping RIDs — exact union count."""
+        aggregate_queries = {
+            "OCT_DICOM": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_OCT/S:OCT_DICOM"), True),
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_CGM/S:CGM/S:OCT_DICOM"), True),
+            ],
+        }
+        # Path 1: 200 rows (RID-001..RID-200), each 3.44MB
+        path1_rids = _make_rids(*[f"RID-{i:03d}" for i in range(1, 201)])
+        path1_assets = _make_asset_rows(*[(f"RID-{i:03d}", 3_440_000) for i in range(1, 201)])
+        # Path 2: 150 rows, 50 overlap with path 1 (RID-151..RID-200 are shared),
+        # 100 new (RID-201..RID-300)
+        path2_rids = _make_rids(*[f"RID-{i:03d}" for i in range(151, 301)])
+        path2_assets = _make_asset_rows(*[(f"RID-{i:03d}", 3_440_000) for i in range(151, 301)])
+
         result = _run_estimate(
-            spec,
+            aggregate_queries,
             {
-                "path1/OCT_DICOM/RID=TEST-RID/cnt:=cnt(RID)": [{"cnt": 200}],
-                "path1/OCT_DICOM/RID=TEST-RID/!(URL::null::)/total:=sum(Length)": [{"total": 688_000_000, "cnt": 200}],
+                # Path 1 queries
+                "S:Dataset_OCT/S:OCT_DICOM/RID": path1_rids,
+                "S:Dataset_OCT/S:OCT_DICOM/!(URL::null::)/RID,Length": path1_assets,
+                # Path 2 queries
+                "S:Dataset_CGM/S:CGM/S:OCT_DICOM/RID": path2_rids,
+                "S:Dataset_CGM/S:CGM/S:OCT_DICOM/!(URL::null::)/RID,Length": path2_assets,
             },
         )
 
-        assert result["tables"]["OCT_DICOM"]["row_count"] == 200
-        assert result["tables"]["OCT_DICOM"]["asset_bytes"] == 688_000_000
+        # Exact union: 200 + 150 - 50 overlap = 300 unique RIDs
+        assert result["tables"]["OCT_DICOM"]["row_count"] == 300
+        # 300 unique assets * 3.44MB each = 1,032,000,000 bytes
+        assert result["tables"]["OCT_DICOM"]["asset_bytes"] == 300 * 3_440_000
         assert result["tables"]["OCT_DICOM"]["is_asset"] is True
-        # total must match per-table (no double counting)
-        assert result["total_asset_bytes"] == result["tables"]["OCT_DICOM"]["asset_bytes"]
+        assert result["total_asset_bytes"] == 300 * 3_440_000
 
-    def test_total_matches_per_table_sum(self):
-        """Verify total_asset_bytes equals sum of all per-table asset_bytes."""
-        spec = _make_spec(
-            [
-                _csv_qp("Dataset/Image", "/entity/Image/RID={RID}"),
-                _fetch_qp("Image", "/attribute/Image/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-                _csv_qp("Dataset/Report", "/entity/Report/RID={RID}"),
-                _fetch_qp("Report", "/attribute/Report/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-            ]
-        )
+    def test_first_path_zero_second_path_has_data(self):
+        """First path returns 0, second has real data — union picks the real data."""
+        aggregate_queries = {
+            "Observation": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_A/S:Observation"), False),
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_B/S:Observation"), False),
+            ],
+        }
         result = _run_estimate(
-            spec,
+            aggregate_queries,
             {
-                "Image/RID=TEST-RID/cnt:=cnt(RID)": [{"cnt": 10}],
-                "Image/RID=TEST-RID/!(URL::null::)/total:=sum(Length)": [{"total": 1000, "cnt": 10}],
-                "Report/RID=TEST-RID/cnt:=cnt(RID)": [{"cnt": 5}],
-                "Report/RID=TEST-RID/!(URL::null::)/total:=sum(Length)": [{"total": 500, "cnt": 5}],
+                # Path A returns 0 rows
+                "S:Path_A/S:Observation/RID": [],
+                # Path B returns 75 rows
+                "S:Path_B/S:Observation/RID": _make_rids(*[f"OBS-{i}" for i in range(75)]),
             },
         )
 
-        per_table_total = sum(t["asset_bytes"] for t in result["tables"].values())
-        assert result["total_asset_bytes"] == per_table_total, (
-            f"total_asset_bytes ({result['total_asset_bytes']}) != "
-            f"sum of per-table asset_bytes ({per_table_total})"
-        )
+        assert result["tables"]["Observation"]["row_count"] == 75
+        assert result["tables"]["Observation"]["is_asset"] is False
+        assert result["total_rows"] == 75
+
+    def test_all_paths_queried(self):
+        """All paths for a table are queried (no first-wins dedup)."""
+        aggregate_queries = {
+            "OCT": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:OCT"), True),
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:OCT"), True),
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathC/S:OCT"), True),
+            ],
+        }
+
+        # 3 paths x (1 csv + 1 fetch) = 6 queries total
+        call_count = _run_estimate_counting(aggregate_queries)
+        assert call_count == 6, f"Expected 6 queries (3 paths x 2 query types), got {call_count}"
 
     def test_csv_only_no_fetch(self):
-        """Table with no assets (csv only, no fetch processor)."""
-        spec = _make_spec(
-            [
-                _csv_qp("Dataset/Subject", "/entity/Subject/RID={RID}"),
-            ]
-        )
+        """Table with no assets (is_asset=False) only produces csv queries."""
+        aggregate_queries = {
+            "Subject": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"), False),
+            ],
+        }
         result = _run_estimate(
-            spec,
+            aggregate_queries,
             {
-                "Subject/RID=TEST-RID/cnt:=cnt(RID)": [{"cnt": 42}],
+                "S:Dataset_Subject/S:Subject/RID": _make_rids(*[f"SUBJ-{i}" for i in range(42)]),
             },
         )
 
@@ -254,17 +301,16 @@ class TestEstimateBagSizeAccumulation:
 
     def test_failed_query_returns_zero(self):
         """When a query fails, it should contribute 0 (not break)."""
-        spec = _make_spec(
-            [
-                _csv_qp("Dataset/BadTable", "/entity/BadTable/RID={RID}"),
-                _fetch_qp("BadTable", "/attribute/BadTable/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-            ]
-        )
+        aggregate_queries = {
+            "BadTable": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BadTable"), True),
+            ],
+        }
         result = _run_estimate(
-            spec,
+            aggregate_queries,
             {
-                "BadTable/RID=TEST-RID/cnt:=cnt(RID)": Exception("timeout"),
-                "BadTable/RID=TEST-RID/!(URL::null::)/total:=sum(Length)": Exception("timeout"),
+                "S:BadTable/RID": Exception("timeout"),
+                "S:BadTable/!(URL::null::)/RID,Length": Exception("timeout"),
             },
         )
 
@@ -272,20 +318,50 @@ class TestEstimateBagSizeAccumulation:
         assert result["tables"]["BadTable"]["asset_bytes"] == 0
         assert result["total_asset_bytes"] == 0
 
-    def test_deduplication_reduces_queries(self):
-        """Verify that duplicate table names only produce one query each."""
-        spec = _make_spec(
-            [
-                _csv_qp("Dataset/A/OCT", "/entity/pathA/OCT/RID={RID}"),
-                _fetch_qp("OCT", "/attribute/pathA/OCT/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-                _csv_qp("Dataset/B/OCT", "/entity/pathB/OCT/RID={RID}"),
-                _fetch_qp("OCT", "/attribute/pathB/OCT/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-                _csv_qp("Dataset/C/OCT", "/entity/pathC/OCT/RID={RID}"),
-                _fetch_qp("OCT", "/attribute/pathC/OCT/RID={RID}/!(URL::null::)/url:=URL,length:=Length"),
-            ]
+    def test_total_matches_per_table_sum(self):
+        """Verify total_asset_bytes equals sum of all per-table asset_bytes."""
+        aggregate_queries = {
+            "Image": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
+            ],
+            "Report": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Report/S:Report"), True),
+            ],
+        }
+        result = _run_estimate(
+            aggregate_queries,
+            {
+                "S:Dataset_Image/S:Image/RID": _make_rids(*[f"IMG-{i}" for i in range(10)]),
+                "S:Dataset_Image/S:Image/!(URL::null::)/RID,Length": _make_asset_rows(*[(f"IMG-{i}", 100) for i in range(10)]),
+                "S:Dataset_Report/S:Report/RID": _make_rids(*[f"RPT-{i}" for i in range(5)]),
+                "S:Dataset_Report/S:Report/!(URL::null::)/RID,Length": _make_asset_rows(*[(f"RPT-{i}", 100) for i in range(5)]),
+            },
         )
 
-        call_count = _run_estimate_counting(spec)
+        per_table_total = sum(t["asset_bytes"] for t in result["tables"].values())
+        assert result["total_asset_bytes"] == per_table_total, (
+            f"total_asset_bytes ({result['total_asset_bytes']}) != "
+            f"sum of per-table asset_bytes ({per_table_total})"
+        )
 
-        # With dedup: 1 csv + 1 fetch = 2 queries (not 3+3=6)
-        assert call_count == 2, f"Expected 2 queries (deduplicated), got {call_count}"
+    def test_disjoint_paths_exact_count(self):
+        """Two paths with completely disjoint RIDs — count is the full union (not max)."""
+        aggregate_queries = {
+            "Image": [
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:Image"), False),
+                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:Image"), False),
+            ],
+        }
+        result = _run_estimate(
+            aggregate_queries,
+            {
+                # Path A: 100 rows
+                "S:PathA/S:Image/RID": _make_rids(*[f"A-{i}" for i in range(100)]),
+                # Path B: 200 completely different rows
+                "S:PathB/S:Image/RID": _make_rids(*[f"B-{i}" for i in range(200)]),
+            },
+        )
+
+        # Old max approach would give 200; exact union gives 300
+        assert result["tables"]["Image"]["row_count"] == 300
+        assert result["total_rows"] == 300
