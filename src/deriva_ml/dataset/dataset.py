@@ -1473,7 +1473,7 @@ class Dataset:
                 "Configure s3_bucket when creating the DerivaML instance to enable MINID support."
             )
 
-        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid, exclude_tables=exclude_tables)
+        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout)
 
         bag_path = (
             self._materialize_dataset_bag(minid, use_minid=use_minid)
@@ -1798,6 +1798,7 @@ class Dataset:
         exclude_tables: set[str] | None = None,
         spec: dict | None = None,
         spec_hash: str | None = None,
+        timeout: tuple[int, int] | None = None,
     ) -> str:
         """Create a new MINID (Minimal Viable Identifier) for the dataset.
 
@@ -1814,6 +1815,8 @@ class Dataset:
                 generated from the snapshot catalog.
             spec_hash: Optional pre-computed SHA-256 hash of the spec. If None and
                 spec is provided, it is computed from the spec.
+            timeout: Optional (connect_timeout, read_timeout) in seconds for network
+                requests. Defaults to (10, 610).
 
         Returns:
             str: URL to the MINID landing page (if use_minid=True) or
@@ -2106,6 +2109,7 @@ class Dataset:
         create: bool,
         use_minid: bool,
         exclude_tables: set[str] | None = None,
+        timeout: tuple[int, int] | None = None,
     ) -> DatasetMinid | None:
         """Get or create a MINID for the specified dataset version.
 
@@ -2118,6 +2122,8 @@ class Dataset:
                 If False, raise an exception if no MINID exists.
             use_minid: If True, use the MINID service for persistent identification.
                 If False, generate a direct download URL without MINID registration.
+            timeout: Optional (connect_timeout, read_timeout) in seconds for network
+                requests. Passed through to _create_dataset_minid.
 
         Returns:
             DatasetMinid: Object containing the MINID URL, checksum, and metadata.
@@ -2168,14 +2174,14 @@ class Dataset:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
             minid_url = self._create_dataset_minid(
                 version, use_minid=True, exclude_tables=exclude_tables,
-                spec=spec, spec_hash=current_spec_hash,
+                spec=spec, spec_hash=current_spec_hash, timeout=timeout,
             )
             return self._fetch_minid_metadata(version, minid_url)
 
         # use_minid=False: always regenerate bag client-side (caching handled by sha256 in _download_dataset_minid).
         if not create and not minid_url:
             raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-        minid_url = self._create_dataset_minid(version, use_minid=False, exclude_tables=exclude_tables)
+        minid_url = self._create_dataset_minid(version, use_minid=False, exclude_tables=exclude_tables, timeout=timeout)
         return DatasetMinid(
             dataset_version=version,
             RID=f"{self.dataset_rid}@{version_record.snapshot}",
