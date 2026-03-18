@@ -139,7 +139,7 @@ class Workflow(BaseModel):
     git_root: Path | None = None
 
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
-    _logger: logging.Logger = PrivateAttr(default=10)
+    _logger: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger("deriva_ml"))
 
     @field_validator("workflow_type", mode="before")
     @classmethod
@@ -478,10 +478,9 @@ class Workflow(BaseModel):
         """
         try:
             subprocess.run(
-                "git rev-parse --is-inside-work-tree",
+                ["git", "rev-parse", "--is-inside-work-tree"],
                 capture_output=True,
                 text=True,
-                shell=True,
                 check=True,
             )
         except subprocess.CalledProcessError:
@@ -495,22 +494,28 @@ class Workflow(BaseModel):
             )
 
         # If you are in a notebook, strip out the outputs before computing the checksum.
-        cmd = (
-            f"nbstripout -t {executable_path} | git hash-object --stdin"
-            if "ipynb" == executable_path.suffix
-            else f"git hash-object {executable_path}"
-        )
-        checksum = (
-            subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=False,
-                shell=True,
-            ).stdout.strip()
-            if executable_path != "REPL"
-            else "1"
-        )
+        if executable_path != "REPL":
+            if "ipynb" == executable_path.suffix:
+                strip_proc = subprocess.run(
+                    ["nbstripout", "-t", str(executable_path)],
+                    capture_output=True,
+                )
+                hash_proc = subprocess.run(
+                    ["git", "hash-object", "--stdin"],
+                    input=strip_proc.stdout,
+                    capture_output=True,
+                    text=True,
+                )
+                checksum = hash_proc.stdout.strip()
+            else:
+                checksum = subprocess.run(
+                    ["git", "hash-object", str(executable_path)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                ).stdout.strip()
+        else:
+            checksum = "1"
         return github_url, checksum
 
     @staticmethod

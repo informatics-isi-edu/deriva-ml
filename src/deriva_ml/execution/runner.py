@@ -151,6 +151,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from hydra.core.hydra_config import HydraConfig
 from hydra_zen import builds
 
+logger = logging.getLogger("deriva_ml")
+
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
     from deriva_ml.core.config import DerivaMLConfig
@@ -499,8 +501,8 @@ def run_model(
             workflow.url = new_url
             workflow.checksum = new_checksum
             workflow.git_root = new_git_root
-        except Exception:
-            pass  # Keep the original URL if recomputation fails
+        except Exception as e:
+            logger.debug(f"Could not recompute workflow URL/checksum: {e}")
 
     # ---------------------------------------------------------------------------
     # Handle multirun mode - create parent execution on first job
@@ -519,8 +521,8 @@ def run_model(
     try:
         hydra_cfg = HydraConfig.get()
         config_choices = {k: v for k, v in hydra_cfg.runtime.choices.items() if v is not None}
-    except Exception:
-        pass  # HydraConfig not available outside Hydra context
+    except Exception as e:
+        logger.debug(f"HydraConfig not available (not in Hydra context): {e}")
 
     # ---------------------------------------------------------------------------
     # Create the execution context

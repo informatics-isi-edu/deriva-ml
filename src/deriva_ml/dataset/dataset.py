@@ -2239,7 +2239,8 @@ class Dataset:
         """
         try:
             bdb.validate_bag_structure(bag_path.as_posix())
-        except Exception:
+        except Exception as e:
+            logging.getLogger("deriva_ml").debug(f"Bag validation check failed for {bag_path}: {e}")
             return False
         fetch_file = bag_path / "fetch.txt"
         if not fetch_file.exists():
