@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DerivaML is a Python library for creating and executing reproducible machine learning workflows using a Deriva catalog. It provides:
+DerivaML is a Python library (requires Python ≥3.12) for creating and executing reproducible machine learning workflows using a Deriva catalog. It provides:
 - Dataset versioning and management with BDBag support
 - Execution tracking with provenance
 - Feature management for ML experiments
 - Controlled vocabulary management
 - Asset tracking and upload
+- Catalog cloning with partial data subsetting
 
 ## Build and Development Commands
 
@@ -41,11 +42,11 @@ uv run mkdocs serve
 
 ### Core Classes
 
-**DerivaML** (`src/deriva_ml/core/base.py`): Main entry point for catalog operations. Provides:
-- Catalog connection and authentication via Globus
-- Vocabulary and feature management
-- Dataset creation and lookup
-- Workflow and execution management
+**DerivaML** (`src/deriva_ml/core/base.py`): Main entry point for catalog operations. Uses mixin composition:
+- `VocabularyMixin`, `FeatureMixin`, `DatasetMixin`, `AssetMixin`, `ExecutionMixin`
+- `WorkflowMixin`, `FileMixin`, `AnnotationMixin`, `RidResolutionMixin`, `PathBuilderMixin`
+
+Each mixin lives in `src/deriva_ml/core/mixins/` and handles one concern.
 
 **Execution** (`src/deriva_ml/execution/execution.py`): Manages ML workflow lifecycle:
 - Downloads/materializes datasets specified in configuration
@@ -91,12 +92,18 @@ results = pb.schemas[schema_name].tables[table_name].entities().fetch()
 
 ### Testing
 
-Tests require a running Deriva catalog. The test fixtures in `tests/conftest.py`:
-- `deriva_catalog`: Creates an empty test catalog (session-scoped)
-- `test_ml`: Provides a DerivaML instance, resets catalog between tests
-- `catalog_with_datasets`: Provides a catalog with populated demo data
+Tests require a running Deriva catalog. Set `DERIVA_HOST` environment variable to specify the test server (defaults to `localhost`).
 
-Set `DERIVA_HOST` environment variable to specify the test server (defaults to `localhost`).
+**Core test infrastructure** (`tests/catalog_manager.py`):
+- `CatalogManager`: Session-scoped owner of the test catalog. Tracks state (EMPTY/POPULATED/DATASETS) and provides `ensure_populated()`, `ensure_datasets()`, `reset()`, and `get_ml_instance()`.
+
+**Key fixtures** (`tests/conftest.py`):
+- `catalog_manager`: Session-scoped `CatalogManager` instance (primary entry point)
+- `test_ml`: Function-scoped DerivaML instance, resets catalog between tests
+- `catalog_with_datasets`: Provides a catalog with populated demo data (datasets, splits)
+- `deriva_catalog`: Legacy session-scoped fixture (uses `catalog_manager` internally)
+
+**Gotcha**: `CatalogManager.ensure_populated()` validates data actually exists before trusting its state flag. Other test modules (function-scoped fixtures) may empty tables during teardown, making the state flag stale.
 
 ## Schema Structure
 
@@ -156,19 +163,19 @@ Import from: `from deriva_ml.interfaces import ...`
 - `configure_logging(level)`: Configure logging for all components
 - `LoggerMixin`: Mixin providing `_logger` attribute
 
-## Future Decomposition
+## Catalog Cloning
 
-The `DerivaML` class (~1700 lines) handles multiple concerns. Future refactoring could extract:
-- `VocabularyManager`: Term and vocabulary CRUD
-- `FeatureManager`: Feature definition and values
-- `WorkflowManager`: Workflow tracking and Git integration
-- `DatasetManager`: Dataset creation and lookup
-- `AssetManager`: Asset table operations
+**`create_ml_workspace`** (`src/deriva_ml/catalog/clone.py`): Creates partial catalog clones:
+- Three-stage approach: schema without FKs → async data copy → FK application with orphan handling
+- Export annotation parsing for guided table discovery
+- Orphan strategies: FAIL, DELETE, NULLIFY for incoherent row-level policies
+- Dataset version reinitialization with proper catalog snapshots
 
-Similarly, `Execution` (~1100 lines) could be decomposed into:
-- `DatasetDownloader`: Dataset materialization
-- `AssetUploader`: Result upload and cataloging
-- `StatusTracker`: Execution status management
+**`localize_assets`** (`src/deriva_ml/catalog/localize.py`): Copies assets from source to local Hatrac after cloning with `asset_mode=REFERENCES`.
+
+### create_ml_schema CASCADE Warning
+
+`create_ml_schema()` in `src/deriva_ml/schema/create_schema.py` **drops the existing `deriva-ml` schema with CASCADE** if it already exists, destroying all data. The clone code guards against this — never call `create_ml_schema` on a catalog that already has data in `deriva-ml`.
 
 ## Hydra-zen Configuration
 
