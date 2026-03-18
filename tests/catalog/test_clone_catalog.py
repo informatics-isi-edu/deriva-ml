@@ -27,12 +27,23 @@ from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 from tests.catalog_manager import CatalogManager
 
 
+def _delete_test_catalog(hostname: str, catalog_id: str) -> None:
+    """Delete a test catalog. Used for cleanup in clone tests."""
+    try:
+        server = DerivaServer("https", hostname, credentials=get_credential(hostname))
+        catalog = server.connect_ermrest(catalog_id)
+        catalog.delete_ermrest_catalog(really=True)
+    except Exception as e:
+        print(f"Warning: Failed to delete catalog {catalog_id}: {e}")
+
+
 def _get_root_rid(catalog_manager: CatalogManager, tmp_path: Path) -> tuple[DerivaML, str]:
     """Helper to get a root dataset RID from a populated catalog.
 
     Returns:
         Tuple of (DerivaML instance, root dataset RID).
     """
+    catalog_manager.reset()
     ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
     return ml, dataset_desc.dataset.dataset_rid
 
@@ -75,7 +86,7 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_with_data(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -122,7 +133,7 @@ class TestCreateMlWorkspace:
             assert len(cloned_images) > 0, "Should have some images"
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_with_datasets_and_download_bag(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -175,7 +186,7 @@ class TestCreateMlWorkspace:
             assert len(members) > 0, "Bag should contain dataset members"
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_add_ml_schema_when_missing(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -235,7 +246,7 @@ class TestCreateMlWorkspace:
                 assert "Workflow" in ml_schema.tables
 
             finally:
-                self._delete_catalog(hostname, result.catalog_id)
+                _delete_test_catalog(hostname, result.catalog_id)
 
         finally:
             plain_catalog.delete_ermrest_catalog(really=True)
@@ -270,7 +281,7 @@ class TestCreateMlWorkspace:
             assert "deriva-ml" in model.schemas
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_preserves_annotations(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -307,7 +318,7 @@ class TestCreateMlWorkspace:
                     )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_without_annotations(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -334,7 +345,7 @@ class TestCreateMlWorkspace:
             assert cloned_model is not None
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_with_alias(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -372,7 +383,7 @@ class TestCreateMlWorkspace:
                 server.delete_ermrest_alias(alias_name)
             except Exception:
                 pass
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_exclude_schemas(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -403,7 +414,7 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_result_has_source_info(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -427,7 +438,7 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_nested_datasets_preserved(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -475,7 +486,7 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_asset_mode_references(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -497,7 +508,7 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_vocabulary_terms_preserved(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -534,7 +545,7 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_reinitializes_dataset_versions(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -611,7 +622,7 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_skip_version_reinitialization(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -634,16 +645,8 @@ class TestCreateMlWorkspace:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
-    def _delete_catalog(self, hostname: str, catalog_id: str) -> None:
-        """Helper to delete a catalog."""
-        try:
-            server = DerivaServer("https", hostname, credentials=get_credential(hostname))
-            catalog = server.connect_ermrest(catalog_id)
-            catalog.delete_ermrest_catalog(really=True)
-        except Exception as e:
-            print(f"Warning: Failed to delete catalog {catalog_id}: {e}")
 
 
 class TestCreateMlWorkspaceErrors:
@@ -822,7 +825,7 @@ class TestOrphanStrategy:
             assert result.report.fkeys_failed == 0
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_result_includes_orphan_stats(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -847,7 +850,7 @@ class TestOrphanStrategy:
             assert result.fkeys_pruned >= 0
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_report_attached_to_result(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -871,16 +874,8 @@ class TestOrphanStrategy:
             assert result.report.fkeys_applied > 0
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
-    def _delete_catalog(self, hostname: str, catalog_id: str) -> None:
-        """Helper to delete a catalog."""
-        try:
-            server = DerivaServer("https", hostname, credentials=get_credential(hostname))
-            catalog = server.connect_ermrest(catalog_id)
-            catalog.delete_ermrest_catalog(really=True)
-        except Exception as e:
-            print(f"Warning: Failed to delete catalog {catalog_id}: {e}")
 
 
 class TestOrphanHandlingWithIncoherentPolicies:
@@ -936,7 +931,7 @@ class TestOrphanHandlingWithIncoherentPolicies:
             assert result.report is not None
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_with_orphan_strategy_nullify(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -960,16 +955,8 @@ class TestOrphanHandlingWithIncoherentPolicies:
             assert result.report is not None
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
-    def _delete_catalog(self, hostname: str, catalog_id: str) -> None:
-        """Helper to delete a catalog."""
-        try:
-            server = DerivaServer("https", hostname, credentials=get_credential(hostname))
-            catalog = server.connect_ermrest(catalog_id)
-            catalog.delete_ermrest_catalog(really=True)
-        except Exception as e:
-            print(f"Warning: Failed to delete catalog {catalog_id}: {e}")
 
 
 class TestThreeStageApproach:
@@ -1014,7 +1001,7 @@ class TestThreeStageApproach:
                     assert fk_count >= 0
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_preserves_data_integrity(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -1056,7 +1043,7 @@ class TestThreeStageApproach:
                     )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_report_tracks_table_progress(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -1079,16 +1066,8 @@ class TestThreeStageApproach:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
-    def _delete_catalog(self, hostname: str, catalog_id: str) -> None:
-        """Helper to delete a catalog."""
-        try:
-            server = DerivaServer("https", hostname, credentials=get_credential(hostname))
-            catalog = server.connect_ermrest(catalog_id)
-            catalog.delete_ermrest_catalog(really=True)
-        except Exception as e:
-            print(f"Warning: Failed to delete catalog {catalog_id}: {e}")
 
 
 class TestPruneHiddenFkeys:
@@ -1115,7 +1094,7 @@ class TestPruneHiddenFkeys:
             )
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
     def test_workspace_with_prune_hidden_fkeys_true(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -1136,16 +1115,8 @@ class TestPruneHiddenFkeys:
             assert result.catalog_id is not None
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
-    def _delete_catalog(self, hostname: str, catalog_id: str) -> None:
-        """Helper to delete a catalog."""
-        try:
-            server = DerivaServer("https", hostname, credentials=get_credential(hostname))
-            catalog = server.connect_ermrest(catalog_id)
-            catalog.delete_ermrest_catalog(really=True)
-        except Exception as e:
-            print(f"Warning: Failed to delete catalog {catalog_id}: {e}")
 
 
 class TestLocalizeResult:
@@ -1501,13 +1472,5 @@ class TestLocalizeAfterClone:
             assert localize_result.assets_processed == 0
 
         finally:
-            self._delete_catalog(hostname, result.catalog_id)
+            _delete_test_catalog(hostname, result.catalog_id)
 
-    def _delete_catalog(self, hostname: str, catalog_id: str) -> None:
-        """Helper to delete a catalog."""
-        try:
-            server = DerivaServer("https", hostname, credentials=get_credential(hostname))
-            catalog = server.connect_ermrest(catalog_id)
-            catalog.delete_ermrest_catalog(really=True)
-        except Exception as e:
-            print(f"Warning: Failed to delete catalog {catalog_id}: {e}")

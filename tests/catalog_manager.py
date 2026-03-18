@@ -315,7 +315,20 @@ class CatalogManager:
         ml = self.get_ml_instance(working_dir)
 
         if self.state.value >= CatalogState.POPULATED.value:
-            return ml
+            # Verify data actually exists — state flag can be stale if a
+            # previous fixture's teardown set state without repopulating.
+            pb = self.catalog.getPathBuilder()
+            domain_path = pb.schemas[self.domain_schema]
+            try:
+                subjects = list(domain_path.tables["Subject"].path.entities().fetch())
+                if len(subjects) > 0:
+                    return ml
+                self._logger.info(
+                    "State is POPULATED but Subject table is empty — repopulating"
+                )
+                self.state = CatalogState.EMPTY
+            except Exception:
+                self.state = CatalogState.EMPTY
 
         self._add_workflow_type(ml)
         workflow = ml.create_workflow(name="Test Population", workflow_type="Test Workflow")
