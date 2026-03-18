@@ -207,7 +207,7 @@ class TestHydraZenExecutionConfiguration:
 
         assert isinstance(exec_config, ExecutionConfiguration)
         assert exec_config.description == "Instantiation test"
-        assert exec_config.assets == ["1ABC", "2DEF"]
+        assert [a.rid for a in exec_config.assets] == ["1ABC", "2DEF"]
 
     def test_execution_config_with_workflow(self):
         """Test ExecutionConfiguration with Workflow object."""

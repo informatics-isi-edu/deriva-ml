@@ -267,8 +267,8 @@ class DerivaModel:
                                 "name": f.feature_name,
                                 "feature_table": f.feature_table.name,
                             })
-                    except Exception:
-                        pass  # Table may not support features
+                    except Exception as e:
+                        logger.debug(f"Could not enumerate features for table {table.name}: {e}")
 
                 table_info = {
                     "comment": table.comment or "",

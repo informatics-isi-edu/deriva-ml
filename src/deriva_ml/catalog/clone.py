@@ -539,8 +539,8 @@ def _upload_source_schema(
         namespace = f"/hatrac/catalog/{catalog_id}/provenance"
         try:
             hatrac.create_namespace(namespace, parents=True)
-        except Exception:
-            pass  # Namespace may already exist
+        except Exception as e:
+            logger.debug(f"Hatrac namespace creation skipped (may already exist): {e}")
 
         schema_bytes = json.dumps(schema_json, indent=2).encode("utf-8")
         object_path = f"{namespace}/source-schema.json"
@@ -601,14 +601,15 @@ def set_catalog_provenance(
         if session_info and "client" in session_info:
             client = session_info["client"]
             created_by = client.get("display_name") or client.get("id")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Could not retrieve session info for provenance: {e}")
 
     try:
         catalog_info = catalog.get("/").json()
         hostname = catalog_info.get("meta", {}).get("host", "")
         catalog_id = str(catalog.catalog_id)
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Could not retrieve catalog info for provenance: {e}")
         hostname = ""
         catalog_id = str(catalog.catalog_id)
 
@@ -1572,8 +1573,17 @@ def _post_clone_operations(
     if add_ml_schema:
         try:
             catalog = server.connect_ermrest(result.catalog_id)
-            create_ml_schema(catalog)
-            result.ml_schema_added = True
+            model = catalog.getCatalogModel()
+
+            if "deriva-ml" in model.schemas:
+                # Schema already exists (copied from source) — don't recreate it,
+                # as create_ml_schema drops the existing schema with CASCADE,
+                # destroying all copied data.
+                logger.info("ML schema already exists in clone, skipping creation")
+            else:
+                create_ml_schema(catalog)
+                result.ml_schema_added = True
+                logger.info("Added ML schema to clone")
 
             try:
                 from deriva_ml import DerivaML
@@ -1608,32 +1618,40 @@ def _reinitialize_dataset_versions(
     result: CloneCatalogResult,
     credential: dict | None,
 ) -> CloneCatalogResult:
-    """Reinitialize dataset versions after cloning."""
+    """Reinitialize dataset versions after cloning.
+
+    Creates new version records for each dataset in the clone with a valid
+    catalog snapshot. This ensures datasets in the clone can be downloaded
+    as bags (since the source catalog's snapshot IDs don't exist in the clone).
+
+    Each dataset gets a new patch version increment with a description
+    indicating it was cloned from the source catalog.
+    """
     try:
-        cred = credential or get_credential(result.hostname)
-        server = DerivaServer("https", result.hostname, credentials=cred)
-        catalog = server.connect_ermrest(result.catalog_id)
+        from deriva_ml import DerivaML
+        from deriva_ml.dataset.aux_classes import VersionPart
 
-        model = catalog.getCatalogModel()
-        if "deriva-ml" not in model.schemas:
-            return result
+        ml = DerivaML(
+            result.hostname, result.catalog_id, check_auth=False,
+        )
 
-        datasets = catalog.get("/entity/deriva-ml:Dataset").json()
+        description = (
+            f"Cloned from {result.source_hostname}:{result.source_catalog_id}"
+        )
+        if result.source_snapshot:
+            description += f" (snapshot {result.source_snapshot})"
 
-        for dataset in datasets:
+        for dataset in ml.find_datasets():
             try:
-                rid = dataset["RID"]
-                catalog.post(
-                    "/entity/deriva-ml:Dataset_Version",
-                    json=[{
-                        "Dataset": rid,
-                        "Version": "0.0.1",
-                        "Description": f"Cloned from {result.source_hostname}:{result.source_catalog_id}",
-                    }]
+                dataset.increment_dataset_version(
+                    component=VersionPart.patch,
+                    description=description,
                 )
                 result.datasets_reinitialized += 1
             except Exception as e:
-                logger.warning(f"Failed to reinitialize version for dataset {rid}: {e}")
+                logger.warning(
+                    f"Failed to reinitialize version for dataset {dataset.dataset_rid}: {e}"
+                )
 
     except Exception as e:
         logger.warning(f"Failed to reinitialize dataset versions: {e}")
@@ -2029,8 +2047,11 @@ def create_ml_workspace(
         progress_callback("Finding root RID", 5.0)
 
     root_table_key = None
+    # Search ALL schemas for the root RID (including "public").
+    # The public/system schema exclusion only applies later during
+    # table discovery — we need to find the root RID wherever it lives.
     for sname, schema in src_model.schemas.items():
-        if sname in {"public", "_acl_admin", "WWW"} or sname in exclude_schemas_set:
+        if sname in {"_acl_admin", "WWW"} or sname in exclude_schemas_set:
             continue
         for tname, table in schema.tables.items():
             if (sname, tname) in excluded_tables:
@@ -2276,8 +2297,8 @@ def create_ml_workspace(
             if session_info and "client" in session_info:
                 client = session_info["client"]
                 created_by = client.get("display_name") or client.get("id")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Could not retrieve session info for clone provenance: {e}")
 
         clone_details = CloneDetails(
             source_hostname=source_hostname,
@@ -2355,6 +2376,6 @@ def create_ml_workspace(
         try:
             dst_server.delete_ermrest_catalog(dst_catalog_id)
             logger.info(f"Cleaned up failed catalog {dst_catalog_id}")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to clean up catalog {dst_catalog_id} after error: {e}")
         raise

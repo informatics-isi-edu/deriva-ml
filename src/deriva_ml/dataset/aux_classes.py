@@ -1,5 +1,5 @@
 """
-THis module defines the DataSet class with is used to manipulate n
+This module defines the DataSet class which is used to manipulate n
 """
 
 from enum import Enum

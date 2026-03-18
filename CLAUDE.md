@@ -257,3 +257,61 @@ Table.define_association(
     metadata=[Column.define("Sequence", builtin_types.int4, nullok=True)]
 )
 ```
+
+### API Priority
+
+When writing new code, prefer APIs in this order:
+1. **deriva-ml routines** (highest level, most convenient)
+2. **deriva-py routines** with preference for **datapath** API over raw ERMrest URLs
+3. **BDBag/fair-data routines** (for bag creation and materialization)
+
+For catalog queries, prefer `dp.attributes(dp.RID)` and `dp.aggregates(Cnt(dp.RID))` over
+constructing raw ERMrest URL strings.
+
+### BDBag Remote File Manifest
+
+When creating bags with remote asset references, **never write fetch.txt directly**. Instead,
+write a remote file manifest JSON file and pass it to `bdb.make_bag(remote_file_manifest=...)`.
+This is because `make_bag(update=True)` destroys any hand-written fetch.txt by regenerating it
+from its internal `remote_entries` dict (which is empty if no manifest was provided).
+
+The manifest format is one JSON object per line:
+```json
+{"url": "https://...", "length": 12345, "filename": "asset/RID/Image/file.txt", "md5": "abc123"}
+```
+Note: `filename` omits the `data/` prefix — the bdbag API prepends it automatically.
+A hash value (md5 or sha256) is required for each entry.
+
+See `deriva_download.py` in deriva-py for the reference implementation.
+
+### CatalogGraph and Dataset Export
+
+`CatalogGraph` (`src/deriva_ml/dataset/catalog_graph.py`) traverses FK paths from the Dataset
+table to discover all reachable tables. It builds:
+- **Export specs** (`generate_dataset_download_spec`): Query processor definitions for bag export
+- **Aggregate queries** (`_aggregate_queries`): Datapath objects for `estimate_bag_size`
+- **Table paths** (`_table_paths`): ERMrest paths for export
+
+`estimate_bag_size` uses RID-union semantics: it fetches RID lists from all FK paths to each
+table and computes `set.union()` for exact counts. This handles the case where the same table
+is reachable via multiple FK paths with overlapping or disjoint rows.
+
+### Dataset Download Flow
+
+`download_dataset_bag` → `_get_dataset_minid` → `_create_dataset_bag_client` (or MINID path):
+1. Creates a bag directory structure
+2. Processes query_processors from the export spec (env, json, csv, fetch)
+3. Writes remote file manifest for assets (passed to `make_bag(remote_file_manifest=...)`)
+4. Archives the bag as a zip
+5. `_materialize_dataset_bag` then calls `bdb.materialize()` to fetch remote assets
+
+### restructure_assets Return Type
+
+`DatasetBag.restructure_assets()` returns `dict[Path, Path]` (manifest mapping source → dest),
+not a `Path`. Tests should assert `isinstance(result, dict)`.
+
+### ExecutionConfiguration Assets
+
+`ExecutionConfiguration.assets` accepts plain RID strings but coerces them to `AssetSpec` objects
+via a Pydantic model validator. Tests comparing assets should use `[a.rid for a in config.assets]`
+rather than comparing directly to string lists.

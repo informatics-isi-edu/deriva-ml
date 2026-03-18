@@ -186,17 +186,6 @@ def dataset_test(
 
 
 @pytest.fixture(scope="function")
-def test_ml_demo_catalog(catalog_manager: CatalogManager, tmp_path: Path) -> DerivaML:
-    """Legacy fixture: DerivaML with full demo catalog.
-
-    Creates subjects, images, features, and datasets.
-    """
-    catalog_manager.reset()
-    ml, _ = catalog_manager.ensure_datasets(tmp_path)
-    return ml
-
-
-@pytest.fixture(scope="function")
 def notebook_test(catalog_manager: CatalogManager, tmp_path: Path) -> DerivaML:
     """Create a DerivaML instance for notebook testing.
 
@@ -209,8 +198,22 @@ def notebook_test(catalog_manager: CatalogManager, tmp_path: Path) -> DerivaML:
     create_jupyter_kernel("test_kernel", tmp_path)
     ml = catalog_manager.get_ml_instance(tmp_path)
     yield ml
-    catalog_manager.reset()
     destroy_jupyter_kernel("test_kernel")
+
+
+# =============================================================================
+# Shared Workflow/Execution Fixtures
+# =============================================================================
+
+
+@pytest.fixture(scope="function")
+def workflow_terms(test_ml):
+    """Add common vocabulary terms needed for workflow/execution tests."""
+    from deriva_ml import MLVocab as vc
+
+    test_ml.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
+    test_ml.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow that uses Deriva ML API")
+    return test_ml
 
 
 # =============================================================================
@@ -312,4 +315,3 @@ def ml_dataset_catalog(
     ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path)
     wrapper = SessionMLDatasetCatalog(catalog_manager, ml, dataset_desc)
     yield wrapper
-    catalog_manager.reset()

@@ -33,7 +33,11 @@ Example (RID validation):
 
 from __future__ import annotations
 
+import logging
+
 from pydantic import ConfigDict
+
+logger = logging.getLogger("deriva_ml")
 
 # =============================================================================
 # Shared Pydantic Configuration
@@ -340,8 +344,8 @@ def validate_rids(
                     dataset = ml.lookup_dataset(rid)
                     if not dataset.description or dataset.description.strip() == "":
                         result.add_warning(f"Dataset '{rid}' has no description")
-                except Exception:
-                    pass  # Already reported other errors
+                except Exception as e:
+                    logger.debug(f"Could not check description for dataset {rid}: {e}")
 
     return result
 

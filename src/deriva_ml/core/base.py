@@ -62,14 +62,6 @@ from deriva_ml.core.mixins import (
 from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 
-# Optional debug imports
-try:
-    from icecream import ic
-
-    ic.configureOutput(includeContext=True)
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
 if TYPE_CHECKING:
     from deriva_ml.catalog.clone import CatalogProvenance
     from deriva_ml.execution.execution import Execution

@@ -36,6 +36,8 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 from deriva_ml.core.definitions import RID, Status
 from deriva_ml.core.exceptions import DerivaMLException
 
+logger = logging.getLogger("deriva_ml")
+
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.dataset.dataset import Dataset
@@ -107,7 +109,7 @@ class ExecutionRecord(BaseModel):
     duration: str | None = None
 
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
-    _logger: logging.Logger = PrivateAttr(default=None)
+    _logger: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger("deriva_ml"))
 
     def __init__(
         self,
@@ -563,11 +565,10 @@ class ExecutionRecord(BaseModel):
                             if asset_rid:
                                 try:
                                     assets.append(self._ml_instance.lookup_asset(asset_rid))
-                                except Exception:
-                                    pass  # Asset might not exist or be inaccessible
-                    except Exception:
-                        # Table might not have expected columns
-                        pass
+                                except Exception as e:
+                                    logger.debug(f"Could not look up asset {asset_rid}: {e}")
+                    except Exception as e:
+                        logger.debug(f"Could not query asset table {table.name}: {e}")
         return assets
 
     def __str__(self) -> str:

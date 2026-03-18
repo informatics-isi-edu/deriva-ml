@@ -29,14 +29,6 @@ from deriva_ml.experiment import Experiment
 
 
 @pytest.fixture
-def workflow_terms(test_ml):
-    """Add required vocabulary terms for workflow testing."""
-    test_ml.add_term(vc.asset_type, "Test Model", description="Model for our Test workflow")
-    test_ml.add_term(vc.workflow_type, "Test Workflow", description="A ML Workflow")
-    return test_ml
-
-
-@pytest.fixture
 def test_workflow(workflow_terms):
     """Create a test workflow and register it in the catalog."""
     ml = workflow_terms

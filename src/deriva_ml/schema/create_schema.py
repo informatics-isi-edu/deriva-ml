@@ -1,4 +1,5 @@
 import argparse
+import logging
 import subprocess
 import sys
 from importlib.resources import files
@@ -19,6 +20,8 @@ from deriva.core.typed import (
 
 from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
 from deriva_ml.schema.annotations import asset_annotation, generate_annotation
+
+logger = logging.getLogger("deriva_ml")
 
 try:
     from icecream import ic
@@ -273,10 +276,22 @@ def create_ml_schema(
     schema_name: str = "deriva-ml",
     project_name: Optional[str] = None,
 ):
+    """Create or recreate the DerivaML schema in the given catalog.
+
+    WARNING: If the schema already exists, it will be DROPPED with CASCADE,
+    destroying all data in the schema. Use _post_clone_operations guard when
+    calling from clone context.
+
+    Args:
+        catalog: An ErmrestCatalog connection to the target catalog.
+        schema_name: Name of the schema to create (default: "deriva-ml").
+        project_name: Display name for the project. Defaults to schema_name.
+    """
     project_name = project_name or schema_name
 
     model = catalog.getCatalogModel()
     if model.schemas.get(schema_name):
+        logger.warning(f"Dropping existing schema '{schema_name}' with CASCADE")
         model.schemas[schema_name].drop(cascade=True)
 
     # get annotations

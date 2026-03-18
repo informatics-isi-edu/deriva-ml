@@ -1473,7 +1473,7 @@ class Dataset:
                 "Configure s3_bucket when creating the DerivaML instance to enable MINID support."
             )
 
-        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid, exclude_tables=exclude_tables)
+        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout)
 
         bag_path = (
             self._materialize_dataset_bag(minid, use_minid=use_minid)
@@ -1798,6 +1798,7 @@ class Dataset:
         exclude_tables: set[str] | None = None,
         spec: dict | None = None,
         spec_hash: str | None = None,
+        timeout: tuple[int, int] | None = None,
     ) -> str:
         """Create a new MINID (Minimal Viable Identifier) for the dataset.
 
@@ -1814,6 +1815,8 @@ class Dataset:
                 generated from the snapshot catalog.
             spec_hash: Optional pre-computed SHA-256 hash of the spec. If None and
                 spec is provided, it is computed from the spec.
+            timeout: Optional (connect_timeout, read_timeout) in seconds for network
+                requests. Defaults to (10, 610).
 
         Returns:
             str: URL to the MINID landing page (if use_minid=True) or
@@ -2085,18 +2088,36 @@ class Dataset:
                 f"than a deep FK join. Failed paths: {failed_queries}"
             )
 
-        # Write fetch.txt for remote asset references.
-        # BDBag's materialize() handles directory creation for fetch targets.
+        # Write remote file manifest for BDBag to generate fetch.txt.
+        # The manifest must be a JSON-stream file (one JSON object per line)
+        # with url, length, filename (without data/ prefix), and a hash.
+        # Passing it to make_bag(remote_file_manifest=...) ensures fetch.txt
+        # is generated correctly and not destroyed by make_bag(update=True).
+        remote_manifest_path = None
         if fetch_entries:
-            fetch_file = bag_path / "fetch.txt"
-            with fetch_file.open("w", encoding="utf-8") as f:
+            remote_manifest_path = str(bag_path / "remote-file-manifest.json")
+            with open(remote_manifest_path, "w", encoding="utf-8") as f:
                 for url, length, rel_path, md5 in fetch_entries.values():
-                    length_str = str(length) if length else "-"
-                    f.write(f"{url}\t{length_str}\t{rel_path}\n")
-            self._logger.info("Wrote %d fetch entries for remote assets", len(fetch_entries))
+                    # rel_path has "data/" prefix; bdbag expects filename without it
+                    filename = rel_path.removeprefix("data/")
+                    entry = {
+                        "url": url,
+                        "length": int(length) if length else 0,
+                        "filename": filename,
+                    }
+                    if md5:
+                        entry["md5"] = md5
+                    f.write(json.dumps(entry) + "\n")
+            self._logger.info("Wrote %d remote file manifest entries", len(fetch_entries))
 
         # Update and archive the bag
-        bdb.make_bag(str(bag_path), algs=bag_algorithms, update=True, idempotent=True)
+        bdb.make_bag(
+            str(bag_path),
+            algs=bag_algorithms,
+            remote_file_manifest=remote_manifest_path,
+            update=True,
+            idempotent=True,
+        )
         archive_path = bdb.archive_bag(str(bag_path), bag_config.get("bag_archiver", "zip"))
         return Path(archive_path).as_uri()
 
@@ -2106,6 +2127,7 @@ class Dataset:
         create: bool,
         use_minid: bool,
         exclude_tables: set[str] | None = None,
+        timeout: tuple[int, int] | None = None,
     ) -> DatasetMinid | None:
         """Get or create a MINID for the specified dataset version.
 
@@ -2118,6 +2140,8 @@ class Dataset:
                 If False, raise an exception if no MINID exists.
             use_minid: If True, use the MINID service for persistent identification.
                 If False, generate a direct download URL without MINID registration.
+            timeout: Optional (connect_timeout, read_timeout) in seconds for network
+                requests. Passed through to _create_dataset_minid.
 
         Returns:
             DatasetMinid: Object containing the MINID URL, checksum, and metadata.
@@ -2168,14 +2192,14 @@ class Dataset:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
             minid_url = self._create_dataset_minid(
                 version, use_minid=True, exclude_tables=exclude_tables,
-                spec=spec, spec_hash=current_spec_hash,
+                spec=spec, spec_hash=current_spec_hash, timeout=timeout,
             )
             return self._fetch_minid_metadata(version, minid_url)
 
         # use_minid=False: always regenerate bag client-side (caching handled by sha256 in _download_dataset_minid).
         if not create and not minid_url:
             raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-        minid_url = self._create_dataset_minid(version, use_minid=False, exclude_tables=exclude_tables)
+        minid_url = self._create_dataset_minid(version, use_minid=False, exclude_tables=exclude_tables, timeout=timeout)
         return DatasetMinid(
             dataset_version=version,
             RID=f"{self.dataset_rid}@{version_record.snapshot}",
@@ -2215,7 +2239,8 @@ class Dataset:
         """
         try:
             bdb.validate_bag_structure(bag_path.as_posix())
-        except Exception:
+        except Exception as e:
+            logging.getLogger("deriva_ml").debug(f"Bag validation check failed for {bag_path}: {e}")
             return False
         fetch_file = bag_path / "fetch.txt"
         if not fetch_file.exists():
