@@ -2029,8 +2029,11 @@ def create_ml_workspace(
         progress_callback("Finding root RID", 5.0)
 
     root_table_key = None
+    # Search ALL schemas for the root RID (including "public").
+    # The public/system schema exclusion only applies later during
+    # table discovery — we need to find the root RID wherever it lives.
     for sname, schema in src_model.schemas.items():
-        if sname in {"public", "_acl_admin", "WWW"} or sname in exclude_schemas_set:
+        if sname in {"_acl_admin", "WWW"} or sname in exclude_schemas_set:
             continue
         for tname, table in schema.tables.items():
             if (sname, tname) in excluded_tables:

@@ -2088,18 +2088,36 @@ class Dataset:
                 f"than a deep FK join. Failed paths: {failed_queries}"
             )
 
-        # Write fetch.txt for remote asset references.
-        # BDBag's materialize() handles directory creation for fetch targets.
+        # Write remote file manifest for BDBag to generate fetch.txt.
+        # The manifest must be a JSON-stream file (one JSON object per line)
+        # with url, length, filename (without data/ prefix), and a hash.
+        # Passing it to make_bag(remote_file_manifest=...) ensures fetch.txt
+        # is generated correctly and not destroyed by make_bag(update=True).
+        remote_manifest_path = None
         if fetch_entries:
-            fetch_file = bag_path / "fetch.txt"
-            with fetch_file.open("w", encoding="utf-8") as f:
+            remote_manifest_path = str(bag_path / "remote-file-manifest.json")
+            with open(remote_manifest_path, "w", encoding="utf-8") as f:
                 for url, length, rel_path, md5 in fetch_entries.values():
-                    length_str = str(length) if length else "-"
-                    f.write(f"{url}\t{length_str}\t{rel_path}\n")
-            self._logger.info("Wrote %d fetch entries for remote assets", len(fetch_entries))
+                    # rel_path has "data/" prefix; bdbag expects filename without it
+                    filename = rel_path.removeprefix("data/")
+                    entry = {
+                        "url": url,
+                        "length": int(length) if length else 0,
+                        "filename": filename,
+                    }
+                    if md5:
+                        entry["md5"] = md5
+                    f.write(json.dumps(entry) + "\n")
+            self._logger.info("Wrote %d remote file manifest entries", len(fetch_entries))
 
         # Update and archive the bag
-        bdb.make_bag(str(bag_path), algs=bag_algorithms, update=True, idempotent=True)
+        bdb.make_bag(
+            str(bag_path),
+            algs=bag_algorithms,
+            remote_file_manifest=remote_manifest_path,
+            update=True,
+            idempotent=True,
+        )
         archive_path = bdb.archive_bag(str(bag_path), bag_config.get("bag_archiver", "zip"))
         return Path(archive_path).as_uri()
 

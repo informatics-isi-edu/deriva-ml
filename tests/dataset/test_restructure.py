@@ -39,7 +39,8 @@ class TestRestructureAssets:
             group_by=[],
         )
 
-        assert result == output_dir
+        assert isinstance(result, dict), f"Expected dict manifest, got {type(result).__name__}"
+        assert len(result) > 0, f"Expected non-empty manifest, got {result}"
         assert output_dir.exists()
 
         # Check that subdirectories were created based on dataset types
@@ -255,8 +256,8 @@ class TestRestructureAssets:
             group_by=[],
         )
 
-        assert result == output_dir
-        # Directory should be created (may or may not have files depending on data)
+        assert isinstance(result, dict), f"Expected dict manifest, got {type(result).__name__}"
+        # Empty table should return empty manifest
 
     def test_restructure_nested_datasets(self, dataset_test, tmp_path):
         """Test restructuring with nested datasets - types should form hierarchy."""
@@ -508,7 +509,8 @@ class TestRestructureForeignKeyPaths:
             group_by=[],
         )
 
-        assert result == output_dir
+        assert isinstance(result, dict), f"Expected dict manifest, got {type(result).__name__}"
+        assert len(result) > 0, "Expected non-empty manifest"
         assert output_dir.exists()
 
         # Should have found images
