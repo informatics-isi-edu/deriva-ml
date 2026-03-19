@@ -241,6 +241,7 @@ class DatasetMixin:
             use_minid=self.use_minid,
             exclude_tables=dataset.exclude_tables,
             timeout=dataset.timeout,
+            fetch_concurrency=dataset.fetch_concurrency,
         )
 
     def estimate_bag_size(
@@ -328,6 +329,7 @@ class DatasetMixin:
             materialize=materialize,
             exclude_tables=dataset.exclude_tables,
             timeout=dataset.timeout,
+            fetch_concurrency=dataset.fetch_concurrency,
         )
 
     # Backward compatibility alias
