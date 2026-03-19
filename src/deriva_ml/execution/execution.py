@@ -65,6 +65,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.asset.manifest import AssetManifest, AssetEntry
 from deriva_ml.dataset.upload import (
     asset_file_path,
     asset_root,
@@ -72,10 +73,13 @@ from deriva_ml.dataset.upload import (
     execution_root,
     feature_root,
     feature_value_path,
+    flat_asset_dir,
     is_feature_dir,
+    manifest_path,
     normalize_asset_dir,
     table_path,
     upload_directory,
+    upload_staging_root,
 )
 from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
@@ -1097,86 +1101,113 @@ class Execution:
         asset_types: list[str] | str | None = None,
         copy_file=False,
         rename_file: str | None = None,
+        metadata=None,
         **kwargs,
     ) -> AssetFilePath:
-        """Return a pathlib Path to the directory in which to place files for the specified execution_asset type.
+        """Register a file for upload and return a path to write to.
 
-        Given the name of an asset table, and a file name, register the file for upload and return a path to that
-        file in the upload directory.  In addition to the filename, additional asset metadata and file asset types may
-        be specified.
+        This routine has three modes depending on whether file_name refers to an existing file:
+        1. **New file**: file_name doesn't exist — returns a path to write to.
+        2. **Symlink**: file_name exists, copy_file=False — symlinks into staging.
+        3. **Copy**: file_name exists, copy_file=True — copies into staging.
 
-        This routine has three modes, depending on if file_name refers to an existing file.  If it doesn't, a path
-        to a new file with the specified name is returned.  The caller can then open that file for writing.
-
-        If the provided filename refers to an existing file and the copy_file argument is False (the default), then the
-        returned path contains a symbolic link to that file.  If the copy_file argument is True, then the contents of
-        file_name are copied into the target directory.
+        Files are stored in a flat per-table directory (``assets/{AssetTable}/``).
+        Metadata is tracked in a persistent JSON manifest for crash safety.
+        Metadata can be set at registration time via the ``metadata`` parameter
+        (an AssetRecord or dict) or incrementally after via the returned
+        AssetFilePath's ``metadata`` property.
 
         Args:
-            asset_name: Type of asset to be uploaded.  Must be a term in Asset_Type controlled vocabulary.
-            file_name: Name of file to be uploaded.
-            asset_types: Type of asset to be uploaded.  Defaults to the name of the asset.
+            asset_name: Name of the asset table. Must be a valid asset table.
+            file_name: Name of file to be uploaded, or path to an existing file.
+            asset_types: Asset type terms from Asset_Type vocabulary. Defaults to asset_name.
             copy_file: Whether to copy the file rather than creating a symbolic link.
-            rename_file: If provided, the file will be renamed to this name if the file already exists..
-            **kwargs: Any additional metadata values that may be part of the asset table.
+            rename_file: If provided, rename the file during staging.
+            metadata: An AssetRecord instance or dict of metadata column values.
+            **kwargs: Additional metadata values (legacy support, merged with metadata).
 
         Returns:
-            Path in which to place asset files.
+            AssetFilePath bound to the manifest for write-through metadata updates.
 
         Raises:
-            DerivaException: If the asset type is not defined.
+            DerivaMLException: If the asset table doesn't exist.
+            DerivaMLValidationError: If asset_types contains invalid terms.
         """
         if not self._model.is_asset(asset_name):
-            DerivaMLException(f"Table {asset_name} is not an asset")
+            raise DerivaMLException(f"Table {asset_name} is not an asset")
 
         asset_table = self._model.name_to_table(asset_name)
+        schema = asset_table.schema.name
 
-        asset_types = asset_types or kwargs.get("Asset_Type", None) or asset_name
+        # Validate and normalize asset types
+        asset_types = asset_types or kwargs.pop("Asset_Type", None) or asset_name
         asset_types = [asset_types] if isinstance(asset_types, str) else asset_types
         for t in asset_types:
             self._ml_object.lookup_term(MLVocab.asset_type, t)
 
-        # Determine if we will need to rename an existing file as the asset.
+        # Resolve metadata from AssetRecord, dict, or kwargs
+        metadata_dict: dict[str, Any] = {}
+        if metadata is not None:
+            if hasattr(metadata, "model_dump"):
+                metadata_dict = {k: v for k, v in metadata.model_dump().items() if v is not None}
+            else:
+                metadata_dict = dict(metadata)
+        # Merge any kwargs that aren't standard parameters
+        metadata_dict.update(kwargs)
+
+        # Determine file name and path
         file_name = Path(file_name)
         if file_name.name == "_implementations.log":
-            # There is a funny bug with S3 hatrac if we have the leading _ in the filename.
             file_name = file_name.with_name("-implementations.log")
 
-        # Resolve relative paths to absolute paths to ensure exists() and symlink work correctly
-        # regardless of the current working directory
         if not file_name.is_absolute():
             file_name = file_name.resolve()
 
         target_name = Path(rename_file) if file_name.exists() and rename_file else file_name
-        asset_path = asset_file_path(
-            prefix=self._working_dir,
-            exec_rid=self.execution_rid,
-            asset_table=self._model.name_to_table(asset_name),
-            file_name=target_name.name,
-            metadata=kwargs,
-        )
+
+        # Store file in flat per-table directory
+        flat_dir = flat_asset_dir(self._working_dir, self.execution_rid, asset_name)
+        flat_path = flat_dir / target_name.name
 
         if file_name.exists():
             if copy_file:
-                asset_path.write_bytes(file_name.read_bytes())
+                flat_path.write_bytes(file_name.read_bytes())
             else:
                 try:
-                    asset_path.symlink_to(file_name)
+                    flat_path.symlink_to(file_name)
                 except (OSError, PermissionError):
-                    # Fallback to copy if symlink fails (common on Windows)
-                    asset_path.write_bytes(file_name.read_bytes())
+                    flat_path.write_bytes(file_name.read_bytes())
 
-        # Persist the asset types into a file
-        with Path(asset_type_path(self._working_dir, self.execution_rid, asset_table)).open("a") as asset_type_file:
-            asset_type_file.write(json.dumps({target_name.name: asset_types}) + "\n")
+        # Register in manifest (write-through + fsync)
+        manifest = self._get_manifest()
+        manifest_key = f"{asset_name}/{target_name.name}"
+        manifest.add_asset(manifest_key, AssetEntry(
+            asset_table=asset_name,
+            schema=schema,
+            asset_types=asset_types,
+            metadata=metadata_dict,
+        ))
 
-        return AssetFilePath(
-            asset_path=asset_path,
+        # Also write legacy asset-type JSONL for backward compatibility with upload
+        with Path(asset_type_path(self._working_dir, self.execution_rid, asset_table)).open("a") as f:
+            f.write(json.dumps({target_name.name: asset_types}) + "\n")
+
+        result = AssetFilePath(
+            asset_path=flat_path,
             asset_table=asset_name,
             file_name=target_name.name,
-            asset_metadata=kwargs,
+            asset_metadata=metadata_dict,
             asset_types=asset_types,
         )
+        result._bind_manifest(manifest, manifest_key)
+        return result
+
+    def _get_manifest(self) -> AssetManifest:
+        """Get or create the asset manifest for this execution."""
+        if not hasattr(self, "_manifest") or self._manifest is None:
+            mp = manifest_path(self._working_dir, self.execution_rid)
+            self._manifest = AssetManifest(mp, self.execution_rid)
+        return self._manifest
 
     def table_path(self, table: str) -> Path:
         """Return a local file path to a CSV to add values to a table on upload.

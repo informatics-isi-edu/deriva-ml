@@ -301,7 +301,7 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
         )
 
-    def prefetch_dataset(
+    def cache_dataset(
         self,
         dataset: "DatasetSpec",
         materialize: bool = True,
@@ -318,14 +318,19 @@ class DatasetMixin:
                 download only table metadata.
 
         Returns:
-            dict with bag_info results after prefetch.
+            dict with bag_info results after caching.
         """
         if not self.model.is_dataset_rid(dataset.rid):
             raise DerivaMLTableTypeError("Dataset", dataset.rid)
         ds = self.lookup_dataset(dataset)
-        return ds.prefetch(
+        return ds.cache(
             version=dataset.version,
             materialize=materialize,
             exclude_tables=dataset.exclude_tables,
             timeout=dataset.timeout,
         )
+
+    # Backward compatibility alias
+    def prefetch_dataset(self, dataset: "DatasetSpec", materialize: bool = True) -> dict[str, Any]:
+        """Deprecated: Use cache_dataset() instead."""
+        return self.cache_dataset(dataset, materialize)

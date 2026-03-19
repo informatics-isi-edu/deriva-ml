@@ -1417,6 +1417,7 @@ class Dataset:
         use_minid: bool = False,
         exclude_tables: set[str] | None = None,
         timeout: tuple[int, int] | None = None,
+        fetch_concurrency: int = 8,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and optionally creates a MINID.
 
@@ -1441,6 +1442,8 @@ class Dataset:
             timeout: Optional (connect_timeout, read_timeout) in seconds for network
                 requests. Defaults to (10, 610). Increase read_timeout for large datasets
                 with deep FK joins that need more time to complete.
+            fetch_concurrency: Maximum number of concurrent file downloads during
+                materialization. Defaults to 8.
 
         Returns:
             DatasetBag: Object containing:
@@ -1476,7 +1479,7 @@ class Dataset:
         minid = self._get_dataset_minid(version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout)
 
         bag_path = (
-            self._materialize_dataset_bag(minid, use_minid=use_minid)
+            self._materialize_dataset_bag(minid, use_minid=use_minid, fetch_concurrency=fetch_concurrency)
             if materialize
             else self._download_dataset_minid(minid, use_minid)
         )
@@ -1702,12 +1705,13 @@ class Dataset:
 
         return {**size_info, **cache_info}
 
-    def prefetch(
+    def cache(
         self,
         version: DatasetVersion | str,
         materialize: bool = True,
         exclude_tables: set[str] | None = None,
         timeout: tuple[int, int] | None = None,
+        fetch_concurrency: int = 8,
     ) -> dict[str, Any]:
         """Download a dataset bag into the local cache without creating an execution.
 
@@ -1717,28 +1721,33 @@ class Dataset:
         Internally calls ``download_dataset_bag`` with ``use_minid=False``.
 
         Args:
-            version: Dataset version to prefetch.
+            version: Dataset version to cache.
             materialize: If True (default), download all asset files. If False,
                 download only metadata (table data without binary assets).
             exclude_tables: Optional set of table names to exclude from FK path
                 traversal during bag export.
             timeout: Optional (connect_timeout, read_timeout) in seconds.
+            fetch_concurrency: Maximum number of concurrent file downloads during
+                materialization. Defaults to 8.
 
         Returns:
-            dict with bag_info results after prefetch (includes cache_status,
+            dict with bag_info results after caching (includes cache_status,
             cache_path, and size info).
         """
-        # Download the bag (this is the same as download_dataset_bag but we
-        # don't need the DatasetBag object — we just want it in the cache)
         self.download_dataset_bag(
             version=version,
             materialize=materialize,
             use_minid=False,
             exclude_tables=exclude_tables,
             timeout=timeout,
+            fetch_concurrency=fetch_concurrency,
         )
-        # Return bag_info so the caller sees the updated cache status
         return self.bag_info(version=version, exclude_tables=exclude_tables)
+
+    # Backward compatibility alias
+    def prefetch(self, *args, **kwargs) -> dict[str, Any]:
+        """Deprecated: Use cache() instead."""
+        return self.cache(*args, **kwargs)
 
     @staticmethod
     def _human_readable_size(size_bytes: int) -> str:
@@ -2333,6 +2342,7 @@ class Dataset:
         self,
         minid: DatasetMinid,
         use_minid: bool,
+        fetch_concurrency: int = 8,
     ) -> Path:
         """Materialize a dataset bag by downloading all referenced files.
 
@@ -2415,6 +2425,7 @@ class Dataset:
             bag_path.as_posix(),
             fetch_callback=fetch_progress_callback,
             validation_callback=validation_progress_callback,
+            fetch_concurrency=fetch_concurrency,
         )
         validated_check.touch()
         return Path(bag_path)
