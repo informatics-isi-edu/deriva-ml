@@ -240,6 +240,15 @@ with path.open("w") as f:
 ```
 Don't manually create files in `working_dir / "Execution_Metadata"` - they won't be uploaded.
 
+### Asset Manifest Architecture
+
+Assets use a manifest-first design (`asset-manifest.json`):
+- Files stored in flat `assets/{Table}/` directories, metadata in the manifest JSON
+- Write-through + fsync on every mutation for crash safety
+- Upload builds ephemeral symlinks into the regex-expected tree at upload time
+- Metadata directory order must match `sorted(metadata_columns)` — both `asset_table_upload_spec()` and `_build_upload_staging()` sort alphabetically
+- Per-asset status tracking enables upload resume after crashes
+
 ### Upload Network Configuration
 
 `upload_directory()` has two network configuration parameters:
@@ -274,6 +283,15 @@ When writing new code, prefer APIs in this order:
 
 For catalog queries, prefer `dp.attributes(dp.RID)` and `dp.aggregates(Cnt(dp.RID))` over
 constructing raw ERMrest URL strings.
+
+### Bags Should Behave Like Catalog Connections
+
+DatasetBag should provide the same interface as live catalog operations wherever possible.
+Users should not need to learn a separate API for working with downloaded data vs live data.
+This means: same method names, same record types (FeatureRecord everywhere, not a separate
+FeatureValueRecord), same selector signatures, same return types. When a bag can't support
+a feature (e.g., workflow-based selection requires catalog access), it should raise a clear
+error, not silently provide a different type.
 
 ### BDBag Remote File Manifest
 

@@ -429,7 +429,7 @@ exe.upload_execution_outputs(
 
 ## Registering Output Files
 
-Use `asset_file_path()` to register files for upload:
+Use `asset_file_path()` to register files for upload. Each call records the file in a persistent manifest for crash safety:
 
 ```python
 with ml.create_execution(config) as exe:
@@ -460,6 +460,15 @@ with ml.create_execution(config) as exe:
         file_name="mask.png",
         asset_types=["Segmentation_Mask", "Derived"]
     )
+
+    # Method 5: Provide metadata column values
+    path = exe.asset_file_path(
+        asset_name="Image",
+        file_name="scan.jpg",
+        metadata={"Subject": subject_rid, "Acquisition_Date": "2026-01-15"}
+    )
+    # Metadata can also be updated after registration:
+    path.set_metadata("Acquisition_Time", "14:30:00")
 ```
 
 ## Updating Status

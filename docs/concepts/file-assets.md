@@ -88,10 +88,10 @@ ml.create_asset(
 
 Assets are uploaded through the execution workflow using `asset_file_path()`. This:
 
-1. Stages files in a local working directory
-2. Associates files with the correct asset table
-3. Applies asset type labels
-4. Links files to the execution for provenance
+1. Registers the file in a persistent JSON manifest (crash-safe)
+2. Stores the file in flat per-table storage (`assets/{Table}/`)
+3. Tracks metadata, asset types, and upload status per file
+4. At upload time, builds ephemeral symlinks for the GenericUploader
 
 ### Basic Upload Pattern
 
@@ -120,11 +120,30 @@ with ml.create_execution(config) as exe:
 exe.upload_execution_outputs()
 ```
 
+### Registering with Metadata
+
+Provide column values for the asset table at registration time:
+
+```python
+with ml.create_execution(config) as exe:
+    # Register an image with metadata columns
+    path = exe.asset_file_path(
+        asset_name="Image",
+        file_name="scan001.jpg",
+        metadata={"Subject": subject_rid, "Acquisition_Date": "2026-01-15"}
+    )
+
+    # Or update metadata after registration
+    path.set_metadata("Acquisition_Time", "14:30:00")
+```
+
+Metadata is stored in the manifest JSON, not encoded in directory names.
+
 ### Registering Existing Files
 
 ```python
 with ml.create_execution(config) as exe:
-    # Stage an existing file for upload
+    # Stage an existing file for upload (symlink by default)
     exe.asset_file_path(
         asset_name="Image",
         file_name="/path/to/existing/image.png",  # Source file path
@@ -140,13 +159,36 @@ exe.upload_execution_outputs()
 ```python
 with ml.create_execution(config) as exe:
     # Register with specific asset types
-    exe.asset_file_path(
+    path = exe.asset_file_path(
         asset_name="Image",
         file_name="mask.png",
         asset_types=["Segmentation_Mask", "Derived"]  # Multiple types
     )
 
+    # Or update types after registration
+    path.set_asset_types(["Segmentation_Mask", "Derived", "QA_Reviewed"])
+
 exe.upload_execution_outputs()
+```
+
+## Asset Manifest
+
+Each execution tracks its assets in a persistent JSON manifest (`asset-manifest.json`). The manifest:
+
+- Is written with fsync on every mutation for crash safety
+- Tracks per-asset status: `pending` → `uploaded` (with RID) or `failed`
+- Enables upload resume after crashes — already-uploaded assets are skipped
+- Stores metadata as key-value pairs, not encoded in directory paths
+
+```
+{working_dir}/deriva-ml/execution/{exec_rid}/
+├── asset-manifest.json     # Single source of truth
+├── assets/                 # Flat per-table storage
+│   ├── Image/
+│   │   └── scan001.jpg
+│   └── Model/
+│       └── weights.pt
+└── ...
 ```
 
 ## Listing Assets
@@ -216,7 +258,7 @@ bag = exe.download_dataset_bag(
 
 ## Working Directory
 
-Each execution has a temporary working directory for staging files:
+Each execution has a working directory for asset storage and manifests:
 
 ```python
 with ml.create_execution(config) as exe:
@@ -224,11 +266,20 @@ with ml.create_execution(config) as exe:
     work_dir = exe.working_dir
     print(f"Working directory: {work_dir}")
 
-    # Files registered with asset_file_path are staged here
-    # They're uploaded when upload_execution_outputs() is called
+    # Files registered with asset_file_path are stored in assets/{Table}/
+    # The manifest tracks all registered files and their metadata
+    # upload_execution_outputs() builds staging symlinks and uploads
 ```
 
 The working directory is cleaned up after `upload_execution_outputs(clean_folder=True)` (default).
+
+### Crash Recovery
+
+If a model crashes between `asset_file_path()` and `upload_execution_outputs()`, the manifest preserves the registration state. On retry:
+
+1. Restore the execution: `exe = ml.restore_execution(execution_rid)`
+2. Call `upload_execution_outputs()` — it reads the manifest and uploads all pending assets
+3. Assets already marked as uploaded are skipped automatically
 
 ## Best Practices
 
