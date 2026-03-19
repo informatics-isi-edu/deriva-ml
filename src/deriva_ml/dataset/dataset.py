@@ -1665,6 +1665,81 @@ class Dataset:
             "total_asset_size": self._human_readable_size(total_asset_bytes),
         }
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def bag_info(
+        self,
+        version: DatasetVersion | str,
+        exclude_tables: set[str] | None = None,
+    ) -> dict[str, Any]:
+        """Get comprehensive info about a dataset bag: size, contents, and cache status.
+
+        Combines the size estimate from ``estimate_bag_size`` with local cache
+        status from ``BagCache``. Use this to decide whether to prefetch a bag
+        before running an experiment.
+
+        Args:
+            version: Dataset version to inspect.
+            exclude_tables: Optional set of table names to exclude from FK path
+                traversal, same as in download_dataset_bag.
+
+        Returns:
+            dict with keys:
+                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
+                - total_rows: total row count across all tables
+                - total_asset_bytes: total size of asset files in bytes
+                - total_asset_size: human-readable size string
+                - cache_status: one of "not_cached", "cached_metadata_only",
+                  "cached_materialized", "cached_incomplete"
+                - cache_path: local path to cached bag (if cached), else None
+        """
+        # Get size estimate
+        size_info = self.estimate_bag_size(version=version, exclude_tables=exclude_tables)
+
+        # Get cache status
+        from deriva_ml.dataset.bag_cache import BagCache
+        cache = BagCache(self._ml_instance.cache_dir)
+        cache_info = cache.cache_status(self.dataset_rid)
+
+        return {**size_info, **cache_info}
+
+    def prefetch(
+        self,
+        version: DatasetVersion | str,
+        materialize: bool = True,
+        exclude_tables: set[str] | None = None,
+        timeout: tuple[int, int] | None = None,
+    ) -> dict[str, Any]:
+        """Download a dataset bag into the local cache without creating an execution.
+
+        Use this to warm the cache before running experiments. No execution or
+        provenance records are created — this is purely a local download operation.
+
+        Internally calls ``download_dataset_bag`` with ``use_minid=False``.
+
+        Args:
+            version: Dataset version to prefetch.
+            materialize: If True (default), download all asset files. If False,
+                download only metadata (table data without binary assets).
+            exclude_tables: Optional set of table names to exclude from FK path
+                traversal during bag export.
+            timeout: Optional (connect_timeout, read_timeout) in seconds.
+
+        Returns:
+            dict with bag_info results after prefetch (includes cache_status,
+            cache_path, and size info).
+        """
+        # Download the bag (this is the same as download_dataset_bag but we
+        # don't need the DatasetBag object — we just want it in the cache)
+        self.download_dataset_bag(
+            version=version,
+            materialize=materialize,
+            use_minid=False,
+            exclude_tables=exclude_tables,
+            timeout=timeout,
+        )
+        # Return bag_info so the caller sees the updated cache status
+        return self.bag_info(version=version, exclude_tables=exclude_tables)
+
     @staticmethod
     def _human_readable_size(size_bytes: int) -> str:
         """Convert bytes to human-readable string."""

@@ -843,7 +843,7 @@ class TestValueSelectorWithNestedDatasets:
         the value_selector function receives feature values for assets in ALL
         datasets (not just the root), and can properly select among them.
         """
-        from deriva_ml.dataset.dataset_bag import FeatureValueRecord
+        from deriva_ml.feature import FeatureRecord
 
         ml = dataset_test.ml_instance
 
@@ -874,10 +874,13 @@ class TestValueSelectorWithNestedDatasets:
         # Track which RIDs the value_selector sees
         seen_rids = set()
 
-        def tracking_selector(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+        def tracking_selector(records: list[FeatureRecord]) -> FeatureRecord:
             """A selector that tracks which asset RIDs it sees."""
             for r in records:
-                seen_rids.add(r.target_rid)
+                # Use the Image attribute to get target RID (FeatureRecord uses table name as attribute)
+                target_rid = getattr(r, 'Image', None) or getattr(r, 'Subject', None)
+                if target_rid:
+                    seen_rids.add(target_rid)
             return records[0]
 
         # Download the parent dataset bag

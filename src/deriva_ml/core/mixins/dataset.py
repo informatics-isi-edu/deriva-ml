@@ -271,3 +271,61 @@ class DatasetMixin:
             version=dataset.version,
             exclude_tables=dataset.exclude_tables,
         )
+
+    def bag_info(
+        self,
+        dataset: "DatasetSpec",
+    ) -> dict[str, Any]:
+        """Get comprehensive info about a dataset bag: size, contents, and cache status.
+
+        Combines the size estimate with local cache status. Use this to decide
+        whether to prefetch a bag before running an experiment.
+
+        Args:
+            dataset: Specification of the dataset, including version and
+                optional exclude_tables.
+
+        Returns:
+            dict with keys:
+                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
+                - total_rows, total_asset_bytes, total_asset_size
+                - cache_status: one of "not_cached", "cached_metadata_only",
+                  "cached_materialized", "cached_incomplete"
+                - cache_path: local path to cached bag (if cached), else None
+        """
+        if not self.model.is_dataset_rid(dataset.rid):
+            raise DerivaMLTableTypeError("Dataset", dataset.rid)
+        ds = self.lookup_dataset(dataset)
+        return ds.bag_info(
+            version=dataset.version,
+            exclude_tables=dataset.exclude_tables,
+        )
+
+    def prefetch_dataset(
+        self,
+        dataset: "DatasetSpec",
+        materialize: bool = True,
+    ) -> dict[str, Any]:
+        """Download a dataset bag into the local cache without creating an execution.
+
+        Use this to warm the cache before running experiments. No execution or
+        provenance records are created.
+
+        Args:
+            dataset: Specification of the dataset, including version and
+                optional exclude_tables.
+            materialize: If True (default), download all asset files. If False,
+                download only table metadata.
+
+        Returns:
+            dict with bag_info results after prefetch.
+        """
+        if not self.model.is_dataset_rid(dataset.rid):
+            raise DerivaMLTableTypeError("Dataset", dataset.rid)
+        ds = self.lookup_dataset(dataset)
+        return ds.prefetch(
+            version=dataset.version,
+            materialize=materialize,
+            exclude_tables=dataset.exclude_tables,
+            timeout=dataset.timeout,
+        )

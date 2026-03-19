@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "bump-my-version",
-    "bdbag",
+    "bdbag @ git+https://github.com/fair-research/bdbag",
     "deriva~=1.7.10",
     "deepdiff",
     "nbconvert",

@@ -36,7 +36,6 @@ import logging
 import shutil
 from collections import defaultdict
 from copy import copy
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Self, cast
 
@@ -63,131 +62,6 @@ try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
-
-@dataclass
-class FeatureValueRecord:
-    """A simplified feature value record used internally by ``restructure_assets``.
-
-    This is a lightweight dataclass (not a Pydantic model) that wraps a single
-    feature value together with its execution provenance and the raw record
-    data. It is used specifically by the ``restructure_assets`` method and its
-    ``value_selector`` parameter — it is *not* the same as ``FeatureRecord``,
-    which is the typed Pydantic model used by ``list_feature_values`` and
-    ``fetch_table_features``.
-
-    **When to use which:**
-
-    - ``FeatureRecord`` — returned by ``list_feature_values()`` and
-      ``fetch_table_features()``. A typed Pydantic model with named attributes
-      for each feature column. Use ``selector`` parameter with these.
-    - ``FeatureValueRecord`` — used only by ``restructure_assets()``'s
-      ``value_selector`` parameter. A simpler dataclass with a generic
-      ``value`` field and a ``raw_record`` dict for accessing all columns.
-
-    The ``raw_record`` attribute contains the complete feature table row as
-    a dictionary, including system columns like ``RCT`` (Row Creation Time)
-    that can be used for ordering.
-
-    Attributes:
-        target_rid: RID of the asset/entity this feature value applies to.
-        feature_name: Name of the feature.
-        value: The resolved feature value (typically a vocabulary term name).
-        execution_rid: RID of the execution that created this feature value,
-            if any. Use this to distinguish between values from different
-            executions or model runs.
-        raw_record: The complete raw record from the feature table as a
-            dictionary. Includes all columns — system columns like ``RCT``
-            and ``RID``, the target column, ``Execution``, and all
-            feature-specific columns. Access via dict keys, e.g.,
-            ``record.raw_record["RCT"]``.
-
-    Example:
-        Using a value_selector to choose the most recent feature value::
-
-            def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-                # Select value with the most recent creation time (RCT is an
-                # ISO 8601 timestamp, so lexicographic comparison works)
-                return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
-
-            bag.restructure_assets(
-                output_dir="./ml_data",
-                group_by=["Diagnosis"],
-                value_selector=select_latest,
-            )
-
-        Accessing raw record data::
-
-            def select_by_confidence(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-                # Select value with highest confidence score from raw record
-                return max(records, key=lambda r: r.raw_record.get("Confidence", 0))
-    """
-    target_rid: RID
-    feature_name: str
-    value: Any
-    execution_rid: RID | None = None
-    raw_record: dict[str, Any] = field(default_factory=dict)
-
-    def __repr__(self) -> str:
-        return (f"FeatureValueRecord(target_rid='{self.target_rid}', "
-                f"feature_name='{self.feature_name}', value='{self.value}', "
-                f"execution_rid='{self.execution_rid}')")
-
-
-# ---------------------------------------------------------------------------
-# Built-in value selectors for use with restructure_assets()
-# ---------------------------------------------------------------------------
-
-def select_majority_vote(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-    """Select the most common label; break ties by the most recent RCT.
-
-    Use this when the same asset has been annotated by multiple executions and
-    you want the label that the majority of annotators agreed on.  Ties (equal
-    vote counts) are broken by choosing the record with the latest ``RCT``
-    (Row Creation Time) timestamp — ISO-8601 strings compare lexicographically.
-
-    Args:
-        records: Non-empty list of conflicting feature value records for one asset.
-
-    Returns:
-        The record whose ``value`` appears most often across all records.
-    """
-    from collections import Counter
-    counts = Counter(r.value for r in records)
-    max_count = max(counts.values())
-    majority_values = {v for v, c in counts.items() if c == max_count}
-    candidates = [r for r in records if r.value in majority_values]
-    return max(candidates, key=lambda r: r.raw_record.get("RCT", "") or "")
-
-
-def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-    """Select the most recently created feature value (highest RCT).
-
-    Use this when you trust the most recent annotation more than earlier ones
-    (e.g. a relabelling pass that corrects earlier mistakes).
-
-    Args:
-        records: Non-empty list of conflicting feature value records for one asset.
-
-    Returns:
-        The record with the latest ``RCT`` (Row Creation Time) timestamp.
-    """
-    return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
-
-
-def select_first(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-    """Select the earliest created feature value (lowest RCT).
-
-    Use this when you want to preserve the original annotation and ignore later
-    revisions.
-
-    Args:
-        records: Non-empty list of conflicting feature value records for one asset.
-
-    Returns:
-        The record with the earliest ``RCT`` (Row Creation Time) timestamp.
-    """
-    return min(records, key=lambda r: r.raw_record.get("RCT", "") or "")
 
 
 class DatasetBag:
@@ -1295,7 +1169,7 @@ class DatasetBag:
         asset_table: str,
         group_keys: list[str],
         enforce_vocabulary: bool = True,
-        value_selector: Callable[[list[FeatureValueRecord]], FeatureValueRecord] | None = None,
+        value_selector: Callable | None = None,
     ) -> dict[str, dict[RID, Any]]:
         """Load feature values into a cache for efficient lookup.
 
@@ -1313,9 +1187,8 @@ class DatasetBag:
                 and use the first value found when multiple exist.
             value_selector: Optional function to select which feature value to use
                 when an asset has multiple values for the same feature. Receives a
-                list of FeatureValueRecord objects (each with execution_rid for
-                provenance) and returns the selected one. If not provided and
-                multiple values exist, raises DerivaMLException when
+                list of FeatureRecord objects and returns the selected one. If not
+                provided and multiple values exist, raises DerivaMLException when
                 enforce_vocabulary=True or uses the first value when False.
 
         Returns:
@@ -1329,10 +1202,13 @@ class DatasetBag:
                   and no value_selector is provided.
         """
         from deriva_ml.core.exceptions import DerivaMLException
+        from deriva_ml.feature import FeatureRecord
 
         cache: dict[str, dict[RID, Any]] = {}
-        # Store all feature value records for later selection when there are multiples
-        records_cache: dict[str, dict[RID, list[FeatureValueRecord]]] = {}
+        # Store FeatureRecord objects directly for later selection
+        records_cache: dict[str, dict[RID, list[FeatureRecord]]] = {}
+        # Track which column to use for each group_key's value extraction
+        column_for_group: dict[str, str] = {}
         logger = logging.getLogger("deriva_ml")
 
         # Parse group_keys to extract feature names and optional column specifications
@@ -1381,33 +1257,22 @@ class DatasetBag:
                     )
                 return
 
+            # Track the column used for this group_key
+            column_for_group[group_key] = use_column
             records_cache[group_key] = defaultdict(list)
             feature_values = self.list_feature_values(table_name, feat.feature_name)
 
             for fv in feature_values:
-                # Convert FeatureRecord to dict for easier access
-                fv_dict = fv.model_dump()
-                target_col = table_name
-                if target_col not in fv_dict:
+                target_rid = getattr(fv, table_name, None)
+                if target_rid is None:
                     continue
 
-                target_rid = fv_dict[target_col]
-
-                # Get the value from the specified column
-                value = fv_dict.get(use_column) if use_column in fv_dict else None
-
+                # Check the value column is populated
+                value = getattr(fv, use_column, None)
                 if value is None:
                     continue
 
-                # Create a FeatureValueRecord with execution provenance
-                record = FeatureValueRecord(
-                    target_rid=target_rid,
-                    feature_name=feat.feature_name,
-                    value=value,
-                    execution_rid=fv_dict.get("Execution"),
-                    raw_record=fv_dict,
-                )
-                records_cache[group_key][target_rid].append(record)
+                records_cache[group_key][target_rid].append(fv)
 
         # Find all features on tables that this asset table references
         asset_table_obj = self.model.name_to_table(asset_table)
@@ -1447,32 +1312,36 @@ class DatasetBag:
         # Now resolve multiple values using value_selector or error handling
         for group_key, target_records in records_cache.items():
             cache[group_key] = {}
+            use_column = column_for_group[group_key]
             for target_rid, records in target_records.items():
                 if len(records) == 1:
                     # Single value - straightforward
-                    cache[group_key][target_rid] = records[0].value
+                    cache[group_key][target_rid] = getattr(records[0], use_column)
                 elif len(records) > 1:
                     # Multiple values - need to resolve
-                    unique_values = set(r.value for r in records)
+                    unique_values = set(getattr(r, use_column) for r in records)
                     if len(unique_values) == 1:
                         # All records have same value, use it
-                        cache[group_key][target_rid] = records[0].value
+                        cache[group_key][target_rid] = getattr(records[0], use_column)
                     elif value_selector:
                         # Use provided selector function
                         selected = value_selector(records)
-                        cache[group_key][target_rid] = selected.value
+                        cache[group_key][target_rid] = getattr(selected, use_column)
                     elif enforce_vocabulary:
                         # Multiple different values without selector - error
-                        values_str = ", ".join(f"'{r.value}' (exec: {r.execution_rid})" for r in records)
+                        values_str = ", ".join(
+                            f"'{getattr(r, use_column)}' (exec: {r.Execution})"
+                            for r in records
+                        )
                         raise DerivaMLException(
                             f"Asset '{target_rid}' has multiple different values for "
-                            f"feature '{records[0].feature_name}': {values_str}. "
+                            f"feature '{records[0].Feature_Name}': {values_str}. "
                             f"Provide a value_selector function to choose between values, "
                             f"or set enforce_vocabulary=False to use the first value."
                         )
                     else:
                         # Not enforcing - use first value
-                        cache[group_key][target_rid] = records[0].value
+                        cache[group_key][target_rid] = getattr(records[0], use_column)
 
         return cache
 
@@ -1575,7 +1444,7 @@ class DatasetBag:
         type_selector: Callable[[list[str]], str] | None = None,
         type_to_dir_map: dict[str, str] | None = None,
         enforce_vocabulary: bool = True,
-        value_selector: Callable[[list[FeatureValueRecord]], FeatureValueRecord] | None = None,
+        value_selector: Callable | None = None,
         file_transformer: Callable[[Path, Path], Path] | None = None,
     ) -> dict[Path, Path]:
         """Restructure downloaded assets into a directory hierarchy.
@@ -1646,10 +1515,12 @@ class DatasetBag:
                 when multiple values exist.
             value_selector: Optional function to select which feature value to use
                 when an asset has multiple values for the same feature. Receives a
-                list of FeatureValueRecord objects (each containing target_rid,
-                feature_name, value, execution_rid, and raw_record) and returns
-                the selected FeatureValueRecord. Use execution_rid to distinguish
-                between values from different executions.
+                list of FeatureRecord objects (typed Pydantic models with named
+                attributes for each feature column) and returns the selected one.
+                Use the Execution attribute to distinguish between values from
+                different executions. Built-in selectors on FeatureRecord:
+                ``select_newest``, ``select_first``, ``select_latest``,
+                ``select_majority_vote(column)``.
             file_transformer: Optional callable invoked instead of the default
                 symlink/copy step. Receives ``(src_path, dest_path)`` where
                 ``dest_path`` is the suggested destination (preserving the original
@@ -1714,16 +1585,14 @@ class DatasetBag:
                     group_by=["Classification.Label"],  # Use Label column
                 )
 
-            Handle multiple feature values with a selector::
+            Handle multiple feature values with a built-in selector::
 
-                def select_latest(records: list[FeatureValueRecord]) -> FeatureValueRecord:
-                    # Select value with the most recent creation time
-                    return max(records, key=lambda r: r.raw_record.get("RCT", "") or "")
+                from deriva_ml.feature import FeatureRecord
 
                 manifest = bag.restructure_assets(
                     output_dir="./ml_data",
                     group_by=["Diagnosis"],
-                    value_selector=select_latest,
+                    value_selector=FeatureRecord.select_newest,
                 )
 
             Prediction scenario with unlabeled data::
