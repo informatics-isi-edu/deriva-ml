@@ -648,6 +648,63 @@ class Execution:
                 [{"RID": self.execution_rid, "Duration": duration}]
             )
 
+    def _build_upload_staging(self) -> Path:
+        """Build ephemeral symlink tree from manifest for GenericUploader.
+
+        Reads the manifest and creates symlinks from the flat assets/ directory
+        into the regex-expected tree structure under asset/ that the
+        GenericUploader needs for pattern matching.
+
+        Returns:
+            Path to the asset root (with staged symlinks) for upload.
+        """
+        manifest = self._get_manifest()
+        pending = manifest.pending_assets()
+
+        if not pending:
+            # No manifest entries — fall back to old asset/ tree if it exists
+            return self._asset_root
+
+        staging_root = asset_root(self._working_dir, self.execution_rid)
+
+        for key, entry in pending.items():
+            # key is "{AssetTable}/{filename}"
+            parts = key.split("/", 1)
+            if len(parts) != 2:
+                continue
+            asset_table_name, filename = parts
+
+            # Source file in flat storage
+            flat_dir = flat_asset_dir(self._working_dir, self.execution_rid, asset_table_name)
+            source = flat_dir / filename
+            if not source.exists():
+                self._logger.warning(f"Asset file not found: {source}")
+                continue
+
+            # Build metadata subdirectory path
+            metadata_parts = [str(v) for v in entry.metadata.values()] if entry.metadata else []
+            target_dir = staging_root / entry.schema / asset_table_name
+            for part in metadata_parts:
+                target_dir = target_dir / part
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            target = target_dir / filename
+            if not target.exists():
+                try:
+                    target.symlink_to(source.resolve())
+                except (OSError, PermissionError):
+                    import shutil
+                    shutil.copy2(source, target)
+
+        return staging_root
+
+    def _cleanup_upload_staging(self) -> None:
+        """Remove ephemeral symlinks created by _build_upload_staging."""
+        staging_root = asset_root(self._working_dir, self.execution_rid)
+        if staging_root.exists():
+            import shutil
+            shutil.rmtree(staging_root, ignore_errors=True)
+
     def _upload_execution_dirs(
         self,
         progress_callback: Callable[[UploadProgress], None] | None = None,
@@ -656,35 +713,32 @@ class Execution:
         timeout: tuple[int, int] | None = None,
         chunk_size: int | None = None,
     ) -> dict[str, list[AssetFilePath]]:
-        """Upload execution assets at _working_dir/Execution_asset.
+        """Upload execution assets using manifest-driven staging.
 
-        This routine uploads the contents of the
-        Execution_Asset directory and then updates the execution_asset table in the ML schema to have references
-        to these newly uploaded files.
+        Builds an ephemeral symlink tree from the manifest, uploads via
+        GenericUploader, then updates the manifest with RIDs for uploaded assets.
 
         Args:
-            progress_callback: Optional callback function to receive upload progress updates.
-                Called with UploadProgress objects containing file information and progress.
-            max_retries: Maximum number of retry attempts for failed uploads (default: 3).
-            retry_delay: Initial delay in seconds between retries, doubles with each attempt (default: 5.0).
-            timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (600, 600).
-                Note: urllib3 uses connect_timeout as the socket timeout during request body
-                writes, so it must be large enough for a full chunk upload.
-            chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
-                large files will be uploaded in chunks of this size.
+            progress_callback: Optional callback for upload progress updates.
+            max_retries: Maximum retry attempts for failed uploads (default: 3).
+            retry_delay: Initial delay between retries in seconds (default: 5.0).
+            timeout: (connect_timeout, read_timeout) in seconds. Default (600, 600).
+            chunk_size: Optional chunk size in bytes for hatrac uploads.
 
         Returns:
-          dict: Results of the upload operation.
+            dict mapping "{schema}/{table}" to list of AssetFilePath with RIDs.
 
         Raises:
-          DerivaMLException: If there is an issue when uploading the assets.
+            DerivaMLException: If upload fails.
         """
+        # Build staging symlinks from manifest into the regex-expected tree
+        upload_root = self._build_upload_staging()
 
         try:
             self.update_status(Status.running, "Uploading execution files...")
             results = upload_directory(
                 self._model,
-                self._asset_root,
+                upload_root,
                 progress_callback=progress_callback,
                 max_retries=max_retries,
                 retry_delay=retry_delay,
@@ -696,9 +750,21 @@ class Execution:
             self.update_status(Status.failed, error)
             raise DerivaMLException(f"Failed to upload execution_assets: {error}")
 
+        # Update manifest with upload results
+        manifest = self._get_manifest()
+
         asset_map = {}
         for path, status in results.items():
             asset_table, file_name = normalize_asset_dir(path)
+
+            # Find and update manifest entry
+            table_name = asset_table.split("/")[1] if "/" in asset_table else asset_table
+            manifest_key = f"{table_name}/{file_name}"
+            rid = status.result["RID"]
+            try:
+                manifest.mark_uploaded(manifest_key, rid)
+            except KeyError:
+                pass  # File wasn't in manifest (legacy flow)
 
             asset_map.setdefault(asset_table, []).append(
                 AssetFilePath(
@@ -708,10 +774,10 @@ class Execution:
                     asset_metadata={
                         k: v
                         for k, v in status.result.items()
-                        if k in self._model.asset_metadata(asset_table.split("/")[1])
+                        if k in self._model.asset_metadata(table_name)
                     },
                     asset_types=[],
-                    asset_rid=status.result["RID"],
+                    asset_rid=rid,
                 )
             )
         self._update_asset_execution_table(asset_map)
