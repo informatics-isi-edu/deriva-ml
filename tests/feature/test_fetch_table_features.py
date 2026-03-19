@@ -555,3 +555,147 @@ class TestCustomSelector:
         if "Health" in result:
             subject_rids = [r.model_dump()["Subject"] for r in result["Health"]]
             assert len(subject_rids) == len(set(subject_rids))
+
+
+class TestSelectFirst:
+    """Test FeatureRecord.select_first — picks earliest RCT."""
+
+    def test_select_first_picks_earliest_rct(self):
+        """select_first returns the record with the earliest RCT."""
+
+        class TestFeature(FeatureRecord):
+            value: str
+
+        records = [
+            TestFeature(Feature_Name="f", value="newest", RCT="2024-06-15T10:30:00+00:00"),
+            TestFeature(Feature_Name="f", value="oldest", RCT="2024-01-01T00:00:00+00:00"),
+            TestFeature(Feature_Name="f", value="middle", RCT="2024-03-01T00:00:00+00:00"),
+        ]
+        selected = FeatureRecord.select_first(records)
+        assert selected.value == "oldest"
+
+    def test_select_first_handles_none_rct(self):
+        """Records with None RCT sort as oldest (empty string)."""
+
+        class TestFeature(FeatureRecord):
+            value: str
+
+        records = [
+            TestFeature(Feature_Name="f", value="no_rct", RCT=None),
+            TestFeature(Feature_Name="f", value="has_rct", RCT="2024-01-01T00:00:00+00:00"),
+        ]
+        selected = FeatureRecord.select_first(records)
+        assert selected.value == "no_rct"
+
+    def test_select_first_single_record(self):
+        """select_first works with a single record."""
+
+        class TestFeature(FeatureRecord):
+            value: str
+
+        records = [TestFeature(Feature_Name="f", value="only", RCT="2024-01-01T00:00:00+00:00")]
+        selected = FeatureRecord.select_first(records)
+        assert selected.value == "only"
+
+    def test_select_first_all_none_rct(self):
+        """select_first returns some record when all have None RCT."""
+
+        class TestFeature(FeatureRecord):
+            value: str
+
+        records = [
+            TestFeature(Feature_Name="f", value="a", RCT=None),
+            TestFeature(Feature_Name="f", value="b", RCT=None),
+        ]
+        selected = FeatureRecord.select_first(records)
+        assert selected in records
+
+
+class TestSelectLatest:
+    """Test FeatureRecord.select_latest — alias for select_newest."""
+
+    def test_select_latest_is_equivalent_to_newest(self):
+        """select_latest returns the same result as select_newest."""
+
+        class TestFeature(FeatureRecord):
+            value: str
+
+        records = [
+            TestFeature(Feature_Name="f", value="old", RCT="2024-01-01T00:00:00+00:00"),
+            TestFeature(Feature_Name="f", value="newest", RCT="2024-06-15T10:30:00+00:00"),
+            TestFeature(Feature_Name="f", value="middle", RCT="2024-03-01T00:00:00+00:00"),
+        ]
+        result_latest = FeatureRecord.select_latest(records)
+        result_newest = FeatureRecord.select_newest(records)
+        assert result_latest.value == "newest"
+        assert result_latest == result_newest
+
+
+class TestSelectMajorityVote:
+    """Test FeatureRecord.select_majority_vote — picks most common value."""
+
+    def test_majority_vote_picks_most_common(self):
+        """Majority vote returns a record with the most frequent value."""
+
+        class TestFeature(FeatureRecord):
+            Diagnosis_Type: str
+
+        records = [
+            TestFeature(Feature_Name="f", Diagnosis_Type="Normal", RCT="2024-01-01T00:00:00+00:00"),
+            TestFeature(Feature_Name="f", Diagnosis_Type="Abnormal", RCT="2024-01-02T00:00:00+00:00"),
+            TestFeature(Feature_Name="f", Diagnosis_Type="Normal", RCT="2024-01-03T00:00:00+00:00"),
+        ]
+        selector = FeatureRecord.select_majority_vote("Diagnosis_Type")
+        result = selector(records)
+        assert result.Diagnosis_Type == "Normal"
+
+    def test_majority_vote_tie_breaks_by_newest(self):
+        """Ties are broken by most recent RCT."""
+
+        class TestFeature(FeatureRecord):
+            Diagnosis_Type: str
+
+        records = [
+            TestFeature(Feature_Name="f", Diagnosis_Type="Normal", RCT="2024-01-01T00:00:00+00:00"),
+            TestFeature(Feature_Name="f", Diagnosis_Type="Abnormal", RCT="2024-01-03T00:00:00+00:00"),
+        ]
+        selector = FeatureRecord.select_majority_vote("Diagnosis_Type")
+        result = selector(records)
+        # Tie (1 each) — break by newest RCT
+        assert result.RCT == "2024-01-03T00:00:00+00:00"
+
+    def test_majority_vote_auto_detect_single_term_column(self):
+        """Auto-detect column when feature metadata has one term column."""
+        from unittest.mock import MagicMock
+
+        mock_feature = MagicMock()
+        mock_col = MagicMock()
+        mock_col.name = "Diagnosis_Type"
+        mock_feature.term_columns = [mock_col]
+
+        class TestFeature(FeatureRecord):
+            Diagnosis_Type: str
+            feature = mock_feature
+
+        records = [
+            TestFeature(Feature_Name="f", Diagnosis_Type="Normal", RCT="2024-01-01T00:00:00+00:00"),
+            TestFeature(Feature_Name="f", Diagnosis_Type="Normal", RCT="2024-01-02T00:00:00+00:00"),
+            TestFeature(Feature_Name="f", Diagnosis_Type="Abnormal", RCT="2024-01-03T00:00:00+00:00"),
+        ]
+        selector = TestFeature.select_majority_vote()
+        result = selector(records)
+        assert result.Diagnosis_Type == "Normal"
+
+    def test_majority_vote_raises_without_column_or_metadata(self):
+        """Raises when column is None and no feature metadata available."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        class TestFeature(FeatureRecord):
+            Diagnosis_Type: str
+
+        records = [
+            TestFeature(Feature_Name="f", Diagnosis_Type="Normal", RCT="2024-01-01T00:00:00+00:00"),
+        ]
+        selector = FeatureRecord.select_majority_vote()
+        with pytest.raises(DerivaMLException, match="requires a column name"):
+            selector(records)

@@ -165,12 +165,133 @@ class FeatureRecord(BaseModel):
         def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
             filtered = [r for r in records if r.Execution == execution_rid]
             if not filtered:
-                from deriva_ml.core.deriva_ml_exception import DerivaMLException
+                from deriva_ml.core.exceptions import DerivaMLException
 
                 raise DerivaMLException(
                     f"No feature records match execution '{execution_rid}'."
                 )
             return FeatureRecord.select_newest(filtered)
+
+        return _selector
+
+    @staticmethod
+    def select_first(records: list["FeatureRecord"]) -> "FeatureRecord":
+        """Select the feature record with the earliest creation time.
+
+        Uses the RCT (Row Creation Time) field. Records with ``None`` RCT
+        are treated as older than any timestamped record (since empty string
+        sorts before any ISO 8601 timestamp).
+
+        Useful when you want to preserve the original annotation and ignore
+        later revisions.
+
+        This method is designed to be passed directly as the ``selector``
+        argument to ``fetch_table_features`` or ``list_feature_values``::
+
+            features = ml.fetch_table_features(
+                "Image", selector=FeatureRecord.select_first
+            )
+
+        Args:
+            records: List of FeatureRecord instances for the same target
+                object. Must be non-empty.
+
+        Returns:
+            The FeatureRecord with the earliest RCT value.
+        """
+        return min(records, key=lambda r: r.RCT or "")
+
+    @staticmethod
+    def select_latest(records: list["FeatureRecord"]) -> "FeatureRecord":
+        """Select the most recently created feature record.
+
+        Alias for ``select_newest``. Included for API symmetry with
+        ``select_first``.
+
+        Args:
+            records: List of FeatureRecord instances for the same target
+                object. Must be non-empty.
+
+        Returns:
+            The FeatureRecord with the latest RCT value.
+        """
+        return FeatureRecord.select_newest(records)
+
+    @classmethod
+    def select_majority_vote(cls, column: str | None = None):
+        """Return a selector that picks the most common value for a column.
+
+        Creates a selector function that counts the values of the specified
+        column across all records, picks the most frequent one, and breaks
+        ties by most recent RCT.
+
+        For single-term features, the column can be auto-detected from the
+        feature's metadata. For multi-term features, the column must be
+        specified explicitly.
+
+        This is useful for consensus labeling, where multiple annotators
+        have labeled the same record and you want the majority opinion::
+
+            selector = RecordClass.select_majority_vote()
+            features = ml.fetch_table_features(
+                "Image",
+                feature_name="Diagnosis",
+                selector=selector,
+            )
+
+        Args:
+            column: Name of the column to count values for. If None,
+                auto-detects the first term column from feature metadata.
+
+        Returns:
+            A selector function ``(list[FeatureRecord]) -> FeatureRecord``.
+
+        Raises:
+            DerivaMLException: If column is None and the feature has no
+                term columns or multiple term columns.
+        """
+
+        def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
+            col = column
+            if col is None:
+                # Auto-detect from feature metadata on the record class
+                record_cls = type(records[0])
+                if (
+                    hasattr(record_cls, "feature")
+                    and record_cls.feature
+                    and record_cls.feature.term_columns
+                ):
+                    if len(record_cls.feature.term_columns) == 1:
+                        col = record_cls.feature.term_columns[0].name
+                    else:
+                        from deriva_ml.core.exceptions import (
+                            DerivaMLException,
+                        )
+
+                        raise DerivaMLException(
+                            "select_majority_vote requires a column name for "
+                            "features with multiple term columns. "
+                            f"Available: {[c.name for c in record_cls.feature.term_columns]}"
+                        )
+                else:
+                    from deriva_ml.core.exceptions import (
+                        DerivaMLException,
+                    )
+
+                    raise DerivaMLException(
+                        "select_majority_vote requires a column name — "
+                        "could not auto-detect from feature metadata."
+                    )
+
+            from collections import Counter
+
+            counts = Counter(getattr(r, col, None) for r in records)
+            max_count = max(counts.values())
+            majority_values = {v for v, c in counts.items() if c == max_count}
+            candidates = [
+                r for r in records if getattr(r, col, None) in majority_values
+            ]
+            return max(candidates, key=lambda r: r.RCT or "")
 
         return _selector
 
