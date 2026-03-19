@@ -382,3 +382,27 @@ class AssetMixin:
                     if asset_type not in asset.asset_types:
                         continue
                 yield asset
+
+    def asset_record_class(self, asset_table_name: str) -> type:
+        """Create a dynamically generated Pydantic model for an asset table's metadata.
+
+        The returned class is a subclass of AssetRecord with fields derived from
+        the asset table's metadata columns (non-system, non-standard-asset columns).
+        Fields are typed according to their database column type, and nullable columns
+        are Optional.
+
+        Follows the same pattern as ``Feature.feature_record_class()``.
+
+        Args:
+            asset_table_name: Name of the asset table (e.g., "Image", "Model").
+
+        Returns:
+            An AssetRecord subclass with validated fields matching the table's metadata.
+
+        Example:
+            >>> ImageAsset = ml.asset_record_class("Image")
+            >>> record = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")
+            >>> path = exe.asset_file_path("Image", "scan.jpg", metadata=record)
+        """
+        from deriva_ml.asset.asset_record import asset_record_class
+        return asset_record_class(self.model, asset_table_name)

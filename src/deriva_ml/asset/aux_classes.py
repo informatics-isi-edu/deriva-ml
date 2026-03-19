@@ -1,29 +1,36 @@
 """Auxiliary classes for asset management in DerivaML.
 
 This module defines helper classes for asset operations including:
-- AssetFilePath: Extended Path for in-flight asset staging
+- AssetFilePath: Extended Path for in-flight asset staging with manifest-backed metadata
 - AssetSpec: Specification for asset references in configurations
 - AssetSpecConfig: Hydra-zen config interface for AssetSpec
 """
 
+from __future__ import annotations
+
+import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from hydra_zen import hydrated_dataclass
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from deriva_ml.core.definitions import RID
 
+if TYPE_CHECKING:
+    from deriva_ml.asset.asset_record import AssetRecord
+    from deriva_ml.asset.manifest import AssetManifest
+
+logger = logging.getLogger(__name__)
+
 
 class AssetFilePath(Path):
     """Extended Path class for managing asset files during execution.
 
     Represents a file path with additional metadata about its role as an asset
-    in the catalog. This class extends the standard Path class to include
-    information about the asset's catalog representation and type.
-
-    This is primarily used during execution for staging files before upload
-    or after download. For catalog-backed asset operations, use the Asset class.
+    in the catalog. Metadata is backed by a persistent JSON manifest for crash
+    safety. Metadata can be set incrementally after creation using the
+    ``metadata`` property or ``set_asset_types()`` method.
 
     Attributes:
         asset_table: Name of the asset table in the catalog (e.g., "Image", "Model").
@@ -33,13 +40,11 @@ class AssetFilePath(Path):
         asset_rid: Resource Identifier if uploaded to an asset table.
 
     Example:
-        >>> path = AssetFilePath(
-        ...     "/path/to/file.txt",
-        ...     asset_table="Execution_Asset",
-        ...     file_name="results.txt",
-        ...     asset_metadata={"version": "1.0"},
-        ...     asset_types=["Model_File"]
-        ... )
+        >>> path = exe.asset_file_path("Image", "scan.jpg")
+        >>> # Set typed metadata via AssetRecord
+        >>> ImageAsset = ml.asset_record_class("Image")
+        >>> path.metadata = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")
+        >>> path.set_asset_types(["Training_Data"])
     """
 
     def __init__(
@@ -67,6 +72,62 @@ class AssetFilePath(Path):
         self.asset_metadata = asset_metadata
         self.asset_types = asset_types if isinstance(asset_types, list) else [asset_types]
         self.asset_rid = asset_rid
+        # Optional manifest reference — set by Execution.asset_file_path()
+        self._manifest: AssetManifest | None = None
+        self._manifest_key: str | None = None
+
+    def _bind_manifest(self, manifest: AssetManifest, key: str) -> None:
+        """Bind this path to a manifest for write-through updates.
+
+        Called internally by Execution.asset_file_path().
+        """
+        self._manifest = manifest
+        self._manifest_key = key
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        """Current metadata dict. If bound to manifest, reads from manifest."""
+        if self._manifest and self._manifest_key:
+            entry = self._manifest.assets.get(self._manifest_key)
+            if entry:
+                return dict(entry.metadata)
+        return dict(self.asset_metadata)
+
+    @metadata.setter
+    def metadata(self, record: AssetRecord | dict[str, Any]) -> None:
+        """Set metadata from an AssetRecord or dict.
+
+        If an AssetRecord is provided, uses model_dump() to extract values.
+        Updates both the local attribute and the manifest (write-through + fsync).
+
+        Args:
+            record: An AssetRecord instance or dict of column → value.
+        """
+        if hasattr(record, "model_dump"):
+            # It's a Pydantic model (AssetRecord subclass)
+            metadata_dict = {
+                k: v for k, v in record.model_dump().items() if v is not None
+            }
+        else:
+            metadata_dict = dict(record)
+
+        self.asset_metadata = metadata_dict
+
+        if self._manifest and self._manifest_key:
+            self._manifest.update_asset_metadata(self._manifest_key, metadata_dict)
+            logger.debug(f"Updated manifest metadata for {self._manifest_key}")
+
+    def set_asset_types(self, types: list[str]) -> None:
+        """Set asset types. Updates both local attribute and manifest.
+
+        Args:
+            types: List of terms from the Asset_Type controlled vocabulary.
+        """
+        self.asset_types = list(types)
+
+        if self._manifest and self._manifest_key:
+            self._manifest.update_asset_types(self._manifest_key, self.asset_types)
+            logger.debug(f"Updated manifest asset_types for {self._manifest_key}")
 
     def with_segments(self, *pathsegments):
         """Return a plain Path for derived path operations.

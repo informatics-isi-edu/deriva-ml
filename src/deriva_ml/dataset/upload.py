@@ -150,6 +150,42 @@ def asset_root(prefix: Path | str, exec_rid: str) -> Path:
     return path
 
 
+def flat_asset_dir(prefix: Path | str, exec_rid: str, asset_table_name: str) -> Path:
+    """Return the flat per-table asset directory for the manifest-first storage layout.
+
+    Files are stored in ``assets/{AssetTable}/`` without metadata encoding in the path.
+    Metadata lives in the manifest JSON file instead.
+
+    Args:
+        prefix: Location of upload root directory.
+        exec_rid: Execution RID.
+        asset_table_name: Name of the asset table (e.g., "Image", "Model").
+
+    Returns:
+        Path to the flat asset directory (created if it doesn't exist).
+    """
+    path = execution_root(prefix, exec_rid) / "assets" / asset_table_name
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def upload_staging_root(prefix: Path | str, exec_rid: str) -> Path:
+    """Return the ephemeral upload-staging directory, created at upload time only.
+
+    This directory holds symlinks arranged in the regex-expected tree structure
+    that GenericUploader needs. It is created from manifest data at upload time
+    and cleaned up after upload completes.
+    """
+    path = execution_root(prefix, exec_rid) / "upload-staging"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def manifest_path(prefix: Path | str, exec_rid: str) -> Path:
+    """Return the path to the asset-manifest.json file for an execution."""
+    return execution_root(prefix, exec_rid) / "asset-manifest.json"
+
+
 def feature_dir(prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str) -> Path:
     """Return the path to eht directory in which a named feature for an execution should be placed."""
     path = feature_root(prefix, exec_rid) / schema / target_table / feature_name

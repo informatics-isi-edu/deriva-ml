@@ -290,8 +290,8 @@ wheels = [
 
 [[package]]
 name = "bdbag"
-version = "1.8.0"
-source = { registry = "https://pypi.org/simple" }
+version = "1.9.0.dev0"
+source = { git = "https://github.com/fair-research/bdbag?rev=1.9.0-dev#7f0368733bbde1a1f52f3dbc49201150793c82ca" }
 dependencies = [
     { name = "bagit" },
     { name = "bagit-profile" },
@@ -300,10 +300,6 @@ dependencies = [
     { name = "pytz" },
     { name = "requests" },
     { name = "tzlocal" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/6d/40baaae77cf3017f340ca71473e024451517f3bf27e60c41ab113421bb3b/bdbag-1.8.0.tar.gz", hash = "sha256:f61e0b676d0ee895cce02bb3421cf6dce74568b84a96c59f3cb3c5571a319cf5", size = 84677, upload-time = "2025-09-29T18:42:30.685Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/d6/827c895374cdf763836bceda59a27613d4cc9c5f2319c15f15a2e0c066a9/bdbag-1.8.0-py3-none-any.whl", hash = "sha256:f835bf80402d90d8586b2aeddf2e070f9a172722c1c928c7d771e74b44e6b5ad", size = 78175, upload-time = "2025-09-29T18:42:29.696Z" },
 ]
 
 [[package]]
@@ -760,7 +756,7 @@ lint = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bdbag" },
+    { name = "bdbag", git = "https://github.com/fair-research/bdbag?rev=1.9.0-dev" },
     { name = "bump-my-version" },
     { name = "deepdiff" },
     { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?branch=2.0-dev" },
