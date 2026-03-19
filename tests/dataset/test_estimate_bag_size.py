@@ -138,6 +138,7 @@ def _run_estimate(
     dataset._version_snapshot_catalog.return_value = MagicMock()
     dataset._version_snapshot_catalog_id.return_value = "99@2024-01-01T00:00:00"
     dataset._human_readable_size.side_effect = Dataset._human_readable_size
+    dataset._estimate_csv_bytes.side_effect = Dataset._estimate_csv_bytes
 
     mock_catalog = _make_mock_async_catalog(catalog_responses)
 
@@ -169,6 +170,7 @@ def _run_estimate_counting(
     dataset._version_snapshot_catalog.return_value = MagicMock()
     dataset._version_snapshot_catalog_id.return_value = "99@2024-01-01T00:00:00"
     dataset._human_readable_size.side_effect = Dataset._human_readable_size
+    dataset._estimate_csv_bytes.side_effect = Dataset._estimate_csv_bytes
 
     call_count = 0
     mock_catalog = MagicMock()
@@ -223,8 +225,12 @@ class TestEstimateBagSizeUnionSemantics:
         assert result["tables"]["Image"]["row_count"] == 100
         assert result["tables"]["Image"]["asset_bytes"] == 5000  # 100 * 50
         assert result["tables"]["Image"]["is_asset"] is True
+        assert "csv_bytes" in result["tables"]["Image"]
         assert result["total_rows"] == 100
         assert result["total_asset_bytes"] == 5000
+        assert "total_csv_bytes" in result
+        assert "total_estimated_bytes" in result
+        assert result["total_estimated_bytes"] == result["total_asset_bytes"] + result["total_csv_bytes"]
 
     def test_duplicate_table_exact_union(self):
         """Same table via two paths with overlapping RIDs — exact union count."""
@@ -293,9 +299,9 @@ class TestEstimateBagSizeUnionSemantics:
             ],
         }
 
-        # 3 paths x (1 csv + 1 fetch) = 6 queries total
+        # 3 paths x (1 csv + 1 fetch) + 1 sample = 7 queries total
         call_count = _run_estimate_counting(aggregate_queries)
-        assert call_count == 6, f"Expected 6 queries (3 paths x 2 query types), got {call_count}"
+        assert call_count == 7, f"Expected 7 queries (3 paths x 2 query types + 1 sample), got {call_count}"
 
     def test_csv_only_no_fetch(self):
         """Table with no assets (is_asset=False) only produces csv queries."""
@@ -406,3 +412,109 @@ class TestEstimateBagSizeUnionSemantics:
         assert hasattr(target_table, "RID"), (
             "target_table must expose .RID for use in .attributes() calls"
         )
+
+
+class TestEstimateBagSizeCsvEstimation:
+    """Test CSV metadata size estimation from sampled rows."""
+
+    def test_csv_bytes_from_sample(self):
+        """Sample entity rows produce a non-zero csv_bytes estimate."""
+        aggregate_queries = {
+            "Subject": [
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"), False),
+            ],
+        }
+        # 50 RIDs for the csv query
+        rids = _make_rids(*[f"SUBJ-{i}" for i in range(50)])
+        # Sample entity rows (returned for ?limit=100 query on entity path)
+        sample_rows = [
+            {"RID": f"SUBJ-{i}", "Name": f"Subject {i}", "Age": 30 + i, "Notes": "Some clinical notes here"}
+            for i in range(10)
+        ]
+
+        result = _run_estimate(
+            aggregate_queries,
+            {
+                "S:Dataset_Subject/S:Subject/RID": rids,
+                # Match the entity path for sample query (contains ?limit=100)
+                "limit=100": sample_rows,
+            },
+        )
+
+        assert result["tables"]["Subject"]["row_count"] == 50
+        assert result["tables"]["Subject"]["csv_bytes"] > 0
+        assert result["total_csv_bytes"] > 0
+        assert result["total_estimated_bytes"] == result["total_asset_bytes"] + result["total_csv_bytes"]
+
+    def test_csv_bytes_with_large_text(self):
+        """Tables with large text columns produce proportionally larger csv_bytes."""
+        aggregate_queries = {
+            "SmallTable": [
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:SmallTable"), False),
+            ],
+            "BigTable": [
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BigTable"), False),
+            ],
+        }
+        small_rids = _make_rids(*[f"S-{i}" for i in range(100)])
+        big_rids = _make_rids(*[f"B-{i}" for i in range(100)])
+        # SmallTable: small rows (~30 bytes each)
+        small_samples = [{"RID": f"S-{i}", "Label": "ok"} for i in range(10)]
+        # BigTable: rows with large text fields (~10KB each)
+        big_samples = [
+            {"RID": f"B-{i}", "OCR_Text": "x" * 10000, "Raw_Data": "y" * 5000}
+            for i in range(10)
+        ]
+
+        result = _run_estimate(
+            aggregate_queries,
+            {
+                "S:SmallTable/RID": small_rids,
+                "S:BigTable/RID": big_rids,
+                # Sample queries match entity paths
+                "S:SmallTable?limit=100": small_samples,
+                "S:BigTable?limit=100": big_samples,
+            },
+        )
+
+        small_csv = result["tables"]["SmallTable"]["csv_bytes"]
+        big_csv = result["tables"]["BigTable"]["csv_bytes"]
+        assert big_csv > small_csv * 10, (
+            f"BigTable csv_bytes ({big_csv}) should be much larger than "
+            f"SmallTable csv_bytes ({small_csv})"
+        )
+
+    def test_csv_bytes_zero_when_no_sample(self):
+        """Tables with no sample rows get csv_bytes=0."""
+        aggregate_queries = {
+            "Empty": [
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Empty"), False),
+            ],
+        }
+        result = _run_estimate(
+            aggregate_queries,
+            {
+                "S:Empty/RID": [],
+            },
+        )
+
+        assert result["tables"]["Empty"]["row_count"] == 0
+        assert result["tables"]["Empty"]["csv_bytes"] == 0
+
+    def test_estimate_csv_bytes_static(self):
+        """Unit test for the _estimate_csv_bytes static method."""
+        from deriva_ml.dataset.dataset import Dataset
+
+        # No rows -> 0
+        assert Dataset._estimate_csv_bytes([], 0) == 0
+
+        # Some rows
+        sample = [
+            {"RID": "A", "Name": "Alice", "Score": 95},
+            {"RID": "B", "Name": "Bob", "Score": 87},
+        ]
+        result = Dataset._estimate_csv_bytes(sample, 1000)
+        assert result > 0
+        # Should be roughly: header + 1000 * avg_row_size
+        # Each row is ~15-20 bytes in CSV, so total ~15-20KB
+        assert 10000 < result < 50000

@@ -1516,10 +1516,15 @@ class Dataset:
 
         Returns:
             dict with keys:
-                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
+                - tables: dict mapping table name to
+                  {row_count, is_asset, asset_bytes, csv_bytes}
                 - total_rows: total row count across all tables
                 - total_asset_bytes: total size of asset files in bytes
-                - total_asset_size: human-readable size string (e.g., "1.2 GB")
+                - total_asset_size: human-readable asset size (e.g., "1.2 GB")
+                - total_csv_bytes: estimated size of CSV metadata in bytes
+                - total_csv_size: human-readable CSV size
+                - total_estimated_bytes: asset + CSV bytes combined
+                - total_estimated_size: human-readable combined size
         """
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
@@ -1567,6 +1572,9 @@ class Dataset:
         # assets) so we can compute the exact union across all FK paths.
         # (table_name, query_path, query_type)
         query_items: list[tuple[str, str, str]] = []
+        # Track which tables already have a sample query to avoid duplicates
+        # when multiple FK paths reach the same table.
+        sampled_tables: set[str] = set()
 
         for table_name, path_entries in table_queries.items():
             for dp, target_table, is_asset in path_entries:
@@ -1581,6 +1589,14 @@ class Dataset:
                     entity_path = _extract_path(dp.uri).removeprefix("/entity/")
                     fetch_path = f"/attribute/{entity_path}/!(URL::null::)/RID,Length"
                     query_items.append((table_name, fetch_path, "fetch"))
+
+                # Sample a few rows to estimate CSV serialization size.
+                # Only one sample per table (first path wins).
+                if table_name not in sampled_tables:
+                    sampled_tables.add(table_name)
+                    entity_path = _extract_path(dp.uri)
+                    sample_path = f"{entity_path}?limit=100"
+                    query_items.append((table_name, sample_path, "sample"))
 
         # Execute all queries concurrently using asyncio.gather
         import asyncio
@@ -1617,15 +1633,29 @@ class Dataset:
         rids_by_table: dict[str, set[str]] = defaultdict(set)
         # For assets, collect {RID: Length} across paths (first wins; same asset = same Length).
         asset_lengths_by_table: dict[str, dict[str, int]] = defaultdict(dict)
+        # Collect sample rows for CSV size estimation.
+        sample_rows_by_table: dict[str, list[dict]] = {}
 
         for table_name, query_type, rows in all_results:
             if query_type == "csv":
                 rids_by_table[table_name].update(r["RID"] for r in rows if "RID" in r)
-            else:  # fetch
+            elif query_type == "fetch":
                 for r in rows:
                     rid = r.get("RID")
                     if rid and rid not in asset_lengths_by_table[table_name]:
                         asset_lengths_by_table[table_name][rid] = r.get("Length") or 0
+            elif query_type == "sample":
+                # Keep only the first sample per table (set during query building)
+                if table_name not in sample_rows_by_table and rows:
+                    sample_rows_by_table[table_name] = rows
+
+        # Estimate CSV size per table from sample rows.
+        csv_bytes_by_table: dict[str, int] = {}
+        for table_name, sample_rows in sample_rows_by_table.items():
+            row_count = len(rids_by_table.get(table_name, set()))
+            csv_bytes_by_table[table_name] = self._estimate_csv_bytes(
+                sample_rows, row_count
+            )
 
         # Determine which tables are assets from the original table_queries
         asset_tables = {
@@ -1637,35 +1667,47 @@ class Dataset:
         table_estimates: dict[str, dict[str, Any]] = {}
         total_rows = 0
         total_asset_bytes = 0
+        total_csv_bytes = 0
 
         for table_name, rids in rids_by_table.items():
             row_count = len(rids)
             is_asset = table_name in asset_tables
             asset_bytes = sum(asset_lengths_by_table[table_name].values())
+            csv_bytes = csv_bytes_by_table.get(table_name, 0)
             table_estimates[table_name] = {
                 "row_count": row_count,
                 "is_asset": is_asset,
                 "asset_bytes": asset_bytes,
+                "csv_bytes": csv_bytes,
             }
             total_rows += row_count
             total_asset_bytes += asset_bytes
+            total_csv_bytes += csv_bytes
 
         # Handle tables that only appear in fetch results (unlikely but safe)
         for table_name, lengths in asset_lengths_by_table.items():
             if table_name not in table_estimates:
+                csv_bytes = csv_bytes_by_table.get(table_name, 0)
                 table_estimates[table_name] = {
                     "row_count": len(lengths),
                     "is_asset": True,
                     "asset_bytes": sum(lengths.values()),
+                    "csv_bytes": csv_bytes,
                 }
                 total_rows += len(lengths)
                 total_asset_bytes += sum(lengths.values())
+                total_csv_bytes += csv_bytes
 
+        total_size = total_asset_bytes + total_csv_bytes
         return {
             "tables": table_estimates,
             "total_rows": total_rows,
             "total_asset_bytes": total_asset_bytes,
             "total_asset_size": self._human_readable_size(total_asset_bytes),
+            "total_csv_bytes": total_csv_bytes,
+            "total_csv_size": self._human_readable_size(total_csv_bytes),
+            "total_estimated_bytes": total_size,
+            "total_estimated_size": self._human_readable_size(total_size),
         }
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -1748,6 +1790,45 @@ class Dataset:
     def prefetch(self, *args, **kwargs) -> dict[str, Any]:
         """Deprecated: Use cache() instead."""
         return self.cache(*args, **kwargs)
+
+    @staticmethod
+    def _estimate_csv_bytes(sample_rows: list[dict], total_row_count: int) -> int:
+        """Estimate the CSV file size for a table from a sample of rows.
+
+        Serializes each sample row to CSV format, computes the average row
+        size, then extrapolates to the full row count.  A header row (column
+        names) is added to the estimate.
+
+        Args:
+            sample_rows: List of row dicts (from an entity query).
+            total_row_count: Total number of rows in the table.
+
+        Returns:
+            Estimated CSV size in bytes.
+        """
+        if not sample_rows or total_row_count == 0:
+            return 0
+
+        import csv
+        import io
+
+        # Measure header size (column names)
+        columns = list(sample_rows[0].keys())
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(columns)
+        header_bytes = len(buf.getvalue().encode("utf-8"))
+
+        # Measure each sample row
+        row_sizes: list[int] = []
+        for row in sample_rows:
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(str(v) if v is not None else "" for v in row.values())
+            row_sizes.append(len(buf.getvalue().encode("utf-8")))
+
+        avg_row_bytes = sum(row_sizes) / len(row_sizes)
+        return int(header_bytes + avg_row_bytes * total_row_count)
 
     @staticmethod
     def _human_readable_size(size_bytes: int) -> str:
