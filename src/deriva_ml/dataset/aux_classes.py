@@ -215,6 +215,7 @@ class DatasetSpec(BaseModel):
     description: str = ""
     exclude_tables: set[str] | None = None
     timeout: tuple[int, int] | None = None
+    fetch_concurrency: int = 8
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -250,3 +251,4 @@ class DatasetSpecConfig:
     description: str = ""
     exclude_tables: list[str] | None = None
     timeout: list[int] | None = None
+    fetch_concurrency: int = 8
