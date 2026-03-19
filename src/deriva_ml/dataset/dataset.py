@@ -1569,9 +1569,9 @@ class Dataset:
         query_items: list[tuple[str, str, str]] = []
 
         for table_name, path_entries in table_queries.items():
-            for dp, is_asset in path_entries:
+            for dp, target_table, is_asset in path_entries:
                 # Fetch RID list for row-count union
-                rid_rs = dp.attributes(dp.RID)
+                rid_rs = dp.attributes(target_table.RID)
                 query_items.append((table_name, _extract_path(rid_rs.uri), "csv"))
 
                 # For assets, fetch RID + Length where URL is not null.
@@ -1631,7 +1631,7 @@ class Dataset:
         asset_tables = {
             table_name
             for table_name, entries in table_queries.items()
-            if any(is_asset for _, is_asset in entries)
+            if any(is_asset for _, _, is_asset in entries)
         }
 
         table_estimates: dict[str, dict[str, Any]] = {}

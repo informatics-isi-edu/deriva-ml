@@ -567,7 +567,7 @@ class CatalogGraph:
     def _aggregate_queries(
         self,
         dataset: DatasetLike | None = None,
-    ) -> dict[str, list[tuple[Any, bool]]]:
+    ) -> dict[str, list[tuple[Any, Any, bool]]]:
         """Build datapath objects grouped by target table name.
 
         For each path collected by ``_collect_paths``, constructs a linked
@@ -581,9 +581,12 @@ class CatalogGraph:
 
         Returns:
             A dict mapping target table name to a list of
-            ``(datapath, is_asset)`` tuples, where *datapath* is the linked
-            pathBuilder object and *is_asset* is ``True`` when the target table
-            contains asset columns (Filename, URL, Length, MD5, Description).
+            ``(datapath, target_pb_table, is_asset)`` tuples, where *datapath*
+            is the linked pathBuilder object, *target_pb_table* is the
+            pathBuilder table reference for the terminal table (needed to
+            access column attributes like ``.RID``), and *is_asset* is
+            ``True`` when the target table contains asset columns
+            (Filename, URL, Length, MD5, Description).
         """
         paths = self._collect_paths(dataset and dataset.dataset_rid)
         pb = self._ml_instance.catalog.getPathBuilder()
@@ -619,8 +622,9 @@ class CatalogGraph:
                 prev_table = table
 
             target_table = path[-1]
+            target_pb_table = _pb_table(target_table) if len(path) > 1 else ds_table
             is_asset = ASSET_COLUMNS.issubset({c.name for c in target_table.columns})
-            result[target_table.name].append((dp, is_asset))
+            result[target_table.name].append((dp, target_pb_table, is_asset))
 
         return dict(result)
 

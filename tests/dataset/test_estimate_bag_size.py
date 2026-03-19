@@ -33,18 +33,36 @@ class _MockColumn:
         return self.name
 
 
-def _make_mock_datapath(uri: str) -> MagicMock:
-    """Create a mock datapath object that supports ``.attributes()`` calls.
+def _make_mock_target_table() -> MagicMock:
+    """Create a mock pathBuilder table with column attributes like ``.RID``.
 
-    The mock provides ``.RID``, ``.Length``, and ``.URL`` as ``_MockColumn``
-    instances.  ``.attributes()`` returns a result-set whose ``.uri`` replaces
-    ``/entity/`` with ``/attribute/`` and appends the column names.
+    This simulates the target table reference returned by
+    ``_aggregate_queries`` alongside the linked datapath.  The datapath
+    itself does *not* expose column attributes after ``.link()`` calls;
+    the separate table reference is needed to access ``.RID`` etc.
     """
-    dp = MagicMock()
+    tbl = MagicMock()
+    tbl.RID = _MockColumn("RID")
+    tbl.Length = _MockColumn("Length")
+    tbl.URL = _MockColumn("URL")
+    return tbl
+
+
+def _make_mock_datapath(uri: str) -> tuple[MagicMock, MagicMock]:
+    """Create a mock (datapath, target_table) pair.
+
+    The datapath mock does *not* have ``.RID`` — just like real linked
+    datapaths.  Column attributes live on the separate target_table mock.
+    ``.attributes()`` accepts column objects from the target table.
+
+    Returns:
+        ``(dp, target_table)`` tuple matching the shape returned by
+        ``CatalogGraph._aggregate_queries``.
+    """
+    dp = MagicMock(spec=[])  # spec=[] prevents auto-creating attributes
     dp.uri = uri
-    dp.RID = _MockColumn("RID")
-    dp.Length = _MockColumn("Length")
-    dp.URL = _MockColumn("URL")
+
+    target_table = _make_mock_target_table()
 
     def _mock_attributes(*cols):
         """Build a mock ResultSet with the correct attribute URI."""
@@ -55,7 +73,7 @@ def _make_mock_datapath(uri: str) -> MagicMock:
         return rs
 
     dp.attributes = _mock_attributes
-    return dp
+    return dp, target_table
 
 
 def _make_rids(*rids: str) -> list[dict]:
@@ -96,14 +114,14 @@ def _make_mock_async_catalog(catalog_responses: dict) -> MagicMock:
 
 
 def _run_estimate(
-    aggregate_queries: dict[str, list[tuple[MagicMock, bool]]],
+    aggregate_queries: dict[str, list[tuple[MagicMock, MagicMock, bool]]],
     catalog_responses: dict,
 ) -> dict:
     """Run estimate_bag_size with mocked internals.
 
     Args:
         aggregate_queries: Return value for CatalogGraph._aggregate_queries.
-            Maps table name to list of (mock_datapath, is_asset) tuples.
+            Maps table name to list of (mock_datapath, target_table, is_asset) tuples.
         catalog_responses: Mapping from query path substring to response JSON.
             For csv queries, responses should be RID arrays: [{"RID": "X"}, ...].
             For fetch queries, responses should be [{RID, Length}, ...].
@@ -136,7 +154,7 @@ def _run_estimate(
 
 
 def _run_estimate_counting(
-    aggregate_queries: dict[str, list[tuple[MagicMock, bool]]],
+    aggregate_queries: dict[str, list[tuple[MagicMock, MagicMock, bool]]],
 ) -> int:
     """Run estimate_bag_size and return the total number of get_async() calls."""
     from deriva_ml.dataset.dataset import Dataset
@@ -187,7 +205,7 @@ class TestEstimateBagSizeUnionSemantics:
         """Basic case: one path to an asset table."""
         aggregate_queries = {
             "Image": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
             ],
         }
         # 100 RIDs for the csv query, 100 (RID, Length) pairs for the fetch query
@@ -212,8 +230,8 @@ class TestEstimateBagSizeUnionSemantics:
         """Same table via two paths with overlapping RIDs — exact union count."""
         aggregate_queries = {
             "OCT_DICOM": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_OCT/S:OCT_DICOM"), True),
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_CGM/S:CGM/S:OCT_DICOM"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_OCT/S:OCT_DICOM"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_CGM/S:CGM/S:OCT_DICOM"), True),
             ],
         }
         # Path 1: 200 rows (RID-001..RID-200), each 3.44MB
@@ -247,8 +265,8 @@ class TestEstimateBagSizeUnionSemantics:
         """First path returns 0, second has real data — union picks the real data."""
         aggregate_queries = {
             "Observation": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_A/S:Observation"), False),
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_B/S:Observation"), False),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_A/S:Observation"), False),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_B/S:Observation"), False),
             ],
         }
         result = _run_estimate(
@@ -269,9 +287,9 @@ class TestEstimateBagSizeUnionSemantics:
         """All paths for a table are queried (no first-wins dedup)."""
         aggregate_queries = {
             "OCT": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:OCT"), True),
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:OCT"), True),
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathC/S:OCT"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:OCT"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:OCT"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathC/S:OCT"), True),
             ],
         }
 
@@ -283,7 +301,7 @@ class TestEstimateBagSizeUnionSemantics:
         """Table with no assets (is_asset=False) only produces csv queries."""
         aggregate_queries = {
             "Subject": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"), False),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"), False),
             ],
         }
         result = _run_estimate(
@@ -303,7 +321,7 @@ class TestEstimateBagSizeUnionSemantics:
         """When a query fails, it should contribute 0 (not break)."""
         aggregate_queries = {
             "BadTable": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BadTable"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BadTable"), True),
             ],
         }
         result = _run_estimate(
@@ -322,10 +340,10 @@ class TestEstimateBagSizeUnionSemantics:
         """Verify total_asset_bytes equals sum of all per-table asset_bytes."""
         aggregate_queries = {
             "Image": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
             ],
             "Report": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Report/S:Report"), True),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Report/S:Report"), True),
             ],
         }
         result = _run_estimate(
@@ -348,8 +366,8 @@ class TestEstimateBagSizeUnionSemantics:
         """Two paths with completely disjoint RIDs — count is the full union (not max)."""
         aggregate_queries = {
             "Image": [
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:Image"), False),
-                (_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:Image"), False),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:Image"), False),
+                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:Image"), False),
             ],
         }
         result = _run_estimate(
@@ -365,3 +383,26 @@ class TestEstimateBagSizeUnionSemantics:
         # Old max approach would give 200; exact union gives 300
         assert result["tables"]["Image"]["row_count"] == 300
         assert result["total_rows"] == 300
+
+    def test_datapath_does_not_expose_rid_attribute(self):
+        """Regression: linked datapaths must not be used for column access.
+
+        After ``.link()`` calls, a DataPath object does not expose column
+        attributes like ``.RID``.  The code must use the separate
+        ``target_table`` reference returned by ``_aggregate_queries``
+        instead of ``dp.RID``.  This test verifies that the mock datapath
+        (which mirrors real linked datapaths) does *not* have ``.RID``,
+        and that the target_table *does*.
+        """
+        dp, target_table = _make_mock_datapath(
+            "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Image"
+        )
+        # Linked datapaths should NOT have .RID
+        assert not hasattr(dp, "RID"), (
+            "Mock datapath should not expose .RID — "
+            "real linked datapaths don't have column attributes"
+        )
+        # The target_table reference SHOULD have .RID
+        assert hasattr(target_table, "RID"), (
+            "target_table must expose .RID for use in .attributes() calls"
+        )
