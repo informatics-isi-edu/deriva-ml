@@ -13,9 +13,24 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+def _json_default(obj: Any) -> Any:
+    """JSON serializer for objects not natively handled by json module.
+
+    Handles datetime.datetime, datetime.date, and Path objects that may
+    appear in asset metadata from catalog column values.
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, date):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +193,7 @@ class AssetManifest:
         # Write to temp file then rename for atomicity
         tmp_path = self._path.with_suffix(".tmp")
         with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, default=_json_default)
             f.flush()
             os.fsync(f.fileno())
         tmp_path.rename(self._path)
