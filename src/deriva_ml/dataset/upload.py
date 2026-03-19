@@ -239,11 +239,12 @@ def asset_table_upload_spec(
     Returns:
         A dictionary containing the upload specification for the asset table.
     """
-    metadata_columns = model.asset_metadata(asset_table)
+    metadata_columns = sorted(model.asset_metadata(asset_table))
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
 
     # Be careful here as a metadata value might be a string with can contain special characters.
+    # metadata_columns is sorted to ensure deterministic directory order matching the regex.
     metadata_path = "/".join([rf"(?P<{c}>[-:._ \w]+)" for c in metadata_columns])
     asset_path = f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
     asset_table = model.name_to_table(asset_table)

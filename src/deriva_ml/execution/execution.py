@@ -681,8 +681,13 @@ class Execution:
                 self._logger.warning(f"Asset file not found: {source}")
                 continue
 
-            # Build metadata subdirectory path
-            metadata_parts = [str(v) for v in entry.metadata.values()] if entry.metadata else []
+            # Build metadata subdirectory path in sorted key order.
+            # This must match the regex group order in asset_table_upload_spec()
+            # which also sorts metadata_columns alphabetically.
+            metadata_parts = (
+                [str(entry.metadata[k]) for k in sorted(entry.metadata)]
+                if entry.metadata else []
+            )
             target_dir = staging_root / entry.schema / asset_table_name
             for part in metadata_parts:
                 target_dir = target_dir / part

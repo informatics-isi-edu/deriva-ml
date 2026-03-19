@@ -350,3 +350,61 @@ class TestAssetRepr:
         assert "deriva_ml.Asset" in repr_str
         assert asset_rid in repr_str
         assert "Execution_Asset" in repr_str
+
+
+class TestUploadStaging:
+    """Tests for upload staging directory structure.
+
+    Verifies that _build_upload_staging creates directories in the same
+    order as asset_table_upload_spec's regex pattern expects.
+    """
+
+    def test_staging_metadata_order_matches_regex(
+        self, workflow_terms, basic_execution, tmp_path
+    ):
+        """Verify staging dirs match the upload regex pattern order.
+
+        The staging directory path must be:
+          asset/{schema}/{table}/{meta_col1}/{meta_col2}/.../file
+        where meta columns are in sorted alphabetical order,
+        matching the regex groups in asset_table_upload_spec.
+        """
+        import re
+        from deriva_ml.dataset.upload import asset_table_upload_spec
+
+        ml = workflow_terms
+
+        with basic_execution.execute() as exe:
+            # Register an Image asset with metadata
+            path = exe.asset_file_path(
+                "Image",
+                "test_staging.txt",
+                metadata={"Subject": "FAKE_RID", "Acquisition_Date": "2026-01-01",
+                          "Acquisition_Time": "12:00:00"},
+            )
+            path.write_text("staging test content")
+
+        # Build staging and get the regex from upload spec
+        staging_root = basic_execution._build_upload_staging()
+        spec = asset_table_upload_spec(basic_execution._model, "Image")
+        regex = spec["file_pattern"]
+
+        # Find staged files and verify they match the regex
+        staged_files = list(staging_root.rglob("test_staging.txt"))
+        assert len(staged_files) == 1, f"Expected 1 staged file, found {len(staged_files)}"
+
+        # Build the full path as GenericUploader would see it
+        # (includes the working_dir/deriva-ml/execution/{rid}/ prefix)
+        full_path = str(staged_files[0])
+
+        match = re.search(regex, full_path)
+        assert match is not None, (
+            f"Staged path does not match upload regex.\n"
+            f"  Path:  {full_path}\n"
+            f"  Regex: {regex}"
+        )
+
+        # Verify captured metadata values are correct
+        assert match.group("Subject") == "FAKE_RID"
+        assert match.group("Acquisition_Date") == "2026-01-01"
+        assert match.group("Acquisition_Time") == "12:00:00"
