@@ -24,7 +24,6 @@ except ImportError:
 from deriva_ml import DerivaML
 from deriva_ml.execution.execution import ExecutionConfiguration
 
-
 class TestDenormalize:
     """Test suite for the _denormalize method in DatasetBag."""
 
@@ -225,7 +224,6 @@ class TestDenormalize:
             matching_cols = [c for c in df.columns if c.startswith(prefix)]
             assert len(matching_cols) == 0, f"Association table columns ({prefix}) should be excluded"
 
-
 class TestDenormalizeSchemaGraph:
     """Test the schema graph walking behavior of _denormalize."""
 
@@ -344,7 +342,6 @@ class TestDenormalizeSchemaGraph:
                 if table_name in join_conditions:
                     assert len(join_conditions[table_name]) > 0, f"Expected join conditions for {table_name}"
 
-
 class TestDenormalizeOrmRelationships:
     """Test ORM relationship handling in _denormalize."""
 
@@ -427,7 +424,6 @@ class TestDenormalizeOrmRelationships:
             # At least one should be MANYTOONE
             has_manytoone = any(r.direction.name == "MANYTOONE" for r in relationships)
             assert has_manytoone, "Expected MANYTOONE relationship from Image to Subject"
-
 
 class TestDenormalizeDataIntegrity:
     """Test data integrity in denormalized results."""
@@ -515,7 +511,6 @@ class TestDenormalizeDataIntegrity:
                     f"Image.Subject={image_subject_fk} != Subject.RID={subject_rid}"
                 )
 
-
 class TestDenormalizeEdgeCases:
     """Test edge cases and error handling in _denormalize."""
 
@@ -596,7 +591,6 @@ class TestDenormalizeEdgeCases:
         assert len(ml_tables) > 0, "Should have ML schema tables"
         assert len(domain_tables) > 0, "Should have domain schema tables"
 
-
 class TestDenormalizeSqlGeneration:
     """Test the SQL generation aspects of _denormalize."""
 
@@ -640,7 +634,6 @@ class TestDenormalizeSqlGeneration:
         # The result should be a CompoundSelect (UNION)
         # This depends on whether there are multiple paths
         assert sql_stmt is not None
-
 
 class TestCatalogDenormalize:
     """Test suite for catalog-based denormalization (Dataset class).

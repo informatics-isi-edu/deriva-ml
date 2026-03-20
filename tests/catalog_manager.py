@@ -157,6 +157,8 @@ class CatalogManager:
             "Dataset_Subject",
             "Dataset_Image",
             "Image_Subject",
+            "Image_Observation",
+            "ClinicalRecord_Observation",
         ]
         for t in domain_assoc_tables:
             self._delete_table_data(domain_path, t)
@@ -170,8 +172,9 @@ class CatalogManager:
         for t in feature_tables:
             self._delete_table_data(domain_path, t)
 
-        # Clear data tables (Image before Subject due to FK)
-        for t in ["Image", "Subject"]:
+        # Clear data tables in dependency order (FK children before parents)
+        # Note: ClinicalRecord_Observation is already cleared in domain_assoc_tables above
+        for t in ["ClinicalRecord", "Image", "Observation", "Subject"]:
             self._delete_table_data(domain_path, t)
 
         # Clear custom vocabularies (domain schema) - just data
