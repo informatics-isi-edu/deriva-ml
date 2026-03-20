@@ -1954,6 +1954,15 @@ class Dataset:
 
         # Move to final cache location only after successful extract + validate.
         staging_dir.rename(bag_dir)
+
+        # Clean up client_export temp directory if this was a local file:// bag.
+        # After extraction to cache, the original archive and unarchived bag
+        # under client_export/ are no longer needed.
+        if not use_minid and minid.bag_url.startswith("file://"):
+            export_dir = Path(archive_path).parent
+            if "client_export" in export_dir.parts:
+                shutil.rmtree(export_dir, ignore_errors=True)
+
         return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
 
     def _create_dataset_minid(

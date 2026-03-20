@@ -93,9 +93,11 @@ class DatabaseModel(DerivaModel):
         domain_schemas = get_domain_schemas(model.schemas.keys(), ml_schema)
         schemas = [*domain_schemas, ml_schema]
 
-        # Extract bag checksum for unique database path
+        # Extract bag checksum for unique database path.
+        # Databases go under a 'databases/' subdirectory to avoid polluting
+        # the working directory root with {RID}_{hash} directories.
         bag_cache_dir = bag_path.parent.name
-        self.database_dir = dbase_path / bag_cache_dir
+        self.database_dir = dbase_path / "databases" / bag_cache_dir
         self.database_dir.mkdir(parents=True, exist_ok=True)
 
         # Phase 1: Build ORM structure
