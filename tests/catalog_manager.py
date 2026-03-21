@@ -157,7 +157,6 @@ class CatalogManager:
             "Dataset_Subject",
             "Dataset_Image",
             "Image_Subject",
-            "Image_Observation",
             "ClinicalRecord_Observation",
         ]
         for t in domain_assoc_tables:

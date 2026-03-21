@@ -79,17 +79,13 @@ def populate_demo_catalog(execution: Execution) -> None:
     observation_table = pb.tables["Observation"]
     observations = list(observation_table.insert(observation_records))
 
-    # Link Images to Observations via association table
+    # Link Images to Observations (update Image.Observation FK)
     image_table = pb.tables["Image"]
     all_images = list(image_table.path.entities().fetch())
-    image_obs_records = []
     for img, obs in zip(all_images, observations):
-        image_obs_records.append({
-            "Image": img["RID"],
-            "Observation": obs["RID"],
-        })
-    image_obs_table = pb.tables["Image_Observation"]
-    image_obs_table.insert(image_obs_records)
+        image_table.path.filter(image_table.RID == img["RID"]).update(
+            [{"RID": img["RID"], "Observation": obs["RID"]}]
+        )
 
     # Create ClinicalRecords
     clinical_records = []
@@ -422,31 +418,18 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         )
     )
 
-    # Create Image_Observation association table (links Image to Observation)
-    # Using an association table instead of a direct FK on Image because
-    # Image is an asset table and adding columns to it would change the
-    # upload regex, breaking the asset upload pipeline.
-    domain_schema.create_table(
-        TableDef(
-            name="Image_Observation",
-            columns=[
-                ColumnDef("Image", BuiltinType.text, nullok=False),
-                ColumnDef("Observation", BuiltinType.text, nullok=False),
-            ],
-            foreign_keys=[
-                ForeignKeyDef(
-                    columns=["Image"],
-                    referenced_schema=sname,
-                    referenced_table="Image",
-                    referenced_columns=["RID"],
-                ),
-                ForeignKeyDef(
-                    columns=["Observation"],
-                    referenced_schema=sname,
-                    referenced_table="Observation",
-                    referenced_columns=["RID"],
-                ),
-            ],
+    # Add FK from Image to Observation (nullable, keeps existing Image -> Subject FK)
+    # Refresh model to pick up the newly created Observation table
+    model = catalog.getCatalogModel()
+    domain_schema = model.schemas[sname]
+    image_table = domain_schema.tables["Image"]
+    image_table.create_column(ColumnDef("Observation", BuiltinType.text, nullok=True))
+    image_table.create_fkey(
+        ForeignKeyDef(
+            columns=["Observation"],
+            referenced_schema=sname,
+            referenced_table="Observation",
+            referenced_columns=["RID"],
         )
     )
 
