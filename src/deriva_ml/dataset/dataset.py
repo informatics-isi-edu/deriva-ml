@@ -1486,7 +1486,7 @@ class Dataset:
         use_minid: bool = False,
         exclude_tables: set[str] | None = None,
         timeout: tuple[int, int] | None = None,
-        fetch_concurrency: int = 8,
+        fetch_concurrency: int = 1,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and optionally creates a MINID.
 
@@ -1822,7 +1822,7 @@ class Dataset:
         materialize: bool = True,
         exclude_tables: set[str] | None = None,
         timeout: tuple[int, int] | None = None,
-        fetch_concurrency: int = 8,
+        fetch_concurrency: int = 1,
     ) -> dict[str, Any]:
         """Download a dataset bag into the local cache without creating an execution.
 
@@ -2501,7 +2501,7 @@ class Dataset:
         self,
         minid: DatasetMinid,
         use_minid: bool,
-        fetch_concurrency: int = 8,
+        fetch_concurrency: int = 1,
     ) -> Path:
         """Materialize a dataset bag by downloading all referenced files.
 
