@@ -633,6 +633,18 @@ class TestDuplicateAssociationTables:
         rows = list(bag.denormalize_as_dict(["Image"]))
         assert len(rows) > 0
 
+    def test_catalog_denormalize_with_duplicate_association(self, catalog_with_datasets, tmp_path):
+        """Catalog-side denormalize should also handle duplicate association tables."""
+        ml_instance, dataset_description = catalog_with_datasets
+        dataset = dataset_description.dataset
+
+        # Test denormalizing with just the Image table
+        df = dataset.denormalize_as_dataframe(include_tables=["Image"])
+        assert len(df) > 0, (
+            "Catalog-side denormalize returned empty DataFrame — "
+            "duplicate association table likely caused empty result"
+        )
+
 class TestDenormalizeSqlGeneration:
     """Test the SQL generation aspects of _denormalize."""
 
