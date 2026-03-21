@@ -52,12 +52,12 @@ class TestDenormalize:
         assert "Subject.RID" in df.columns
         assert "Subject.Name" in df.columns
 
-    @pytest.mark.xfail(reason="Ambiguous Image->Subject path after schema extension - resolved in Task 4", strict=False)
     def test_denormalize_multiple_tables(self, dataset_test, tmp_path):
         """Test denormalization with multiple tables included.
 
         This verifies that denormalizing with multiple tables correctly
-        joins them based on FK relationships.
+        joins them based on FK relationships. Observation is included
+        to disambiguate the Image→Subject path.
         """
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
@@ -67,8 +67,9 @@ class TestDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        # Test denormalizing with Subject and Image tables
-        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image"])
+        # Test denormalizing with Subject, Image, and Observation tables
+        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
+        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image", "Observation"])
 
         # Verify the dataframe has columns from both tables
         assert isinstance(df, pd.DataFrame)
@@ -103,7 +104,6 @@ class TestDenormalize:
         assert "Subject.RID" in first_row
         assert "Subject.Name" in first_row
 
-    @pytest.mark.xfail(reason="Ambiguous Image->Subject path after schema extension - resolved in Task 4", strict=False)
     def test_denormalize_column_labeling(self, dataset_test, tmp_path):
         """Test that denormalized columns are properly labeled with table name prefixes.
 
@@ -118,13 +118,14 @@ class TestDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image"])
+        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
+        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image", "Observation"])
 
         # All columns should be prefixed with table name
         for col in df.columns:
             assert "." in col, f"Column {col} should be prefixed with table name"
             table_name, col_name = col.split(".", 1)
-            assert table_name in ["Subject", "Image"], f"Unexpected table prefix: {table_name}"
+            assert table_name in ["Subject", "Image", "Observation"], f"Unexpected table prefix: {table_name}"
 
     def test_denormalize_with_nested_dataset(self, dataset_test, tmp_path):
         """Test denormalization includes data from nested datasets.
@@ -203,7 +204,6 @@ class TestDenormalize:
             matching_cols = [c for c in df.columns if c.endswith(f".{sys_col}")]
             assert len(matching_cols) == 0, f"System column {sys_col} should be excluded"
 
-    @pytest.mark.xfail(reason="Ambiguous Image->Subject path after schema extension - resolved in Task 4", strict=False)
     def test_denormalize_excludes_association_tables(self, dataset_test, tmp_path):
         """Test that association table columns are not included in denormalized output.
 
@@ -218,7 +218,8 @@ class TestDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image"])
+        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
+        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image", "Observation"])
 
         # Association tables like Dataset_Subject should not have columns in output
         # The association tables are used for joining but their columns are excluded
@@ -315,7 +316,6 @@ class TestDenormalizeSchemaGraph:
         with pytest.raises(DerivaMLException):
             bag.denormalize_as_dataframe(include_tables=["NonExistentTable"])
 
-    @pytest.mark.xfail(reason="Ambiguous Image->Subject path after schema extension - resolved in Task 4", strict=False)
     def test_join_order_topological_sort(self, dataset_test, tmp_path):
         """Test that joins are ordered correctly via topological sort.
 
@@ -331,8 +331,9 @@ class TestDenormalizeSchemaGraph:
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
         # Call _prepare_wide_table to get join structure
+        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
         join_tables, columns = bag.model._prepare_wide_table(
-            bag, bag.dataset_rid, include_tables=["Subject", "Image"]
+            bag, bag.dataset_rid, include_tables=["Subject", "Image", "Observation"]
         )
 
         # join_tables should have entries with ordered table lists
@@ -485,12 +486,12 @@ class TestDenormalizeDataIntegrity:
         assert member_rids == denorm_rids, "RIDs should be preserved"
         assert member_names == denorm_names, "Names should be preserved"
 
-    @pytest.mark.xfail(reason="Ambiguous Image->Subject path after schema extension - resolved in Task 4", strict=False)
     def test_joined_data_relationships(self, dataset_test, tmp_path):
         """Test that joined data maintains correct relationships.
 
         When multiple tables are denormalized, the joined rows should
-        maintain the correct FK relationships.
+        maintain the correct FK relationships via the multi-hop chain
+        Image → Observation → Subject.
         """
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
@@ -500,20 +501,25 @@ class TestDenormalizeDataIntegrity:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        # Denormalize Image and Subject together
-        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image"])
+        # Denormalize Image, Observation, and Subject together
+        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
+        df = bag.denormalize_as_dataframe(include_tables=["Subject", "Image", "Observation"])
 
-        # Each row should have matching Subject FK
-        # Image has a Subject FK column
-        if "Image.Subject" in df.columns and "Subject.RID" in df.columns:
-            # Filter to rows where both values are non-null
-            valid_rows = df.dropna(subset=["Image.Subject", "Subject.RID"])
+        # Each row should have matching FK chain: Image→Observation→Subject
+        if "Image.Observation" in df.columns and "Observation.RID" in df.columns:
+            valid_rows = df.dropna(subset=["Image.Observation", "Observation.RID"])
             for _, row in valid_rows.iterrows():
-                image_subject_fk = row["Image.Subject"]
-                subject_rid = row["Subject.RID"]
-                assert image_subject_fk == subject_rid, (
-                    f"FK relationship should be maintained in join: "
-                    f"Image.Subject={image_subject_fk} != Subject.RID={subject_rid}"
+                assert row["Image.Observation"] == row["Observation.RID"], (
+                    f"FK relationship should be maintained: "
+                    f"Image.Observation={row['Image.Observation']} != Observation.RID={row['Observation.RID']}"
+                )
+
+        if "Observation.Subject" in df.columns and "Subject.RID" in df.columns:
+            valid_rows = df.dropna(subset=["Observation.Subject", "Subject.RID"])
+            for _, row in valid_rows.iterrows():
+                assert row["Observation.Subject"] == row["Subject.RID"], (
+                    f"FK relationship should be maintained: "
+                    f"Observation.Subject={row['Observation.Subject']} != Subject.RID={row['Subject.RID']}"
                 )
 
 class TestDenormalizeEdgeCases:
@@ -618,7 +624,6 @@ class TestDenormalizeSqlGeneration:
         # Should return a Select or CompoundSelect (union)
         assert isinstance(sql_stmt, (Select, CompoundSelect)), "Should return SQLAlchemy Select object"
 
-    @pytest.mark.xfail(reason="Ambiguous Image->Subject path after schema extension - resolved in Task 4", strict=False)
     def test_union_for_multiple_paths(self, dataset_test, tmp_path):
         """Test that multiple paths result in a UNION statement.
 
@@ -635,7 +640,8 @@ class TestDenormalizeSqlGeneration:
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
         # With multiple element types, we should get a union
-        sql_stmt = bag._denormalize(include_tables=["Subject", "Image"])
+        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
+        sql_stmt = bag._denormalize(include_tables=["Subject", "Image", "Observation"])
 
         # The result should be a CompoundSelect (UNION)
         # This depends on whether there are multiple paths
@@ -670,7 +676,6 @@ class TestCatalogDenormalize:
         assert "Subject_RID" in df.columns, "Expected Subject_RID column"
         assert "Subject_Name" in df.columns, "Expected Subject_Name column"
 
-    @pytest.mark.xfail(reason="Ambiguous Image->Subject path after schema extension - resolved in Task 4", strict=False)
     def test_catalog_denormalize_multiple_tables(self, catalog_with_datasets, tmp_path):
         """Test catalog-based denormalization with multiple tables.
 
@@ -681,8 +686,9 @@ class TestCatalogDenormalize:
 
         dataset = dataset_description.dataset
 
-        # Test denormalizing with Subject and Image tables
-        df = dataset.denormalize_as_dataframe(include_tables=["Subject", "Image"])
+        # Test denormalizing with Subject, Image, and Observation tables
+        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
+        df = dataset.denormalize_as_dataframe(include_tables=["Subject", "Image", "Observation"])
 
         # Verify the dataframe has columns from both tables
         assert isinstance(df, pd.DataFrame)
