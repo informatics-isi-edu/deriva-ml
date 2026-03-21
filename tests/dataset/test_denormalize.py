@@ -888,6 +888,36 @@ class TestCatalogDenormalize:
             cols = [c for c in df.columns if c.startswith(prefix)]
             assert len(cols) > 0, f"Expected columns with prefix {prefix}"
 
+    def test_bag_catalog_multihop_consistency(self, catalog_with_datasets, tmp_path):
+        """C1: Bag and catalog denormalize produce same data for multi-hop joins."""
+        ml_instance, dataset_description = catalog_with_datasets
+        dataset = dataset_description.dataset
+        current_version = dataset.current_version
+
+        # Catalog-based
+        catalog_df = dataset.denormalize_as_dataframe(
+            include_tables=["Image", "Observation"]
+        )
+
+        # Bag-based
+        bag = dataset.download_dataset_bag(current_version, use_minid=False)
+        bag_df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation"])
+
+        # Same row count
+        assert len(catalog_df) == len(bag_df), (
+            f"Row count mismatch: catalog={len(catalog_df)}, bag={len(bag_df)}"
+        )
+
+        # Same Image RIDs (compare sets, ignoring order)
+        catalog_rids = set(catalog_df["Image_RID"].dropna())
+        bag_rids = set(bag_df["Image.RID"].dropna())
+        assert catalog_rids == bag_rids, "Image RIDs should match between catalog and bag"
+
+        # Same Observation RIDs
+        catalog_obs = set(catalog_df["Observation_RID"].dropna())
+        bag_obs = set(bag_df["Observation.RID"].dropna())
+        assert catalog_obs == bag_obs, "Observation RIDs should match between catalog and bag"
+
 
 class TestMultiHopDenormalize:
     """Test multi-hop FK joins in bag denormalization.
