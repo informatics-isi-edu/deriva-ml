@@ -813,13 +813,17 @@ class Dataset:
         # Get all members for the included tables (recursively includes nested datasets)
         members = self.list_dataset_members(version=version, recurse=True)
 
-        # Build a lookup of columns for each table
+        # Build a lookup of columns and schema names for each table
+        from deriva_ml.model.catalog import denormalize_column_name
+
         table_columns: dict[str, list[str]] = {}
+        table_schemas: dict[str, str] = {}
         for table_name in include_tables:
             table = self._ml_instance.model.name_to_table(table_name)
             table_columns[table_name] = [
                 c.name for c in table.columns if c.name not in skip_columns
             ]
+            table_schemas[table_name] = table.schema.name
 
         # Find the primary table (first table in include_tables with dataset members)
         primary_table = None
@@ -835,7 +839,7 @@ class Dataset:
         # Check for ambiguous FK paths before proceeding.
         # Uses the same graph-based path analysis as the bag-side implementation,
         # ensuring consistent ambiguity errors between catalog and bag denormalization.
-        self._ml_instance.model._prepare_wide_table(
+        _, _, multi_schema = self._ml_instance.model._prepare_wide_table(
             self, self.dataset_rid, list(include_tables)
         )
 
@@ -902,13 +906,19 @@ class Dataset:
                 r[pk_col.name]: r for r in all_target_records if r[pk_col.name] in fk_values
             }
 
+        # Helper to build prefixed column name
+        def _col(table_name: str, col_name: str) -> str:
+            return denormalize_column_name(
+                table_schemas[table_name], table_name, col_name, multi_schema
+            )
+
         # Build output rows
         for member in members[primary_table]:
             row: dict[str, Any] = {}
 
             # Add primary table columns
             for col_name in table_columns[primary_table]:
-                row[f"{primary_table}_{col_name}"] = member.get(col_name)
+                row[_col(primary_table, col_name)] = member.get(col_name)
 
             # Add columns from each joined table
             for target_name in include_tables:
@@ -919,7 +929,7 @@ class Dataset:
 
                 # Initialize to None (outer join semantics)
                 for col_name in other_cols:
-                    row[f"{target_name}_{col_name}"] = None
+                    row[_col(target_name, col_name)] = None
 
                 # Walk the FK chain from primary to this target
                 if target_name in fk_relationships:
@@ -945,7 +955,7 @@ class Dataset:
 
                     if found:
                         for col_name in other_cols:
-                            row[f"{target_name}_{col_name}"] = current_record.get(col_name)
+                            row[_col(target_name, col_name)] = current_record.get(col_name)
 
             yield row
 
@@ -975,8 +985,13 @@ class Dataset:
 
         **Column naming:**
 
-        Column names are prefixed with the source table name using underscores
-        to avoid collisions (e.g., "Image_Filename", "Subject_RID").
+        Column names are prefixed with the source table name using dot notation
+        to avoid collisions (e.g., ``Image.Filename``, ``Subject.RID``). When the
+        catalog has multiple domain schemas, the schema name is also included
+        (e.g., ``test-schema.Image.Filename``).
+
+        Use :meth:`denormalize_columns` to preview the column names and types
+        without fetching data.
 
         Args:
             include_tables: List of table names to include in the output. Tables
@@ -995,22 +1010,23 @@ class Dataset:
                 >>> # Get all images with their diagnoses in one table
                 >>> df = dataset.denormalize_as_dataframe(["Image", "Diagnosis"])
                 >>> print(df.columns.tolist())
-                ['Image_RID', 'Image_Filename', 'Image_URL', 'Diagnosis_RID',
-                 'Diagnosis_Label', 'Diagnosis_Confidence']
+                ['Image.RID', 'Image.Filename', 'Image.URL', 'Diagnosis.RID',
+                 'Diagnosis.Label', 'Diagnosis.Confidence']
 
                 >>> # Use with scikit-learn
-                >>> X = df[["Image_Filename"]]  # Features
-                >>> y = df["Diagnosis_Label"]    # Labels
+                >>> X = df[["Image.Filename"]]  # Features
+                >>> y = df["Diagnosis.Label"]    # Labels
 
             Include subject metadata for stratified splitting::
 
                 >>> df = dataset.denormalize_as_dataframe(
                 ...     ["Subject", "Image", "Diagnosis"]
                 ... )
-                >>> # Now df has Subject_Age, Subject_Gender, etc.
+                >>> # Now df has Subject.Age, Subject.Gender, etc.
                 >>> # for stratified train/test splits by subject
 
         See Also:
+            denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dict: Generator version for memory-efficient processing.
         """
         rows = list(self._denormalize_datapath(include_tables, version))
@@ -1036,8 +1052,9 @@ class Dataset:
 
         **Column naming:**
 
-        Column names are prefixed with the source table name using underscores
-        to avoid collisions (e.g., "Image_Filename", "Subject_RID").
+        Column names are prefixed with the source table name using dot notation
+        (e.g., ``Image.Filename``, ``Subject.RID``). See :meth:`denormalize_as_dataframe`
+        for details on multi-schema prefix behavior.
 
         Args:
             include_tables: List of table names to include in the output.
@@ -1047,15 +1064,15 @@ class Dataset:
 
         Yields:
             dict[str, Any]: Dictionary representing one row of the wide table.
-                Keys are column names in "Table_Column" format.
+                Keys are column names in ``Table.Column`` format.
 
         Example:
             Process images one at a time for training::
 
                 >>> for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
                 ...     # Load and preprocess each image
-                ...     img = load_image(row["Image_Filename"])
-                ...     label = row["Diagnosis_Label"]
+                ...     img = load_image(row["Image.Filename"])
+                ...     label = row["Diagnosis.Label"]
                 ...     yield img, label  # Feed to training loop
 
             Count labels without loading all data into memory::
@@ -1063,14 +1080,55 @@ class Dataset:
                 >>> from collections import Counter
                 >>> labels = Counter()
                 >>> for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
-                ...     labels[row["Diagnosis_Label"]] += 1
+                ...     labels[row["Diagnosis.Label"]] += 1
                 >>> print(labels)
                 Counter({'Normal': 450, 'Abnormal': 150})
 
         See Also:
+            denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
         yield from self._denormalize_datapath(include_tables, version)
+
+    def denormalize_columns(
+        self,
+        include_tables: list[str],
+        **kwargs: Any,
+    ) -> list[tuple[str, str]]:
+        """Return the columns that denormalize would produce, without fetching data.
+
+        Performs the same validation as :meth:`denormalize_as_dataframe` (table existence,
+        FK path resolution, ambiguity detection) but stops before executing any data
+        queries. Use this to preview column names and debug ``include_tables``.
+
+        Args:
+            include_tables: List of table names to include.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
+
+        Returns:
+            List of ``(column_name, column_type)`` tuples using dot notation.
+
+        Example:
+            >>> cols = dataset.denormalize_columns(["Image", "Subject"])
+            >>> for name, dtype in cols:
+            ...     print(f"  {name}: {dtype}")
+            Image.RID: ermrest_rid
+            Image.Filename: text
+            Subject.RID: ermrest_rid
+            Subject.Name: text
+        """
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        _, column_specs, multi_schema = self._ml_instance.model._prepare_wide_table(
+            self, self.dataset_rid, list(include_tables)
+        )
+        return [
+            (
+                denormalize_column_name(schema_name, table_name, col_name, multi_schema),
+                type_name,
+            )
+            for schema_name, table_name, col_name, type_name in column_specs
+        ]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_members(

@@ -714,10 +714,10 @@ class TestCatalogDenormalize:
         # Verify the dataframe has the expected structure
         assert isinstance(df, pd.DataFrame)
         # Should have columns from Subject table (prefixed with table name using underscore)
-        subject_columns = [col for col in df.columns if col.startswith("Subject_")]
+        subject_columns = [col for col in df.columns if col.startswith("Subject.")]
         assert len(subject_columns) > 0, "Expected Subject columns in denormalized result"
-        assert "Subject_RID" in df.columns, "Expected Subject_RID column"
-        assert "Subject_Name" in df.columns, "Expected Subject_Name column"
+        assert "Subject.RID" in df.columns, "Expected Subject.RID column"
+        assert "Subject.Name" in df.columns, "Expected Subject_Name column"
 
     def test_catalog_denormalize_multiple_tables(self, catalog_with_datasets, tmp_path):
         """Test catalog-based denormalization with multiple tables.
@@ -735,8 +735,8 @@ class TestCatalogDenormalize:
 
         # Verify the dataframe has columns from both tables
         assert isinstance(df, pd.DataFrame)
-        subject_columns = [col for col in df.columns if col.startswith("Subject_")]
-        image_columns = [col for col in df.columns if col.startswith("Image_")]
+        subject_columns = [col for col in df.columns if col.startswith("Subject.")]
+        image_columns = [col for col in df.columns if col.startswith("Image.")]
 
         assert len(subject_columns) > 0, "Expected Subject columns in denormalized result"
         assert len(image_columns) > 0, "Expected Image columns in denormalized result"
@@ -760,8 +760,8 @@ class TestCatalogDenormalize:
 
         # Verify column naming convention (table_column)
         first_row = rows[0]
-        subject_keys = [k for k in first_row.keys() if k.startswith("Subject_")]
-        assert len(subject_keys) > 0, "Expected Subject_ prefixed keys"
+        subject_keys = [k for k in first_row.keys() if k.startswith("Subject.")]
+        assert len(subject_keys) > 0, "Expected Subject. prefixed keys"
 
     def test_catalog_denormalize_empty_result(self, test_ml, tmp_path):
         """Test catalog denormalization handles empty datasets gracefully.
@@ -818,8 +818,8 @@ class TestCatalogDenormalize:
             "should have same number of rows"
         )
 
-        # Both should have Subject columns (different naming: _ vs .)
-        catalog_subject_cols = [c for c in catalog_df.columns if c.startswith("Subject_")]
+        # Both should have Subject columns (dot notation)
+        catalog_subject_cols = [c for c in catalog_df.columns if c.startswith("Subject.")]
         bag_subject_cols = [c for c in bag_df.columns if c.startswith("Subject.")]
 
         assert len(catalog_subject_cols) > 0, "Expected Subject columns in catalog result"
@@ -877,10 +877,10 @@ class TestCatalogDenormalize:
         df = dataset.denormalize_as_dataframe(include_tables=["Image", "Observation"])
 
         assert len(df) > 0
-        obs_cols = [c for c in df.columns if c.startswith("Observation_")]
+        obs_cols = [c for c in df.columns if c.startswith("Observation.")]
         assert len(obs_cols) > 0, "Expected Observation columns"
 
-        obs_rid_col = "Observation_RID"
+        obs_rid_col = "Observation.RID"
         if obs_rid_col in df.columns:
             non_null = df[obs_rid_col].notna().sum()
             assert non_null > 0, "Observation_RID should be populated"
@@ -895,13 +895,13 @@ class TestCatalogDenormalize:
         )
 
         assert len(df) > 0
-        for prefix in ["Image_", "Observation_", "Subject_"]:
+        for prefix in ["Image.", "Observation.", "Subject."]:
             cols = [c for c in df.columns if c.startswith(prefix)]
             assert len(cols) > 0, f"Expected columns with prefix {prefix}"
 
-        if "Subject_RID" in df.columns:
-            non_null = df["Subject_RID"].notna().sum()
-            assert non_null > 0, "Subject_RID should be populated via multi-hop"
+        if "Subject.RID" in df.columns:
+            non_null = df["Subject.RID"].notna().sum()
+            assert non_null > 0, "Subject.RID should be populated via multi-hop"
 
     def test_catalog_ambiguous_paths_error(self, catalog_with_datasets, tmp_path):
         """Catalog: Ambiguous paths raise error."""
@@ -927,7 +927,7 @@ class TestCatalogDenormalize:
         )
 
         assert len(df) > 0
-        for prefix in ["Image_", "Observation_", "Subject_"]:
+        for prefix in ["Image.", "Observation.", "Subject."]:
             cols = [c for c in df.columns if c.startswith(prefix)]
             assert len(cols) > 0, f"Expected columns with prefix {prefix}"
 
@@ -952,12 +952,12 @@ class TestCatalogDenormalize:
         )
 
         # Same Image RIDs (compare sets, ignoring order)
-        catalog_rids = set(catalog_df["Image_RID"].dropna())
+        catalog_rids = set(catalog_df["Image.RID"].dropna())
         bag_rids = set(bag_df["Image.RID"].dropna())
         assert catalog_rids == bag_rids, "Image RIDs should match between catalog and bag"
 
         # Same Observation RIDs
-        catalog_obs = set(catalog_df["Observation_RID"].dropna())
+        catalog_obs = set(catalog_df["Observation.RID"].dropna())
         bag_obs = set(bag_df["Observation.RID"].dropna())
         assert catalog_obs == bag_obs, "Observation RIDs should match between catalog and bag"
 

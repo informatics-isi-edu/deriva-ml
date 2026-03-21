@@ -800,13 +800,17 @@ class DatasetBag:
                     return relationship
             return None
 
-        join_tables, denormalized_columns = self.model._prepare_wide_table(self, self.dataset_rid, include_tables)
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        join_tables, column_specs, multi_schema = self.model._prepare_wide_table(
+            self, self.dataset_rid, include_tables
+        )
 
         denormalized_columns = [
             self.model.get_orm_class_by_name(table_name)
             .__table__.columns[column_name]
-            .label(f"{table_name}.{column_name}")
-            for table_name, column_name in denormalized_columns
+            .label(denormalize_column_name(schema_name, table_name, column_name, multi_schema))
+            for schema_name, table_name, column_name, _type_name in column_specs
         ]
         sql_statements = []
         for key, (path, join_conditions) in join_tables.items():
@@ -957,6 +961,68 @@ class DatasetBag:
             result = session.execute(sql_stmt)
             for row in result:
                 yield dict(row._mapping)
+
+    # SQLAlchemy type name → ermrest type name mapping.
+    _SQLALCHEMY_TO_ERMREST: dict[str, str] = {
+        "TEXT": "text",
+        "VARCHAR": "text",
+        "STRING": "text",
+        "INTEGER": "int4",
+        "BIGINT": "int8",
+        "SMALLINT": "int2",
+        "FLOAT": "float8",
+        "REAL": "float4",
+        "NUMERIC": "float8",
+        "BOOLEAN": "boolean",
+        "DATE": "date",
+        "DATETIME": "timestamptz",
+        "TIMESTAMP": "timestamptz",
+        "BLOB": "bytea",
+    }
+
+    def denormalize_columns(
+        self,
+        include_tables: list[str],
+        **kwargs: Any,
+    ) -> list[tuple[str, str]]:
+        """Return the columns that denormalize would produce, without fetching data.
+
+        Performs the same validation as :meth:`denormalize_as_dataframe` (table existence,
+        FK path resolution, ambiguity detection) but stops before executing any data
+        queries.
+
+        Args:
+            include_tables: List of table names to include.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
+
+        Returns:
+            List of ``(column_name, column_type)`` tuples using dot notation.
+            Type strings use ermrest type names (``text``, ``int4``, etc.).
+
+        Example:
+            >>> cols = bag.denormalize_columns(["Image", "Subject"])
+            >>> for name, dtype in cols:
+            ...     print(f"  {name}: {dtype}")
+            Image.RID: ermrest_rid
+            Image.Filename: text
+            Subject.RID: ermrest_rid
+            Subject.Name: text
+        """
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        _, column_specs, multi_schema = self.model._prepare_wide_table(
+            self, self.dataset_rid, list(include_tables)
+        )
+
+        result = []
+        for schema_name, table_name, col_name, type_name in column_specs:
+            prefixed = denormalize_column_name(
+                schema_name, table_name, col_name, multi_schema
+            )
+            # _prepare_wide_table now returns ermrest type names directly,
+            # so no mapping needed.
+            result.append((prefixed, type_name))
+        return result
 
 
     # =========================================================================

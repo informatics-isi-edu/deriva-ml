@@ -48,6 +48,28 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
+
+def denormalize_column_name(
+    schema_name: str, table_name: str, column_name: str, multi_schema: bool
+) -> str:
+    """Build a prefixed column name for denormalized output.
+
+    Uses dot notation to avoid ambiguity with column names that contain
+    underscores (e.g., ``Acquisition_Date``).
+
+    Args:
+        schema_name: Schema the table belongs to.
+        table_name: Table the column belongs to.
+        column_name: Raw column name.
+        multi_schema: If True, include schema prefix for disambiguation.
+
+    Returns:
+        Prefixed column name, e.g. ``Image.Filename`` or ``test-schema.Image.Filename``.
+    """
+    if multi_schema:
+        return f"{schema_name}.{table_name}.{column_name}"
+    return f"{table_name}.{column_name}"
+
 logger = logging.getLogger(__name__)
 
 # Define common types:
@@ -726,14 +748,23 @@ class DerivaModel:
                     )
             element_tables[element_table] = (element_join_tables, element_join_conditions)
         # Get the list of columns that will appear in the final denormalized dataset.
-        denormalized_columns = [
-            (table_name, c.name)
-            for table_name in include_tables
-            if not self.is_association(table_name)  # Don't include association columns in the denormalized view.'
-            for c in self.name_to_table(table_name).columns
-            if (not include_tables or table_name in include_tables) and (c.name not in skip_columns)
-        ]
-        return element_tables, denormalized_columns
+        # Each entry is (schema_name, table_name, column_name, type_name).
+        denormalized_columns = []
+        for table_name in include_tables:
+            if self.is_association(table_name):
+                continue
+            table = self.name_to_table(table_name)
+            for c in table.columns:
+                if c.name not in skip_columns:
+                    denormalized_columns.append(
+                        (table.schema.name, table_name, c.name, c.type.typename)
+                    )
+
+        # Determine if schema prefix is needed (multiple domain schemas in the output).
+        output_schemas = {s for s, _, _, _ in denormalized_columns if self.is_domain_schema(s)}
+        multi_schema = len(output_schemas) > 1
+
+        return element_tables, denormalized_columns, multi_schema
 
     def _table_relationship(
         self,

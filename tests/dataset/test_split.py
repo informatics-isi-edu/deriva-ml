@@ -853,7 +853,7 @@ class TestSplitDataset:
             split_dataset(
                 ml, source_rid,
                 test_size=4,
-                stratify_by_column="SplitTestItem_Category",
+                stratify_by_column="SplitTestItem.Category",
             )
 
     def test_selection_fn_requires_include_tables(self, test_ml):
