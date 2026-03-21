@@ -266,10 +266,9 @@ class DatasetLike(Protocol):
                 Column names are prefixed with the source table name.
 
         Note:
-            Column naming conventions differ between implementations:
-
-            - Dataset (catalog): Uses underscore separator (e.g., "Image_Filename")
-            - DatasetBag (bag): Uses dot separator (e.g., "Image.Filename")
+            Column names use dot notation (e.g., ``Image.Filename``, ``Subject.RID``).
+            When the catalog has multiple domain schemas, the schema name is included
+            (e.g., ``test-schema.Image.Filename``).
 
         Example:
             Suppose you have a dataset with Images linked to Subjects, and each
@@ -284,14 +283,15 @@ class DatasetLike(Protocol):
                 df = dataset.denormalize_as_dataframe(["Subject", "Image", "Diagnosis"])
 
                 # Result has columns like:
-                # Subject_RID, Subject_Name, Subject_Age,
-                # Image_RID, Image_Filename, Image_Subject,
-                # Diagnosis_RID, Diagnosis_Image, Diagnosis_Label
+                # Subject.RID, Subject.Name, Subject.Age,
+                # Image.RID, Image.Filename, Image.Subject,
+                # Diagnosis.RID, Diagnosis.Image, Diagnosis.Label
 
                 # Each row represents one Image with its Subject info and Diagnosis
                 # Ready for use with sklearn, pandas, or other ML tools
 
         See Also:
+            denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dict: Generator version for memory-efficient processing.
         """
         ...
@@ -325,25 +325,70 @@ class DatasetLike(Protocol):
                 Keys are column names prefixed by table name.
 
         Note:
-            Column naming conventions differ between implementations:
-
-            - Dataset (catalog): Uses underscore separator (e.g., "Image_Filename")
-            - DatasetBag (bag): Uses dot separator (e.g., "Image.Filename")
+            Column names use dot notation (e.g., ``Image.Filename``, ``Subject.RID``).
+            When the catalog has multiple domain schemas, the schema name is included
+            (e.g., ``test-schema.Image.Filename``).
 
         Example:
             Process a large dataset without loading everything into memory::
 
                 # Stream through rows one at a time
                 for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
-                    image_path = row["Image_Filename"]
-                    label = row["Diagnosis_Label"]
+                    image_path = row["Image.Filename"]
+                    label = row["Diagnosis.Label"]
                     # Process each image-label pair...
 
                 # Or convert to list if you need random access
                 rows = list(dataset.denormalize_as_dict(["Image", "Diagnosis"]))
 
         See Also:
+            denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dataframe: Returns all data as a pandas DataFrame.
+        """
+        ...
+
+    def denormalize_columns(
+        self,
+        include_tables: list[str],
+        **kwargs: Any,
+    ) -> list[tuple[str, str]]:
+        """Return the columns that denormalize would produce, without fetching data.
+
+        Performs the same validation as :meth:`denormalize_as_dataframe` (table existence,
+        FK path resolution, ambiguity detection) but stops before executing any data
+        queries. Use this to preview column names and debug ``include_tables`` before
+        running an expensive denormalization.
+
+        Column names use dot notation (e.g., ``Image.Filename``). When the catalog
+        has multiple domain schemas, the schema name is included
+        (e.g., ``test-schema.Image.Filename``).
+
+        Args:
+            include_tables: List of table names to include.
+            **kwargs: Additional arguments (ignored, for protocol compatibility).
+
+        Returns:
+            List of ``(column_name, column_type)`` tuples.
+            Column names use the same dot notation as :meth:`denormalize_as_dataframe`.
+            Type strings use ermrest type names (``text``, ``int4``, ``float8``, etc.).
+
+        Raises:
+            DerivaMLException: If tables don't exist or FK paths are ambiguous.
+
+        Example:
+            Preview columns before running an expensive query::
+
+                >>> cols = dataset.denormalize_columns(["Image", "Subject"])
+                >>> for name, dtype in cols:
+                ...     print(f"  {name}: {dtype}")
+                Image.RID: ermrest_rid
+                Image.Filename: text
+                Subject.RID: ermrest_rid
+                Subject.Name: text
+
+        See Also:
+            denormalize_as_dataframe: Fetch data as a pandas DataFrame.
+            denormalize_as_dict: Fetch data as a generator of dicts.
         """
         ...
 

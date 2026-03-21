@@ -46,7 +46,7 @@ Example:
         result = split_dataset(
             ml, "28D0",
             test_size=0.2,
-            stratify_by_column="Image_Classification_Image_Class",
+            stratify_by_column="Image_Classification.Image_Class",
             include_tables=["Image", "Image_Classification"],
         )
 
@@ -546,8 +546,9 @@ def split_dataset(
             (they handle their own shuffling).
         seed: Random seed for reproducibility. Default: 42.
         stratify_by_column: Column name for stratified splitting.
-            Must be a column in the denormalized DataFrame (prefixed
-            with table name, e.g., ``Image_Classification_Image_Class``).
+            Must be a column in the denormalized DataFrame using dot notation
+            (e.g., ``Image_Classification.Image_Class``). Use
+            :meth:`Dataset.denormalize_columns` to discover available columns.
             Mutually exclusive with ``selection_fn``.
         stratify_missing: Policy for null values in the stratify column.
             ``"error"`` (default) raises if any nulls exist,
@@ -618,7 +619,7 @@ def split_dataset(
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification_Image_Class",
+                stratify_by_column="Image_Classification.Image_Class",
                 include_tables=["Image", "Image_Classification"],
             )
 
@@ -627,7 +628,7 @@ def split_dataset(
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification_Image_Class",
+                stratify_by_column="Image_Classification.Image_Class",
                 stratify_missing="drop",
                 include_tables=["Image", "Image_Classification"],
             )
@@ -767,13 +768,13 @@ def split_dataset(
 
         partition_indices = selector(df, partition_sizes, seed)
 
-        # Map indices back to RIDs
-        rid_column = f"{element_table}_RID"
+        # Map indices back to RIDs (dot notation: Table.RID)
+        rid_column = f"{element_table}.RID"
         if rid_column not in df.columns:
             rid_column = "RID"
             if rid_column not in df.columns:
                 raise ValueError(
-                    f"Cannot find RID column. Tried '{element_table}_RID' and 'RID'. "
+                    f"Cannot find RID column. Tried '{element_table}.RID' and 'RID'. "
                     f"Available columns: {list(df.columns)}"
                 )
 
