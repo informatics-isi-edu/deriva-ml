@@ -826,6 +826,68 @@ class TestCatalogDenormalize:
         rows = list(gen)
         assert isinstance(rows, list), "Should be consumable as list"
 
+    def test_catalog_non_member_fk_join(self, catalog_with_datasets, tmp_path):
+        """Catalog: Join to non-member table via FK."""
+        ml_instance, dataset_description = catalog_with_datasets
+        dataset = dataset_description.dataset
+
+        df = dataset.denormalize_as_dataframe(include_tables=["Image", "Observation"])
+
+        assert len(df) > 0
+        obs_cols = [c for c in df.columns if c.startswith("Observation_")]
+        assert len(obs_cols) > 0, "Expected Observation columns"
+
+        obs_rid_col = "Observation_RID"
+        if obs_rid_col in df.columns:
+            non_null = df[obs_rid_col].notna().sum()
+            assert non_null > 0, "Observation_RID should be populated"
+
+    def test_catalog_multihop_chain(self, catalog_with_datasets, tmp_path):
+        """Catalog: Multi-hop chain Image → Observation → Subject."""
+        ml_instance, dataset_description = catalog_with_datasets
+        dataset = dataset_description.dataset
+
+        df = dataset.denormalize_as_dataframe(
+            include_tables=["Image", "Observation", "Subject"]
+        )
+
+        assert len(df) > 0
+        for prefix in ["Image_", "Observation_", "Subject_"]:
+            cols = [c for c in df.columns if c.startswith(prefix)]
+            assert len(cols) > 0, f"Expected columns with prefix {prefix}"
+
+        if "Subject_RID" in df.columns:
+            non_null = df["Subject_RID"].notna().sum()
+            assert non_null > 0, "Subject_RID should be populated via multi-hop"
+
+    def test_catalog_ambiguous_paths_error(self, catalog_with_datasets, tmp_path):
+        """Catalog: Ambiguous paths raise error."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        ml_instance, dataset_description = catalog_with_datasets
+        dataset = dataset_description.dataset
+
+        with pytest.raises(DerivaMLException) as exc_info:
+            dataset.denormalize_as_dataframe(include_tables=["Image", "Subject"])
+
+        error_msg = str(exc_info.value)
+        assert "ambiguous" in error_msg.lower() or "multiple" in error_msg.lower()
+        assert "Observation" in error_msg
+
+    def test_catalog_disambiguation(self, catalog_with_datasets, tmp_path):
+        """Catalog: Including intermediate resolves ambiguity."""
+        ml_instance, dataset_description = catalog_with_datasets
+        dataset = dataset_description.dataset
+
+        df = dataset.denormalize_as_dataframe(
+            include_tables=["Image", "Observation", "Subject"]
+        )
+
+        assert len(df) > 0
+        for prefix in ["Image_", "Observation_", "Subject_"]:
+            cols = [c for c in df.columns if c.startswith(prefix)]
+            assert len(cols) > 0, f"Expected columns with prefix {prefix}"
+
 
 class TestMultiHopDenormalize:
     """Test multi-hop FK joins in bag denormalization.
