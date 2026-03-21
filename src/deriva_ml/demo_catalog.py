@@ -79,13 +79,17 @@ def populate_demo_catalog(execution: Execution) -> None:
     observation_table = pb.tables["Observation"]
     observations = list(observation_table.insert(observation_records))
 
-    # Link Images to Observations (update Image.Observation FK)
+    # Link Images to Observations via Subject-keyed matching
+    # (ERMrest doesn't guarantee fetch order, so match by Subject FK)
+    obs_by_subject = {obs["Subject"]: obs["RID"] for obs in observations}
     image_table = pb.tables["Image"]
     all_images = list(image_table.path.entities().fetch())
-    for img, obs in zip(all_images, observations):
-        image_table.path.filter(image_table.RID == img["RID"]).update(
-            [{"RID": img["RID"], "Observation": obs["RID"]}]
-        )
+    for img in all_images:
+        obs_rid = obs_by_subject.get(img["Subject"])
+        if obs_rid:
+            image_table.path.filter(image_table.RID == img["RID"]).update(
+                [{"RID": img["RID"], "Observation": obs_rid}]
+            )
 
     # Create ClinicalRecords
     clinical_records = []

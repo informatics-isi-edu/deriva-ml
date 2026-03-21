@@ -243,6 +243,10 @@ class CatalogManager:
         for t in test_tables:
             self._drop_table_if_exists(self.domain_schema, t)
 
+        # Note: Observation, ClinicalRecord, and ClinicalRecord_Observation are permanent
+        # schema tables (created in create_domain_schema), not dynamically created by tests.
+        # Like Image and Subject, they only need data clearing (done above), not table drops.
+
         # Clear catalog history snapshots
         self._clear_history()
 
