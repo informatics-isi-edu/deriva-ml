@@ -602,6 +602,37 @@ class TestDenormalizeEdgeCases:
         assert len(ml_tables) > 0, "Should have ML schema tables"
         assert len(domain_tables) > 0, "Should have domain schema tables"
 
+
+class TestDuplicateAssociationTables:
+    """Test denormalization when multiple association tables connect Dataset to the same element."""
+
+    def test_denormalize_with_duplicate_association_tables(self, dataset_test, tmp_path):
+        """Denormalize should work when schema has two association tables linking Dataset to Image.
+
+        Regression test for eye-ai bug where Image_Dataset and Dataset_Image both exist.
+        Only one has data; the other is empty. Merging both into the join path causes
+        INNER JOIN to return 0 rows.
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(["Image"])
+        # Should return rows even though Image_Dataset_Legacy has no data
+        assert len(df) > 0, (
+            "denormalize_as_dataframe returned empty DataFrame — "
+            "duplicate association table likely caused empty INNER JOIN"
+        )
+
+    def test_denormalize_dict_with_duplicate_association_tables(self, dataset_test, tmp_path):
+        """denormalize_as_dict should also work with duplicate association tables."""
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        rows = list(bag.denormalize_as_dict(["Image"]))
+        assert len(rows) > 0
+
 class TestDenormalizeSqlGeneration:
     """Test the SQL generation aspects of _denormalize."""
 
