@@ -403,6 +403,34 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         )
         ml_instance.apply_catalog_annotations()
 
+    # Create a second (redundant) association table between Dataset and Image.
+    # This simulates real-world catalogs (e.g., eye-ai) where both Image_Dataset
+    # and Dataset_Image exist as association tables linking Dataset to Image.
+    domain_schema = catalog.getCatalogModel().schemas[sname]
+    domain_schema.create_table(
+        TableDef(
+            name="Image_Dataset_Legacy",
+            columns=[
+                ColumnDef("Image", BuiltinType.text, nullok=False),
+                ColumnDef("Dataset_Ref", BuiltinType.text, nullok=False),
+            ],
+            foreign_keys=[
+                ForeignKeyDef(
+                    columns=["Image"],
+                    referenced_schema=sname,
+                    referenced_table="Image",
+                    referenced_columns=["RID"],
+                ),
+                ForeignKeyDef(
+                    columns=["Dataset_Ref"],
+                    referenced_schema="deriva-ml",
+                    referenced_table="Dataset",
+                    referenced_columns=["RID"],
+                ),
+            ],
+        )
+    )
+
     # Create Observation table with FK to Subject
     domain_schema.create_table(
         TableDef(

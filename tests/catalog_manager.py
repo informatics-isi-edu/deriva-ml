@@ -154,6 +154,7 @@ class CatalogManager:
 
         # Clear domain schema association tables
         domain_assoc_tables = [
+            "Image_Dataset_Legacy",
             "Dataset_Subject",
             "Dataset_Image",
             "Image_Subject",
