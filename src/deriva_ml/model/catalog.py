@@ -576,6 +576,48 @@ class DerivaModel:
             for path in self._schema_to_paths()
             if path[-1].name in include_tables and include_tables.intersection({p.name for p in path})
         ]
+
+        # Deduplicate paths that reach the same element via different association tables.
+        # In some catalogs (e.g., eye-ai), both Image_Dataset and Dataset_Image exist as
+        # association tables linking Dataset to Image. _schema_to_paths() discovers paths
+        # through both. If we merge them into a single join graph, the SQL JOINs through
+        # both association tables, and the empty one produces 0 rows via INNER JOIN.
+        #
+        # Fix: For each (element, endpoint) pair, if multiple paths differ only in the
+        # association table (path[1]), keep only one path per association table group.
+        # First-encountered path wins (both lead to same data).
+        deduplicated_paths = []
+        seen_element_endpoint = {}  # (element_name, endpoint_name) -> best path
+        for path in table_paths:
+            if len(path) < 3:
+                deduplicated_paths.append(path)
+                continue
+            assoc_table = path[1]  # Association table between Dataset and element
+            element = path[2]     # Element table
+            endpoint = path[-1]   # Final table
+            key = (element.name, endpoint.name)
+
+            # Check if assoc_table is actually an association table linking Dataset to element
+            if not self.is_association(assoc_table, pure=False):
+                deduplicated_paths.append(path)
+                continue
+
+            if key not in seen_element_endpoint:
+                seen_element_endpoint[key] = (path, assoc_table)
+                deduplicated_paths.append(path)
+            else:
+                existing_path, existing_assoc = seen_element_endpoint[key]
+                # Check if this is a different association table for the same element
+                if existing_assoc.name != assoc_table.name:
+                    # Same element via different association table — skip this duplicate path.
+                    # Keep the one already chosen (first wins; both lead to same data).
+                    pass
+                else:
+                    # Same association table, different endpoint path — keep both
+                    deduplicated_paths.append(path)
+
+        table_paths = deduplicated_paths
+
         paths_by_element = defaultdict(list)
         for p in table_paths:
             paths_by_element[p[2].name].append(p)
