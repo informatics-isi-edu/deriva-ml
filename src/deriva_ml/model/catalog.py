@@ -580,6 +580,65 @@ class DerivaModel:
         for p in table_paths:
             paths_by_element[p[2].name].append(p)
 
+        # Check for ambiguous paths to the same endpoint through different intermediates.
+        for element_table, paths in paths_by_element.items():
+            # Group paths by their final table (endpoint).
+            endpoints: dict[str, list[list[Table]]] = defaultdict(list)
+            for path in paths:
+                endpoint = path[-1].name
+                if endpoint in include_tables:
+                    endpoints[endpoint].append(path)
+
+            for endpoint, endpoint_paths in endpoints.items():
+                if len(endpoint_paths) > 1:
+                    # Multiple paths reach the same endpoint — check if user included
+                    # intermediate tables to disambiguate.
+                    path_intermediates = []
+                    for path in endpoint_paths:
+                        # Path structure: [Dataset, Dataset_X, element, ..., endpoint]
+                        # Intermediates are tables between the element (path[2]) and endpoint (path[-1]).
+                        intermediates = tuple(p.name for p in path[3:-1])
+                        path_intermediates.append(intermediates)
+
+                    # If all paths have identical intermediates, no ambiguity.
+                    if len(set(path_intermediates)) <= 1:
+                        continue
+
+                    # Check if user included enough intermediates to disambiguate.
+                    # A path is "selected" if all its intermediates are in include_tables.
+                    selected_paths = []
+                    for path, intermediates in zip(endpoint_paths, path_intermediates):
+                        if all(t in include_tables for t in intermediates):
+                            selected_paths.append((path, intermediates))
+
+                    if len(selected_paths) == 1:
+                        continue  # User disambiguated by including intermediates.
+
+                    # Build error message listing each path and suggesting intermediates.
+                    path_descriptions = []
+                    all_intermediates: set[str] = set()
+                    for path, intermediates in zip(endpoint_paths, path_intermediates):
+                        path_names = [p.name for p in path[2:]]  # Start from element table.
+                        path_descriptions.append(" → ".join(path_names))
+                        all_intermediates.update(intermediates)
+
+                    # Only suggest tables the user hasn't already included.
+                    suggestion_tables = all_intermediates - include_tables
+
+                    suggestion = ""
+                    if suggestion_tables:
+                        suggestion = (
+                            f"\nInclude an intermediate table to disambiguate "
+                            f"(e.g., add {', '.join(sorted(suggestion_tables))} to include_tables)."
+                        )
+
+                    raise DerivaMLException(
+                        f"Ambiguous path between {element_table} and {endpoint}: "
+                        f"found {len(endpoint_paths)} FK paths:\n"
+                        + "\n".join(f"  {d}" for d in path_descriptions)
+                        + suggestion
+                    )
+
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
         element_tables = {}
         for element_table, paths in paths_by_element.items():
@@ -647,9 +706,19 @@ class DerivaModel:
         relationships.extend(
             [(fk.referenced_columns[0], fk.foreign_key_columns[0]) for fk in table1.referenced_by if fk.table == table2]
         )
-        if len(relationships) != 1:
+        if len(relationships) == 0:
             raise DerivaMLException(
-                f"Ambiguous linkage between {table1.name} and {table2.name}: {[(r[0].name, r[1].name) for r in relationships]}"
+                f"No FK relationship found between {table1.name} and {table2.name}. "
+                f"These tables may not be directly connected. Check your include_tables list."
+            )
+        if len(relationships) > 1:
+            path_descriptions = []
+            for fk_col, pk_col in relationships:
+                path_descriptions.append(f"  {fk_col.table.name}.{fk_col.name} → {pk_col.table.name}.{pk_col.name}")
+            raise DerivaMLException(
+                f"Ambiguous linkage between {table1.name} and {table2.name}: "
+                f"found {len(relationships)} FK relationships:\n"
+                + "\n".join(path_descriptions)
             )
         return relationships[0]
 

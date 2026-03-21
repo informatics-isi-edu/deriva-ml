@@ -782,19 +782,18 @@ class Dataset:
         include_tables: list[str],
         version: DatasetVersion | str | None = None,
     ) -> Generator[dict[str, Any], None, None]:
-        """Denormalize dataset members by joining related tables.
+        """Denormalize dataset members by joining related tables via multi-hop FK chains.
 
-        This method creates a "wide table" view by joining related tables together using
-        the Deriva datapath API, producing rows that contain columns from all specified
-        tables. The result has outer join semantics - rows from tables without FK
-        relationships are included with NULL values for unrelated columns.
+        This method creates a "wide table" view by following FK relationships through
+        intermediate tables. Unlike the previous implementation, tables do NOT need to
+        be explicit dataset members — they just need to be FK-reachable from a member
+        table via the BFS chain built from include_tables.
 
         The method:
-        1. Gets the list of dataset members for each included table
-        2. For each member in the first table, follows foreign key relationships to
-           get related records from other tables
-        3. Tables without FK connections to the first table are included with NULLs
-        4. Includes nested dataset members recursively
+        1. Gets dataset members for the primary table (first table with members).
+        2. Uses BFS through include_tables to discover FK chains from primary table.
+        3. For each chain hop, pre-fetches records from the catalog using pathBuilder.
+        4. Builds output rows by walking the FK chain for each primary member.
 
         Args:
             include_tables: List of table names to include in the output.
@@ -802,7 +801,7 @@ class Dataset:
 
         Yields:
             dict[str, Any]: Rows with column names prefixed by table name (e.g., "Image_Filename").
-                Unrelated tables have NULL values for their columns.
+                Tables not reachable via FK from the primary table have NULL values.
 
         Note:
             Column names in the result are prefixed with the table name to avoid
@@ -822,7 +821,7 @@ class Dataset:
                 c.name for c in table.columns if c.name not in skip_columns
             ]
 
-        # Find the primary table (first non-empty table in include_tables)
+        # Find the primary table (first table in include_tables with dataset members)
         primary_table = None
         for table_name in include_tables:
             if table_name in members and members[table_name]:
@@ -833,50 +832,120 @@ class Dataset:
             # No data at all
             return
 
-        primary_table_obj = self._ml_instance.model.name_to_table(primary_table)
+        # Check for ambiguous FK paths before proceeding.
+        # Uses the same graph-based path analysis as the bag-side implementation,
+        # ensuring consistent ambiguity errors between catalog and bag denormalization.
+        self._ml_instance.model._prepare_wide_table(
+            self, self.rid, list(include_tables)
+        )
 
+        # BFS from primary table to discover FK chains through include_tables.
+        # fk_relationships maps target_name -> (from_table_name, fk_col, pk_col)
+        fk_relationships: dict[str, tuple] = {}
+        visited = {primary_table}
+        queue = [primary_table]
+        chain_order: list[str] = []
+
+        while queue:
+            current_name = queue.pop(0)
+            current_table = self._ml_instance.model.name_to_table(current_name)
+
+            for target_name in include_tables:
+                if target_name in visited:
+                    continue
+                target_table = self._ml_instance.model.name_to_table(target_name)
+
+                try:
+                    fk_col, pk_col = self._ml_instance.model._table_relationship(
+                        current_table, target_table
+                    )
+                    visited.add(target_name)
+                    queue.append(target_name)
+                    chain_order.append(target_name)
+                    fk_relationships[target_name] = (current_name, fk_col, pk_col)
+                except DerivaMLException as exc:
+                    # If it's ambiguous (multiple paths), re-raise immediately.
+                    # If it's just "no relationship", continue BFS.
+                    msg = str(exc)
+                    if "ambiguous" in msg.lower() or "multiple" in msg.lower():
+                        raise
+                    # Not directly connected — might be reachable via another table later
+
+        # Pre-fetch records for each table in chain order.
+        # Primary table records come from dataset members (already fetched).
+        # For non-member tables, fetch ALL records from the catalog and index by pk_col.
+        record_indexes: dict[str, dict[str, dict]] = {
+            primary_table: {m["RID"]: m for m in members[primary_table]}
+        }
+
+        pb = self._ml_instance.pathBuilder()
+
+        for target_name in chain_order:
+            from_table_name, fk_col, pk_col = fk_relationships[target_name]
+
+            # Collect FK values from the source table's records
+            fk_values = set()
+            for record in record_indexes.get(from_table_name, {}).values():
+                fk_value = record.get(fk_col.name)
+                if fk_value is not None:
+                    fk_values.add(fk_value)
+
+            if not fk_values:
+                record_indexes[target_name] = {}
+                continue
+
+            # Fetch ALL records from the target table and index by pk_col
+            target_table_obj = self._ml_instance.model.name_to_table(target_name)
+            pb_target = pb.schemas[target_table_obj.schema.name].tables[target_name]
+            all_target_records = list(pb_target.entities().fetch())
+            record_indexes[target_name] = {
+                r[pk_col.name]: r for r in all_target_records if r[pk_col.name] in fk_values
+            }
+
+        # Build output rows
         for member in members[primary_table]:
-            # Build the row with all columns from all tables
             row: dict[str, Any] = {}
 
             # Add primary table columns
             for col_name in table_columns[primary_table]:
-                prefixed_name = f"{primary_table}_{col_name}"
-                row[prefixed_name] = member.get(col_name)
+                row[f"{primary_table}_{col_name}"] = member.get(col_name)
 
-            # For each other table, try to join or add NULL values
-            for other_table_name in include_tables:
-                if other_table_name == primary_table:
+            # Add columns from each joined table
+            for target_name in include_tables:
+                if target_name == primary_table:
                     continue
 
-                other_table = self._ml_instance.model.name_to_table(other_table_name)
-                other_cols = table_columns[other_table_name]
+                other_cols = table_columns[target_name]
 
-                # Initialize all columns to None (outer join behavior)
+                # Initialize to None (outer join semantics)
                 for col_name in other_cols:
-                    prefixed_name = f"{other_table_name}_{col_name}"
-                    row[prefixed_name] = None
+                    row[f"{target_name}_{col_name}"] = None
 
-                # Try to find FK relationship and join
-                if other_table_name in members:
-                    try:
-                        relationship = self._ml_instance.model._table_relationship(
-                            primary_table_obj, other_table
-                        )
-                        fk_col, pk_col = relationship
+                # Walk the FK chain from primary to this target
+                if target_name in fk_relationships:
+                    # Build path from primary to target by tracing back
+                    path_to_target: list[str] = []
+                    t = target_name
+                    while t != primary_table:
+                        path_to_target.append(t)
+                        t = fk_relationships[t][0]
+                    path_to_target.reverse()
 
-                        # Look up the related record
-                        fk_value = member.get(fk_col.name)
-                        if fk_value:
-                            for other_member in members.get(other_table_name, []):
-                                if other_member.get(pk_col.name) == fk_value:
-                                    for col_name in other_cols:
-                                        prefixed_name = f"{other_table_name}_{col_name}"
-                                        row[prefixed_name] = other_member.get(col_name)
-                                    break
-                    except DerivaMLException:
-                        # No FK relationship - columns remain NULL (outer join)
-                        pass
+                    # Walk each hop
+                    current_record = member
+                    found = True
+                    for hop_target in path_to_target:
+                        _, fk_c, _pk_c = fk_relationships[hop_target]
+                        fk_value = current_record.get(fk_c.name)
+                        if fk_value is not None and fk_value in record_indexes.get(hop_target, {}):
+                            current_record = record_indexes[hop_target][fk_value]
+                        else:
+                            found = False
+                            break
+
+                    if found:
+                        for col_name in other_cols:
+                            row[f"{target_name}_{col_name}"] = current_record.get(col_name)
 
             yield row
 

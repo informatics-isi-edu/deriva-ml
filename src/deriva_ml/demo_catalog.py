@@ -20,7 +20,7 @@ from random import choice, randint, random
 from tempfile import TemporaryDirectory
 
 from deriva.core import BaseCLI, ErmrestCatalog
-from deriva.core.typed import BuiltinType, ColumnDef, SchemaDef, TableDef
+from deriva.core.typed import BuiltinType, ColumnDef, ForeignKeyDef, SchemaDef, TableDef
 from pydantic import BaseModel, ConfigDict
 from requests.exceptions import HTTPError
 
@@ -67,6 +67,49 @@ def populate_demo_catalog(execution: Execution) -> None:
             f.write(f"Hello there {random()}\n")
 
     execution.upload_execution_outputs()
+
+    # Create Observations (one per Subject)
+    pb = ml_instance.domain_path()
+    observation_records = []
+    for s in ss:
+        observation_records.append({
+            "Subject": s["RID"],
+            "Observation_Date": datetime.now().date().isoformat(),
+        })
+    observation_table = pb.tables["Observation"]
+    observations = list(observation_table.insert(observation_records))
+
+    # Link Images to Observations via Subject-keyed matching
+    # (ERMrest doesn't guarantee fetch order, so match by Subject FK)
+    obs_by_subject = {obs["Subject"]: obs["RID"] for obs in observations}
+    image_table = pb.tables["Image"]
+    all_images = list(image_table.path.entities().fetch())
+    for img in all_images:
+        obs_rid = obs_by_subject.get(img["Subject"])
+        if obs_rid:
+            image_table.path.filter(image_table.RID == img["RID"]).update(
+                [{"RID": img["RID"], "Observation": obs_rid}]
+            )
+
+    # Create ClinicalRecords
+    clinical_records = []
+    for i, obs in enumerate(observations):
+        clinical_records.append({
+            "Diagnosis": f"Diagnosis_{i}",
+            "Notes": f"Notes for observation {obs['RID']}",
+        })
+    cr_table = pb.tables["ClinicalRecord"]
+    crs = list(cr_table.insert(clinical_records))
+
+    # Create ClinicalRecord_Observation associations
+    assoc_records = []
+    for cr, obs in zip(crs, observations):
+        assoc_records.append({
+            "ClinicalRecord": cr["RID"],
+            "Observation_Ref": obs["RID"],
+        })
+    cr_obs_table = pb.tables["ClinicalRecord_Observation"]
+    cr_obs_table.insert(assoc_records)
 
 
 class DatasetDescription(BaseModel):
@@ -359,6 +402,76 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
             update_navbar=False,
         )
         ml_instance.apply_catalog_annotations()
+
+    # Create Observation table with FK to Subject
+    domain_schema.create_table(
+        TableDef(
+            name="Observation",
+            columns=[
+                ColumnDef("Observation_Date", BuiltinType.date),
+                ColumnDef("Subject", BuiltinType.text, nullok=False),
+            ],
+            foreign_keys=[
+                ForeignKeyDef(
+                    columns=["Subject"],
+                    referenced_schema=sname,
+                    referenced_table="Subject",
+                    referenced_columns=["RID"],
+                )
+            ],
+        )
+    )
+
+    # Add FK from Image to Observation (nullable, keeps existing Image -> Subject FK)
+    # Refresh model to pick up the newly created Observation table
+    model = catalog.getCatalogModel()
+    domain_schema = model.schemas[sname]
+    image_table = domain_schema.tables["Image"]
+    image_table.create_column(ColumnDef("Observation", BuiltinType.text, nullok=True))
+    image_table.create_fkey(
+        ForeignKeyDef(
+            columns=["Observation"],
+            referenced_schema=sname,
+            referenced_table="Observation",
+            referenced_columns=["RID"],
+        )
+    )
+
+    # Create ClinicalRecord table
+    domain_schema.create_table(
+        TableDef(
+            name="ClinicalRecord",
+            columns=[
+                ColumnDef("Diagnosis", BuiltinType.text),
+                ColumnDef("Notes", BuiltinType.text, nullok=True),
+            ],
+        )
+    )
+
+    # Create ClinicalRecord_Observation association table
+    domain_schema.create_table(
+        TableDef(
+            name="ClinicalRecord_Observation",
+            columns=[
+                ColumnDef("ClinicalRecord", BuiltinType.text, nullok=False),
+                ColumnDef("Observation_Ref", BuiltinType.text, nullok=False),
+            ],
+            foreign_keys=[
+                ForeignKeyDef(
+                    columns=["ClinicalRecord"],
+                    referenced_schema=sname,
+                    referenced_table="ClinicalRecord",
+                    referenced_columns=["RID"],
+                ),
+                ForeignKeyDef(
+                    columns=["Observation_Ref"],
+                    referenced_schema=sname,
+                    referenced_table="Observation",
+                    referenced_columns=["RID"],
+                ),
+            ],
+        )
+    )
 
 
 def destroy_demo_catalog(catalog):
