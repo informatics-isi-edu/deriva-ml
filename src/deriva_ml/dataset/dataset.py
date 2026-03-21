@@ -836,7 +836,7 @@ class Dataset:
         # Uses the same graph-based path analysis as the bag-side implementation,
         # ensuring consistent ambiguity errors between catalog and bag denormalization.
         self._ml_instance.model._prepare_wide_table(
-            self, self.rid, list(include_tables)
+            self, self.dataset_rid, list(include_tables)
         )
 
         # BFS from primary table to discover FK chains through include_tables.
