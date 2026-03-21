@@ -606,7 +606,7 @@ class TestDenormalizeEdgeCases:
 class TestDuplicateAssociationTables:
     """Test denormalization when multiple association tables connect Dataset to the same element."""
 
-    def test_denormalize_with_duplicate_association_tables(self, dataset_test, tmp_path):
+    def test_denormalize_with_duplicate_association_tables(self, dataset_test):
         """Denormalize should work when schema has two association tables linking Dataset to Image.
 
         Regression test for eye-ai bug where Image_Dataset and Dataset_Image both exist.
@@ -624,7 +624,7 @@ class TestDuplicateAssociationTables:
             "duplicate association table likely caused empty INNER JOIN"
         )
 
-    def test_denormalize_dict_with_duplicate_association_tables(self, dataset_test, tmp_path):
+    def test_denormalize_dict_with_duplicate_association_tables(self, dataset_test):
         """denormalize_as_dict should also work with duplicate association tables."""
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
