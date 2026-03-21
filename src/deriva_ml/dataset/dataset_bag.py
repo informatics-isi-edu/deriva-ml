@@ -989,7 +989,10 @@ class DatasetBag:
         See Also:
             denormalize_as_dict: Generator version for memory-efficient processing.
         """
-        rows = list(self._denormalize_from_members(include_tables=include_tables))
+        sql_stmt = self._denormalize(include_tables=include_tables)
+        with Session(self.engine) as session:
+            result = session.execute(sql_stmt)
+            rows = [dict(row._mapping) for row in result]
         return pd.DataFrame(rows)
 
     def denormalize_as_dict(
@@ -1050,7 +1053,11 @@ class DatasetBag:
         See Also:
             denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
-        yield from self._denormalize_from_members(include_tables=include_tables)
+        sql_stmt = self._denormalize(include_tables=include_tables)
+        with Session(self.engine) as session:
+            result = session.execute(sql_stmt)
+            for row in result:
+                yield dict(row._mapping)
 
 
     # =========================================================================
