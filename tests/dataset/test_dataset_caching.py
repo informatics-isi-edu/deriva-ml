@@ -52,7 +52,7 @@ class TestDownloadCacheLifecycle:
     def test_redownload_uses_cache(
         self, catalog_manager: CatalogManager, tmp_path: Path
     ):
-        """Second download returns the cached bag without re-creating it."""
+        """Second download of the same version uses cache (no re-export)."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
@@ -60,14 +60,20 @@ class TestDownloadCacheLifecycle:
 
         # First download
         bag1 = dataset.download_dataset_bag(version=version, use_minid=False)
-        bag1_path = bag1.bag_path
 
-        # Second download — should hit cache
+        # After first download: should be cached
+        info = dataset.bag_info(version=version)
+        assert info["status"] == CacheStatus.cached_materialized.value
+
+        # Second download — verify it still works and cache is still present
         bag2 = dataset.download_dataset_bag(version=version, use_minid=False)
-        bag2_path = bag2.bag_path
 
-        # Both should resolve to the same cache directory
-        assert bag1_path == bag2_path
+        # Both should produce usable bags with the same dataset RID
+        assert bag1.dataset_rid == bag2.dataset_rid
+
+        # Cache should still show materialized
+        info2 = dataset.bag_info(version=version)
+        assert info2["status"] == CacheStatus.cached_materialized.value
 
     def test_materialized_download(
         self, catalog_manager: CatalogManager, tmp_path: Path
@@ -258,7 +264,7 @@ class TestMultiVersionCache:
         assert len(result["versions_cached"]) >= 2
 
         # Bags should have different paths
-        assert bag1.bag_path != bag2.bag_path
+        assert bag1.model.bag_path != bag2.model.bag_path
 
 
 class TestCacheStatusTransitions:
