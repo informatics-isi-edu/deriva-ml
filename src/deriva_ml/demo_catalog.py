@@ -50,46 +50,41 @@ TEST_DATASET_SIZE = 12
 
 
 def populate_demo_catalog(execution: Execution) -> None:
-    # Delete any vocabularies and features.
     ml_instance = execution._ml_object
     domain_schema = ml_instance.domain_path()
+
+    # Create Subjects
     subject = domain_schema.tables["Subject"]
     ss = subject.insert([{"Name": f"Thing{t + 1}"} for t in range(TEST_DATASET_SIZE)])
-    for s in ss:
-        image_file = execution.asset_file_path(
-            "Image",
-            f"test_{s['RID']}.txt",
-            Subject=s["RID"],
-            Acquisition_Time=datetime.now(),
-            Acquisition_Date=datetime.now().date(),
-        )
-        with image_file.open("w") as f:
-            f.write(f"Hello there {random()}\n")
 
-    execution.upload_execution_outputs()
-
-    # Create Observations (one per Subject)
-    pb = ml_instance.domain_path()
+    # Create Observations (one per Subject) — before images, so we can
+    # include Observation FK in the image metadata for upload regex matching.
     observation_records = []
     for s in ss:
         observation_records.append({
             "Subject": s["RID"],
             "Observation_Date": datetime.now().date().isoformat(),
         })
-    observation_table = pb.tables["Observation"]
+    observation_table = domain_schema.tables["Observation"]
     observations = list(observation_table.insert(observation_records))
-
-    # Link Images to Observations via Subject-keyed matching
-    # (ERMrest doesn't guarantee fetch order, so match by Subject FK)
     obs_by_subject = {obs["Subject"]: obs["RID"] for obs in observations}
-    image_table = pb.tables["Image"]
-    all_images = list(image_table.path.entities().fetch())
-    for img in all_images:
-        obs_rid = obs_by_subject.get(img["Subject"])
-        if obs_rid:
-            image_table.path.filter(image_table.RID == img["RID"]).update(
-                [{"RID": img["RID"], "Observation": obs_rid}]
-            )
+
+    # Register image assets with all metadata columns (Subject, Observation,
+    # Acquisition_Date, Acquisition_Time). All metadata must be present because
+    # the upload regex expects a directory level for each metadata column.
+    for s in ss:
+        image_file = execution.asset_file_path(
+            "Image",
+            f"test_{s['RID']}.txt",
+            Subject=s["RID"],
+            Observation=obs_by_subject[s["RID"]],
+            Acquisition_Time=datetime.now().isoformat(),
+            Acquisition_Date=datetime.now().date().isoformat(),
+        )
+        with image_file.open("w") as f:
+            f.write(f"Hello there {random()}\n")
+
+    execution.upload_execution_outputs()
 
     # Create ClinicalRecords
     clinical_records = []
@@ -98,7 +93,7 @@ def populate_demo_catalog(execution: Execution) -> None:
             "Diagnosis": f"Diagnosis_{i}",
             "Notes": f"Notes for observation {obs['RID']}",
         })
-    cr_table = pb.tables["ClinicalRecord"]
+    cr_table = domain_schema.tables["ClinicalRecord"]
     crs = list(cr_table.insert(clinical_records))
 
     # Create ClinicalRecord_Observation associations
@@ -108,7 +103,7 @@ def populate_demo_catalog(execution: Execution) -> None:
             "ClinicalRecord": cr["RID"],
             "Observation_Ref": obs["RID"],
         })
-    cr_obs_table = pb.tables["ClinicalRecord_Observation"]
+    cr_obs_table = domain_schema.tables["ClinicalRecord_Observation"]
     cr_obs_table.insert(assoc_records)
 
 
