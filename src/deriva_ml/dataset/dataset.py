@@ -2463,7 +2463,32 @@ class Dataset:
         except StopIteration:
             raise DerivaMLException(f"Version {version_str} does not exist for RID {self.dataset_rid}")
 
-        # Check or create MINID
+        # =====================================================================
+        # Step 1: Check local deterministic cache (cheapest — filesystem only).
+        # The snapshot is immutable, so any cached directory matching it has
+        # identical data regardless of how the bag was originally created
+        # (MINID or client-side). This check applies to BOTH paths.
+        # =====================================================================
+        snapshot = version_record.snapshot
+        snapshot_suffix = f"_{snapshot}"
+        for cached_dir in self._ml_instance.cache_dir.glob(f"{self.dataset_rid}_*{snapshot_suffix}"):
+            cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
+            if cached_bag_path.exists():
+                self._logger.info(
+                    "Local cache hit for %s version %s (snapshot match: %s)",
+                    self.dataset_rid, version, cached_dir.name,
+                )
+                cache_suffix = cached_dir.name[len(self.dataset_rid) + 1:]
+                return DatasetMinid(
+                    dataset_version=version,
+                    RID=f"{self.dataset_rid}@{snapshot}",
+                    location=cached_bag_path.parent.as_uri(),
+                    checksums=[{"function": "sha256", "value": cache_suffix}],
+                )
+
+        # =====================================================================
+        # Step 2: No local cache. Try MINID (S3) or generate client-side.
+        # =====================================================================
         minid_url = version_record.minid
 
         if use_minid:
@@ -2500,30 +2525,9 @@ class Dataset:
             )
             return self._fetch_minid_metadata(version, minid_url)
 
-        # use_minid=False: check deterministic cache first, then regenerate if needed.
+        # use_minid=False: generate bag client-side.
         if not create and not minid_url:
             raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-
-        # Deterministic cache: snapshot uniquely identifies catalog state for this version.
-        # Check all cache entries for this RID that match the snapshot suffix.
-        # This avoids recomputing the spec hash entirely for cache hits.
-        snapshot = version_record.snapshot
-        snapshot_suffix = f"_{snapshot}"
-        for cached_dir in self._ml_instance.cache_dir.glob(f"{self.dataset_rid}_*{snapshot_suffix}"):
-            cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
-            if cached_bag_path.exists():
-                self._logger.info(
-                    "Deterministic cache hit for %s version %s (snapshot match: %s)",
-                    self.dataset_rid, version, cached_dir.name,
-                )
-                # Extract the cache suffix from directory name for _download_dataset_minid
-                cache_suffix = cached_dir.name[len(self.dataset_rid) + 1:]
-                return DatasetMinid(
-                    dataset_version=version,
-                    RID=f"{self.dataset_rid}@{snapshot}",
-                    location=cached_bag_path.parent.as_uri(),
-                    checksums=[{"function": "sha256", "value": cache_suffix}],
-                )
 
         # Cache miss — compute spec and generate bag.
         import hashlib
