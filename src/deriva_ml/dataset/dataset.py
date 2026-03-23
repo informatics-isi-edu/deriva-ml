@@ -2058,7 +2058,10 @@ class Dataset:
             else:
                 exporter = DerivaExport(host=self._ml_instance.catalog.deriva_server.server, output_dir=tmp_dir)
                 archive_path = exporter.retrieve_file(minid.bag_url)
-            if not use_minid:
+            if not use_minid and not minid.checksum:
+                # No pre-computed cache key — compute SHA-256 as fallback.
+                # When a deterministic cache key (spec_hash+snapshot) is already
+                # set in minid.checksum, we use that instead.
                 hashes = hash_utils.compute_file_hashes(archive_path, hashes=["md5", "sha256"])
                 checksum = hashes["sha256"][0]
                 bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{checksum}"
@@ -2497,14 +2500,59 @@ class Dataset:
             )
             return self._fetch_minid_metadata(version, minid_url)
 
-        # use_minid=False: always regenerate bag client-side (caching handled by sha256 in _download_dataset_minid).
+        # use_minid=False: check deterministic cache first, then regenerate if needed.
         if not create and not minid_url:
             raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-        minid_url = self._create_dataset_minid(version, use_minid=False, exclude_tables=exclude_tables, timeout=timeout)
+
+        # Deterministic cache: snapshot uniquely identifies catalog state for this version.
+        # Check all cache entries for this RID that match the snapshot suffix.
+        # This avoids recomputing the spec hash entirely for cache hits.
+        snapshot = version_record.snapshot
+        snapshot_suffix = f"_{snapshot}"
+        for cached_dir in self._ml_instance.cache_dir.glob(f"{self.dataset_rid}_*{snapshot_suffix}"):
+            cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
+            if cached_bag_path.exists():
+                self._logger.info(
+                    "Deterministic cache hit for %s version %s (snapshot match: %s)",
+                    self.dataset_rid, version, cached_dir.name,
+                )
+                # Extract the cache suffix from directory name for _download_dataset_minid
+                cache_suffix = cached_dir.name[len(self.dataset_rid) + 1:]
+                return DatasetMinid(
+                    dataset_version=version,
+                    RID=f"{self.dataset_rid}@{snapshot}",
+                    location=cached_bag_path.parent.as_uri(),
+                    checksums=[{"function": "sha256", "value": cache_suffix}],
+                )
+
+        # Cache miss — compute spec and generate bag.
+        import hashlib
+        version_snapshot_catalog = self._version_snapshot_catalog(version)
+        downloader = CatalogGraph(
+            version_snapshot_catalog,
+            s3_bucket=self._ml_instance.s3_bucket,
+            use_minid=False,
+            exclude_tables=exclude_tables,
+        )
+        spec = downloader.generate_dataset_download_spec(self)
+        spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
+
+        self._logger.info(
+            "Deterministic cache miss for %s version %s — generating bag",
+            self.dataset_rid, version,
+        )
+        minid_url = self._create_dataset_minid(
+            version, use_minid=False, exclude_tables=exclude_tables,
+            spec=spec, spec_hash=spec_hash, timeout=timeout,
+        )
+        # Pass the deterministic cache key suffix so _download_dataset_minid
+        # stores the bag under the predictable name for future cache hits.
+        cache_suffix = f"{spec_hash[:16]}_{snapshot}"
         return DatasetMinid(
             dataset_version=version,
-            RID=f"{self.dataset_rid}@{version_record.snapshot}",
+            RID=f"{self.dataset_rid}@{snapshot}",
             location=minid_url,
+            checksums=[{"function": "sha256", "value": cache_suffix}],
         )
 
     def _fetch_minid_metadata(self, version: DatasetVersion, url: str) -> DatasetMinid:
