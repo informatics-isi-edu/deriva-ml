@@ -178,12 +178,7 @@ The MCP server coordinates catalog records. The skill (or Python library) handle
 
 **Current:** In-process ChromaDB with fastembed ONNX model (~150MB RAM). Single collection shared across users. Schema indexed per-catalog, docs indexed globally.
 
-**Multi-tenant options:**
-1. **Chroma server mode** — Run ChromaDB as a separate service, shared by all MCP instances
-2. **External vector DB** — Replace with Postgres pgvector or Qdrant
-3. **Per-user index** — Each user gets isolated collection (memory expensive)
-
-**Recommendation:** Move to Chroma server mode for the first multi-tenant deployment. The ONNX embedding model stays in-process (read-only, shared). Collections get per-user prefixes for isolation.
+**Decision:** Keep ChromaDB for now. A better multi-tenant RAG solution is being developed separately and will replace this when ready. No investment in Chroma server mode or external vector DB migration at this time.
 
 ## Background Tasks
 
@@ -227,7 +222,7 @@ Several current Tools are pure read operations that fit the MCP Resource pattern
 
 ### Phase 3: Remove Local State from MCP
 
-1. Externalize RAG to Chroma server
+1. RAG: keep ChromaDB for now; replace with multi-tenant RAG service when available
 2. Replace in-memory task tracking with Redis
 3. Remove filesystem-dependent tools from remote MCP profile
 4. Introduce `local` vs `remote` server profiles
@@ -242,7 +237,7 @@ Several current Tools are pure read operations that fit the MCP Resource pattern
 ## Open Questions
 
 1. **Result cache location:** Move entirely to skills (SQLite on client), keep in MCP (shared Redis), or hybrid?
-2. **RAG index sharing:** Should doc chunks be global (shared) with schema chunks per-catalog-per-user?
+2. **RAG replacement:** A multi-tenant RAG service is being developed separately. Keep ChromaDB until then.
 3. **Asset upload path:** Should skills upload directly to Hatrac, or go through MCP as proxy?
 4. **Server profiles:** One codebase with feature flags, or separate packages?
 
