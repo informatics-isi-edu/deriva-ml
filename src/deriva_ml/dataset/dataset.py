@@ -1032,6 +1032,50 @@ class Dataset:
         rows = list(self._denormalize_datapath(include_tables, version))
         return pd.DataFrame(rows)
 
+    def cache_denormalized(
+        self,
+        include_tables: list[str],
+        version: str | None = None,
+        force: bool = False,
+    ) -> pd.DataFrame:
+        """Denormalize dataset tables and cache the result locally as SQLite.
+
+        On first call, computes the denormalized join and stores it in the
+        working data cache. Subsequent calls return the cached data without
+        re-computing the join. Use ``force=True`` to re-compute.
+
+        The cache key is derived from the dataset RID, sorted table names,
+        and version, so different combinations are cached independently.
+
+        Args:
+            include_tables: List of table names to include in the join.
+            version: Dataset version to query. Defaults to current version.
+            force: If True, re-compute even if already cached.
+
+        Returns:
+            DataFrame with the denormalized wide table.
+
+        Example::
+
+            dataset = ml.lookup_dataset("28CT")
+            df = dataset.cache_denormalized(["Image", "Diagnosis"], version="1.0.0")
+            print(df["Image.Filename"].head())
+
+            # Second call returns cached data instantly
+            df = dataset.cache_denormalized(["Image", "Diagnosis"], version="1.0.0")
+        """
+        cache_key = f"denorm_{self.rid}_{'_'.join(sorted(include_tables))}"
+        if version:
+            cache_key += f"_v{version.replace('.', '_')}"
+
+        cache = self._ml.working_data
+        if not force and cache.has_table(cache_key):
+            return cache.read_table(cache_key)
+
+        df = self.denormalize_as_dataframe(include_tables, version=version)
+        cache.cache_table(cache_key, df)
+        return df
+
     def denormalize_as_dict(
         self,
         include_tables: list[str],
