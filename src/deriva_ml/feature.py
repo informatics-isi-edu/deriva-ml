@@ -431,6 +431,8 @@ class Feature:
                     return int
                 case "float4" | "float8":
                     return float
+                case "boolean":
+                    return bool
                 case _:
                     return str
 
