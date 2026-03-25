@@ -358,6 +358,7 @@ def run_model(
     ml_class: type["DerivaML"] | None = None,
     upload_timeout: int = 600,
     upload_chunk_size: int = 50_000_000,
+    script_config: Any = None,
 ) -> None:
     """
     Execute a machine learning model within a DerivaML execution context.
@@ -582,11 +583,14 @@ def run_model(
             # In dry run mode, skip model execution but still test the setup
             logging.info("Dry run mode: skipping model execution")
         else:
-            # Invoke the model configuration callable. The model_config is a
-            # hydra-zen wrapped function that has been partially configured with
-            # all model-specific parameters (e.g., learning rate, batch size).
-            # We provide the runtime context here.
-            model_config(ml_instance=ml_instance, execution=exec_context)
+            # Determine which callable to invoke. script_config takes precedence
+            # over model_config when both are provided — this allows skill-generated
+            # scripts to use a separate config group while sharing the same runner.
+            callable_config = script_config if script_config is not None else model_config
+            # Invoke the configuration callable. It has been partially configured
+            # with all parameters via hydra-zen builds(). We provide the runtime
+            # context here.
+            callable_config(ml_instance=ml_instance, execution=exec_context)
 
     # ---------------------------------------------------------------------------
     # Upload results to the catalog

@@ -112,6 +112,7 @@ class BaseConfig:
     dry_run: bool = False
     description: str = ""
     config_choices: dict[str, str] = field(default_factory=dict)
+    script_config: Any = None
 
 
 # Create and register the base config with hydra-zen store.
