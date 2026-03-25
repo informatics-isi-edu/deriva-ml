@@ -183,7 +183,7 @@ class DatasetMixin:
 
         # Add table to map.
         element_table = self.model.name_to_table(element)
-        atable_def = self.model.define_association(
+        atable_def = self.model._define_association(
             associates=[self._dataset_table, element_table],
         )
         try:

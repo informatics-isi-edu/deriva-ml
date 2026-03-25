@@ -164,7 +164,7 @@ class FeatureMixin:
         atable_name = f"Execution_{target_table.name}_{feature_name_term.name}"
         # Create an association table implementing the feature
         atable = self.model.create_table(
-            self.model.define_association(
+            self.model._define_association(
                 table_name=atable_name,
                 associates=[execution, target_table, feature_name_table],
                 metadata=[normalize_metadata(m) for m in chain(assets, terms, metadata)],

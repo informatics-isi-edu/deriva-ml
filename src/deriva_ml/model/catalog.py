@@ -895,7 +895,7 @@ class DerivaModel:
         table_dict = table_def.to_dict() if hasattr(table_def, 'to_dict') else table_def
         return self.model.schemas[schema].create_table(table_dict)
 
-    def define_association(
+    def _define_association(
         self,
         associates: list,
         metadata: list | None = None,
