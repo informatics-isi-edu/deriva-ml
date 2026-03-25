@@ -1117,6 +1117,55 @@ class DerivaML(
 
         return new_table
 
+    def define_association(
+        self,
+        associates: list,
+        metadata: list | None = None,
+        table_name: str | None = None,
+        comment: str | None = None,
+        **kwargs,
+    ) -> dict:
+        """Build an association table definition with vocab-aware key selection.
+
+        Creates a table definition that links two or more tables via an association
+        (many-to-many) table. Non-vocabulary tables automatically use RID as the
+        foreign key target, while vocabulary tables use their Name key.
+
+        Use with ``create_table()`` to create the association table in the catalog.
+
+        Args:
+            associates: Tables to associate. Each item can be:
+                - A Table object
+                - A (name, Table) tuple to customize the column name
+                - A (name, nullok, Table) tuple for nullable references
+                - A Key object for explicit key selection
+            metadata: Additional metadata columns or reference targets.
+            table_name: Name for the association table. Auto-generated if omitted.
+            comment: Comment for the association table.
+            **kwargs: Additional arguments passed to Table.define_association.
+
+        Returns:
+            Table definition dict suitable for ``create_table()``.
+
+        Example::
+
+            # Associate Image with Subject (many-to-many)
+            image_table = ml.model.name_to_table("Image")
+            subject_table = ml.model.name_to_table("Subject")
+            assoc_def = ml.define_association(
+                associates=[image_table, subject_table],
+                comment="Links images to subjects",
+            )
+            ml.create_table(assoc_def)
+        """
+        return self.model._define_association(
+            associates=associates,
+            metadata=metadata,
+            table_name=table_name,
+            comment=comment,
+            **kwargs,
+        )
+
     # =========================================================================
     # Cache and Directory Management
     # =========================================================================
