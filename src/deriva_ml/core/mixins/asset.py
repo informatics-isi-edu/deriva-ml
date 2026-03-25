@@ -99,11 +99,11 @@ class AssetMixin:
 
         # Create an association table between asset and asset type
         self.model.create_table(
-            Table.define_association(
-                [
+            self.model.define_association(
+                associates=[
                     (asset_table.name, asset_table),
                     ("Asset_Type", self.model.name_to_table("Asset_Type")),
-                ]
+                ],
             ),
             schema=schema,
         )
@@ -114,14 +114,14 @@ class AssetMixin:
 
         # Create an association table for tracking execution
         atable = self.model.create_table(
-            Table.define_association(
-                [
+            self.model.define_association(
+                associates=[
                     (asset_name, asset_table),
                     (
                         "Execution",
                         self.model.schemas[self.ml_schema].tables["Execution"],
                     ),
-                ]
+                ],
             ),
             schema=schema,
         )

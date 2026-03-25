@@ -182,12 +182,9 @@ class DatasetMixin:
         from deriva_ml.dataset.catalog_graph import CatalogGraph
 
         # Add table to map.
-        # Force RID as the FK target — the default heuristic prefers 'id' or 'Name' columns,
-        # which can pick domain-specific integer keys in cloned catalogs.
         element_table = self.model.name_to_table(element)
-        atable_def = Table.define_association(
-            [self._dataset_table, element_table],
-            key_column_search_order=["RID"],
+        atable_def = self.model.define_association(
+            associates=[self._dataset_table, element_table],
         )
         try:
             table = self.model.create_table(atable_def)

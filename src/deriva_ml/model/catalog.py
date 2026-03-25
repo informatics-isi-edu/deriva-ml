@@ -22,6 +22,7 @@ _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
 Column = _ermrest_model.Column
 FindAssociationResult = _ermrest_model.FindAssociationResult
+Key = _ermrest_model.Key
 Model = _ermrest_model.Model
 Schema = _ermrest_model.Schema
 Table = _ermrest_model.Table
@@ -893,3 +894,56 @@ class DerivaModel:
         # Handle both TableDefinition (dataclass with to_dict) and plain dicts
         table_dict = table_def.to_dict() if hasattr(table_def, 'to_dict') else table_def
         return self.model.schemas[schema].create_table(table_dict)
+
+    def define_association(
+        self,
+        associates: list,
+        metadata: list | None = None,
+        table_name: str | None = None,
+        comment: str | None = None,
+        **kwargs,
+    ) -> dict:
+        """Build an association table definition with vocab-aware key selection.
+
+        Wraps Table.define_association to ensure non-vocabulary tables use RID
+        as their foreign key target. The default key search heuristic in
+        define_association prefers Name/ID keys over RID, which is correct for
+        vocabulary tables (FK to human-readable Name) but wrong for domain
+        tables that happen to have non-nullable Name or ID keys (e.g., tables
+        in cloned catalogs like FaceBase).
+
+        Args:
+            associates: Reference targets being associated (Table, Key, or tuples).
+            metadata: Additional metadata fields and/or reference targets.
+            table_name: Name for the association table.
+            comment: Comment for the association table.
+            **kwargs: Additional arguments passed to Table.define_association.
+
+        Returns:
+            Table definition dict suitable for create_table.
+        """
+        metadata = metadata or []
+
+        def _resolve_key(ref):
+            """Convert non-vocabulary Table references to their RID Key."""
+            if isinstance(ref, tuple):
+                # (name, Table) or (name, nullok, Table) — resolve the Table element
+                items = list(ref)
+                table_obj = items[-1]
+                if isinstance(table_obj, Table) and not table_obj.is_vocabulary():
+                    items[-1] = table_obj.key_by_columns(["RID"])
+                return tuple(items)
+            elif isinstance(ref, Table) and not ref.is_vocabulary():
+                return ref.key_by_columns(["RID"])
+            return ref  # Key objects or vocabulary Tables pass through
+
+        resolved_associates = [_resolve_key(a) for a in associates]
+        resolved_metadata = [_resolve_key(m) for m in metadata]
+
+        return Table.define_association(
+            associates=resolved_associates,
+            metadata=resolved_metadata,
+            table_name=table_name,
+            comment=comment,
+            **kwargs,
+        )
