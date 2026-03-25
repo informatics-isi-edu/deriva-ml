@@ -579,17 +579,20 @@ def run_model(
     # The context manager handles setup (downloading datasets, creating output
     # directories) and teardown (recording completion status, timing).
     with execution.execute() as exec_context:
+        # Determine which callable to invoke. script_config takes precedence
+        # over model_config when both are provided — this allows skill-generated
+        # scripts to use a separate config group while sharing the same runner.
+        callable_config = script_config if script_config is not None else model_config
         if dry_run:
-            # In dry run mode, skip model execution but still test the setup
-            logging.info("Dry run mode: skipping model execution")
+            if script_config is not None:
+                # Script configs handle dry run internally by checking
+                # execution=None and printing a preview instead of writing.
+                logging.info("Dry run mode: running script preview")
+                callable_config(ml_instance=ml_instance, execution=None)
+            else:
+                # Model configs may not handle execution=None, so skip entirely.
+                logging.info("Dry run mode: skipping model execution")
         else:
-            # Determine which callable to invoke. script_config takes precedence
-            # over model_config when both are provided — this allows skill-generated
-            # scripts to use a separate config group while sharing the same runner.
-            callable_config = script_config if script_config is not None else model_config
-            # Invoke the configuration callable. It has been partially configured
-            # with all parameters via hydra-zen builds(). We provide the runtime
-            # context here.
             callable_config(ml_instance=ml_instance, execution=exec_context)
 
     # ---------------------------------------------------------------------------
