@@ -60,9 +60,13 @@ T = TypeVar("T")
 # be part of the Hydra structured config schema.
 _captured_hydra_output_dir: str | None = None
 
-# Standard hydra defaults for DerivaML applications.
-# Projects can customize these or define their own defaults.
-base_defaults = [
+#: Standard hydra defaults for DerivaML applications.
+#:
+#: This list specifies the default configuration groups and their selected
+#: config names that are applied to every DerivaML hydra-zen application
+#: unless overridden.  Projects can customize these or supply their own
+#: defaults list when calling :func:`notebook_config` or ``builds()``.
+base_defaults: list[str | dict[str, str]] = [
     "_self_",
     {"deriva_ml": "default_deriva"},
     {"datasets": "default_dataset"},
@@ -115,8 +119,11 @@ class BaseConfig:
     script_config: Any = None
 
 
-# Create and register the base config with hydra-zen store.
-# This provides a ready-to-use base that experiments can inherit from.
+#: Pre-built hydra-zen configuration class for :class:`BaseConfig`.
+#:
+#: Created via ``builds(BaseConfig, ...)`` with :data:`base_defaults` applied.
+#: Register it in the hydra store as ``"deriva_base"`` and use it as the
+#: parent config for experiment configurations that do not need custom fields.
 DerivaBaseConfig = builds(
     BaseConfig,
     populate_full_signature=True,

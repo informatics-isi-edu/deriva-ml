@@ -380,10 +380,26 @@ class DerivaML(
         return session_config
 
     def is_snapshot(self) -> bool:
+        """Check whether this DerivaML instance is connected to a catalog snapshot.
+
+        Returns:
+            True if the underlying catalog has a snapshot timestamp, False otherwise.
+        """
         return hasattr(self.catalog, "_snaptime")
 
     def catalog_snapshot(self, version_snapshot: str) -> Self:
-        """Returns a DerivaML instance for a specific snapshot of the catalog."""
+        """Return a new DerivaML instance connected to a specific catalog snapshot.
+
+        Catalog snapshots provide a read-only, point-in-time view of the catalog.
+        The snapshot identifier is typically obtained from a dataset version record.
+
+        Args:
+            version_snapshot: Snapshot identifier string (e.g., ``"2T-SXEH-JH4A"``),
+                usually the ``snapshot`` field from a :class:`DatasetHistory` entry.
+
+        Returns:
+            A new DerivaML instance connected to the specified catalog snapshot.
+        """
         return DerivaML(
             self.host_name,
             version_snapshot,
@@ -516,16 +532,23 @@ class DerivaML(
 
     @staticmethod
     def globus_login(host: str) -> None:
-        """Authenticates with Globus for accessing Deriva services.
+        """Authenticate with Globus to obtain credentials for a Deriva server.
 
-        Performs authentication using Globus Auth to access Deriva services. If already logged in, notifies the user.
-        Uses non-interactive authentication flow without a browser or local server.
+        Initiates a Globus Native Login flow to obtain OAuth2 tokens required
+        by the Deriva server.  The flow uses a device-code grant (no browser
+        or local server), and stores refresh tokens so that subsequent calls
+        can re-authenticate silently.  The BDBag keychain is also updated so
+        that bag downloads can use the same credentials.
+
+        If the user is already logged in for the given host, a message is
+        printed and no further action is taken.
 
         Args:
-            host: The hostname of the Deriva server to authenticate with (e.g., 'deriva.example.org').
+            host: Hostname of the Deriva server to authenticate with
+                (e.g., ``"www.eye-ai.org"``).
 
         Example:
-            >>> DerivaML.globus_login('deriva.example.org')
+            >>> DerivaML.globus_login('www.eye-ai.org')
             'Login Successful'
         """
         gnl = GlobusNativeLogin(host=host)

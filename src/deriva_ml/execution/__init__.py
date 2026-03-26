@@ -1,3 +1,11 @@
+"""Execution management for DerivaML.
+
+Provides the Execution lifecycle, workflow tracking, hydra-zen
+configuration helpers (BaseConfig, notebook_config, run_notebook),
+and multirun support for running reproducible ML experiments with
+full provenance tracking.
+"""
+
 from typing import TYPE_CHECKING
 
 # Safe imports - no circular dependencies

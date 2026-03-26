@@ -97,7 +97,15 @@ table_regex = exec_dir_regex + rf"{SEP}table{SEP}(?P<schema>[-\w]+){SEP}(?P<tabl
 
 
 def is_feature_dir(path: Path) -> Optional[re.Match]:
-    """Path matches the pattern for where the table for a feature would go."""
+    """Check whether a path matches the expected directory layout for a feature table.
+
+    Args:
+        path: Filesystem path to check against the feature table directory pattern.
+
+    Returns:
+        A regex Match object with named groups (``schema``, ``target_table``,
+        ``feature_name``) if the path matches, or ``None`` otherwise.
+    """
     return re.match(feature_table_dir_regex + "$", path.as_posix())
 
 
@@ -124,27 +132,67 @@ def upload_root(prefix: Path | str) -> Path:
 
 
 def execution_rids(prefix: Path | str) -> list[RID]:
-    """Return a list of all the execution RIDS that have files waiting to be uploaded."""
+    """Return all execution RIDs that have files staged for upload.
+
+    Scans the ``execution/`` subdirectory under the upload root and returns the
+    name of each immediate child directory, which corresponds to an execution RID.
+
+    Args:
+        prefix: Location of the upload root directory.
+
+    Returns:
+        List of execution RID strings found under the upload root.
+    """
     path = upload_root(prefix) / "execution"
     return [d.name for d in path.iterdir()]
 
 
 def execution_root(prefix: Path | str, exec_rid) -> Path:
-    """Path to directory to place execution specific upload files."""
+    """Return the directory for staging upload files for a specific execution.
+
+    The directory is created if it does not already exist.
+
+    Args:
+        prefix: Location of the upload root directory.
+        exec_rid: RID of the execution whose upload files are being staged.
+
+    Returns:
+        Path to the execution-specific upload directory.
+    """
     path = upload_root(prefix) / "execution" / exec_rid
     path.mkdir(exist_ok=True, parents=True)
     return path
 
 
 def feature_root(prefix: Path | str, exec_rid: str) -> Path:
-    """Return the path to the directory in which features for the specified execution should be placed."""
+    """Return the directory for staging feature uploads for a specific execution.
+
+    The directory is created if it does not already exist.
+
+    Args:
+        prefix: Location of the upload root directory.
+        exec_rid: RID of the execution whose feature files are being staged.
+
+    Returns:
+        Path to the feature upload directory for the given execution.
+    """
     path = execution_root(prefix, exec_rid) / "feature"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def asset_root(prefix: Path | str, exec_rid: str) -> Path:
-    """Return the path to the directory in which features for the specified execution should be placed."""
+    """Return the directory for staging asset uploads for a specific execution.
+
+    The directory is created if it does not already exist.
+
+    Args:
+        prefix: Location of the upload root directory.
+        exec_rid: RID of the execution whose asset files are being staged.
+
+    Returns:
+        Path to the asset upload directory for the given execution.
+    """
     path = execution_root(prefix, exec_rid) / "asset"
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -187,7 +235,7 @@ def manifest_path(prefix: Path | str, exec_rid: str) -> Path:
 
 
 def feature_dir(prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str) -> Path:
-    """Return the path to eht directory in which a named feature for an execution should be placed."""
+    """Return the path to the directory in which a named feature for an execution should be placed."""
     path = feature_root(prefix, exec_rid) / schema / target_table / feature_name
     path.mkdir(parents=True, exist_ok=True)
     return path

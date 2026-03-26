@@ -1,3 +1,10 @@
+"""Dataset management for DerivaML.
+
+Provides classes for creating, versioning, splitting, and downloading
+datasets, as well as hydra-zen configuration helpers for specifying
+dataset inputs in ML workflows.
+"""
+
 from .aux_classes import DatasetSpec, DatasetSpecConfig, DatasetVersion, VersionPart
 from .dataset import Dataset
 from .dataset_bag import (

@@ -1,5 +1,9 @@
-"""
-This module defines the DataSet class which is used to manipulate n
+"""Auxiliary classes for dataset versioning, history, and configuration.
+
+This module defines VersionPart, DatasetVersion, DatasetHistory,
+DatasetMinid, DatasetSpec, and DatasetSpecConfig -- the value objects
+used throughout DerivaML to represent dataset versions, provenance
+records, and hydra-zen configuration entries.
 """
 
 from enum import Enum
@@ -84,10 +88,34 @@ class DatasetVersion(Version):
 
     @classmethod
     def parse(cls, version: str, optional_minor_an_path: bool = False) -> "DatasetVersion":
+        """Parse a semantic version string into a DatasetVersion.
+
+        Args:
+            version: A semantic version string (e.g., ``"1.2.3"``).
+            optional_minor_an_path: Unused; kept for API compatibility with
+                :meth:`semver.Version.parse`.
+
+        Returns:
+            A new DatasetVersion corresponding to the parsed string.
+
+        Raises:
+            ValueError: If *version* is not a valid semantic version string.
+        """
         v = Version.parse(version)
         return DatasetVersion(v.major, v.minor, v.patch)
 
     def increment_version(self, component: VersionPart) -> "DatasetVersion":
+        """Return a new DatasetVersion with the specified component incremented.
+
+        Follows standard semantic versioning rules: incrementing a higher-order
+        component resets all lower-order components to zero.
+
+        Args:
+            component: Which part of the version to bump (major, minor, or patch).
+
+        Returns:
+            A new DatasetVersion with the requested component incremented.
+        """
         match component:
             case VersionPart.major:
                 return self.bump_major()
@@ -245,6 +273,24 @@ class DatasetSpec(BaseModel):
 # Interface for hydra-zen
 @hydrated_dataclass(DatasetSpec)
 class DatasetSpecConfig:
+    """Hydra-zen configuration dataclass for :class:`DatasetSpec`.
+
+    Use this in hydra-zen ``store()`` calls and configuration modules to
+    specify dataset inputs.  When instantiated by hydra-zen, it produces a
+    :class:`DatasetSpec` instance.
+
+    Attributes:
+        rid: Dataset RID (e.g., ``"28CT"``).
+        version: Semantic version string (e.g., ``"0.21.0"``).
+        materialize: If False, download only table metadata, not asset files.
+        description: Human-readable description of the dataset's role in this config.
+        exclude_tables: Optional table names to exclude from FK path traversal
+            during bag export.
+        timeout: Optional ``[connect_timeout, read_timeout]`` in seconds for
+            network requests during bag download.
+        fetch_concurrency: Number of concurrent fetch threads for asset download.
+    """
+
     rid: str
     version: str
     materialize: bool = True

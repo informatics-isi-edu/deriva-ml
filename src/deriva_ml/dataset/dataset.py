@@ -510,15 +510,17 @@ class Dataset:
     @property
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def current_version(self) -> DatasetVersion:
-        """Retrieve the current version of the specified dataset_table.
+        """Retrieve the current (most recent) version of this dataset.
 
-        Return the most recent version of the dataset. It is important to remember that this version
-        captures the state of the catalog at the time the version was created, not the current state of the catalog.
-        This means that its possible that the values associated with an object in the catalog may be different
-        from the values of that object in the dataset.
+        Returns the highest semantic version from the dataset's version history.
+        If the dataset has no version history, returns ``0.1.0`` as the default.
+
+        Note that each version captures the state of the catalog at the time the
+        version was created, not the current state. Values associated with an
+        object in the catalog may differ from the values in a given dataset version.
 
         Returns:
-            A tuple with the semantic version of the dataset_table.
+            DatasetVersion: The most recent semantic version of this dataset.
         """
         history = self.dataset_history()
         if not history:
@@ -1392,17 +1394,24 @@ class Dataset:
         version: DatasetVersion | str | None = None,
         **kwargs: Any,
     ) -> list[Self]:
-        """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
-        nested dataset.
+        """Return the parent datasets that contain this dataset as a nested child.
+
+        Queries the Dataset_Dataset association table to find datasets that include
+        this dataset as a nested member. When ``recurse=True``, traverses the full
+        ancestor chain (parents of parents, etc.).
 
         Args:
-            recurse: If True, recursively return all ancestor datasets.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Dataset version to list parents from. Defaults to the current version.
+            recurse: If True, recursively return all ancestor datasets, not just
+                direct parents.
+            _visited: Internal parameter to track visited datasets and prevent
+                infinite recursion in cyclic graphs. Callers should not set this.
+            version: Dataset version to query against. If provided, uses a catalog
+                snapshot from that version. Defaults to the current version.
             **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
-            List of parent datasets.
+            list[Dataset]: Parent Dataset objects that contain this dataset. Empty
+                list if this dataset is not nested inside any other dataset.
         """
         # Initialize visited set for recursion guard
         if _visited is None:
@@ -1434,17 +1443,24 @@ class Dataset:
         version: DatasetVersion | str | None = None,
         **kwargs: Any,
     ) -> list[Self]:
-        """Given a dataset_table RID, return a list of RIDs for any nested datasets.
+        """Return the child datasets nested inside this dataset.
+
+        Queries the Dataset_Dataset association table to find datasets that are
+        nested members of this dataset. When ``recurse=True``, traverses the full
+        descendant tree (children of children, etc.).
 
         Args:
-            recurse: If True, return a list of nested datasets RIDs.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Dataset version to list children from. Defaults to the current version.
+            recurse: If True, recursively return all descendant datasets, not just
+                direct children.
+            _visited: Internal parameter to track visited datasets and prevent
+                infinite recursion in cyclic graphs. Callers should not set this.
+            version: Dataset version to query against. If provided, uses a catalog
+                snapshot from that version. Defaults to the current version.
             **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
-          list of nested dataset RIDs.
-
+            list[Dataset]: Child Dataset objects nested in this dataset. Empty list
+                if this dataset has no nested children.
         """
         # Initialize visited set for recursion guard
         if _visited is None:

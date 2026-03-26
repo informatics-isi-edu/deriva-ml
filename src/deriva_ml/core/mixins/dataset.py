@@ -130,11 +130,21 @@ class DatasetMixin:
             raise DerivaMLException(f"Dataset {dataset_rid} not found.")
 
     def delete_dataset(self, dataset: "Dataset", recurse: bool = False) -> None:
-        """Delete a dataset from the catalog.
+        """Soft-delete a dataset by marking it as deleted in the catalog.
+
+        Sets the ``Deleted`` flag on the dataset record. The dataset's data is
+        preserved but it will no longer appear in normal queries (e.g.,
+        ``find_datasets()``). The dataset cannot be deleted if it is currently
+        nested inside a parent dataset.
 
         Args:
-            dataset: The dataset to delete.
-            recurse: If True, delete the dataset along with any nested datasets. (Default value = False)
+            dataset (Dataset): The dataset to delete.
+            recurse (bool): If True, also soft-delete all nested child datasets.
+                If False (default), only this dataset is marked as deleted.
+
+        Raises:
+            DerivaMLException: If the dataset RID is not a valid dataset, or if the
+                dataset is nested inside a parent dataset.
         """
         # Get association table entries for this dataset_table
         # Delete association table entries
