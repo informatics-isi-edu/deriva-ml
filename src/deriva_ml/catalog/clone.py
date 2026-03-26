@@ -32,7 +32,7 @@ from deriva.core.asyncio.async_datapath import copy_tables_concurrent_async
 from deriva.core.hatrac_store import HatracStore
 
 from deriva_ml.model.catalog import VOCAB_COLUMNS
-from deriva_ml.schema import create_ml_schema
+from deriva_ml.schema import create_ml_schema, initialize_ml_schema
 
 logger = logging.getLogger("deriva_ml")
 
@@ -1578,8 +1578,11 @@ def _post_clone_operations(
             if "deriva-ml" in model.schemas:
                 # Schema already exists (copied from source) — don't recreate it,
                 # as create_ml_schema drops the existing schema with CASCADE,
-                # destroying all copied data.
-                logger.info("ML schema already exists in clone, skipping creation")
+                # destroying all copied data. But we do need to ensure the
+                # vocabulary terms are populated, since the clone may not have
+                # copied them (e.g., if the source catalog's ACLs hid them).
+                logger.info("ML schema already exists in clone, initializing vocabulary terms")
+                initialize_ml_schema(model)
             else:
                 create_ml_schema(catalog)
                 result.ml_schema_added = True
