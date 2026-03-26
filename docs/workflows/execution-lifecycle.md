@@ -288,6 +288,91 @@ The execution workflow follows these steps:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### Execution Status Lifecycle
+
+Each execution progresses through a series of status states. The transitions are
+managed automatically by the context manager, but you can also update status
+manually to report progress.
+
+```
+created ──► initializing ──► pending ──► running ──► completed
+                                            │
+                                            └──────► failed
+```
+
+| Status | Value | When Set | Description |
+|--------|-------|----------|-------------|
+| `created` | `"Created"` | `__init__` | Initial state after the `Execution` record is inserted into the catalog. |
+| `initializing` | `"Initializing"` | `_initialize_execution` | Downloading input datasets and assets, saving configuration metadata. |
+| `pending` | `"Pending"` | End of `_initialize_execution` | All inputs are downloaded and ready; waiting for the model to start. |
+| `running` | `"Running"` | `__enter__` / `execution_start` | The model function is executing. Also used for manual progress updates. |
+| `completed` | `"Completed"` | `__exit__` (no exception) | The execution finished successfully. Duration is recorded. |
+| `failed` | `"Failed"` | `__exit__` (exception raised) | An exception occurred during execution. The exception details are stored in `Status_Detail`. |
+
+When using the context manager (`with ml.create_execution(config) as exe:`), the
+transitions from `running` through `completed` or `failed` happen automatically.
+You do not need to set `completed` or `failed` yourself.
+
+To report progress within a long-running execution, call `update_status` with
+`Status.running` and a descriptive message:
+
+```python
+exe.update_status(Status.running, "Training epoch 5/10")
+exe.update_status(Status.running, "Evaluating on validation set...")
+```
+
+These updates are written to the `Status` and `Status_Detail` columns of the
+`Execution` table, making progress visible to anyone monitoring the catalog.
+
+## Execution Metadata
+
+When an execution is created, DerivaML automatically generates several catalog
+records and metadata files for provenance tracking. Understanding what gets
+created helps when debugging or auditing workflow runs.
+
+### Catalog Records
+
+The following records are created or updated during the execution lifecycle:
+
+| Table | Record | Description |
+|-------|--------|-------------|
+| `Execution` | One row per execution | Contains RID, Description, Workflow (FK), Status, Status_Detail, and Duration. |
+| `Dataset_Execution` | One row per input dataset | Links each input dataset to the execution, establishing the input provenance chain. |
+| `Execution_Asset_Execution` | One row per input/output asset | Links assets to the execution with a role of `"Input"` or `"Output"`. Created when assets are downloaded (inputs) or uploaded (outputs). |
+
+### Automatic Metadata Files
+
+During initialization, DerivaML uploads several metadata files as `Execution_Metadata`
+assets. Each file is tagged with an asset type from the `ExecMetadataType` vocabulary:
+
+| Asset Type | File | Contents |
+|------------|------|----------|
+| `Deriva_Config` | `configuration.json` | The fully resolved `ExecutionConfiguration`, serialized as JSON. Includes datasets, assets, workflow reference, description, and Hydra config choices. |
+| `Hydra_Config` | `hydra-<timestamp>-*.yaml` | Hydra YAML configuration files (`config.yaml`, `overrides.yaml`, etc.) captured from the Hydra runtime output directory. Only present when running via `deriva-ml-run`. |
+| `Execution_Config` | `uv.lock` | Environment lock file from the project root, recording exact dependency versions for reproducibility. |
+| `Runtime_Env` | `environment_snapshot_<timestamp>.txt` | A snapshot of the runtime environment: Python version, installed packages, OS details, GPU availability, and environment variables. |
+
+These metadata files are uploaded immediately during initialization (before the
+model runs), so they are available even if the execution fails.
+
+### Configuration Choices
+
+When running via Hydra (`deriva-ml-run`), the `config_choices` field in
+`ExecutionConfiguration` captures which named config was selected for each
+Hydra config group. For example:
+
+```json
+{
+    "model_config": "cifar10_quick",
+    "datasets": "cifar10_small_labeled_split",
+    "workflow": "cifar10_training",
+    "deriva_ml": "default_deriva"
+}
+```
+
+This makes it possible to reproduce a run by selecting the same config choices,
+rather than reconstructing individual parameter values.
+
 ## Creating an Execution Configuration
 
 The `ExecutionConfiguration` specifies what inputs your workflow will use:
@@ -335,6 +420,52 @@ DatasetSpec(rid="1-ABC", materialize=False)
 
 # Use specific version
 DatasetSpec(rid="1-ABC", version="2.1.0")
+```
+
+### AssetSpec and Asset Caching
+
+Execution assets (model weights, pretrained checkpoints, etc.) are specified as a
+list in `ExecutionConfiguration.assets`. Each entry can be a bare RID string or an
+`AssetSpec` object:
+
+```python
+from deriva_ml.asset.aux_classes import AssetSpec
+
+config = ExecutionConfiguration(
+    workflow=workflow,
+    description="Inference with cached weights",
+    datasets=[DatasetSpec(rid="1-ABC")],
+    assets=[
+        AssetSpec(rid="2-GHI", cache=True),   # Cached by MD5
+        "2-JKL",                               # Not cached (bare RID)
+    ],
+)
+```
+
+When `cache=True`, the downloaded asset is stored in the DerivaML cache directory
+at `cache_dir/assets/{rid}_{md5}/`. On subsequent executions, the cached copy is
+reused if the MD5 checksum in the catalog record still matches. The cached file
+is symlinked into the execution's working directory, avoiding redundant downloads.
+
+| Behavior | `cache=False` (default) | `cache=True` |
+|----------|------------------------|--------------|
+| First download | Downloads to execution directory | Downloads to cache, symlinks to execution directory |
+| Subsequent runs | Downloads again | Reuses cached copy if MD5 matches |
+| Stale detection | N/A | Compares MD5 against catalog record |
+
+Use `cache=True` for large, immutable assets like pretrained model weights. Avoid
+caching assets that change frequently, as stale cache entries are only detected by
+MD5 mismatch (not by timestamp).
+
+For hydra-zen configurations, use `AssetSpecConfig`:
+
+```python
+from deriva_ml.asset.aux_classes import AssetSpecConfig
+
+asset_store(
+    [AssetSpecConfig(rid="6-EPNR", cache=True)],
+    name="pretrained_weights",
+)
 ```
 
 ## Running an Execution
@@ -524,6 +655,113 @@ exe = ml.restore_execution("1-XYZ")
 exe.asset_file_path("Model", "continued_model.pt")
 exe.upload_execution_outputs()
 ```
+
+## Nested Executions
+
+Executions can be organized in a parent-child hierarchy. This is useful for grouping
+related runs such as parameter sweeps, cross-validation folds, or multi-stage pipelines.
+
+### How Nesting Works
+
+A parent execution acts as a container that links to one or more child executions
+through the `Execution_Execution` association table. Each child can have an optional
+`Sequence` number to record ordering.
+
+```
+Parent Execution (sweep description, no input datasets)
+  ├── Child 0: learning_rate=0.001  (sequence=0)
+  ├── Child 1: learning_rate=0.01   (sequence=1)
+  └── Child 2: learning_rate=0.1    (sequence=2)
+```
+
+The parent typically has a descriptive summary (often markdown-formatted) and no
+input datasets of its own. The children carry the actual inputs, outputs, and
+execution logic.
+
+### Automatic Nesting with Multirun
+
+When using `deriva-ml-run` with Hydra's multirun mode, nesting is handled
+automatically. The runner creates a parent execution on the first job and links
+each subsequent job as a child with incrementing sequence numbers:
+
+```python
+# In configs/multiruns.py
+from deriva_ml.execution import multirun_config
+
+multirun_config(
+    "lr_sweep",
+    overrides=[
+        "+experiment=cifar10_default",
+        "model_config.learning_rate=0.001,0.01,0.1",
+    ],
+    description="""## Learning Rate Sweep
+
+    Comparing three learning rates on the default CIFAR-10 configuration.
+
+    | Learning Rate | Expected Behavior |
+    |--------------|-------------------|
+    | 0.001 | Standard baseline |
+    | 0.01 | Fast convergence |
+    | 0.1 | Potentially unstable |
+    """,
+)
+```
+
+Run from the command line:
+
+```bash
+uv run deriva-ml-run +multirun=lr_sweep
+```
+
+This creates 4 executions: 1 parent + 3 children (one per learning rate value).
+The parent stores the markdown description; each child records its own inputs,
+outputs, configuration choices, and timing.
+
+### Manual Nesting
+
+You can also create parent-child relationships manually:
+
+```python
+# Create parent execution
+parent_config = ExecutionConfiguration(
+    workflow=workflow,
+    description="Cross-validation experiment (5 folds)",
+)
+parent = ml.create_execution(parent_config)
+parent.execution_start()
+
+# Create and link child executions
+for fold in range(5):
+    child_config = ExecutionConfiguration(
+        workflow=workflow,
+        description=f"Fold {fold}",
+        datasets=[DatasetSpec(rid=fold_datasets[fold])],
+    )
+    with ml.create_execution(child_config) as child:
+        parent.add_nested_execution(child, sequence=fold)
+        # ... run fold ...
+
+parent.execution_stop()
+parent.upload_execution_outputs()
+```
+
+### Querying Nested Executions
+
+Navigate the hierarchy using `list_nested_executions`:
+
+```python
+# List direct children
+children = parent.list_nested_executions()
+for child in children:
+    print(f"  [{child.status}] {child.description}")
+
+# List all descendants (children, grandchildren, etc.)
+all_descendants = parent.list_nested_executions(recurse=True)
+```
+
+Each item in the returned list is an `ExecutionRecord` with properties like
+`execution_rid`, `status`, and `description`. To get a full `Execution` object
+with lifecycle management, use `ml.restore_execution(child.execution_rid)`.
 
 ## Complete Example
 
