@@ -412,6 +412,7 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     ])
 
     _ensure_terms(MLVocab.dataset_type, [
+        {"Name": "Complete", "Description": "A dataset containing all available records of a given type."},
         {"Name": "File", "Description": "A dataset that contains file assets."},
         {"Name": "Training", "Description": "A dataset subset used for model training."},
         {"Name": "Testing", "Description": "A dataset subset used for model testing/evaluation."},
