@@ -293,7 +293,8 @@ def main() -> int:
     1. Validates the environment (git repo, required tools)
     2. Fetches existing tags from remote
     3. Either seeds an initial tag or bumps the existing version
-    4. Pushes changes to the remote repository
+    4. Auto-commits ``uv.lock`` if it's the only dirty file (common after ``uv sync``)
+    5. Pushes changes to the remote repository
 
     The bump type can be specified as a command-line argument:
 
@@ -355,6 +356,19 @@ def main() -> int:
         return 0
 
     print(f"Bumping version: {args.bump}")
+
+    # Auto-commit uv.lock if it's the only dirty file.
+    # Running `uv run` (which we do for bump-my-version) often updates uv.lock,
+    # and bump-my-version refuses to run with a dirty working tree.
+    try:
+        cp = run(["git", "status", "--porcelain"], capture=True, quiet=True)
+        dirty_files = [line.strip().split(None, 1)[-1] for line in cp.stdout.splitlines() if line.strip()]
+        if dirty_files and all(f in ("uv.lock", "M uv.lock") or f.endswith("uv.lock") for f in dirty_files):
+            print("Auto-committing uv.lock (updated by uv sync)...")
+            run(["git", "add", "uv.lock"], quiet=True)
+            run(["git", "commit", "-m", "Update uv.lock"], quiet=True)
+    except subprocess.CalledProcessError:
+        pass  # non-fatal; bump-my-version will catch the dirty tree if needed
 
     # Bump using bump-my-version via uv
     # Mirrors: uv run bump-my-version bump $BUMP --verbose
