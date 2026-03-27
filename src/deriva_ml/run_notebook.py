@@ -46,6 +46,7 @@ import base64
 import json
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 
@@ -58,6 +59,7 @@ from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, MLAsset
 from deriva_ml.core.constants import DRY_RUN_RID
+from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
 from deriva_ml.execution import Execution, ExecutionConfiguration, Workflow
 
 
@@ -297,6 +299,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         )
 
         self.parser.add_argument(
+            "--allow-dirty",
+            action="store_true",
+            help="Allow execution with uncommitted changes (skips git clean check).",
+        )
+
+        self.parser.add_argument(
             "hydra_overrides",
             nargs="*",
             help="Hydra-zen configuration overrides (e.g., assets=roc_quick_probabilities)",
@@ -400,15 +408,26 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             self._show_hydra_info(notebook_file)
             return
 
-        # Merge notebook defaults with provided parameters and execute
-        notebook_parameters = {k: v["default"] for k, v in notebook_parameters.items()} | parameters
-        self.run_notebook(
-            notebook_file.resolve(),
-            parameters,
-            kernel=args.kernel,
-            log=args.log_output,
-            hydra_overrides=args.hydra_overrides,
-        )
+        # Set allow-dirty flag via environment variable so Workflow picks it up
+        if args.allow_dirty:
+            os.environ["DERIVA_ML_ALLOW_DIRTY"] = "true"
+
+        try:
+            # Merge notebook defaults with provided parameters and execute
+            notebook_parameters = {k: v["default"] for k, v in notebook_parameters.items()} | parameters
+            self.run_notebook(
+                notebook_file.resolve(),
+                parameters,
+                kernel=args.kernel,
+                log=args.log_output,
+                hydra_overrides=args.hydra_overrides,
+                allow_dirty=args.allow_dirty,
+            )
+        except DerivaMLDirtyWorkflowError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            exit(1)
+        finally:
+            os.environ.pop("DERIVA_ML_ALLOW_DIRTY", None)
 
     @staticmethod
     def _show_hydra_info(notebook_file: Path) -> None:
@@ -539,6 +558,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         kernel: str | None = None,
         log: bool = False,
         hydra_overrides: list[str] | None = None,
+        allow_dirty: bool = False,
     ) -> None:
         """Execute a notebook with papermill and upload results to the catalog.
 
@@ -574,7 +594,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             the catalog as Execution_Asset records with type 'notebook_output'.
         """
         # Get workflow provenance info (URL for Git-tracked files, checksum for integrity)
-        url, checksum = Workflow.get_url_and_checksum(Path(notebook_file))
+        url, checksum = Workflow.get_url_and_checksum(Path(notebook_file), allow_dirty=allow_dirty)
         os.environ["DERIVA_ML_WORKFLOW_URL"] = url
         os.environ["DERIVA_ML_WORKFLOW_CHECKSUM"] = checksum
         os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file.as_posix()

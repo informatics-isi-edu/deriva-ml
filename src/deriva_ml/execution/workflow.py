@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_
 from requests import RequestException
 
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError, DerivaMLException
 from deriva_ml.execution.find_caller import _get_calling_module
 
 if TYPE_CHECKING:
@@ -137,6 +137,7 @@ class Workflow(BaseModel):
     checksum: str | None = None
     is_notebook: bool = False
     git_root: Path | None = None
+    allow_dirty: bool = False
 
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
     _logger: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger("deriva_ml"))
@@ -447,16 +448,20 @@ class Workflow(BaseModel):
             return self
 
         # Standard git detection for local development
+        # Check env var for allow_dirty (set by CLI --allow-dirty flag)
+        if os.environ.get("DERIVA_ML_ALLOW_DIRTY", "").lower() == "true":
+            self.allow_dirty = True
+
         if not self.url:
             path, self.is_notebook = Workflow._get_python_script()
-            self.url, self.checksum = Workflow.get_url_and_checksum(path)
+            self.url, self.checksum = Workflow.get_url_and_checksum(path, allow_dirty=self.allow_dirty)
             self.git_root = Workflow._get_git_root(path)
 
         self.version = self.version or Workflow.get_dynamic_version(root=str(self.git_root or Path.cwd()))
         return self
 
     @staticmethod
-    def get_url_and_checksum(executable_path: Path) -> tuple[str, str]:
+    def get_url_and_checksum(executable_path: Path, allow_dirty: bool = False) -> tuple[str, str]:
         """Determines the Git URL and checksum for a file.
 
         Computes the Git repository URL and file checksum for the specified path.
@@ -464,12 +469,16 @@ class Workflow(BaseModel):
 
         Args:
             executable_path: Path to the workflow file.
+            allow_dirty: If True, log a warning instead of raising an error
+                when the file has uncommitted changes. Defaults to False.
 
         Returns:
             tuple[str, str]: (GitHub URL, Git object hash)
 
         Raises:
             DerivaMLException: If not in a Git repository.
+            DerivaMLDirtyWorkflowError: If the file has uncommitted changes
+                and allow_dirty is False.
 
         Example:
             >>> url, checksum = Workflow.get_url_and_checksum(Path("analysis.ipynb"))
@@ -489,9 +498,13 @@ class Workflow(BaseModel):
         github_url, is_dirty = Workflow._github_url(executable_path)
 
         if is_dirty:
-            logging.getLogger("deriva_ml").warning(
-                f"File {executable_path} has been modified since last commit. Consider commiting before executing"
-            )
+            if allow_dirty:
+                logging.getLogger("deriva_ml").warning(
+                    f"File {executable_path} has uncommitted changes. "
+                    f"Proceeding with --allow-dirty override."
+                )
+            else:
+                raise DerivaMLDirtyWorkflowError(str(executable_path))
 
         # If you are in a notebook, strip out the outputs before computing the checksum.
         if executable_path != "REPL":

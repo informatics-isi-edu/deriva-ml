@@ -30,6 +30,7 @@ from deriva_ml.core.definitions import (
     UploadState,
 )
 from deriva_ml.core.exceptions import (
+    DerivaMLDirtyWorkflowError,
     DerivaMLException,
     DerivaMLInvalidTerm,
     DerivaMLTableTypeError,

@@ -22,12 +22,14 @@ See Also:
     - runner.run_model: The underlying function that executes models
 """
 
+import os
 import sys
 from pathlib import Path
 
 from deriva.core import BaseCLI
 from hydra_zen import store, zen
 
+from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
 from deriva_ml.execution import (
     get_all_multirun_configs,
     get_multirun_config,
@@ -106,6 +108,12 @@ class DerivaMLRunCLI(BaseCLI):
             "--multirun", "-m",
             action="store_true",
             help="Run multiple configurations (Hydra multirun mode).",
+        )
+
+        self.parser.add_argument(
+            "--allow-dirty",
+            action="store_true",
+            help="Allow execution with uncommitted changes (skips git clean check).",
         )
 
         self.parser.add_argument(
@@ -211,6 +219,10 @@ class DerivaMLRunCLI(BaseCLI):
         # Finalize the hydra-zen store
         store.add_to_hydra_store()
 
+        # Set allow-dirty flag via environment variable so Workflow picks it up
+        if args.allow_dirty:
+            os.environ["DERIVA_ML_ALLOW_DIRTY"] = "true"
+
         # Build argv for Hydra
         hydra_argv = [sys.argv[0]] + hydra_overrides
         if use_multirun:
@@ -226,8 +238,12 @@ class DerivaMLRunCLI(BaseCLI):
                 version_base="1.3",
                 config_path=None,
             )
+        except DerivaMLDirtyWorkflowError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
         finally:
             sys.argv = original_argv
+            os.environ.pop("DERIVA_ML_ALLOW_DIRTY", None)
 
         return 0
 

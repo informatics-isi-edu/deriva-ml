@@ -22,6 +22,7 @@ Exception Hierarchy:
     │
     ├── DerivaMLExecutionError (execution lifecycle)
     │   ├── DerivaMLWorkflowError (workflow issues)
+    │   │   └── DerivaMLDirtyWorkflowError (uncommitted changes)
     │   └── DerivaMLUploadError (asset upload failures)
     │
     └── DerivaMLReadOnlyError (write operation on read-only resource)
@@ -278,6 +279,32 @@ class DerivaMLWorkflowError(DerivaMLExecutionError):
     """
 
     pass
+
+
+class DerivaMLDirtyWorkflowError(DerivaMLWorkflowError):
+    """Exception raised when workflow code has uncommitted changes.
+
+    DerivaML requires code to be committed before execution for provenance
+    tracking. Running with uncommitted changes means the execution record
+    cannot reliably link back to the source code.
+
+    Use ``allow_dirty=True`` in the API or ``--allow-dirty`` on the CLI
+    to override this check when debugging or iterating.
+
+    Args:
+        path: Path to the file with uncommitted changes.
+
+    Example:
+        >>> raise DerivaMLDirtyWorkflowError("src/models/train.py")
+        DerivaMLDirtyWorkflowError: File src/models/train.py has uncommitted changes. ...
+    """
+
+    def __init__(self, path: str) -> None:
+        super().__init__(
+            f"File {path} has uncommitted changes. "
+            f"Commit before running, or use --allow-dirty to override."
+        )
+        self.path = path
 
 
 class DerivaMLUploadError(DerivaMLExecutionError):

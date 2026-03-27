@@ -497,7 +497,7 @@ def run_model(
         try:
             from deriva_ml.execution.workflow import Workflow as _Wf
 
-            new_url, new_checksum = _Wf.get_url_and_checksum(model_source)
+            new_url, new_checksum = _Wf.get_url_and_checksum(model_source, allow_dirty=workflow.allow_dirty)
             new_git_root = _Wf._get_git_root(model_source)
             workflow.url = new_url
             workflow.checksum = new_checksum
