@@ -807,9 +807,12 @@ class DatasetBag:
             prev_class = self.model.get_orm_class_by_name(prev_table_name)
             target_class = self.model.get_orm_class_by_name(table_name)
             conditions = []
+            table_name_str = table_name if isinstance(table_name, str) else table_name.name
+            prev_name_str = prev_table_name if isinstance(prev_table_name, str) else prev_table_name.name
             for fk_col, pk_col in join_condition_pairs:
                 # Determine which column belongs to which table
-                if fk_col.table.name == prev_table_name or fk_col.table.name.split(".")[-1] == prev_table_name:
+                fk_table = fk_col.table.name if hasattr(fk_col.table, 'name') else str(fk_col.table)
+                if fk_table == prev_name_str or fk_table.split(".")[-1] == prev_name_str:
                     left = prev_class.__table__.columns[fk_col.name]
                     right = target_class.__table__.columns[pk_col.name]
                 else:
@@ -836,7 +839,8 @@ class DatasetBag:
                 self.model.get_orm_class_for_table(self._dataset_table)
             )
             for i, table_name in enumerate(path[1:]):  # Skip over dataset table
-                prev_name = path[i].name  # path[i] because we skip path[0] via [1:]
+                prev_entry = path[i]  # path[i] because enumerate starts at 0 for path[1:]
+                prev_name = prev_entry.name if hasattr(prev_entry, 'name') else str(prev_entry)
                 on_clause = build_join_on_clause(
                     prev_name, table_name, join_conditions[table_name]
                 )
