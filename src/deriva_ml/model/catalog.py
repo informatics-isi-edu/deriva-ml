@@ -743,18 +743,27 @@ class DerivaModel:
             if "Dataset_Version" in element_join_tables:
                 element_join_tables.remove("Dataset_Version")
 
-            for path in paths:
-                for left, right in zip(path[0:], path[1:]):
-                    if right.name == "Dataset_Version":
-                        # The Dataset_Version table is a special case as it points to dataset and dataset to version.
-                        continue
-                    if element_join_tables.index(right.name) < element_join_tables.index(left.name):
-                        continue
-                    col_pairs = self._table_relationship(left, right)
+            # Build join conditions only for consecutive tables in the join order.
+            # We iterate over the topologically-sorted element_join_tables rather
+            # than individual paths to avoid leaking cross-path conditions (e.g.,
+            # Image.Subject = Subject.RID from the direct path leaking into the
+            # Image → Observation → Subject join order).
+            for left_name, right_name in zip(element_join_tables[:-1], element_join_tables[1:]):
+                if right_name == "Dataset_Version":
+                    continue
+                left_table = self.name_to_table(left_name)
+                right_table = self.name_to_table(right_name)
+                try:
+                    col_pairs = self._table_relationship(left_table, right_table)
                     for fk_col, pk_col in col_pairs:
-                        element_join_conditions.setdefault(right.name, set()).add(
+                        element_join_conditions.setdefault(right_name, set()).add(
                             (fk_col, pk_col)
                         )
+                except DerivaMLException:
+                    # No direct FK between these consecutive tables — skip.
+                    # They may be connected through an intermediate not in this
+                    # join order (topological sort artifact).
+                    pass
             element_tables[element_table] = (element_join_tables, element_join_conditions)
         # Get the list of columns that will appear in the final denormalized dataset.
         # Each entry is (schema_name, table_name, column_name, type_name).
