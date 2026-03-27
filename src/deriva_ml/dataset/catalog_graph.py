@@ -556,6 +556,41 @@ class CatalogGraph:
             """Look up a pathBuilder table from an ermrest_model Table."""
             return pb.schemas[table.schema.name].tables[table.name]
 
+        def _build_on_clause(prev_model_table, table, prev_pb_table, pb_table):
+            """Build an explicit on= clause for .link(), handling composite FKs.
+
+            For simple FKs, returns a single equality expression.
+            For composite FKs, returns an AND of equality expressions.
+            Returns None if the FK can't be resolved (falls back to implicit linking).
+            """
+            try:
+                col_pairs = self._ml_instance.model._table_relationship(prev_model_table, table)
+            except Exception:
+                return None
+
+            if len(col_pairs) <= 1:
+                # Simple FK — let datapath resolve it implicitly
+                return None
+
+            # Composite FK — build explicit on= clause
+            # Each (fk_col, pk_col) pair becomes an equality expression
+            conditions = []
+            for fk_col, pk_col in col_pairs:
+                # Determine which side is on prev_table and which on target
+                if fk_col.table.name == prev_model_table.name:
+                    left = getattr(prev_pb_table, fk_col.name)
+                    right = getattr(pb_table, pk_col.name)
+                else:
+                    left = getattr(prev_pb_table, pk_col.name)
+                    right = getattr(pb_table, fk_col.name)
+                conditions.append(left == right)
+
+            # AND all conditions together
+            result = conditions[0]
+            for cond in conditions[1:]:
+                result = result & cond
+            return result
+
         def source_path(path: tuple[Table, ...]) -> str:
             """Build an ERMrest query path using the datapath API.
 
@@ -573,16 +608,22 @@ class CatalogGraph:
             dd_table = _pb_table(self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"])
 
             prev_table = path[0]
+            prev_pb = ds_table
             for table in path[1:]:
-                pb_table = _pb_table(table)
+                cur_pb = _pb_table(table)
                 if table.name == "Dataset_Dataset":
-                    dp = dp.link(pb_table)
+                    dp = dp.link(cur_pb)
                 elif table.name == "Dataset" and prev_table.name == "Dataset_Dataset":
                     # Nested dataset: follow Nested_Dataset FK back to Dataset
-                    dp = dp.link(pb_table, on=(dd_table.Nested_Dataset == pb_table.RID))
+                    dp = dp.link(cur_pb, on=(dd_table.Nested_Dataset == cur_pb.RID))
                 else:
-                    dp = dp.link(pb_table)
+                    on_clause = _build_on_clause(prev_table, table, prev_pb, cur_pb)
+                    if on_clause is not None:
+                        dp = dp.link(cur_pb, on=on_clause)
+                    else:
+                        dp = dp.link(cur_pb)
                 prev_table = table
+                prev_pb = cur_pb
 
             # Extract path portion from the datapath URI
             uri = dp.uri
@@ -647,16 +688,38 @@ class CatalogGraph:
                 dp = ds_table
 
             prev_table = path[0]
+            prev_pb = ds_table
             for table in path[1:]:
-                pb_table = _pb_table(table)
+                cur_pb = _pb_table(table)
                 if table.name == "Dataset_Dataset":
-                    dp = dp.link(pb_table)
+                    dp = dp.link(cur_pb)
                 elif table.name == "Dataset" and prev_table.name == "Dataset_Dataset":
                     # Nested dataset: follow Nested_Dataset FK back to Dataset
-                    dp = dp.link(pb_table, on=(dd_table.Nested_Dataset == pb_table.RID))
+                    dp = dp.link(cur_pb, on=(dd_table.Nested_Dataset == cur_pb.RID))
                 else:
-                    dp = dp.link(pb_table)
+                    # Build explicit on= clause for composite FKs
+                    try:
+                        col_pairs = self._ml_instance.model._table_relationship(prev_table, table)
+                        if len(col_pairs) > 1:
+                            conditions = []
+                            for fk_col, pk_col in col_pairs:
+                                if fk_col.table.name == prev_table.name:
+                                    left = getattr(prev_pb, fk_col.name)
+                                    right = getattr(cur_pb, pk_col.name)
+                                else:
+                                    left = getattr(prev_pb, pk_col.name)
+                                    right = getattr(cur_pb, fk_col.name)
+                                conditions.append(left == right)
+                            on_clause = conditions[0]
+                            for cond in conditions[1:]:
+                                on_clause = on_clause & cond
+                            dp = dp.link(cur_pb, on=on_clause)
+                        else:
+                            dp = dp.link(cur_pb)
+                    except Exception:
+                        dp = dp.link(cur_pb)
                 prev_table = table
+                prev_pb = cur_pb
 
             target_table = path[-1]
             target_pb_table = _pb_table(target_table) if len(path) > 1 else ds_table
