@@ -17,6 +17,8 @@ import pytest
 from deriva.core.typed import BuiltinType, ColumnDef, ForeignKeyDef, KeyDef, TableDef
 
 from deriva_ml import DerivaML
+from deriva_ml.execution.execution import ExecutionConfiguration
+from deriva_ml.core.definitions import MLVocab
 
 
 class TestCompositeFKDenormalize:
@@ -37,9 +39,13 @@ class TestCompositeFKDenormalize:
             Child(RID, Label, Parent_RID, Parent_Group)
               - composite FK: (Parent_RID, Parent_Group) → Parent(RID, Group)
         """
-        schema_name = ml.domain_schema
-        model = ml._catalog.getCatalogModel()
+        schema_name = ml.default_schema
+        model = ml.catalog.getCatalogModel()
         domain = model.schemas[schema_name]
+
+        # Skip if tables already exist (session-scoped catalog reuse)
+        if "Group" in domain.tables:
+            return
 
         # Create Group table (grandchild in the join chain)
         domain.create_table(
@@ -99,7 +105,7 @@ class TestCompositeFKDenormalize:
         Returns dict with RIDs for verification.
         """
         pb = ml.pathBuilder()
-        domain = pb.schemas[ml.domain_schema]
+        domain = pb.schemas[ml.default_schema]
 
         # Insert Group
         groups = list(
@@ -143,6 +149,22 @@ class TestCompositeFKDenormalize:
             "parent2_rid": parent2_rid,
         }
 
+    def _create_dataset_with_children(self, ml: DerivaML, data: dict, description: str):
+        """Helper: create a dataset with Child members via an execution."""
+        ml.add_dataset_element_type("Child")
+        # Ensure the workflow type exists (test_ml fixture starts with clean vocab)
+        try:
+            ml.lookup_term(MLVocab.workflow_type, "Test Workflow")
+        except Exception:
+            ml.add_term(MLVocab.workflow_type, "Test Workflow", description="Workflow type for testing")
+        workflow = ml.create_workflow(name="Composite FK Test", workflow_type="Test Workflow")
+        execution = ml.create_execution(ExecutionConfiguration(description="Test", workflow=workflow))
+        dataset = execution.create_dataset(description)
+        child_rids = [c["RID"] for c in data["children"]]
+        dataset.add_dataset_members(members_by_table={"Child": child_rids})
+        dataset.increment_version("Initial data")
+        return dataset
+
     def test_table_relationship_composite_fk(self, test_ml: DerivaML):
         """_table_relationship must return all columns of a composite FK.
 
@@ -151,14 +173,21 @@ class TestCompositeFKDenormalize:
         self._create_composite_fk_schema(test_ml)
         self._populate_composite_fk_data(test_ml)
 
-        # _table_relationship should return BOTH columns of the composite FK
-        col_a, col_b = test_ml._table_relationship("Child", "Parent")
+        # _table_relationship should return ALL column pairs of the composite FK
+        # Need to refresh the model to pick up newly created tables
+        test_ml.model.refresh_model()
+        col_pairs = test_ml.model._table_relationship("Child", "Parent")
 
-        # With a composite FK, we expect lists of columns, not single columns
-        # The current code returns only the first column of each side
-        # This test verifies the fix handles all columns
-        assert col_a is not None, "Expected FK column(s) from Child"
-        assert col_b is not None, "Expected referenced column(s) from Parent"
+        # With a composite FK (Parent_RID, Parent_Group) → (RID, Group),
+        # we expect 2 column pairs
+        assert len(col_pairs) == 2, (
+            f"Expected 2 column pairs for composite FK, got {len(col_pairs)}. "
+            f"_table_relationship may be dropping columns with [0] indexing."
+        )
+        fk_col_names = {fk.name for fk, _ in col_pairs}
+        pk_col_names = {pk.name for _, pk in col_pairs}
+        assert fk_col_names == {"Parent_RID", "Parent_Group"}, f"FK columns: {fk_col_names}"
+        assert pk_col_names == {"RID", "Group"}, f"PK columns: {pk_col_names}"
 
     def test_denormalize_across_composite_fk(self, test_ml: DerivaML, tmp_path):
         """Denormalization must produce correct rows across composite FKs.
@@ -170,12 +199,7 @@ class TestCompositeFKDenormalize:
         self._create_composite_fk_schema(test_ml)
         data = self._populate_composite_fk_data(test_ml)
 
-        # Register Child as dataset element type, create dataset, add members
-        test_ml.add_dataset_element_type("Child")
-        dataset = test_ml.create_dataset("Composite FK test dataset")
-        child_rids = [c["RID"] for c in data["children"]]
-        dataset.add_dataset_members(members_by_table={"Child": child_rids})
-        test_ml.increment_dataset_version(dataset.dataset_rid, "Initial data")
+        dataset = self._create_dataset_with_children(test_ml, data, "Composite FK test dataset")
 
         # Download bag and denormalize
         version = dataset.current_version
@@ -216,11 +240,7 @@ class TestCompositeFKDenormalize:
         self._create_composite_fk_schema(test_ml)
         data = self._populate_composite_fk_data(test_ml)
 
-        test_ml.add_dataset_element_type("Child")
-        dataset = test_ml.create_dataset("Three-table composite FK test")
-        child_rids = [c["RID"] for c in data["children"]]
-        dataset.add_dataset_members(members_by_table={"Child": child_rids})
-        test_ml.increment_dataset_version(dataset.dataset_rid, "Initial data")
+        dataset = self._create_dataset_with_children(test_ml, data, "Three-table composite FK test")
 
         version = dataset.current_version
         bag = dataset.download_dataset_bag(version=version, materialize=False)
@@ -247,11 +267,7 @@ class TestCompositeFKDenormalize:
         self._create_composite_fk_schema(test_ml)
         data = self._populate_composite_fk_data(test_ml)
 
-        test_ml.add_dataset_element_type("Child")
-        dataset = test_ml.create_dataset("Bag export composite FK test")
-        child_rids = [c["RID"] for c in data["children"]]
-        dataset.add_dataset_members(members_by_table={"Child": child_rids})
-        test_ml.increment_dataset_version(dataset.dataset_rid, "Initial data")
+        dataset = self._create_dataset_with_children(test_ml, data, "Bag export composite FK test")
 
         version = dataset.current_version
         bag = dataset.download_dataset_bag(version=version, materialize=False)
