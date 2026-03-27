@@ -789,17 +789,34 @@ class DatasetBag:
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
         # table.
 
-        def find_relationship(table, join_condition):
-            side1 = (join_condition[0].table.name, join_condition[0].name)
-            side2 = (join_condition[1].table.name, join_condition[1].name)
+        def build_join_on_clause(prev_table_name, table_name, join_condition_pairs):
+            """Build a SQLAlchemy ON clause from join condition column pairs.
 
-            for relationship in inspect(table).relationships:
-                local_cols = {(c.table.name, c.name) for c in relationship.local_columns}
-                remote_cols = {(c.table.name, c.name) for c in relationship.remote_side}
-                # Match if this join_condition pair is part of the relationship
-                if (side1 in local_cols and side2 in remote_cols) or (side2 in local_cols and side1 in remote_cols):
-                    return relationship
-            return None
+            For simple FKs: single equality condition.
+            For composite FKs: AND of multiple equality conditions.
+
+            Args:
+                prev_table_name: Name of the source table in the join.
+                table_name: Name of the target table in the join.
+                join_condition_pairs: Set of (fk_col, pk_col) Column pairs from
+                    _table_relationship(). Each pair represents one column in the FK.
+
+            Returns:
+                SQLAlchemy AND clause for use as join onclause.
+            """
+            prev_class = self.model.get_orm_class_by_name(prev_table_name)
+            target_class = self.model.get_orm_class_by_name(table_name)
+            conditions = []
+            for fk_col, pk_col in join_condition_pairs:
+                # Determine which column belongs to which table
+                if fk_col.table.name == prev_table_name or fk_col.table.name.split(".")[-1] == prev_table_name:
+                    left = prev_class.__table__.columns[fk_col.name]
+                    right = target_class.__table__.columns[pk_col.name]
+                else:
+                    left = prev_class.__table__.columns[pk_col.name]
+                    right = target_class.__table__.columns[fk_col.name]
+                conditions.append(left == right)
+            return and_(*conditions)
 
         from deriva_ml.model.catalog import denormalize_column_name
 
@@ -818,14 +835,13 @@ class DatasetBag:
             sql_statement = select(*denormalized_columns).select_from(
                 self.model.get_orm_class_for_table(self._dataset_table)
             )
-            for table_name in path[1:]:  # Skip over dataset table
+            for i, table_name in enumerate(path[1:]):  # Skip over dataset table
+                prev_name = path[i].name  # path[i] because we skip path[0] via [1:]
+                on_clause = build_join_on_clause(
+                    prev_name, table_name, join_conditions[table_name]
+                )
                 table_class = self.model.get_orm_class_by_name(table_name)
-                on_clause = [
-                    getattr(table_class, r.key)
-                    for on_condition in join_conditions[table_name]
-                    if (r := find_relationship(table_class, on_condition))
-                ]
-                sql_statement = sql_statement.join(table_class, onclause=and_(*on_clause))
+                sql_statement = sql_statement.join(table_class, onclause=on_clause)
             dataset_rid_list = [self.dataset_rid] + [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
             dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
             sql_statement = sql_statement.where(dataset_class.RID.in_(dataset_rid_list))
