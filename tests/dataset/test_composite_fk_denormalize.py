@@ -161,7 +161,7 @@ class TestCompositeFKDenormalize:
             ml.add_term(MLVocab.workflow_type, "Test Workflow", description="Workflow type for testing")
         workflow = ml.create_workflow(name="Composite FK Test", workflow_type="Test Workflow")
         execution = ml.create_execution(ExecutionConfiguration(description="Test", workflow=workflow))
-        dataset = execution.create_dataset(description=description)
+        dataset = execution.create_dataset(dataset_types=[], description=description)
         child_rids = [c["RID"] for c in data["children"]]
         dataset.add_dataset_members(members_by_table={"Child": child_rids})
         dataset.increment_version("Initial data")
