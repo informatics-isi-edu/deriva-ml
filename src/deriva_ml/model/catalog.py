@@ -687,6 +687,17 @@ class DerivaModel:
                     if len(selected_paths) == 1:
                         continue  # User disambiguated by including intermediates.
 
+                    if len(selected_paths) > 1:
+                        # Multiple paths are fully covered. Prefer the longest path
+                        # (most intermediates) since the user explicitly included those
+                        # tables, suggesting they want that join chain. The direct path
+                        # (no intermediates) is vacuously "selected" but shouldn't win
+                        # when a longer explicit path exists.
+                        max_intermediates = max(len(ints) for _, ints in selected_paths)
+                        longest = [p for p, ints in selected_paths if len(ints) == max_intermediates]
+                        if len(longest) == 1:
+                            continue  # Longest path wins
+
                     # Build error message listing each path and suggesting intermediates.
                     path_descriptions = []
                     all_intermediates: set[str] = set()
