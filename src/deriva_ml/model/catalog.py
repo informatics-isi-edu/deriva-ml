@@ -743,10 +743,11 @@ class DerivaModel:
                         continue
                     if element_join_tables.index(right.name) < element_join_tables.index(left.name):
                         continue
-                    table_relationship = self._table_relationship(left, right)
-                    element_join_conditions.setdefault(right.name, set()).add(
-                        (table_relationship[0], table_relationship[1])
-                    )
+                    col_pairs = self._table_relationship(left, right)
+                    for fk_col, pk_col in col_pairs:
+                        element_join_conditions.setdefault(right.name, set()).add(
+                            (fk_col, pk_col)
+                        )
             element_tables[element_table] = (element_join_tables, element_join_conditions)
         # Get the list of columns that will appear in the final denormalized dataset.
         # Each entry is (schema_name, table_name, column_name, type_name).
@@ -771,16 +772,29 @@ class DerivaModel:
         self,
         table1: TableInput,
         table2: TableInput,
-    ) -> tuple[Column, Column]:
-        """Return columns used to relate two tables."""
+    ) -> list[tuple[Column, Column]]:
+        """Return column pairs used to relate two tables.
+
+        For simple FKs, returns a single-element list: [(fk_col, pk_col)].
+        For composite FKs, returns multiple pairs: [(fk_col1, pk_col1), (fk_col2, pk_col2)].
+
+        Each FK constraint counts as one relationship (even if composite),
+        so ambiguity is detected when multiple separate FK constraints exist
+        between the same two tables.
+        """
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)
-        relationships = [
-            (fk.foreign_key_columns[0], fk.referenced_columns[0]) for fk in table1.foreign_keys if fk.pk_table == table2
-        ]
-        relationships.extend(
-            [(fk.referenced_columns[0], fk.foreign_key_columns[0]) for fk in table1.referenced_by if fk.table == table2]
-        )
+        # Each FK constraint produces a list of (fk_col, pk_col) pairs
+        relationships: list[list[tuple[Column, Column]]] = []
+        for fk in table1.foreign_keys:
+            if fk.pk_table == table2:
+                pairs = list(zip(fk.foreign_key_columns, fk.referenced_columns))
+                relationships.append(pairs)
+        for fk in table1.referenced_by:
+            if fk.table == table2:
+                pairs = list(zip(fk.referenced_columns, fk.foreign_key_columns))
+                relationships.append(pairs)
+
         if len(relationships) == 0:
             raise DerivaMLException(
                 f"No FK relationship found between {table1.name} and {table2.name}. "
@@ -788,8 +802,12 @@ class DerivaModel:
             )
         if len(relationships) > 1:
             path_descriptions = []
-            for fk_col, pk_col in relationships:
-                path_descriptions.append(f"  {fk_col.table.name}.{fk_col.name} → {pk_col.table.name}.{pk_col.name}")
+            for col_pairs in relationships:
+                desc = ", ".join(
+                    f"{fk_col.table.name}.{fk_col.name} → {pk_col.table.name}.{pk_col.name}"
+                    for fk_col, pk_col in col_pairs
+                )
+                path_descriptions.append(f"  {desc}")
             raise DerivaMLException(
                 f"Ambiguous linkage between {table1.name} and {table2.name}: "
                 f"found {len(relationships)} FK relationships:\n"

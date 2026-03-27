@@ -794,9 +794,10 @@ class DatasetBag:
             side2 = (join_condition[1].table.name, join_condition[1].name)
 
             for relationship in inspect(table).relationships:
-                local_columns = list(relationship.local_columns)[0].table.name, list(relationship.local_columns)[0].name
-                remote_side = list(relationship.remote_side)[0].table.name, list(relationship.remote_side)[0].name
-                if local_columns == side1 and remote_side == side2 or local_columns == side2 and remote_side == side1:
+                local_cols = {(c.table.name, c.name) for c in relationship.local_columns}
+                remote_cols = {(c.table.name, c.name) for c in relationship.remote_side}
+                # Match if this join_condition pair is part of the relationship
+                if (side1 in local_cols and side2 in remote_cols) or (side2 in local_cols and side1 in remote_cols):
                     return relationship
             return None
 

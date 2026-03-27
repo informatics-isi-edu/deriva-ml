@@ -862,13 +862,13 @@ class Dataset:
                 target_table = self._ml_instance.model.name_to_table(target_name)
 
                 try:
-                    fk_col, pk_col = self._ml_instance.model._table_relationship(
+                    col_pairs = self._ml_instance.model._table_relationship(
                         current_table, target_table
                     )
                     visited.add(target_name)
                     queue.append(target_name)
                     chain_order.append(target_name)
-                    fk_relationships[target_name] = (current_name, fk_col, pk_col)
+                    fk_relationships[target_name] = (current_name, col_pairs)
                 except DerivaMLException as exc:
                     # If it's ambiguous (multiple paths), re-raise immediately.
                     # If it's just "no relationship", continue BFS.
@@ -887,25 +887,34 @@ class Dataset:
         pb = self._ml_instance.pathBuilder()
 
         for target_name in chain_order:
-            from_table_name, fk_col, pk_col = fk_relationships[target_name]
+            from_table_name, col_pairs = fk_relationships[target_name]
+
+            # col_pairs is a list of (fk_col, pk_col) tuples.
+            # For simple FKs: [(fk_col, pk_col)]
+            # For composite FKs: [(fk_col1, pk_col1), (fk_col2, pk_col2), ...]
+            fk_col_names = [fk_col.name for fk_col, _ in col_pairs]
+            pk_col_names = [pk_col.name for _, pk_col in col_pairs]
 
             # Collect FK values from the source table's records
+            # For composite FKs, the key is a tuple of column values
             fk_values = set()
             for record in record_indexes.get(from_table_name, {}).values():
-                fk_value = record.get(fk_col.name)
-                if fk_value is not None:
-                    fk_values.add(fk_value)
+                key = tuple(record.get(name) for name in fk_col_names)
+                if all(v is not None for v in key):
+                    fk_values.add(key)
 
             if not fk_values:
                 record_indexes[target_name] = {}
                 continue
 
-            # Fetch ALL records from the target table and index by pk_col
+            # Fetch ALL records from the target table and index by pk columns
             target_table_obj = self._ml_instance.model.name_to_table(target_name)
             pb_target = pb.schemas[target_table_obj.schema.name].tables[target_name]
             all_target_records = list(pb_target.entities().fetch())
             record_indexes[target_name] = {
-                r[pk_col.name]: r for r in all_target_records if r[pk_col.name] in fk_values
+                tuple(r[name] for name in pk_col_names): r
+                for r in all_target_records
+                if tuple(r[name] for name in pk_col_names) in fk_values
             }
 
         # Helper to build prefixed column name
@@ -947,10 +956,11 @@ class Dataset:
                     current_record = member
                     found = True
                     for hop_target in path_to_target:
-                        _, fk_c, _pk_c = fk_relationships[hop_target]
-                        fk_value = current_record.get(fk_c.name)
-                        if fk_value is not None and fk_value in record_indexes.get(hop_target, {}):
-                            current_record = record_indexes[hop_target][fk_value]
+                        _, hop_col_pairs = fk_relationships[hop_target]
+                        hop_fk_names = [fk_c.name for fk_c, _ in hop_col_pairs]
+                        fk_key = tuple(current_record.get(name) for name in hop_fk_names)
+                        if all(v is not None for v in fk_key) and fk_key in record_indexes.get(hop_target, {}):
+                            current_record = record_indexes[hop_target][fk_key]
                         else:
                             found = False
                             break
