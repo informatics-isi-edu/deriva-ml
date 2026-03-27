@@ -620,24 +620,19 @@ class DerivaModel:
             endpoint = path[-1]   # Final table
             key = (element.name, endpoint.name)
 
-            # Only deduplicate paths through association tables. Non-association path[1]
-            # tables represent genuine structural relationships, not redundant join paths.
-            if not self.is_association(assoc_table, pure=False):
-                deduplicated_paths.append(path)
-                continue
-
             if key not in seen_element_endpoint:
                 seen_element_endpoint[key] = (path, assoc_table)
                 deduplicated_paths.append(path)
             else:
                 existing_path, existing_assoc = seen_element_endpoint[key]
-                # Check if this is a different association table for the same element
                 if existing_assoc.name != assoc_table.name:
-                    # Same element via different association table — skip this duplicate path.
-                    # The duplicate is typically empty or points to the same rows.
+                    # Same (element, endpoint) via different linking table — skip.
+                    # This handles both association tables (Dataset_Image vs Image_Dataset_Legacy)
+                    # and non-association linking tables that create duplicate routes.
                     continue
                 else:
-                    # Same association table, different endpoint path — keep both
+                    # Same linking table, different intermediate path — keep both
+                    # (these are genuinely different routes, e.g., direct vs via Observation)
                     deduplicated_paths.append(path)
 
         table_paths = deduplicated_paths
