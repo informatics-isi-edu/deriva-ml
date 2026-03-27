@@ -14,7 +14,7 @@ bag.denormalize_as_dataframe(["file", "biosample"]) to return 0 rows because:
 """
 
 import pytest
-from deriva.core.typed import BuiltinType, ColumnDef, ForeignKeyDef, TableDef
+from deriva.core.typed import BuiltinType, ColumnDef, ForeignKeyDef, KeyDef, TableDef
 
 from deriva_ml import DerivaML
 
@@ -71,9 +71,7 @@ class TestCompositeFKDenormalize:
         # Add compound unique key on (RID, Group) to Parent
         # This is needed so the composite FK from Child can reference it
         parent_table = model.schemas[schema_name].tables["Parent"]
-        parent_table.create_key(
-            {"unique_columns": ["RID", "Group"], "constraint_name": "Parent_RID_Group_key"}
-        )
+        parent_table.create_key(KeyDef(columns=["RID", "Group"]))
 
         # Create Child table with composite FK to Parent
         domain.create_table(
