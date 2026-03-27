@@ -163,7 +163,7 @@ class TestCompositeFKDenormalize:
         execution = ml.create_execution(ExecutionConfiguration(description="Test", workflow=workflow))
         dataset = execution.create_dataset(dataset_types=[], description=description)
         child_rids = [c["RID"] for c in data["children"]]
-        dataset.add_dataset_members(members_by_table={"Child": child_rids})
+        dataset.add_dataset_members(members={"Child": child_rids})
         dataset.increment_version("Initial data")
         return dataset
 
