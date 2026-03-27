@@ -656,6 +656,18 @@ class DerivaModel:
                     endpoints[endpoint].append(path)
 
             for endpoint, endpoint_paths in endpoints.items():
+                # Deduplicate paths that traverse the same tables (can happen when
+                # multiple FK constraints exist between the same pair of tables,
+                # e.g., composite FKs create separate paths for each column).
+                seen_signatures = set()
+                unique_paths = []
+                for path in endpoint_paths:
+                    sig = tuple(t.name for t in path)
+                    if sig not in seen_signatures:
+                        seen_signatures.add(sig)
+                        unique_paths.append(path)
+                endpoint_paths = unique_paths
+
                 if len(endpoint_paths) > 1:
                     # Multiple paths reach the same endpoint — check if user included
                     # intermediate tables to disambiguate.
