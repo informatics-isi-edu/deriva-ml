@@ -164,7 +164,6 @@ class TestCompositeFKDenormalize:
         dataset = execution.create_dataset(dataset_types=[], description=description)
         child_rids = [c["RID"] for c in data["children"]]
         dataset.add_dataset_members(members={"Child": child_rids})
-        ml.increment_dataset_version(dataset.dataset_rid, "Initial data")
         return dataset
 
     def test_table_relationship_composite_fk(self, test_ml: DerivaML):
