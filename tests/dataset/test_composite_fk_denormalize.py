@@ -151,6 +151,8 @@ class TestCompositeFKDenormalize:
 
     def _create_dataset_with_children(self, ml: DerivaML, data: dict, description: str):
         """Helper: create a dataset with Child members via an execution."""
+        # Refresh model to pick up dynamically created tables
+        ml.model.refresh_model()
         ml.add_dataset_element_type("Child")
         # Ensure the workflow type exists (test_ml fixture starts with clean vocab)
         try:
