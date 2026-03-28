@@ -641,6 +641,16 @@ class DerivaModel:
         for p in table_paths:
             paths_by_element[p[2].name].append(p)
 
+        # Only keep element tables that are in include_tables. Paths rooted at
+        # elements NOT in include_tables would produce extra rows in the UNION
+        # (e.g., requesting ["Image", "Observation"] should not traverse Subject
+        # element paths even though Subject → Image is FK-reachable).
+        paths_by_element = {
+            element: paths
+            for element, paths in paths_by_element.items()
+            if element in include_tables
+        }
+
         # Check for ambiguous paths to the same endpoint through different intermediates.
         for element_table, paths in paths_by_element.items():
             # Group paths by their final table (endpoint).
@@ -685,7 +695,14 @@ class DerivaModel:
                             selected_paths.append((path, intermediates))
 
                     if len(selected_paths) == 1:
-                        continue  # User disambiguated by including intermediates.
+                        # A single selected path counts as disambiguation ONLY if
+                        # the user explicitly included intermediate tables.  The
+                        # direct path (zero intermediates) is vacuously selected
+                        # and should NOT automatically win when longer paths exist.
+                        _, selected_ints = selected_paths[0]
+                        if len(selected_ints) > 0:
+                            continue  # User disambiguated by including intermediates.
+                        # Direct (zero-intermediate) path — fall through to error.
 
                     if len(selected_paths) > 1:
                         # Multiple paths are fully covered. Prefer the longest path

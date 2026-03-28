@@ -332,7 +332,7 @@ class TestDenormalizeSchemaGraph:
 
         # Call _prepare_wide_table to get join structure
         # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
-        join_tables, columns = bag.model._prepare_wide_table(
+        join_tables, columns, _multi_schema = bag.model._prepare_wide_table(
             bag, bag.dataset_rid, include_tables=["Subject", "Image", "Observation"]
         )
 
