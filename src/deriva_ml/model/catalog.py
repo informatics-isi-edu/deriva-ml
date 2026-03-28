@@ -876,81 +876,120 @@ class DerivaModel:
             )
         return relationships[0]
 
+    # Default tables to skip during FK path traversal.
+    # These are ML schema tables that create unwanted traversal branches:
+    # - Dataset_Dataset: nested dataset self-reference (handled separately)
+    # - Execution: execution tracking (not useful for data traversal)
+    _DEFAULT_SKIP_TABLES = frozenset({"Dataset_Dataset", "Execution"})
+
     def _schema_to_paths(
         self,
         root: Table | None = None,
         path: list[Table] | None = None,
         exclude_tables: set[str] | None = None,
+        skip_tables: frozenset[str] | None = None,
+        max_depth: int | None = None,
     ) -> list[list[Table]]:
-        """Return a list of paths through the schema graph.
+        """Discover all FK paths through the schema graph via depth-first traversal.
+
+        This is the shared foundation for both bag export (catalog_graph._collect_paths)
+        and denormalization (_prepare_wide_table). Changes here affect both systems.
+
+        Traversal rules:
+        - Follows both outbound FKs (table.foreign_keys) and inbound FKs (table.referenced_by)
+        - Only traverses tables in valid schemas (domain + ML)
+        - Terminates at vocabulary tables (paths go INTO vocabs but not OUT)
+        - Skips tables in exclude_tables and skip_tables
+        - Detects and skips cycles (same table appearing twice in a path)
+        - Prevents dataset element loopback (traversing back to Dataset via element associations)
+        - When multiple FKs exist between the same two domain tables, deduplicates
+          arcs to avoid redundant paths (keeps one arc per target table)
 
         Args:
-            root: The root table to start from.
-            path: The current path being built.
-            exclude_tables: Optional set of table names to skip during traversal.
-                Tables in this set will not be visited, effectively pruning branches
-                of the FK graph that pass through them.
+            root: Starting table. Defaults to the Dataset table in the ML schema.
+            path: Current path being built (used during recursion).
+            exclude_tables: Caller-specified table names to skip. These tables and
+                all paths through them are pruned from the result.
+            skip_tables: Infrastructure table names to skip. Defaults to
+                _DEFAULT_SKIP_TABLES (Dataset_Dataset, Execution). Override to
+                customize which ML schema tables are excluded from traversal.
+            max_depth: Maximum path length (number of tables). None = unlimited.
+                Use to protect against pathological schemas with deep chains.
 
         Returns:
-            A list of paths through the schema graph.
+            List of paths, where each path is a list of Table objects starting
+            from root. Every prefix of a path is also included (e.g., if
+            [Dataset, A, B, C] is a path, then [Dataset], [Dataset, A], and
+            [Dataset, A, B] are also in the result).
         """
-        path = path or []
         exclude_tables = exclude_tables or set()
+        skip_tables = skip_tables if skip_tables is not None else self._DEFAULT_SKIP_TABLES
 
         root = root or self.model.schemas[self.ml_schema].tables["Dataset"]
         path = path.copy() if path else []
-        parent = path[-1] if path else None  # Table that we are coming from.
+        parent = path[-1] if path else None  # Table we are coming from.
         path.append(root)
         paths = [path]
 
+        # Depth limit check
+        if max_depth is not None and len(path) >= max_depth:
+            return paths
+
         def find_arcs(table: Table) -> set[Table]:
-            """Given a path through the model, return the FKs that link the tables"""
-            # Valid schemas for traversal: all domain schemas + ML schema
+            """Return reachable tables via FK arcs, deduplicating multi-FK targets."""
             valid_schemas = self.domain_schemas | {self.ml_schema}
-            arc_list = [fk.pk_table for fk in table.foreign_keys] + [fk.table for fk in table.referenced_by]
+            arc_list = (
+                [fk.pk_table for fk in table.foreign_keys]
+                + [fk.table for fk in table.referenced_by]
+            )
             arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
-            domain_tables = [t for t in arc_list if self.is_domain_schema(t.schema.name)]
-            if multiple_columns := [c for c, cnt in Counter(domain_tables).items() if cnt > 1]:
-                # Skip ambiguous tables rather than failing — complex schemas (e.g., cloned
-                # catalogs) can have multiple FKs between the same pair of tables.
-                ambiguous_set = set(multiple_columns)
-                logger.warning(
-                    f"Ambiguous relationship in {table.name} to {[t.name for t in ambiguous_set]}, "
-                    f"skipping ambiguous tables in path traversal"
-                )
-                arc_list = [t for t in arc_list if t not in ambiguous_set]
-            return set(arc_list)
+            # Deduplicate: when multiple FKs point to the same target table,
+            # keep only one arc. This prevents redundant path branching.
+            # Downstream code (_prepare_wide_table, _table_relationship) handles
+            # the specific FK selection and ambiguity detection.
+            seen = set()
+            deduped = []
+            for t in arc_list:
+                if t not in seen:
+                    seen.add(t)
+                    deduped.append(t)
+            return set(deduped)
 
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
-            """Test to see if node is an association table used to link elements to datasets."""
-            # If we have node_name <- node_name_dataset-> Dataset then we are looping
-            # back around to a new dataset element
+            """Check if traversal would loop back to Dataset via an element association.
+
+            Prevents: Subject -> Dataset_Subject -> Dataset (looping back to root).
+            Allows: Dataset -> Dataset_Subject -> Subject (the intended direction).
+            """
             dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
             assoc_table = [a for a in dataset_table.find_associations() if a.table == n2]
             return len(assoc_table) == 1 and n1 != dataset_table
 
-        # Don't follow vocabulary terms back to their use.
+        # Vocabulary tables are terminal — traverse INTO but not OUT.
         if self.is_vocabulary(root):
             return paths
 
         for child in find_arcs(root):
-            #        if child.name in {"Dataset_Execution", "Dataset_Dataset", "Execution"}:
-            if child.name in {"Dataset_Dataset", "Execution"}:
+            if child.name in skip_tables:
                 continue
             if child.name in exclude_tables:
                 continue
             if child == parent:
-                # Don't loop back via referred_by
+                # Don't loop back to immediate parent via referenced_by
                 continue
             if is_nested_dataset_loopback(root, child):
                 continue
             if child in path:
-                # Skip cyclic paths rather than failing — complex schemas (e.g., cloned
-                # catalogs) can have FK cycles through domain tables.
-                logger.warning(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}, skipping")
+                # Cycle detected — skip to avoid infinite recursion.
+                logger.warning(
+                    f"Cycle in schema path: {child.name} "
+                    f"path:{[p.name for p in path]}, skipping"
+                )
                 continue
 
-            paths.extend(self._schema_to_paths(child, path, exclude_tables))
+            paths.extend(
+                self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth)
+            )
         return paths
 
     def create_table(self, table_def: TableDefinition, schema: str | None = None) -> Table:

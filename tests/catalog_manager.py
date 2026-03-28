@@ -190,63 +190,21 @@ class CatalogManager:
         # like "Execution_Config" that are created during schema initialization.
         # Deleting these would break the catalog.
 
-        # Drop dynamically created tables in dependency order:
-        # 1. First drop tables that reference other tables (FK children)
-        # 2. Then drop the referenced tables (FK parents)
-
-        # Feature execution tables (reference Image, Subject, and assets)
-        feature_execution_tables = [
-            "Execution_Image_BoundingBox",
-            "Execution_Image_Quality",
-            "Execution_Subject_Health",
-        ]
-        for t in feature_execution_tables:
-            self._drop_table_if_exists(self.domain_schema, t)
-
-        # Asset association tables (created automatically for assets)
-        # These reference the asset tables and must be dropped first
-        asset_assoc_tables = [
-            "BoundingBox_Asset_Type",
-            "BoundingBox_Execution",
-        ]
-        for t in asset_assoc_tables:
-            self._drop_table_if_exists(self.domain_schema, t)
-
-        # Asset tables created by create_asset() (referenced by association tables)
-        asset_tables = ["BoundingBox"]
-        for t in asset_tables:
-            self._drop_table_if_exists(self.domain_schema, t)
-
-        # Custom vocabulary tables created by create_vocabulary()
-        for t in domain_vocab_tables:
-            self._drop_table_if_exists(self.domain_schema, t)
-
-        # Test-specific tables that may be created by individual tests
-        # First drop association tables, then the main tables
-        test_assoc_tables = [
-            "TestTableExecution_Execution",
-            "TestTableExecution_Asset_Type",
-            "TestTable_Execution",
-            "TestTable_Asset_Type",
-            "Dataset_TestTableExecution",
-            "Dataset_TestTable",
-            "SplitTestItem_Execution",
-            "SplitTestItem_Asset_Type",
-            "Dataset_SplitTestItem",
-            "TestTableDelete_Execution",
-            "TestTableDelete_Asset_Type",
-            "Dataset_TestTableDelete",
-        ]
-        for t in test_assoc_tables:
-            self._drop_table_if_exists(self.domain_schema, t)
-
-        test_tables = ["TestTableExecution", "TestTable", "SplitTestItem", "TestTableDelete"]
-        for t in test_tables:
-            self._drop_table_if_exists(self.domain_schema, t)
-
-        # Note: Observation, ClinicalRecord, and ClinicalRecord_Observation are permanent
-        # schema tables (created in create_domain_schema), not dynamically created by tests.
-        # Like Image and Subject, they only need data clearing (done above), not table drops.
+        # Drop ALL dynamically created tables (anything not in the permanent schema).
+        # This avoids a hardcoded list that must be updated every time a test creates
+        # new tables. Uses FK-aware ordering to drop children before parents.
+        # Permanent tables created by create_domain_schema() and initial
+        # asset/element registration. These survive resets; all others are dropped.
+        permanent_tables = {
+            # Domain tables from create_domain_schema()
+            "Subject", "Image", "Observation", "ClinicalRecord",
+            "ClinicalRecord_Observation", "Image_Dataset_Legacy",
+            # Asset metadata tables (created automatically for Image asset)
+            "Image_Asset_Type", "Image_Execution",
+            # Element type association tables (created by add_dataset_element_type)
+            "Dataset_Subject", "Dataset_Image",
+        }
+        self._drop_dynamic_tables(permanent_tables)
 
         # Clear catalog history snapshots
         self._clear_history()
@@ -280,6 +238,70 @@ class CatalogManager:
             pass
         except Exception as e:
             self._logger.warning(f"Could not drop table {schema_name}.{table_name}: {e}")
+
+    def _drop_dynamic_tables(self, permanent_tables: set[str]) -> None:
+        """Drop all domain schema tables that aren't in the permanent set.
+
+        Uses FK-aware ordering: repeatedly attempts to drop tables, deferring
+        any that have inbound FK dependencies. Converges because each pass
+        drops at least one leaf table.
+        """
+        try:
+            model = self.catalog.getCatalogModel()
+            if self.domain_schema not in model.schemas:
+                return
+            schema = model.schemas[self.domain_schema]
+            dynamic_tables = {
+                t for t in schema.tables if t not in permanent_tables
+            }
+            if not dynamic_tables:
+                return
+
+            self._logger.info(f"Dropping {len(dynamic_tables)} dynamic tables: {sorted(dynamic_tables)}")
+
+            # Iteratively drop tables, deferring those with FK dependencies.
+            # Each pass should drop at least one table (leaf nodes first).
+            max_passes = len(dynamic_tables) + 1  # Worst case: one per pass
+            for pass_num in range(max_passes):
+                if not dynamic_tables:
+                    break
+                # Refresh model to reflect drops from previous pass
+                model = self.catalog.getCatalogModel()
+                if self.domain_schema not in model.schemas:
+                    break
+                schema = model.schemas[self.domain_schema]
+
+                deferred = set()
+                dropped_any = False
+                for t in sorted(dynamic_tables):
+                    if t not in schema.tables:
+                        # Already gone (dropped in a previous iteration this pass)
+                        continue
+                    try:
+                        schema.tables[t].drop()
+                        self._logger.debug(f"Dropped {t} (pass {pass_num + 1})")
+                        dropped_any = True
+                    except Exception as e:
+                        err_str = str(e).lower()
+                        if "depend" in err_str or "foreign key" in err_str or "conflict" in err_str:
+                            deferred.add(t)
+                            self._logger.debug(f"Deferred {t} (pass {pass_num + 1})")
+                        else:
+                            self._logger.warning(f"Could not drop {t}: {e}")
+
+                dynamic_tables = deferred
+                if not dropped_any and dynamic_tables:
+                    # No progress — remaining tables have circular deps or permanent refs
+                    self._logger.warning(
+                        f"No tables dropped in pass {pass_num + 1}, "
+                        f"remaining: {sorted(dynamic_tables)}"
+                    )
+                    break
+
+            if dynamic_tables:
+                self._logger.warning(f"Could not drop tables: {sorted(dynamic_tables)}")
+        except Exception as e:
+            self._logger.warning(f"Error in _drop_dynamic_tables: {e}")
 
     def _clear_history(self) -> None:
         """Clear catalog history snapshots."""
