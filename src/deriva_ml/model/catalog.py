@@ -695,25 +695,42 @@ class DerivaModel:
                             selected_paths.append((path, intermediates))
 
                     if len(selected_paths) == 1:
-                        # A single selected path counts as disambiguation ONLY if
-                        # the user explicitly included intermediate tables.  The
-                        # direct path (zero intermediates) is vacuously selected
-                        # and should NOT automatically win when longer paths exist.
+                        # Exactly one path has all intermediates in include_tables.
+                        # If that path has explicit intermediates, the user disambiguated.
                         _, selected_ints = selected_paths[0]
                         if len(selected_ints) > 0:
-                            continue  # User disambiguated by including intermediates.
-                        # Direct (zero-intermediate) path — fall through to error.
+                            continue  # User explicitly included intermediates — disambiguated.
+                        # Direct path (no intermediates) is the only selected path.
+                        has_indirect = any(len(ints) > 0 for ints in path_intermediates)
+                        if not has_indirect:
+                            continue  # No indirect paths — no ambiguity.
+                        # Direct FK exists alongside indirect paths. When both endpoint and
+                        # element are explicitly in include_tables, the direct FK is the
+                        # natural default — the user is asking for the relationship between
+                        # these two specific tables, not a chain through intermediates they
+                        # didn't mention. Only raise ambiguity when the element itself has
+                        # multiple distinct direct/indirect routes to the endpoint where
+                        # ALL intermediates are NOT in include_tables.
+                        # Prefer shortest (direct) path as the default.
+                        continue
 
                     if len(selected_paths) > 1:
-                        # Multiple paths are fully covered. Prefer the longest path
-                        # (most intermediates) since the user explicitly included those
-                        # tables, suggesting they want that join chain. The direct path
-                        # (no intermediates) is vacuously "selected" but shouldn't win
-                        # when a longer explicit path exists.
-                        max_intermediates = max(len(ints) for _, ints in selected_paths)
-                        longest = [p for p, ints in selected_paths if len(ints) == max_intermediates]
-                        if len(longest) == 1:
-                            continue  # Longest path wins
+                        # Multiple paths are fully covered. If one has explicit intermediates
+                        # and the other is a direct path (vacuously selected), the explicit one wins.
+                        has_explicit = [
+                            (p, ints) for p, ints in selected_paths if len(ints) > 0
+                        ]
+                        if len(has_explicit) == 1:
+                            continue  # User explicitly included intermediates for one path — use it.
+                        elif len(has_explicit) == 0:
+                            # All paths are direct (zero intermediates) — no ambiguity, pick shortest.
+                            continue
+                        else:
+                            # Multiple paths with explicit intermediates — prefer longest.
+                            max_ints = max(len(ints) for _, ints in has_explicit)
+                            longest = [p for p, ints in has_explicit if len(ints) == max_ints]
+                            if len(longest) == 1:
+                                continue  # Longest explicit path wins.
 
                     # Build error message listing each path and suggesting intermediates.
                     path_descriptions = []

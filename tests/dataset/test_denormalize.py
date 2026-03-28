@@ -903,19 +903,17 @@ class TestCatalogDenormalize:
             non_null = df["Subject.RID"].notna().sum()
             assert non_null > 0, "Subject.RID should be populated via multi-hop"
 
-    def test_catalog_ambiguous_paths_error(self, catalog_with_datasets, tmp_path):
-        """Catalog: Ambiguous paths raise error."""
-        from deriva_ml.core.exceptions import DerivaMLException
-
+    def test_catalog_direct_fk_preferred(self, catalog_with_datasets, tmp_path):
+        """Catalog: Direct FK preferred over indirect when no intermediates specified."""
         ml_instance, dataset_description = catalog_with_datasets
         dataset = dataset_description.dataset
 
-        with pytest.raises(DerivaMLException) as exc_info:
-            dataset.denormalize_as_dataframe(include_tables=["Image", "Subject"])
-
-        error_msg = str(exc_info.value)
-        assert "ambiguous" in error_msg.lower() or "multiple" in error_msg.lower()
-        assert "Observation" in error_msg
+        # Image has direct FK to Subject AND indirect via Observation.
+        # Direct FK should be preferred — no ambiguity error.
+        df = dataset.denormalize_as_dataframe(include_tables=["Image", "Subject"])
+        assert len(df) > 0, "Direct FK should work without ambiguity error"
+        subject_cols = [c for c in df.columns if c.startswith("Subject.")]
+        assert len(subject_cols) > 0, "Expected Subject columns via direct FK"
 
     def test_catalog_disambiguation(self, catalog_with_datasets, tmp_path):
         """Catalog: Including intermediate resolves ambiguity."""
@@ -1188,40 +1186,46 @@ class TestAmbiguousPaths:
     Including Observation should disambiguate.
     """
 
-    def test_ambiguous_paths_raises_error(self, dataset_test, tmp_path):
-        """A1: Ambiguous paths produce DerivaMLException with both paths listed."""
-        from deriva_ml.core.exceptions import DerivaMLException
+    def test_direct_fk_prefers_shortest_path(self, dataset_test, tmp_path):
+        """A1: When a direct FK exists alongside indirect paths, prefer the direct FK.
 
+        Image has both a direct FK to Subject and an indirect path via Observation.
+        When the user requests ["Image", "Subject"] without including Observation,
+        the direct FK should be used without raising an ambiguity error.
+        """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        with pytest.raises(DerivaMLException) as exc_info:
-            bag.denormalize_as_dataframe(include_tables=["Image", "Subject"])
+        # Should NOT raise — direct FK is preferred when no intermediates are specified.
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Subject"])
+        assert len(df) > 0, "Direct FK path should produce results"
+        subject_cols = [c for c in df.columns if c.startswith("Subject.")]
+        assert len(subject_cols) > 0, "Expected Subject columns via direct FK"
 
-        error_msg = str(exc_info.value)
-        assert "Subject" in error_msg, "Error should mention the ambiguous target table"
-        assert "Image" in error_msg, "Error should mention the source table"
-        assert "ambiguous" in error_msg.lower() or "multiple" in error_msg.lower(), (
-            f"Error should indicate ambiguity. Got: {error_msg}"
-        )
+    def test_disambiguation_with_intermediate_changes_path(self, dataset_test, tmp_path):
+        """A1b: Including an intermediate table changes which FK path is used.
 
-    def test_ambiguous_error_lists_paths(self, dataset_test, tmp_path):
-        """A1b: Error message contains enough info to resolve the ambiguity."""
-        from deriva_ml.core.exceptions import DerivaMLException
-
+        Without Observation: Image → Subject (direct FK, default).
+        With Observation: Image → Observation → Subject (explicit chain).
+        Both should work, but may produce different row counts due to different
+        join semantics (direct FK vs chain through Observation).
+        """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        with pytest.raises(DerivaMLException) as exc_info:
-            bag.denormalize_as_dataframe(include_tables=["Image", "Subject"])
-
-        error_msg = str(exc_info.value)
-        assert "Observation" in error_msg, (
-            f"Error should mention intermediate table 'Observation' so user knows "
-            f"to include it for disambiguation. Got: {error_msg}"
+        # Direct path
+        df_direct = bag.denormalize_as_dataframe(include_tables=["Image", "Subject"])
+        # Explicit chain through Observation
+        df_chain = bag.denormalize_as_dataframe(
+            include_tables=["Image", "Observation", "Subject"]
         )
+        assert len(df_direct) > 0
+        assert len(df_chain) > 0
+        # Both should have Subject columns
+        assert any(c.startswith("Subject.") for c in df_direct.columns)
+        assert any(c.startswith("Subject.") for c in df_chain.columns)
 
     def test_including_intermediate_resolves_ambiguity(self, dataset_test, tmp_path):
         """A2: Including Observation resolves the Image→Subject ambiguity."""

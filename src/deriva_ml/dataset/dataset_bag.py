@@ -823,33 +823,6 @@ class DatasetBag:
 
         from deriva_ml.model.catalog import denormalize_column_name
 
-        # Check if any of the included tables have dataset members.
-        # If none do, there is no anchor for the denormalization and the
-        # result should be empty (consistent with the catalog-side
-        # _denormalize_datapath which returns early when primary_table is None).
-        members = self.list_dataset_members(recurse=True)
-        has_member_table = any(
-            table_name in members and len(members[table_name]) > 0
-            for table_name in include_tables
-        )
-        if not has_member_table:
-            # Return an empty SELECT with the correct columns.
-            # We still need _prepare_wide_table to validate table names and
-            # produce column specs, but we'll return a WHERE FALSE query.
-            join_tables_raw, column_specs, multi_schema = self.model._prepare_wide_table(
-                self, self.dataset_rid, include_tables
-            )
-            denormalized_columns = [
-                self.model.get_orm_class_by_name(table_name)
-                .__table__.columns[column_name]
-                .label(denormalize_column_name(schema_name, table_name, column_name, multi_schema))
-                for schema_name, table_name, column_name, _type_name in column_specs
-            ]
-            if denormalized_columns:
-                empty_stmt = select(*denormalized_columns).where(literal(False))
-                return empty_stmt
-            return select(literal(1)).where(literal(False))
-
         join_tables, column_specs, multi_schema = self.model._prepare_wide_table(
             self, self.dataset_rid, include_tables
         )
