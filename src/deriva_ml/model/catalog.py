@@ -705,11 +705,58 @@ class DerivaModel:
                 selected_subpaths[target] = unique[0]
                 continue
 
-            # A path is "selected" if all its intermediates are in include_tables
+            # A path is "selected" if all its non-association intermediates are
+            # in include_tables.  Association tables (M:N link tables) are
+            # infrastructure that the user shouldn't need to name explicitly —
+            # they are transparently included in the join chain.
+            #
+            # We detect association tables by checking if the Table object has
+            # exactly 2 FKs (the definition of a pure association table).
+            # This works regardless of model context (bag or catalog).
+            def _is_likely_association(tbl: Table) -> bool:
+                """Check if table is an association table (M:N link table).
+
+                An association table has only system columns (RID, RCT, RMT,
+                RCB, RMB) plus FK columns to the tables it connects.  ERMrest's
+                built-in is_association() counts system FKs (RCB/RMB → ERMrest_Client),
+                so we use our own check that ignores them.
+                """
+                system_cols = {'RID', 'RCT', 'RMT', 'RCB', 'RMB'}
+                try:
+                    cols = {c.name for c in tbl.columns}
+                    fks = list(tbl.foreign_keys)
+                    # Domain FKs: those NOT to system tables like ERMrest_Client
+                    domain_fks = [
+                        fk for fk in fks
+                        if fk.pk_table.name not in ('ERMrest_Client', 'ERMrest_Group')
+                    ]
+                    # FK column names
+                    fk_col_names = set()
+                    for fk in domain_fks:
+                        for col in fk.columns:
+                            fk_col_names.add(col.name if hasattr(col, 'name') else str(col))
+                    # Non-system, non-FK columns
+                    user_cols = cols - system_cols - fk_col_names
+                    # Association = exactly 2 domain FKs and no other user columns
+                    return len(domain_fks) == 2 and len(user_cols) == 0
+                except Exception:
+                    return False
+
+            def _intermediates_covered(sp: list[Table], ints: tuple[str, ...]) -> bool:
+                sp_tables = {t.name: t for t in sp}
+                for t in ints:
+                    if t in include_tables:
+                        continue
+                    tbl = sp_tables.get(t)
+                    if tbl is not None and _is_likely_association(tbl):
+                        continue  # transparent — doesn't need to be in include_tables
+                    return False
+                return True
+
             fully_covered = [
                 (sp, ints)
                 for sp, ints in zip(unique, path_intermediates)
-                if all(t in include_tables for t in ints)
+                if _intermediates_covered(sp, ints)
             ]
 
             if len(fully_covered) == 1:
