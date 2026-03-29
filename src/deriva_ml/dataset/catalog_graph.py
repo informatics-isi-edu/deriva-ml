@@ -322,6 +322,16 @@ class CatalogGraph:
         }
 
     def _dataset_visible_fkeys(self) -> dict[str, Any]:
+        """Build visible-foreign-keys annotation for the Dataset table.
+
+        Generates the Chaise annotation that controls which related tables
+        appear in the detailed view of a Dataset record, including parent/child
+        dataset links and all dataset element type associations.
+
+        Returns:
+            A dict with a ``"detailed"`` key containing the ordered list of
+            foreign key source specifications for Chaise.
+        """
         def fkey_name(fk):
             return [fk.name[0].name, fk.name[1]]
 
@@ -529,13 +539,18 @@ class CatalogGraph:
         return paths
 
     def _export_vocabulary(self, writer: Callable[[str, str, Table], list[dict[str, Any]]]) -> list[dict[str, Any]]:
-        """
+        """Generate export entries for all vocabulary tables in the catalog.
+
+        Vocabulary tables are exported in full (not filtered by dataset membership)
+        since they provide shared controlled terms used across all datasets.
 
         Args:
-          writer: Callable[[list[Table]]: list[dict[str: Any]]]:
+            writer: A callable that generates export spec entries for a single table.
+                Receives (source_path, dest_path, table) and returns a list of
+                export specification dictionaries.
 
         Returns:
-
+            A list of export specification dictionaries for all vocabulary tables.
         """
         vocabs = [
             table
@@ -545,23 +560,36 @@ class CatalogGraph:
         ]
         return [o for table in vocabs for o in writer(f"{table.schema.name}:{table.name}", table.name, table)]
 
-    def _table_paths(
+    def _build_linked_datapath(
         self,
-        dataset: DatasetLike | None = None,
-    ) -> Iterator[tuple[str, str, Table]]:
-        paths = self._collect_paths(dataset and dataset.dataset_rid)
-        pb = self._ml_instance.catalog.getPathBuilder()
+        path: tuple[Table, ...],
+        pb: Any,
+        root_dp: Any = None,
+    ) -> tuple[Any, Any]:
+        """Build a linked datapath by walking an FK path through the schema.
 
+        Handles Dataset_Dataset nesting and composite FK ON-clauses. Used by
+        both ``_table_paths`` (for export specs) and ``_aggregate_queries``
+        (for size estimation) to avoid duplicating the FK-linking logic.
+
+        Args:
+            path: Tuple of ermrest Table objects representing the FK path.
+            pb: The pathBuilder instance for looking up tables.
+            root_dp: Optional pre-built datapath for the root table (e.g., with
+                a filter applied). If None, starts from ``pb_table(path[0])``.
+
+        Returns:
+            ``(datapath, root_pb_table)`` where *datapath* is the fully linked
+            pathBuilder object and *root_pb_table* is the pathBuilder table
+            for the first table in the path.
+        """
         def _pb_table(table: Table):
-            """Look up a pathBuilder table from an ermrest_model Table."""
             return pb.schemas[table.schema.name].tables[table.name]
 
         def _build_on_clause(prev_model_table, table, prev_pb_table, pb_table):
-            """Build an explicit on= clause for .link(), handling composite FKs.
+            """Build an explicit on= clause for composite FKs.
 
-            For simple FKs, returns a single equality expression.
-            For composite FKs, returns an AND of equality expressions.
-            Returns None if the FK can't be resolved (falls back to implicit linking).
+            Returns None for simple FKs (datapath resolves them implicitly).
             """
             try:
                 col_pairs = self._ml_instance.model._table_relationship(prev_model_table, table)
@@ -569,14 +597,10 @@ class CatalogGraph:
                 return None
 
             if len(col_pairs) <= 1:
-                # Simple FK — let datapath resolve it implicitly
                 return None
 
-            # Composite FK — build explicit on= clause
-            # Each (fk_col, pk_col) pair becomes an equality expression
             conditions = []
             for fk_col, pk_col in col_pairs:
-                # Determine which side is on prev_table and which on target
                 if fk_col.table.name == prev_model_table.name:
                     left = getattr(prev_pb_table, fk_col.name)
                     right = getattr(pb_table, pk_col.name)
@@ -585,53 +609,64 @@ class CatalogGraph:
                     right = getattr(pb_table, fk_col.name)
                 conditions.append(left == right)
 
-            # AND all conditions together
             result = conditions[0]
             for cond in conditions[1:]:
                 result = result & cond
             return result
 
-        def source_path(path: tuple[Table, ...]) -> str:
-            """Build an ERMrest query path using the datapath API.
+        dd_table = _pb_table(
+            self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
+        )
 
-            Uses the datapath API to construct properly-formed ERMrest paths with
-            correct FK resolution across schemas. The datapath API generates alias
-            syntax (TableName:=schema:TableName) and explicit FK specifications
-            where needed, avoiding manual ERMrest path string construction.
+        ds_pb = _pb_table(path[0])
+        dp = root_dp if root_dp is not None else ds_pb
 
-            The resulting path has the root Dataset filter replaced with RID={RID}
-            placeholder for use in export specifications.
-            """
-            # Start with root Dataset table via datapath
-            ds_table = _pb_table(path[0])
-            dp = ds_table
-            dd_table = _pb_table(self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"])
-
-            prev_table = path[0]
-            prev_pb = ds_table
-            for table in path[1:]:
-                cur_pb = _pb_table(table)
-                if table.name == "Dataset_Dataset":
-                    dp = dp.link(cur_pb)
-                elif table.name == "Dataset" and prev_table.name == "Dataset_Dataset":
-                    # Nested dataset: follow Nested_Dataset FK back to Dataset
-                    dp = dp.link(cur_pb, on=(dd_table.Nested_Dataset == cur_pb.RID))
+        prev_table = path[0]
+        prev_pb = ds_pb
+        for table in path[1:]:
+            cur_pb = _pb_table(table)
+            if table.name == "Dataset_Dataset":
+                dp = dp.link(cur_pb)
+            elif table.name == "Dataset" and prev_table.name == "Dataset_Dataset":
+                dp = dp.link(cur_pb, on=(dd_table.Nested_Dataset == cur_pb.RID))
+            else:
+                on_clause = _build_on_clause(prev_table, table, prev_pb, cur_pb)
+                if on_clause is not None:
+                    dp = dp.link(cur_pb, on=on_clause)
                 else:
-                    on_clause = _build_on_clause(prev_table, table, prev_pb, cur_pb)
-                    if on_clause is not None:
-                        dp = dp.link(cur_pb, on=on_clause)
-                    else:
-                        dp = dp.link(cur_pb)
-                prev_table = table
-                prev_pb = cur_pb
+                    dp = dp.link(cur_pb)
+            prev_table = table
+            prev_pb = cur_pb
 
-            # Extract path portion from the datapath URI
+        return dp, ds_pb
+
+    def _table_paths(
+        self,
+        dataset: DatasetLike | None = None,
+    ) -> Iterator[tuple[str, str, Table]]:
+        """Build ERMrest source paths, destination paths, and target tables for export.
+
+        For each FK path from ``_collect_paths``, constructs an ERMrest query path
+        using the datapath API with correct FK resolution (including composite FKs).
+
+        Args:
+            dataset: If provided, paths are filtered to this dataset's members.
+
+        Returns:
+            Iterator of ``(source_path, dest_path, target_table)`` tuples.
+        """
+        paths = self._collect_paths(dataset and dataset.dataset_rid)
+        pb = self._ml_instance.catalog.getPathBuilder()
+
+        def source_path(path: tuple[Table, ...]) -> str:
+            """Build an ERMrest query path with RID={RID} placeholder."""
+            dp, _ = self._build_linked_datapath(path, pb)
+
             uri = dp.uri
             entity_prefix = "/entity/"
             idx = uri.index(entity_prefix)
             entity_path = uri[idx + len(entity_prefix):]
 
-            # Insert RID={RID} placeholder after the root Dataset segment
             parts = entity_path.split("/", 1)
             if len(parts) == 1:
                 return f"{parts[0]}/RID={{RID}}"
@@ -670,59 +705,17 @@ class CatalogGraph:
         pb = self._ml_instance.catalog.getPathBuilder()
 
         def _pb_table(table: Table):
-            """Look up a pathBuilder table from an ermrest_model Table."""
             return pb.schemas[table.schema.name].tables[table.name]
-
-        dd_table = _pb_table(
-            self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
-        )
 
         result: dict[str, list[tuple[Any, bool]]] = defaultdict(list)
 
         for path in paths:
-            # Build linked datapath with Dataset RID filter on root table
-            ds_table = _pb_table(path[0])
-            if dataset and dataset.dataset_rid:
-                dp = ds_table.filter(ds_table.RID == dataset.dataset_rid)
-            else:
-                dp = ds_table
-
-            prev_table = path[0]
-            prev_pb = ds_table
-            for table in path[1:]:
-                cur_pb = _pb_table(table)
-                if table.name == "Dataset_Dataset":
-                    dp = dp.link(cur_pb)
-                elif table.name == "Dataset" and prev_table.name == "Dataset_Dataset":
-                    # Nested dataset: follow Nested_Dataset FK back to Dataset
-                    dp = dp.link(cur_pb, on=(dd_table.Nested_Dataset == cur_pb.RID))
-                else:
-                    # Build explicit on= clause for composite FKs
-                    try:
-                        col_pairs = self._ml_instance.model._table_relationship(prev_table, table)
-                        if len(col_pairs) > 1:
-                            conditions = []
-                            for fk_col, pk_col in col_pairs:
-                                if fk_col.table.name == prev_table.name:
-                                    left = getattr(prev_pb, fk_col.name)
-                                    right = getattr(cur_pb, pk_col.name)
-                                else:
-                                    left = getattr(prev_pb, pk_col.name)
-                                    right = getattr(cur_pb, fk_col.name)
-                                conditions.append(left == right)
-                            on_clause = conditions[0]
-                            for cond in conditions[1:]:
-                                on_clause = on_clause & cond
-                            dp = dp.link(cur_pb, on=on_clause)
-                        else:
-                            dp = dp.link(cur_pb)
-                    except Exception:
-                        dp = dp.link(cur_pb)
-                prev_table = table
-                prev_pb = cur_pb
+            ds_pb = _pb_table(path[0])
+            root_dp = ds_pb.filter(ds_pb.RID == dataset.dataset_rid) if dataset and dataset.dataset_rid else None
+            dp, _ = self._build_linked_datapath(path, pb, root_dp=root_dp)
 
             target_table = path[-1]
-            target_pb_table = _pb_table(target_table) if len(path) > 1 else ds_table
+            target_pb_table = _pb_table(target_table) if len(path) > 1 else ds_pb
             is_asset = ASSET_COLUMNS.issubset({c.name for c in target_table.columns})
             result[target_table.name].append((dp, target_pb_table, is_asset))
 
@@ -731,8 +724,12 @@ class CatalogGraph:
     def _dataset_nesting_depth(self, dataset: DatasetLike | None = None) -> int:
         """Determine the maximum dataset nesting depth in the current catalog.
 
-        Returns:
+        Args:
+            dataset: If provided, compute depth for this dataset's subtree only.
+                If None, computes the maximum depth across all datasets.
 
+        Returns:
+            The maximum nesting depth (0 if no nested datasets exist).
         """
 
         def children_depth(dataset: RID, nested_datasets: dict[str, list[str]]) -> int:
