@@ -223,6 +223,11 @@ class DerivaMLRunCLI(BaseCLI):
         if args.allow_dirty:
             os.environ["DERIVA_ML_ALLOW_DIRTY"] = "true"
 
+        # Set dry-run flag via environment variable so Workflow skips the
+        # uncommitted-changes check (warns instead of raising).
+        if any(o in ("dry_run=True", "dry_run=true") for o in hydra_overrides):
+            os.environ["DERIVA_ML_DRY_RUN"] = "true"
+
         # Build argv for Hydra
         hydra_argv = [sys.argv[0]] + hydra_overrides
         if use_multirun:
@@ -244,6 +249,7 @@ class DerivaMLRunCLI(BaseCLI):
         finally:
             sys.argv = original_argv
             os.environ.pop("DERIVA_ML_ALLOW_DIRTY", None)
+            os.environ.pop("DERIVA_ML_DRY_RUN", None)
 
         return 0
 

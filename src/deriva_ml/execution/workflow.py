@@ -448,8 +448,10 @@ class Workflow(BaseModel):
             return self
 
         # Standard git detection for local development
-        # Check env var for allow_dirty (set by CLI --allow-dirty flag)
+        # Check env var for allow_dirty (set by CLI --allow-dirty flag or dry-run mode)
         if os.environ.get("DERIVA_ML_ALLOW_DIRTY", "").lower() == "true":
+            self.allow_dirty = True
+        if os.environ.get("DERIVA_ML_DRY_RUN", "").lower() == "true":
             self.allow_dirty = True
 
         if not self.url:
