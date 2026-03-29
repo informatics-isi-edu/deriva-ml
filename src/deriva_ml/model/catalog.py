@@ -13,6 +13,7 @@ import logging
 
 # Standard library imports
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from graphlib import CycleError, TopologicalSorter
 from typing import Any, Callable, Final, Iterable, NewType, TypeAlias
 
@@ -48,6 +49,52 @@ try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
+@dataclass
+class JoinNode:
+    """A node in the join tree used by ``_prepare_wide_table``.
+
+    The join tree is a rooted tree where each node represents a table that
+    participates in the denormalized query.  The root is the element table
+    (e.g., Image), and children are tables that should be JOINed to it by
+    following FK relationships.
+
+    Attributes:
+        table: The ermrest ``Table`` object for this node.
+        table_name: Human-readable name (``table.name``).
+        join_type: ``"inner"`` or ``"left"`` -- LEFT JOIN is used when the
+            FK column is nullable so that rows with NULL FK values are
+            preserved.
+        fk_columns: ``(fk_col, pk_col)`` pairs describing how this node
+            joins to its parent.  ``None`` for the root node.
+        is_association: If True, this table is needed for the JOIN chain
+            but its columns are excluded from the output (e.g., M:N
+            linking tables like ``ClinicalRecord_Observation``).
+        children: Child nodes to join after this one.
+    """
+
+    table: Any  # ermrest Table
+    table_name: str
+    join_type: str = "inner"  # "inner" or "left"
+    fk_columns: list[tuple] | None = None  # list[(fk_col, pk_col)]
+    is_association: bool = False
+    children: list["JoinNode"] = field(default_factory=list)
+
+    def walk(self) -> list["JoinNode"]:
+        """Return a pre-order traversal of the tree (self first, then children)."""
+        result = [self]
+        for child in self.children:
+            result.extend(child.walk())
+        return result
+
+    def walk_edges(self) -> list[tuple["JoinNode", "JoinNode"]]:
+        """Return (parent, child) pairs in pre-order traversal."""
+        edges = []
+        for child in self.children:
+            edges.append((self, child))
+            edges.extend(child.walk_edges())
+        return edges
 
 
 def denormalize_column_name(
@@ -572,52 +619,293 @@ class DerivaModel:
 
         return [t for a in dataset_table.find_associations() if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)]
 
-    def _prepare_wide_table(
-        self, dataset, dataset_rid: RID, include_tables: list[str]
-    ) -> tuple[dict[str, Any], list[tuple]]:
-        """
-        Generates details of a wide table from the model
+    def _build_join_tree(
+        self,
+        element_name: str,
+        include_tables: set[str],
+        all_paths: list[list[Table]],
+    ) -> JoinNode:
+        """Build a JoinTree rooted at *element_name* that reaches all *include_tables*.
+
+        The algorithm:
+
+        1. Collect all FK paths from `_schema_to_paths()` that start at the element
+           table and end at a table in *include_tables*.
+        2. For each target table, pick the SHORTEST sub-path from the element.
+           If a longer path exists but ALL its intermediates are in *include_tables*,
+           prefer it (user disambiguated).  If multiple equally-short paths exist
+           and cannot be disambiguated, raise an ambiguity error.
+        3. Merge the selected paths into a tree rooted at the element.
+        4. Mark association tables (``is_association=True``) so their columns are
+           excluded from output but they are still JOINed through.
+        5. Set ``join_type="left"`` when the FK column is nullable.
 
         Args:
-            include_tables (list[str] | None): List of table names to include in the denormalized dataset. If None,
-                all tables from the dataset will be included.
+            element_name: The dataset element table (tree root), e.g. ``"Image"``.
+            include_tables: Set of table names the user wants in the output.
+            all_paths: All FK paths from ``_schema_to_paths()``.
 
         Returns:
-            str: SQL query string that represents the process of denormalization.
+            A ``JoinNode`` tree rooted at the element table.
+
+        Raises:
+            DerivaMLException: If ambiguous paths cannot be resolved.
         """
+        element_table = self.name_to_table(element_name)
 
-        # Skip over tables that we don't want to include in the denormalized dataset.
-        # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
-        # table.
-        include_tables = set(include_tables)
-        for t in include_tables:
-            # Check to make sure the table is in the catalog.
-            _ = self.name_to_table(t)
+        # ── Step 1: collect sub-paths from element to each include_table ─────
+        # Each "all_path" has the structure [Dataset, assoc, element, ..., endpoint].
+        # We extract the sub-path starting from the element: [element, ..., endpoint].
+        subpaths_by_target: dict[str, list[list[Table]]] = defaultdict(list)
 
+        for path in all_paths:
+            if len(path) < 3:
+                continue
+            if path[2].name != element_name:
+                continue
+            endpoint = path[-1].name
+            if endpoint not in include_tables:
+                continue
+            # Sub-path from element onward
+            sub = path[2:]  # [element, ..., endpoint]
+            subpaths_by_target[endpoint].append(sub)
+
+        # The element itself (self-path of length 1)
+        if element_name in include_tables:
+            subpaths_by_target.setdefault(element_name, []).append([element_table])
+
+        # ── Step 2: for each target, pick the best path ──────────────────────
+        selected_subpaths: dict[str, list[Table]] = {}
+
+        for target, subpaths in subpaths_by_target.items():
+            if target == element_name:
+                # Self-path: no join needed
+                selected_subpaths[target] = [element_table]
+                continue
+
+            # Deduplicate by table-name signature
+            seen_sigs: set[tuple[str, ...]] = set()
+            unique: list[list[Table]] = []
+            for sp in subpaths:
+                sig = tuple(t.name for t in sp)
+                if sig not in seen_sigs:
+                    seen_sigs.add(sig)
+                    unique.append(sp)
+
+            if len(unique) == 1:
+                selected_subpaths[target] = unique[0]
+                continue
+
+            # Multiple paths — disambiguate.
+            # Intermediates are tables between element (sp[0]) and endpoint (sp[-1]).
+            path_intermediates = [tuple(t.name for t in sp[1:-1]) for sp in unique]
+
+            # If all have identical intermediates, no ambiguity
+            if len(set(path_intermediates)) <= 1:
+                selected_subpaths[target] = unique[0]
+                continue
+
+            # A path is "selected" if all its intermediates are in include_tables
+            fully_covered = [
+                (sp, ints)
+                for sp, ints in zip(unique, path_intermediates)
+                if all(t in include_tables for t in ints)
+            ]
+
+            if len(fully_covered) == 1:
+                sp, ints = fully_covered[0]
+                if len(ints) > 0:
+                    # User explicitly included intermediates
+                    selected_subpaths[target] = sp
+                    continue
+                # Direct path (no intermediates) — check if there are indirect paths
+                has_indirect = any(len(i) > 0 for i in path_intermediates)
+                if not has_indirect:
+                    selected_subpaths[target] = sp
+                    continue
+                # Direct FK alongside indirect — prefer direct (shortest)
+                selected_subpaths[target] = sp
+                continue
+
+            if len(fully_covered) > 1:
+                # Multiple fully-covered paths
+                has_explicit = [(sp, ints) for sp, ints in fully_covered if len(ints) > 0]
+                if len(has_explicit) == 1:
+                    selected_subpaths[target] = has_explicit[0][0]
+                    continue
+                elif len(has_explicit) == 0:
+                    # All direct paths — pick shortest
+                    shortest = min(fully_covered, key=lambda x: len(x[0]))
+                    selected_subpaths[target] = shortest[0]
+                    continue
+                else:
+                    # Multiple explicit — prefer longest (most specific)
+                    max_ints = max(len(ints) for _, ints in has_explicit)
+                    longest = [sp for sp, ints in has_explicit if len(ints) == max_ints]
+                    if len(longest) == 1:
+                        selected_subpaths[target] = longest[0]
+                        continue
+
+            if len(fully_covered) == 0:
+                # No path is fully covered.  Check if direct path exists.
+                direct = [sp for sp, ints in zip(unique, path_intermediates) if len(ints) == 0]
+                if len(direct) == 1:
+                    selected_subpaths[target] = direct[0]
+                    continue
+
+            # Ambiguity error
+            path_descriptions = []
+            all_ints: set[str] = set()
+            for sp, ints in zip(unique, path_intermediates):
+                names = [t.name for t in sp]
+                path_descriptions.append(" → ".join(names))
+                all_ints.update(ints)
+
+            suggestion_tables = all_ints - include_tables
+            suggestion = ""
+            if suggestion_tables:
+                suggestion = (
+                    f"\nInclude an intermediate table to disambiguate "
+                    f"(e.g., add {', '.join(sorted(suggestion_tables))} to include_tables)."
+                )
+
+            raise DerivaMLException(
+                f"Ambiguous path between {element_name} and {target}: "
+                f"found {len(unique)} FK paths:\n"
+                + "\n".join(f"  {d}" for d in path_descriptions)
+                + suggestion
+            )
+
+        # ── Step 3: merge selected paths into a tree ─────────────────────────
+        # Build the tree by inserting each selected sub-path into the tree.
+        root = JoinNode(
+            table=element_table,
+            table_name=element_name,
+            join_type="inner",
+            fk_columns=None,
+            is_association=bool(self.is_association(element_name)),
+            children=[],
+        )
+
+        # Map table_name -> JoinNode for quick lookup during tree building
+        node_map: dict[str, JoinNode] = {element_name: root}
+
+        for target, subpath in selected_subpaths.items():
+            if target == element_name:
+                continue
+            # subpath = [element, ..intermediate.., target]
+            # Walk the subpath, creating nodes as needed
+            for i in range(1, len(subpath)):
+                child_table = subpath[i]
+                child_name = child_table.name
+                parent_table = subpath[i - 1]
+                parent_name = parent_table.name
+
+                if child_name in node_map:
+                    continue  # Already in tree
+
+                # Get FK column pairs
+                col_pairs = self._table_relationship(parent_table, child_table)
+
+                # Determine join type: LEFT for nullable FK columns
+                join_type = "inner"
+                for fk_col, pk_col in col_pairs:
+                    if fk_col.nullok:
+                        join_type = "left"
+                        break
+
+                node = JoinNode(
+                    table=child_table,
+                    table_name=child_name,
+                    join_type=join_type,
+                    fk_columns=col_pairs,
+                    is_association=bool(self.is_association(child_name)),
+                    children=[],
+                )
+                node_map[child_name] = node
+                # Attach to parent
+                if parent_name in node_map:
+                    node_map[parent_name].children.append(node)
+                else:
+                    # Parent not yet in tree — this shouldn't happen since we
+                    # process paths from element outward, but handle gracefully
+                    logger.warning(
+                        f"Parent {parent_name} not in tree when adding {child_name}"
+                    )
+
+        return root
+
+    def _prepare_wide_table(
+        self, dataset, dataset_rid: RID, include_tables: list[str]
+    ) -> tuple[dict[str, Any], list[tuple], bool]:
+        """Generate a join plan for denormalizing a dataset into a wide table.
+
+        Uses a **JoinTree** approach that preserves path-specific structure:
+
+        1. **Path discovery** -- ``_schema_to_paths()`` discovers all FK paths
+           from Dataset through the schema.
+        2. **Path filtering & deduplication** -- keep only paths relevant to
+           *include_tables*, dedup duplicate association table routes.
+        3. **JoinTree construction** -- for each element type, build a tree
+           rooted at the element.  Each node is a table to JOIN; association
+           tables are in the tree (for JOIN) but excluded from output columns.
+           Nullable FK columns produce LEFT JOINs.
+        4. **Flatten to legacy format** -- convert the tree to the
+           ``(path, join_conditions, join_types)`` tuple expected by
+           ``_denormalize()`` and ``_denormalize_datapath()``.
+
+        Args:
+            dataset: A DatasetLike object (DatasetBag or Dataset).
+            dataset_rid: RID of the dataset.
+            include_tables: List of table names to include in the output.
+
+        Returns:
+            ``(element_tables, denormalized_columns, multi_schema)`` where:
+
+            - **element_tables** -- ``dict[str, (path, join_conditions, join_types)]``
+              keyed by element table name.
+              *path* is a list of table name strings in JOIN order (pre-order walk
+              of the JoinTree, starting with "Dataset").
+              *join_conditions* maps ``table_name -> set[(fk_col, pk_col)]``.
+              *join_types* maps ``table_name -> "inner" | "left"``.
+            - **denormalized_columns** -- list of
+              ``(schema_name, table_name, column_name, type_name)`` for the output.
+            - **multi_schema** -- True if output spans multiple domain schemas.
+        """
+        include_tables_set = set(include_tables)
+        for t in include_tables_set:
+            _ = self.name_to_table(t)  # validate existence
+
+        # ── Phase 1: path discovery ──────────────────────────────────────────
+        all_paths = self._schema_to_paths()
+
+        # Filter paths: must end at a table in include_tables AND
+        # have at least one table in include_tables along the path.
         table_paths = [
             path
-            for path in self._schema_to_paths()
-            if path[-1].name in include_tables and include_tables.intersection({p.name for p in path})
+            for path in all_paths
+            if path[-1].name in include_tables_set
+            and include_tables_set.intersection({p.name for p in path})
         ]
 
-        # Deduplicate paths that reach the same element via different association tables.
-        # In some catalogs (e.g., eye-ai), both Image_Dataset and Dataset_Image exist as
-        # association tables linking Dataset to Image. _schema_to_paths() discovers paths
-        # through both. If we merge them into a single join graph, the SQL JOINs through
-        # both association tables, and the empty one produces 0 rows via INNER JOIN.
-        #
-        # Fix: For each (element, endpoint) pair, if multiple paths differ only in the
-        # association table (path[1]), keep only one path per association table group.
-        # First-encountered path wins (both lead to same data).
-        deduplicated_paths = []
-        seen_element_endpoint = {}  # (element_name, endpoint_name) -> best path
+        # ── Phase 1b: deduplicate association table routes ───────────────────
+        # In some catalogs (e.g., eye-ai), both Image_Dataset and Dataset_Image
+        # exist.  Keep only one route per (element, endpoint) via different
+        # association tables (path[1]).
+        deduplicated_paths: list[list[Table]] = []
+        seen_element_endpoint: dict[tuple[str, str], tuple[list[Table], Table]] = {}
+
+        def _is_standard_assoc(assoc_name: str, element_name: str) -> bool:
+            """Check if assoc table matches the Dataset_{Element} naming pattern."""
+            return assoc_name == f"Dataset_{element_name}"
+
         for path in table_paths:
             if len(path) < 3:
                 deduplicated_paths.append(path)
                 continue
-            assoc_table = path[1]  # Association table between Dataset and element
-            element = path[2]     # Element table
-            endpoint = path[-1]   # Final table
+            assoc_table = path[1]
+            element = path[2]
+            endpoint = path[-1]
             key = (element.name, endpoint.name)
 
             if key not in seen_element_endpoint:
@@ -626,194 +914,97 @@ class DerivaModel:
             else:
                 existing_path, existing_assoc = seen_element_endpoint[key]
                 if existing_assoc.name != assoc_table.name:
-                    # Same (element, endpoint) via different linking table — skip.
-                    # This handles both association tables (Dataset_Image vs Image_Dataset_Legacy)
-                    # and non-association linking tables that create duplicate routes.
-                    continue
+                    # Duplicate route via different association table.
+                    # Prefer the standard Dataset_{Element} pattern over legacy.
+                    if _is_standard_assoc(assoc_table.name, element.name) and not _is_standard_assoc(existing_assoc.name, element.name):
+                        # Replace existing with standard pattern
+                        deduplicated_paths = [p for p in deduplicated_paths if not (len(p) >= 3 and (p[2].name, p[-1].name) == key)]
+                        seen_element_endpoint[key] = (path, assoc_table)
+                        deduplicated_paths.append(path)
+                    # else: keep existing (either it's standard or both are non-standard)
                 else:
-                    # Same linking table, different intermediate path — keep both
-                    # (these are genuinely different routes, e.g., direct vs via Observation)
                     deduplicated_paths.append(path)
 
         table_paths = deduplicated_paths
 
-        paths_by_element = defaultdict(list)
+        # ── Phase 1c: group by element, filter to elements in include_tables ─
+        paths_by_element: dict[str, list[list[Table]]] = defaultdict(list)
         for p in table_paths:
-            paths_by_element[p[2].name].append(p)
+            if len(p) >= 3:
+                paths_by_element[p[2].name].append(p)
 
-        # Only keep element tables that are in include_tables. Paths rooted at
-        # elements NOT in include_tables would produce extra rows in the UNION
-        # (e.g., requesting ["Image", "Observation"] should not traverse Subject
-        # element paths even though Subject → Image is FK-reachable).
         paths_by_element = {
-            element: paths
-            for element, paths in paths_by_element.items()
-            if element in include_tables
+            elem: paths
+            for elem, paths in paths_by_element.items()
+            if elem in include_tables_set
         }
 
-        # Check for ambiguous paths to the same endpoint through different intermediates.
-        for element_table, paths in paths_by_element.items():
-            # Group paths by their final table (endpoint).
-            endpoints: dict[str, list[list[Table]]] = defaultdict(list)
-            for path in paths:
-                endpoint = path[-1].name
-                if endpoint in include_tables:
-                    endpoints[endpoint].append(path)
-
-            for endpoint, endpoint_paths in endpoints.items():
-                # Deduplicate paths that traverse the same tables (can happen when
-                # multiple FK constraints exist between the same pair of tables,
-                # e.g., composite FKs create separate paths for each column).
-                seen_signatures = set()
-                unique_paths = []
-                for path in endpoint_paths:
-                    sig = tuple(t.name for t in path)
-                    if sig not in seen_signatures:
-                        seen_signatures.add(sig)
-                        unique_paths.append(path)
-                endpoint_paths = unique_paths
-
-                if len(endpoint_paths) > 1:
-                    # Multiple paths reach the same endpoint — check if user included
-                    # intermediate tables to disambiguate.
-                    path_intermediates = []
-                    for path in endpoint_paths:
-                        # Path structure: [Dataset, Dataset_X, element, ..., endpoint]
-                        # Intermediates are tables between the element (path[2]) and endpoint (path[-1]).
-                        intermediates = tuple(p.name for p in path[3:-1])
-                        path_intermediates.append(intermediates)
-
-                    # If all paths have identical intermediates, no ambiguity.
-                    if len(set(path_intermediates)) <= 1:
-                        continue
-
-                    # Check if user included enough intermediates to disambiguate.
-                    # A path is "selected" if all its intermediates are in include_tables.
-                    selected_paths = []
-                    for path, intermediates in zip(endpoint_paths, path_intermediates):
-                        if all(t in include_tables for t in intermediates):
-                            selected_paths.append((path, intermediates))
-
-                    if len(selected_paths) == 1:
-                        # Exactly one path has all intermediates in include_tables.
-                        # If that path has explicit intermediates, the user disambiguated.
-                        _, selected_ints = selected_paths[0]
-                        if len(selected_ints) > 0:
-                            continue  # User explicitly included intermediates — disambiguated.
-                        # Direct path (no intermediates) is the only selected path.
-                        has_indirect = any(len(ints) > 0 for ints in path_intermediates)
-                        if not has_indirect:
-                            continue  # No indirect paths — no ambiguity.
-                        # Direct FK exists alongside indirect paths. When both endpoint and
-                        # element are explicitly in include_tables, the direct FK is the
-                        # natural default — the user is asking for the relationship between
-                        # these two specific tables, not a chain through intermediates they
-                        # didn't mention. Only raise ambiguity when the element itself has
-                        # multiple distinct direct/indirect routes to the endpoint where
-                        # ALL intermediates are NOT in include_tables.
-                        # Prefer shortest (direct) path as the default.
-                        continue
-
-                    if len(selected_paths) > 1:
-                        # Multiple paths are fully covered. If one has explicit intermediates
-                        # and the other is a direct path (vacuously selected), the explicit one wins.
-                        has_explicit = [
-                            (p, ints) for p, ints in selected_paths if len(ints) > 0
-                        ]
-                        if len(has_explicit) == 1:
-                            continue  # User explicitly included intermediates for one path — use it.
-                        elif len(has_explicit) == 0:
-                            # All paths are direct (zero intermediates) — no ambiguity, pick shortest.
-                            continue
-                        else:
-                            # Multiple paths with explicit intermediates — prefer longest.
-                            max_ints = max(len(ints) for _, ints in has_explicit)
-                            longest = [p for p, ints in has_explicit if len(ints) == max_ints]
-                            if len(longest) == 1:
-                                continue  # Longest explicit path wins.
-
-                    # Build error message listing each path and suggesting intermediates.
-                    path_descriptions = []
-                    all_intermediates: set[str] = set()
-                    for path, intermediates in zip(endpoint_paths, path_intermediates):
-                        path_names = [p.name for p in path[2:]]  # Start from element table.
-                        path_descriptions.append(" → ".join(path_names))
-                        all_intermediates.update(intermediates)
-
-                    # Only suggest tables the user hasn't already included.
-                    suggestion_tables = all_intermediates - include_tables
-
-                    suggestion = ""
-                    if suggestion_tables:
-                        suggestion = (
-                            f"\nInclude an intermediate table to disambiguate "
-                            f"(e.g., add {', '.join(sorted(suggestion_tables))} to include_tables)."
-                        )
-
-                    raise DerivaMLException(
-                        f"Ambiguous path between {element_table} and {endpoint}: "
-                        f"found {len(endpoint_paths)} FK paths:\n"
-                        + "\n".join(f"  {d}" for d in path_descriptions)
-                        + suggestion
-                    )
-
+        # ── Phase 2: build JoinTree per element ──────────────────────────────
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
-        element_tables = {}
-        for element_table, paths in paths_by_element.items():
-            graph = {}
-            for path in paths:
-                for left, right in zip(path[0:], path[1:]):
-                    graph.setdefault(left.name, set()).add(right.name)
+        element_tables: dict[str, tuple[list[str], dict[str, set], dict[str, str]]] = {}
 
-            # New lets remove any cycles that we may have in the graph.
-            # We will use a topological sort to find the order in which we need to join the tables.
-            # If we find a cycle, we will remove the table from the graph and splice in an additional ON clause.
-            # We will then repeat the process until there are no cycles.
-            graph_has_cycles = True
-            element_join_tables = []
-            element_join_conditions = {}
-            while graph_has_cycles:
+        for element_name, paths in paths_by_element.items():
+            tree = self._build_join_tree(element_name, include_tables_set, table_paths)
+
+            # ── Phase 3: flatten JoinTree to legacy format ───────────────────
+            # Pre-order walk gives us the correct JOIN order.
+            # We prepend "Dataset" and the association table that connects
+            # Dataset to the element (taken from paths[0][0:3]).
+
+            # Find the Dataset -> assoc -> element prefix from the first path
+            if paths and len(paths[0]) >= 3:
+                dataset_name = paths[0][0].name  # "Dataset"
+                assoc_name = paths[0][1].name    # e.g. "Dataset_Image"
+            else:
+                dataset_name = "Dataset"
+                assoc_name = None
+
+            # Walk the tree to get the join order (element -> children)
+            tree_nodes = tree.walk()
+
+            # Build the legacy path: [Dataset, assoc, element, ...tree children...]
+            path_names: list[str] = [dataset_name]
+            if assoc_name:
+                path_names.append(assoc_name)
+
+            # Add tree nodes (element first, then its subtree in pre-order)
+            for node in tree_nodes:
+                if node.table_name not in path_names:
+                    path_names.append(node.table_name)
+
+            # Build join conditions and join types from the tree edges
+            join_conditions: dict[str, set[tuple]] = {}
+            join_types: dict[str, str] = {}
+
+            # First, add the Dataset -> assoc and assoc -> element conditions
+            if assoc_name:
+                dataset_table = self.name_to_table(dataset_name)
+                assoc_table_obj = self.name_to_table(assoc_name)
                 try:
-                    ts = TopologicalSorter(graph)
-                    element_join_tables = list(reversed(list(ts.static_order())))
-                    graph_has_cycles = False
-                except CycleError as e:
-                    cycle_nodes = e.args[1]
-                    if len(cycle_nodes) > 3:
-                        raise DerivaMLException(f"Unexpected cycle found when normalizing dataset {cycle_nodes}")
-                    # Remove cycle from graph and splice in additional ON constraint.
-                    graph[cycle_nodes[1]].remove(cycle_nodes[0])
-
-            # The Dataset_Version table is a special case as it points to dataset and dataset to version.
-            if "Dataset_Version" in element_join_tables:
-                element_join_tables.remove("Dataset_Version")
-
-            # Build join conditions only for consecutive tables in the join order.
-            # We iterate over the topologically-sorted element_join_tables rather
-            # than individual paths to avoid leaking cross-path conditions (e.g.,
-            # Image.Subject = Subject.RID from the direct path leaking into the
-            # Image → Observation → Subject join order).
-            for left_name, right_name in zip(element_join_tables[:-1], element_join_tables[1:]):
-                if right_name == "Dataset_Version":
-                    continue
-                left_table = self.name_to_table(left_name)
-                right_table = self.name_to_table(right_name)
-                try:
-                    col_pairs = self._table_relationship(left_table, right_table)
-                    for fk_col, pk_col in col_pairs:
-                        element_join_conditions.setdefault(right_name, set()).add(
-                            (fk_col, pk_col)
-                        )
+                    col_pairs = self._table_relationship(dataset_table, assoc_table_obj)
+                    join_conditions[assoc_name] = set(col_pairs)
+                    join_types[assoc_name] = "inner"
                 except DerivaMLException:
-                    # No direct FK between these consecutive tables — skip.
-                    # They may be connected through an intermediate not in this
-                    # join order (topological sort artifact).
                     pass
-            element_tables[element_table] = (element_join_tables, element_join_conditions)
-        # Get the list of columns that will appear in the final denormalized dataset.
-        # Each entry is (schema_name, table_name, column_name, type_name).
+
+                try:
+                    col_pairs = self._table_relationship(assoc_table_obj, tree.table)
+                    join_conditions[tree.table_name] = set(col_pairs)
+                    join_types[tree.table_name] = "inner"
+                except DerivaMLException:
+                    pass
+
+            # Add conditions from the JoinTree edges
+            for parent_node, child_node in tree.walk_edges():
+                if child_node.fk_columns:
+                    join_conditions[child_node.table_name] = set(child_node.fk_columns)
+                    join_types[child_node.table_name] = child_node.join_type
+
+            element_tables[element_name] = (path_names, join_conditions, join_types)
+
+        # ── Phase 4: build denormalized column list ──────────────────────────
         denormalized_columns = []
-        for table_name in include_tables:
+        for table_name in include_tables_set:
             if self.is_association(table_name):
                 continue
             table = self.name_to_table(table_name)
@@ -823,7 +1014,6 @@ class DerivaModel:
                         (table.schema.name, table_name, c.name, c.type.typename)
                     )
 
-        # Determine if schema prefix is needed (multiple domain schemas in the output).
         output_schemas = {s for s, _, _, _ in denormalized_columns if self.is_domain_schema(s)}
         multi_schema = len(output_schemas) > 1
 

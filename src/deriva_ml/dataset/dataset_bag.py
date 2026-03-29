@@ -789,35 +789,35 @@ class DatasetBag:
         # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
         # table.
 
-        def build_join_on_clause(prev_table_name, table_name, join_condition_pairs):
+        def build_join_on_clause(table_name, join_condition_pairs):
             """Build a SQLAlchemy ON clause from join condition column pairs.
 
             For simple FKs: single equality condition.
             For composite FKs: AND of multiple equality conditions.
 
+            Each ``(fk_col, pk_col)`` pair comes from ``_table_relationship``
+            which always returns the FK column first and the PK column second.
+            We use the column objects' own ``.table.name`` to find the correct
+            ORM classes -- this is more robust than relying on sequential path
+            order, which breaks with branching join trees.
+
             Args:
-                prev_table_name: Name of the source table in the join.
-                table_name: Name of the target table in the join.
+                table_name: Name of the table being joined (the target).
                 join_condition_pairs: Set of (fk_col, pk_col) Column pairs from
                     _table_relationship(). Each pair represents one column in the FK.
 
             Returns:
                 SQLAlchemy AND clause for use as join onclause.
             """
-            prev_class = self.model.get_orm_class_by_name(prev_table_name)
-            target_class = self.model.get_orm_class_by_name(table_name)
             conditions = []
-            table_name_str = table_name if isinstance(table_name, str) else table_name.name
-            prev_name_str = prev_table_name if isinstance(prev_table_name, str) else prev_table_name.name
             for fk_col, pk_col in join_condition_pairs:
-                # Determine which column belongs to which table
-                fk_table = fk_col.table.name if hasattr(fk_col.table, 'name') else str(fk_col.table)
-                if fk_table == prev_name_str or fk_table.split(".")[-1] == prev_name_str:
-                    left = prev_class.__table__.columns[fk_col.name]
-                    right = target_class.__table__.columns[pk_col.name]
-                else:
-                    left = prev_class.__table__.columns[pk_col.name]
-                    right = target_class.__table__.columns[fk_col.name]
+                # Use the FK column's table info to get the correct ORM class
+                fk_table_name = fk_col.table.name if hasattr(fk_col.table, 'name') else str(fk_col.table)
+                pk_table_name = pk_col.table.name if hasattr(pk_col.table, 'name') else str(pk_col.table)
+                fk_class = self.model.get_orm_class_by_name(fk_table_name)
+                pk_class = self.model.get_orm_class_by_name(pk_table_name)
+                left = fk_class.__table__.columns[fk_col.name]
+                right = pk_class.__table__.columns[pk_col.name]
                 conditions.append(left == right)
             return and_(*conditions)
 
@@ -834,18 +834,23 @@ class DatasetBag:
             for schema_name, table_name, column_name, _type_name in column_specs
         ]
         sql_statements = []
-        for key, (path, join_conditions) in join_tables.items():
+        for key, (path, join_conditions, join_types) in join_tables.items():
             sql_statement = select(*denormalized_columns).select_from(
                 self.model.get_orm_class_for_table(self._dataset_table)
             )
-            for i, table_name in enumerate(path[1:]):  # Skip over dataset table
-                prev_entry = path[i]  # path[i] because enumerate starts at 0 for path[1:]
-                prev_name = prev_entry.name if hasattr(prev_entry, 'name') else str(prev_entry)
+            for table_name in path[1:]:  # Skip over dataset table
+                if table_name not in join_conditions:
+                    continue  # No join condition — skip (not connected)
                 on_clause = build_join_on_clause(
-                    prev_name, table_name, join_conditions[table_name]
+                    table_name, join_conditions[table_name]
                 )
                 table_class = self.model.get_orm_class_by_name(table_name)
-                sql_statement = sql_statement.join(table_class, onclause=on_clause)
+                # Use LEFT OUTER JOIN for nullable FK columns to preserve all
+                # rows from the left side (e.g., Images with null Observation FK).
+                if join_types.get(table_name) == "left":
+                    sql_statement = sql_statement.outerjoin(table_class, onclause=on_clause)
+                else:
+                    sql_statement = sql_statement.join(table_class, onclause=on_clause)
             dataset_rid_list = [self.dataset_rid] + [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
             dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
             sql_statement = sql_statement.where(dataset_class.RID.in_(dataset_rid_list))

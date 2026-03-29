@@ -339,7 +339,7 @@ class TestDenormalizeSchemaGraph:
         # join_tables should have entries with ordered table lists
         assert len(join_tables) > 0, "Expected join table structure"
 
-        for element, (path, join_conditions) in join_tables.items():
+        for element, (path, join_conditions, *rest) in join_tables.items():
             # Path should start with Dataset
             assert path[0] == "Dataset", "Join path should start with Dataset"
             # Should have join conditions for tables after Dataset
