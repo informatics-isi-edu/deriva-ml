@@ -1295,3 +1295,238 @@ class TestAmbiguousPaths:
             include_tables=["Image", "Observation", "ClinicalRecord"]
         )
         assert len(df) > 0
+
+
+class TestNewFKPatterns:
+    """Test FK patterns not yet covered by existing tests.
+
+    These tests target the gaps identified in the denormalization analysis
+    (docs/denormalization-analysis.md, section "FK Patterns NOT Covered by Tests"):
+
+    - Diamond pattern resolution (Image→Subject direct vs Image→Observation→Subject)
+    - Association table as mandatory intermediate (Observation↔ClinicalRecord via M:N)
+    - Nullable FK preserving all rows (LEFT JOIN semantics)
+    - Single-table denormalization unaffected by FK additions
+    - Feature table denormalization (Execution_Image_Quality)
+    """
+
+    # -------------------------------------------------------------------------
+    # Diamond pattern tests
+    # -------------------------------------------------------------------------
+
+    def test_diamond_ambiguity_detected(self, dataset_test, tmp_path):
+        """Diamond: Image→Subject has two paths (direct FK and via Observation).
+
+        The existing behavior prefers the direct FK when no intermediate is
+        specified.  This test documents that ["Image", "Subject"] does NOT
+        raise an ambiguity error — the shortest-path heuristic resolves it.
+
+        If the refactored code changes to raise an ambiguity error instead,
+        this test should be updated to expect that error.
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Currently the direct FK is preferred silently — no error.
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Subject"])
+        assert len(df) > 0, "Direct FK path should produce results"
+        subject_cols = [c for c in df.columns if c.startswith("Subject.")]
+        assert len(subject_cols) > 0, "Expected Subject columns via direct FK"
+
+    @pytest.mark.xfail(reason="Pending join tree refactoring — intermediate should force multi-hop path")
+    def test_diamond_resolved_with_intermediate(self, dataset_test, tmp_path):
+        """Diamond: Including Observation forces the multi-hop path.
+
+        With ["Image", "Observation", "Subject"], the join should follow
+        Image→Observation→Subject (not Image→Subject directly).  Every row
+        should have consistent FK chain values:
+          Image.Observation == Observation.RID
+          Observation.Subject == Subject.RID
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=["Image", "Observation", "Subject"]
+        )
+        assert len(df) > 0, "Should return rows with all three tables"
+
+        # Verify the multi-hop chain is used (not the direct FK)
+        required_cols = ["Image.Observation", "Observation.RID",
+                         "Observation.Subject", "Subject.RID"]
+        if all(c in df.columns for c in required_cols):
+            valid = df.dropna(subset=required_cols)
+            for _, row in valid.iterrows():
+                assert row["Image.Observation"] == row["Observation.RID"], (
+                    "Image.Observation should match Observation.RID in multi-hop chain"
+                )
+                assert row["Observation.Subject"] == row["Subject.RID"], (
+                    "Observation.Subject should match Subject.RID in multi-hop chain"
+                )
+
+        # The number of rows should match Image members (no duplication from
+        # the direct FK path leaking in)
+        members = bag.list_dataset_members(recurse=True)
+        image_count = len(members.get("Image", []))
+        assert len(df) == image_count, (
+            f"Row count ({len(df)}) should equal Image member count ({image_count}). "
+            "Extra rows suggest the direct FK path is leaking into the join."
+        )
+
+    # -------------------------------------------------------------------------
+    # Association table as mandatory intermediate
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.xfail(reason="Pending join tree refactoring — association table must be joined through as implicit intermediate")
+    def test_association_mandatory_intermediate(self, dataset_test, tmp_path):
+        """Association: Image→ClinicalRecord requires two implicit intermediates.
+
+        Requesting ["Image", "ClinicalRecord"] requires the engine to discover
+        the chain Image→Observation→ClinicalRecord_Observation→ClinicalRecord,
+        using both Observation and ClinicalRecord_Observation as implicit
+        intermediates.  The result should contain columns from Image and
+        ClinicalRecord (but NOT from the association or Observation tables).
+
+        This test verifies that the denormalization engine can discover and use
+        association tables as implicit intermediates even when they are not
+        listed in include_tables.
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=["Image", "ClinicalRecord"]
+        )
+
+        assert len(df) > 0, "Expected rows — Image is a dataset member"
+
+        # Image columns should be present (Image is a dataset member)
+        image_cols = [c for c in df.columns if c.startswith("Image.")]
+        assert len(image_cols) > 0, "Expected Image columns"
+
+        # ClinicalRecord columns should be present (joined via intermediates)
+        cr_cols = [c for c in df.columns if c.startswith("ClinicalRecord.")]
+        assert len(cr_cols) > 0, "Expected ClinicalRecord columns"
+
+        # Association table columns should NOT be present
+        assoc_cols = [c for c in df.columns if c.startswith("ClinicalRecord_Observation.")]
+        assert len(assoc_cols) == 0, "Association table columns should be excluded from output"
+
+        # At least some rows should have non-null ClinicalRecord data
+        if "ClinicalRecord.RID" in df.columns:
+            non_null = df["ClinicalRecord.RID"].notna().sum()
+            assert non_null > 0, (
+                "ClinicalRecord.RID should be populated via association table join"
+            )
+
+    # -------------------------------------------------------------------------
+    # Nullable FK preserves all rows (LEFT JOIN semantics)
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.xfail(reason="Pending join tree refactoring — topological sort contamination drops rows")
+    def test_nullable_fk_preserves_all_rows(self, dataset_test, tmp_path):
+        """Nullable FK: Image.Observation is nullable — all Image members must appear.
+
+        Image has a nullable FK to Observation.  When denormalizing
+        ["Image", "Observation"], the result should include ALL Image dataset
+        members, with null Observation columns for Images that have no
+        Observation FK set.
+
+        NOTE: The current demo data sets Observation on all Images, so this
+        test currently passes trivially.  After Step 7 of the refactoring plan
+        (adding Images with null Observation FK to demo data), this test will
+        exercise the actual LEFT JOIN behavior.
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        members = bag.list_dataset_members(recurse=True)
+        image_count = len(members.get("Image", []))
+        assert image_count > 0, "Expected Image members in dataset"
+
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation"])
+
+        assert len(df) == image_count, (
+            f"Row count ({len(df)}) should match Image member count ({image_count}). "
+            "Images with null Observation FK should still appear (LEFT JOIN semantics)."
+        )
+
+    # -------------------------------------------------------------------------
+    # Single table unaffected by FK additions
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.xfail(reason="Pending join tree refactoring — topological sort contamination affects single-table")
+    def test_single_table_unaffected_by_fks(self, dataset_test, tmp_path):
+        """Single table: ["Image"] should return exactly Image members.
+
+        Denormalizing a single table should not be affected by Image's
+        FK relationships to Observation or Subject.  The row count should
+        exactly match the number of Image dataset members, and all Image
+        member RIDs should be present.
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        members = bag.list_dataset_members(recurse=True)
+        image_member_rids = {m["RID"] for m in members.get("Image", [])}
+        assert len(image_member_rids) > 0, "Expected Image members in dataset"
+
+        df = bag.denormalize_as_dataframe(include_tables=["Image"])
+
+        assert len(df) == len(image_member_rids), (
+            f"Row count ({len(df)}) should match Image member count ({len(image_member_rids)}). "
+            "Single-table denormalization should not be affected by FK additions."
+        )
+
+        denorm_rids = set(df["Image.RID"].dropna())
+        assert image_member_rids == denorm_rids, (
+            f"Denormalized RIDs should exactly match list_dataset_members. "
+            f"Missing: {image_member_rids - denorm_rids}, Extra: {denorm_rids - image_member_rids}"
+        )
+
+    # -------------------------------------------------------------------------
+    # Feature table denormalization
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.xfail(reason="Feature table denormalization not yet implemented in include_tables")
+    def test_feature_table_included(self, dataset_test, tmp_path):
+        """Feature: Execution_Image_Quality should be joinable to Image.
+
+        The demo schema creates a feature table Execution_Image_Quality that
+        links Image records to ImageQuality vocabulary terms.  Requesting
+        ["Image", "Execution_Image_Quality"] should produce a wide table with
+        both Image columns and feature columns (ImageQuality values).
+
+        This tests whether feature tables (which are essentially association
+        tables with extra columns) can participate in denormalization.
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=["Image", "Execution_Image_Quality"]
+        )
+
+        assert len(df) > 0, "Expected rows from Image + feature table denormalization"
+
+        # Image columns should be present
+        image_cols = [c for c in df.columns if c.startswith("Image.")]
+        assert len(image_cols) > 0, "Expected Image columns"
+
+        # Feature table columns should be present
+        feature_cols = [c for c in df.columns if c.startswith("Execution_Image_Quality.")]
+        assert len(feature_cols) > 0, "Expected Execution_Image_Quality columns"
+
+        # Every Image member should have a quality feature value
+        members = bag.list_dataset_members(recurse=True)
+        image_count = len(members.get("Image", []))
+        assert len(df) == image_count, (
+            f"Row count ({len(df)}) should match Image member count ({image_count}). "
+            "Each Image should have exactly one quality feature value."
+        )
