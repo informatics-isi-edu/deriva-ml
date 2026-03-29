@@ -1426,7 +1426,6 @@ class TestNewFKPatterns:
     # Nullable FK preserves all rows (LEFT JOIN semantics)
     # -------------------------------------------------------------------------
 
-    @pytest.mark.xfail(reason="Pending join tree refactoring — topological sort contamination drops rows")
     def test_nullable_fk_preserves_all_rows(self, dataset_test, tmp_path):
         """Nullable FK: Image.Observation is nullable — all Image members must appear.
 
@@ -1459,7 +1458,6 @@ class TestNewFKPatterns:
     # Single table unaffected by FK additions
     # -------------------------------------------------------------------------
 
-    @pytest.mark.xfail(reason="Pending join tree refactoring — topological sort contamination affects single-table")
     def test_single_table_unaffected_by_fks(self, dataset_test, tmp_path):
         """Single table: ["Image"] should return exactly Image members.
 
