@@ -199,6 +199,54 @@ class TestAssetManifest:
         assert len(uploaded) == 1
         assert uploaded["Image/a.jpg"].rid == "1-A"
 
+    def test_description_stored_in_entry(self, tmp_path):
+        """Test that description is stored in asset entry."""
+        mp = tmp_path / "asset-manifest.json"
+        manifest = AssetManifest(mp, "4SP")
+        manifest.add_asset("Image/scan.jpg", AssetEntry(
+            asset_table="Image", schema="test-schema",
+            description="A test scan image",
+        ))
+
+        assert manifest.assets["Image/scan.jpg"].description == "A test scan image"
+
+    def test_description_persists_to_disk(self, tmp_path):
+        """Test that description survives reload from disk."""
+        mp = tmp_path / "asset-manifest.json"
+        manifest = AssetManifest(mp, "4SP")
+        manifest.add_asset("Image/scan.jpg", AssetEntry(
+            asset_table="Image", schema="test-schema",
+            description="Persisted description",
+        ))
+
+        # Reload from disk (simulates crash recovery)
+        manifest2 = AssetManifest(mp, "4SP")
+        assert manifest2.assets["Image/scan.jpg"].description == "Persisted description"
+
+    def test_description_none_by_default(self, tmp_path):
+        """Test that description defaults to None when not provided."""
+        mp = tmp_path / "asset-manifest.json"
+        manifest = AssetManifest(mp, "4SP")
+        manifest.add_asset("Image/scan.jpg", AssetEntry(
+            asset_table="Image", schema="test-schema",
+        ))
+
+        assert manifest.assets["Image/scan.jpg"].description is None
+
+    def test_description_in_json_format(self, tmp_path):
+        """Test that description appears in raw JSON on disk."""
+        mp = tmp_path / "asset-manifest.json"
+        manifest = AssetManifest(mp, "4SP")
+        manifest.add_asset("Image/scan.jpg", AssetEntry(
+            asset_table="Image", schema="test-schema",
+            description="JSON visible description",
+        ))
+
+        with open(mp) as f:
+            data = json.load(f)
+
+        assert data["assets"]["Image/scan.jpg"]["description"] == "JSON visible description"
+
 
 # =============================================================================
 # AssetFilePath Tests

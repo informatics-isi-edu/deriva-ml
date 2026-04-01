@@ -6,6 +6,7 @@ Test Classes:
     TestWorkflow: Workflow creation and management
     TestExecutionLifecycle: Context manager, start/stop, status tracking
     TestExecutionAssets: Asset upload/download operations
+    TestAssetDescriptions: Asset description and metadata description resolution
     TestExecutionDatasets: Dataset operations within executions
     TestExecutionFeatures: Feature record management
     TestExecutionRestore: Execution restoration from previous runs
@@ -697,6 +698,80 @@ class TestExecutionAssets:
                     assert asset_path.read_text() == "Content to copy"
             finally:
                 os.chdir(original_cwd)
+
+
+# =============================================================================
+# TestAssetDescriptions - Asset Description Tests
+# =============================================================================
+
+
+class TestAssetDescriptions:
+    """Tests for asset description functionality."""
+
+    def test_get_metadata_description_direct(self):
+        """Test direct filename matches for metadata descriptions."""
+        assert Execution._get_metadata_description("configuration.json") is not None
+        assert "DerivaML execution configuration" in Execution._get_metadata_description("configuration.json")
+
+        assert Execution._get_metadata_description("config.yaml") is not None
+        assert "Resolved Hydra configuration" in Execution._get_metadata_description("config.yaml")
+
+        assert Execution._get_metadata_description("overrides.yaml") is not None
+        assert "Hydra overrides" in Execution._get_metadata_description("overrides.yaml")
+
+        assert Execution._get_metadata_description("hydra.yaml") is not None
+        assert "Hydra runtime config" in Execution._get_metadata_description("hydra.yaml")
+
+        assert Execution._get_metadata_description("uv.lock") is not None
+        assert "Python dependency lockfile" in Execution._get_metadata_description("uv.lock")
+
+    def test_get_metadata_description_hydra_renamed(self):
+        """Test hydra renamed files resolve to the original description."""
+        # Hydra renames files with a timestamp prefix: hydra-{timestamp}-{original_name}
+        desc = Execution._get_metadata_description("hydra-14-30-00-config.yaml")
+        assert desc is not None
+        assert "Resolved Hydra configuration" in desc
+
+        desc = Execution._get_metadata_description("hydra-09-15-42-overrides.yaml")
+        assert desc is not None
+        assert "Hydra overrides" in desc
+
+        desc = Execution._get_metadata_description("hydra-23-59-59-hydra.yaml")
+        assert desc is not None
+        assert "Hydra runtime config" in desc
+
+    def test_get_metadata_description_environment_snapshot(self):
+        """Test environment snapshot files are recognized."""
+        desc = Execution._get_metadata_description("environment_snapshot_20260401_143000.txt")
+        assert desc is not None
+        assert "Runtime environment snapshot" in desc
+
+        # Different timestamp
+        desc = Execution._get_metadata_description("environment_snapshot_20250101_000000.txt")
+        assert desc is not None
+        assert "Runtime environment snapshot" in desc
+
+    def test_get_metadata_description_unknown(self):
+        """Test that unknown files return None."""
+        assert Execution._get_metadata_description("unknown_file.txt") is None
+        assert Execution._get_metadata_description("random.json") is None
+        assert Execution._get_metadata_description("model_weights.pt") is None
+
+    def test_asset_file_path_with_description(self, basic_execution):
+        """Test that description is stored in manifest when passed to asset_file_path."""
+        with basic_execution.execute() as execution:
+            path = execution.asset_file_path(
+                MLAsset.execution_asset,
+                "predictions.csv",
+                asset_types=ExecAssetType.model_file,
+                description="Model predictions on test set",
+            )
+            path.write_text("pred1,pred2")
+
+            # Check manifest has the description
+            manifest = execution._get_manifest()
+            entry = manifest.assets["Execution_Asset/predictions.csv"]
+            assert entry.description == "Model predictions on test set"
 
 
 # =============================================================================

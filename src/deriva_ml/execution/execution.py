@@ -110,6 +110,36 @@ except ImportError:
         return s
 
 
+# Descriptions for execution metadata files, keyed by original filename.
+_METADATA_DESCRIPTIONS: dict[str, str] = {
+    "config.yaml": (
+        "Resolved Hydra configuration: complete merged config values "
+        "used for this execution"
+    ),
+    "overrides.yaml": (
+        "Hydra overrides: command-line and sweep parameters that "
+        "modified the default configuration"
+    ),
+    "hydra.yaml": (
+        "Hydra runtime config: job name, config group choices, "
+        "sweep parameters, and runtime metadata"
+    ),
+    "configuration.json": (
+        "DerivaML execution configuration: datasets, assets, workflow, "
+        "and config group choices"
+    ),
+    "uv.lock": (
+        "Python dependency lockfile: pinned versions of all packages "
+        "in the execution environment"
+    ),
+}
+
+_ENV_SNAPSHOT_DESCRIPTION = (
+    "Runtime environment snapshot: installed packages, OS, platform, "
+    "and Python configuration"
+)
+
+
 class Execution:
     """Manages the lifecycle and context of a DerivaML execution.
 
@@ -301,6 +331,7 @@ class Execution:
             asset_name="Execution_Metadata",
             file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
             asset_types=ExecMetadataType.runtime_env.value,
+            description=_ENV_SNAPSHOT_DESCRIPTION,
         )
         with Path(runtime_env_path).open("w") as fp:
             json.dump(get_execution_environment(), fp)
@@ -320,7 +351,75 @@ class Execution:
                     file_name=hydra_runtime_output_dir / hydra_asset,
                     rename_file=f"hydra-{timestamp}-{hydra_asset.name}",
                     asset_types=ExecMetadataType.hydra_config.value,
+                    description=self._get_metadata_description(hydra_asset.name),
                 )
+
+    @staticmethod
+    def _get_metadata_description(file_name: str) -> str | None:
+        """Resolve a description for an execution metadata file.
+
+        Handles both direct filenames (configuration.json, uv.lock) and
+        hydra-renamed files (hydra-{timestamp}-{original_name}).
+
+        Args:
+            file_name: The filename as it appears in the catalog.
+
+        Returns:
+            A human-readable description, or None if the file is unrecognized.
+        """
+        if file_name in _METADATA_DESCRIPTIONS:
+            return _METADATA_DESCRIPTIONS[file_name]
+
+        # Hydra renamed files: "hydra-{timestamp}-{original_name}"
+        if file_name.startswith("hydra-"):
+            for original, desc in _METADATA_DESCRIPTIONS.items():
+                if file_name.endswith(f"-{original}"):
+                    return desc
+
+        if file_name.startswith("environment_snapshot_"):
+            return _ENV_SNAPSHOT_DESCRIPTION
+
+        return None
+
+    def _set_asset_descriptions(self, uploaded_assets: dict[str, list[AssetFilePath]]) -> None:
+        """Set Description on asset records after upload.
+
+        Applies descriptions from two sources:
+        1. Hardcoded descriptions for known execution metadata files.
+        2. User-provided descriptions passed via the ``description`` parameter
+           of ``asset_file_path()``.
+
+        Args:
+            uploaded_assets: Dict mapping "{schema}/{table}" to uploaded AssetFilePaths.
+        """
+        manifest = self._get_manifest()
+        pb = self._ml_object.pathBuilder()
+
+        # Group updates by schema/table for batch efficiency
+        table_updates: dict[str, list[dict[str, str]]] = {}
+
+        for table_key, assets in uploaded_assets.items():
+            for asset in assets:
+                # Determine description: check manifest first, then fall back to
+                # hardcoded metadata descriptions for Execution_Metadata files.
+                table_name = table_key.split("/")[1] if "/" in table_key else table_key
+                manifest_key = f"{table_name}/{asset.file_name}"
+                entry = manifest.assets.get(manifest_key)
+
+                description = None
+                if entry and entry.description:
+                    description = entry.description
+                elif table_name == "Execution_Metadata":
+                    description = self._get_metadata_description(asset.file_name)
+
+                if description and asset.asset_rid:
+                    table_updates.setdefault(table_key, []).append(
+                        {"RID": asset.asset_rid, "Description": description}
+                    )
+
+        for table_key, updates in table_updates.items():
+            schema, table_name = table_key.split("/", 1) if "/" in table_key else ("", table_key)
+            pb.schemas[schema].tables[table_name].update(updates)
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution environment.
@@ -374,6 +473,7 @@ class Execution:
                 asset_name=MLAsset.execution_metadata,
                 file_name="configuration.json",
                 asset_types=ExecMetadataType.deriva_config.value,
+                description=_METADATA_DESCRIPTIONS["configuration.json"],
             )
 
             with Path(cfile).open("w", encoding="utf-8") as config_file:
@@ -388,6 +488,7 @@ class Execution:
                     asset_name=MLAsset.execution_metadata,
                     file_name=lock_file,
                     asset_types=ExecMetadataType.execution_config.value,
+                    description=_METADATA_DESCRIPTIONS["uv.lock"],
                 )
 
             self._upload_hydra_config_assets()
@@ -397,6 +498,7 @@ class Execution:
 
             # Now upload the files so we have the info in case the execution fails.
             self.uploaded_assets = self._upload_execution_dirs()
+            self._set_asset_descriptions(self.uploaded_assets)
         self.start_time = datetime.now()
         self.update_status(Status.pending, "Initialize status finished.")
 
@@ -997,6 +1099,7 @@ class Execution:
                 timeout=timeout,
                 chunk_size=chunk_size,
             )
+            self._set_asset_descriptions(self.uploaded_assets)
             self.update_status(Status.completed, "Successfully end the execution.")
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)
@@ -1173,6 +1276,7 @@ class Execution:
         copy_file=False,
         rename_file: str | None = None,
         metadata=None,
+        description: str | None = None,
         **kwargs,
     ) -> AssetFilePath:
         """Register a file for upload and return a path to write to.
@@ -1195,6 +1299,7 @@ class Execution:
             copy_file: Whether to copy the file rather than creating a symbolic link.
             rename_file: If provided, rename the file during staging.
             metadata: An AssetRecord instance or dict of metadata column values.
+            description: Optional description for the asset record.
             **kwargs: Additional metadata values (legacy support, merged with metadata).
 
         Returns:
@@ -1257,6 +1362,7 @@ class Execution:
             schema=schema,
             asset_types=asset_types,
             metadata=metadata_dict,
+            description=description,
         ))
 
         # Also write legacy asset-type JSONL for backward compatibility with upload

@@ -120,6 +120,24 @@ with ml.create_execution(config) as exe:
 exe.upload_execution_outputs()
 ```
 
+### Adding Descriptions
+
+Provide a human-readable description for the asset record:
+
+```python
+with ml.create_execution(config) as exe:
+    path = exe.asset_file_path(
+        asset_name="Model",
+        file_name="best_model.pt",
+        description="ResNet-50 fine-tuned on CIFAR-10, epoch 42, val_acc=0.94"
+    )
+    torch.save(model.state_dict(), path)
+```
+
+Descriptions are applied to the catalog record after upload. Built-in execution metadata
+files (Hydra configs, `configuration.json`, `uv.lock`, environment snapshots) receive
+automatic descriptions — you only need to provide descriptions for your own assets.
+
 ### Registering with Metadata
 
 Provide column values for the asset table at registration time:

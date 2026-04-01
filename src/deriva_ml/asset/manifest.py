@@ -43,6 +43,7 @@ class AssetEntry:
     schema: str
     asset_types: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    description: str | None = None
     status: str = "pending"  # pending | uploaded | failed
     rid: str | None = None
     uploaded_at: str | None = None
