@@ -12,23 +12,37 @@ DerivaML is a Python library (requires Python ≥3.12) for creating and executin
 - Asset tracking and upload
 - Catalog cloning with partial data subsetting
 
+## Environment Setup
+
+**PATH**: `uv` is installed at `/Users/carl/.local/bin/uv`. If `uv` is not found, prefix commands with:
+```bash
+export PATH="/Users/carl/.local/bin:$PATH"
+```
+
+**Dirty workflow check**: DerivaML checks for uncommitted git changes before running workflows. For tests, set:
+```bash
+export DERIVA_ML_ALLOW_DIRTY=true
+```
+
+**Test catalog**: Tests require a running Deriva catalog server. Set `DERIVA_HOST` to specify the server (defaults to `localhost`). Tests take 30-90 minutes due to real catalog operations.
+
 ## Build and Development Commands
 
 ```bash
 # Install dependencies
 uv sync
 
-# Run all tests (requires DERIVA_HOST env var or defaults to localhost)
-uv run pytest
+# Run all tests
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest
 
 # Run a single test file
-uv run pytest tests/dataset/test_datasets.py
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_datasets.py
 
 # Run a specific test
-uv run pytest tests/dataset/test_datasets.py::test_function_name -v
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_datasets.py::test_function_name -v
 
 # Run tests with coverage
-uv run pytest --cov=deriva_ml --cov-report=term-missing
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest --cov=deriva_ml --cov-report=term-missing
 
 # Lint and format
 uv run ruff check src/
