@@ -266,3 +266,107 @@ class TestDeterministicCacheUnit:
         key1 = f"{rid}_{h1}_{snapshot}"
         key2 = f"{rid}_{h2}_{snapshot}"
         assert key1 != key2
+
+
+class TestStaleCacheInvalidation:
+    """Regression tests for stale cache entries.
+
+    When the schema changes (e.g., a new table is added to the FK traversal),
+    the spec_hash changes even though the snapshot stays the same. The cache
+    must NOT return bags created under the old spec_hash.
+
+    This was a real bug: the Tier 1 glob matched on snapshot only
+    ({rid}_*_{snapshot}), ignoring the spec_hash prefix. A bag missing
+    newly added tables would be returned as a cache hit because its
+    directory name ended with the matching snapshot suffix.
+    """
+
+    def test_stale_cache_not_returned_after_schema_change(
+        self, catalog_manager: CatalogManager, tmp_path: Path
+    ):
+        """A cached bag with old spec_hash is NOT returned when spec changes.
+
+        Simulates the scenario:
+        1. Download bag → creates cache entry with spec_hash_A
+        2. Schema changes (new table added) → spec_hash_B
+        3. Second download must NOT hit the cache from step 1
+        """
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+        dataset = dataset_desc.dataset
+        version = dataset.current_version
+
+        # Step 1: Download to populate cache
+        bag1 = dataset.download_dataset_bag(version=version, use_minid=False)
+
+        # Verify cache entry exists
+        cache_dirs = list(ml.cache_dir.glob(f"{dataset.dataset_rid}_*"))
+        assert len(cache_dirs) >= 1
+        original_cache_dir = cache_dirs[-1]  # Most recent
+        original_name = original_cache_dir.name
+
+        # Step 2: Create a fake stale cache entry with same snapshot but
+        # different spec_hash (simulating what an old download would have
+        # produced before a schema change)
+        parts = original_name.split("_", 1)  # rid, rest
+        rid = parts[0]
+        # Extract the snapshot from the cache dir name
+        # Format: {rid}_{spec_hash[:16]}_{snapshot}
+        rest = parts[1]
+        # spec_hash is 16 hex chars, then underscore, then snapshot
+        old_spec_hash = rest[:16]
+        snapshot_part = rest[17:]  # skip spec_hash + underscore
+
+        # Create stale entry: different spec_hash, same snapshot
+        stale_spec_hash = "0000000000000000"
+        assert stale_spec_hash != old_spec_hash  # Must differ
+        stale_dir = ml.cache_dir / f"{rid}_{stale_spec_hash}_{snapshot_part}"
+        stale_bag = stale_dir / f"Dataset_{rid}"
+        stale_bag.mkdir(parents=True, exist_ok=True)
+        # Put a marker file so we can detect if this stale entry was returned
+        (stale_bag / "STALE_MARKER").touch()
+
+        # Step 3: Download again — must hit the CORRECT cache, not the stale one
+        bag2 = dataset.download_dataset_bag(version=version, use_minid=False)
+
+        # Verify the returned bag does NOT contain the stale marker
+        assert not (bag2.path / "STALE_MARKER").exists(), (
+            "Stale cache entry was returned! The cache lookup matched on "
+            "snapshot alone, ignoring the spec_hash difference."
+        )
+
+        # Clean up stale entry
+        shutil.rmtree(stale_dir, ignore_errors=True)
+
+    def test_snapshot_only_dir_not_matched(
+        self, catalog_manager: CatalogManager, tmp_path: Path
+    ):
+        """A cache entry matching only the snapshot suffix is NOT returned.
+
+        Ensures the fix works: the old glob pattern {rid}_*_{snapshot} would
+        match, but the new exact lookup {rid}_{spec_hash[:16]}_{snapshot} does not.
+        """
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+        dataset = dataset_desc.dataset
+        version = dataset.current_version
+
+        # Create a decoy cache entry with matching snapshot but wrong spec_hash
+        history = dataset.dataset_history()
+        version_record = next(
+            v for v in history if v.dataset_version == str(version)
+        )
+        snapshot = version_record.snapshot
+        decoy_dir = ml.cache_dir / f"{dataset.dataset_rid}_deadbeefdeadbeef_{snapshot}"
+        decoy_bag = decoy_dir / f"Dataset_{dataset.dataset_rid}"
+        decoy_bag.mkdir(parents=True, exist_ok=True)
+        (decoy_bag / "DECOY").touch()
+
+        # Download — should NOT return the decoy
+        bag = dataset.download_dataset_bag(version=version, use_minid=False)
+        assert not (bag.path / "DECOY").exists(), (
+            "Decoy cache entry with wrong spec_hash was returned!"
+        )
+
+        # Clean up
+        shutil.rmtree(decoy_dir, ignore_errors=True)

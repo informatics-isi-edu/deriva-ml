@@ -2527,17 +2527,17 @@ class Dataset:
         The download algorithm proceeds through three tiers, stopping at the
         first success. This applies identically to both MINID and non-MINID paths:
 
-        **Tier 1 — Local deterministic cache (filesystem glob, no network)**
+        **Tier 1 — Local deterministic cache (filesystem lookup, no network beyond spec)**
 
-        Each dataset version records an immutable catalog snapshot ID. Since
-        snapshots are point-in-time views, any cached bag whose directory name
-        ends with ``_{snapshot}`` is guaranteed to contain identical data.
+        The cache key is ``{rid}_{spec_hash[:16]}_{snapshot}``, combining:
+        - **spec_hash**: SHA-256 of the download spec (captures FK traversal plan).
+          Changes when the schema changes (new tables, new FKs).
+        - **snapshot**: Immutable catalog snapshot ID (captures data state).
 
-        The glob pattern ``{rid}_*_{snapshot}`` matches directories created by
-        either the MINID or client-side paths, since both store bags under
-        ``{rid}_{spec_hash[:16]}_{snapshot}``.
+        Both must match for a cache hit — a snapshot-only match would return
+        stale bags created before schema changes.
 
-        Cost: one filesystem glob + stat.  Returns immediately on hit.
+        Cost: one schema introspection query (to compute spec_hash) + one stat.
 
         **Tier 2 — MINID / S3 (when ``use_minid=True``)**
 
@@ -2586,57 +2586,67 @@ class Dataset:
             raise DerivaMLException(f"Version {version_str} does not exist for RID {self.dataset_rid}")
 
         snapshot = version_record.snapshot
+        minid_url = version_record.minid
 
         # =====================================================================
-        # Tier 1: Local deterministic cache (cheapest — filesystem only).
+        # Compute spec_hash upfront (required for all tiers).
         #
-        # The snapshot is immutable: same snapshot ⇒ identical query results.
-        # We glob for {rid}_*_{snapshot} to find a cached bag from ANY prior
-        # download (MINID-sourced or client-generated) for this snapshot.
+        # The download spec defines which FK paths and tables are included in
+        # the bag. If the schema changes (new tables, new FKs), the spec_hash
+        # changes even for the same snapshot. We MUST include the spec_hash in
+        # the cache key to avoid returning stale bags that are missing tables
+        # added after the cached bag was created.
+        #
+        # Cost: one schema introspection query (no data queries). This is
+        # cheap and necessary for correctness.
         # =====================================================================
-        snapshot_suffix = f"_{snapshot}"
-        for cached_dir in self._ml_instance.cache_dir.glob(f"{self.dataset_rid}_*{snapshot_suffix}"):
-            cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
-            if cached_bag_path.exists():
-                self._logger.info(
-                    "Local cache hit for %s version %s (snapshot match: %s)",
-                    self.dataset_rid, version, cached_dir.name,
-                )
-                # Return a DatasetMinid pointing at the cached directory.
-                # The checksum field carries the cache directory suffix so that
-                # _download_dataset_minid resolves the path via {rid}_{checksum}.
-                cache_suffix = cached_dir.name[len(self.dataset_rid) + 1:]
-                return DatasetMinid(
-                    dataset_version=version,
-                    RID=f"{self.dataset_rid}@{snapshot}",
-                    location=cached_bag_path.parent.as_uri(),
-                    checksums=[{"function": "sha256", "value": cache_suffix}],
-                )
+        version_snapshot_catalog = self._version_snapshot_catalog(version)
+        downloader = CatalogGraph(
+            version_snapshot_catalog,
+            s3_bucket=self._ml_instance.s3_bucket,
+            use_minid=use_minid,
+            exclude_tables=exclude_tables,
+        )
+        spec = downloader.generate_dataset_download_spec(self)
+        spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
+
+        # The deterministic cache key: {spec_hash[:16]}_{snapshot}
+        # - spec_hash[:16] captures the FK traversal plan (schema-dependent)
+        # - snapshot captures the catalog data state (immutable point-in-time)
+        # Together they uniquely identify the bag contents.
+        cache_suffix = f"{spec_hash[:16]}_{snapshot}"
+
+        # =====================================================================
+        # Tier 1: Local deterministic cache (filesystem lookup, no network).
+        #
+        # Look for a cached bag with BOTH the same spec_hash and snapshot.
+        # A snapshot-only match would return stale bags created before schema
+        # changes (e.g., new tables added to the FK traversal).
+        # =====================================================================
+        cache_dir_name = f"{self.dataset_rid}_{cache_suffix}"
+        cached_dir = self._ml_instance.cache_dir / cache_dir_name
+        cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
+        if cached_bag_path.exists():
+            self._logger.info(
+                "Local cache hit for %s version %s (spec+snapshot match: %s)",
+                self.dataset_rid, version, cache_dir_name,
+            )
+            return DatasetMinid(
+                dataset_version=version,
+                RID=f"{self.dataset_rid}@{snapshot}",
+                location=cached_bag_path.parent.as_uri(),
+                checksums=[{"function": "sha256", "value": cache_suffix}],
+            )
 
         # =====================================================================
         # Tier 2: MINID / S3 download (use_minid=True only).
         #
-        # Generate the download spec and compare its hash to the stored
-        # Minid_Spec_Hash in the Dataset_Version record.  If they match,
-        # the S3 bag is still current — fetch MINID metadata and download.
-        # If they differ (schema or FK paths changed), regenerate.
+        # Compare spec_hash to the stored Minid_Spec_Hash. If they match,
+        # the S3 bag is still current. If not, regenerate.
         # =====================================================================
-        minid_url = version_record.minid
-
         if use_minid:
-            version_snapshot_catalog = self._version_snapshot_catalog(version)
-            downloader = CatalogGraph(
-                version_snapshot_catalog,
-                s3_bucket=self._ml_instance.s3_bucket,
-                use_minid=use_minid,
-                exclude_tables=exclude_tables,
-            )
-            spec = downloader.generate_dataset_download_spec(self)
-            current_spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
-
-            if minid_url and version_record.spec_hash == current_spec_hash:
-                # S3 bag is current — fetch metadata and let _download_dataset_minid
-                # download it (which will also populate the local cache for Tier 1).
+            if minid_url and version_record.spec_hash == spec_hash:
+                # S3 bag is current — download it (populates local cache for Tier 1).
                 return self._fetch_minid_metadata(version, minid_url)
 
             # No MINID, or spec has changed — need to regenerate.
@@ -2651,34 +2661,18 @@ class Dataset:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
             minid_url = self._create_dataset_minid(
                 version, use_minid=True, exclude_tables=exclude_tables,
-                spec=spec, spec_hash=current_spec_hash, timeout=timeout,
+                spec=spec, spec_hash=spec_hash, timeout=timeout,
             )
             return self._fetch_minid_metadata(version, minid_url)
 
         # =====================================================================
         # Tier 3: Client-side bag generation (use_minid=False).
         #
-        # Build the bag locally from ERMrest queries against the snapshot
-        # catalog.  The resulting bag is stored under a deterministic cache
-        # key so Tier 1 finds it on subsequent calls:
-        #
-        #   {cache_dir}/{rid}_{spec_hash[:16]}_{snapshot}/Dataset_{rid}/
-        #
-        # The spec_hash prefix captures the FK traversal plan.  The snapshot
-        # suffix enables the Tier 1 glob match.
+        # Build the bag locally. Store under the deterministic cache key
+        # {rid}_{spec_hash[:16]}_{snapshot} so Tier 1 finds it next time.
         # =====================================================================
         if not create and not minid_url:
             raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-
-        version_snapshot_catalog = self._version_snapshot_catalog(version)
-        downloader = CatalogGraph(
-            version_snapshot_catalog,
-            s3_bucket=self._ml_instance.s3_bucket,
-            use_minid=False,
-            exclude_tables=exclude_tables,
-        )
-        spec = downloader.generate_dataset_download_spec(self)
-        spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
 
         self._logger.info(
             "Cache miss for %s version %s — generating bag client-side",
@@ -2688,10 +2682,6 @@ class Dataset:
             version, use_minid=False, exclude_tables=exclude_tables,
             spec=spec, spec_hash=spec_hash, timeout=timeout,
         )
-        # The checksum field carries the deterministic cache key suffix so
-        # _download_dataset_minid stores the extracted bag under this name.
-        # Format: {spec_hash[:16]}_{snapshot}  (e.g., "a1b2c3d4e5f6g7h8_34T-GGHM-6JBE")
-        cache_suffix = f"{spec_hash[:16]}_{snapshot}"
         return DatasetMinid(
             dataset_version=version,
             RID=f"{self.dataset_rid}@{snapshot}",
