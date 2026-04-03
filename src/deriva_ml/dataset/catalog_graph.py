@@ -132,7 +132,7 @@ class CatalogGraph:
                 {
                     "processor": "fetch",
                     "processor_params": {
-                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID",
+                        "query_path": f"/attribute/{spath}/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID",
                         "output_path": "asset/{asset_rid}/" + table.name,
                     },
                 }
@@ -183,7 +183,7 @@ class CatalogGraph:
                     "source": {
                         "skip_root_path": False,
                         "api": "attribute",
-                        "path": f"{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5, asset_rid:=RID",
+                        "path": f"{spath}/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID",
                     },
                     "destination": {"name": "asset/{asset_rid}/" + table.name, "type": "fetch"},
                 }
