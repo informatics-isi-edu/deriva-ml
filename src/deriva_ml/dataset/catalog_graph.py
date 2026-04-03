@@ -617,7 +617,11 @@ class CatalogGraph:
         Returns:
             Iterator of ``(source_path, dest_path, target_table)`` tuples.
         """
-        paths = self._collect_paths(dataset and dataset.dataset_rid)
+        # Sort paths for deterministic spec generation (set iteration order is arbitrary).
+        paths = sorted(
+            self._collect_paths(dataset and dataset.dataset_rid),
+            key=lambda p: tuple(f"{t.schema.name}:{t.name}" for t in p),
+        )
         pb = self._ml_instance.catalog.getPathBuilder()
 
         def source_path(path: tuple[Table, ...]) -> str:

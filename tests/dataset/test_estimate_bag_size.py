@@ -217,8 +217,8 @@ class TestEstimateBagSizeUnionSemantics:
         result = _run_estimate(
             aggregate_queries,
             {
+                "S:Dataset_Image/S:Image/RID,Length": assets,
                 "S:Dataset_Image/S:Image/RID": rids,
-                "S:Dataset_Image/S:Image/!(URL::null::)/RID,Length": assets,
             },
         )
 
@@ -251,12 +251,12 @@ class TestEstimateBagSizeUnionSemantics:
         result = _run_estimate(
             aggregate_queries,
             {
-                # Path 1 queries
+                # Path 1 queries — put RID,Length before RID to avoid prefix match
+                "S:Dataset_OCT/S:OCT_DICOM/RID,Length": path1_assets,
                 "S:Dataset_OCT/S:OCT_DICOM/RID": path1_rids,
-                "S:Dataset_OCT/S:OCT_DICOM/!(URL::null::)/RID,Length": path1_assets,
-                # Path 2 queries
+                # Path 2 queries — put RID,Length before RID to avoid prefix match
+                "S:Dataset_CGM/S:CGM/S:OCT_DICOM/RID,Length": path2_assets,
                 "S:Dataset_CGM/S:CGM/S:OCT_DICOM/RID": path2_rids,
-                "S:Dataset_CGM/S:CGM/S:OCT_DICOM/!(URL::null::)/RID,Length": path2_assets,
             },
         )
 
@@ -334,7 +334,7 @@ class TestEstimateBagSizeUnionSemantics:
             aggregate_queries,
             {
                 "S:BadTable/RID": Exception("timeout"),
-                "S:BadTable/!(URL::null::)/RID,Length": Exception("timeout"),
+                "S:BadTable/RID,Length": Exception("timeout"),
             },
         )
 
@@ -355,10 +355,10 @@ class TestEstimateBagSizeUnionSemantics:
         result = _run_estimate(
             aggregate_queries,
             {
+                "S:Dataset_Image/S:Image/RID,Length": _make_asset_rows(*[(f"IMG-{i}", 100) for i in range(10)]),
                 "S:Dataset_Image/S:Image/RID": _make_rids(*[f"IMG-{i}" for i in range(10)]),
-                "S:Dataset_Image/S:Image/!(URL::null::)/RID,Length": _make_asset_rows(*[(f"IMG-{i}", 100) for i in range(10)]),
+                "S:Dataset_Report/S:Report/RID,Length": _make_asset_rows(*[(f"RPT-{i}", 100) for i in range(5)]),
                 "S:Dataset_Report/S:Report/RID": _make_rids(*[f"RPT-{i}" for i in range(5)]),
-                "S:Dataset_Report/S:Report/!(URL::null::)/RID,Length": _make_asset_rows(*[(f"RPT-{i}", 100) for i in range(5)]),
             },
         )
 
