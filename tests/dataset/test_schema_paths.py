@@ -297,7 +297,7 @@ class TestSchemaToPathsBenchmark:
         )
 
     def test_asset_table_paths(self, dataset_test, tmp_path):
-        """Asset tables (Image, BoundingBox) are traversed with their metadata."""
+        """Asset tables (Image, BoundingBox, Report) are traversed with their metadata."""
         dataset_description = dataset_test.dataset_description
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
@@ -316,3 +316,9 @@ class TestSchemaToPathsBenchmark:
         # BoundingBox asset (reached via feature table)
         assert "Dataset -> Dataset_Image -> Image -> Execution_Image_BoundingBox -> BoundingBox" in sigs
         assert "Dataset -> Dataset_Image -> Image -> Execution_Image_BoundingBox -> BoundingBox -> BoundingBox_Asset_Type -> Asset_Type" in sigs
+
+        # Report asset (null URLs) and downstream OCR_Report
+        assert "Dataset -> Dataset_Subject -> Subject -> Observation -> Report" in sigs
+        assert "Dataset -> Dataset_Subject -> Subject -> Observation -> Report -> OCR_Report" in sigs
+        assert "Dataset -> Dataset_Image -> Image -> Observation -> Report" in sigs
+        assert "Dataset -> Dataset_Image -> Image -> Observation -> Report -> OCR_Report" in sigs

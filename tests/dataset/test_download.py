@@ -351,6 +351,40 @@ class TestDatasetDownload:
             assert bag_parent.dataset_rid == catalog_parent.dataset_rid
 
 
+    def test_null_url_asset_metadata_preserved(self, dataset_test, tmp_path):
+        """Asset tables with all-null URLs should still have their CSV metadata in the bag.
+
+        Bug reference: Report_HVF in eye-ai has rows with Observation FKs and
+        Report_Type metadata but no uploaded files (all URLs null). The bag export
+        was pruning all paths through such tables, which also removed downstream
+        non-asset tables (OCR_HVF) that are only reachable through the asset table.
+
+        The fix: keep the CSV metadata for asset tables regardless of URL status.
+        The fetch processor already filters out null-URL rows via !(URL::null::),
+        so no empty file downloads occur.
+        """
+        dataset_description = dataset_test.dataset_description
+        dataset = dataset_description.dataset
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # Report is an asset table with rows but all-null URLs.
+        # Its metadata (Observation FK, Report_Type) should be in the bag.
+        report_rows = list(bag.get_table_as_dict("Report"))
+        assert len(report_rows) > 0, (
+            "Report table should have rows in the bag even though all URLs are null. "
+            "Asset metadata (Observation FK, Report_Type) is valuable without uploaded files."
+        )
+
+        # OCR_Report is a non-asset table reachable only through Report.
+        # It should also be in the bag.
+        ocr_rows = list(bag.get_table_as_dict("OCR_Report"))
+        assert len(ocr_rows) > 0, (
+            "OCR_Report should be in the bag. It is reachable via "
+            "Subject -> Observation -> Report -> OCR_Report. "
+            "Pruning the Report asset table should not remove downstream tables."
+        )
+
+
 class TestDatabasePathCaching:
     """Tests for SQLite database path caching behavior."""
 

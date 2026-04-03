@@ -470,43 +470,6 @@ class CatalogGraph:
             }
             paths = {p for p in paths if p[-1] not in vocab_tables}
 
-            # Detect asset tables with no uploaded files (all URLs null) and prune
-            # paths that pass through them.  An empty asset table means no files were
-            # uploaded to Hatrac; keeping its FK-reachable tables in the bag inflates
-            # the download with metadata-only CSV that serves no purpose.  The fetch
-            # processor already filters out null-URL assets, but the CSV and downstream
-            # FK traversal would still run without this pruning.
-            asset_tables_in_paths = {
-                table for path in paths for table in path
-                if ASSET_COLUMNS.issubset({c.name for c in table.columns})
-                and table not in (self._exclude_tables or set())
-            }
-            if asset_tables_in_paths:
-                pb = self._ml_instance.catalog.getPathBuilder()
-                empty_asset_tables: set[Table] = set()
-                for asset_table in asset_tables_in_paths:
-                    try:
-                        pb_table = pb.schemas[asset_table.schema.name].tables[asset_table.name]
-                        # Quick probe: is there at least one row with a non-null URL?
-                        has_files = bool(
-                            list(pb_table.filter(pb_table.URL != None).entities().fetch(limit=1))  # noqa: E711
-                        )
-                        if not has_files:
-                            empty_asset_tables.add(asset_table)
-                            logger.warning(
-                                "Asset table %s has records but no uploaded files "
-                                "(all URLs null). Pruning FK paths through this table.",
-                                asset_table.name,
-                            )
-                    except Exception:
-                        # If the probe fails, keep the table to avoid data loss.
-                        pass
-                if empty_asset_tables:
-                    paths = {
-                        p for p in paths
-                        if not any(t in empty_asset_tables for t in p)
-                    }
-
             # Add feature table paths for member element types reachable via paths.
             reachable_element_types = {
                 table for path in paths for table in path if table in all_element_types
