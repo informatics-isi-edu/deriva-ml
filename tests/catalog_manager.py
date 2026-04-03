@@ -173,7 +173,7 @@ class CatalogManager:
             self._delete_table_data(domain_path, t)
 
         # Clear Report-related tables
-        for t in ["OCR_Report", "Report_Asset_Type", "Report_Execution", "Report"]:
+        for t in ["OCR_Report", "Report"]:
             self._delete_table_data(domain_path, t)
 
         # Clear data tables in dependency order (FK children before parents)
@@ -204,9 +204,8 @@ class CatalogManager:
             "Subject", "Image", "Observation", "ClinicalRecord",
             "ClinicalRecord_Observation", "Image_Dataset_Legacy",
             "Report", "OCR_Report",
-            # Asset metadata tables (created automatically for Image/Report assets)
+            # Asset metadata tables (created automatically for Image asset)
             "Image_Asset_Type", "Image_Execution",
-            "Report_Asset_Type", "Report_Execution",
             # Element type association tables (created by add_dataset_element_type)
             "Dataset_Subject", "Dataset_Image",
         }
