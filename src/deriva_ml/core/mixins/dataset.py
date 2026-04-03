@@ -309,6 +309,97 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
         )
 
+    def denormalize_info(
+        self,
+        include_tables: list[str],
+    ) -> dict[str, Any]:
+        """Return schema shape and size estimates for a denormalized table.
+
+        This method does NOT require a dataset — it uses global row counts
+        across the entire catalog. Use ``Dataset.denormalize_info()`` for
+        dataset-scoped counts.
+
+        Aligned with :meth:`estimate_bag_size` return structure.
+
+        Args:
+            include_tables: List of table names to include in the join.
+
+        Returns:
+            dict with keys:
+                - columns: list of (column_name, column_type) tuples
+                - join_path: ordered list of table names showing the join chain
+                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
+                - total_rows: total row count across included tables
+                - total_asset_bytes: total asset size in bytes
+                - total_asset_size: human-readable size string
+        """
+        from deriva_ml.dataset.dataset import Dataset
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        model = self.model
+
+        # _prepare_wide_table doesn't actually use dataset or dataset_rid
+        # in its body — it only traverses the schema. Pass None for both.
+        element_tables, column_specs, multi_schema = model._prepare_wide_table(
+            None, None, list(include_tables)
+        )
+
+        # Build columns list
+        columns = [
+            (
+                denormalize_column_name(schema_name, table_name, col_name, multi_schema),
+                type_name,
+            )
+            for schema_name, table_name, col_name, type_name in column_specs
+        ]
+
+        # Extract join path (domain tables only, no Dataset or association tables)
+        join_path: list[str] = []
+        for element_name, (path_names, _, _) in element_tables.items():
+            for table_name in path_names:
+                if table_name not in join_path and table_name != "Dataset":
+                    if not model.is_association(table_name):
+                        join_path.append(table_name)
+
+        # Query global row counts per table
+        pb = self.pathBuilder()
+        tables_info: dict[str, Any] = {}
+        total_rows = 0
+        total_asset_bytes = 0
+
+        for table_name in join_path:
+            table = model.name_to_table(table_name)
+            is_asset = model.is_asset(table_name)
+
+            schema_name = table.schema.name
+            table_path = pb.schemas[schema_name].tables[table_name]
+            row_count = table_path.aggregates(cnt=table_path.column_definitions["RID"].count).fetch()[0]["cnt"]
+
+            entry: dict[str, Any] = {
+                "row_count": row_count,
+                "is_asset": is_asset,
+                "asset_bytes": 0,
+            }
+
+            if is_asset:
+                length_col = table_path.column_definitions["Length"]
+                result = table_path.aggregates(total=length_col.sum).fetch()
+                asset_bytes = result[0]["total"] or 0
+                entry["asset_bytes"] = asset_bytes
+                total_asset_bytes += asset_bytes
+
+            tables_info[table_name] = entry
+            total_rows += row_count
+
+        return {
+            "columns": columns,
+            "join_path": join_path,
+            "tables": tables_info,
+            "total_rows": total_rows,
+            "total_asset_bytes": total_asset_bytes,
+            "total_asset_size": Dataset._human_readable_size(total_asset_bytes),
+        }
+
     def cache_dataset(
         self,
         dataset: "DatasetSpec",

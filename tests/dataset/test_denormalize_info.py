@@ -162,3 +162,17 @@ class TestDenormalizeInfoMethod:
         for table_name, info in result["tables"].items():
             assert "asset_bytes" in info, f"{table_name} missing asset_bytes"
             assert info["asset_bytes"] == 0
+
+
+class TestDenormalizeInfoMixin:
+    """Tests for the DerivaML-level denormalize_info (no dataset required)."""
+
+    def test_mixin_does_not_require_dataset_rid(self):
+        """The mixin method takes only include_tables, no dataset."""
+        from deriva_ml.core.mixins.dataset import DatasetMixin
+        import inspect
+        sig = inspect.signature(DatasetMixin.denormalize_info)
+        params = list(sig.parameters.keys())
+        assert "self" in params
+        assert "include_tables" in params
+        assert "dataset_rid" not in params
