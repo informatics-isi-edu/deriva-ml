@@ -195,11 +195,13 @@ class TestWorkflow:
                 "--kernel",
                 "test_kernel",
                 "--log-output",
+                "--allow-dirty",
             ],
             capture_output=True,
             text=True,
             env=env,
         )
+        assert result.returncode == 0, f"Notebook run failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
         workflows = list(workflow_table.entities().fetch())
         assert len(workflows) == 1

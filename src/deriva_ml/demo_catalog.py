@@ -499,6 +499,18 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         )
         ml_tmp.apply_catalog_annotations()
 
+    # Make asset file columns nullable to simulate real-world catalogs where some
+    # asset rows have metadata populated but the file has not yet been uploaded.
+    model = catalog.getCatalogModel()
+    report_table = model.schemas[sname].tables["Report"]
+    for col_name in ("URL", "Length", "MD5", "SHA256", "Filename"):
+        try:
+            col = report_table.columns[col_name]
+            if not col.nullok:
+                col.alter(nullok=True)
+        except KeyError:
+            pass
+
     # Create OCR_Report — a non-asset table reachable only through Report.
     # This simulates tables like OCR_HVF that contain extracted data from
     # reports and should be included in bags even when the parent asset

@@ -783,13 +783,15 @@ class Execution:
                 self._logger.warning(f"Asset file not found: {source}")
                 continue
 
-            # Build metadata subdirectory path in sorted key order.
+            # Build metadata subdirectory path using ALL metadata columns
+            # from the asset table (not just those in the manifest entry).
             # This must match the regex group order in asset_table_upload_spec()
-            # which also sorts metadata_columns alphabetically.
-            metadata_parts = (
-                [str(entry.metadata[k]) for k in sorted(entry.metadata)]
-                if entry.metadata else []
-            )
+            # which uses sorted(model.asset_metadata(asset_table)).
+            # Missing metadata values get "None" (matching legacy asset_file_path).
+            all_metadata_cols = sorted(self._model.asset_metadata(asset_table_name))
+            metadata_parts = [
+                str(entry.metadata.get(k, "None")) for k in all_metadata_cols
+            ] if all_metadata_cols else []
             target_dir = staging_root / entry.schema / asset_table_name
             for part in metadata_parts:
                 target_dir = target_dir / part
@@ -1190,10 +1192,28 @@ class Execution:
             for asset in assets
         }
 
+        # Build a secondary lookup by (table_name, filename) to handle flat
+        # asset paths (assets/{table}/file) written by the manifest-first
+        # storage layout.  normalize_asset_dir only recognises the staging
+        # path format (asset/{schema}/{table}/...), so flat paths return None.
+        asset_map_by_table = {
+            (asset_table.split("/")[1] if "/" in asset_table else asset_table, asset.file_name): asset.asset_rid
+            for asset_table, assets in uploaded_files.items()
+            for asset in assets
+        }
+
         def map_path(e):
             """Go through the asset columns and replace the file name with the RID for the uploaded file."""
             for c in asset_columns:
-                e[c] = asset_map[normalize_asset_dir(e[c])]
+                key = normalize_asset_dir(e[c])
+                if key is not None:
+                    e[c] = asset_map[key]
+                else:
+                    # Fall back to flat-path lookup: extract the table name
+                    # and filename from the path.  Flat paths look like
+                    # .../assets/{table}/{filename}
+                    p = Path(e[c])
+                    e[c] = asset_map_by_table[(p.parent.name, p.name)]
             return e
 
         # Load the JSON file that has the set of records that contain the feature values.

@@ -330,7 +330,7 @@ class TestStaleCacheInvalidation:
         bag2 = dataset.download_dataset_bag(version=version, use_minid=False)
 
         # Verify the returned bag does NOT contain the stale marker
-        assert not (bag2.path / "STALE_MARKER").exists(), (
+        assert not (bag2._catalog._database_model.bag_path / "STALE_MARKER").exists(), (
             "Stale cache entry was returned! The cache lookup matched on "
             "snapshot alone, ignoring the spec_hash difference."
         )
@@ -364,7 +364,7 @@ class TestStaleCacheInvalidation:
 
         # Download — should NOT return the decoy
         bag = dataset.download_dataset_bag(version=version, use_minid=False)
-        assert not (bag.path / "DECOY").exists(), (
+        assert not (bag._catalog._database_model.bag_path / "DECOY").exists(), (
             "Decoy cache entry with wrong spec_hash was returned!"
         )
 

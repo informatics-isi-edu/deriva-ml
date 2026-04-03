@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "bump-my-version",
     "bdbag @ git+https://github.com/fair-research/bdbag@1.9.0-dev",
-    "deriva~=1.7.10",
+    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@2.0-dev",
     "deepdiff",
     "nbconvert",
     "pandas",
