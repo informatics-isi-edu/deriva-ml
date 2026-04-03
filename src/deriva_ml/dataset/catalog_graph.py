@@ -10,7 +10,6 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 
 from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
-from deriva_ml.model.catalog import ASSET_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +127,7 @@ class CatalogGraph:
         ]
 
         # If this table is an asset table, then we need to output the files associated with the asset.
-        if ASSET_COLUMNS.issubset({c.name for c in table.columns}):
+        if table.is_asset():
             exports.append(
                 {
                     "processor": "fetch",
@@ -178,7 +177,7 @@ class CatalogGraph:
         ]
 
         # If this table is an asset table, then we need to output the files associated with the asset.
-        if ASSET_COLUMNS.issubset({c.name for c in table.columns}):
+        if table.is_asset():
             exports.append(
                 {
                     "source": {
@@ -679,7 +678,7 @@ class CatalogGraph:
 
             target_table = path[-1]
             target_pb_table = _pb_table(target_table) if len(path) > 1 else ds_pb
-            is_asset = ASSET_COLUMNS.issubset({c.name for c in target_table.columns})
+            is_asset = target_table.is_asset()
             result[target_table.name].append((dp, target_pb_table, is_asset))
 
         return dict(result)

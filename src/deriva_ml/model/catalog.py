@@ -132,7 +132,6 @@ PathList: TypeAlias = list[list[Table]]
 
 # Define constants:
 VOCAB_COLUMNS: Final[set[str]] = {"NAME", "URI", "SYNONYMS", "DESCRIPTION", "ID"}
-ASSET_COLUMNS: Final[set[str]] = {"Filename", "URL", "Length", "MD5", "Description"}
 
 FilterPredicate = Callable[[Table], bool]
 
@@ -473,18 +472,21 @@ class DerivaModel:
             )
 
     def is_asset(self, table_name: TableInput) -> bool:
-        """True if the specified table is an asset table.
+        """True if the specified table is a proper asset table.
+
+        Delegates to Table.is_asset() from deriva-py which checks:
+        - Required columns exist (URL, Filename, Length, MD5)
+        - URL, Length, MD5 are NOT NULL
+        - URL has the asset annotation
 
         Args:
-            table_name: str | Table:
+            table_name: str | Table
 
         Returns:
-            True if the specified table is an asset table, False otherwise.
-
+            True if the specified table is a proper asset table.
         """
-        asset_columns = {"Filename", "URL", "Length", "MD5", "Description"}
         table = self.name_to_table(table_name)
-        return asset_columns.issubset({c.name for c in table.columns})
+        return table.is_asset()
 
     def find_assets(self, with_metadata: bool = False) -> list[Table]:
         """Return the list of asset tables in the current model"""

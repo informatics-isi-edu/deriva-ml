@@ -97,7 +97,6 @@ from deriva_ml.dataset.aux_classes import (
 )
 from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.model.catalog import ASSET_COLUMNS
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
