@@ -172,6 +172,10 @@ class CatalogManager:
         for t in feature_tables:
             self._delete_table_data(domain_path, t)
 
+        # Clear Report-related tables
+        for t in ["OCR_Report", "Report"]:
+            self._delete_table_data(domain_path, t)
+
         # Clear data tables in dependency order (FK children before parents)
         # Note: ClinicalRecord_Observation is already cleared in domain_assoc_tables above
         for t in ["ClinicalRecord", "Image", "Observation", "Subject"]:
@@ -199,6 +203,7 @@ class CatalogManager:
             # Domain tables from create_domain_schema()
             "Subject", "Image", "Observation", "ClinicalRecord",
             "ClinicalRecord_Observation", "Image_Dataset_Legacy",
+            "Report", "OCR_Report",
             # Asset metadata tables (created automatically for Image asset)
             "Image_Asset_Type", "Image_Execution",
             # Element type association tables (created by add_dataset_element_type)

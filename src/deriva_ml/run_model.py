@@ -219,8 +219,9 @@ class DerivaMLRunCLI(BaseCLI):
         # Finalize the hydra-zen store
         store.add_to_hydra_store()
 
-        # Set allow-dirty flag via environment variable so Workflow picks it up
-        if args.allow_dirty:
+        # Determine allow-dirty from CLI flag or environment variable
+        allow_dirty = args.allow_dirty or os.environ.get("DERIVA_ML_ALLOW_DIRTY", "").lower() == "true"
+        if allow_dirty:
             os.environ["DERIVA_ML_ALLOW_DIRTY"] = "true"
 
         # Set dry-run flag via environment variable so Workflow skips the

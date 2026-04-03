@@ -281,7 +281,7 @@ class TestSchemaToPathsBenchmark:
         # The demo schema with features produces ~115 paths.
         # Allow some tolerance for minor schema changes.
         assert len(paths) >= 80, f"Too few paths: {len(paths)} (expected ~115)"
-        assert len(paths) <= 150, f"Too many paths: {len(paths)} (expected ~115)"
+        assert len(paths) <= 165, f"Too many paths: {len(paths)} (expected ~115-155)"
 
     def test_no_duplicate_paths(self, dataset_test, tmp_path):
         """Each path should be unique — no exact duplicates."""

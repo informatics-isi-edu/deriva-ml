@@ -97,7 +97,6 @@ from deriva_ml.dataset.aux_classes import (
 )
 from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.model.catalog import ASSET_COLUMNS
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
@@ -1779,12 +1778,9 @@ class Dataset:
                 rid_rs = dp.attributes(target_table.RID)
                 query_items.append((table_name, _extract_path(rid_rs.uri), "csv"))
 
-                # For assets, fetch RID + Length where URL is not null.
-                # The !(URL::null::) filter has no clean datapath equivalent, so
-                # we build it from the entity path with a literal null-check filter.
                 if is_asset:
                     entity_path = _extract_path(dp.uri).removeprefix("/entity/")
-                    fetch_path = f"/attribute/{entity_path}/!(URL::null::)/RID,Length"
+                    fetch_path = f"/attribute/{entity_path}/RID,Length"
                     query_items.append((table_name, fetch_path, "fetch"))
 
                 # Sample a few rows to estimate CSV serialization size.

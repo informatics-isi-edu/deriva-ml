@@ -10,7 +10,6 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 
 from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
-from deriva_ml.model.catalog import ASSET_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -128,12 +127,12 @@ class CatalogGraph:
         ]
 
         # If this table is an asset table, then we need to output the files associated with the asset.
-        if ASSET_COLUMNS.issubset({c.name for c in table.columns}):
+        if table.is_asset():
             exports.append(
                 {
                     "processor": "fetch",
                     "processor_params": {
-                        "query_path": f"/attribute/{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID",
+                        "query_path": f"/attribute/{spath}/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID",
                         "output_path": "asset/{asset_rid}/" + table.name,
                     },
                 }
@@ -178,13 +177,13 @@ class CatalogGraph:
         ]
 
         # If this table is an asset table, then we need to output the files associated with the asset.
-        if ASSET_COLUMNS.issubset({c.name for c in table.columns}):
+        if table.is_asset():
             exports.append(
                 {
                     "source": {
                         "skip_root_path": False,
                         "api": "attribute",
-                        "path": f"{spath}/!(URL::null::)/url:=URL,length:=Length,filename:=Filename,md5:=MD5, asset_rid:=RID",
+                        "path": f"{spath}/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID",
                     },
                     "destination": {"name": "asset/{asset_rid}/" + table.name, "type": "fetch"},
                 }
@@ -618,7 +617,11 @@ class CatalogGraph:
         Returns:
             Iterator of ``(source_path, dest_path, target_table)`` tuples.
         """
-        paths = self._collect_paths(dataset and dataset.dataset_rid)
+        # Sort paths for deterministic spec generation (set iteration order is arbitrary).
+        paths = sorted(
+            self._collect_paths(dataset and dataset.dataset_rid),
+            key=lambda p: tuple(f"{t.schema.name}:{t.name}" for t in p),
+        )
         pb = self._ml_instance.catalog.getPathBuilder()
 
         def source_path(path: tuple[Table, ...]) -> str:
@@ -679,7 +682,7 @@ class CatalogGraph:
 
             target_table = path[-1]
             target_pb_table = _pb_table(target_table) if len(path) > 1 else ds_pb
-            is_asset = ASSET_COLUMNS.issubset({c.name for c in target_table.columns})
+            is_asset = target_table.is_asset()
             result[target_table.name].append((dp, target_pb_table, is_asset))
 
         return dict(result)

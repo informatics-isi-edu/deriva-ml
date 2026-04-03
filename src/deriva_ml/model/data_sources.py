@@ -35,9 +35,6 @@ from deriva.core.ermrest_model import Table as DerivaTable
 logger = logging.getLogger(__name__)
 
 
-# Standard asset table columns
-ASSET_COLUMNS = {"Filename", "URL", "Length", "MD5", "Description"}
-
 
 @runtime_checkable
 class DataSource(Protocol):
@@ -184,14 +181,12 @@ class BagDataSource:
         return table
 
     def _is_asset_table(self, table_name: str) -> bool:
-        """Check if a table is an asset table (has Filename, URL, etc. columns)."""
+        """Check if a table is an asset table."""
         if self.model is None:
             return False
-
         for schema in self.model.schemas.values():
             if table_name in schema.tables:
-                table = schema.tables[table_name]
-                return ASSET_COLUMNS.issubset({c.name for c in table.columns})
+                return schema.tables[table_name].is_asset()
         return False
 
     def _localize_asset_row(self, row: dict[str, Any]) -> dict[str, Any]:

@@ -408,8 +408,9 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             self._show_hydra_info(notebook_file)
             return
 
-        # Set allow-dirty flag via environment variable so Workflow picks it up
-        if args.allow_dirty:
+        # Determine allow-dirty from CLI flag or environment variable
+        allow_dirty = args.allow_dirty or os.environ.get("DERIVA_ML_ALLOW_DIRTY", "").lower() == "true"
+        if allow_dirty:
             os.environ["DERIVA_ML_ALLOW_DIRTY"] = "true"
 
         try:
@@ -421,7 +422,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 kernel=args.kernel,
                 log=args.log_output,
                 hydra_overrides=args.hydra_overrides,
-                allow_dirty=args.allow_dirty,
+                allow_dirty=allow_dirty,
             )
         except DerivaMLDirtyWorkflowError as e:
             print(f"Error: {e}", file=sys.stderr)

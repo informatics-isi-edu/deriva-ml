@@ -408,3 +408,6 @@ class TestUploadStaging:
         assert match.group("Subject") == "FAKE_RID"
         assert match.group("Acquisition_Date") == "2026-01-01"
         assert match.group("Acquisition_Time") == "12:00:00"
+        # Observation is a metadata column on Image but was not provided,
+        # so it should appear as "None" in the staging path.
+        assert match.group("Observation") == "None"

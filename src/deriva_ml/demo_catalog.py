@@ -86,15 +86,12 @@ def populate_demo_catalog(execution: Execution) -> None:
 
     execution.upload_execution_outputs()
 
-    # Create Report rows with NULL URLs (metadata only, no uploaded files).
-    # This simulates asset tables where the file upload hasn't happened yet
-    # but the metadata (Observation FK, Report_Type) is already populated.
+    # Create Report rows linked to Observations.
     report_records = []
     for obs in observations:
         report_records.append({
             "Observation": obs["RID"],
             "Report_Type": "TestReport",
-            "Filename": f"report_{obs['RID']}.pdf",
         })
     report_table = domain_schema.tables["Report"]
     reports = list(report_table.insert(report_records))
@@ -483,21 +480,29 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         )
     )
 
-    # Create Report asset table with FK to Observation.
-    # This simulates real-world asset tables (e.g., Report_HVF in eye-ai) where
-    # report files may not yet be uploaded (all URLs null) but the metadata rows
-    # (Observation FK, Report_Type, etc.) still carry valuable information.
-    with TemporaryDirectory() as tmpdir:
-        ml_tmp = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
-        ml_tmp.create_asset(
-            "Report",
-            column_defs=[
+    # Create Report table with FK to Observation.
+    # This is a regular (non-asset) table that simulates tables like Report_HVF
+    # which have metadata (Observation FK, Report_Type) and are FK-reachable
+    # from Subject via Observation. OCR_Report depends on it.
+    model = catalog.getCatalogModel()
+    domain_schema = model.schemas[sname]
+    domain_schema.create_table(
+        TableDef(
+            name="Report",
+            columns=[
                 ColumnDef("Report_Type", BuiltinType.text, nullok=True),
+                ColumnDef("Observation", BuiltinType.text, nullok=False),
             ],
-            referenced_tables=[domain_schema.tables["Observation"]],
-            update_navbar=False,
+            foreign_keys=[
+                ForeignKeyDef(
+                    columns=["Observation"],
+                    referenced_schema=sname,
+                    referenced_table="Observation",
+                    referenced_columns=["RID"],
+                ),
+            ],
         )
-        ml_tmp.apply_catalog_annotations()
+    )
 
     # Create OCR_Report — a non-asset table reachable only through Report.
     # This simulates tables like OCR_HVF that contain extracted data from
