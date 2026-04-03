@@ -1185,6 +1185,105 @@ class Dataset:
             for schema_name, table_name, col_name, type_name in column_specs
         ]
 
+    def denormalize_info(
+        self,
+        include_tables: list[str],
+        version: str | None = None,
+    ) -> dict[str, Any]:
+        """Return schema shape and size estimates for a denormalized table.
+
+        Performs the same FK path resolution as :meth:`denormalize_as_dataframe`
+        but returns metadata instead of data. Aligned with :meth:`estimate_bag_size`
+        return structure.
+
+        Note:
+            Row counts are currently catalog-wide (not scoped to dataset
+            members). The ``version`` parameter is accepted for API
+            compatibility but does not yet filter by dataset membership.
+
+        Args:
+            include_tables: List of table names to include in the join.
+            version: Reserved for future dataset-scoped counting. Currently
+                unused — row counts reflect the entire catalog.
+
+        Returns:
+            dict with keys:
+                - columns: list of (column_name, column_type) tuples
+                - join_path: ordered list of table names showing the join chain
+                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
+                - total_rows: total row count across included tables
+                - total_asset_bytes: total asset size in bytes
+                - total_asset_size: human-readable size string
+        """
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        model = self._ml_instance.model
+
+        # Get column specs and join tree from schema
+        element_tables, column_specs, multi_schema = model._prepare_wide_table(
+            self, self.dataset_rid, list(include_tables)
+        )
+
+        # Build columns list
+        columns = [
+            (
+                denormalize_column_name(schema_name, table_name, col_name, multi_schema),
+                type_name,
+            )
+            for schema_name, table_name, col_name, type_name in column_specs
+        ]
+
+        # Extract join path from element_tables.
+        # path_names includes Dataset and association tables; keep only domain tables.
+        join_path: list[str] = []
+        for element_name, (path_names, _, _) in element_tables.items():
+            for table_name in path_names:
+                if table_name not in join_path and table_name != "Dataset":
+                    if not model.is_association(table_name):
+                        join_path.append(table_name)
+
+        # Query row counts per table
+        pb = self._ml_instance.pathBuilder()
+        tables_info: dict[str, dict[str, Any]] = {}
+        total_rows = 0
+        total_asset_bytes = 0
+
+        for table_name in join_path:
+            table = model.name_to_table(table_name)
+            is_asset = model.is_asset(table_name)
+
+            # Get row count via ermrest aggregate
+            schema_name = table.schema.name
+            table_path = pb.schemas[schema_name].tables[table_name]
+            row_count = table_path.aggregates(
+                cnt=table_path.column_definitions["RID"].count
+            ).fetch()[0]["cnt"]
+
+            entry: dict[str, Any] = {
+                "row_count": row_count,
+                "is_asset": is_asset,
+                "asset_bytes": 0,
+            }
+
+            if is_asset:
+                length_col = table_path.column_definitions["Length"]
+                result = table_path.aggregates(total=length_col.sum).fetch()
+                asset_bytes = result[0]["total"] or 0
+                entry["asset_bytes"] = asset_bytes
+                total_asset_bytes += asset_bytes
+
+            tables_info[table_name] = entry
+            total_rows += row_count
+
+        return {
+            "columns": columns,
+            "join_path": join_path,
+            "tables": tables_info,
+            "total_rows": total_rows,
+            "total_asset_bytes": total_asset_bytes,
+            "total_asset_size": self._human_readable_size(total_asset_bytes),
+        }
+
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_members(
         self,
