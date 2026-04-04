@@ -373,7 +373,7 @@ class DatasetMixin:
 
             schema_name = table.schema.name
             table_path = pb.schemas[schema_name].tables[table_name]
-            row_count = table_path.aggregates(cnt=table_path.column_definitions["RID"].count).fetch()[0]["cnt"]
+            row_count = table_path.aggregates(table_path.RID.cnt.alias("cnt")).fetch()[0]["cnt"]
 
             entry: dict[str, Any] = {
                 "row_count": row_count,
@@ -382,8 +382,7 @@ class DatasetMixin:
             }
 
             if is_asset:
-                length_col = table_path.column_definitions["Length"]
-                result = table_path.aggregates(total=length_col.sum).fetch()
+                result = table_path.aggregates(table_path.Length.sum.alias("total")).fetch()
                 asset_bytes = result[0]["total"] or 0
                 entry["asset_bytes"] = asset_bytes
                 total_asset_bytes += asset_bytes
