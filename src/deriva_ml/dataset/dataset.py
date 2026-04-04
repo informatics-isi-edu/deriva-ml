@@ -47,6 +47,7 @@ from urllib.parse import urlparse
 # Deriva imports
 import deriva.core.utils.hash_utils as hash_utils
 from deriva.core.asyncio import AsyncErmrestCatalog
+from deriva.core.datapath import Cnt, Sum
 from deriva.core.asyncio.async_catalog import AsyncErmrestSnapshot
 
 if TYPE_CHECKING:
@@ -1256,7 +1257,7 @@ class Dataset:
             schema_name = table.schema.name
             table_path = pb.schemas[schema_name].tables[table_name]
             row_count = table_path.aggregates(
-                table_path.RID.cnt.alias("cnt")
+                Cnt(table_path.RID).alias("cnt")
             ).fetch()[0]["cnt"]
 
             entry: dict[str, Any] = {
@@ -1266,7 +1267,7 @@ class Dataset:
             }
 
             if is_asset:
-                result = table_path.aggregates(table_path.Length.sum.alias("total")).fetch()
+                result = table_path.aggregates(Sum(table_path.Length).alias("total")).fetch()
                 asset_bytes = result[0]["total"] or 0
                 entry["asset_bytes"] = asset_bytes
                 total_asset_bytes += asset_bytes

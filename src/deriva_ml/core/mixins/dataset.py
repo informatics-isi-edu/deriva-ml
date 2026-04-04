@@ -333,6 +333,7 @@ class DatasetMixin:
                 - total_asset_bytes: total asset size in bytes
                 - total_asset_size: human-readable size string
         """
+        from deriva.core.datapath import Cnt, Sum
         from deriva_ml.dataset.dataset import Dataset
         from deriva_ml.model.catalog import denormalize_column_name
 
@@ -373,7 +374,7 @@ class DatasetMixin:
 
             schema_name = table.schema.name
             table_path = pb.schemas[schema_name].tables[table_name]
-            row_count = table_path.aggregates(table_path.RID.cnt.alias("cnt")).fetch()[0]["cnt"]
+            row_count = table_path.aggregates(Cnt(table_path.RID).alias("cnt")).fetch()[0]["cnt"]
 
             entry: dict[str, Any] = {
                 "row_count": row_count,
@@ -382,7 +383,7 @@ class DatasetMixin:
             }
 
             if is_asset:
-                result = table_path.aggregates(table_path.Length.sum.alias("total")).fetch()
+                result = table_path.aggregates(Sum(table_path.Length).alias("total")).fetch()
                 asset_bytes = result[0]["total"] or 0
                 entry["asset_bytes"] = asset_bytes
                 total_asset_bytes += asset_bytes
