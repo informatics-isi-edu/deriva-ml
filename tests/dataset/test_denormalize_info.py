@@ -261,16 +261,23 @@ class TestDenormalizeInfoIntegration:
         assert isinstance(info["total_rows"], int)
         assert info["total_rows"] >= 0
 
-    def test_mixin_row_counts_are_positive(self, populated_catalog: "DerivaML"):
-        """Row counts from real catalog should be positive for populated tables."""
+    def test_mixin_row_counts_are_non_negative(self, populated_catalog: "DerivaML"):
+        """Row counts from real catalog should be non-negative integers."""
         ml = populated_catalog
         info = ml.denormalize_info(["Image", "Subject"])
 
-        # Populated catalog has data in these tables
+        # Row counts should be non-negative integers; some intermediate/
+        # association tables may legitimately have 0 rows.
+        has_positive = False
         for table_name, table_info in info["tables"].items():
             assert isinstance(table_info["row_count"], int)
-            assert table_info["row_count"] > 0, \
-                f"{table_name} should have rows in populated catalog"
+            assert table_info["row_count"] >= 0, \
+                f"{table_name} has negative row count"
+            if table_info["row_count"] > 0:
+                has_positive = True
+
+        # At least one table should have data in a populated catalog
+        assert has_positive, "No tables have rows in populated catalog"
 
     def test_mixin_per_table_structure(self, populated_catalog: "DerivaML"):
         """Each table entry has row_count, is_asset, and asset_bytes."""
@@ -291,7 +298,7 @@ class TestDenormalizeInfoIntegration:
         """Dataset.denormalize_info() works with a real dataset."""
         ml, dataset_desc = catalog_with_datasets
         # Get any dataset from the catalog
-        datasets = list(ml.list_datasets())
+        datasets = list(ml.find_datasets())
         assert len(datasets) > 0, "catalog_with_datasets should have datasets"
 
         dataset = ml.lookup_dataset(datasets[0]["RID"])
