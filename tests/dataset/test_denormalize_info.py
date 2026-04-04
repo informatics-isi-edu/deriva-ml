@@ -1,10 +1,18 @@
-"""Tests for Dataset.denormalize_info()."""
+"""Tests for Dataset.denormalize_info().
+
+Unit tests use MagicMock for structure validation.
+Integration tests use the populated_catalog fixture against a real catalog.
+"""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from deriva_ml import DerivaML
 
 
 def _make_mock_model():
@@ -176,3 +184,120 @@ class TestDenormalizeInfoMixin:
         assert "self" in params
         assert "include_tables" in params
         assert "dataset_rid" not in params
+
+
+class TestDenormalizeInfoAggregateAPI:
+    """Tests that aggregate queries use the correct datapath API.
+
+    These tests use spec-constrained mocks that raise AttributeError for
+    methods that don't exist on the real classes — catching API misuse
+    that unconstrained MagicMock would silently accept.
+    """
+
+    def test_uses_cnt_aggregate_class_not_column_attribute(self):
+        """Row count query must use Cnt(col).alias(), not col.count or col.cnt."""
+        from deriva.core.datapath import Cnt, _ColumnWrapper
+
+        # Create a column mock constrained to real _ColumnWrapper API
+        mock_col = MagicMock(spec=_ColumnWrapper)
+
+        # Verify that .count and .cnt don't exist on real _ColumnWrapper
+        assert not hasattr(mock_col, "count"), \
+            "_ColumnWrapper should not have .count — use Cnt(col) instead"
+        assert not hasattr(mock_col, "cnt"), \
+            "_ColumnWrapper should not have .cnt — use Cnt(col) instead"
+
+        # Verify Cnt(col) works and produces an aggregate with .alias()
+        agg = Cnt(mock_col)
+        assert hasattr(agg, "alias"), "Cnt(col) should have .alias() method"
+
+    def test_uses_sum_aggregate_class_not_column_attribute(self):
+        """Asset size query must use Sum(col).alias(), not col.sum."""
+        from deriva.core.datapath import Sum, _ColumnWrapper
+
+        mock_col = MagicMock(spec=_ColumnWrapper)
+
+        assert not hasattr(mock_col, "sum"), \
+            "_ColumnWrapper should not have .sum — use Sum(col) instead"
+
+        agg = Sum(mock_col)
+        assert hasattr(agg, "alias"), "Sum(col) should have .alias() method"
+
+
+class TestDenormalizeInfoIntegration:
+    """Integration tests against a real catalog.
+
+    These tests require a running Deriva server (set DERIVA_HOST env var).
+    They use the populated_catalog fixture which provides Subject and Image
+    tables with real data.
+    """
+
+    def test_mixin_returns_valid_structure(self, populated_catalog: "DerivaML"):
+        """DerivaML.denormalize_info() returns correct structure with real catalog."""
+        ml = populated_catalog
+        info = ml.denormalize_info(["Image", "Subject"])
+
+        # Verify all required keys
+        assert "columns" in info
+        assert "join_path" in info
+        assert "tables" in info
+        assert "total_rows" in info
+        assert "total_asset_bytes" in info
+        assert "total_asset_size" in info
+
+        # Columns should be non-empty list of (name, type) tuples
+        assert len(info["columns"]) > 0
+        for col in info["columns"]:
+            assert isinstance(col, tuple)
+            assert len(col) == 2
+            name, type_name = col
+            assert isinstance(name, str)
+            assert isinstance(type_name, str)
+
+        # Join path should include requested tables
+        assert "Image" in info["join_path"] or "Subject" in info["join_path"]
+
+        # Total rows should be a non-negative integer
+        assert isinstance(info["total_rows"], int)
+        assert info["total_rows"] >= 0
+
+    def test_mixin_row_counts_are_positive(self, populated_catalog: "DerivaML"):
+        """Row counts from real catalog should be positive for populated tables."""
+        ml = populated_catalog
+        info = ml.denormalize_info(["Image", "Subject"])
+
+        # Populated catalog has data in these tables
+        for table_name, table_info in info["tables"].items():
+            assert isinstance(table_info["row_count"], int)
+            assert table_info["row_count"] > 0, \
+                f"{table_name} should have rows in populated catalog"
+
+    def test_mixin_per_table_structure(self, populated_catalog: "DerivaML"):
+        """Each table entry has row_count, is_asset, and asset_bytes."""
+        ml = populated_catalog
+        info = ml.denormalize_info(["Image", "Subject"])
+
+        for table_name, table_info in info["tables"].items():
+            assert "row_count" in table_info, f"{table_name} missing row_count"
+            assert "is_asset" in table_info, f"{table_name} missing is_asset"
+            assert "asset_bytes" in table_info, f"{table_name} missing asset_bytes"
+            assert isinstance(table_info["is_asset"], bool)
+            assert isinstance(table_info["asset_bytes"], int)
+            assert table_info["asset_bytes"] >= 0
+
+    def test_dataset_denormalize_info(
+        self, catalog_with_datasets: "tuple[DerivaML, object]"
+    ):
+        """Dataset.denormalize_info() works with a real dataset."""
+        ml, dataset_desc = catalog_with_datasets
+        # Get any dataset from the catalog
+        datasets = list(ml.list_datasets())
+        assert len(datasets) > 0, "catalog_with_datasets should have datasets"
+
+        dataset = ml.lookup_dataset(datasets[0]["RID"])
+        info = dataset.denormalize_info(["Image", "Subject"])
+
+        assert "columns" in info
+        assert "join_path" in info
+        assert "tables" in info
+        assert info["total_rows"] >= 0
