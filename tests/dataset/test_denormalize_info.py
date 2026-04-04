@@ -301,7 +301,8 @@ class TestDenormalizeInfoIntegration:
         datasets = list(ml.find_datasets())
         assert len(datasets) > 0, "catalog_with_datasets should have datasets"
 
-        dataset = ml.lookup_dataset(datasets[0]["RID"])
+        # find_datasets returns Dataset objects with .dataset_rid attribute
+        dataset = datasets[0]
         info = dataset.denormalize_info(["Image", "Subject"])
 
         assert "columns" in info
