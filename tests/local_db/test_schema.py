@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from deriva.core.ermrest_model import Model
 from sqlalchemy import text
 
@@ -132,3 +133,53 @@ class TestLocalSchemaProperties:
             # The result type may be None or a class depending on automap success;
             # the point is the call doesn't raise.
             _ = ls.get_orm_class("isa.Image")
+
+
+class TestLocalSchemaReadOnly:
+    def test_read_only_rejects_writes(self, canned_bag_model: Model, tmp_path: Path) -> None:
+        """Opening with read_only=True must yield an engine that rejects writes."""
+        # First build writable so the files exist
+        db = tmp_path / "ro_test.db"
+        rw = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=["deriva-ml"],
+            database_path=db,
+        )
+        rw.dispose()
+
+        # Then re-open read-only (single-schema).
+        ro = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=["deriva-ml"],
+            database_path=db,
+            read_only=True,
+        )
+        try:
+            with ro.engine.connect() as conn:
+                # A table read should work
+                ro_t = ro.find_table("Dataset")
+                conn.execute(ro_t.select()).fetchall()
+                # A write must fail
+                with pytest.raises(Exception):  # noqa: B017, BLE001
+                    conn.execute(ro_t.insert().values(RID="X"))
+                    conn.commit()
+        finally:
+            ro.dispose()
+
+    def test_read_only_multi_schema_not_supported(self, canned_bag_model: Model, tmp_path: Path) -> None:
+        """Multi-schema read-only raises NotImplementedError (Phase 2 will address)."""
+        db = tmp_path / "ro_multi.db"
+        rw = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=["isa", "deriva-ml"],
+            database_path=db,
+        )
+        rw.dispose()
+
+        with pytest.raises(NotImplementedError):
+            LocalSchema.build(
+                model=canned_bag_model,
+                schemas=["isa", "deriva-ml"],
+                database_path=db,
+                read_only=True,
+            )

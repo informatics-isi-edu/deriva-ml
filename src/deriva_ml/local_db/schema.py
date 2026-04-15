@@ -42,6 +42,18 @@ class LocalSchema:
         self._orm = orm
         self._database_path = database_path
 
+    @staticmethod
+    def _main_db_path(database_path: Path) -> Path:
+        """Compute the main SQLite file path SchemaBuilder will use.
+
+        Matches the logic in SchemaBuilder.build(): if the path ends in ``.db``
+        it's treated as the main file directly; otherwise a ``main.db`` is
+        placed inside the directory.
+        """
+        if database_path.suffix == ".db":
+            return database_path
+        return database_path / "main.db"
+
     @classmethod
     def build(
         cls,
@@ -58,20 +70,26 @@ class LocalSchema:
             schemas: Schema names to materialize.
             database_path: Directory or `.db` file path for storage.
             read_only: If True, open the underlying engine read-only. This is
-                used for slice DBs at query time.
+                used for slice DBs at query time. Multi-schema read-only is
+                not yet supported and will raise NotImplementedError — Phase 2
+                will revisit slice DBs with proper multi-schema support.
         """
         database_path = Path(database_path)
+
+        if read_only and len(schemas) > 1:
+            raise NotImplementedError(
+                "Multi-schema read-only LocalSchema is not yet supported; "
+                "Phase 2 will address slice DBs with proper multi-schema read-only."
+            )
 
         # Pre-configure WAL mode on the database files using raw sqlite3 before
         # SchemaBuilder creates the engine. This ensures WAL is set BEFORE any
         # SQLAlchemy connection is made. For multi-schema file-based DBs, we
         # need to set WAL on both the main database and each schema file.
+        # Skip when read_only=True — files already exist and we don't want to
+        # write to them.
         if not read_only and database_path != ":memory:":
-            # Determine which files will be created by SchemaBuilder
-            if database_path.suffix == ".db":
-                main_db = database_path
-            else:
-                main_db = database_path / "main.db"
+            main_db = cls._main_db_path(database_path)
 
             # Set WAL on the main file
             try:
@@ -94,6 +112,8 @@ class LocalSchema:
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"Failed to pre-configure WAL on {schema_db}: {e}")
 
+        # SchemaBuilder only builds writable engines — we always start writable,
+        # then swap in a read-only engine below if requested.
         builder = SchemaBuilder(model=model, schemas=schemas, database_path=database_path)
         orm = builder.build()
 
@@ -111,8 +131,37 @@ class LocalSchema:
             finally:
                 cur.close()
 
-        # Track schema version in the DB.
+        # Track schema version in the DB (while still writable).
         sh.ensure_schema_meta(orm.engine, expected_version=SCHEMA_VERSION)
+
+        # If read-only was requested, swap the writable engine for a read-only
+        # one over the same file. The metadata/Base on the ORM remain valid —
+        # only the engine changes. For single-schema, also ATTACH the schema
+        # file in read-only mode so the ORM tables (stored under the schema
+        # namespace) remain visible.
+        if read_only:
+            main_db = cls._main_db_path(database_path)
+            schema_db_dir = database_path if database_path.is_dir() else database_path.parent
+            orm.engine.dispose()
+            ro_engine = sh.create_wal_engine(main_db, read_only=True)
+
+            # Attach per-schema DB files in read-only mode so table names like
+            # ``"<schema>"."<table>"`` resolve. Uses SQLite URI syntax with
+            # mode=ro (connection was opened with uri=True by create_wal_engine).
+            @event.listens_for(ro_engine, "connect")
+            def _attach_ro_schemas(dbapi_conn: Any, _r: Any) -> None:
+                cur = dbapi_conn.cursor()
+                try:
+                    for schema in schemas:
+                        schema_file = (schema_db_dir / f"{schema}.db").resolve()
+                        uri = f"file:{schema_file}?mode=ro"
+                        # ATTACH with URI form; SQLite accepts this when the
+                        # connection was opened with uri=True.
+                        cur.execute(f"ATTACH DATABASE '{uri}' AS \"{schema}\"")
+                finally:
+                    cur.close()
+
+            orm.engine = ro_engine
 
         return cls(orm=orm, database_path=database_path)
 
