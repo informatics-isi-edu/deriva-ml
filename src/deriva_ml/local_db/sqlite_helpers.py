@@ -10,14 +10,11 @@ Provides:
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Connection, Engine
-
-logger = logging.getLogger(__name__)
 
 SCHEMA_META_TABLE = "schema_meta"
 
@@ -30,7 +27,9 @@ def create_wal_engine(db_path: Path, *, read_only: bool = False) -> Engine:
     """Create a SQLAlchemy engine for a SQLite file with WAL mode.
 
     - Ensures the parent directory exists.
-    - Sets ``journal_mode=WAL`` and ``synchronous=NORMAL`` on every connection.
+    - When ``read_only=False``, sets ``journal_mode=WAL`` and
+      ``synchronous=NORMAL`` on every connection. Always sets
+      ``foreign_keys=ON``.
     - When ``read_only=True``, opens the file via SQLite's ``mode=ro`` URI.
 
     Args:
@@ -106,13 +105,14 @@ def ensure_schema_meta(engine: Engine, expected_version: int) -> int:
                 ")"
             )
         )
+        conn.execute(
+            text(f"INSERT OR IGNORE INTO {SCHEMA_META_TABLE}(version) VALUES (:v)"),
+            {"v": expected_version},
+        )
+        conn.commit()
         existing = conn.execute(text(f"SELECT MAX(version) FROM {SCHEMA_META_TABLE}")).scalar()
         if existing is None:
-            conn.execute(
-                text(f"INSERT INTO {SCHEMA_META_TABLE}(version) VALUES (:v)"),
-                {"v": expected_version},
-            )
-            conn.commit()
+            # Should not happen — INSERT OR IGNORE succeeded, and no one else wrote.
             return expected_version
         if existing > expected_version:
             raise SchemaVersionError(
