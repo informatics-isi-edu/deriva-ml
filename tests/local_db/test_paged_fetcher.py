@@ -465,7 +465,7 @@ class TestErmrestPagedClient:
 
         cat = _MockCatalog(
             get_responses={
-                "/ermrest/catalog/1/aggregate/isa:Image/n:=cnt(*)": [{"n": 42}],
+                "/aggregate/isa:Image/n:=cnt(*)": [{"n": 42}],
             }
         )
         c = ErmrestPagedClient(catalog=cat, catalog_id="1")
@@ -477,7 +477,7 @@ class TestErmrestPagedClient:
 
         cat = _MockCatalog(
             get_responses={
-                "/ermrest/catalog/1/entity/isa:Image@sort(RID)?limit=10": [{"RID": "R1", "Filename": "f1"}],
+                "/entity/isa:Image@sort(RID)?limit=10": [{"RID": "R1", "Filename": "f1"}],
             }
         )
         c = ErmrestPagedClient(catalog=cat, catalog_id="1")
@@ -506,7 +506,7 @@ class TestErmrestPagedClient:
 
         cat = _MockCatalog(
             get_responses={
-                "/ermrest/catalog/1/entity/isa:Image/RID=any(R1,R2)": [{"RID": "R1"}, {"RID": "R2"}],
+                "/entity/isa:Image/RID=any(R1,R2)": [{"RID": "R1"}, {"RID": "R2"}],
             }
         )
         c = ErmrestPagedClient(catalog=cat, catalog_id="1")
@@ -527,7 +527,7 @@ class TestErmrestPagedClient:
 
         cat = _MockCatalog(
             post_responses={
-                "/ermrest/catalog/1/entity/isa:Image": [{"RID": "R1"}],
+                "/entity/isa:Image": [{"RID": "R1"}],
             }
         )
         c = ErmrestPagedClient(catalog=cat, catalog_id="1")

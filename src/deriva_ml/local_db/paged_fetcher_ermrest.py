@@ -4,13 +4,17 @@ Translates the narrow ``PagedClient`` protocol into ERMrest HTTP calls via
 an ``ErmrestCatalog`` handle. Responsible for URL construction, GET/POST
 transport choice, and JSON response parsing.
 
-URL forms used:
+**Path convention:** ``ErmrestCatalog.get(path)`` already prepends the
+server URI and catalog prefix (``https://host/ermrest/catalog/{N}``), so
+all paths here are **relative to the catalog root** — they start with
+``/aggregate/...``, ``/entity/...``, etc.
 
-- count:   ``/ermrest/catalog/{N}/aggregate/{schema}:{table}/n:=cnt(*)``
-- page:    ``/ermrest/catalog/{N}/entity/{schema}:{table}[/predicate]@sort({s})[@after({a})]?limit={L}``
-- RID-IN (GET):  ``/ermrest/catalog/{N}/entity/{schema}:{table}/{col}=any({r1,r2,...})``
-- RID-IN (POST): ``POST /ermrest/catalog/{N}/entity/{schema}:{table}`` with a
-  JSON body describing the filter.
+URL forms used (relative to catalog root):
+
+- count:   ``/aggregate/{schema}:{table}/n:=cnt(*)``
+- page:    ``/entity/{schema}:{table}[/predicate]@sort({s})[@after({a})]?limit={L}``
+- RID-IN (GET):  ``/entity/{schema}:{table}/{col}=any({r1,r2,...})``
+- RID-IN (POST): ``POST /entity/{schema}:{table}`` with JSON filter body.
 """
 
 from __future__ import annotations
@@ -30,7 +34,7 @@ class ErmrestPagedClient:
         self._catalog_id = str(catalog_id if catalog_id is not None else getattr(catalog, "catalog_id"))
 
     def count(self, table: str) -> int:
-        url = f"/ermrest/catalog/{self._catalog_id}/aggregate/{table}/n:=cnt(*)"
+        url = f"/aggregate/{table}/n:=cnt(*)"
         resp = self._catalog.get(url)
         resp.raise_for_status()
         data = resp.json()
@@ -46,7 +50,7 @@ class ErmrestPagedClient:
         predicate: str | None,
         limit: int,
     ) -> list[dict[str, Any]]:
-        parts = [f"/ermrest/catalog/{self._catalog_id}/entity/{table}"]
+        parts = [f"/entity/{table}"]
         if predicate:
             parts.append(f"/{predicate}")
         sort_cols = ",".join(quote(c) for c in sort)
@@ -69,14 +73,14 @@ class ErmrestPagedClient:
     ) -> list[dict[str, Any]]:
         if method == "GET":
             rid_list = ",".join(quote(r) for r in rids)
-            url = f"/ermrest/catalog/{self._catalog_id}/entity/{table}/{quote(column)}=any({rid_list})"
+            url = f"/entity/{table}/{quote(column)}=any({rid_list})"
             if len(url) > 7000:
                 raise RuntimeError(f"GET URL too long ({len(url)} bytes)")
             resp = self._catalog.get(url)
             resp.raise_for_status()
             return list(resp.json())
         # POST fallback
-        url = f"/ermrest/catalog/{self._catalog_id}/entity/{table}"
+        url = f"/entity/{table}"
         body = {"filter": {"and": [{column: {"in": rids}}]}}
         resp = self._catalog.post(url, json=body)
         resp.raise_for_status()
