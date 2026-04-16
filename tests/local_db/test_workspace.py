@@ -146,9 +146,33 @@ class TestLegacyWorkingDataView:
             assert view.has_table("t1")
             assert view.has_table("t2")
             view.clear()
-            # After clear, user tables should be gone; schema_meta may remain
-            user_tables = [t for t in view.list_tables() if t != "schema_meta"]
-            assert user_tables == []
+            # After clear, user tables should be gone
+            assert not view.has_table("t1")
+            assert not view.has_table("t2")
+        finally:
+            ws.close()
+
+    def test_clear_does_not_destroy_manifest_tables(self, tmp_path: Path) -> None:
+        """clear() must preserve execution_state and schema_meta tables."""
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            # Populate a manifest entry
+            store = ws.manifest_store()
+            from deriva_ml.asset.manifest import AssetEntry
+
+            store.add_asset("EX1", "Image/a.jpg", AssetEntry(asset_table="Image", schema="isa"))
+
+            # Also cache a user table
+            view = ws.legacy_working_data_view()
+            view.cache_table("user_data", pd.DataFrame({"x": [1]}))
+
+            # Clear should remove user_data but preserve manifest tables
+            view.clear()
+            assert not view.has_table("user_data")
+
+            # Manifest data must survive
+            rows = store.list_assets("EX1")
+            assert "Image/a.jpg" in rows
         finally:
             ws.close()
 
@@ -199,8 +223,9 @@ class TestWorkspaceClose:
 class TestDerivaMLIntegration:
     def test_ml_working_data_uses_workspace_path(self, tmp_path: Path) -> None:
         """DerivaML.working_data should write to catalogs/{host}__{cat}/working.db."""
-        from deriva_ml import DerivaML
         import pandas as pd
+
+        from deriva_ml import DerivaML
 
         ml = DerivaML.__new__(DerivaML)
         ml.working_dir = tmp_path

@@ -522,18 +522,13 @@ class TestErmrestPagedClient:
         with pytest.raises(RuntimeError, match="too long"):
             c.fetch_rid_batch("isa:Image", "RID", long_rids, method="GET")
 
-    def test_fetch_rid_batch_post(self) -> None:
+    def test_fetch_rid_batch_post_raises(self) -> None:
         from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
-        cat = _MockCatalog(
-            post_responses={
-                "/entity/isa:Image": [{"RID": "R1"}],
-            }
-        )
+        cat = _MockCatalog()
         c = ErmrestPagedClient(catalog=cat, catalog_id="1")
-        rows = c.fetch_rid_batch("isa:Image", "RID", ["R1"], method="POST")
-        assert len(rows) == 1
-        assert len(cat.post_calls) == 1
+        with pytest.raises(RuntimeError, match="not supported"):
+            c.fetch_rid_batch("isa:Image", "RID", ["R1"], method="POST")
 
     def test_catalog_id_from_attribute(self) -> None:
         from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient

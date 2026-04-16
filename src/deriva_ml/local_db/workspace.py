@@ -33,6 +33,14 @@ logger = logging.getLogger(__name__)
 
 WORKING_DB_SCHEMA_VERSION = 1
 
+_RESERVED_TABLES = frozenset(
+    {
+        "schema_meta",
+        "execution_state__assets",
+        "execution_state__features",
+    }
+)
+
 
 class Workspace:
     """Per-catalog working database, shared across script invocations."""
@@ -48,6 +56,7 @@ class Workspace:
         self._hostname = hostname
         self._catalog_id = str(catalog_id)
         self._engine: Engine | None = None
+        self._manifest_store: "ManifestStore | None" = None
         self._closed = False
 
     # ---- paths ----
@@ -102,7 +111,7 @@ class Workspace:
 
     def manifest_store(self) -> "ManifestStore":
         """Return a ManifestStore backed by this workspace's engine (cached)."""
-        if not hasattr(self, "_manifest_store"):
+        if self._manifest_store is None:
             from deriva_ml.local_db.manifest_store import ManifestStore
 
             s = ManifestStore(self.engine)
@@ -194,7 +203,8 @@ class _LegacyWorkingDataView:
     def cache_table(self, table_name: str, df: "pd.DataFrame") -> Path:
         import pandas as pd  # lazy import
 
-        assert isinstance(df, pd.DataFrame)
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError(f"Expected DataFrame, got {type(df).__name__}")
         df.to_sql(table_name, self._ws.engine, if_exists="replace", index=False)
         return self._ws.working_db_path
 
@@ -232,4 +242,5 @@ class _LegacyWorkingDataView:
 
     def clear(self) -> None:
         for t in self.list_tables():
-            self.drop_table(t)
+            if t not in _RESERVED_TABLES:
+                self.drop_table(t)

@@ -1,8 +1,8 @@
 """ERMrest adapter for :class:`PagedFetcher`.
 
 Translates the narrow ``PagedClient`` protocol into ERMrest HTTP calls via
-an ``ErmrestCatalog`` handle. Responsible for URL construction, GET/POST
-transport choice, and JSON response parsing.
+an ``ErmrestCatalog`` handle. Responsible for URL construction, GET
+transport, and JSON response parsing.
 
 **Path convention:** ``ErmrestCatalog.get(path)`` already prepends the
 server URI and catalog prefix (``https://host/ermrest/catalog/{N}``), so
@@ -14,7 +14,11 @@ URL forms used (relative to catalog root):
 - count:   ``/aggregate/{schema}:{table}/n:=cnt(*)``
 - page:    ``/entity/{schema}:{table}[/predicate]@sort({s})[@after({a})]?limit={L}``
 - RID-IN (GET):  ``/entity/{schema}:{table}/{col}=any({r1,r2,...})``
-- RID-IN (POST): ``POST /entity/{schema}:{table}`` with JSON filter body.
+
+Note: POST-based filtering is **not** supported — ``POST /entity/{table}``
+in ERMrest is an entity-insert endpoint, not a filter query. For large RID
+sets that would exceed GET URL limits, use
+``fetch_by_rids_or_predicate`` with a predicate-scan fallback instead.
 """
 
 from __future__ import annotations
@@ -71,17 +75,16 @@ class ErmrestPagedClient:
         rids: list[str],
         method: str = "GET",
     ) -> list[dict[str, Any]]:
-        if method == "GET":
-            rid_list = ",".join(quote(r) for r in rids)
-            url = f"/entity/{table}/{quote(column)}=any({rid_list})"
-            if len(url) > 7000:
-                raise RuntimeError(f"GET URL too long ({len(url)} bytes)")
-            resp = self._catalog.get(url)
-            resp.raise_for_status()
-            return list(resp.json())
-        # POST fallback
-        url = f"/entity/{table}"
-        body = {"filter": {"and": [{column: {"in": rids}}]}}
-        resp = self._catalog.post(url, json=body)
+        if method != "GET":
+            raise RuntimeError(
+                "POST-based RID filtering is not supported by ERMrest. "
+                "Use fetch_by_rids_or_predicate with a predicate scan fallback "
+                "for large RID sets that exceed GET URL limits."
+            )
+        rid_list = ",".join(quote(r) for r in rids)
+        url = f"/entity/{table}/{quote(column)}=any({rid_list})"
+        if len(url) > 7000:
+            raise RuntimeError(f"GET URL too long ({len(url)} bytes)")
+        resp = self._catalog.get(url)
         resp.raise_for_status()
         return list(resp.json())

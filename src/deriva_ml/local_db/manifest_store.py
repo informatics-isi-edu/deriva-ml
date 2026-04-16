@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Column,
+    Index,
     MetaData,
     String,
     Table,
@@ -77,6 +78,8 @@ class ManifestStore:
             Column("created_at", String, nullable=False),
             Column("updated_at", String, nullable=False),
         )
+        Index("ix_assets_exec_status", self._assets_t.c.execution_rid, self._assets_t.c.status)
+        Index("ix_features_exec_status", self._features_t.c.execution_rid, self._features_t.c.status)
 
     def ensure_schema(self) -> None:
         """Create the tables if they don't exist."""
