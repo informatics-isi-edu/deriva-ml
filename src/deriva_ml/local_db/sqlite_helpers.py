@@ -61,6 +61,7 @@ def create_wal_engine(db_path: Path, *, read_only: bool = False) -> Engine:
                 cur.execute("PRAGMA journal_mode=WAL")
                 cur.execute("PRAGMA synchronous=NORMAL")
             cur.execute("PRAGMA foreign_keys=ON")
+            cur.execute("PRAGMA busy_timeout=5000")
         finally:
             cur.close()
 

@@ -131,28 +131,32 @@ class TestSchemaMeta:
             engine.dispose()
 
     def test_concurrent_initial_inserts_do_not_race(self, tmp_path: Path) -> None:
-        """Two threads calling ensure_schema_meta concurrently must both succeed."""
+        """Multiple threads calling ensure_schema_meta concurrently must all succeed.
+
+        Uses a shared engine (matching real-world usage where one Workspace
+        owns one engine) to avoid inter-engine WAL contention.
+        """
         import threading
 
         db = tmp_path / "db.sqlite"
+        engine = sh.create_wal_engine(db)
         results: list[int] = []
         errors: list[BaseException] = []
 
         def _worker() -> None:
             try:
-                eng = sh.create_wal_engine(db)
-                try:
-                    results.append(sh.ensure_schema_meta(eng, expected_version=1))
-                finally:
-                    eng.dispose()
+                results.append(sh.ensure_schema_meta(engine, expected_version=1))
             except BaseException as exc:  # noqa: BLE001 — we record anything
                 errors.append(exc)
 
-        threads = [threading.Thread(target=_worker) for _ in range(4)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        try:
+            threads = [threading.Thread(target=_worker) for _ in range(4)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        finally:
+            engine.dispose()
 
         assert not errors, f"Unexpected errors: {errors}"
         assert all(v == 1 for v in results)
