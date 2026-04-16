@@ -9,6 +9,18 @@ classes originate:
 
 - For bags: ``database_model.get_orm_class_by_name``
 - For the workspace: ``local_schema.get_orm_class``
+
+The ``source`` parameter controls how rows get into the local SQLite engine:
+
+- ``"local"`` (default): caller has already populated rows; denormalize runs
+  the SQL join against whatever is there. Used by tests with pre-populated
+  fixtures.
+- ``"catalog"``: denormalize uses a :class:`PagedClient` to fetch rows from a
+  live ERMrest catalog into the local engine before running the join. This is
+  the production path for :meth:`Dataset.denormalize_as_dataframe`.
+- ``"slice"``: rows are assumed to already be visible via an attached slice
+  database (ATTACH'd into the engine). Used by
+  :meth:`DatasetBag.denormalize_as_dataframe`.
 """
 
 from __future__ import annotations
@@ -22,6 +34,7 @@ from sqlalchemy import and_, literal, select, union
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+from deriva_ml.local_db.paged_fetcher import PagedClient, PagedFetcher
 from deriva_ml.model.catalog import DerivaModel, denormalize_column_name
 
 logger = logging.getLogger(__name__)
@@ -84,6 +97,8 @@ def denormalize(
     include_tables: list[str],
     dataset: Any = None,
     dataset_children_rids: list[str] | None = None,
+    source: str = "local",
+    paged_client: PagedClient | None = None,
 ) -> DenormalizeResult:
     """Unified denormalization: plan joins via ``_prepare_wide_table``, execute locally.
 
@@ -100,15 +115,44 @@ def denormalize(
             If ``None``, a minimal mock is used (empty members, no children).
         dataset_children_rids: Extra dataset RIDs for the ``WHERE`` clause.
             If ``None``, only *dataset_rid* is used.
+        source: How rows get into the engine. ``"local"`` (default) assumes
+            the caller has pre-populated rows; ``"catalog"`` fetches rows via
+            *paged_client* before running the join; ``"slice"`` assumes rows
+            are visible via an attached slice database.
+        paged_client: Required when ``source="catalog"``. The client used to
+            fetch rows from a live ERMrest catalog.
 
     Returns:
         :class:`DenormalizeResult` with rows and column metadata.
+
+    Raises:
+        ValueError: If ``source="catalog"`` but ``paged_client`` is ``None``.
+        RuntimeError: If the ``"Dataset"`` ORM class cannot be resolved
+            (likely because ``build_local_schema`` was not called with the
+            ``deriva-ml`` schema).
     """
+    # Validate source / paged_client combination up front so callers get a
+    # clear error before we do any work.
+    if source == "catalog" and paged_client is None:
+        raise ValueError(
+            "paged_client is required when source='catalog'. Pass an ErmrestPagedClient (or compatible) to fetch rows."
+        )
+
     # Step 1: Plan the join.
     if dataset is None:
         dataset = _MinimalDatasetMock(dataset_rid=dataset_rid)
 
     join_tables, column_specs, multi_schema = model._prepare_wide_table(dataset, dataset_rid, include_tables)
+
+    # Build a quick lookup from table name to schema name so we can form
+    # qualified ERMrest names ("schema:table") for PagedFetcher calls.
+    table_to_schema: dict[str, str] = {}
+    for schema_name, table_name, _col, _type in column_specs:
+        table_to_schema[table_name] = schema_name
+    # The Dataset table itself is not in column_specs (its columns are not
+    # included in the output); fill in its schema from the model.
+    if "Dataset" not in table_to_schema:
+        table_to_schema["Dataset"] = getattr(model, "ml_schema", "deriva-ml")
 
     # Step 2: Build labelled columns from ORM classes.
     denormalized_columns = []
@@ -131,10 +175,31 @@ def denormalize(
     if not denormalized_columns:
         return DenormalizeResult(columns=output_columns, row_count=0, _rows=[])
 
-    # Step 3: Build SQL for each element path.
-    dataset_rid_list = [dataset_rid] + (dataset_children_rids or [])
+    # Step 3: Resolve the Dataset ORM class (required for the WHERE clause).
+    # C3: fail loudly if missing so callers get a clear error instead of a
+    # cryptic SQLAlchemy crash on select_from(None).
     dataset_orm = orm_resolver("Dataset")
+    if dataset_orm is None:
+        raise RuntimeError(
+            "Dataset ORM class not found — ensure build_local_schema() was called with the 'deriva-ml' schema included."
+        )
 
+    dataset_rid_list = [dataset_rid] + (dataset_children_rids or [])
+
+    # Step 3b: If source='catalog', fetch rows into the engine's tables
+    # before we run the SQL join. Without this step, the join runs against
+    # an empty working DB and returns zero rows.
+    if source == "catalog":
+        _populate_from_catalog(
+            paged_client=paged_client,
+            engine=engine,
+            orm_resolver=orm_resolver,
+            table_to_schema=table_to_schema,
+            join_tables=join_tables,
+            dataset_rid_list=dataset_rid_list,
+        )
+
+    # Step 4: Build SQL for each element path.
     sql_statements = []
     for _key, (path, join_conditions, join_types) in join_tables.items():
         stmt = select(*denormalized_columns).select_from(dataset_orm)
@@ -152,15 +217,14 @@ def denormalize(
                 stmt = stmt.join(table_class, onclause=on_clause)
 
         # WHERE Dataset.RID IN (...)
-        if dataset_orm is not None:
-            stmt = stmt.where(dataset_orm.RID.in_(dataset_rid_list))
+        stmt = stmt.where(dataset_orm.RID.in_(dataset_rid_list))
 
         sql_statements.append(stmt)
 
     if not sql_statements:
         return DenormalizeResult(columns=output_columns, row_count=0, _rows=[])
 
-    # Step 4: Execute.
+    # Step 5: Execute.
     final_query = union(*sql_statements) if len(sql_statements) > 1 else sql_statements[0]
 
     with Session(engine) as session:
@@ -168,6 +232,194 @@ def denormalize(
         rows = [dict(row._mapping) for row in result]
 
     return DenormalizeResult(columns=output_columns, row_count=len(rows), _rows=rows)
+
+
+def _populate_from_catalog(
+    *,
+    paged_client: PagedClient,
+    engine: Engine,
+    orm_resolver: Callable[[str], Any],
+    table_to_schema: dict[str, str],
+    join_tables: dict,
+    dataset_rid_list: list[str],
+) -> None:
+    """Fetch rows from a live catalog into the engine's local tables.
+
+    Walks the join paths in order so that each table's fetch can use the RID
+    values already loaded into the preceding table. The algorithm is:
+
+    1. Fetch the Dataset row(s) — always needed for the WHERE clause join.
+    2. Walk each join path in order. For each table after Dataset:
+       - Read FK values from the already-loaded preceding table(s)
+       - Fetch rows for this table filtered by those FK/RID values
+       - The PagedFetcher deduplicates so multi-path traversals are safe.
+
+    This uses ``fetch_by_rids`` with a configurable ``rid_column`` so both
+    FK-by-target (e.g., Dataset_Image filtered by Dataset FK) and FK-by-RID
+    (e.g., Image filtered by RID) are handled uniformly.
+
+    Args:
+        paged_client: The client used for all catalog HTTP calls.
+        engine: Local SQLAlchemy engine (rows are inserted into this engine's
+            tables via the ORM class returned by orm_resolver).
+        orm_resolver: Maps table name -> ORM class (its ``__table__`` is the
+            write target).
+        table_to_schema: Maps table name -> ERMrest schema name (used to
+            build ``"schema:table"`` qualified names).
+        join_tables: Output from ``_prepare_wide_table`` — dict keyed by leaf
+            table name, values are ``(path, join_conditions, join_types)``
+            where ``path`` is a list of table names in join order starting
+            with "Dataset".
+        dataset_rid_list: RIDs to scope the denormalization to (the root
+            dataset plus any children from recursive traversal).
+    """
+    fetcher = PagedFetcher(client=paged_client, engine=engine)
+
+    # --- Step 1: Fetch the Dataset rows themselves -------------------------
+    # These are needed so the WHERE Dataset.RID IN (...) clause finds the
+    # rows during the SQL join.
+    dataset_orm = orm_resolver("Dataset")
+    dataset_schema = table_to_schema.get("Dataset", "deriva-ml")
+    fetcher.fetch_by_rids(
+        table=f"{dataset_schema}:Dataset",
+        rids=dataset_rid_list,
+        target_table=dataset_orm.__table__,
+        rid_column="RID",
+    )
+
+    # --- Step 2: Walk each join path, fetching each table in turn ----------
+    # We process tables in the order they appear along each path. Already-
+    # fetched tables are skipped (PagedFetcher dedup handles this per-table
+    # via its internal _seen map, but we also dedupe at the path level to
+    # avoid unnecessary method-call overhead).
+    processed: set[str] = {"Dataset"}
+
+    for _key, (path, join_conditions, _join_types) in join_tables.items():
+        # Walk in order — each table depends on rows loaded by the previous.
+        prior_tables_in_path: list[str] = ["Dataset"]
+        for table_name in path[1:]:
+            if table_name in processed:
+                prior_tables_in_path.append(table_name)
+                continue
+
+            target_orm = orm_resolver(table_name)
+            if target_orm is None:
+                logger.warning("Skipping fetch for %s: no ORM class resolved", table_name)
+                prior_tables_in_path.append(table_name)
+                continue
+
+            target_schema = table_to_schema.get(table_name)
+            if target_schema is None:
+                logger.warning("Skipping fetch for %s: no schema known", table_name)
+                prior_tables_in_path.append(table_name)
+                continue
+
+            qualified = f"{target_schema}:{table_name}"
+
+            # To fetch rows of this table, we need to know which RIDs to
+            # request. Look at the join_conditions[table_name] entry which
+            # is a set of (fk_col, pk_col) pairs. For each pair:
+            #   - fk_col is on one of the tables we've already loaded
+            #   - pk_col is on `table_name` (the one we're about to fetch)
+            # We collect the values of fk_col from the local DB, then fetch
+            # rows of table_name where the pk_col equals any of those values.
+            conditions = join_conditions.get(table_name, set())
+            rids_to_fetch, fk_column_on_target = _collect_fk_values(
+                engine=engine,
+                orm_resolver=orm_resolver,
+                conditions=conditions,
+                target_table_name=table_name,
+            )
+
+            if rids_to_fetch and fk_column_on_target is not None:
+                # Convert any non-string values (e.g., integer RIDs) to
+                # strings since PagedFetcher's Iterable[str] contract expects
+                # stringified RID values.
+                str_rids = [str(r) for r in rids_to_fetch if r is not None]
+                if str_rids:
+                    fetcher.fetch_by_rids(
+                        table=qualified,
+                        rids=str_rids,
+                        target_table=target_orm.__table__,
+                        rid_column=fk_column_on_target,
+                    )
+
+            processed.add(table_name)
+            prior_tables_in_path.append(table_name)
+
+
+def _collect_fk_values(
+    *,
+    engine: Engine,
+    orm_resolver: Callable[[str], Any],
+    conditions: set,
+    target_table_name: str,
+) -> tuple[list[Any], str | None]:
+    """Determine which rows of *target_table_name* we need to fetch.
+
+    Given the join conditions for *target_table_name* (pairs of
+    (fk_col, pk_col) where fk_col lives on one side and pk_col on the other),
+    figure out:
+
+    - Which column on the target table is the one we filter by, and
+    - What values of that column we need (pulled from already-loaded rows on
+      the other side of the join).
+
+    Returns ``(values, column_name)`` where ``column_name`` is the name of the
+    filter column on *target_table_name*, or ``(empty, None)`` if no workable
+    condition is found.
+    """
+    for fk_col, pk_col in conditions:
+        # Each pair has one column that belongs to target_table_name (the
+        # "far side" for this join) and one that belongs to an already-loaded
+        # table. Figure out which is which.
+        fk_table_name = _col_table_name(fk_col)
+        pk_table_name = _col_table_name(pk_col)
+
+        if fk_table_name == target_table_name:
+            # FK is on the target table, PK is on the prior table.
+            # e.g., Image has FK "Subject" -> Subject.RID
+            # We fetch Images where Image.Subject matches loaded Subject.RIDs.
+            other_table_name = pk_table_name
+            filter_col_on_target = fk_col.name
+            pull_col_name = pk_col.name
+        elif pk_table_name == target_table_name:
+            # PK is on the target table, FK is on the prior table.
+            # e.g., Dataset_Image.Image -> Image.RID
+            # We fetch Images by RID where those RIDs come from loaded
+            # Dataset_Image rows' Image column.
+            other_table_name = fk_table_name
+            filter_col_on_target = pk_col.name
+            pull_col_name = fk_col.name
+        else:
+            # Neither side of the condition is the target table — skip.
+            continue
+
+        other_orm = orm_resolver(other_table_name)
+        if other_orm is None:
+            continue
+
+        # Query the local DB for distinct non-null values of pull_col_name
+        # on the other-side ORM table.
+        other_col = other_orm.__table__.columns.get(pull_col_name)
+        if other_col is None:
+            continue
+        stmt = select(other_col).distinct().where(other_col.isnot(None))
+        with engine.connect() as conn:
+            values = [row[0] for row in conn.execute(stmt).fetchall() if row[0] is not None]
+
+        if values:
+            return values, filter_col_on_target
+
+    return [], None
+
+
+def _col_table_name(col: Any) -> str:
+    """Return the ERMrest table name for an ERMrest ``Column`` object."""
+    table = getattr(col, "table", None)
+    if table is None:
+        return ""
+    return getattr(table, "name", str(table))
 
 
 # ---------------------------------------------------------------------------
