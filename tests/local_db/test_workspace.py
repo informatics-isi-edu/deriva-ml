@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
 import pytest
 from sqlalchemy import text
 
@@ -114,143 +113,99 @@ class TestAttachSlice:
             ws.close()
 
 
-class TestLegacyWorkingDataView:
-    def test_cache_table_roundtrip(self, tmp_path: Path) -> None:
+class TestLocalSchema:
+    def test_local_schema_is_none_before_build(self, tmp_path: Path) -> None:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
-            view = ws.legacy_working_data_view()
-            df = pd.DataFrame({"x": [1, 2, 3]})
-            view.cache_table("mytable", df)
-            got = view.read_table("mytable")
-            assert list(got["x"]) == [1, 2, 3]
-            assert view.has_table("mytable")
-            assert "mytable" in view.list_tables()
+            assert ws.local_schema is None
         finally:
             ws.close()
 
-    def test_query(self, tmp_path: Path) -> None:
+    def test_build_local_schema_from_model(self, tmp_path: Path, canned_bag_model) -> None:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
-            view = ws.legacy_working_data_view()
-            df = pd.DataFrame({"a": [10, 20, 30]})
-            view.cache_table("qtable", df)
-            result = view.query("SELECT SUM(a) AS total FROM qtable")
-            assert result["total"].iloc[0] == 60
+            ws.build_local_schema(
+                model=canned_bag_model,
+                schemas=["isa", "deriva-ml"],
+            )
+            assert ws.local_schema is not None
+            assert ws.orm_class("Image") is not None
+            assert ws.orm_class("Dataset") is not None
         finally:
             ws.close()
 
-    def test_drop_table(self, tmp_path: Path) -> None:
+    def test_local_schema_creates_per_schema_files(self, tmp_path: Path, canned_bag_model) -> None:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
-            view = ws.legacy_working_data_view()
-            df = pd.DataFrame({"v": [1, 2]})
-            view.cache_table("todelete", df)
-            assert view.has_table("todelete")
-            view.drop_table("todelete")
-            assert not view.has_table("todelete")
+            ws.build_local_schema(
+                model=canned_bag_model,
+                schemas=["isa", "deriva-ml"],
+            )
+            working_dir = tmp_path / "catalogs" / "h__1" / "working"
+            assert (working_dir / "isa.db").is_file()
+            assert (working_dir / "deriva-ml.db").is_file()
         finally:
             ws.close()
 
-    def test_clear(self, tmp_path: Path) -> None:
+    def test_rebuild_schema_disposes_and_recreates(self, tmp_path: Path, canned_bag_model) -> None:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
-            view = ws.legacy_working_data_view()
-            view.cache_table("t1", pd.DataFrame({"x": [1]}))
-            view.cache_table("t2", pd.DataFrame({"y": [2]}))
-            assert view.has_table("t1")
-            assert view.has_table("t2")
-            view.clear()
-            # After clear, user tables should be gone
-            assert not view.has_table("t1")
-            assert not view.has_table("t2")
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            first = ws.local_schema
+            ws.rebuild_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            second = ws.local_schema
+            assert first is not second
         finally:
             ws.close()
 
-    def test_clear_does_not_destroy_manifest_tables(self, tmp_path: Path) -> None:
-        """clear() must preserve execution_state and schema_meta tables."""
+    def test_orm_class_returns_none_for_unknown(self, tmp_path: Path, canned_bag_model) -> None:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
-            # Populate a manifest entry
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            result = ws.orm_class("NonexistentTable")
+            assert result is None
+        finally:
+            ws.close()
+
+    def test_orm_class_none_without_schema(self, tmp_path: Path) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            assert ws.orm_class("Image") is None
+        finally:
+            ws.close()
+
+    def test_engine_unified_with_local_schema(self, tmp_path: Path, canned_bag_model) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            assert ws.engine is ws.local_schema.engine
+        finally:
+            ws.close()
+
+    def test_manifest_store_works_after_schema_build(self, tmp_path: Path, canned_bag_model) -> None:
+        """ManifestStore should work on the unified engine after schema build."""
+        from deriva_ml.asset.manifest import AssetEntry
+
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
             store = ws.manifest_store()
-            from deriva_ml.asset.manifest import AssetEntry
-
             store.add_asset("EX1", "Image/a.jpg", AssetEntry(asset_table="Image", schema="isa"))
-
-            # Also cache a user table
-            view = ws.legacy_working_data_view()
-            view.cache_table("user_data", pd.DataFrame({"x": [1]}))
-
-            # Clear should remove user_data but preserve manifest tables
-            view.clear()
-            assert not view.has_table("user_data")
-
-            # Manifest data must survive
             rows = store.list_assets("EX1")
             assert "Image/a.jpg" in rows
         finally:
             ws.close()
 
-    def test_workspace_property(self, tmp_path: Path) -> None:
-        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
-        try:
-            view = ws.legacy_working_data_view()
-            assert view.workspace is ws
-        finally:
-            ws.close()
+    def test_manifest_store_before_schema_build(self, tmp_path: Path) -> None:
+        """ManifestStore should work even before schema build."""
+        from deriva_ml.asset.manifest import AssetEntry
 
-    def test_drop_table_refuses_reserved_tables(self, tmp_path: Path) -> None:
-        """drop_table silently refuses to drop infrastructure tables."""
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
             store = ws.manifest_store()
-            from deriva_ml.asset.manifest import AssetEntry
-
             store.add_asset("EX1", "Image/a.jpg", AssetEntry(asset_table="Image", schema="isa"))
-
-            view = ws.legacy_working_data_view()
-            view.drop_table("execution_state__assets")  # Should be silently refused
-            view.drop_table("schema_meta")  # Same
-
-            # Tables still exist
             rows = store.list_assets("EX1")
             assert "Image/a.jpg" in rows
-        finally:
-            ws.close()
-
-    def test_cache_table_rejects_non_dataframe(self, tmp_path: Path) -> None:
-        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
-        try:
-            view = ws.legacy_working_data_view()
-            with pytest.raises(TypeError, match="Expected DataFrame"):
-                view.cache_table("bad", [1, 2, 3])
-        finally:
-            ws.close()
-
-    def test_has_table_returns_false_before_db_exists(self, tmp_path: Path) -> None:
-        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
-        try:
-            view = ws.legacy_working_data_view()
-            # The DB directory/file doesn't exist yet (engine not yet accessed)
-            assert not (ws.working_db_path / "main.db").exists()
-            assert not view.has_table("anything")
-        finally:
-            ws.close()
-
-    def test_list_tables_returns_empty_before_db_exists(self, tmp_path: Path) -> None:
-        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
-        try:
-            view = ws.legacy_working_data_view()
-            assert not (ws.working_db_path / "main.db").exists()
-            assert view.list_tables() == []
-        finally:
-            ws.close()
-
-    def test_read_table_raises_when_missing(self, tmp_path: Path) -> None:
-        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
-        try:
-            view = ws.legacy_working_data_view()
-            with pytest.raises(ValueError, match="not found"):
-                view.read_table("does_not_exist")
         finally:
             ws.close()
 
@@ -260,22 +215,3 @@ class TestWorkspaceClose:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         ws.close()
         ws.close()  # Should not raise
-
-
-class TestDerivaMLIntegration:
-    def test_ml_working_data_uses_workspace_path(self, tmp_path: Path) -> None:
-        """DerivaML.working_data should write to catalogs/{host}__{cat}/working/main.db."""
-        import pandas as pd
-
-        from deriva_ml import DerivaML
-
-        ml = DerivaML.__new__(DerivaML)
-        ml.working_dir = tmp_path
-        ml.host_name = "example.org"
-        ml.catalog_id = "9"
-
-        wd = ml.working_data
-        wd.cache_table("demo", pd.DataFrame({"x": [1]}))
-
-        expected = tmp_path / "catalogs" / "example.org__9" / "working" / "main.db"
-        assert expected.is_file()

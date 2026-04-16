@@ -1,14 +1,15 @@
 """Per-catalog working database and slice registry.
 
 A ``Workspace`` is bound to ``(working_dir, hostname, catalog_id)``. It owns:
-- A single SQLAlchemy engine over ``working.db`` in WAL mode.
+- A single SQLAlchemy engine over ``working/main.db`` in WAL mode.
 - An ``attach_slice`` context manager that ATTACHes a slice DB under alias
   ``"slice"`` for the duration of a single connection.
-- A ``legacy_working_data_view`` compatibility shim exposing the old
-  ``WorkingDataCache`` API (pandas table roundtrips) on top of the new file.
+- ``build_local_schema()`` / ``rebuild_schema()`` for building an ORM over the
+  working DB with cross-schema relationships.
 
-Phase 1 intentionally does not build a ``LocalSchema`` over the working DB
-eagerly; the paged fetcher and denormalizer drive schema creation lazily.
+The workspace engine is unified with the LocalSchema engine once
+``build_local_schema()`` is called, so ManifestStore, result cache, and ORM
+tables all share one connection pool.
 """
 
 from __future__ import annotations
@@ -18,28 +19,18 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
-from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
 from deriva_ml.local_db import paths as p
 from deriva_ml.local_db import sqlite_helpers as sh
 
 if TYPE_CHECKING:
-    import pandas as pd
-
     from deriva_ml.local_db.manifest_store import ManifestStore
+    from deriva_ml.local_db.schema import LocalSchema
 
 logger = logging.getLogger(__name__)
 
 WORKING_DB_SCHEMA_VERSION = 1
-
-_RESERVED_TABLES = frozenset(
-    {
-        "schema_meta",
-        "execution_state__assets",
-        "execution_state__features",
-    }
-)
 
 
 class Workspace:
@@ -57,6 +48,7 @@ class Workspace:
         self._catalog_id = str(catalog_id)
         self._engine: Engine | None = None
         self._manifest_store: "ManifestStore | None" = None
+        self._local_schema: "LocalSchema | None" = None
         self._closed = False
 
     # ---- paths ----
@@ -85,6 +77,82 @@ class Workspace:
             sh.ensure_schema_meta(self._engine, expected_version=WORKING_DB_SCHEMA_VERSION)
         return self._engine
 
+    # ---- local schema ----
+
+    @property
+    def local_schema(self) -> "LocalSchema | None":
+        """The LocalSchema for this workspace, or None if not yet built.
+
+        The schema is built lazily via ``build_local_schema(model, schemas)``.
+        Once built, it provides ORM classes with cross-schema relationships
+        for all tables in the working DB.
+        """
+        return self._local_schema
+
+    def build_local_schema(
+        self,
+        *,
+        model: Any,
+        schemas: list[str],
+    ) -> "LocalSchema":
+        """Build the ORM schema for this workspace's working DB.
+
+        Creates per-schema .db files in the working directory and sets up
+        SQLAlchemy ORM with cross-schema relationships via ATTACH. After
+        this call, ``local_schema`` is non-None and ``orm_class()`` works.
+
+        The workspace engine is unified with the LocalSchema engine so that
+        ManifestStore, result cache, and ORM tables all share one connection
+        pool.
+
+        Args:
+            model: ERMrest Model (from live catalog or schema.json).
+            schemas: Schema names to include (e.g. ["isa", "deriva-ml"]).
+        """
+        from deriva_ml.local_db.schema import LocalSchema
+
+        if self._local_schema is not None:
+            self._local_schema.dispose()
+
+        self._local_schema = LocalSchema.build(
+            model=model,
+            schemas=schemas,
+            database_path=self.working_db_path,  # directory path
+        )
+
+        # Unify engines: workspace engine = LocalSchema engine.
+        # ManifestStore tables live in main.db which is the same file
+        # LocalSchema's engine opens.
+        if self._engine is not None and self._engine is not self._local_schema.engine:
+            self._engine.dispose()
+        self._engine = self._local_schema.engine
+
+        # Re-initialize manifest store if it was previously created,
+        # since it holds a reference to the old engine.
+        if self._manifest_store is not None:
+            from deriva_ml.local_db.manifest_store import ManifestStore
+
+            self._manifest_store = ManifestStore(self._engine)
+            self._manifest_store.ensure_schema()
+
+        return self._local_schema
+
+    def rebuild_schema(self, *, model: Any, schemas: list[str]) -> "LocalSchema":
+        """Dispose the current LocalSchema and build a fresh one."""
+        return self.build_local_schema(model=model, schemas=schemas)
+
+    def orm_class(self, table_name: str) -> Any | None:
+        """Get the ORM class for a table by name.
+
+        Returns None if local_schema hasn't been built or table not found.
+        """
+        if self._local_schema is None:
+            return None
+        try:
+            return self._local_schema.get_orm_class(table_name)
+        except (KeyError, Exception):
+            return None
+
     # ---- slice attach/detach ----
 
     @contextlib.contextmanager
@@ -109,7 +177,7 @@ class Workspace:
         finally:
             conn.close()
 
-    # ---- legacy compat ----
+    # ---- manifest store ----
 
     def manifest_store(self) -> "ManifestStore":
         """Return a ManifestStore backed by this workspace's engine (cached)."""
@@ -159,21 +227,17 @@ class Workspace:
             migrated += 1
         return migrated
 
-    def legacy_working_data_view(self) -> "_LegacyWorkingDataView":
-        """Return an adapter exposing the old ``WorkingDataCache`` API.
-
-        Lets existing callers (``Dataset.cache_denormalized``, tests) continue
-        to use the string-keyed DataFrame table semantics they rely on, backed
-        by the new per-catalog working DB.
-        """
-        return _LegacyWorkingDataView(self)
-
     # ---- lifecycle ----
 
     def close(self) -> None:
         if self._closed:
             return
-        if self._engine is not None:
+        if self._local_schema is not None:
+            self._local_schema.dispose()
+            self._local_schema = None
+            # Engine was unified with LocalSchema; already disposed above.
+            self._engine = None
+        elif self._engine is not None:
             self._engine.dispose()
             self._engine = None
         self._closed = True
@@ -184,67 +248,3 @@ class Workspace:
     def __exit__(self, *exc_info: Any) -> bool:
         self.close()
         return False
-
-
-class _LegacyWorkingDataView:
-    """Adapter providing the old ``WorkingDataCache`` surface on a Workspace.
-
-    Keeps the working DataFrames in the same SQLite file as everything else
-    (under their bare user-chosen table names) so existing callers keep
-    working without code changes.
-    """
-
-    def __init__(self, ws: Workspace) -> None:
-        self._ws = ws
-
-    @property
-    def workspace(self) -> Workspace:
-        """The underlying Workspace."""
-        return self._ws
-
-    def cache_table(self, table_name: str, df: "pd.DataFrame") -> Path:
-        import pandas as pd  # lazy import
-
-        if not isinstance(df, pd.DataFrame):
-            raise TypeError(f"Expected DataFrame, got {type(df).__name__}")
-        df.to_sql(table_name, self._ws.engine, if_exists="replace", index=False)
-        return self._ws.working_db_path
-
-    def read_table(self, table_name: str) -> "pd.DataFrame":
-        import pandas as pd
-
-        if not self.has_table(table_name):
-            raise ValueError(f"Table '{table_name}' not found in workspace working DB; available: {self.list_tables()}")
-        return pd.read_sql_table(table_name, self._ws.engine)
-
-    def query(self, sql: str) -> "pd.DataFrame":
-        import pandas as pd
-
-        return pd.read_sql_query(text(sql), self._ws.engine)
-
-    def has_table(self, table_name: str) -> bool:
-        from sqlalchemy import inspect
-
-        if not self._ws.working_db_path.exists():
-            return False
-        return table_name in inspect(self._ws.engine).get_table_names()
-
-    def list_tables(self) -> list[str]:
-        from sqlalchemy import inspect
-
-        if not self._ws.working_db_path.exists():
-            return []
-        return inspect(self._ws.engine).get_table_names()
-
-    def drop_table(self, table_name: str) -> None:
-        if table_name in _RESERVED_TABLES:
-            return  # Silently refuse to drop reserved infrastructure tables
-        if self.has_table(table_name):
-            with self._ws.engine.connect() as conn:
-                conn.execute(text(f"DROP TABLE IF EXISTS [{table_name}]"))
-                conn.commit()
-
-    def clear(self) -> None:
-        for t in self.list_tables():
-            if t not in _RESERVED_TABLES:
-                self.drop_table(t)
