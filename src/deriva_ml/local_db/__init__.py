@@ -1,11 +1,21 @@
 """Unified local SQLite layer for deriva-ml.
 
-This package provides per-catalog working databases, per-slice immutable
-databases, a paged-fetch primitive, and a SQLite-backed asset manifest.
-
-See `docs/superpowers/specs/2026-04-15-unified-local-db-design.md`.
+See ``docs/superpowers/specs/2026-04-15-unified-local-db-design.md`` for design.
+See ``README.md`` in this directory for a short orientation.
 """
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from deriva_ml.local_db.manifest_store import ManifestStore
+from deriva_ml.local_db.paged_fetcher import PagedFetcher
+from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+from deriva_ml.local_db.schema import LocalSchema
+from deriva_ml.local_db.workspace import Workspace
+
+__all__ = [
+    "ErmrestPagedClient",
+    "LocalSchema",
+    "ManifestStore",
+    "PagedFetcher",
+    "Workspace",
+]
