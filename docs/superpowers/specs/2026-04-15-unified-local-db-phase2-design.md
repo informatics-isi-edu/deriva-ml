@@ -60,15 +60,49 @@ by `SchemaBuilder`, identical to today's bag path.
 live in `main.db`. Per-schema tables (populated by `PagedFetcher`) live in
 their respective ATTACH'd files.
 
-### 2.2 Schema lifecycle
+### 2.2 Schema and ORM lifecycle
 
-**When built:** Lazily, on first denormalization or paged-fetch request. Not
-at workspace creation (which doesn't require a catalog connection).
+The `LocalSchema` (and its ORM) is the general-purpose interface to the
+local SQLite data. It is **not** owned by or gated behind denormalization.
+Denormalization is one consumer of the ORM; others include direct table
+queries, FK-graph traversal in application code, and the `PagedFetcher`
+(which needs target tables to write into).
+
+**When built:** Lazily, on first access to `workspace.local_schema`. Not
+at workspace creation (which doesn't require a catalog connection). Any
+operation that needs the ORM — denormalization, paged fetch, direct table
+query — triggers the build if it hasn't happened yet.
 
 **How built:** `LocalSchema.build(model=catalog_model, schemas=[ml_schema,
 *domain_schemas], database_path=working_dir)` creates the per-schema files,
-ATTACH handler, ORM classes, and cross-schema relationships. Cached on the
-`Workspace` object for its lifetime.
+ATTACH handler, ORM classes, and cross-schema relationships (including
+cross-schema `relationship()` calls that let SQLAlchemy traverse FK graphs
+across ATTACH'd databases). Cached on the `Workspace` object for its
+lifetime.
+
+**What the ORM provides once built:**
+- SQLAlchemy engine with all per-schema files ATTACH'd.
+- ORM classes for every table, with intra-schema FKs as SQLite constraints
+  and cross-schema FKs as SQLAlchemy `relationship()` objects.
+- The full FK graph is traversable — `_prepare_wide_table()` walks it for
+  join planning, but any code can traverse it for other purposes.
+- Direct table queries via `session.query(OrmClass)` or
+  `select(table)` work against the local data.
+
+**Workspace exposes the ORM for general use:**
+
+```python
+workspace.local_schema      # LocalSchema (engine, metadata, ORM Base)
+workspace.orm_class(name)   # convenience: get ORM class for a table
+workspace.engine            # SQLAlchemy engine (already exists from Phase 1)
+```
+
+**For slices:** When a `DatasetBag` is opened, it creates a `Workspace`
+scoped to the bag directory. The bag's per-schema `.db` files (produced by
+`SchemaBuilder` during download) ARE the slice — no conversion needed. The
+`LocalSchema` built from the bag's `schema.json` provides the same ORM
+interface. A downloaded bag is therefore a layer on top of the slice
+interface: same file format, same ORM, same query capabilities.
 
 **Staleness:** Tied to the catalog model at build time. A
 `workspace.rebuild_schema()` method disposes and recreates the
@@ -103,6 +137,12 @@ the existing `import_legacy_manifests` path if any exist).
 
 ## 3. Unified denormalization engine
 
+The denormalizer is a **consumer** of the workspace's ORM (§2.2), not the
+owner of it. The ORM and its FK-graph relationships exist independently and
+are usable for any purpose. The denormalizer's job is narrow: given an ORM
+and a dataset, plan the joins, ensure rows are present, build the SQL, and
+execute it.
+
 ### 3.1 Module
 
 `deriva_ml.local_db.denormalize`
@@ -133,10 +173,11 @@ for nullable FKs and composite FKs), and the output column list. No I/O —
 pure model analysis. This is the same call both `Dataset._denormalize_datapath`
 and `DatasetBag._denormalize` make today.
 
-**Step 2 — Ensure the working DB has a schema.** If
-`workspace.local_schema` is None, build it from the live `Model` via
-`LocalSchema.build(model, schemas, database_path=working_dir)`. Creates
-per-schema `.db` files and ORM. Cached for workspace lifetime.
+**Step 2 — Ensure the ORM is available.** Access
+`workspace.local_schema`, which triggers the lazy build (§2.2) if needed.
+The denormalizer does not own the schema lifecycle — it just requires the
+ORM to be present. After this step, the engine has all per-schema files
+ATTACH'd and ORM classes with cross-schema relationships are ready.
 
 **Step 3 — Populate rows.** Depends on `source`:
 
@@ -208,8 +249,12 @@ def denormalize_as_dataframe(self, include_tables, version=None, **kwargs):
 ```
 
 A `DatasetBag` creates a lightweight `Workspace` pointing at its bag
-directory on open. The bag's existing per-schema `.db` files become the
-slice. No data movement.
+directory on open. The bag's existing per-schema `.db` files — produced by
+the same `SchemaBuilder` during download — ARE the slice. No conversion, no
+data movement. The ORM built from the bag's `schema.json` provides the same
+FK-graph relationships as a live-catalog ORM, so the unified denormalizer
+works identically. A downloaded bag is a layer on top of the slice
+interface: same file format, same ORM, same denormalization path.
 
 ### 3.6 What this deletes
 
