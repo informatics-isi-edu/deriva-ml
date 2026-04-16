@@ -42,10 +42,11 @@ class TestWorkspaceCreation:
         assert root == tmp_path / "catalogs" / "myhost__42"
         ws.close()
 
-    def test_slice_db_path_method(self, tmp_path: Path) -> None:
+    def test_slice_db_path_method_returns_directory(self, tmp_path: Path) -> None:
+        """slice_db_path is now an alias for the slice directory."""
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
-        p = ws.slice_db_path("my_slice")
-        assert p == tmp_path / "catalogs" / "h__1" / "slices" / "my_slice" / "slice.db"
+        result = ws.slice_db_path("my_slice")
+        assert result == tmp_path / "catalogs" / "h__1" / "slices" / "my_slice"
         ws.close()
 
     def test_context_manager_protocol(self, tmp_path: Path) -> None:
@@ -108,6 +109,107 @@ class TestAttachSlice:
         try:
             with pytest.raises(FileNotFoundError):
                 with ws.attach_slice("nonexistent"):
+                    pass
+        finally:
+            ws.close()
+
+
+class TestMultiSchemaSliceAttach:
+    """Tests for multi-schema (directory-based) slice attachment."""
+
+    def test_attach_multi_schema_slice(self, tmp_path: Path, canned_bag_model) -> None:
+        """Multi-schema slice: each per-schema file is ATTACH'd under slice_{stem}."""
+        from sqlalchemy import insert
+
+        from deriva_ml.local_db.schema import LocalSchema
+
+        # Build a multi-schema slice directory
+        s_dir = tmp_path / "catalogs" / "h__1" / "slices" / "ms1"
+        s_dir.mkdir(parents=True)
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=["isa", "deriva-ml"],
+            database_path=s_dir,
+        )
+        image_t = ls.find_table("isa.Image")
+        with ls.engine.begin() as conn:
+            conn.execute(insert(image_t).values(RID="SLICE-IMG-1", Filename="test.jpg"))
+        ls.dispose()
+
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            with ws.attach_slice("ms1") as conn:
+                result = conn.execute(text("SELECT RID FROM slice_isa.Image")).fetchall()
+                assert len(result) == 1
+                assert result[0][0] == "SLICE-IMG-1"
+        finally:
+            ws.close()
+
+    def test_attach_detaches_all_on_exit(self, tmp_path: Path, canned_bag_model) -> None:
+        """After context exit, all slice schemas are detached."""
+        from deriva_ml.local_db.schema import LocalSchema
+
+        s_dir = tmp_path / "catalogs" / "h__1" / "slices" / "ms1"
+        s_dir.mkdir(parents=True)
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=["isa", "deriva-ml"],
+            database_path=s_dir,
+        )
+        ls.dispose()
+
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            with ws.attach_slice("ms1") as conn:
+                pass  # just enter and exit
+            # After exit, slice_isa should not be accessible
+            with ws.engine.connect() as conn:
+                with pytest.raises(Exception):
+                    conn.execute(text("SELECT * FROM slice_isa.Image"))
+        finally:
+            ws.close()
+
+    def test_missing_slice_dir_raises(self, tmp_path: Path) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            with pytest.raises(FileNotFoundError):
+                with ws.attach_slice("nonexistent"):
+                    pass
+        finally:
+            ws.close()
+
+    def test_legacy_single_file_slice_still_works(self, tmp_path: Path) -> None:
+        """A slice with only slice.db (Phase 1 layout) still works under alias 'slice'."""
+        from deriva_ml.local_db.sqlite_helpers import create_wal_engine
+
+        s_dir = tmp_path / "catalogs" / "h__1" / "slices" / "legacy1"
+        s_dir.mkdir(parents=True)
+        eng = create_wal_engine(s_dir / "slice.db")
+        with eng.connect() as conn:
+            conn.execute(text("CREATE TABLE t (x INT)"))
+            conn.execute(text("INSERT INTO t VALUES (42)"))
+            conn.commit()
+        eng.dispose()
+
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            with ws.attach_slice("legacy1") as conn:
+                val = conn.execute(text("SELECT x FROM slice.t")).scalar()
+                assert val == 42
+        finally:
+            ws.close()
+
+    def test_empty_slice_dir_raises(self, tmp_path: Path) -> None:
+        """A slice directory with no .db file raises FileNotFoundError."""
+        s_dir = tmp_path / "catalogs" / "h__1" / "slices" / "empty1"
+        s_dir.mkdir(parents=True)
+
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            with pytest.raises(FileNotFoundError, match="expected main.db or slice.db"):
+                with ws.attach_slice("empty1"):
                     pass
         finally:
             ws.close()

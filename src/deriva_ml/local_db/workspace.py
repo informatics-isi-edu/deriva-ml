@@ -156,24 +156,50 @@ class Workspace:
     # ---- slice attach/detach ----
 
     @contextlib.contextmanager
-    def attach_slice(self, slice_id: str, alias: str = "slice") -> Iterator[Connection]:
-        """ATTACH a slice DB under ``alias`` for the duration of the block.
+    def attach_slice(self, slice_id: str) -> Iterator[Connection]:
+        """ATTACH a slice's per-schema DB files for the duration of the block.
 
-        Yields an open SQLAlchemy :class:`Connection` with the slice visible
-        as ``{alias}.{table}``.
+        Multi-schema slices (directory with ``main.db`` + per-schema files):
+            Each ``.db`` file is ATTACH'd under alias ``slice_{stem}`` (e.g.
+            ``slice_isa``, ``slice_deriva-ml``).
+
+        Legacy single-file slices (``slice.db``):
+            ATTACH'd under alias ``"slice"`` for backward compatibility.
+
+        Yields an open SQLAlchemy :class:`Connection` with the slice schemas
+        visible as ``{alias}.{table}``.
         """
-        slice_path = self.slice_db_path(slice_id)
-        if not slice_path.is_file():
-            raise FileNotFoundError(f"Slice database not found: {slice_path}")
+        s_dir = p.slice_dir(self._working_dir, self._hostname, self._catalog_id, slice_id)
+        if not s_dir.is_dir():
+            raise FileNotFoundError(f"Slice directory not found: {s_dir}")
+
+        main_db = s_dir / "main.db"
+        legacy_db = s_dir / "slice.db"
+
+        if not main_db.is_file() and not legacy_db.is_file():
+            raise FileNotFoundError(f"No database found in slice directory {s_dir} (expected main.db or slice.db)")
 
         conn = self.engine.connect()
+        attached_aliases: list[str] = []
         try:
-            sh.attach_database(conn, slice_path, alias)
+            if main_db.is_file():
+                # Multi-schema layout: attach each .db file under slice_{stem}
+                for db_file in sorted(s_dir.glob("*.db")):
+                    alias = f"slice_{db_file.stem}"
+                    sh.attach_database(conn, db_file, alias)
+                    attached_aliases.append(alias)
+            else:
+                # Legacy single-file layout
+                sh.attach_database(conn, legacy_db, "slice")
+                attached_aliases.append("slice")
+
             yield conn
-            try:
-                sh.detach_database(conn, alias)
-            except Exception:  # pragma: no cover — best-effort detach
-                logger.debug("detach_database failed; closing connection")
+
+            for alias in attached_aliases:
+                try:
+                    sh.detach_database(conn, alias)
+                except Exception:  # pragma: no cover — best-effort detach
+                    logger.debug("detach %s failed; closing connection", alias)
         finally:
             conn.close()
 

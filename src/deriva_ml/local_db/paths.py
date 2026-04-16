@@ -66,5 +66,18 @@ def slice_dir(working_dir: Path, hostname: str, catalog_id: str | int, slice_id:
 
 
 def slice_db_path(working_dir: Path, hostname: str, catalog_id: str | int, slice_id: str) -> Path:
-    """Return the slice.db path for a single slice."""
-    return slice_dir(working_dir, hostname, catalog_id, slice_id) / "slice.db"
+    """Return the slice directory path (backward-compat alias for ``slice_dir``).
+
+    For multi-schema slices the directory contains ``main.db`` plus one
+    per-schema ``.db`` file.  For legacy Phase-1 slices it contains a single
+    ``slice.db`` file.
+    """
+    return slice_dir(working_dir, hostname, catalog_id, slice_id)
+
+
+def slice_main_db_path(working_dir: Path, hostname: str, catalog_id: str | int, slice_id: str) -> Path:
+    """Return the ``main.db`` file inside a multi-schema slice directory.
+
+    Layout: {slice_dir}/main.db
+    """
+    return slice_dir(working_dir, hostname, catalog_id, slice_id) / "main.db"

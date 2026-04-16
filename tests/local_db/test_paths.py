@@ -58,9 +58,21 @@ class TestSliceDir:
 
 
 class TestSliceDbPath:
-    def test_slice_db_file_under_slice_dir(self, tmp_path: Path) -> None:
+    def test_slice_db_path_returns_directory(self, tmp_path: Path) -> None:
+        """slice_db_path is a backward-compat alias for slice_dir (returns a directory)."""
         db = p.slice_db_path(tmp_path, "example.org", "42", "abc123")
-        assert db == (tmp_path / "catalogs" / "example.org__42" / "slices" / "abc123" / "slice.db")
+        assert db == tmp_path / "catalogs" / "example.org__42" / "slices" / "abc123"
+
+    def test_slice_db_path_equals_slice_dir(self, tmp_path: Path) -> None:
+        assert p.slice_db_path(tmp_path, "example.org", "42", "abc123") == p.slice_dir(
+            tmp_path, "example.org", "42", "abc123"
+        )
+
+
+class TestSliceMainDbPath:
+    def test_slice_main_db_inside_slice_dir(self, tmp_path: Path) -> None:
+        main = p.slice_main_db_path(tmp_path, "example.org", "42", "abc123")
+        assert main == (tmp_path / "catalogs" / "example.org__42" / "slices" / "abc123" / "main.db")
 
 
 class TestSanitiseComponent:
