@@ -16,6 +16,7 @@ from pprint import pformat
 
 import pandas as pd
 import pytest
+
 try:
     from icecream import ic
 except ImportError:
@@ -23,6 +24,7 @@ except ImportError:
 
 from deriva_ml import DerivaML
 from deriva_ml.execution.execution import ExecutionConfiguration
+
 
 class TestDenormalize:
     """Test suite for the _denormalize method in DatasetBag."""
@@ -228,6 +230,7 @@ class TestDenormalize:
             matching_cols = [c for c in df.columns if c.startswith(prefix)]
             assert len(matching_cols) == 0, f"Association table columns ({prefix}) should be excluded"
 
+
 class TestDenormalizeSchemaGraph:
     """Test the schema graph walking behavior of _denormalize."""
 
@@ -273,12 +276,7 @@ class TestDenormalizeSchemaGraph:
         all_paths = bag.model._schema_to_paths()
 
         # Find a table name that appears in at least one path (not Dataset itself)
-        table_names_in_paths = {
-            table.name
-            for path in all_paths
-            for table in path
-            if table.name != "Dataset"
-        }
+        table_names_in_paths = {table.name for path in all_paths for table in path if table.name != "Dataset"}
         assert len(table_names_in_paths) > 0, "Expected tables in paths besides Dataset"
 
         # Pick a table to exclude
@@ -293,9 +291,7 @@ class TestDenormalizeSchemaGraph:
                 )
 
         # Excluded paths should be a subset of all paths (fewer or equal)
-        assert len(excluded_paths) <= len(all_paths), (
-            "Excluding tables should not produce more paths"
-        )
+        assert len(excluded_paths) <= len(all_paths), "Excluding tables should not produce more paths"
 
     def test_prepare_wide_table_validation(self, dataset_test, tmp_path):
         """Test that _prepare_wide_table validates table existence.
@@ -346,6 +342,7 @@ class TestDenormalizeSchemaGraph:
             for table_name in path[1:]:
                 if table_name in join_conditions:
                     assert len(join_conditions[table_name]) > 0, f"Expected join conditions for {table_name}"
+
 
 class TestDenormalizeOrmRelationships:
     """Test ORM relationship handling in _denormalize."""
@@ -429,6 +426,7 @@ class TestDenormalizeOrmRelationships:
             # At least one should be MANYTOONE
             has_manytoone = any(r.direction.name == "MANYTOONE" for r in relationships)
             assert has_manytoone, "Expected MANYTOONE relationship from Image to Subject"
+
 
 class TestDenormalizeDataIntegrity:
     """Test data integrity in denormalized results."""
@@ -521,6 +519,7 @@ class TestDenormalizeDataIntegrity:
                     f"FK relationship should be maintained: "
                     f"Observation.Subject={row['Observation.Subject']} != Subject.RID={row['Subject.RID']}"
                 )
+
 
 class TestDenormalizeEdgeCases:
     """Test edge cases and error handling in _denormalize."""
@@ -641,9 +640,9 @@ class TestDuplicateAssociationTables:
         # Test denormalizing with just the Image table
         df = dataset.denormalize_as_dataframe(include_tables=["Image"])
         assert len(df) > 0, (
-            "Catalog-side denormalize returned empty DataFrame — "
-            "duplicate association table likely caused empty result"
+            "Catalog-side denormalize returned empty DataFrame — duplicate association table likely caused empty result"
         )
+
 
 class TestDenormalizeSqlGeneration:
     """Test the SQL generation aspects of _denormalize."""
@@ -689,6 +688,7 @@ class TestDenormalizeSqlGeneration:
         # The result should be a CompoundSelect (UNION)
         # This depends on whether there are multiple paths
         assert sql_stmt is not None
+
 
 class TestCatalogDenormalize:
     """Test suite for catalog-based denormalization (Dataset class).
@@ -814,8 +814,7 @@ class TestCatalogDenormalize:
 
         # Both should have the same number of rows
         assert len(catalog_df) == len(bag_df), (
-            f"Catalog ({len(catalog_df)} rows) and bag ({len(bag_df)} rows) "
-            "should have same number of rows"
+            f"Catalog ({len(catalog_df)} rows) and bag ({len(bag_df)} rows) should have same number of rows"
         )
 
         # Both should have Subject columns (dot notation)
@@ -863,6 +862,7 @@ class TestCatalogDenormalize:
 
         # Should be a generator
         from types import GeneratorType
+
         assert isinstance(gen, GeneratorType), "Should return a generator"
 
         # Consume the generator
@@ -890,9 +890,7 @@ class TestCatalogDenormalize:
         ml_instance, dataset_description = catalog_with_datasets
         dataset = dataset_description.dataset
 
-        df = dataset.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "Subject"]
-        )
+        df = dataset.denormalize_as_dataframe(include_tables=["Image", "Observation", "Subject"])
 
         assert len(df) > 0
         for prefix in ["Image.", "Observation.", "Subject."]:
@@ -920,9 +918,7 @@ class TestCatalogDenormalize:
         ml_instance, dataset_description = catalog_with_datasets
         dataset = dataset_description.dataset
 
-        df = dataset.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "Subject"]
-        )
+        df = dataset.denormalize_as_dataframe(include_tables=["Image", "Observation", "Subject"])
 
         assert len(df) > 0
         for prefix in ["Image.", "Observation.", "Subject."]:
@@ -936,18 +932,14 @@ class TestCatalogDenormalize:
         current_version = dataset.current_version
 
         # Catalog-based
-        catalog_df = dataset.denormalize_as_dataframe(
-            include_tables=["Image", "Observation"]
-        )
+        catalog_df = dataset.denormalize_as_dataframe(include_tables=["Image", "Observation"])
 
         # Bag-based
         bag = dataset.download_dataset_bag(current_version, use_minid=False)
         bag_df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation"])
 
         # Same row count
-        assert len(catalog_df) == len(bag_df), (
-            f"Row count mismatch: catalog={len(catalog_df)}, bag={len(bag_df)}"
-        )
+        assert len(catalog_df) == len(bag_df), f"Row count mismatch: catalog={len(catalog_df)}, bag={len(bag_df)}"
 
         # Same Image RIDs (compare sets, ignoring order)
         catalog_rids = set(catalog_df["Image.RID"].dropna())
@@ -993,9 +985,7 @@ class TestMultiHopDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "Subject"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "Subject"])
 
         assert len(df) > 0
         for prefix in ["Image.", "Observation.", "Subject."]:
@@ -1013,9 +1003,7 @@ class TestMultiHopDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "ClinicalRecord"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "ClinicalRecord"])
 
         assert len(df) > 0
         cr_cols = [c for c in df.columns if c.startswith("ClinicalRecord.")]
@@ -1029,9 +1017,7 @@ class TestMultiHopDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Observation", "Image"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Observation", "Image"])
 
         assert len(df) > 0
         obs_cols = [c for c in df.columns if c.startswith("Observation.")]
@@ -1045,9 +1031,7 @@ class TestMultiHopDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "ClinicalRecord"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "ClinicalRecord"])
 
         assert len(df) > 0
         for prefix in ["Image.", "Observation.", "ClinicalRecord."]:
@@ -1085,9 +1069,7 @@ class TestMultiHopDenormalize:
         image_count = len(members.get("Image", []))
 
         df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation"])
-        assert len(df) == image_count, (
-            f"Row count ({len(df)}) should match Image member count ({image_count})"
-        )
+        assert len(df) == image_count, f"Row count ({len(df)}) should match Image member count ({image_count})"
 
     def test_null_fk_outer_join(self, dataset_test, tmp_path):
         """D3: Images with null Observation FK get null Observation columns."""
@@ -1150,12 +1132,8 @@ class TestMultiHopDenormalize:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Observation", "ClinicalRecord"]
-        )
-        assert len(df) == 0, (
-            "Should return empty result when no included table has dataset members"
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Observation", "ClinicalRecord"])
+        assert len(df) == 0, "Should return empty result when no included table has dataset members"
 
     def test_denormalize_matches_members(self, dataset_test, tmp_path):
         """C2: Denormalized RIDs match list_dataset_members for member tables."""
@@ -1218,9 +1196,7 @@ class TestAmbiguousPaths:
         # Direct path
         df_direct = bag.denormalize_as_dataframe(include_tables=["Image", "Subject"])
         # Explicit chain through Observation
-        df_chain = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "Subject"]
-        )
+        df_chain = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "Subject"])
         assert len(df_direct) > 0
         assert len(df_chain) > 0
         # Both should have Subject columns
@@ -1233,9 +1209,7 @@ class TestAmbiguousPaths:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "Subject"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "Subject"])
 
         assert len(df) > 0, "Should return rows after disambiguation"
 
@@ -1243,17 +1217,13 @@ class TestAmbiguousPaths:
             cols = [c for c in df.columns if c.startswith(prefix)]
             assert len(cols) > 0, f"Expected columns with prefix {prefix}"
 
-        if all(c in df.columns for c in ["Image.Observation", "Observation.RID",
-                                          "Observation.Subject", "Subject.RID"]):
-            valid = df.dropna(subset=["Image.Observation", "Observation.RID",
-                                       "Observation.Subject", "Subject.RID"])
+        if all(c in df.columns for c in ["Image.Observation", "Observation.RID", "Observation.Subject", "Subject.RID"]):
+            valid = df.dropna(subset=["Image.Observation", "Observation.RID", "Observation.Subject", "Subject.RID"])
             for _, row in valid.iterrows():
                 assert row["Image.Observation"] == row["Observation.RID"], (
                     "Image.Observation should match Observation.RID"
                 )
-                assert row["Observation.Subject"] == row["Subject.RID"], (
-                    "Observation.Subject should match Subject.RID"
-                )
+                assert row["Observation.Subject"] == row["Subject.RID"], "Observation.Subject should match Subject.RID"
 
     def test_disambiguation_produces_correct_data(self, dataset_test, tmp_path):
         """A2b: Disambiguated path returns correct Subject for each Image."""
@@ -1261,17 +1231,13 @@ class TestAmbiguousPaths:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "Subject"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "Subject"])
 
         if all(c in df.columns for c in ["Subject.RID", "Subject.Name"]):
             valid = df.dropna(subset=["Subject.RID", "Subject.Name"])
             assert len(valid) > 0, "Should have rows with Subject data"
             for _, row in valid.iterrows():
-                assert row["Subject.Name"].startswith("Thing"), (
-                    f"Unexpected Subject.Name: {row['Subject.Name']}"
-                )
+                assert row["Subject.Name"].startswith("Thing"), f"Unexpected Subject.Name: {row['Subject.Name']}"
 
     def test_direct_fk_no_ambiguity(self, dataset_test, tmp_path):
         """A3: Direct FK still works when no ambiguity exists."""
@@ -1291,9 +1257,7 @@ class TestAmbiguousPaths:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "ClinicalRecord"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "ClinicalRecord"])
         assert len(df) > 0
 
 
@@ -1348,14 +1312,11 @@ class TestNewFKPatterns:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Observation", "Subject"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Observation", "Subject"])
         assert len(df) > 0, "Should return rows with all three tables"
 
         # Verify the multi-hop chain is used (not the direct FK)
-        required_cols = ["Image.Observation", "Observation.RID",
-                         "Observation.Subject", "Subject.RID"]
+        required_cols = ["Image.Observation", "Observation.RID", "Observation.Subject", "Subject.RID"]
         if all(c in df.columns for c in required_cols):
             valid = df.dropna(subset=required_cols)
             for _, row in valid.iterrows():
@@ -1379,7 +1340,9 @@ class TestNewFKPatterns:
     # Association table as mandatory intermediate
     # -------------------------------------------------------------------------
 
-    @pytest.mark.xfail(reason="Pending join tree refactoring — association table must be joined through as implicit intermediate")
+    @pytest.mark.xfail(
+        reason="Pending join tree refactoring — association table must be joined through as implicit intermediate"
+    )
     def test_association_mandatory_intermediate(self, dataset_test, tmp_path):
         """Association: Image→ClinicalRecord requires two implicit intermediates.
 
@@ -1397,9 +1360,7 @@ class TestNewFKPatterns:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "ClinicalRecord"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "ClinicalRecord"])
 
         assert len(df) > 0, "Expected rows — Image is a dataset member"
 
@@ -1418,9 +1379,7 @@ class TestNewFKPatterns:
         # At least some rows should have non-null ClinicalRecord data
         if "ClinicalRecord.RID" in df.columns:
             non_null = df["ClinicalRecord.RID"].notna().sum()
-            assert non_null > 0, (
-                "ClinicalRecord.RID should be populated via association table join"
-            )
+            assert non_null > 0, "ClinicalRecord.RID should be populated via association table join"
 
     # -------------------------------------------------------------------------
     # Nullable FK preserves all rows (LEFT JOIN semantics)
@@ -1507,9 +1466,7 @@ class TestNewFKPatterns:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["Image", "Execution_Image_Quality"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["Image", "Execution_Image_Quality"])
 
         assert len(df) > 0, "Expected rows from Image + feature table denormalization"
 

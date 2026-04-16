@@ -14,7 +14,6 @@ from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 logger = logging.getLogger(__name__)
 
 try:
-
     from icecream import ic
 
     ic.configureOutput(
@@ -331,6 +330,7 @@ class CatalogGraph:
             A dict with a ``"detailed"`` key containing the ordered list of
             foreign key source specifications for Chaise.
         """
+
         def fkey_name(fk):
             return [fk.name[0].name, fk.name[1]]
 
@@ -439,7 +439,8 @@ class CatalogGraph:
                 if self._ml_instance.model.is_vocabulary(table)
             }
             included_associations = [
-                a.table for a in dataset_table.find_associations()
+                a.table
+                for a in dataset_table.find_associations()
                 if any(fk.pk_table in dataset_elements for fk in a.other_fkeys)
                 or any(fk.pk_table in vocab_tables for fk in a.other_fkeys)
             ]
@@ -470,9 +471,7 @@ class CatalogGraph:
             paths = {p for p in paths if p[-1] not in vocab_tables}
 
             # Add feature table paths for member element types reachable via paths.
-            reachable_element_types = {
-                table for path in paths for table in path if table in all_element_types
-            }
+            reachable_element_types = {table for path in paths for table in path if table in all_element_types}
             for element_table in reachable_element_types:
                 for feature in self._ml_instance.find_features(element_table):
                     for path in paths.copy():
@@ -545,6 +544,7 @@ class CatalogGraph:
             pathBuilder object and *root_pb_table* is the pathBuilder table
             for the first table in the path.
         """
+
         def _pb_table(table: Table):
             return pb.schemas[table.schema.name].tables[table.name]
 
@@ -576,9 +576,7 @@ class CatalogGraph:
                 result = result & cond
             return result
 
-        dd_table = _pb_table(
-            self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"]
-        )
+        dd_table = _pb_table(self._ml_instance.model.schemas[self._ml_schema].tables["Dataset_Dataset"])
 
         ds_pb = _pb_table(path[0])
         dp = root_dp if root_dp is not None else ds_pb
@@ -631,7 +629,7 @@ class CatalogGraph:
             uri = dp.uri
             entity_prefix = "/entity/"
             idx = uri.index(entity_prefix)
-            entity_path = uri[idx + len(entity_prefix):]
+            entity_path = uri[idx + len(entity_prefix) :]
 
             parts = entity_path.split("/", 1)
             if len(parts) == 1:

@@ -57,11 +57,13 @@ class TestForeignKeyOrderer:
 
     def test_simple_linear_order(self):
         """Test linear FK chain: C -> B -> A."""
-        model = _make_mock_model({
-            "A": [],
-            "B": ["A"],
-            "C": ["B"],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": ["A"],
+                "C": ["B"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         result = orderer.get_insertion_order()
         names = [t.name for t in result]
@@ -72,21 +74,25 @@ class TestForeignKeyOrderer:
 
     def test_no_dependencies(self):
         """Test tables with no FK relationships."""
-        model = _make_mock_model({
-            "A": [],
-            "B": [],
-            "C": [],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": [],
+                "C": [],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         result = orderer.get_insertion_order()
         assert len(result) == 3
 
     def test_simple_two_node_cycle(self):
         """Test breaking a simple A <-> B cycle."""
-        model = _make_mock_model({
-            "A": ["B"],
-            "B": ["A"],
-        })
+        model = _make_mock_model(
+            {
+                "A": ["B"],
+                "B": ["A"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         result = orderer.get_insertion_order(handle_cycles=True)
         names = [t.name for t in result]
@@ -96,11 +102,13 @@ class TestForeignKeyOrderer:
 
     def test_three_node_cycle(self):
         """Test breaking a 3-node cycle: A -> B -> C -> A."""
-        model = _make_mock_model({
-            "A": ["B"],
-            "B": ["C"],
-            "C": ["A"],
-        })
+        model = _make_mock_model(
+            {
+                "A": ["B"],
+                "B": ["C"],
+                "C": ["A"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         result = orderer.get_insertion_order(handle_cycles=True)
         names = [t.name for t in result]
@@ -114,11 +122,13 @@ class TestForeignKeyOrderer:
         This mirrors the real-world Dataset/Dataset_Version cycle:
         Dataset <-> Dataset_Version, with Other_Table depending on Dataset.
         """
-        model = _make_mock_model({
-            "Dataset": ["Dataset_Version"],
-            "Dataset_Version": ["Dataset"],
-            "Other_Table": ["Dataset"],
-        })
+        model = _make_mock_model(
+            {
+                "Dataset": ["Dataset_Version"],
+                "Dataset_Version": ["Dataset"],
+                "Other_Table": ["Dataset"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         result = orderer.get_insertion_order(handle_cycles=True)
         names = [t.name for t in result]
@@ -130,13 +140,15 @@ class TestForeignKeyOrderer:
 
     def test_two_separate_cycles(self):
         """Test breaking two independent cycles in the same graph."""
-        model = _make_mock_model({
-            "A": ["B"],
-            "B": ["C"],
-            "C": ["A"],
-            "D": ["E"],
-            "E": ["D"],
-        })
+        model = _make_mock_model(
+            {
+                "A": ["B"],
+                "B": ["C"],
+                "C": ["A"],
+                "D": ["E"],
+                "E": ["D"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         result = orderer.get_insertion_order(handle_cycles=True)
         names = [t.name for t in result]
@@ -146,10 +158,12 @@ class TestForeignKeyOrderer:
 
     def test_cycle_raises_when_handle_cycles_false(self):
         """Test that CycleError is raised when handle_cycles=False."""
-        model = _make_mock_model({
-            "A": ["B"],
-            "B": ["A"],
-        })
+        model = _make_mock_model(
+            {
+                "A": ["B"],
+                "B": ["A"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
 
         with pytest.raises(CycleError):
@@ -157,10 +171,12 @@ class TestForeignKeyOrderer:
 
     def test_self_reference_ignored(self):
         """Test that self-referencing FKs are not included as dependencies."""
-        model = _make_mock_model({
-            "Tree": ["Tree"],  # Self-referencing FK (parent_id)
-            "Leaf": ["Tree"],
-        })
+        model = _make_mock_model(
+            {
+                "Tree": ["Tree"],  # Self-referencing FK (parent_id)
+                "Leaf": ["Tree"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         result = orderer.get_insertion_order()
         names = [t.name for t in result]
@@ -169,11 +185,13 @@ class TestForeignKeyOrderer:
 
     def test_deletion_order_is_reversed(self):
         """Test that deletion order is reverse of insertion order."""
-        model = _make_mock_model({
-            "A": [],
-            "B": ["A"],
-            "C": ["B"],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": ["A"],
+                "C": ["B"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         insertion = orderer.get_insertion_order()
         deletion = orderer.get_deletion_order()
@@ -182,11 +200,13 @@ class TestForeignKeyOrderer:
 
     def test_get_dependencies(self):
         """Test getting dependencies for a single table."""
-        model = _make_mock_model({
-            "A": [],
-            "B": ["A"],
-            "C": ["A", "B"],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": ["A"],
+                "C": ["A", "B"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         deps = orderer.get_dependencies("C")
         dep_names = {t.name for t in deps}
@@ -195,12 +215,14 @@ class TestForeignKeyOrderer:
 
     def test_get_dependents(self):
         """Test getting tables that depend on a given table."""
-        model = _make_mock_model({
-            "A": [],
-            "B": ["A"],
-            "C": ["A"],
-            "D": ["B"],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": ["A"],
+                "C": ["A"],
+                "D": ["B"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         dependents = orderer.get_dependents("A")
         dep_names = {t.name for t in dependents}
@@ -209,11 +231,13 @@ class TestForeignKeyOrderer:
 
     def test_validate_insertion_order_valid(self):
         """Test validation passes for correct insertion order."""
-        model = _make_mock_model({
-            "A": [],
-            "B": ["A"],
-            "C": ["B"],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": ["A"],
+                "C": ["B"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         violations = orderer.validate_insertion_order(["A", "B", "C"])
 
@@ -221,11 +245,13 @@ class TestForeignKeyOrderer:
 
     def test_validate_insertion_order_invalid(self):
         """Test validation catches wrong insertion order."""
-        model = _make_mock_model({
-            "A": [],
-            "B": ["A"],
-            "C": ["B"],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": ["A"],
+                "C": ["B"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         violations = orderer.validate_insertion_order(["C", "B", "A"])
 
@@ -234,11 +260,13 @@ class TestForeignKeyOrderer:
 
     def test_find_cycles(self):
         """Test cycle detection."""
-        model = _make_mock_model({
-            "A": ["B"],
-            "B": ["A"],
-            "C": [],
-        })
+        model = _make_mock_model(
+            {
+                "A": ["B"],
+                "B": ["A"],
+                "C": [],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         cycles = orderer.find_cycles()
 
@@ -252,12 +280,14 @@ class TestForeignKeyOrderer:
 
     def test_subset_ordering(self):
         """Test ordering a subset of tables."""
-        model = _make_mock_model({
-            "A": [],
-            "B": ["A"],
-            "C": ["B"],
-            "D": ["A"],
-        })
+        model = _make_mock_model(
+            {
+                "A": [],
+                "B": ["A"],
+                "C": ["B"],
+                "D": ["A"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         # Only order A and C (B is between them but not included)
         result = orderer.get_insertion_order(["A", "C"])
@@ -279,10 +309,12 @@ class TestBreakCyclesRegression:
 
     def test_no_infinite_recursion_on_simple_cycle(self):
         """Regression: simple cycle must not cause infinite recursion."""
-        model = _make_mock_model({
-            "Dataset": ["Dataset_Version"],
-            "Dataset_Version": ["Dataset"],
-        })
+        model = _make_mock_model(
+            {
+                "Dataset": ["Dataset_Version"],
+                "Dataset_Version": ["Dataset"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         # This used to cause RecursionError
         result = orderer.get_insertion_order(handle_cycles=True)
@@ -290,36 +322,40 @@ class TestBreakCyclesRegression:
 
     def test_no_infinite_recursion_on_complex_graph(self):
         """Regression: complex graph with cycles must not cause infinite recursion."""
-        model = _make_mock_model({
-            "Dataset": ["Dataset_Version", "Dataset_Type"],
-            "Dataset_Version": ["Dataset"],
-            "Dataset_Type": [],
-            "Dataset_Member": ["Dataset", "Dataset_Version"],
-            "Image": [],
-            "Subject": [],
-        })
+        model = _make_mock_model(
+            {
+                "Dataset": ["Dataset_Version", "Dataset_Type"],
+                "Dataset_Version": ["Dataset"],
+                "Dataset_Type": [],
+                "Dataset_Member": ["Dataset", "Dataset_Version"],
+                "Image": [],
+                "Subject": [],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         # This used to cause RecursionError
         result = orderer.get_insertion_order(handle_cycles=True)
         names = [t.name for t in result]
 
-        assert set(names) == {"Dataset", "Dataset_Version", "Dataset_Type",
-                              "Dataset_Member", "Image", "Subject"}
+        assert set(names) == {"Dataset", "Dataset_Version", "Dataset_Type", "Dataset_Member", "Image", "Subject"}
         # Dataset_Type must come before Dataset
         assert names.index("Dataset_Type") < names.index("Dataset")
 
     def test_max_depth_safety(self):
         """Test that the max depth safety guard works."""
-        model = _make_mock_model({
-            "A": ["B"],
-            "B": ["A"],
-        })
+        model = _make_mock_model(
+            {
+                "A": ["B"],
+                "B": ["A"],
+            }
+        )
         orderer = ForeignKeyOrderer(model, schemas=["test"])
         graph = orderer._build_dependency_graph()
 
         # Simulate a broken CycleError that can't be resolved
         # by passing an empty cycle
         from graphlib import CycleError
+
         error = CycleError("nodes are in a cycle", [])
         # Should not infinite-recurse due to max depth guard
         result = orderer._break_cycles_and_sort(graph, error, _depth=999)

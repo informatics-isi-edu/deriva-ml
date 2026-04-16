@@ -8,6 +8,7 @@ except ImportError:
 from deriva_ml.dataset.aux_classes import DatasetVersion, VersionPart
 from deriva_ml.execution.execution import ExecutionConfiguration
 
+
 class TestDatasetVersion:
     def test_dataset_version_simple(self, test_ml):
         ml_instance = test_ml

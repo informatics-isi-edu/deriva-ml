@@ -74,9 +74,14 @@ class TestSchemaToPathsBenchmark:
         assert "Dataset -> Dataset_Image -> Image -> Subject" in sigs
         assert "Dataset -> Dataset_Image -> Image -> Observation" in sigs
         assert "Dataset -> Dataset_Image -> Image -> Observation -> Subject" in sigs
-        assert "Dataset -> Dataset_Image -> Image -> Observation -> ClinicalRecord_Observation -> ClinicalRecord" in sigs
+        assert (
+            "Dataset -> Dataset_Image -> Image -> Observation -> ClinicalRecord_Observation -> ClinicalRecord" in sigs
+        )
         assert "Dataset -> Dataset_Image -> Image -> Subject -> Observation" in sigs
-        assert "Dataset -> Dataset_Image -> Image -> Subject -> Observation -> ClinicalRecord_Observation -> ClinicalRecord" in sigs
+        assert (
+            "Dataset -> Dataset_Image -> Image -> Subject -> Observation -> ClinicalRecord_Observation -> ClinicalRecord"
+            in sigs
+        )
 
     def test_domain_paths_via_dataset_subject(self, dataset_test, tmp_path):
         """Paths from Dataset through Dataset_Subject element."""
@@ -90,7 +95,10 @@ class TestSchemaToPathsBenchmark:
         # Core domain paths through Dataset_Subject
         assert "Dataset -> Dataset_Subject -> Subject" in sigs
         assert "Dataset -> Dataset_Subject -> Subject -> Observation" in sigs
-        assert "Dataset -> Dataset_Subject -> Subject -> Observation -> ClinicalRecord_Observation -> ClinicalRecord" in sigs
+        assert (
+            "Dataset -> Dataset_Subject -> Subject -> Observation -> ClinicalRecord_Observation -> ClinicalRecord"
+            in sigs
+        )
         assert "Dataset -> Dataset_Subject -> Subject -> Image" in sigs
         assert "Dataset -> Dataset_Subject -> Subject -> Image -> Observation" in sigs
 
@@ -107,7 +115,10 @@ class TestSchemaToPathsBenchmark:
         assert "Dataset -> Image_Dataset_Legacy -> Image" in sigs
         assert "Dataset -> Image_Dataset_Legacy -> Image -> Subject" in sigs
         assert "Dataset -> Image_Dataset_Legacy -> Image -> Observation" in sigs
-        assert "Dataset -> Image_Dataset_Legacy -> Image -> Observation -> ClinicalRecord_Observation -> ClinicalRecord" in sigs
+        assert (
+            "Dataset -> Image_Dataset_Legacy -> Image -> Observation -> ClinicalRecord_Observation -> ClinicalRecord"
+            in sigs
+        )
 
     def test_feature_table_paths(self, dataset_test, tmp_path):
         """Feature tables are traversed as intermediate nodes."""
@@ -151,9 +162,7 @@ class TestSchemaToPathsBenchmark:
         # Verify cycle avoidance: no path should contain Dataset twice
         for p in paths:
             names = [t.name for t in p]
-            assert names.count("Dataset") <= 1, (
-                f"Cycle detected — Dataset appears twice in path: {' -> '.join(names)}"
-            )
+            assert names.count("Dataset") <= 1, f"Cycle detected — Dataset appears twice in path: {' -> '.join(names)}"
 
     def test_vocabulary_termination(self, dataset_test, tmp_path):
         """Paths terminate at vocabulary tables (no traversal out of vocabs)."""
@@ -163,16 +172,22 @@ class TestSchemaToPathsBenchmark:
         )
         paths = bag.model._schema_to_paths()
 
-        vocab_tables = {"Dataset_Type", "Asset_Type", "Asset_Role", "Feature_Name",
-                        "ImageQuality", "SubjectHealth", "Workflow_Type"}
+        vocab_tables = {
+            "Dataset_Type",
+            "Asset_Type",
+            "Asset_Role",
+            "Feature_Name",
+            "ImageQuality",
+            "SubjectHealth",
+            "Workflow_Type",
+        }
 
         for p in paths:
             for i, table in enumerate(p):
                 if table.name in vocab_tables and i < len(p) - 1:
                     # Vocab table should only appear as the LAST table in a path
                     pytest.fail(
-                        f"Vocabulary table {table.name} is not terminal in path: "
-                        f"{' -> '.join(t.name for t in p)}"
+                        f"Vocabulary table {table.name} is not terminal in path: {' -> '.join(t.name for t in p)}"
                     )
 
     def test_mn_association_traversal(self, dataset_test, tmp_path):
@@ -185,7 +200,11 @@ class TestSchemaToPathsBenchmark:
         sigs = path_signatures(paths)
 
         # ClinicalRecord is only reachable via ClinicalRecord_Observation (M:N)
-        cr_paths = [s for s in sigs if "ClinicalRecord" in s and "ClinicalRecord_Observation" not in s.split(" -> ClinicalRecord")[0]]
+        cr_paths = [
+            s
+            for s in sigs
+            if "ClinicalRecord" in s and "ClinicalRecord_Observation" not in s.split(" -> ClinicalRecord")[0]
+        ]
         # All paths to ClinicalRecord must go through ClinicalRecord_Observation
         for s in sigs:
             if s.endswith("ClinicalRecord"):
@@ -228,10 +247,7 @@ class TestSchemaToPathsBenchmark:
                 # Execution can appear as endpoint of Dataset_Execution path
                 idx = names.index("Execution")
                 if idx > 0 and names[idx - 1] != "Dataset_Execution":
-                    pytest.fail(
-                        f"Execution appears as non-terminal traversal node: "
-                        f"{' -> '.join(names)}"
-                    )
+                    pytest.fail(f"Execution appears as non-terminal traversal node: {' -> '.join(names)}")
 
     def test_exclude_tables(self, dataset_test, tmp_path):
         """exclude_tables parameter prunes all paths through excluded table."""
@@ -248,23 +264,17 @@ class TestSchemaToPathsBenchmark:
 
         # Observation should not appear in any excluded path (except as root, which won't happen)
         for s in excluded_sigs:
-            assert "Observation" not in s.split(" -> "), (
-                f"Excluded table Observation found in path: {s}"
-            )
+            assert "Observation" not in s.split(" -> "), f"Excluded table Observation found in path: {s}"
 
         # Paths that went through Observation should be gone
         obs_paths = {s for s in all_sigs if "Observation" in s.split(" -> ")}
         assert len(obs_paths) > 0, "Expected some paths through Observation"
-        assert obs_paths.isdisjoint(excluded_sigs), (
-            f"Observation paths survived exclusion: {obs_paths & excluded_sigs}"
-        )
+        assert obs_paths.isdisjoint(excluded_sigs), f"Observation paths survived exclusion: {obs_paths & excluded_sigs}"
 
         # But paths that don't go through Observation should still exist
         non_obs_paths = all_sigs - obs_paths
         # Some non-obs paths should survive (e.g., Dataset -> Dataset_Image -> Image -> Subject)
-        assert len(excluded_sigs & non_obs_paths) > 0, (
-            "Non-Observation paths should survive exclusion"
-        )
+        assert len(excluded_sigs & non_obs_paths) > 0, "Non-Observation paths should survive exclusion"
 
     def test_total_path_count(self, dataset_test, tmp_path):
         """Sanity check: total path count for the demo schema.
@@ -292,9 +302,7 @@ class TestSchemaToPathsBenchmark:
         paths = bag.model._schema_to_paths()
         sigs = [path_signature(p) for p in paths]
 
-        assert len(sigs) == len(set(sigs)), (
-            f"Duplicate paths found: {[s for s in sigs if sigs.count(s) > 1]}"
-        )
+        assert len(sigs) == len(set(sigs)), f"Duplicate paths found: {[s for s in sigs if sigs.count(s) > 1]}"
 
     def test_asset_table_paths(self, dataset_test, tmp_path):
         """Asset tables (Image, BoundingBox, Report) are traversed with their metadata."""
@@ -315,7 +323,10 @@ class TestSchemaToPathsBenchmark:
 
         # BoundingBox asset (reached via feature table)
         assert "Dataset -> Dataset_Image -> Image -> Execution_Image_BoundingBox -> BoundingBox" in sigs
-        assert "Dataset -> Dataset_Image -> Image -> Execution_Image_BoundingBox -> BoundingBox -> BoundingBox_Asset_Type -> Asset_Type" in sigs
+        assert (
+            "Dataset -> Dataset_Image -> Image -> Execution_Image_BoundingBox -> BoundingBox -> BoundingBox_Asset_Type -> Asset_Type"
+            in sigs
+        )
 
         # Report asset (null URLs) and downstream OCR_Report
         assert "Dataset -> Dataset_Subject -> Subject -> Observation -> Report" in sigs

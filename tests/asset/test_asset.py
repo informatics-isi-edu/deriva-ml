@@ -359,9 +359,7 @@ class TestUploadStaging:
     order as asset_table_upload_spec's regex pattern expects.
     """
 
-    def test_staging_metadata_order_matches_regex(
-        self, workflow_terms, basic_execution, tmp_path
-    ):
+    def test_staging_metadata_order_matches_regex(self, workflow_terms, basic_execution, tmp_path):
         """Verify staging dirs match the upload regex pattern order.
 
         The staging directory path must be:
@@ -379,8 +377,7 @@ class TestUploadStaging:
             path = exe.asset_file_path(
                 "Image",
                 "test_staging.txt",
-                metadata={"Subject": "FAKE_RID", "Acquisition_Date": "2026-01-01",
-                          "Acquisition_Time": "12:00:00"},
+                metadata={"Subject": "FAKE_RID", "Acquisition_Date": "2026-01-01", "Acquisition_Time": "12:00:00"},
             )
             path.write_text("staging test content")
 
@@ -398,11 +395,7 @@ class TestUploadStaging:
         full_path = str(staged_files[0])
 
         match = re.search(regex, full_path)
-        assert match is not None, (
-            f"Staged path does not match upload regex.\n"
-            f"  Path:  {full_path}\n"
-            f"  Regex: {regex}"
-        )
+        assert match is not None, f"Staged path does not match upload regex.\n  Path:  {full_path}\n  Regex: {regex}"
 
         # Verify captured metadata values are correct
         assert match.group("Subject") == "FAKE_RID"

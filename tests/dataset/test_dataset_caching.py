@@ -27,9 +27,7 @@ from tests.catalog_manager import CatalogManager
 class TestDownloadCacheLifecycle:
     """Integration tests for the full download → cache → re-use lifecycle."""
 
-    def test_fresh_download_creates_cache(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_fresh_download_creates_cache(self, catalog_manager: CatalogManager, tmp_path: Path):
         """First download creates a cache entry that bag_info can find."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -49,9 +47,7 @@ class TestDownloadCacheLifecycle:
         assert info_after["status"] == CacheStatus.cached_materialized.value
         assert info_after["cache_path"] is not None
 
-    def test_redownload_uses_cache(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_redownload_uses_cache(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Second download of the same version uses cache (no re-export)."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -75,35 +71,27 @@ class TestDownloadCacheLifecycle:
         info2 = dataset.bag_info(version=version)
         assert info2["status"] == CacheStatus.cached_materialized.value
 
-    def test_materialized_download(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_materialized_download(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Download with materialize=True results in cached_materialized status."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
         version = dataset.current_version
 
-        bag = dataset.download_dataset_bag(
-            version=version, use_minid=False, materialize=True
-        )
+        bag = dataset.download_dataset_bag(version=version, use_minid=False, materialize=True)
         assert bag is not None
 
         info = dataset.bag_info(version=version)
         assert info["status"] == CacheStatus.cached_materialized.value
 
-    def test_non_materialized_download(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_non_materialized_download(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Download with materialize=False results in cached_metadata_only status."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
         version = dataset.current_version
 
-        bag = dataset.download_dataset_bag(
-            version=version, use_minid=False, materialize=False
-        )
+        bag = dataset.download_dataset_bag(version=version, use_minid=False, materialize=False)
         assert bag is not None
 
         info = dataset.bag_info(version=version)
@@ -113,9 +101,7 @@ class TestDownloadCacheLifecycle:
             CacheStatus.cached_materialized.value,  # May be materialized if no fetch.txt entries
         )
 
-    def test_non_default_cache_directory(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_non_default_cache_directory(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Download to a non-default cache directory stores bag there."""
         catalog_manager.reset()
         ml_default, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -147,9 +133,7 @@ class TestDownloadCacheLifecycle:
 class TestCacheWarmingAPI:
     """Tests for cache() / prefetch() and bag_info() methods."""
 
-    def test_cache_warms_without_execution(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_cache_warms_without_execution(self, catalog_manager: CatalogManager, tmp_path: Path):
         """cache() downloads the bag without creating an execution record."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -158,9 +142,7 @@ class TestCacheWarmingAPI:
 
         # Count executions before
         pb = ml.pathBuilder()
-        executions_before = len(list(
-            pb.schemas["deriva-ml"].tables["Execution"].path.entities().fetch()
-        ))
+        executions_before = len(list(pb.schemas["deriva-ml"].tables["Execution"].path.entities().fetch()))
 
         # Warm cache
         result = dataset.cache(version=version)
@@ -170,14 +152,10 @@ class TestCacheWarmingAPI:
 
         # Count executions after — should not have created a new one
         # (the MCP workflow execution from catalog setup doesn't count)
-        executions_after = len(list(
-            pb.schemas["deriva-ml"].tables["Execution"].path.entities().fetch()
-        ))
+        executions_after = len(list(pb.schemas["deriva-ml"].tables["Execution"].path.entities().fetch()))
         assert executions_after == executions_before
 
-    def test_bag_info_returns_size_and_status(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_bag_info_returns_size_and_status(self, catalog_manager: CatalogManager, tmp_path: Path):
         """bag_info() returns both size estimates and cache status."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -199,9 +177,7 @@ class TestCacheWarmingAPI:
         # Before download, should be not_cached
         assert info["status"] == CacheStatus.not_cached.value
 
-    def test_bag_info_after_cache(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_bag_info_after_cache(self, catalog_manager: CatalogManager, tmp_path: Path):
         """bag_info() reflects cached status after cache() call."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -216,9 +192,7 @@ class TestCacheWarmingAPI:
         assert info["status"] == CacheStatus.cached_materialized.value
         assert info["cache_path"] is not None
 
-    def test_prefetch_is_alias_for_cache(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_prefetch_is_alias_for_cache(self, catalog_manager: CatalogManager, tmp_path: Path):
         """prefetch() is a backward-compatible alias for cache()."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -232,9 +206,7 @@ class TestCacheWarmingAPI:
 class TestMultiVersionCache:
     """Tests for caching multiple versions of the same dataset."""
 
-    def test_different_versions_cached_separately(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_different_versions_cached_separately(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Different versions of the same dataset have separate cache entries."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -246,10 +218,7 @@ class TestMultiVersionCache:
 
         # Create v2 by adding members
         pb = ml.pathBuilder()
-        subjects = [
-            s["RID"]
-            for s in pb.schemas[ml.default_schema].tables["Subject"].path.entities().fetch()
-        ]
+        subjects = [s["RID"] for s in pb.schemas[ml.default_schema].tables["Subject"].path.entities().fetch()]
         if len(subjects) >= 2:
             dataset.add_dataset_members(subjects[-2:])
         v2 = dataset.current_version
@@ -282,14 +251,10 @@ class TestCacheStatusTransitions:
         bag_dir = tmp_path / f"{rid}_checksum123"
         bag_path = bag_dir / f"Dataset_{rid}"
         bag_path.mkdir(parents=True)
-        (bag_path / "bagit.txt").write_text(
-            "BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n"
-        )
+        (bag_path / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
         (bag_path / "data").mkdir()
         (bag_path / "manifest-sha256.txt").write_text("")
-        (bag_path / "fetch.txt").write_text(
-            "https://example.com/file.dat\t100\tdata/file.dat\n"
-        )
+        (bag_path / "fetch.txt").write_text("https://example.com/file.dat\t100\tdata/file.dat\n")
 
         # Now: metadata only
         assert cache.cache_status(rid)["status"] == CacheStatus.cached_metadata_only.value
@@ -326,17 +291,13 @@ class TestCacheStatusTransitions:
         bag_dir = tmp_path / f"{rid}_checksum123"
         bag_path = bag_dir / f"Dataset_{rid}"
         bag_path.mkdir(parents=True)
-        (bag_path / "bagit.txt").write_text(
-            "BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n"
-        )
+        (bag_path / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
         data_dir = bag_path / "data"
         data_dir.mkdir()
 
         # Create a file, then add fetch.txt referencing another file that's missing
         data_dir.joinpath("present.dat").write_text("here")
-        (bag_path / "fetch.txt").write_text(
-            "https://example.com/missing.dat\t100\tdata/missing.dat\n"
-        )
+        (bag_path / "fetch.txt").write_text("https://example.com/missing.dat\t100\tdata/missing.dat\n")
         (bag_path / "manifest-sha256.txt").write_text("")
 
         # Mark as validated but file is missing

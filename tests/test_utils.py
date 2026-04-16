@@ -105,8 +105,12 @@ class MLDatasetCatalog:
             "Demo Catalog Creation",
             description="A Workflow that creates a new catalog and populates it with demo data.",
         )
-        populate_workflow = self.ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
-        execution = self.ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+        populate_workflow = self.ml_instance.create_workflow(
+            name="Demo Creation", workflow_type="Demo Catalog Creation"
+        )
+        execution = self.ml_instance.create_execution(
+            workflow=populate_workflow, configuration=ExecutionConfiguration()
+        )
         with execution.execute() as exe:
             populate_demo_catalog(exe)
             create_demo_features(exe)
@@ -114,7 +118,7 @@ class MLDatasetCatalog:
 
     def cleanup(self):
         """Clean up the temporary directory."""
-        if hasattr(self, '_tmpdir'):
+        if hasattr(self, "_tmpdir"):
             self._tmpdir.cleanup()
 
     def list_datasets(self, dataset_description: DatasetDescription) -> list[DatasetDescription]:
@@ -140,8 +144,12 @@ class MLDatasetCatalog:
         """Reset the demo catalog to a clean state."""
         self.catalog.reset_demo_catalog()
         # Reuse the existing ml_instance and its working directory
-        populate_workflow = self.ml_instance.create_workflow(name="Demo Creation", workflow_type="Demo Catalog Creation")
-        execution = self.ml_instance.create_execution(workflow=populate_workflow, configuration=ExecutionConfiguration())
+        populate_workflow = self.ml_instance.create_workflow(
+            name="Demo Creation", workflow_type="Demo Catalog Creation"
+        )
+        execution = self.ml_instance.create_execution(
+            workflow=populate_workflow, configuration=ExecutionConfiguration()
+        )
         with execution.execute() as exe:
             self.dataset_description: DatasetDescription = create_demo_datasets(exe)
 

@@ -12,6 +12,7 @@ try:
 except ImportError:
     ic = lambda *a, **kw: None
 
+
 class TestDataBaseModel:
     def make_frozen(self, e) -> frozenset:
         e.pop("RMT")
@@ -188,9 +189,7 @@ class TestDataBaseModel:
         explicit_image_rids = [image_for_a[0]["RID"], image_for_c[0]["RID"]]
 
         # Create the dataset
-        workflow = ml_instance.create_workflow(
-            name="FK Traversal Test", workflow_type="Test Workflow"
-        )
+        workflow = ml_instance.create_workflow(name="FK Traversal Test", workflow_type="Test Workflow")
         config = ExecutionConfiguration(workflow=workflow)
         with ml_instance.create_execution(config) as execution:
             dataset = execution.create_dataset(

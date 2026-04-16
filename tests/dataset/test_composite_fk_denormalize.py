@@ -108,11 +108,7 @@ class TestCompositeFKDenormalize:
         domain = pb.schemas[ml.default_schema]
 
         # Insert Group
-        groups = list(
-            domain.tables["Group"].insert(
-                [{"Name": "Alpha"}, {"Name": "Beta"}]
-            )
-        )
+        groups = list(domain.tables["Group"].insert([{"Name": "Alpha"}, {"Name": "Beta"}]))
         group_a_rid = groups[0]["RID"]
         group_b_rid = groups[1]["RID"]
 
@@ -231,9 +227,7 @@ class TestCompositeFKDenormalize:
         parent_names = set(df["Parent.Name"].tolist())
         assert parent_names == {"Parent1", "Parent2"}
 
-    def test_denormalize_three_table_chain_with_composite_fk(
-        self, test_ml: DerivaML, tmp_path
-    ):
+    def test_denormalize_three_table_chain_with_composite_fk(self, test_ml: DerivaML, tmp_path):
         """Denormalize through a chain: Child →(composite FK)→ Parent →(simple FK)→ Group.
 
         Tests that composite FKs don't break multi-hop denormalization.
@@ -249,17 +243,14 @@ class TestCompositeFKDenormalize:
         # Denormalize all three tables
         df = bag.denormalize_as_dataframe(include_tables=["Child", "Parent", "Group"])
         assert len(df) == 3, (
-            f"Expected 3 rows for 3-table chain, got {len(df)}. "
-            "Composite FK may be breaking the multi-hop join."
+            f"Expected 3 rows for 3-table chain, got {len(df)}. Composite FK may be breaking the multi-hop join."
         )
 
         # Verify Group names are present
         group_names = set(df["Group.Name"].tolist())
         assert group_names == {"Alpha", "Beta"}
 
-    def test_bag_export_populates_parent_table_via_composite_fk(
-        self, test_ml: DerivaML, tmp_path
-    ):
+    def test_bag_export_populates_parent_table_via_composite_fk(self, test_ml: DerivaML, tmp_path):
         """Bag export must follow composite FK paths to populate parent tables.
 
         The bag should contain Parent rows that are reachable via composite FK

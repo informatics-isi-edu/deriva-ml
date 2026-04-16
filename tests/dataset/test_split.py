@@ -27,6 +27,7 @@ from deriva_ml.execution import ExecutionConfiguration
 
 try:
     import sklearn  # noqa: F401
+
     HAS_SKLEARN = True
 except ImportError:
     HAS_SKLEARN = False
@@ -275,10 +276,12 @@ class TestStratifiedSplit:
 
     def test_correct_sizes(self):
         """Test that output arrays have correct sizes."""
-        df = pd.DataFrame({
-            "label": ["A"] * 50 + ["B"] * 50,
-            "value": range(100),
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 50 + ["B"] * 50,
+                "value": range(100),
+            }
+        )
         selector = stratified_split("label")
         result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
         assert len(result["Training"]) == 70
@@ -286,10 +289,12 @@ class TestStratifiedSplit:
 
     def test_maintains_distribution(self):
         """Test that class distribution is preserved."""
-        df = pd.DataFrame({
-            "label": ["A"] * 60 + ["B"] * 40,
-            "value": range(100),
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 60 + ["B"] * 40,
+                "value": range(100),
+            }
+        )
         selector = stratified_split("label")
         result = selector(df, partition_sizes={"Training": 80, "Testing": 20}, seed=42)
 
@@ -304,18 +309,22 @@ class TestStratifiedSplit:
 
     def test_no_overlap(self):
         """Test that train and test indices don't overlap."""
-        df = pd.DataFrame({
-            "label": ["A"] * 50 + ["B"] * 50,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 50 + ["B"] * 50,
+            }
+        )
         selector = stratified_split("label")
         result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
         assert len(set(result["Training"]) & set(result["Testing"])) == 0
 
     def test_deterministic(self):
         """Test that same seed produces same result."""
-        df = pd.DataFrame({
-            "label": ["A"] * 50 + ["B"] * 50,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 50 + ["B"] * 50,
+            }
+        )
         selector = stratified_split("label")
         r1 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
         r2 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
@@ -338,9 +347,11 @@ class TestStratifiedSplit:
 
     def test_subset_of_total(self):
         """Test stratified split with fewer samples than total."""
-        df = pd.DataFrame({
-            "label": ["A"] * 50 + ["B"] * 50,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 50 + ["B"] * 50,
+            }
+        )
         selector = stratified_split("label")
         result = selector(df, partition_sizes={"Training": 30, "Testing": 10}, seed=42)
         assert len(result["Training"]) == 30
@@ -353,9 +364,11 @@ class TestStratifiedSplit:
 
     def test_multiclass(self):
         """Test with more than two classes."""
-        df = pd.DataFrame({
-            "label": ["A"] * 30 + ["B"] * 30 + ["C"] * 30 + ["D"] * 10,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 30 + ["B"] * 30 + ["C"] * 30 + ["D"] * 10,
+            }
+        )
         selector = stratified_split("label")
         result = selector(df, partition_sizes={"Training": 80, "Testing": 20}, seed=42)
         assert len(result["Training"]) == 80
@@ -369,9 +382,11 @@ class TestStratifiedSplit:
 
     def test_three_way_split(self):
         """Test three-way stratified split."""
-        df = pd.DataFrame({
-            "label": ["A"] * 60 + ["B"] * 40,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 60 + ["B"] * 40,
+            }
+        )
         selector = stratified_split("label")
         result = selector(
             df,
@@ -390,9 +405,11 @@ class TestStratifiedSplit:
 
     def test_three_way_maintains_distribution(self):
         """Test that three-way split preserves class distribution."""
-        df = pd.DataFrame({
-            "label": ["A"] * 60 + ["B"] * 40,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 60 + ["B"] * 40,
+            }
+        )
         selector = stratified_split("label")
         result = selector(
             df,
@@ -407,9 +424,11 @@ class TestStratifiedSplit:
 
     def test_three_way_multiclass_distribution(self):
         """Test three-way stratified split with many classes preserves distribution."""
-        df = pd.DataFrame({
-            "label": ["A"] * 40 + ["B"] * 30 + ["C"] * 20 + ["D"] * 10,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 40 + ["B"] * 30 + ["C"] * 20 + ["D"] * 10,
+            }
+        )
         selector = stratified_split("label")
         result = selector(
             df,
@@ -424,9 +443,11 @@ class TestStratifiedSplit:
 
     def test_three_way_subset(self):
         """Test three-way stratified split using a subset of total data."""
-        df = pd.DataFrame({
-            "label": ["A"] * 50 + ["B"] * 50,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 50 + ["B"] * 50,
+            }
+        )
         selector = stratified_split("label")
         result = selector(
             df,
@@ -445,9 +466,11 @@ class TestStratifiedSplit:
 
     def test_different_seeds(self):
         """Test that different seeds produce different stratified splits."""
-        df = pd.DataFrame({
-            "label": ["A"] * 50 + ["B"] * 50,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 50 + ["B"] * 50,
+            }
+        )
         selector = stratified_split("label")
         r1 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
         r2 = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=99)
@@ -459,27 +482,33 @@ class TestStratifiedSplit:
 
     def test_missing_error_raises_on_nulls(self):
         """Test that missing='error' (default) raises on null values."""
-        df = pd.DataFrame({
-            "label": ["A"] * 5 + [None] * 3 + ["B"] * 2,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 5 + [None] * 3 + ["B"] * 2,
+            }
+        )
         selector = stratified_split("label", missing="error")
         with pytest.raises(ValueError, match="3 missing values"):
             selector(df, partition_sizes={"Training": 7, "Testing": 3}, seed=42)
 
     def test_missing_error_reports_percentage(self):
         """Test that the error message includes the percentage of nulls."""
-        df = pd.DataFrame({
-            "label": ["A"] * 5 + [None] * 5,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 5 + [None] * 5,
+            }
+        )
         selector = stratified_split("label", missing="error")
         with pytest.raises(ValueError, match="50.0%"):
             selector(df, partition_sizes={"Training": 7, "Testing": 3}, seed=42)
 
     def test_missing_error_no_nulls_succeeds(self):
         """Test that missing='error' succeeds when no nulls present."""
-        df = pd.DataFrame({
-            "label": ["A"] * 50 + ["B"] * 50,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 50 + ["B"] * 50,
+            }
+        )
         selector = stratified_split("label", missing="error")
         result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
         assert len(result["Training"]) == 70
@@ -487,9 +516,11 @@ class TestStratifiedSplit:
 
     def test_missing_drop_excludes_nulls(self):
         """Test that missing='drop' excludes rows with null values."""
-        df = pd.DataFrame({
-            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+            }
+        )
         selector = stratified_split("label", missing="drop")
         result = selector(df, partition_sizes={"Training": 56, "Testing": 24}, seed=42)
         assert len(result["Training"]) == 56
@@ -497,26 +528,32 @@ class TestStratifiedSplit:
 
         # All returned indices should point to non-null rows
         all_idx = np.concatenate([result["Training"], result["Testing"]])
-        original_df = pd.DataFrame({
-            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
-        })
+        original_df = pd.DataFrame(
+            {
+                "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+            }
+        )
         # Indices are into the filtered df, so they should all be < 80
         assert all(0 <= i < 80 for i in all_idx)
 
     def test_missing_drop_reduces_available(self):
         """Test that drop reduces available samples, raising if too few."""
-        df = pd.DataFrame({
-            "label": ["A"] * 10 + [None] * 90,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 10 + [None] * 90,
+            }
+        )
         selector = stratified_split("label", missing="drop")
         with pytest.raises(ValueError, match="Requested .* samples but dataset has 10"):
             selector(df, partition_sizes={"Training": 8, "Testing": 5}, seed=42)
 
     def test_missing_include_treats_nulls_as_class(self):
         """Test that missing='include' treats nulls as a separate class."""
-        df = pd.DataFrame({
-            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+            }
+        )
         selector = stratified_split("label", missing="include")
         result = selector(df, partition_sizes={"Training": 70, "Testing": 30}, seed=42)
         assert len(result["Training"]) == 70
@@ -529,9 +566,11 @@ class TestStratifiedSplit:
 
     def test_missing_include_preserves_distribution(self):
         """Test that include policy distributes nulls proportionally."""
-        df = pd.DataFrame({
-            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+            }
+        )
         selector = stratified_split("label", missing="include")
         result = selector(df, partition_sizes={"Training": 80, "Testing": 20}, seed=42)
 
@@ -544,9 +583,11 @@ class TestStratifiedSplit:
 
     def test_missing_include_three_way(self):
         """Test include policy with three-way split."""
-        df = pd.DataFrame({
-            "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 40 + ["B"] * 40 + [None] * 20,
+            }
+        )
         selector = stratified_split("label", missing="include")
         result = selector(
             df,
@@ -570,10 +611,12 @@ class TestStratifiedSplit:
 
     def test_missing_drop_with_nan(self):
         """Test that drop handles both None and np.nan."""
-        df = pd.DataFrame({
-            "label": ["A"] * 30 + ["B"] * 30 + [None] * 10 + [np.nan] * 10,
-            "value": range(80),
-        })
+        df = pd.DataFrame(
+            {
+                "label": ["A"] * 30 + ["B"] * 30 + [None] * 10 + [np.nan] * 10,
+                "value": range(80),
+            }
+        )
         selector = stratified_split("label", missing="drop")
         result = selector(df, partition_sizes={"Training": 42, "Testing": 18}, seed=42)
         assert len(result["Training"]) == 42
@@ -613,15 +656,8 @@ class TestSplitDataset:
         ml.add_dataset_element_type("SplitTestItem")
 
         # Insert records with categories for stratification testing
-        table_path = (
-            ml.catalog.getPathBuilder()
-            .schemas[ml.default_schema]
-            .tables["SplitTestItem"]
-        )
-        records = [
-            {"Name": f"Item{i}", "Category": "A" if i < 6 else "B"}
-            for i in range(12)
-        ]
+        table_path = ml.catalog.getPathBuilder().schemas[ml.default_schema].tables["SplitTestItem"]
+        records = [{"Name": f"Item{i}", "Category": "A" if i < 6 else "B"} for i in range(12)]
         table_path.insert(records)
         item_rids = [r["RID"] for r in table_path.entities().fetch()]
 
@@ -633,9 +669,7 @@ class TestSplitDataset:
             workflow_type="Setup",
             description="Creating test data",
         )
-        execution = ml.create_execution(
-            ExecutionConfiguration(description="Setup", workflow=workflow)
-        )
+        execution = ml.create_execution(ExecutionConfiguration(description="Setup", workflow=workflow))
         dataset = execution.create_dataset(
             dataset_types=["Source"],
             description="Test dataset for splitting",
@@ -650,7 +684,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=0.25,
             seed=42,
         )
@@ -689,7 +724,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=4,
             train_size=8,
             seed=42,
@@ -715,12 +751,8 @@ class TestSplitDataset:
         training_ds = ml.lookup_dataset(result.training.rid)
         testing_ds = ml.lookup_dataset(result.testing.rid)
 
-        train_rids = {
-            r["RID"] for r in training_ds.list_dataset_members().get("SplitTestItem", [])
-        }
-        test_rids = {
-            r["RID"] for r in testing_ds.list_dataset_members().get("SplitTestItem", [])
-        }
+        train_rids = {r["RID"] for r in training_ds.list_dataset_members().get("SplitTestItem", [])}
+        test_rids = {r["RID"] for r in testing_ds.list_dataset_members().get("SplitTestItem", [])}
 
         assert len(train_rids & test_rids) == 0
 
@@ -731,18 +763,12 @@ class TestSplitDataset:
 
         result1 = split_dataset(ml, source_rid, test_size=4, seed=42)
         training_ds1 = ml.lookup_dataset(result1.training.rid)
-        train_rids1 = {
-            r["RID"]
-            for r in training_ds1.list_dataset_members().get("SplitTestItem", [])
-        }
+        train_rids1 = {r["RID"] for r in training_ds1.list_dataset_members().get("SplitTestItem", [])}
 
         # Create another split with same parameters on same source
         result2 = split_dataset(ml, source_rid, test_size=4, seed=42)
         training_ds2 = ml.lookup_dataset(result2.training.rid)
-        train_rids2 = {
-            r["RID"]
-            for r in training_ds2.list_dataset_members().get("SplitTestItem", [])
-        }
+        train_rids2 = {r["RID"] for r in training_ds2.list_dataset_members().get("SplitTestItem", [])}
 
         assert train_rids1 == train_rids2
 
@@ -752,7 +778,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=4,
             seed=42,
             training_types=["Labeled"],
@@ -778,7 +805,8 @@ class TestSplitDataset:
         initial_count = len(initial_datasets)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=4,
             seed=42,
             dry_run=True,
@@ -817,7 +845,8 @@ class TestSplitDataset:
             return result
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=4,
             seed=42,
             selection_fn=first_n_selector,
@@ -837,7 +866,8 @@ class TestSplitDataset:
 
         with pytest.raises(ValueError, match="mutually exclusive"):
             split_dataset(
-                ml, source_rid,
+                ml,
+                source_rid,
                 test_size=4,
                 stratify_by_column="Category",
                 selection_fn=dummy_fn,
@@ -851,7 +881,8 @@ class TestSplitDataset:
 
         with pytest.raises(ValueError, match="include_tables is required"):
             split_dataset(
-                ml, source_rid,
+                ml,
+                source_rid,
                 test_size=4,
                 stratify_by_column="SplitTestItem.Category",
             )
@@ -866,7 +897,8 @@ class TestSplitDataset:
 
         with pytest.raises(ValueError, match="include_tables is required"):
             split_dataset(
-                ml, source_rid,
+                ml,
+                source_rid,
                 test_size=4,
                 selection_fn=dummy_fn,
             )
@@ -883,9 +915,7 @@ class TestSplitDataset:
             workflow_type="Setup",
             description="Setup",
         )
-        execution = ml.create_execution(
-            ExecutionConfiguration(description="Setup", workflow=workflow)
-        )
+        execution = ml.create_execution(ExecutionConfiguration(description="Setup", workflow=workflow))
         empty_ds = execution.create_dataset(
             dataset_types=["Source"],
             description="Empty dataset",
@@ -924,7 +954,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=4,
             shuffle=False,
             seed=42,
@@ -943,7 +974,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=2,
             val_size=2,
             seed=42,
@@ -966,7 +998,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=2,
             val_size=2,
             seed=42,
@@ -986,23 +1019,21 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=2,
             val_size=2,
             seed=42,
         )
 
         train_rids = {
-            r["RID"] for r in
-            ml.lookup_dataset(result.training.rid).list_dataset_members().get("SplitTestItem", [])
+            r["RID"] for r in ml.lookup_dataset(result.training.rid).list_dataset_members().get("SplitTestItem", [])
         }
         val_rids = {
-            r["RID"] for r in
-            ml.lookup_dataset(result.validation.rid).list_dataset_members().get("SplitTestItem", [])
+            r["RID"] for r in ml.lookup_dataset(result.validation.rid).list_dataset_members().get("SplitTestItem", [])
         }
         test_rids = {
-            r["RID"] for r in
-            ml.lookup_dataset(result.testing.rid).list_dataset_members().get("SplitTestItem", [])
+            r["RID"] for r in ml.lookup_dataset(result.testing.rid).list_dataset_members().get("SplitTestItem", [])
         }
 
         assert len(train_rids & val_rids) == 0
@@ -1015,7 +1046,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=2,
             val_size=2,
             seed=42,
@@ -1041,7 +1073,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=2,
             val_size=2,
             seed=42,
@@ -1077,7 +1110,8 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=4,
             seed=42,
             element_table="SplitTestItem",
@@ -1094,7 +1128,8 @@ class TestSplitDataset:
 
         custom_desc = "My custom split for experiment X"
         result = split_dataset(
-            ml, source_rid,
+            ml,
+            source_rid,
             test_size=4,
             seed=42,
             split_description=custom_desc,
@@ -1134,7 +1169,8 @@ class TestSplitDataset:
 
         with pytest.raises(ValueError, match="no members"):
             split_dataset(
-                ml, source_rid,
+                ml,
+                source_rid,
                 test_size=4,
                 element_table="NonExistentTable",
             )

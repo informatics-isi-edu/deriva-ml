@@ -486,9 +486,7 @@ def assert_dataset_has_members(
     members = dataset.list_dataset_members(recurse=recurse)
     for member_type, expected_count in expected_types.items():
         actual_count = len(members.get(member_type, []))
-        assert actual_count == expected_count, (
-            f"Expected {expected_count} {member_type} members, got {actual_count}"
-        )
+        assert actual_count == expected_count, f"Expected {expected_count} {member_type} members, got {actual_count}"
 
 
 def assert_dataset_version(

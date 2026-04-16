@@ -226,9 +226,7 @@ class TestDataset:
             )
         )
         ml_instance.add_dataset_element_type("TestTableDelete")
-        table_path = (
-            ml_instance.catalog.getPathBuilder().schemas[ml_instance.default_schema].tables["TestTableDelete"]
-        )
+        table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.default_schema].tables["TestTableDelete"]
         table_path.insert([{"Col1": f"Item{i}"} for i in range(5)])
         test_rids = [i["RID"] for i in table_path.entities().fetch()]
 
@@ -255,17 +253,12 @@ class TestDataset:
 
         # Delete some members from the dataset
         rids_to_delete = test_rids[:2]
-        dataset.delete_dataset_members(
-            members=rids_to_delete,
-            description="Removed 2 test items"
-        )
+        dataset.delete_dataset_members(members=rids_to_delete, description="Removed 2 test items")
 
         # Verify version was incremented (minor bump)
         new_version = dataset.current_version
         expected_version = initial_version.increment_version(VersionPart.minor)
-        assert new_version == expected_version, (
-            f"Expected version {expected_version}, got {new_version}"
-        )
+        assert new_version == expected_version, f"Expected version {expected_version}, got {new_version}"
 
         # Verify members were removed
         remaining_members = dataset.list_dataset_members()
@@ -349,9 +342,7 @@ class TestDataset:
             workflow_type="Test Workflow",
             description="Testing",
         )
-        execution = ml_instance.create_execution(
-            ExecutionConfiguration(description="Test", workflow=workflow)
-        )
+        execution = ml_instance.create_execution(ExecutionConfiguration(description="Test", workflow=workflow))
 
         # Create independent datasets
         ds1 = execution.create_dataset(dataset_types=["TestSet"], description="Dataset 1")
@@ -385,9 +376,7 @@ class TestDataset:
         )
 
         # Create an execution that will use a dataset
-        execution1 = ml_instance.create_execution(
-            ExecutionConfiguration(description="Execution 1", workflow=workflow)
-        )
+        execution1 = ml_instance.create_execution(ExecutionConfiguration(description="Execution 1", workflow=workflow))
 
         # Create a dataset within this execution
         dataset = execution1.create_dataset(dataset_types=["TestSet"], description="Test dataset")

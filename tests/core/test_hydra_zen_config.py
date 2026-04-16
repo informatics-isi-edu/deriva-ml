@@ -328,12 +328,7 @@ class TestDatasetSpecConfig:
         """Test DatasetSpecConfig with materialize=False."""
         from deriva_ml.dataset import DatasetSpecConfig
 
-        spec = DatasetSpecConfig(
-            rid="2DEF",
-            version="2.1.0",
-            materialize=False,
-            description="Metadata only dataset"
-        )
+        spec = DatasetSpecConfig(rid="2DEF", version="2.1.0", materialize=False, description="Metadata only dataset")
 
         assert spec.rid == "2DEF"
         assert spec.version == "2.1.0"
@@ -531,12 +526,14 @@ class TestWorkingDirectoryIntegration:
         custom_base = tmp_path / "ml_workspace"
 
         # Resolve using the OmegaConf resolver with three arguments
-        cfg = OmegaConf.create({
-            "base_path": str(custom_base),
-            "catalog_id": "42",
-            "hostname": "ml.example.org",
-            "resolved_path": "${compute_workdir:${base_path},${catalog_id},${hostname}}"
-        })
+        cfg = OmegaConf.create(
+            {
+                "base_path": str(custom_base),
+                "catalog_id": "42",
+                "hostname": "ml.example.org",
+                "resolved_path": "${compute_workdir:${base_path},${catalog_id},${hostname}}",
+            }
+        )
         resolved = OmegaConf.to_container(cfg, resolve=True)
 
         expected = custom_base / getpass.getuser() / "deriva-ml" / "ml.example.org" / "42"

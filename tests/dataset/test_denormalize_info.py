@@ -24,7 +24,11 @@ def _make_mock_model():
         {
             "Image": (
                 ["Dataset", "Dataset_Image", "Image", "Subject"],
-                {"Dataset_Image": {("Dataset", "RID")}, "Image": {("Image", "RID")}, "Subject": {("Subject_FK", "RID")}},
+                {
+                    "Dataset_Image": {("Dataset", "RID")},
+                    "Image": {("Image", "RID")},
+                    "Subject": {("Subject_FK", "RID")},
+                },
                 {"Dataset_Image": "inner", "Image": "inner", "Subject": "left"},
             )
         },
@@ -179,6 +183,7 @@ class TestDenormalizeInfoMixin:
         """The mixin method takes only include_tables, no dataset."""
         from deriva_ml.core.mixins.dataset import DatasetMixin
         import inspect
+
         sig = inspect.signature(DatasetMixin.denormalize_info)
         params = list(sig.parameters.keys())
         assert "self" in params
@@ -202,10 +207,8 @@ class TestDenormalizeInfoAggregateAPI:
         mock_col = MagicMock(spec=_ColumnWrapper)
 
         # Verify that .count and .cnt don't exist on real _ColumnWrapper
-        assert not hasattr(mock_col, "count"), \
-            "_ColumnWrapper should not have .count — use Cnt(col) instead"
-        assert not hasattr(mock_col, "cnt"), \
-            "_ColumnWrapper should not have .cnt — use Cnt(col) instead"
+        assert not hasattr(mock_col, "count"), "_ColumnWrapper should not have .count — use Cnt(col) instead"
+        assert not hasattr(mock_col, "cnt"), "_ColumnWrapper should not have .cnt — use Cnt(col) instead"
 
         # Verify Cnt(col) works and produces an aggregate with .alias()
         agg = Cnt(mock_col)
@@ -217,8 +220,7 @@ class TestDenormalizeInfoAggregateAPI:
 
         mock_col = MagicMock(spec=_ColumnWrapper)
 
-        assert not hasattr(mock_col, "sum"), \
-            "_ColumnWrapper should not have .sum — use Sum(col) instead"
+        assert not hasattr(mock_col, "sum"), "_ColumnWrapper should not have .sum — use Sum(col) instead"
 
         agg = Sum(mock_col)
         assert hasattr(agg, "alias"), "Sum(col) should have .alias() method"
@@ -271,8 +273,7 @@ class TestDenormalizeInfoIntegration:
         has_positive = False
         for table_name, table_info in info["tables"].items():
             assert isinstance(table_info["row_count"], int)
-            assert table_info["row_count"] >= 0, \
-                f"{table_name} has negative row count"
+            assert table_info["row_count"] >= 0, f"{table_name} has negative row count"
             if table_info["row_count"] > 0:
                 has_positive = True
 
@@ -292,9 +293,7 @@ class TestDenormalizeInfoIntegration:
             assert isinstance(table_info["asset_bytes"], int)
             assert table_info["asset_bytes"] >= 0
 
-    def test_dataset_denormalize_info(
-        self, catalog_with_datasets: "tuple[DerivaML, object]"
-    ):
+    def test_dataset_denormalize_info(self, catalog_with_datasets: "tuple[DerivaML, object]"):
         """Dataset.denormalize_info() works with a real dataset."""
         ml, dataset_desc = catalog_with_datasets
         # Get any dataset from the catalog

@@ -29,20 +29,12 @@ def nested_bag(tmp_path: Path) -> Path:
     # Parent-level Dataset_Version (e.g., for the root split dataset)
     parent_dv = data_dir / "Dataset" / "Dataset_Version.csv"
     parent_dv.parent.mkdir(parents=True)
-    parent_dv.write_text(
-        "RID,Dataset,Version\n"
-        "V1,DS-ROOT,0.4.0\n"
-        "V2,DS-ROOT,0.3.0\n"
-    )
+    parent_dv.write_text("RID,Dataset,Version\nV1,DS-ROOT,0.4.0\nV2,DS-ROOT,0.3.0\n")
 
     # Child-level Dataset_Version (e.g., for Training/Test children)
     child_dv = data_dir / "Dataset" / "Dataset_Dataset" / "Dataset" / "Dataset_Version.csv"
     child_dv.parent.mkdir(parents=True)
-    child_dv.write_text(
-        "RID,Dataset,Version\n"
-        "V3,DS-TRAIN,3.11.0\n"
-        "V4,DS-TEST,5.11.0\n"
-    )
+    child_dv.write_text("RID,Dataset,Version\nV3,DS-TRAIN,3.11.0\nV4,DS-TEST,5.11.0\n")
 
     return tmp_path
 
@@ -59,20 +51,12 @@ def nested_bag_with_duplicates(tmp_path: Path) -> Path:
     # First CSV with some subjects
     csv1 = data_dir / "Dataset" / "Subject.csv"
     csv1.parent.mkdir(parents=True)
-    csv1.write_text(
-        "RID,Name\n"
-        "S1,Alice\n"
-        "S2,Bob\n"
-    )
+    csv1.write_text("RID,Name\nS1,Alice\nS2,Bob\n")
 
     # Second CSV with overlapping and new subjects
     csv2 = data_dir / "Dataset" / "Dataset_Dataset" / "Dataset" / "Subject.csv"
     csv2.parent.mkdir(parents=True)
-    csv2.write_text(
-        "RID,Name\n"
-        "S2,Bob\n"
-        "S3,Carol\n"
-    )
+    csv2.write_text("RID,Name\nS2,Bob\nS3,Carol\n")
 
     return tmp_path
 
@@ -141,11 +125,7 @@ class TestBagDataSourceMultiCSV:
         data_dir = tmp_path / "data"
         csv_file = data_dir / "Simple.csv"
         csv_file.parent.mkdir(parents=True)
-        csv_file.write_text(
-            "RID,Value\n"
-            "R1,hello\n"
-            "R2,world\n"
-        )
+        csv_file.write_text("RID,Value\nR1,hello\nR2,world\n")
 
         source = BagDataSource(tmp_path, asset_localization=False)
         rows = list(source.get_table_data("Simple"))

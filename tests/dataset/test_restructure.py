@@ -1,6 +1,5 @@
 """Tests for DatasetBag.restructure_assets() method."""
 
-
 import pytest
 
 from deriva_ml import MLVocab
@@ -18,9 +17,7 @@ def _create_dataset_via_execution(ml, dataset_types, description):
         workflow_type="Test Workflow",
         description="Workflow for restructure tests",
     )
-    execution = ml.create_execution(
-        ExecutionConfiguration(description="Restructure test execution", workflow=workflow)
-    )
+    execution = ml.create_execution(ExecutionConfiguration(description="Restructure test execution", workflow=workflow))
     return execution.create_dataset(dataset_types=dataset_types, description=description)
 
 
@@ -145,7 +142,8 @@ class TestRestructureAssets:
         ml = dataset_test.ml_instance
 
         # Create a dataset with NO types (empty list)
-        dataset = _create_dataset_via_execution(ml,
+        dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=[],  # No type - prediction scenario
             description="Unlabeled prediction dataset",
         )
@@ -199,7 +197,8 @@ class TestRestructureAssets:
         ml = dataset_test.ml_instance
 
         # Create a dataset with NO types
-        dataset = _create_dataset_via_execution(ml,
+        dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=[],
             description="Full prediction scenario test",
         )
@@ -227,8 +226,7 @@ class TestRestructureAssets:
         # Should have testing/Unknown path
         expected_path = output_dir / "testing" / "Unknown"
         assert expected_path.exists(), (
-            f"Expected testing/Unknown directory for prediction scenario. "
-            f"Found: {list(output_dir.rglob('*'))}"
+            f"Expected testing/Unknown directory for prediction scenario. Found: {list(output_dir.rglob('*'))}"
         )
 
         # Verify files are in testing/Unknown
@@ -303,19 +301,22 @@ class TestRestructureAssets:
         ml = dataset_test.ml_instance
 
         # Create parent "Split" dataset
-        split_dataset = _create_dataset_via_execution(ml,
+        split_dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Split"],
             description="Split dataset with Training/Testing children",
         )
 
         # Create Training child
-        training_dataset = _create_dataset_via_execution(ml,
+        training_dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Training"],
             description="Training split",
         )
 
         # Create Testing child
-        testing_dataset = _create_dataset_via_execution(ml,
+        testing_dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Testing"],
             description="Testing split",
         )
@@ -337,9 +338,7 @@ class TestRestructureAssets:
         split_dataset.add_dataset_members({"Dataset": [training_dataset.dataset_rid, testing_dataset.dataset_rid]})
 
         # Download the Split dataset bag
-        bag = split_dataset.download_dataset_bag(
-            version=split_dataset.current_version, use_minid=False
-        )
+        bag = split_dataset.download_dataset_bag(version=split_dataset.current_version, use_minid=False)
 
         output_dir = tmp_path / "restructured_split"
         bag.restructure_assets(
@@ -423,7 +422,8 @@ class TestRestructureForeignKeyPaths:
         ml = dataset_test.ml_instance
 
         # Create a dataset with both Subjects and Images
-        dataset = _create_dataset_via_execution(ml,
+        dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Testing"],
             description="Dataset with subjects and images",
         )
@@ -454,15 +454,12 @@ class TestRestructureForeignKeyPaths:
         # _get_reachable_assets should find Images through Subject -> Image FK
         reachable_images = bag._get_reachable_assets("Image")
 
-        assert len(reachable_images) > 0, (
-            "Expected to find Images reachable through Subject FK path."
-        )
+        assert len(reachable_images) > 0, "Expected to find Images reachable through Subject FK path."
 
         # Verify the images are associated with the subjects we added
         for img in reachable_images:
             assert img.get("Subject") in subject_rids, (
-                f"Image {img.get('RID')} has Subject={img.get('Subject')} "
-                f"which is not in added subjects {subject_rids}"
+                f"Image {img.get('RID')} has Subject={img.get('Subject')} which is not in added subjects {subject_rids}"
             )
 
     def test_restructure_finds_assets_via_fk_path(self, dataset_test, tmp_path):
@@ -476,7 +473,8 @@ class TestRestructureForeignKeyPaths:
         """
         ml = dataset_test.ml_instance
 
-        dataset = _create_dataset_via_execution(ml,
+        dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Training"],
             description="Dataset with subjects and images",
         )
@@ -515,10 +513,7 @@ class TestRestructureForeignKeyPaths:
 
         # Should have found images
         all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
-        assert len(all_files) > 0, (
-            "No images found. restructure_assets should find Images "
-            "in the dataset."
-        )
+        assert len(all_files) > 0, "No images found. restructure_assets should find Images in the dataset."
 
     def test_asset_dataset_mapping_via_fk_path(self, dataset_test, tmp_path):
         """Test that _get_asset_dataset_mapping works with dataset members.
@@ -528,7 +523,8 @@ class TestRestructureForeignKeyPaths:
         """
         ml = dataset_test.ml_instance
 
-        dataset = _create_dataset_via_execution(ml,
+        dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Testing"],
             description="Test FK mapping",
         )
@@ -588,9 +584,7 @@ class TestRestructureHelperMethods:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # Use a selector that returns a fixed value
-        type_map = bag._build_dataset_type_path_map(
-            type_selector=lambda types: "FIXED_TYPE"
-        )
+        type_map = bag._build_dataset_type_path_map(type_selector=lambda types: "FIXED_TYPE")
 
         # All paths should contain "FIXED_TYPE"
         for rid, path in type_map.items():
@@ -848,13 +842,15 @@ class TestValueSelectorWithNestedDatasets:
         ml = dataset_test.ml_instance
 
         # Create a parent dataset
-        parent_dataset = _create_dataset_via_execution(ml,
+        parent_dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Training"],
             description="Parent dataset for value_selector test",
         )
 
         # Create a child dataset
-        child_dataset = _create_dataset_via_execution(ml,
+        child_dataset = _create_dataset_via_execution(
+            ml,
             dataset_types=["Training"],
             description="Child dataset with labeled images",
         )
@@ -878,15 +874,13 @@ class TestValueSelectorWithNestedDatasets:
             """A selector that tracks which asset RIDs it sees."""
             for r in records:
                 # Use the Image attribute to get target RID (FeatureRecord uses table name as attribute)
-                target_rid = getattr(r, 'Image', None) or getattr(r, 'Subject', None)
+                target_rid = getattr(r, "Image", None) or getattr(r, "Subject", None)
                 if target_rid:
                     seen_rids.add(target_rid)
             return records[0]
 
         # Download the parent dataset bag
-        bag = parent_dataset.download_dataset_bag(
-            version=parent_dataset.current_version, use_minid=False
-        )
+        bag = parent_dataset.download_dataset_bag(version=parent_dataset.current_version, use_minid=False)
 
         output_dir = tmp_path / "restructured_nested"
 
@@ -907,8 +901,7 @@ class TestValueSelectorWithNestedDatasets:
 
         all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
         assert len(all_files) >= len(image_rids), (
-            f"Expected at least {len(image_rids)} files from child dataset, "
-            f"got {len(all_files)}"
+            f"Expected at least {len(image_rids)} files from child dataset, got {len(all_files)}"
         )
 
     def test_feature_values_loaded_for_all_nested_datasets(self, dataset_test, tmp_path):
@@ -977,24 +970,16 @@ class TestListFeatureValuesReturnType:
             )
 
             # Should have model_dump() method from Pydantic
-            assert hasattr(first_value, "model_dump"), (
-                "FeatureRecord should have model_dump() method"
-            )
+            assert hasattr(first_value, "model_dump"), "FeatureRecord should have model_dump() method"
 
             # model_dump() should return a dict with column names as keys
             dumped = first_value.model_dump()
             assert isinstance(dumped, dict), "model_dump() should return a dict"
-            assert "Image" in dumped, (
-                f"Expected 'Image' key in model_dump(), got keys: {list(dumped.keys())}"
-            )
+            assert "Image" in dumped, f"Expected 'Image' key in model_dump(), got keys: {list(dumped.keys())}"
 
             # Should have Feature_Name and Execution attributes
-            assert hasattr(first_value, "Feature_Name"), (
-                "FeatureRecord should have Feature_Name attribute"
-            )
-            assert hasattr(first_value, "Execution"), (
-                "FeatureRecord should have Execution attribute for provenance"
-            )
+            assert hasattr(first_value, "Feature_Name"), "FeatureRecord should have Feature_Name attribute"
+            assert hasattr(first_value, "Execution"), "FeatureRecord should have Execution attribute for provenance"
 
     def test_list_feature_values_columns_accessible_by_attribute(self, dataset_test, tmp_path):
         """Test that feature value columns can be accessed as attributes."""
@@ -1007,9 +992,7 @@ class TestListFeatureValuesReturnType:
             for fv in feature_values:
                 # Access as attribute should work
                 image_rid = getattr(fv, "Image", None)
-                assert image_rid is not None, (
-                    "Cannot access 'Image' column from feature value as attribute"
-                )
+                assert image_rid is not None, "Cannot access 'Image' column from feature value as attribute"
 
                 # Can also access via model_dump()
                 dumped = fv.model_dump()
@@ -1048,8 +1031,7 @@ class TestFeatureTablesInBagExport:
         # e.g., ImageQuality for the Quality feature on Image table
         feature_table_name = "ImageQuality"
         assert feature_table_name in bag_tables, (
-            f"Feature table {feature_table_name} not found in bag. "
-            f"Available domain tables: {sorted(bag_tables)}"
+            f"Feature table {feature_table_name} not found in bag. Available domain tables: {sorted(bag_tables)}"
         )
 
     def test_restructure_can_use_feature_from_bag(self, dataset_test, tmp_path):
@@ -1077,6 +1059,5 @@ class TestFeatureTablesInBagExport:
         # Files should be organized by Quality values
         all_files = [f for f in output_dir.rglob("*") if f.is_file() or f.is_symlink()]
         assert len(all_files) > 0, (
-            "No files created by restructure_assets - "
-            "feature table data may not have been exported properly"
+            "No files created by restructure_assets - feature table data may not have been exported properly"
         )

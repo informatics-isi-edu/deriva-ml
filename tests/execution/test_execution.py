@@ -61,9 +61,13 @@ def feature_setup(workflow_terms):
     """Set up feature infrastructure for testing."""
     ml = workflow_terms
     # Create a simple feature with numeric Score column
-    ml.create_feature("Subject", "TestScore", metadata=[
-        ColumnDefinition(name="Score", type=BuiltinTypes.int2, nullok=False),
-    ])
+    ml.create_feature(
+        "Subject",
+        "TestScore",
+        metadata=[
+            ColumnDefinition(name="Score", type=BuiltinTypes.int2, nullok=False),
+        ],
+    )
 
     return ml
 
@@ -505,9 +509,7 @@ class TestExecutionAssets:
         download_execution = ml.create_execution(config)
 
         with TemporaryDirectory() as tmpdir:
-            downloaded = download_execution.download_asset(
-                asset_rid, Path(tmpdir), update_catalog=False
-            )
+            downloaded = download_execution.download_asset(asset_rid, Path(tmpdir), update_catalog=False)
             assert downloaded.exists()
             assert downloaded.name == "downloadable.txt"
             with downloaded.open() as f:
@@ -537,9 +539,7 @@ class TestExecutionAssets:
         check_execution = ml.create_execution(config)
 
         with TemporaryDirectory() as tmpdir:
-            downloaded = check_execution.download_asset(
-                asset_rid, Path(tmpdir), update_catalog=False
-            )
+            downloaded = check_execution.download_asset(asset_rid, Path(tmpdir), update_catalog=False)
             assert "Model_File" in downloaded.asset_types
 
     def test_upload_progress_callback(self, basic_execution):
@@ -549,12 +549,14 @@ class TestExecutionAssets:
         progress_updates = []
 
         def progress_callback(progress: UploadProgress) -> None:
-            progress_updates.append({
-                "file_name": progress.file_name,
-                "phase": progress.phase,
-                "message": progress.message,
-                "percent_complete": progress.percent_complete,
-            })
+            progress_updates.append(
+                {
+                    "file_name": progress.file_name,
+                    "phase": progress.phase,
+                    "message": progress.message,
+                    "percent_complete": progress.percent_complete,
+                }
+            )
 
         with basic_execution.execute() as execution:
             # Create multiple assets to ensure we get progress updates
@@ -803,9 +805,7 @@ class TestAssetCaching:
         exec1 = ml.create_execution(config1)
 
         with TemporaryDirectory() as tmpdir1:
-            result1 = exec1.download_asset(
-                asset_rid, Path(tmpdir1), update_catalog=False, use_cache=True
-            )
+            result1 = exec1.download_asset(asset_rid, Path(tmpdir1), update_catalog=False, use_cache=True)
             assert result1.exists()
             assert result1.is_symlink(), "After cache miss, file should be symlinked from cache"
             with result1.open() as f:
@@ -832,9 +832,7 @@ class TestAssetCaching:
         exec2 = ml.create_execution(config2)
 
         with TemporaryDirectory() as tmpdir2:
-            result2 = exec2.download_asset(
-                asset_rid, Path(tmpdir2), update_catalog=False, use_cache=True
-            )
+            result2 = exec2.download_asset(asset_rid, Path(tmpdir2), update_catalog=False, use_cache=True)
             assert result2.exists()
             assert result2.is_symlink(), "Cache hit should produce a symlink"
             # Symlink should point to the same cached file
@@ -859,9 +857,7 @@ class TestAssetCaching:
         dl_execution = ml.create_execution(config)
 
         with TemporaryDirectory() as tmpdir:
-            result = dl_execution.download_asset(
-                asset_rid, Path(tmpdir), update_catalog=False, use_cache=False
-            )
+            result = dl_execution.download_asset(asset_rid, Path(tmpdir), update_catalog=False, use_cache=False)
             assert result.exists()
             assert not result.is_symlink(), "Without cache, file should be a regular file"
             with result.open() as f:
@@ -1057,10 +1053,7 @@ class TestExecutionDatasets:
             )
 
             config = ExecutionConfiguration(
-                datasets=[
-                    DatasetSpec(rid=ds.dataset_rid, version=ds.current_version)
-                    for ds in all_datasets[:2]
-                ],
+                datasets=[DatasetSpec(rid=ds.dataset_rid, version=ds.current_version) for ds in all_datasets[:2]],
                 description="Multi-Dataset Execution",
                 workflow=workflow,
             )
@@ -1440,11 +1433,7 @@ class TestExecutionNesting:
         # Verify
         pb = ml.pathBuilder().schemas[ml.ml_schema]
         exec_exec = pb.Execution_Execution
-        records = list(
-            exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid)
-            .entities()
-            .fetch()
-        )
+        records = list(exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid).entities().fetch())
 
         assert len(records) == 1
         assert records[0]["Nested_Execution"] == child_exec.execution_rid
@@ -1473,11 +1462,7 @@ class TestExecutionNesting:
         # Verify all children are added
         pb = ml.pathBuilder().schemas[ml.ml_schema]
         exec_exec = pb.Execution_Execution
-        records = list(
-            exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid)
-            .entities()
-            .fetch()
-        )
+        records = list(exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid).entities().fetch())
 
         assert len(records) == 3
         # Verify sequences
@@ -1704,11 +1689,7 @@ class TestExecutionNesting:
         # Verify all children are added with null sequence
         pb = ml.pathBuilder().schemas[ml.ml_schema]
         exec_exec = pb.Execution_Execution
-        records = list(
-            exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid)
-            .entities()
-            .fetch()
-        )
+        records = list(exec_exec.filter(exec_exec.Execution == parent_exec.execution_rid).entities().fetch())
 
         assert len(records) == 3
         # All should have null sequence
@@ -1741,8 +1722,5 @@ class TestExecutionNesting:
         # Both executions use DRY_RUN_RID, so query should return nothing
         records = list(exec_exec.entities().fetch())
         # Filter for our dry run RIDs - they shouldn't exist
-        dry_run_records = [
-            r for r in records
-            if r["Execution"] == parent_exec.execution_rid
-        ]
+        dry_run_records = [r for r in records if r["Execution"] == parent_exec.execution_rid]
         assert len(dry_run_records) == 0

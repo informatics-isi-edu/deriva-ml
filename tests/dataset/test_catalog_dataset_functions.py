@@ -1,4 +1,5 @@
-""" Test catalog level functions that support datasets."""
+"""Test catalog level functions that support datasets."""
+
 from pprint import pformat
 
 try:
@@ -12,6 +13,7 @@ from deriva_ml import (
 )
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution import ExecutionConfiguration
+
 
 class TestCatalogDatasetFunctions:
     def test_dataset_creation(self, deriva_catalog, tmp_path):

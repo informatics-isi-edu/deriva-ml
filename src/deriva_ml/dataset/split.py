@@ -235,9 +235,7 @@ def stratified_split(
         >>> partitions = selector(df, {"Training": 300, "Testing": 100}, seed=42)
     """
     if missing not in ("error", "drop", "include"):
-        raise ValueError(
-            f"missing must be 'error', 'drop', or 'include', got '{missing}'"
-        )
+        raise ValueError(f"missing must be 'error', 'drop', or 'include', got '{missing}'")
 
     def _stratified_split(
         df: pd.DataFrame,
@@ -251,8 +249,7 @@ def stratified_split(
         if stratify_column not in df.columns:
             available = [c for c in df.columns if not c.startswith("_")]
             raise ValueError(
-                f"Column '{stratify_column}' not found in denormalized DataFrame. "
-                f"Available columns: {available}"
+                f"Column '{stratify_column}' not found in denormalized DataFrame. Available columns: {available}"
             )
 
         # Handle missing values in the stratify column
@@ -269,10 +266,7 @@ def stratified_split(
                     f"or 'include' to treat nulls as a separate class."
                 )
             elif missing == "drop":
-                logger.info(
-                    f"Dropping {null_count} rows ({null_pct:.1f}%) with missing "
-                    f"values in '{stratify_column}'"
-                )
+                logger.info(f"Dropping {null_count} rows ({null_pct:.1f}%) with missing values in '{stratify_column}'")
                 df = df[~null_mask].reset_index(drop=True)
             elif missing == "include":
                 logger.info(
@@ -285,8 +279,11 @@ def stratified_split(
         if total_needed > len(df):
             raise ValueError(
                 f"Requested {total_needed} samples but dataset has {len(df)} records"
-                + (f" (after dropping {null_count} rows with missing values)"
-                   if null_count > 0 and missing == "drop" else "")
+                + (
+                    f" (after dropping {null_count} rows with missing values)"
+                    if null_count > 0 and missing == "drop"
+                    else ""
+                )
             )
 
         indices = np.arange(len(df))
@@ -391,9 +388,7 @@ def _resolve_sizes(
         elif isinstance(size, (int, float)) and size >= 1:
             return int(size)
         else:
-            raise ValueError(
-                f"{name} must be a float in (0, 1) or an int >= 1, got {size}"
-            )
+            raise ValueError(f"{name} must be a float in (0, 1) or an int >= 1, got {size}")
 
     test_count = _to_count(test_size, "test_size")
 
@@ -415,17 +410,11 @@ def _resolve_sizes(
         )
 
     if train_count <= 0:
-        raise ValueError(
-            f"Training set must have at least 1 sample. Got train_size={train_count}"
-        )
+        raise ValueError(f"Training set must have at least 1 sample. Got train_size={train_count}")
     if test_count <= 0:
-        raise ValueError(
-            f"Test set must have at least 1 sample. Got test_size={test_count}"
-        )
+        raise ValueError(f"Test set must have at least 1 sample. Got test_size={test_count}")
     if val_size is not None and val_count <= 0:
-        raise ValueError(
-            f"Validation set must have at least 1 sample. Got val_size={val_count}"
-        )
+        raise ValueError(f"Validation set must have at least 1 sample. Got val_size={val_count}")
 
     result = {"Training": train_count, "Testing": test_count}
     if val_size is not None:
@@ -683,10 +672,7 @@ def split_dataset(
     # Validate inputs
     # -------------------------------------------------------------------------
     if stratify_by_column and selection_fn:
-        raise ValueError(
-            "stratify_by_column and selection_fn are mutually exclusive. "
-            "Use one or the other."
-        )
+        raise ValueError("stratify_by_column and selection_fn are mutually exclusive. Use one or the other.")
 
     if stratify_by_column and not include_tables:
         raise ValueError(
@@ -713,15 +699,10 @@ def split_dataset(
     # Auto-detect element table if not specified
     if element_table is None:
         candidate_tables = [
-            table_name
-            for table_name, records in members.items()
-            if table_name != "Dataset" and len(records) > 0
+            table_name for table_name, records in members.items() if table_name != "Dataset" and len(records) > 0
         ]
         if not candidate_tables:
-            raise ValueError(
-                f"Source dataset {source_dataset_rid} has no members. "
-                "Cannot split an empty dataset."
-            )
+            raise ValueError(f"Source dataset {source_dataset_rid} has no members. Cannot split an empty dataset.")
         if len(candidate_tables) > 1:
             raise ValueError(
                 f"Source dataset has members in multiple tables: {candidate_tables}. "
@@ -755,9 +736,7 @@ def split_dataset(
     if use_denormalization:
         logger.info(f"Denormalizing dataset with tables: {include_tables}")
         df = source_ds.denormalize_as_dataframe(include_tables)
-        logger.info(
-            f"Denormalized DataFrame: {len(df)} rows, {len(df.columns)} columns"
-        )
+        logger.info(f"Denormalized DataFrame: {len(df)} rows, {len(df.columns)} columns")
 
         if stratify_by_column:
             logger.info(f"Using stratified split on column: {stratify_by_column}")
@@ -778,10 +757,7 @@ def split_dataset(
                     f"Available columns: {list(df.columns)}"
                 )
 
-        partition_rids = {
-            name: df.iloc[indices][rid_column].tolist()
-            for name, indices in partition_indices.items()
-        }
+        partition_rids = {name: df.iloc[indices][rid_column].tolist() for name, indices in partition_indices.items()}
 
     else:
         all_rids = [record["RID"] for record in member_records]
@@ -804,9 +780,7 @@ def split_dataset(
     # -------------------------------------------------------------------------
     # Compute strategy description
     # -------------------------------------------------------------------------
-    strategy_desc = (
-        f"stratified by {stratify_by_column}" if stratify_by_column else "random"
-    )
+    strategy_desc = f"stratified by {stratify_by_column}" if stratify_by_column else "random"
     if selection_fn:
         strategy_desc = "custom selection function"
 
@@ -853,10 +827,7 @@ def split_dataset(
     # Create execution and dataset hierarchy
     # -------------------------------------------------------------------------
     partitions_desc = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
-    auto_description = (
-        f"Split of dataset {source_dataset_rid} "
-        f"({strategy_desc}, {partitions_desc}, seed={seed})"
-    )
+    auto_description = f"Split of dataset {source_dataset_rid} ({strategy_desc}, {partitions_desc}, seed={seed})"
 
     logger.info("Creating workflow and execution...")
     workflow = ml.create_workflow(
@@ -1060,11 +1031,13 @@ def main() -> int:
 
     # Connection parameters
     parser.add_argument(
-        "--hostname", required=True,
+        "--hostname",
+        required=True,
         help="Deriva server hostname (e.g., localhost, ml.derivacloud.org)",
     )
     parser.add_argument(
-        "--catalog-id", required=True,
+        "--catalog-id",
+        required=True,
         help="Catalog ID to connect to",
     )
     parser.add_argument(
@@ -1074,31 +1047,39 @@ def main() -> int:
 
     # Source dataset
     parser.add_argument(
-        "--dataset-rid", required=True,
+        "--dataset-rid",
+        required=True,
         help="RID of the source dataset to split",
     )
 
     # Split parameters (scikit-learn conventions)
     parser.add_argument(
-        "--test-size", type=float, default=0.2,
+        "--test-size",
+        type=float,
+        default=0.2,
         help="Test set size as fraction (0-1) or absolute count (default: 0.2)",
     )
     parser.add_argument(
-        "--train-size", type=float, default=None,
-        help="Train set size as fraction (0-1) or absolute count "
-        "(default: complement of test-size)",
+        "--train-size",
+        type=float,
+        default=None,
+        help="Train set size as fraction (0-1) or absolute count (default: complement of test-size)",
     )
     parser.add_argument(
-        "--val-size", type=float, default=None,
-        help="Validation set size as fraction (0-1) or absolute count "
-        "(default: None, no validation split)",
+        "--val-size",
+        type=float,
+        default=None,
+        help="Validation set size as fraction (0-1) or absolute count (default: None, no validation split)",
     )
     parser.add_argument(
-        "--no-shuffle", action="store_true",
+        "--no-shuffle",
+        action="store_true",
         help="Do not shuffle before splitting",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed for reproducibility (default: 42)",
     )
     parser.add_argument(
@@ -1126,34 +1107,38 @@ def main() -> int:
         "(e.g., Image,Image_Classification). Required for stratified splitting.",
     )
     parser.add_argument(
-        "--training-types", default="Labeled",
-        help="Comma-separated additional dataset types for training set "
-        "(default: Labeled)",
+        "--training-types",
+        default="Labeled",
+        help="Comma-separated additional dataset types for training set (default: Labeled)",
     )
     parser.add_argument(
-        "--testing-types", default="Labeled",
-        help="Comma-separated additional dataset types for testing set "
-        "(default: Labeled)",
+        "--testing-types",
+        default="Labeled",
+        help="Comma-separated additional dataset types for testing set (default: Labeled)",
     )
     parser.add_argument(
-        "--validation-types", default="Labeled",
-        help="Comma-separated additional dataset types for validation set "
-        "(default: Labeled)",
+        "--validation-types",
+        default="Labeled",
+        help="Comma-separated additional dataset types for validation set (default: Labeled)",
     )
     parser.add_argument(
-        "--description", default="",
+        "--description",
+        default="",
         help="Description for the parent split dataset",
     )
     parser.add_argument(
-        "--workflow-type", default="Dataset_Split",
+        "--workflow-type",
+        default="Dataset_Split",
         help="Workflow type vocabulary term (default: Dataset_Split)",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Print plan without modifying catalog",
     )
     parser.add_argument(
-        "--show-urls", action="store_true",
+        "--show-urls",
+        action="store_true",
         help="Show Chaise web interface URLs for created datasets",
     )
 
@@ -1162,9 +1147,7 @@ def main() -> int:
     # Configure logging
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.INFO)
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logging.getLogger("deriva_ml").addHandler(handler)
     logging.getLogger("deriva_ml").setLevel(logging.INFO)
 
@@ -1185,22 +1168,10 @@ def main() -> int:
         logger.info(f"Connected, domain schema: {ml.default_schema}")
 
         # Parse comma-separated lists
-        include_tables = (
-            [t.strip() for t in args.include_tables.split(",")]
-            if args.include_tables else None
-        )
-        training_types = (
-            [t.strip() for t in args.training_types.split(",")]
-            if args.training_types else None
-        )
-        testing_types = (
-            [t.strip() for t in args.testing_types.split(",")]
-            if args.testing_types else None
-        )
-        validation_types = (
-            [t.strip() for t in args.validation_types.split(",")]
-            if args.validation_types else None
-        )
+        include_tables = [t.strip() for t in args.include_tables.split(",")] if args.include_tables else None
+        training_types = [t.strip() for t in args.training_types.split(",")] if args.training_types else None
+        testing_types = [t.strip() for t in args.testing_types.split(",")] if args.testing_types else None
+        validation_types = [t.strip() for t in args.validation_types.split(",")] if args.validation_types else None
 
         # Run the split
         result = split_dataset(
@@ -1225,9 +1196,9 @@ def main() -> int:
 
         # Print summary
         if args.dry_run:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("  DRY RUN - No changes will be made")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             print(f"  Source dataset:  {result.source}")
             print(f"  Element table:   {result.element_table}")
             print(f"  Strategy:        {result.strategy}")
@@ -1236,11 +1207,11 @@ def main() -> int:
             if result.validation:
                 print(f"  Validation size: {result.validation.count}")
             print(f"  Testing size:    {result.testing.count}")
-            print(f"{'='*60}\n")
+            print(f"{'=' * 60}\n")
         else:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("  SPLIT COMPLETE")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             print(f"  Source dataset:  {result.source}")
             print(f"  Split dataset:   {result.split.rid} (v{result.split.version})")
             print(f"  Training:        {result.training.rid} (v{result.training.version})")
@@ -1265,7 +1236,7 @@ def main() -> int:
                     except Exception:
                         pass
 
-            print(f"{'='*60}\n")
+            print(f"{'=' * 60}\n")
 
         return 0
 
@@ -1276,4 +1247,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

@@ -25,12 +25,8 @@ def git_repo(tmp_path):
 
     # Initialize git repo
     subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@test.com"], cwd=repo, capture_output=True, check=True
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"], cwd=repo, capture_output=True, check=True
-    )
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, capture_output=True, check=True)
 
     # Add a remote (needed for _github_url)
     subprocess.run(
@@ -44,9 +40,7 @@ def git_repo(tmp_path):
     test_file = repo / "model.py"
     test_file.write_text("# test model\n")
     subprocess.run(["git", "add", "model.py"], cwd=repo, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Initial commit"], cwd=repo, capture_output=True, check=True
-    )
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo, capture_output=True, check=True)
 
     return repo, test_file
 

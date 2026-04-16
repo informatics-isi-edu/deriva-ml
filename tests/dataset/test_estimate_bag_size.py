@@ -66,7 +66,7 @@ def _make_mock_datapath(uri: str) -> tuple[MagicMock, MagicMock]:
 
     def _mock_attributes(*cols):
         """Build a mock ResultSet with the correct attribute URI."""
-        col_names = ",".join(c._projection_name if hasattr(c, '_projection_name') else str(c) for c in cols)
+        col_names = ",".join(c._projection_name if hasattr(c, "_projection_name") else str(c) for c in cols)
         attr_uri = uri.replace("/entity/", "/attribute/") + "/" + col_names
         rs = MagicMock()
         rs.uri = attr_uri
@@ -207,7 +207,12 @@ class TestEstimateBagSizeUnionSemantics:
         """Basic case: one path to an asset table."""
         aggregate_queries = {
             "Image": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"
+                    ),
+                    True,
+                ),
             ],
         }
         # 100 RIDs for the csv query, 100 (RID, Length) pairs for the fetch query
@@ -236,8 +241,18 @@ class TestEstimateBagSizeUnionSemantics:
         """Same table via two paths with overlapping RIDs — exact union count."""
         aggregate_queries = {
             "OCT_DICOM": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_OCT/S:OCT_DICOM"), True),
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_CGM/S:CGM/S:OCT_DICOM"), True),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_OCT/S:OCT_DICOM"
+                    ),
+                    True,
+                ),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_CGM/S:CGM/S:OCT_DICOM"
+                    ),
+                    True,
+                ),
             ],
         }
         # Path 1: 200 rows (RID-001..RID-200), each 3.44MB
@@ -271,8 +286,18 @@ class TestEstimateBagSizeUnionSemantics:
         """First path returns 0, second has real data — union picks the real data."""
         aggregate_queries = {
             "Observation": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_A/S:Observation"), False),
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_B/S:Observation"), False),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_A/S:Observation"
+                    ),
+                    False,
+                ),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Path_B/S:Observation"
+                    ),
+                    False,
+                ),
             ],
         }
         result = _run_estimate(
@@ -293,9 +318,24 @@ class TestEstimateBagSizeUnionSemantics:
         """All paths for a table are queried (no first-wins dedup)."""
         aggregate_queries = {
             "OCT": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:OCT"), True),
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:OCT"), True),
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathC/S:OCT"), True),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:OCT"
+                    ),
+                    True,
+                ),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:OCT"
+                    ),
+                    True,
+                ),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathC/S:OCT"
+                    ),
+                    True,
+                ),
             ],
         }
 
@@ -307,7 +347,12 @@ class TestEstimateBagSizeUnionSemantics:
         """Table with no assets (is_asset=False) only produces csv queries."""
         aggregate_queries = {
             "Subject": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"), False),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"
+                    ),
+                    False,
+                ),
             ],
         }
         result = _run_estimate(
@@ -327,7 +372,12 @@ class TestEstimateBagSizeUnionSemantics:
         """When a query fails, it should contribute 0 (not break)."""
         aggregate_queries = {
             "BadTable": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BadTable"), True),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BadTable"
+                    ),
+                    True,
+                ),
             ],
         }
         result = _run_estimate(
@@ -346,10 +396,20 @@ class TestEstimateBagSizeUnionSemantics:
         """Verify total_asset_bytes equals sum of all per-table asset_bytes."""
         aggregate_queries = {
             "Image": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"), True),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Image/S:Image"
+                    ),
+                    True,
+                ),
             ],
             "Report": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Report/S:Report"), True),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Report/S:Report"
+                    ),
+                    True,
+                ),
             ],
         }
         result = _run_estimate(
@@ -364,16 +424,25 @@ class TestEstimateBagSizeUnionSemantics:
 
         per_table_total = sum(t["asset_bytes"] for t in result["tables"].values())
         assert result["total_asset_bytes"] == per_table_total, (
-            f"total_asset_bytes ({result['total_asset_bytes']}) != "
-            f"sum of per-table asset_bytes ({per_table_total})"
+            f"total_asset_bytes ({result['total_asset_bytes']}) != sum of per-table asset_bytes ({per_table_total})"
         )
 
     def test_disjoint_paths_exact_count(self):
         """Two paths with completely disjoint RIDs — count is the full union (not max)."""
         aggregate_queries = {
             "Image": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:Image"), False),
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:Image"), False),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathA/S:Image"
+                    ),
+                    False,
+                ),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:PathB/S:Image"
+                    ),
+                    False,
+                ),
             ],
         }
         result = _run_estimate(
@@ -405,13 +474,10 @@ class TestEstimateBagSizeUnionSemantics:
         )
         # Linked datapaths should NOT have .RID
         assert not hasattr(dp, "RID"), (
-            "Mock datapath should not expose .RID — "
-            "real linked datapaths don't have column attributes"
+            "Mock datapath should not expose .RID — real linked datapaths don't have column attributes"
         )
         # The target_table reference SHOULD have .RID
-        assert hasattr(target_table, "RID"), (
-            "target_table must expose .RID for use in .attributes() calls"
-        )
+        assert hasattr(target_table, "RID"), "target_table must expose .RID for use in .attributes() calls"
 
 
 class TestEstimateBagSizeCsvEstimation:
@@ -421,7 +487,12 @@ class TestEstimateBagSizeCsvEstimation:
         """Sample entity rows produce a non-zero csv_bytes estimate."""
         aggregate_queries = {
             "Subject": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"), False),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Dataset_Subject/S:Subject"
+                    ),
+                    False,
+                ),
             ],
         }
         # 50 RIDs for the csv query
@@ -450,10 +521,20 @@ class TestEstimateBagSizeCsvEstimation:
         """Tables with large text columns produce proportionally larger csv_bytes."""
         aggregate_queries = {
             "SmallTable": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:SmallTable"), False),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:SmallTable"
+                    ),
+                    False,
+                ),
             ],
             "BigTable": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BigTable"), False),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:BigTable"
+                    ),
+                    False,
+                ),
             ],
         }
         small_rids = _make_rids(*[f"S-{i}" for i in range(100)])
@@ -461,10 +542,7 @@ class TestEstimateBagSizeCsvEstimation:
         # SmallTable: small rows (~30 bytes each)
         small_samples = [{"RID": f"S-{i}", "Label": "ok"} for i in range(10)]
         # BigTable: rows with large text fields (~10KB each)
-        big_samples = [
-            {"RID": f"B-{i}", "OCR_Text": "x" * 10000, "Raw_Data": "y" * 5000}
-            for i in range(10)
-        ]
+        big_samples = [{"RID": f"B-{i}", "OCR_Text": "x" * 10000, "Raw_Data": "y" * 5000} for i in range(10)]
 
         result = _run_estimate(
             aggregate_queries,
@@ -480,15 +558,19 @@ class TestEstimateBagSizeCsvEstimation:
         small_csv = result["tables"]["SmallTable"]["csv_bytes"]
         big_csv = result["tables"]["BigTable"]["csv_bytes"]
         assert big_csv > small_csv * 10, (
-            f"BigTable csv_bytes ({big_csv}) should be much larger than "
-            f"SmallTable csv_bytes ({small_csv})"
+            f"BigTable csv_bytes ({big_csv}) should be much larger than SmallTable csv_bytes ({small_csv})"
         )
 
     def test_csv_bytes_zero_when_no_sample(self):
         """Tables with no sample rows get csv_bytes=0."""
         aggregate_queries = {
             "Empty": [
-                (*_make_mock_datapath("https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Empty"), False),
+                (
+                    *_make_mock_datapath(
+                        "https://test.example.org/ermrest/catalog/99/entity/S:Dataset/RID=TEST-RID/S:Empty"
+                    ),
+                    False,
+                ),
             ],
         }
         result = _run_estimate(

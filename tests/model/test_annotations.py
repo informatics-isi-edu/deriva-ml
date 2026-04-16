@@ -70,9 +70,7 @@ class TestDisplay:
 
     def test_with_name_style(self):
         """Test display with name style."""
-        display = Display(
-            name_style=NameStyle(underline_space=True, title_case=True)
-        )
+        display = Display(name_style=NameStyle(underline_space=True, title_case=True))
         result = display.to_dict()
         assert result["name_style"] == {
             "underline_space": True,
@@ -81,10 +79,7 @@ class TestDisplay:
 
     def test_with_show_null(self):
         """Test display with show_null options."""
-        display = Display(
-            name="Table",
-            show_null={CONTEXT_COMPACT: False, CONTEXT_DETAILED: True}
-        )
+        display = Display(name="Table", show_null={CONTEXT_COMPACT: False, CONTEXT_DETAILED: True})
         result = display.to_dict()
         assert result["show_null"] == {
             "compact": False,
@@ -142,15 +137,9 @@ class TestPseudoColumn:
 
     def test_fk_path(self):
         """Test pseudo-column with FK traversal."""
-        pc = PseudoColumn(
-            source=[OutboundFK("domain", "Image_Subject_fkey"), "Name"],
-            markdown_name="Subject"
-        )
+        pc = PseudoColumn(source=[OutboundFK("domain", "Image_Subject_fkey"), "Name"], markdown_name="Subject")
         result = pc.to_dict()
-        assert result["source"] == [
-            {"outbound": ["domain", "Image_Subject_fkey"]},
-            "Name"
-        ]
+        assert result["source"] == [{"outbound": ["domain", "Image_Subject_fkey"]}, "Name"]
         assert result["markdown_name"] == "Subject"
 
     def test_with_aggregate(self):
@@ -158,7 +147,7 @@ class TestPseudoColumn:
         pc = PseudoColumn(
             source=[InboundFK("domain", "Image_Subject_fkey"), "RID"],
             aggregate=Aggregate.CNT,
-            markdown_name="Image Count"
+            markdown_name="Image Count",
         )
         result = pc.to_dict()
         assert result["aggregate"] == "cnt"
@@ -172,10 +161,7 @@ class TestPseudoColumn:
         """Test pseudo-column with display options."""
         pc = PseudoColumn(
             source="URL",
-            display=PseudoColumnDisplay(
-                markdown_pattern="[Link]({{{_value}}})",
-                show_foreign_key_link=False
-            )
+            display=PseudoColumnDisplay(markdown_pattern="[Link]({{{_value}}})", show_foreign_key_link=False),
         )
         result = pc.to_dict()
         assert result["display"]["markdown_pattern"] == "[Link]({{{_value}}})"
@@ -221,11 +207,13 @@ class TestVisibleColumns:
     def test_with_pseudo_columns(self):
         """Test with pseudo-column entries."""
         vc = VisibleColumns()
-        vc.compact([
-            "RID",
-            PseudoColumn(source="Name", markdown_name="Subject Name"),
-            fk_constraint("domain", "Image_Subject_fkey"),
-        ])
+        vc.compact(
+            [
+                "RID",
+                PseudoColumn(source="Name", markdown_name="Subject Name"),
+                fk_constraint("domain", "Image_Subject_fkey"),
+            ]
+        )
 
         result = vc.to_dict()
         assert result["compact"][0] == "RID"
@@ -248,10 +236,12 @@ class TestVisibleForeignKeys:
     def test_basic_usage(self):
         """Test basic FK visibility."""
         vfk = VisibleForeignKeys()
-        vfk.detailed([
-            fk_constraint("domain", "Image_Subject_fkey"),
-            fk_constraint("domain", "Diagnosis_Subject_fkey"),
-        ])
+        vfk.detailed(
+            [
+                fk_constraint("domain", "Image_Subject_fkey"),
+                fk_constraint("domain", "Diagnosis_Subject_fkey"),
+            ]
+        )
 
         result = vfk.to_dict()
         assert vfk.tag == TAG_VISIBLE_FOREIGN_KEYS
@@ -282,25 +272,16 @@ class TestTableDisplay:
     def test_compact_options(self):
         """Test compact view options."""
         td = TableDisplay()
-        td.compact(TableDisplayOptions(
-            row_order=[SortKey("Name"), SortKey("Created", descending=True)],
-            page_size=25
-        ))
+        td.compact(TableDisplayOptions(row_order=[SortKey("Name"), SortKey("Created", descending=True)], page_size=25))
 
         result = td.to_dict()
         assert result["compact"]["page_size"] == 25
-        assert result["compact"]["row_order"] == [
-            "Name",
-            {"column": "Created", "descending": True}
-        ]
+        assert result["compact"]["row_order"] == ["Name", {"column": "Created", "descending": True}]
 
     def test_with_template_engine(self):
         """Test setting template engine."""
         td = TableDisplay()
-        td.row_name(
-            "{{{Name}}}",
-            template_engine=TemplateEngine.HANDLEBARS
-        )
+        td.row_name("{{{Name}}}", template_engine=TemplateEngine.HANDLEBARS)
 
         result = td.to_dict()
         assert result["row_name"]["template_engine"] == "handlebars"
@@ -312,9 +293,7 @@ class TestColumnDisplay:
     def test_pre_format(self):
         """Test pre-formatting options."""
         cd = ColumnDisplay()
-        cd.default(ColumnDisplayOptions(
-            pre_format=PreFormat(format="%.2f")
-        ))
+        cd.default(ColumnDisplayOptions(pre_format=PreFormat(format="%.2f")))
 
         result = cd.to_dict()
         assert cd.tag == TAG_COLUMN_DISPLAY
@@ -323,12 +302,7 @@ class TestColumnDisplay:
     def test_boolean_format(self):
         """Test boolean formatting."""
         cd = ColumnDisplay()
-        cd.default(ColumnDisplayOptions(
-            pre_format=PreFormat(
-                bool_true_value="Yes",
-                bool_false_value="No"
-            )
-        ))
+        cd.default(ColumnDisplayOptions(pre_format=PreFormat(bool_true_value="Yes", bool_false_value="No")))
 
         result = cd.to_dict()
         assert result["*"]["pre_format"]["bool_true_value"] == "Yes"
@@ -337,9 +311,7 @@ class TestColumnDisplay:
     def test_markdown_pattern(self):
         """Test markdown pattern."""
         cd = ColumnDisplay()
-        cd.default(ColumnDisplayOptions(
-            markdown_pattern="[Link]({{{_value}}})"
-        ))
+        cd.default(ColumnDisplayOptions(markdown_pattern="[Link]({{{_value}}})"))
 
         result = cd.to_dict()
         assert result["*"]["markdown_pattern"] == "[Link]({{{_value}}})"
@@ -364,7 +336,7 @@ class TestFacet:
                 FacetRange(min=0, max=18),
                 FacetRange(min=18, max=65),
                 FacetRange(min=65),
-            ]
+            ],
         )
         result = facet.to_dict()
         assert result["ux_mode"] == "ranges"
@@ -372,20 +344,13 @@ class TestFacet:
 
     def test_facet_with_choices(self):
         """Test facet with preset choices."""
-        facet = Facet(
-            source="Status",
-            ux_mode=FacetUxMode.CHOICES,
-            choices=["Active", "Inactive", "Pending"]
-        )
+        facet = Facet(source="Status", ux_mode=FacetUxMode.CHOICES, choices=["Active", "Inactive", "Pending"])
         result = facet.to_dict()
         assert result["choices"] == ["Active", "Inactive", "Pending"]
 
     def test_facet_with_fk_path(self):
         """Test facet with FK traversal."""
-        facet = Facet(
-            source=[OutboundFK("domain", "Image_Subject_fkey"), "Species"],
-            markdown_name="Species"
-        )
+        facet = Facet(source=[OutboundFK("domain", "Image_Subject_fkey"), "Species"], markdown_name="Species")
         result = facet.to_dict()
         assert result["source"][0] == {"outbound": ["domain", "Image_Subject_fkey"]}
 
@@ -395,10 +360,12 @@ class TestFacetList:
 
     def test_facet_list(self):
         """Test creating a facet list."""
-        facets = FacetList([
-            Facet(source="Species", open=True),
-            Facet(source="Age", ux_mode=FacetUxMode.RANGES),
-        ])
+        facets = FacetList(
+            [
+                Facet(source="Species", open=True),
+                Facet(source="Age", ux_mode=FacetUxMode.RANGES),
+            ]
+        )
 
         result = facets.to_dict()
         assert "and" in result
@@ -459,22 +426,23 @@ class TestComplexScenarios:
         vc = VisibleColumns()
 
         # Compact view: basic columns
-        vc.compact([
-            "RID",
-            "Name",
-            fk_constraint("domain", "Image_Subject_fkey"),
-        ])
+        vc.compact(
+            [
+                "RID",
+                "Name",
+                fk_constraint("domain", "Image_Subject_fkey"),
+            ]
+        )
 
         # Detailed view: more columns with pseudo-column
-        vc.detailed([
-            "RID",
-            "Name",
-            PseudoColumn(
-                source=[OutboundFK("domain", "Image_Subject_fkey"), "Name"],
-                markdown_name="Subject Name"
-            ),
-            "Description",
-        ])
+        vc.detailed(
+            [
+                "RID",
+                "Name",
+                PseudoColumn(source=[OutboundFK("domain", "Image_Subject_fkey"), "Name"], markdown_name="Subject Name"),
+                "Description",
+            ]
+        )
 
         # Entry view: editable columns
         vc.entry(["Name", "Description"])
@@ -492,15 +460,19 @@ class TestComplexScenarios:
         td.row_name("{{{Name}}} - {{{RID}}}")
 
         # Compact view options
-        td.compact(TableDisplayOptions(
-            row_order=[SortKey("Name")],
-            page_size=50,
-        ))
+        td.compact(
+            TableDisplayOptions(
+                row_order=[SortKey("Name")],
+                page_size=50,
+            )
+        )
 
         # Detailed view options
-        td.detailed(TableDisplayOptions(
-            collapse_toc_panel=True,
-        ))
+        td.detailed(
+            TableDisplayOptions(
+                collapse_toc_panel=True,
+            )
+        )
 
         result = td.to_dict()
         assert "row_name" in result
