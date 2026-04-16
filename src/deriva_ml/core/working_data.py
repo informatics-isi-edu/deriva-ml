@@ -16,7 +16,6 @@ Location: {working_dir}/working-data/catalog.db
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +43,13 @@ class WorkingDataCache:
     """
 
     def __init__(self, working_dir: Path):
+        import warnings
+
+        warnings.warn(
+            "WorkingDataCache is deprecated; use deriva_ml.local_db.workspace.Workspace instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._db_dir = working_dir / "working-data"
         self._db_dir.mkdir(parents=True, exist_ok=True)
         self._db_path = self._db_dir / "catalog.db"
@@ -90,10 +96,7 @@ class WorkingDataCache:
             ValueError: If the table does not exist in the cache.
         """
         if not self.has_table(table_name):
-            raise ValueError(
-                f"Table '{table_name}' not found in cache. "
-                f"Available: {self.list_tables()}"
-            )
+            raise ValueError(f"Table '{table_name}' not found in cache. Available: {self.list_tables()}")
         return pd.read_sql_table(table_name, self.engine)
 
     def query(self, sql: str) -> pd.DataFrame:
@@ -144,17 +147,12 @@ class WorkingDataCache:
 
         columns = inspect(self.engine).get_columns(table_name)
         with self.engine.connect() as conn:
-            row_count = conn.execute(
-                text(f"SELECT COUNT(*) FROM [{table_name}]")
-            ).scalar()
+            row_count = conn.execute(text(f"SELECT COUNT(*) FROM [{table_name}]")).scalar()
 
         return {
             "table_name": table_name,
             "row_count": row_count,
-            "columns": [
-                {"name": c["name"], "type": str(c["type"])}
-                for c in columns
-            ],
+            "columns": [{"name": c["name"], "type": str(c["type"])} for c in columns],
         }
 
     def status(self) -> dict[str, Any]:

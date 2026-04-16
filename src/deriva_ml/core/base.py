@@ -25,6 +25,7 @@ import requests
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+
 _deriva_core = importlib.import_module("deriva.core")
 _deriva_server = importlib.import_module("deriva.core.deriva_server")
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
@@ -280,6 +281,7 @@ class DerivaML(
         self.catalog = server.connect_ermrest(catalog_id)
         # Import here to avoid circular imports
         from deriva_ml.model.catalog import DerivaModel
+
         self.model = DerivaModel(
             self.catalog.getCatalogModel(),
             ml_schema=ml_schema,
@@ -433,11 +435,11 @@ class DerivaML(
 
     @property
     def working_data(self):
-        """Access the working data cache for this catalog.
+        """Per-catalog working-DB view (pandas-table roundtrips).
 
-        Returns a :class:`WorkingDataCache` backed by a SQLite database in
-        the working directory. Use this to cache catalog query results
-        (tables, denormalized views, feature values) for reuse across scripts.
+        Backed by ``Workspace`` under ``{working_dir}/catalogs/{host}__{cat}/
+        working.db``. Shared across invocations of scripts that use the same
+        working directory.
 
         Example::
 
@@ -450,11 +452,15 @@ class DerivaML(
             # Clear the cache
             ml.working_data.clear()
         """
-        from deriva_ml.core.working_data import WorkingDataCache
+        from deriva_ml.local_db.workspace import Workspace
 
-        if not hasattr(self, "_working_data"):
-            self._working_data = WorkingDataCache(self.working_dir)
-        return self._working_data
+        if not hasattr(self, "_workspace"):
+            self._workspace = Workspace(
+                working_dir=self.working_dir,
+                hostname=self.host_name,
+                catalog_id=self.catalog_id,
+            )
+        return self._workspace.legacy_working_data_view()
 
     def cache_table(self, table_name: str, force: bool = False) -> "pd.DataFrame":
         """Fetch a table from the catalog and cache locally as SQLite.
@@ -520,12 +526,8 @@ class DerivaML(
         if not force and self.working_data.has_table(cache_key):
             return self.working_data.read_table(cache_key)
 
-        features = self.fetch_table_features(
-            table_name, feature_name=feature_name, **kwargs
-        )
-        records = [
-            r.model_dump(mode="json") for r in features.get(feature_name, [])
-        ]
+        features = self.fetch_table_features(table_name, feature_name=feature_name, **kwargs)
+        records = [r.model_dump(mode="json") for r in features.get(feature_name, [])]
         df = pd.DataFrame(records)
         self.working_data.cache_table(cache_key, df)
         return df
@@ -754,44 +756,49 @@ class DerivaML(
         for domain_schema in sorted(self.domain_schemas):
             if domain_schema not in self.model.schemas:
                 continue
-            domain_schema_menus.append({
-                "name": domain_schema,
-                "children": [
-                    {
-                        "name": tname,
-                        "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                    }
-                    for tname in self.model.schemas[domain_schema].tables
-                    # Don't include controlled vocabularies, association tables, or feature tables.
-                    if not (
-                        self.model.is_vocabulary(tname)
-                        or self.model.is_association(tname, pure=False, max_arity=3)
-                    )
-                ],
-            })
+            domain_schema_menus.append(
+                {
+                    "name": domain_schema,
+                    "children": [
+                        {
+                            "name": tname,
+                            "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
+                        }
+                        for tname in self.model.schemas[domain_schema].tables
+                        # Don't include controlled vocabularies, association tables, or feature tables.
+                        if not (
+                            self.model.is_vocabulary(tname) or self.model.is_association(tname, pure=False, max_arity=3)
+                        )
+                    ],
+                }
+            )
 
         # Build vocabulary menu items (ML schema + all domain schemas)
         vocab_children = [{"name": f"{ml_schema} Vocabularies", "header": True}]
-        vocab_children.extend([
-            {
-                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
-                "name": tname,
-            }
-            for tname in self.model.schemas[ml_schema].tables
-            if self.model.is_vocabulary(tname)
-        ])
+        vocab_children.extend(
+            [
+                {
+                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
+                    "name": tname,
+                }
+                for tname in self.model.schemas[ml_schema].tables
+                if self.model.is_vocabulary(tname)
+            ]
+        )
         for domain_schema in sorted(self.domain_schemas):
             if domain_schema not in self.model.schemas:
                 continue
             vocab_children.append({"name": f"{domain_schema} Vocabularies", "header": True})
-            vocab_children.extend([
-                {
-                    "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                    "name": tname,
-                }
-                for tname in self.model.schemas[domain_schema].tables
-                if self.model.is_vocabulary(tname)
-            ])
+            vocab_children.extend(
+                [
+                    {
+                        "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
+                        "name": tname,
+                    }
+                    for tname in self.model.schemas[domain_schema].tables
+                    if self.model.is_vocabulary(tname)
+                ]
+            )
 
         # Build asset menu items (ML schema + all domain schemas)
         asset_children = [
@@ -805,14 +812,16 @@ class DerivaML(
         for domain_schema in sorted(self.domain_schemas):
             if domain_schema not in self.model.schemas:
                 continue
-            asset_children.extend([
-                {
-                    "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                    "name": tname,
-                }
-                for tname in self.model.schemas[domain_schema].tables
-                if self.model.is_asset(tname)
-            ])
+            asset_children.extend(
+                [
+                    {
+                        "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
+                        "name": tname,
+                    }
+                    for tname in self.model.schemas[domain_schema].tables
+                    if self.model.is_asset(tname)
+                ]
+            )
 
         catalog_annotation = {
             deriva_tags.display: {"name_style": {"underline_space": True}},
@@ -1131,7 +1140,7 @@ class DerivaML(
 
         # Create table in domain schema using provided definition
         # Handle both TableDefinition (dataclass with to_dict) and plain dicts
-        table_dict = table.to_dict() if hasattr(table, 'to_dict') else table
+        table_dict = table.to_dict() if hasattr(table, "to_dict") else table
         new_table = self.model.schemas[schema].create_table(table_dict)
 
         # Update navbar to include the new table
@@ -1222,7 +1231,7 @@ class DerivaML(
         import shutil
         import time
 
-        stats = {'files_removed': 0, 'dirs_removed': 0, 'bytes_freed': 0, 'errors': 0}
+        stats = {"files_removed": 0, "dirs_removed": 0, "bytes_freed": 0, "errors": 0}
 
         if not self.cache_dir.exists():
             return stats
@@ -1242,22 +1251,22 @@ class DerivaML(
 
                     # Calculate size before removal
                     if entry.is_dir():
-                        entry_size = sum(f.stat().st_size for f in entry.rglob('*') if f.is_file())
+                        entry_size = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
                         shutil.rmtree(entry)
-                        stats['dirs_removed'] += 1
+                        stats["dirs_removed"] += 1
                     else:
                         entry_size = entry.stat().st_size
                         entry.unlink()
-                        stats['files_removed'] += 1
+                        stats["files_removed"] += 1
 
-                    stats['bytes_freed'] += entry_size
+                    stats["bytes_freed"] += entry_size
                 except (OSError, PermissionError) as e:
                     self._logger.warning(f"Failed to remove cache entry {entry}: {e}")
-                    stats['errors'] += 1
+                    stats["errors"] += 1
 
         except OSError as e:
             self._logger.error(f"Failed to iterate cache directory: {e}")
-            stats['errors'] += 1
+            stats["errors"] += 1
 
         return stats
 
@@ -1276,19 +1285,19 @@ class DerivaML(
             >>> size = ml.get_cache_size()
             >>> print(f"Cache size: {size['total_mb']:.1f} MB ({size['file_count']} files)")
         """
-        stats = {'total_bytes': 0, 'total_mb': 0.0, 'file_count': 0, 'dir_count': 0}
+        stats = {"total_bytes": 0, "total_mb": 0.0, "file_count": 0, "dir_count": 0}
 
         if not self.cache_dir.exists():
             return stats
 
-        for entry in self.cache_dir.rglob('*'):
+        for entry in self.cache_dir.rglob("*"):
             if entry.is_file():
-                stats['total_bytes'] += entry.stat().st_size
-                stats['file_count'] += 1
+                stats["total_bytes"] += entry.stat().st_size
+                stats["file_count"] += 1
             elif entry.is_dir():
-                stats['dir_count'] += 1
+                stats["dir_count"] += 1
 
-        stats['total_mb'] = stats['total_bytes'] / (1024 * 1024)
+        stats["total_mb"] = stats["total_bytes"] / (1024 * 1024)
         return stats
 
     def list_execution_dirs(self) -> list[dict[str, any]]:
@@ -1324,20 +1333,22 @@ class DerivaML(
 
         for entry in exec_root.iterdir():
             if entry.is_dir():
-                size_bytes = sum(f.stat().st_size for f in entry.rglob('*') if f.is_file())
-                file_count = sum(1 for f in entry.rglob('*') if f.is_file())
+                size_bytes = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
+                file_count = sum(1 for f in entry.rglob("*") if f.is_file())
                 mtime = datetime.fromtimestamp(entry.stat().st_mtime)
 
-                results.append({
-                    'execution_rid': entry.name,
-                    'path': str(entry),
-                    'size_bytes': size_bytes,
-                    'size_mb': size_bytes / (1024 * 1024),
-                    'modified': mtime,
-                    'file_count': file_count,
-                })
+                results.append(
+                    {
+                        "execution_rid": entry.name,
+                        "path": str(entry),
+                        "size_bytes": size_bytes,
+                        "size_mb": size_bytes / (1024 * 1024),
+                        "modified": mtime,
+                        "file_count": file_count,
+                    }
+                )
 
-        return sorted(results, key=lambda x: x['modified'], reverse=True)
+        return sorted(results, key=lambda x: x["modified"], reverse=True)
 
     def clean_execution_dirs(
         self,
@@ -1374,7 +1385,7 @@ class DerivaML(
 
         from deriva_ml.dataset.upload import upload_root
 
-        stats = {'dirs_removed': 0, 'bytes_freed': 0, 'errors': 0}
+        stats = {"dirs_removed": 0, "bytes_freed": 0, "errors": 0}
         exclude_rids = set(exclude_rids or [])
 
         exec_root = upload_root(self.working_dir) / "execution"
@@ -1401,14 +1412,14 @@ class DerivaML(
                         continue
 
                 # Calculate size before removal
-                entry_size = sum(f.stat().st_size for f in entry.rglob('*') if f.is_file())
+                entry_size = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
                 shutil.rmtree(entry)
-                stats['dirs_removed'] += 1
-                stats['bytes_freed'] += entry_size
+                stats["dirs_removed"] += 1
+                stats["bytes_freed"] += entry_size
 
             except (OSError, PermissionError) as e:
                 self._logger.warning(f"Failed to remove execution dir {entry}: {e}")
-                stats['errors'] += 1
+                stats["errors"] += 1
 
         return stats
 
@@ -1435,16 +1446,16 @@ class DerivaML(
         cache_stats = self.get_cache_size()
         exec_dirs = self.list_execution_dirs()
 
-        exec_size_mb = sum(d['size_mb'] for d in exec_dirs)
+        exec_size_mb = sum(d["size_mb"] for d in exec_dirs)
 
         return {
-            'working_dir': str(self.working_dir),
-            'cache_dir': str(self.cache_dir),
-            'cache_size_mb': cache_stats['total_mb'],
-            'cache_file_count': cache_stats['file_count'],
-            'execution_dir_count': len(exec_dirs),
-            'execution_size_mb': exec_size_mb,
-            'total_size_mb': cache_stats['total_mb'] + exec_size_mb,
+            "working_dir": str(self.working_dir),
+            "cache_dir": str(self.cache_dir),
+            "cache_size_mb": cache_stats["total_mb"],
+            "cache_file_count": cache_stats["file_count"],
+            "execution_dir_count": len(exec_dirs),
+            "execution_size_mb": exec_size_mb,
+            "total_size_mb": cache_stats["total_mb"] + exec_size_mb,
         }
 
     # =========================================================================
@@ -1510,6 +1521,7 @@ class DerivaML(
             - deriva_ml.schema.validation.validate_ml_schema
         """
         from deriva_ml.schema.validation import validate_ml_schema
+
         return validate_ml_schema(self, strict=strict)
 
     # Methods moved to mixins:
@@ -1554,4 +1566,3 @@ def _find_context_file(start: Path) -> Path:
         "Connect to a catalog first using the MCP 'connect_catalog' tool, "
         "or create the file manually with hostname, catalog_id, and default_schema."
     )
-

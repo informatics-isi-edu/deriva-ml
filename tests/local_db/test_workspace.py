@@ -194,3 +194,21 @@ class TestWorkspaceClose:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         ws.close()
         ws.close()  # Should not raise
+
+
+class TestDerivaMLIntegration:
+    def test_ml_working_data_uses_workspace_path(self, tmp_path: Path) -> None:
+        """DerivaML.working_data should write to catalogs/{host}__{cat}/working.db."""
+        from deriva_ml import DerivaML
+        import pandas as pd
+
+        ml = DerivaML.__new__(DerivaML)
+        ml.working_dir = tmp_path
+        ml.host_name = "example.org"
+        ml.catalog_id = "9"
+
+        wd = ml.working_data
+        wd.cache_table("demo", pd.DataFrame({"x": [1]}))
+
+        expected = tmp_path / "catalogs" / "example.org__9" / "working.db"
+        assert expected.is_file()
