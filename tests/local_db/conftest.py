@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from deriva.core.ermrest_model import Model
+from sqlalchemy.orm import Session
+
+from deriva_ml.local_db.schema import LocalSchema
+from deriva_ml.model.catalog import DerivaModel
 
 
 @pytest.fixture
@@ -18,7 +23,179 @@ def canned_bag_schema(tmp_path: Path) -> Path:
       - schema 'deriva-ml' with table 'Dataset'
       - Image has FK to Subject and FK to Dataset
     """
-    schema_doc = {
+    schema_doc = _base_schema_doc()
+    out = tmp_path / "schema.json"
+    out.write_text(json.dumps(schema_doc))
+    return out
+
+
+@pytest.fixture
+def canned_bag_model(canned_bag_schema: Path) -> Model:
+    """Load the canned bag schema as a deriva Model."""
+    return Model.fromfile("file-system", canned_bag_schema)
+
+
+# ---------------------------------------------------------------------------
+# Extended schema with Dataset_Image association table (for denormalize tests)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def denorm_schema(tmp_path: Path) -> Path:
+    """Canned schema with a Dataset_Image association table.
+
+    FK graph: Dataset <-- Dataset_Image --> Image --> Subject
+    """
+    doc = _base_schema_doc()
+    # Add Dataset_Image to the deriva-ml schema
+    doc["schemas"]["deriva-ml"]["tables"]["Dataset_Image"] = {
+        "table_name": "Dataset_Image",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Dataset", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Dataset_Image",
+                        "column_name": "Dataset",
+                    }
+                ],
+                "referenced_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Dataset",
+                        "column_name": "RID",
+                    }
+                ],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Dataset_Image",
+                        "column_name": "Image",
+                    }
+                ],
+                "referenced_columns": [
+                    {
+                        "schema_name": "isa",
+                        "table_name": "Image",
+                        "column_name": "RID",
+                    }
+                ],
+            },
+        ],
+    }
+    out = tmp_path / "schema.json"
+    out.write_text(json.dumps(doc))
+    return out
+
+
+@pytest.fixture
+def denorm_model(denorm_schema: Path) -> Model:
+    """ERMrest Model loaded from the extended schema."""
+    return Model.fromfile("file-system", denorm_schema)
+
+
+@pytest.fixture
+def denorm_deriva_model(denorm_model: Model) -> DerivaModel:
+    """DerivaModel instance for join planning."""
+    return DerivaModel(
+        model=denorm_model,
+        ml_schema="deriva-ml",
+        domain_schemas={"isa"},
+    )
+
+
+@pytest.fixture
+def denorm_local_schema(denorm_model: Model, tmp_path: Path) -> LocalSchema:
+    """LocalSchema with tables from the extended schema."""
+    db_path = tmp_path / "denorm_db"
+    db_path.mkdir()
+    return LocalSchema.build(
+        model=denorm_model,
+        schemas=["isa", "deriva-ml"],
+        database_path=db_path,
+    )
+
+
+@pytest.fixture
+def populated_denorm(
+    denorm_deriva_model: DerivaModel,
+    denorm_local_schema: LocalSchema,
+) -> dict[str, Any]:
+    """LocalSchema pre-populated with test data for denormalization.
+
+    Returns a dict with:
+        model: DerivaModel
+        local_schema: LocalSchema
+        dataset_rid: str
+        subject_rids: list[str]
+        image_rids: list[str]
+    """
+    ls = denorm_local_schema
+    engine = ls.engine
+
+    ds_rid = "DS-001"
+    subj_rids = ["SUBJ-A", "SUBJ-B"]
+    img_rids = ["IMG-1", "IMG-2", "IMG-3"]
+
+    with Session(engine) as session:
+        # Insert subjects
+        subj_cls = ls.get_orm_class("Subject")
+        for rid, name in zip(subj_rids, ["Alice", "Bob"]):
+            session.add(subj_cls(RID=rid, Name=name))
+
+        # Insert images (IMG-3 has NULL subject for LEFT JOIN testing)
+        img_cls = ls.get_orm_class("Image")
+        session.add(img_cls(RID="IMG-1", Filename="a.png", Subject="SUBJ-A"))
+        session.add(img_cls(RID="IMG-2", Filename="b.png", Subject="SUBJ-B"))
+        session.add(img_cls(RID="IMG-3", Filename="c.png", Subject=None))
+
+        # Insert dataset
+        ds_cls = ls.get_orm_class("Dataset")
+        session.add(ds_cls(RID=ds_rid, Description="test dataset"))
+
+        # Insert associations
+        di_cls = ls.get_orm_class("Dataset_Image")
+        for img_rid in img_rids:
+            session.add(
+                di_cls(
+                    RID=f"DI-{img_rid}",
+                    Dataset=ds_rid,
+                    Image=img_rid,
+                )
+            )
+
+        session.commit()
+
+    return {
+        "model": denorm_deriva_model,
+        "local_schema": ls,
+        "dataset_rid": ds_rid,
+        "subject_rids": subj_rids,
+        "image_rids": img_rids,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
+def _base_schema_doc() -> dict:
+    """Return the base schema document (Subject, Image, Dataset)."""
+    return {
         "schemas": {
             "isa": {
                 "tables": {
@@ -84,12 +261,3 @@ def canned_bag_schema(tmp_path: Path) -> Path:
             },
         },
     }
-    out = tmp_path / "schema.json"
-    out.write_text(json.dumps(schema_doc))
-    return out
-
-
-@pytest.fixture
-def canned_bag_model(canned_bag_schema: Path) -> Model:
-    """Load the canned bag schema as a deriva Model."""
-    return Model.fromfile("file-system", canned_bag_schema)

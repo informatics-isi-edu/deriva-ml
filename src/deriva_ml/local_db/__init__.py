@@ -6,6 +6,7 @@ See ``README.md`` in this directory for a short orientation.
 
 from __future__ import annotations
 
+from deriva_ml.local_db.denormalize import DenormalizeResult, denormalize
 from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva_ml.local_db.paged_fetcher import PagedFetcher
 from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
@@ -13,9 +14,11 @@ from deriva_ml.local_db.schema import LocalSchema
 from deriva_ml.local_db.workspace import Workspace
 
 __all__ = [
+    "DenormalizeResult",
     "ErmrestPagedClient",
     "LocalSchema",
     "ManifestStore",
     "PagedFetcher",
     "Workspace",
+    "denormalize",
 ]
