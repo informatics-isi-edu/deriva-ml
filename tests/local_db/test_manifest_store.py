@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 
 from deriva_ml.asset.manifest import AssetEntry, FeatureEntry
 from deriva_ml.local_db.manifest_store import ManifestStore
@@ -107,6 +107,23 @@ class TestAssetCrud:
         with pytest.raises(KeyError):
             store.mark_asset_uploaded("4SP", "nope", rid="X")
 
+    def test_mark_failed_after_uploaded(self, store: ManifestStore) -> None:
+        """Marking a previously-uploaded asset as failed should work (last write wins)."""
+        entry = AssetEntry(asset_table="Image", schema="isa")
+        store.add_asset("4SP", "Image/x.jpg", entry)
+        store.mark_asset_uploaded("4SP", "Image/x.jpg", rid="1-RID")
+        store.mark_asset_failed("4SP", "Image/x.jpg", error="re-upload failed")
+        got = store.get_asset("4SP", "Image/x.jpg")
+        assert got.status == "failed"
+        assert got.error == "re-upload failed"
+        # The uploaded_at and rid from the previous upload should be preserved
+        # (mark_failed only sets status, error, updated_at)
+        assert got.rid == "1-RID"
+
+    def test_update_types_missing_raises(self, store: ManifestStore) -> None:
+        with pytest.raises(KeyError):
+            store.update_asset_types("4SP", "nonexistent", ["A"])
+
 
 class TestFeatureCrud:
     def test_add_and_list(self, store: ManifestStore) -> None:
@@ -128,11 +145,9 @@ class TestFeatureCrud:
         assert got == {}
 
     def test_add_feature_replaces_existing(self, store: ManifestStore) -> None:
-        f1 = FeatureEntry(feature_name="D", target_table="Image", schema="isa",
-                          values_path="/v1.csv", status="pending")
+        f1 = FeatureEntry(feature_name="D", target_table="Image", schema="isa", values_path="/v1.csv", status="pending")
         store.add_feature("4SP", "D", f1)
-        f2 = FeatureEntry(feature_name="D", target_table="Image", schema="isa",
-                          values_path="/v2.csv", status="pending")
+        f2 = FeatureEntry(feature_name="D", target_table="Image", schema="isa", values_path="/v2.csv", status="pending")
         store.add_feature("4SP", "D", f2)
         got = store.list_features("4SP")
         assert got["D"].values_path == "/v2.csv"

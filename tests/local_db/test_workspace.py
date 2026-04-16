@@ -63,6 +63,20 @@ class TestWorkspaceCreation:
         with pytest.raises(RuntimeError, match="closed"):
             _ = ws.engine
 
+    def test_engine_is_memoized(self, tmp_path: Path) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            assert ws.engine is ws.engine
+        finally:
+            ws.close()
+
+    def test_manifest_store_is_memoized(self, tmp_path: Path) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            assert ws.manifest_store() is ws.manifest_store()
+        finally:
+            ws.close()
+
 
 class TestAttachSlice:
     def test_attach_context_manager(self, tmp_path: Path) -> None:
@@ -181,6 +195,34 @@ class TestLegacyWorkingDataView:
         try:
             view = ws.legacy_working_data_view()
             assert view.workspace is ws
+        finally:
+            ws.close()
+
+    def test_drop_table_refuses_reserved_tables(self, tmp_path: Path) -> None:
+        """drop_table silently refuses to drop infrastructure tables."""
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            store = ws.manifest_store()
+            from deriva_ml.asset.manifest import AssetEntry
+
+            store.add_asset("EX1", "Image/a.jpg", AssetEntry(asset_table="Image", schema="isa"))
+
+            view = ws.legacy_working_data_view()
+            view.drop_table("execution_state__assets")  # Should be silently refused
+            view.drop_table("schema_meta")  # Same
+
+            # Tables still exist
+            rows = store.list_assets("EX1")
+            assert "Image/a.jpg" in rows
+        finally:
+            ws.close()
+
+    def test_cache_table_rejects_non_dataframe(self, tmp_path: Path) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            view = ws.legacy_working_data_view()
+            with pytest.raises(TypeError, match="Expected DataFrame"):
+                view.cache_table("bad", [1, 2, 3])
         finally:
             ws.close()
 

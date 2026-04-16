@@ -166,6 +166,41 @@ class TestLocalSchemaReadOnly:
         finally:
             ro.dispose()
 
+    def test_read_only_returns_previously_written_data(self, canned_bag_model: Model, tmp_path: Path) -> None:
+        """Data written via writable engine is visible through read-only engine."""
+        db = tmp_path / "ro_data_test.db"
+
+        # Write some data
+        rw = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=["isa", "deriva-ml"],
+            database_path=db,
+        )
+        dataset_t = rw.find_table("Dataset")
+        from sqlalchemy import insert
+
+        with rw.engine.begin() as conn:
+            conn.execute(insert(dataset_t).values(RID="TEST-1", Description="hello"))
+        rw.dispose()
+
+        # Re-open read-only (single schema to avoid NotImplementedError)
+        ro = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=["deriva-ml"],
+            database_path=db,
+            read_only=True,
+        )
+        try:
+            ro_t = ro.find_table("Dataset")
+            from sqlalchemy import select
+
+            with ro.engine.connect() as conn:
+                rows = conn.execute(select(ro_t)).mappings().all()
+            assert any(r["RID"] == "TEST-1" for r in rows)
+            assert any(r["Description"] == "hello" for r in rows)
+        finally:
+            ro.dispose()
+
     def test_read_only_multi_schema_not_supported(self, canned_bag_model: Model, tmp_path: Path) -> None:
         """Multi-schema read-only raises NotImplementedError (Phase 2 will address)."""
         db = tmp_path / "ro_multi.db"

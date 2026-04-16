@@ -206,3 +206,11 @@ class TestFromContext:
 
         with pytest.raises(FileNotFoundError, match="No .deriva-context.json"):
             _find_context_file(tmp_path)
+
+
+class TestDeprecationWarning:
+    def test_direct_instantiation_emits_warning(self, tmp_path):
+        from deriva_ml.core.working_data import WorkingDataCache
+
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            WorkingDataCache(tmp_path)

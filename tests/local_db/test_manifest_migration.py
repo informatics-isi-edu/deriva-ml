@@ -122,6 +122,36 @@ class TestManifestImport:
         finally:
             ws.close()
 
+    def test_missing_execution_rid_falls_back_to_parent_name(self, tmp_path: Path) -> None:
+        """When the JSON has no execution_rid key, use the parent directory name."""
+        d = tmp_path / "execution" / "PARENT-DIR-RID"
+        d.mkdir(parents=True)
+        (d / "asset-manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    # No "execution_rid" key
+                    "assets": {
+                        "Image/a.jpg": {
+                            "asset_table": "Image",
+                            "schema": "isa",
+                            "status": "pending",
+                        }
+                    },
+                    "features": {},
+                }
+            )
+        )
+
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            count = ws.import_legacy_manifests()
+            assert count == 1
+            rows = ws.manifest_store().list_assets("PARENT-DIR-RID")
+            assert "Image/a.jpg" in rows
+        finally:
+            ws.close()
+
     def test_feature_entries_imported(self, tmp_path: Path) -> None:
         """Features in the legacy manifest are also imported."""
         d = tmp_path / "execution" / "F-1"

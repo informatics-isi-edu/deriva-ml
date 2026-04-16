@@ -561,3 +561,60 @@ class TestAssetRecordWithFilePath:
 
         afp.metadata = {"Subject": "2-DEF"}
         assert afp.metadata == {"Subject": "2-DEF"}
+
+
+class TestJsonDefault:
+    """Tests for the _json_default serializer used by to_json()."""
+
+    def test_datetime_serialized(self) -> None:
+        from datetime import datetime, timezone
+
+        from deriva_ml.asset.manifest import _json_default
+
+        dt = datetime(2026, 4, 15, 12, 0, 0, tzinfo=timezone.utc)
+        assert _json_default(dt) == "2026-04-15T12:00:00+00:00"
+
+    def test_date_serialized(self) -> None:
+        from datetime import date
+
+        from deriva_ml.asset.manifest import _json_default
+
+        d = date(2026, 4, 15)
+        assert _json_default(d) == "2026-04-15"
+
+    def test_path_serialized(self) -> None:
+        from pathlib import Path
+
+        from deriva_ml.asset.manifest import _json_default
+
+        p = Path("/tmp/test.txt")
+        assert _json_default(p) == "/tmp/test.txt"
+
+    def test_unknown_type_raises(self) -> None:
+        from deriva_ml.asset.manifest import _json_default
+
+        with pytest.raises(TypeError, match="not JSON serializable"):
+            _json_default(object())
+
+    def test_to_json_with_datetime_metadata(self, store, manifest) -> None:
+        """to_json() + json.dumps with _json_default handles datetime metadata."""
+        import json
+        from datetime import datetime, timezone
+
+        from deriva_ml.asset.manifest import AssetEntry, _json_default
+
+        # Store the asset with plain string metadata (DB can't serialize datetime directly)
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="isa",
+                metadata={"date": "2026-01-01T00:00:00+00:00"},
+            ),
+        )
+        # Build a JSON structure that includes a datetime object (simulating catalog data)
+        data = manifest.to_json()
+        # Inject a datetime into the structure to test the serializer path
+        data["assets"]["Image/scan.jpg"]["metadata"]["ts"] = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        result = json.dumps(data, default=_json_default)
+        assert "2026-01-01" in result

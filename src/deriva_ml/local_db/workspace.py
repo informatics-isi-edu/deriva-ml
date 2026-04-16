@@ -235,6 +235,8 @@ class _LegacyWorkingDataView:
         return inspect(self._ws.engine).get_table_names()
 
     def drop_table(self, table_name: str) -> None:
+        if table_name in _RESERVED_TABLES:
+            return  # Silently refuse to drop reserved infrastructure tables
         if self.has_table(table_name):
             with self._ws.engine.connect() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS [{table_name}]"))

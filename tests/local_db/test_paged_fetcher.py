@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -290,6 +291,21 @@ class TestFetchByRids:
 
         assert _rows_count(engine, table) == 5
 
+    def test_extra_columns_in_rows_are_silently_dropped(self, tmp_path: Path) -> None:
+        engine = create_engine(f"sqlite:///{tmp_path / 'wd.sqlite'}", future=True)
+        target = _make_target_table(engine)  # has RID, Filename, Subject
+
+        # Rows have an extra column not in the target table
+        rows = [
+            {"RID": "R1", "Filename": "f1", "Subject": "S1", "Extra_Column": "should_be_dropped"},
+        ]
+        client = FakePagedClient(rows_by_table={"Image": rows})
+
+        f = PagedFetcher(client=client, engine=engine)
+        n = f.fetch_by_rids("Image", ["R1"], target, rid_column="RID")
+        assert n == 1
+        assert _rows_count(engine, target) == 1
+
 
 # ---------------------------------------------------------------------------
 # TestFetchedRids
@@ -414,6 +430,28 @@ class TestCardinalityHeuristic:
             stored = {row[0] for row in conn.execute(select(table.c["RID"])).fetchall()}
         assert stored == set(wanted_rids)
 
+    def test_zero_total_uses_rid_batch(self, tmp_path: Path) -> None:
+        """When the table is empty (count=0), RID-batch path is taken (no division by zero)."""
+        engine = create_engine(f"sqlite:///{tmp_path / 'wd.sqlite'}", future=True)
+        target = _make_target_table(engine)
+
+        client = FakePagedClient(rows_by_table={"Image": []})
+
+        f = PagedFetcher(client=client, engine=engine)
+        n = f.fetch_by_rids_or_predicate(
+            table="Image",
+            rids=["R0", "R1"],
+            target_table=target,
+            rid_column="RID",
+            sort=("RID",),
+            cardinality_threshold=0.5,
+        )
+        assert n == 0
+        # Should not have used fetch_page (since total=0, the guard prevents division)
+        methods_used = {r[0] for r in client.requests}
+        assert "count" in methods_used
+        assert "fetch_rid_batch" in methods_used
+
 
 # ---------- ErmrestPagedClient URL-construction tests ---------- #
 
@@ -537,3 +575,44 @@ class TestErmrestPagedClient:
         cat.catalog_id = "99"
         c = ErmrestPagedClient(catalog=cat)  # No explicit catalog_id
         assert c._catalog_id == "99"
+
+
+class _FailingMockCatalog:
+    """Mock catalog whose get() returns an error response."""
+
+    catalog_id = "1"
+
+    def get(self, url, headers=None):
+        class R:
+            def raise_for_status(self):
+                import requests
+
+                raise requests.exceptions.HTTPError("404 Not Found")
+
+            def json(self):
+                return []
+
+        return R()
+
+    def post(self, url, json=None, headers=None):
+        return self.get(url)
+
+
+class TestErmrestPagedClientErrors:
+    def test_count_propagates_http_error(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        c = ErmrestPagedClient(catalog=_FailingMockCatalog(), catalog_id="1")
+        import requests.exceptions
+
+        with pytest.raises(requests.exceptions.HTTPError):
+            c.count("isa:Image")
+
+    def test_fetch_page_propagates_http_error(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        c = ErmrestPagedClient(catalog=_FailingMockCatalog(), catalog_id="1")
+        import requests.exceptions
+
+        with pytest.raises(requests.exceptions.HTTPError):
+            c.fetch_page("isa:Image", ("RID",), None, None, 10)
