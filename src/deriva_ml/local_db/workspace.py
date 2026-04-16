@@ -67,6 +67,7 @@ class Workspace:
 
     @property
     def working_db_path(self) -> Path:
+        """Path to the working DB directory (contains main.db + per-schema files)."""
         return p.working_db_path(self._working_dir, self._hostname, self._catalog_id)
 
     def slice_db_path(self, slice_id: str) -> Path:
@@ -79,7 +80,8 @@ class Workspace:
         if self._closed:
             raise RuntimeError("Workspace is closed")
         if self._engine is None:
-            self._engine = sh.create_wal_engine(self.working_db_path)
+            main_db = p.working_main_db_path(self._working_dir, self._hostname, self._catalog_id)
+            self._engine = sh.create_wal_engine(main_db)
             sh.ensure_schema_meta(self._engine, expected_version=WORKING_DB_SCHEMA_VERSION)
         return self._engine
 

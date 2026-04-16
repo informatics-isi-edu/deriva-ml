@@ -16,8 +16,8 @@ class TestWorkspaceCreation:
         ws = Workspace(working_dir=tmp_path, hostname="host.example.org", catalog_id="1")
         # File is created lazily when an engine is first requested
         _ = ws.engine
-        assert ws.working_db_path.parent.is_dir()
-        assert ws.working_db_path.is_file()
+        assert ws.working_db_path.is_dir()
+        assert (ws.working_db_path / "main.db").is_file()
         ws.close()
 
     def test_wal_mode(self, tmp_path: Path) -> None:
@@ -52,7 +52,7 @@ class TestWorkspaceCreation:
     def test_context_manager_protocol(self, tmp_path: Path) -> None:
         with Workspace(working_dir=tmp_path, hostname="h", catalog_id="1") as ws:
             _ = ws.engine
-            assert ws.working_db_path.is_file()
+            assert (ws.working_db_path / "main.db").is_file()
         # After exiting the context manager, engine should be gone
         assert ws._engine is None
         assert ws._closed
@@ -230,8 +230,8 @@ class TestLegacyWorkingDataView:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
             view = ws.legacy_working_data_view()
-            # The DB file doesn't exist yet (engine not yet accessed)
-            assert not ws.working_db_path.exists()
+            # The DB directory/file doesn't exist yet (engine not yet accessed)
+            assert not (ws.working_db_path / "main.db").exists()
             assert not view.has_table("anything")
         finally:
             ws.close()
@@ -240,7 +240,7 @@ class TestLegacyWorkingDataView:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
             view = ws.legacy_working_data_view()
-            assert not ws.working_db_path.exists()
+            assert not (ws.working_db_path / "main.db").exists()
             assert view.list_tables() == []
         finally:
             ws.close()
@@ -264,7 +264,7 @@ class TestWorkspaceClose:
 
 class TestDerivaMLIntegration:
     def test_ml_working_data_uses_workspace_path(self, tmp_path: Path) -> None:
-        """DerivaML.working_data should write to catalogs/{host}__{cat}/working.db."""
+        """DerivaML.working_data should write to catalogs/{host}__{cat}/working/main.db."""
         import pandas as pd
 
         from deriva_ml import DerivaML
@@ -277,5 +277,5 @@ class TestDerivaMLIntegration:
         wd = ml.working_data
         wd.cache_table("demo", pd.DataFrame({"x": [1]}))
 
-        expected = tmp_path / "catalogs" / "example.org__9" / "working.db"
+        expected = tmp_path / "catalogs" / "example.org__9" / "working" / "main.db"
         assert expected.is_file()

@@ -27,7 +27,24 @@ class TestWorkspaceRoot:
 class TestWorkingDbPath:
     def test_under_workspace_root(self, tmp_path: Path) -> None:
         db = p.working_db_path(tmp_path, "example.org", "42")
-        assert db == tmp_path / "catalogs" / "example.org__42" / "working.db"
+        assert db == tmp_path / "catalogs" / "example.org__42" / "working"
+
+
+class TestWorkingDir:
+    def test_working_dir_is_directory_not_file(self, tmp_path: Path) -> None:
+        d = p.working_db_path(tmp_path, "example.org", "42")
+        assert d.name == "working"
+        assert not d.name.endswith(".db")
+
+    def test_working_dir_under_workspace_root(self, tmp_path: Path) -> None:
+        d = p.working_db_path(tmp_path, "example.org", "42")
+        assert d == tmp_path / "catalogs" / "example.org__42" / "working"
+
+
+class TestWorkingMainDbPath:
+    def test_main_db_inside_working_dir(self, tmp_path: Path) -> None:
+        main = p.working_main_db_path(tmp_path, "example.org", "42")
+        assert main == tmp_path / "catalogs" / "example.org__42" / "working" / "main.db"
 
 
 class TestSliceDir:

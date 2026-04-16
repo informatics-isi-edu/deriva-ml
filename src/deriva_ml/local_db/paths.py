@@ -38,8 +38,23 @@ def workspace_root(working_dir: Path, hostname: str, catalog_id: str | int) -> P
 
 
 def working_db_path(working_dir: Path, hostname: str, catalog_id: str | int) -> Path:
-    """Return the per-catalog working SQLite DB path."""
-    return workspace_root(working_dir, hostname, catalog_id) / "working.db"
+    """Return the per-catalog working DB directory path.
+
+    The working DB is a directory containing main.db plus per-schema .db files
+    (created by SchemaBuilder's multi-schema ATTACH pattern).
+
+    Layout: {workspace_root}/working/
+    """
+    return workspace_root(working_dir, hostname, catalog_id) / "working"
+
+
+def working_main_db_path(working_dir: Path, hostname: str, catalog_id: str | int) -> Path:
+    """Return the main.db file inside the working DB directory.
+
+    This is the file the SQLAlchemy engine opens. Per-schema .db files are
+    ATTACH'd into connections on this engine.
+    """
+    return working_db_path(working_dir, hostname, catalog_id) / "main.db"
 
 
 def slice_dir(working_dir: Path, hostname: str, catalog_id: str | int, slice_id: str) -> Path:
