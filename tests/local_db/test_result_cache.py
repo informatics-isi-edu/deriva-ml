@@ -142,6 +142,47 @@ class TestResultCacheStore:
         assert "schema.name" in result.columns
         assert "col-name" in result.columns
 
+    def test_store_denormalization_column_names(self, cache):
+        """Column names like 'Image.Filename' and 'deriva-ml.Dataset.RID' survive round-trip."""
+        key = "rc_denormcols000"
+        denorm_cols = [
+            "Image.RID",
+            "Image.Filename",
+            "Subject.Name",
+            "deriva-ml.Dataset.RID",
+        ]
+        rows = [
+            {
+                "Image.RID": "IMG-1",
+                "Image.Filename": "a.png",
+                "Subject.Name": "Alice",
+                "deriva-ml.Dataset.RID": "DS-001",
+            }
+        ]
+        meta = _make_meta(key, columns=denorm_cols, row_count=1)
+        cache.store(key, denorm_cols, rows, meta)
+
+        # Verify columns survive via metadata
+        got_meta = cache.get_meta(key)
+        assert got_meta is not None
+        assert got_meta.columns == denorm_cols
+
+        # Verify data survives via CachedResult
+        result = cache.get(key)
+        assert result is not None
+        assert result.columns == denorm_cols
+        df = result.to_dataframe()
+        assert list(df.columns) == denorm_cols
+        assert df["Image.Filename"].iloc[0] == "a.png"
+        assert df["deriva-ml.Dataset.RID"].iloc[0] == "DS-001"
+
+        # Verify data survives via query()
+        qr = cache.query(key)
+        assert qr is not None
+        assert qr.total_count == 1
+        assert "Image.Filename" in qr.columns
+        assert qr.rows[0]["Image.Filename"] == "a.png"
+
 
 class TestResultCacheQuery:
     def _setup(self, cache, key="rc_querytest1234"):

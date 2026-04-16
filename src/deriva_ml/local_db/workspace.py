@@ -37,7 +37,44 @@ WORKING_DB_SCHEMA_VERSION = 1
 
 
 class Workspace:
-    """Per-catalog working database, shared across script invocations."""
+    """Per-catalog working database, shared across script invocations.
+
+    A ``Workspace`` is bound to a ``(working_dir, hostname, catalog_id)`` triple
+    and provides:
+
+    - A WAL-mode SQLAlchemy engine over ``{working_dir}/catalogs/{host}__{id}/working/main.db``.
+    - ``build_local_schema()``: builds SQLAlchemy ORM classes for all catalog tables
+      (via :class:`~deriva_ml.local_db.schema.LocalSchema`).
+    - ``attach_slice()``: ATTACH a per-dataset snapshot (slice) database for
+      query-time join-back.
+    - ``manifest_store()``: SQLite-backed asset/feature manifest (replaces the old
+      JSON ``asset-manifest.json`` file).
+    - ``cached_table_read()`` / ``cache_denormalized()``: result-cache layer so
+      expensive reads are stored in SQLite and returned instantly on the second call.
+
+    The workspace engine is *unified* with the ``LocalSchema`` engine once
+    ``build_local_schema()`` is called: manifest tables, cache tables, and ORM tables
+    all share one SQLite file and connection pool.
+
+    Typical usage::
+
+        ws = Workspace(working_dir=Path("."), hostname="myhost.example.org", catalog_id="42")
+        ws.build_local_schema(model=ermrest_model, schemas=["isa", "deriva-ml"])
+        df = ws.cached_table_read("Subject").to_dataframe()
+        ws.close()
+
+    It also implements the context-manager protocol::
+
+        with Workspace(...) as ws:
+            ws.build_local_schema(...)
+            ...
+        # engine disposed automatically
+
+    Args:
+        working_dir: Root directory under which all catalog workspaces live.
+        hostname: Deriva server hostname (used to partition workspaces by catalog).
+        catalog_id: Catalog identifier (numeric or string).
+    """
 
     def __init__(
         self,
@@ -59,20 +96,38 @@ class Workspace:
 
     @property
     def root(self) -> Path:
+        """Root directory for this catalog's workspace (``{working_dir}/catalogs/{host}__{id}/``)."""
         return p.workspace_root(self._working_dir, self._hostname, self._catalog_id)
 
     @property
     def working_db_path(self) -> Path:
-        """Path to the working DB directory (contains main.db + per-schema files)."""
+        """Path to the working DB directory (contains ``main.db`` + per-schema ``.db`` files)."""
         return p.working_db_path(self._working_dir, self._hostname, self._catalog_id)
 
     def slice_db_path(self, slice_id: str) -> Path:
+        """Return the directory for the named slice.
+
+        Args:
+            slice_id: Opaque identifier for the slice (typically a dataset RID or version tag).
+
+        Returns:
+            Path to the slice directory (``{root}/slices/{slice_id}/``).
+        """
         return p.slice_db_path(self._working_dir, self._hostname, self._catalog_id, slice_id)
 
     # ---- engine ----
 
     @property
     def engine(self) -> Engine:
+        """Lazy-initialised WAL-mode SQLAlchemy engine over ``main.db``.
+
+        The engine is created on first access. After ``build_local_schema()`` is
+        called, this property returns the same engine as ``local_schema.engine``
+        (they are unified to share one connection pool).
+
+        Raises:
+            RuntimeError: If the workspace has been closed via :meth:`close`.
+        """
         if self._closed:
             raise RuntimeError("Workspace is closed")
         if self._engine is None:
@@ -142,13 +197,31 @@ class Workspace:
         return self._local_schema
 
     def rebuild_schema(self, *, model: Any, schemas: list[str]) -> "LocalSchema":
-        """Dispose the current LocalSchema and build a fresh one."""
+        """Dispose the current LocalSchema and build a fresh one.
+
+        Equivalent to calling :meth:`build_local_schema` again.  Useful when
+        the catalog model changes and the ORM needs to reflect the new schema.
+
+        Args:
+            model: Updated ERMrest Model.
+            schemas: Schema names to materialize.
+
+        Returns:
+            The newly built :class:`~deriva_ml.local_db.schema.LocalSchema`.
+        """
         return self.build_local_schema(model=model, schemas=schemas)
 
     def orm_class(self, table_name: str) -> Any | None:
         """Get the ORM class for a table by name.
 
-        Returns None if local_schema hasn't been built or table not found.
+        Convenience wrapper around ``local_schema.get_orm_class()``.
+
+        Args:
+            table_name: Bare table name (e.g., ``"Image"``).
+
+        Returns:
+            The mapped ORM class, or ``None`` if the schema hasn't been built
+            or the table is not found.
         """
         if self._local_schema is None:
             return None
@@ -210,7 +283,15 @@ class Workspace:
     # ---- manifest store ----
 
     def manifest_store(self) -> "ManifestStore":
-        """Return a ManifestStore backed by this workspace's engine (cached)."""
+        """Return the :class:`~deriva_ml.local_db.manifest_store.ManifestStore` for this workspace.
+
+        The store is created lazily and cached. It backs the asset/feature
+        manifest that was previously stored as ``asset-manifest.json``.  All
+        mutations are committed immediately so the store is crash-safe.
+
+        Returns:
+            The shared :class:`ManifestStore` instance.
+        """
         if self._manifest_store is None:
             from deriva_ml.local_db.manifest_store import ManifestStore
 
@@ -393,15 +474,36 @@ class Workspace:
         return rc.get(key)
 
     def list_cached_results(self) -> "list[CachedResultMeta]":
-        """List all non-expired cached result entries."""
+        """List all non-expired cached result entries.
+
+        Lazily removes expired entries from the registry as a side effect.
+
+        Returns:
+            List of :class:`~deriva_ml.local_db.result_cache.CachedResultMeta` for
+            every live (non-expired) cache entry.
+        """
         return self._get_result_cache().list_cached()
 
     def get_cached_result(self, cache_key: str) -> "CachedResult | None":
-        """Get a cached result handle by key, or None if missing/expired."""
+        """Get a cached result handle by key, or None if missing/expired.
+
+        Args:
+            cache_key: The ``rc_`` prefixed key returned by :meth:`cached_table_read`
+                or :meth:`cache_denormalized`.
+
+        Returns:
+            A :class:`~deriva_ml.local_db.result_cache.CachedResult` handle, or
+            ``None`` if the entry doesn't exist or has expired.
+        """
         return self._get_result_cache().get(cache_key)
 
     def invalidate_cache(self, cache_key: str | None = None, source: str | None = None) -> int:
         """Invalidate cache entries by key, source, or all.
+
+        Args:
+            cache_key: Remove only this specific entry (by exact key).
+            source: Remove all entries with this source tag (e.g., ``"catalog"``).
+            (Both None): Remove all entries.
 
         Returns:
             Count of entries removed.
@@ -411,6 +513,11 @@ class Workspace:
     # ---- lifecycle ----
 
     def close(self) -> None:
+        """Dispose the engine and release all resources.
+
+        Safe to call multiple times (idempotent). After this call, accessing
+        :attr:`engine` will raise :class:`RuntimeError`.
+        """
         if self._closed:
             return
         if self._local_schema is not None:

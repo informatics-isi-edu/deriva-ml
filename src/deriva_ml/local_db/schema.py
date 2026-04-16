@@ -36,6 +36,24 @@ class LocalSchema:
     Normalizes construction and pragma setup so callers don't have to know
     whether the underlying DB is a working DB or a slice DB. All real work
     is delegated to the existing ``SchemaBuilder`` machinery.
+
+    Typical usage::
+
+        ls = LocalSchema.build(
+            model=ermrest_model,
+            schemas=["isa", "deriva-ml"],
+            database_path=Path("/tmp/working"),
+        )
+        image_cls = ls.get_orm_class("Image")
+        with ls.engine.begin() as conn:
+            conn.execute(insert(image_cls.__table__).values(RID="IMG-1", ...))
+        ls.dispose()
+
+    Attributes:
+        engine: The SQLAlchemy :class:`Engine` over the SQLite file(s).
+        metadata: The SQLAlchemy :class:`MetaData` reflecting all schema tables.
+        schemas: List of schema names materialized in this database.
+        database_path: Directory or ``.db`` file path where data is stored.
     """
 
     def __init__(self, orm: SchemaORM, database_path: Path) -> None:
@@ -169,30 +187,59 @@ class LocalSchema:
 
     @property
     def engine(self) -> Engine:
+        """The SQLAlchemy engine for this schema's database file(s)."""
         return self._orm.engine
 
     @property
     def metadata(self):  # noqa: ANN201 — SQLAlchemy MetaData
+        """The SQLAlchemy MetaData reflecting all tables in this schema."""
         return self._orm.metadata
 
     @property
     def schemas(self) -> list[str]:
+        """List of ERMrest schema names materialized in this database."""
         return list(self._orm.schemas)
 
     @property
     def database_path(self) -> Path:
+        """Directory or ``.db`` file path for storage."""
         return self._database_path
 
     def find_table(self, table_name: str) -> SQLTable:
+        """Return the SQLAlchemy :class:`Table` object for a given table name.
+
+        Args:
+            table_name: Bare table name or ``schema.TableName`` qualified form.
+
+        Returns:
+            The SQLAlchemy Table reflecting the given table.
+
+        Raises:
+            KeyError: If the table is not found in the schema.
+        """
         return self._orm.find_table(table_name)
 
     def list_tables(self) -> list[str]:
+        """Return a list of all table names known to this schema."""
         return self._orm.list_tables()
 
     def get_orm_class(self, table_name: str) -> Any | None:
+        """Return the SQLAlchemy ORM mapped class for *table_name*, or None.
+
+        The ORM class has attributes for each column (e.g., ``Image.RID``,
+        ``Image.Filename``) and a ``__table__`` attribute pointing to the
+        underlying :class:`Table`.
+
+        Args:
+            table_name: Bare table name (e.g., ``"Image"``).
+
+        Returns:
+            The mapped ORM class, or ``None`` if the table is not found.
+        """
         return self._orm.get_orm_class(table_name)
 
     def dispose(self) -> None:
+        """Dispose the underlying engine, releasing all connections and file handles."""
         self._orm.dispose()
 
     def __enter__(self) -> "LocalSchema":

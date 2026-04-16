@@ -47,7 +47,24 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CachedResultMeta:
-    """Metadata for a single cached result."""
+    """Metadata stored in the registry for a single cached result.
+
+    One row in ``cached_results_registry`` per cache entry.  The actual data
+    is stored in a separate dynamically-named table (e.g., ``rc_a1b2c3d4e5f67890``).
+
+    Attributes:
+        cache_key: Unique identifier for this cache entry (``rc_`` + 16 hex chars).
+        source: Origin of the data, e.g. ``"catalog"``, ``"bag"``, ``"denormalize"``,
+            or ``"feature_values"``.
+        tool_name: MCP/API tool that produced this result, e.g. ``"table_read"``
+            or ``"denormalize"``.
+        params: Query parameters that produced this result (stored for display and
+            cache-key derivation).
+        columns: Ordered list of column names in the data table.
+        row_count: Number of rows stored.
+        created_at: Unix timestamp when the entry was created.
+        ttl_seconds: Time-to-live in seconds; ``None`` means never expire.
+    """
 
     cache_key: str
     source: str  # "catalog", "bag", "denormalize", "feature_values"
@@ -86,7 +103,18 @@ class CachedResultMeta:
 
 @dataclass
 class QueryResult:
-    """Result of querying a cached table with sort/filter/pagination."""
+    """Result of querying a cached table with sort/filter/pagination.
+
+    Returned by :meth:`ResultCache.query` and :meth:`CachedResult.query`.
+
+    Attributes:
+        columns: Ordered list of column names.
+        rows: List of row dicts (after limit/offset applied).
+        count: Number of rows in *rows* (``len(rows)``).
+        total_count: Total rows matching the filter before pagination.
+        cache_key: The cache entry this result came from.
+        source: Source tag of the parent cache entry.
+    """
 
     columns: list[str]
     rows: list[dict[str, Any]]
@@ -102,7 +130,27 @@ class QueryResult:
 
 
 class CachedResult:
-    """Handle over a cached result stored as a table in main.db."""
+    """Handle over a cached result stored as a table in ``main.db``.
+
+    Returned by :meth:`ResultCache.get`, :meth:`Workspace.cached_table_read`,
+    and :meth:`Workspace.cache_denormalized`.  Provides high-level access to the
+    data without exposing SQLite internals.
+
+    Typical usage::
+
+        result = workspace.cached_table_read("Subject")
+        df = result.to_dataframe()          # all rows as pandas DataFrame
+        for row in result.iter_rows():      # streaming row-by-row
+            ...
+        paged = result.query(limit=50, offset=0, sort_by="Name")
+
+    Attributes:
+        cache_key: Unique ``rc_`` key identifying this cache entry.
+        source: Origin tag (e.g., ``"catalog"``).
+        row_count: Number of stored rows.
+        columns: Ordered column names.
+        fetched_at: :class:`datetime` when this entry was created.
+    """
 
     def __init__(self, meta: CachedResultMeta, engine: Engine, result_cache: "ResultCache") -> None:
         self._meta = meta
@@ -223,7 +271,27 @@ REGISTRY_TABLE = "cached_results_registry"
 
 
 class ResultCache:
-    """Manages cached tabular results in the workspace's main.db."""
+    """Manages cached tabular results in the workspace's ``main.db``.
+
+    Each result is stored as a dedicated SQLite table named by its cache key
+    (e.g., ``rc_a1b2c3d4e5f67890``).  A ``cached_results_registry`` table
+    tracks metadata (source, columns, TTL, creation time).
+
+    Cache keys are deterministic SHA-256 digests of ``(tool_name, params)``,
+    so the same query always maps to the same key.  This enables MCP tools to
+    detect hits before re-executing expensive catalog reads.
+
+    Typical usage::
+
+        rc = ResultCache(engine)
+        rc.ensure_schema()
+        key = ResultCache.cache_key("table_read", table="Subject")
+        if not rc.has(key):
+            rows = fetch_from_catalog(...)
+            rc.store(key, columns, rows, meta)
+        result = rc.get(key)
+        df = result.to_dataframe()
+    """
 
     REGISTRY_TABLE = REGISTRY_TABLE
 

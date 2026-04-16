@@ -31,9 +31,24 @@ logger = logging.getLogger(__name__)
 class DenormalizeResult:
     """Result of a denormalization operation.
 
+    Holds the materialized wide-table rows and the column schema.  Rows are
+    stored in-memory after the SQL query executes; for very large datasets
+    consider using :meth:`iter_rows` in a streaming fashion rather than calling
+    :meth:`to_dataframe` which loads everything into pandas at once.
+
     Attributes:
-        columns: ``(name, type)`` pairs describing the output schema.
-        row_count: Number of rows returned.
+        columns: ``(name, type)`` pairs describing the output schema.  Column
+            names use ``Table.Column`` dot notation (or
+            ``schema.Table.Column`` when multi-schema).
+        row_count: Number of rows in the result (``len(_rows)``).
+
+    Example::
+
+        result = denormalize(model=m, engine=e, orm_resolver=r,
+                             dataset_rid="DS-001", include_tables=["Image", "Subject"])
+        df = result.to_dataframe()       # full DataFrame
+        for row in result.iter_rows():   # streaming
+            process(row)
     """
 
     columns: list[tuple[str, str]]
@@ -41,14 +56,23 @@ class DenormalizeResult:
     _rows: list[dict[str, Any]] = field(repr=False)
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert the result to a :class:`pandas.DataFrame`."""
+        """Convert the result to a :class:`pandas.DataFrame`.
+
+        Returns:
+            A DataFrame with one column per entry in :attr:`columns`.  Returns
+            an empty DataFrame (with correct column names) if there are no rows.
+        """
         if not self._rows:
             # Return an empty DataFrame with the correct column names.
             return pd.DataFrame(columns=[name for name, _ in self.columns])
         return pd.DataFrame(self._rows)
 
     def iter_rows(self) -> Generator[dict[str, Any], None, None]:
-        """Yield each row as a dictionary."""
+        """Yield each row as a dictionary.
+
+        Keys are column names in ``Table.Column`` (or ``schema.Table.Column``)
+        dot notation.  Values are raw Python types as returned by SQLAlchemy.
+        """
         yield from self._rows
 
 
@@ -181,13 +205,19 @@ class _MinimalDatasetMock:
     """Minimal ``DatasetLike`` mock for ``_prepare_wide_table``.
 
     Returns empty members and no children, which is sufficient when the
-    caller doesn't need member-based filtering.
+    caller doesn't need member-based filtering (i.e., when the denormalizer
+    is driven purely by ``dataset_rid`` without a live Dataset object).
+
+    This exists to avoid importing the full ``Dataset`` class inside the
+    local_db layer, keeping the dependency graph simple.
     """
 
     dataset_rid: str
 
     def list_dataset_members(self, **kwargs: Any) -> dict:  # noqa: ARG002
+        """Return an empty member dict (no members known without a live catalog)."""
         return {}
 
     def list_dataset_children(self, **kwargs: Any) -> list:  # noqa: ARG002
+        """Return an empty children list (no children known without a live catalog)."""
         return []

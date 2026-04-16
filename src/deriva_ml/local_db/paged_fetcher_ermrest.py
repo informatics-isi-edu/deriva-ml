@@ -31,13 +31,35 @@ logger = logging.getLogger(__name__)
 
 
 class ErmrestPagedClient:
-    """Adapter conforming to :class:`~deriva_ml.local_db.paged_fetcher.PagedClient`."""
+    """Adapter conforming to :class:`~deriva_ml.local_db.paged_fetcher.PagedClient`.
+
+    Translates the narrow three-method protocol into ERMrest HTTP calls using
+    the ``ErmrestCatalog`` handle from deriva-py.
+
+    **POST limitation:** ERMrest's ``POST /entity/{table}`` is an entity-insert
+    endpoint, not a filter.  So ``fetch_rid_batch`` raises immediately if
+    ``method="POST"`` is requested.  Callers must use
+    :meth:`~PagedFetcher.fetch_by_rids_or_predicate` with a predicate fallback
+    for large RID sets.
+
+    Args:
+        catalog: An open ``ErmrestCatalog`` instance.
+        catalog_id: Catalog numeric ID.  Defaults to ``catalog.catalog_id``.
+    """
 
     def __init__(self, *, catalog: Any, catalog_id: str | None = None) -> None:
         self._catalog = catalog
         self._catalog_id = str(catalog_id if catalog_id is not None else getattr(catalog, "catalog_id"))
 
     def count(self, table: str) -> int:
+        """Return the total row count for *table* via an aggregate query.
+
+        Args:
+            table: Qualified table name (``"schema:table"``).
+
+        Returns:
+            Total row count, or ``0`` if the server returns an empty response.
+        """
         url = f"/aggregate/{table}/n:=cnt(*)"
         resp = self._catalog.get(url)
         resp.raise_for_status()
@@ -54,6 +76,22 @@ class ErmrestPagedClient:
         predicate: str | None,
         limit: int,
     ) -> list[dict[str, Any]]:
+        """Fetch one page of rows from *table* via ERMrest entity API.
+
+        Constructs a URL of the form:
+        ``/entity/{table}[/{predicate}]@sort({cols})[@after({vals})]?limit={N}``
+
+        Args:
+            table: Qualified table name (``"schema:table"``).
+            sort: Column names for ``@sort(...)`` and ``@after(...)`` pagination.
+            after: Keyset cursor values corresponding to *sort*, or ``None`` for
+                the first page.
+            predicate: Optional ERMrest filter clause (e.g., ``"Status=active"``).
+            limit: Maximum rows to return per page.
+
+        Returns:
+            List of row dicts.
+        """
         parts = [f"/entity/{table}"]
         if predicate:
             parts.append(f"/{predicate}")
@@ -75,6 +113,25 @@ class ErmrestPagedClient:
         rids: list[str],
         method: str = "GET",
     ) -> list[dict[str, Any]]:
+        """Fetch rows by RID list via ERMrest ``{col}=any(...)`` filter.
+
+        Only ``method="GET"`` is supported.  If the resulting URL would exceed
+        7 000 bytes, raises ``RuntimeError("GET URL too long ...")`` so that
+        :class:`~deriva_ml.local_db.paged_fetcher.PagedFetcher` can fall back
+        to a predicate scan.
+
+        Args:
+            table: Qualified table name.
+            column: Column to filter on (typically ``"RID"``).
+            rids: List of values.
+            method: Must be ``"GET"``; ``"POST"`` is not supported.
+
+        Returns:
+            List of matching row dicts.
+
+        Raises:
+            RuntimeError: If ``method != "GET"`` or the URL exceeds 7 000 bytes.
+        """
         if method != "GET":
             raise RuntimeError(
                 "POST-based RID filtering is not supported by ERMrest. "

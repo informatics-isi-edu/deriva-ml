@@ -849,13 +849,34 @@ class Dataset:
             denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dict: Generator version for memory-efficient processing.
         """
+        import warnings
+
         from deriva_ml.local_db.denormalize import denormalize
+
+        # Guard: workspace must have a built local_schema before we can use it.
+        ws = self._ml_instance.workspace
+        if ws.local_schema is None:
+            raise RuntimeError(
+                "Workspace local_schema not built. This usually means the DerivaML workspace was not fully initialized."
+            )
+
+        # The version parameter is accepted for protocol compatibility but is not
+        # yet implemented in the unified denormalization engine.
+        if version is not None:
+            warnings.warn(
+                "The 'version' parameter is not yet supported by the unified "
+                "denormalization engine. Denormalization will use the current "
+                "catalog state, not a pinned version. Version-pinned "
+                "denormalization will be added in a future release.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         result = denormalize(
             model=self._ml_instance.model,
-            engine=self._ml_instance.workspace.engine,
-            orm_resolver=self._ml_instance.workspace.local_schema.get_orm_class,
+            engine=ws.engine,
+            orm_resolver=ws.local_schema.get_orm_class,
             dataset_rid=self.dataset_rid,
             include_tables=include_tables,
             dataset=self,
@@ -964,13 +985,34 @@ class Dataset:
             denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
+        import warnings
+
         from deriva_ml.local_db.denormalize import denormalize
+
+        # Guard: workspace must have a built local_schema before we can use it.
+        ws = self._ml_instance.workspace
+        if ws.local_schema is None:
+            raise RuntimeError(
+                "Workspace local_schema not built. This usually means the DerivaML workspace was not fully initialized."
+            )
+
+        # The version parameter is accepted for protocol compatibility but is not
+        # yet implemented in the unified denormalization engine.
+        if version is not None:
+            warnings.warn(
+                "The 'version' parameter is not yet supported by the unified "
+                "denormalization engine. Denormalization will use the current "
+                "catalog state, not a pinned version. Version-pinned "
+                "denormalization will be added in a future release.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         result = denormalize(
             model=self._ml_instance.model,
-            engine=self._ml_instance.workspace.engine,
-            orm_resolver=self._ml_instance.workspace.local_schema.get_orm_class,
+            engine=ws.engine,
+            orm_resolver=ws.local_schema.get_orm_class,
             dataset_rid=self.dataset_rid,
             include_tables=include_tables,
             dataset=self,

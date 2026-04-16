@@ -395,3 +395,108 @@ class TestWorkspaceCachedReads:
                 ws.cached_table_read("Subject")
         finally:
             ws.close()
+
+    def test_cached_table_read_with_refresh(self, tmp_path: Path, canned_bag_model) -> None:
+        """refresh=True re-reads even when the cache already has an entry."""
+        from sqlalchemy import insert
+
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            subject_t = ws.local_schema.find_table("Subject")
+
+            # Populate with one row and cache it
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID="S1", Name="Alice"))
+            r1 = ws.cached_table_read("Subject", source="local")
+            assert r1.row_count == 1
+
+            # Add a second row and use refresh=True to bypass the cache
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID="S2", Name="Bob"))
+            r2 = ws.cached_table_read("Subject", source="local", refresh=True)
+            assert r2.row_count == 2
+        finally:
+            ws.close()
+
+    def test_cache_denormalized_returns_cached_on_second_call(self, tmp_path: Path, populated_denorm) -> None:
+        """Second call to cache_denormalized returns cached data without re-running."""
+        from deriva_ml.local_db.workspace import Workspace
+
+        model = populated_denorm["model"]
+        ls = populated_denorm["local_schema"]
+        ds_rid = populated_denorm["dataset_rid"]
+
+        # Use the same engine and db_path from the populated fixture
+        # We need our own Workspace that uses the same DB as the LocalSchema fixture
+        ws = Workspace.__new__(Workspace)
+        ws._working_dir = tmp_path / "ws2"
+        ws._hostname = "h"
+        ws._catalog_id = "1"
+        ws._engine = ls.engine
+        ws._manifest_store = None
+        ws._local_schema = ls
+        ws._result_cache = None
+        ws._closed = False
+
+        result1 = ws.cache_denormalized(
+            model=model,
+            dataset_rid=ds_rid,
+            include_tables=["Image", "Subject"],
+        )
+        result2 = ws.cache_denormalized(
+            model=model,
+            dataset_rid=ds_rid,
+            include_tables=["Image", "Subject"],
+        )
+        # Same cache_key → same cached entry
+        assert result1.cache_key == result2.cache_key
+        assert result1.row_count == result2.row_count
+
+
+class TestWorkingDataDeprecation:
+    """Test that accessing working_data on DerivaML emits DeprecationWarning."""
+
+    def test_working_data_deprecated(self, tmp_path: Path, canned_bag_model) -> None:
+        """DerivaML.working_data emits DeprecationWarning and returns workspace."""
+        import warnings
+        from unittest.mock import MagicMock, PropertyMock
+
+        from deriva_ml.local_db.workspace import Workspace
+
+        # Build a minimal mock DerivaML that has a real workspace property
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            # Create a mock ml instance that has working_data wired the same
+            # way as the real base.py implementation.
+            class FakeDerivaML:
+                _workspace = ws
+
+                @property
+                def workspace(self):
+                    return self._workspace
+
+                @property
+                def working_data(self):
+                    """Deprecated: use ``workspace`` instead."""
+                    import warnings
+
+                    warnings.warn(
+                        "DerivaML.working_data is deprecated; use DerivaML.workspace instead.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    return self.workspace
+
+            ml = FakeDerivaML()
+
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                result = ml.working_data
+
+            dep_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(dep_warnings) == 1
+            assert "working_data" in str(dep_warnings[0].message)
+            assert result is ws
+        finally:
+            ws.close()

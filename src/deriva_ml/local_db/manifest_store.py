@@ -43,7 +43,28 @@ def _now_iso() -> str:
 
 
 class ManifestStore:
-    """SQLite persistence for asset + feature manifest entries."""
+    """SQLite persistence for asset + feature manifest entries.
+
+    Replaces the old ``asset-manifest.json`` write-through file with a
+    crash-safe SQLite-backed store.  Every mutation is committed immediately
+    (``engine.begin()`` auto-commit) so a process crash cannot corrupt the
+    manifest.
+
+    Two logical tables are managed:
+
+    - ``execution_state__assets``: one row per ``(execution_rid, key)`` pair,
+      tracking upload status, metadata, and the remote RID once uploaded.
+    - ``execution_state__features``: one row per ``(execution_rid, feature_name)``
+      pair, tracking the feature table, schema, values path, and upload status.
+
+    Usage::
+
+        store = ManifestStore(engine)
+        store.ensure_schema()          # idempotent: creates tables if absent
+        store.add_asset("EX1", "Image/a.jpg", AssetEntry(...))
+        store.mark_asset_uploaded("EX1", "Image/a.jpg", rid="2A3B4C")
+        pending = store.pending_assets("EX1")
+    """
 
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
@@ -88,6 +109,15 @@ class ManifestStore:
     # ---------------- assets ---------------- #
 
     def add_asset(self, execution_rid: str, key: str, entry: AssetEntry) -> None:
+        """Upsert an asset entry into the manifest.
+
+        If an entry for ``(execution_rid, key)`` already exists it is replaced.
+
+        Args:
+            execution_rid: RID of the owning execution.
+            key: Asset key (typically ``"{AssetTable}/{filename}"``).
+            entry: :class:`~deriva_ml.asset.manifest.AssetEntry` with metadata.
+        """
         now = _now_iso()
         row = {
             "execution_rid": execution_rid,
@@ -113,6 +143,18 @@ class ManifestStore:
             conn.execute(insert(self._assets_t), row)
 
     def get_asset(self, execution_rid: str, key: str) -> AssetEntry:
+        """Return the :class:`AssetEntry` for ``(execution_rid, key)``.
+
+        Args:
+            execution_rid: Owning execution RID.
+            key: Asset key.
+
+        Returns:
+            The matching :class:`~deriva_ml.asset.manifest.AssetEntry`.
+
+        Raises:
+            KeyError: If no entry exists for the given ``(execution_rid, key)`` pair.
+        """
         with self._engine.connect() as conn:
             row = (
                 conn.execute(
@@ -138,6 +180,14 @@ class ManifestStore:
         )
 
     def list_assets(self, execution_rid: str) -> dict[str, AssetEntry]:
+        """Return all asset entries for an execution as ``{key: AssetEntry}``.
+
+        Args:
+            execution_rid: Owning execution RID.
+
+        Returns:
+            Dict mapping asset key to :class:`~deriva_ml.asset.manifest.AssetEntry`.
+        """
         with self._engine.connect() as conn:
             rows = (
                 conn.execute(select(self._assets_t).where(self._assets_t.c.execution_rid == execution_rid))
@@ -160,12 +210,38 @@ class ManifestStore:
         }
 
     def pending_assets(self, execution_rid: str) -> dict[str, AssetEntry]:
+        """Return only assets with ``status == "pending"`` for *execution_rid*.
+
+        Args:
+            execution_rid: Owning execution RID.
+
+        Returns:
+            Filtered subset of :meth:`list_assets`.
+        """
         return {k: v for k, v in self.list_assets(execution_rid).items() if v.status == "pending"}
 
     def uploaded_assets(self, execution_rid: str) -> dict[str, AssetEntry]:
+        """Return only assets with ``status == "uploaded"`` for *execution_rid*.
+
+        Args:
+            execution_rid: Owning execution RID.
+
+        Returns:
+            Filtered subset of :meth:`list_assets`.
+        """
         return {k: v for k, v in self.list_assets(execution_rid).items() if v.status == "uploaded"}
 
     def update_asset_metadata(self, execution_rid: str, key: str, metadata: dict[str, Any]) -> None:
+        """Update the metadata JSON blob for an existing asset entry.
+
+        Args:
+            execution_rid: Owning execution RID.
+            key: Asset key.
+            metadata: New metadata dict to store.
+
+        Raises:
+            KeyError: If the entry does not exist.
+        """
         self._require_asset(execution_rid, key)
         with self._engine.begin() as conn:
             conn.execute(
@@ -175,6 +251,16 @@ class ManifestStore:
             )
 
     def update_asset_types(self, execution_rid: str, key: str, asset_types: list[str]) -> None:
+        """Replace the ``asset_types`` list for an existing asset entry.
+
+        Args:
+            execution_rid: Owning execution RID.
+            key: Asset key.
+            asset_types: New list of asset type strings.
+
+        Raises:
+            KeyError: If the entry does not exist.
+        """
         self._require_asset(execution_rid, key)
         with self._engine.begin() as conn:
             conn.execute(
@@ -184,6 +270,16 @@ class ManifestStore:
             )
 
     def mark_asset_uploaded(self, execution_rid: str, key: str, rid: str) -> None:
+        """Transition an asset entry to ``status="uploaded"`` and record its catalog RID.
+
+        Args:
+            execution_rid: Owning execution RID.
+            key: Asset key.
+            rid: The catalog RID assigned to the uploaded asset.
+
+        Raises:
+            KeyError: If the entry does not exist.
+        """
         self._require_asset(execution_rid, key)
         now = _now_iso()
         with self._engine.begin() as conn:
@@ -200,6 +296,16 @@ class ManifestStore:
             )
 
     def mark_asset_failed(self, execution_rid: str, key: str, error: str) -> None:
+        """Transition an asset entry to ``status="failed"`` and record the error message.
+
+        Args:
+            execution_rid: Owning execution RID.
+            key: Asset key.
+            error: Human-readable error description.
+
+        Raises:
+            KeyError: If the entry does not exist.
+        """
         self._require_asset(execution_rid, key)
         with self._engine.begin() as conn:
             conn.execute(
@@ -225,6 +331,15 @@ class ManifestStore:
     # ---------------- features ---------------- #
 
     def add_feature(self, execution_rid: str, feature_name: str, entry: FeatureEntry) -> None:
+        """Upsert a feature entry into the manifest.
+
+        If an entry for ``(execution_rid, feature_name)`` already exists it is replaced.
+
+        Args:
+            execution_rid: RID of the owning execution.
+            feature_name: Feature name (e.g., ``"Classification"``).
+            entry: :class:`~deriva_ml.asset.manifest.FeatureEntry` with metadata.
+        """
         now = _now_iso()
         row = {
             "execution_rid": execution_rid,
@@ -247,6 +362,14 @@ class ManifestStore:
             conn.execute(insert(self._features_t), row)
 
     def list_features(self, execution_rid: str) -> dict[str, FeatureEntry]:
+        """Return all feature entries for an execution as ``{feature_name: FeatureEntry}``.
+
+        Args:
+            execution_rid: Owning execution RID.
+
+        Returns:
+            Dict mapping feature name to :class:`~deriva_ml.asset.manifest.FeatureEntry`.
+        """
         with self._engine.connect() as conn:
             rows = (
                 conn.execute(select(self._features_t).where(self._features_t.c.execution_rid == execution_rid))
