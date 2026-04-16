@@ -434,8 +434,8 @@ class DerivaML(
         return self.cache_dir if cached else self.working_dir
 
     @property
-    def working_data(self):
-        """Per-catalog working-DB view (pandas-table roundtrips).
+    def workspace(self) -> "Workspace":
+        """Per-catalog Workspace for local caching, denormalization, and asset manifests.
 
         Backed by ``Workspace`` under ``{working_dir}/catalogs/{host}__{cat}/
         working.db``. Shared across invocations of scripts that use the same
@@ -447,33 +447,51 @@ class DerivaML(
             df = ml.cache_table("Subject")
 
             # Check what's cached
-            ml.working_data.list_tables()
-
-            # Clear the cache
-            ml.working_data.clear()
+            ml.workspace.list_cached_results()
         """
         from deriva_ml.local_db.workspace import Workspace
 
-        if not hasattr(self, "_workspace"):
+        if not hasattr(self, "_workspace") or self._workspace is None:
             self._workspace = Workspace(
                 working_dir=self.working_dir,
                 hostname=self.host_name,
                 catalog_id=self.catalog_id,
             )
+            # Import any legacy JSON manifests
             try:
                 n = self._workspace.import_legacy_manifests()
                 if n:
                     import logging
+
                     logging.getLogger("deriva_ml").info(
-                        "Migrated %d legacy asset manifests into %s",
-                        n, self._workspace.working_db_path,
+                        "Migrated %d legacy asset manifests into workspace",
+                        n,
                     )
             except Exception as exc:
                 import logging
+
                 logging.getLogger("deriva_ml").warning(
-                    "Legacy manifest migration failed: %s", exc,
+                    "Legacy manifest migration failed: %s",
+                    exc,
                 )
-        return self._workspace.legacy_working_data_view()
+            # Build the local schema so the ORM is available
+            self._workspace.build_local_schema(
+                model=self.model.model,  # the ERMrest Model object
+                schemas=[self.ml_schema, *self.domain_schemas],
+            )
+        return self._workspace
+
+    @property
+    def working_data(self):
+        """Deprecated: use ``workspace`` instead."""
+        import warnings
+
+        warnings.warn(
+            "DerivaML.working_data is deprecated; use DerivaML.workspace instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.workspace
 
     def cache_table(self, table_name: str, force: bool = False) -> "pd.DataFrame":
         """Fetch a table from the catalog and cache locally as SQLite.
@@ -497,14 +515,12 @@ class DerivaML(
             # Second call returns cached data instantly
             subjects = ml.cache_table("Subject")
         """
-        import pandas as pd
-
-        if not force and self.working_data.has_table(table_name):
-            return self.working_data.read_table(table_name)
-
-        df = self.get_table_as_dataframe(table_name)
-        self.working_data.cache_table(table_name, df)
-        return df
+        result = self.workspace.cached_table_read(
+            table=table_name,
+            source="catalog",
+            refresh=force,
+        )
+        return result.to_dataframe()
 
     def cache_features(
         self,
@@ -533,16 +549,36 @@ class DerivaML(
             labels = ml.cache_features("Image", "Classification")
             print(labels["Diagnosis_Type"].value_counts())
         """
+        import time
+
         import pandas as pd
 
-        cache_key = f"features_{table_name}_{feature_name}"
-        if not force and self.working_data.has_table(cache_key):
-            return self.working_data.read_table(cache_key)
+        from deriva_ml.local_db.result_cache import CachedResultMeta, ResultCache
+
+        rc = self.workspace._get_result_cache()
+        key = ResultCache.cache_key("features", table=table_name, feature=feature_name)
+
+        if not force and rc.has(key):
+            cached = rc.get(key)
+            if cached is not None:
+                return cached.to_dataframe()
 
         features = self.fetch_table_features(table_name, feature_name=feature_name, **kwargs)
         records = [r.model_dump(mode="json") for r in features.get(feature_name, [])]
         df = pd.DataFrame(records)
-        self.working_data.cache_table(cache_key, df)
+        if not df.empty:
+            columns = list(df.columns)
+            rows = df.to_dict(orient="records")
+            meta = CachedResultMeta(
+                cache_key=key,
+                source="catalog",
+                tool_name="features",
+                params={"table": table_name, "feature": feature_name},
+                columns=columns,
+                row_count=len(rows),
+                created_at=time.time(),
+            )
+            rc.store(key, columns, rows, meta)
         return df
 
     @staticmethod

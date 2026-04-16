@@ -25,6 +25,7 @@ from deriva_ml.execution.execution import ExecutionConfiguration
 # Helpers shared across test classes
 # ---------------------------------------------------------------------------
 
+
 def _ensure_workflow(ml: DerivaML, name: str = "Pattern Test") -> None:
     """Ensure the workflow type and a workflow exist for creating executions."""
     try:
@@ -33,9 +34,7 @@ def _ensure_workflow(ml: DerivaML, name: str = "Pattern Test") -> None:
         ml.add_term(MLVocab.workflow_type, "Test Workflow", description="Testing")
 
 
-def _create_dataset_with_members(
-    ml: DerivaML, element_table: str, rids: list[str], description: str
-):
+def _create_dataset_with_members(ml: DerivaML, element_table: str, rids: list[str], description: str):
     """Create a dataset with the given members."""
     ml.model.refresh_model()
     ml.add_dataset_element_type(element_table)
@@ -51,6 +50,7 @@ def _create_dataset_with_members(
 # Deep FK chains (mimics FaceBase: Dataset → assoc → file → biosample →
 # experiment → study → project)
 # ===========================================================================
+
 
 class TestDeepFKChains:
     """Test denormalization across deep FK chains (5+ hops).
@@ -69,9 +69,7 @@ class TestDeepFKChains:
             return
 
         # Build chain from leaf to root (F has no FKs, E→F, D→E, etc.)
-        domain.create_table(
-            TableDef(name="ChainF", columns=[ColumnDef("F_Name", BuiltinType.text)])
-        )
+        domain.create_table(TableDef(name="ChainF", columns=[ColumnDef("F_Name", BuiltinType.text)]))
         for prev, cur in [("E", "F"), ("D", "E"), ("C", "D"), ("B", "C"), ("A", "B")]:
             domain.create_table(
                 TableDef(
@@ -109,14 +107,10 @@ class TestDeepFKChains:
         self._create_deep_chain_schema(test_ml)
         data = self._populate_deep_chain(test_ml)
 
-        dataset = _create_dataset_with_members(
-            test_ml, "ChainA", [r["RID"] for r in data["a"]], "Deep chain test"
-        )
+        dataset = _create_dataset_with_members(test_ml, "ChainA", [r["RID"] for r in data["a"]], "Deep chain test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
-        df = bag.denormalize_as_dataframe(
-            include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
         assert len(df) == 1
         assert df["ChainA.A_Name"].iloc[0] == "Level1"
         assert df["ChainF.F_Name"].iloc[0] == "Root"
@@ -142,28 +136,18 @@ class TestDeepFKChains:
         data = self._populate_deep_chain(test_ml)
 
         # Register ChainA as a dataset element type so paths flow through it
-        _create_dataset_with_members(
-            test_ml, "ChainA", [r["RID"] for r in data["a"]], "max_depth test"
-        )
+        _create_dataset_with_members(test_ml, "ChainA", [r["RID"] for r in data["a"]], "max_depth test")
         test_ml.model.refresh_model()
 
         # Without depth limit, should find paths reaching ChainF
         # Path: Dataset → Dataset_ChainA → ChainA → ChainB → ... → ChainF (8 hops)
         all_paths = test_ml.model._schema_to_paths()
-        deep_sigs = {
-            " -> ".join(t.name for t in p)
-            for p in all_paths
-            if any(t.name == "ChainF" for t in p)
-        }
+        deep_sigs = {" -> ".join(t.name for t in p) for p in all_paths if any(t.name == "ChainF" for t in p)}
         assert len(deep_sigs) > 0, "Should find paths to ChainF without depth limit"
 
         # With max_depth=4, should NOT reach ChainF (needs 8 hops from Dataset)
         shallow_paths = test_ml.model._schema_to_paths(max_depth=4)
-        shallow_sigs = {
-            " -> ".join(t.name for t in p)
-            for p in shallow_paths
-            if any(t.name == "ChainF" for t in p)
-        }
+        shallow_sigs = {" -> ".join(t.name for t in p) for p in shallow_paths if any(t.name == "ChainF" for t in p)}
         assert len(shallow_sigs) == 0, "max_depth=4 should not reach ChainF"
 
     def test_partial_chain_denormalize(self, test_ml: DerivaML, tmp_path):
@@ -171,15 +155,11 @@ class TestDeepFKChains:
         self._create_deep_chain_schema(test_ml)
         data = self._populate_deep_chain(test_ml)
 
-        dataset = _create_dataset_with_members(
-            test_ml, "ChainA", [r["RID"] for r in data["a"]], "Partial chain test"
-        )
+        dataset = _create_dataset_with_members(test_ml, "ChainA", [r["RID"] for r in data["a"]], "Partial chain test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
         # Include only endpoints: ChainA and ChainF, with intermediates auto-joined
-        df = bag.denormalize_as_dataframe(
-            include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"]
-        )
+        df = bag.denormalize_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
         assert len(df) == 1
         assert df["ChainF.F_Name"].iloc[0] == "Root"
 
@@ -187,6 +167,7 @@ class TestDeepFKChains:
 # ===========================================================================
 # Nullable composite FKs (LEFT JOIN semantics)
 # ===========================================================================
+
 
 class TestNullableCompositeFKs:
     """Test nullable composite FKs produce LEFT JOIN semantics.
@@ -248,14 +229,22 @@ class TestNullableCompositeFKs:
         pb = ml.pathBuilder()
         domain = pb.schemas[ml.default_schema]
 
-        targets = list(domain.tables["NullTarget"].insert([
-            {"Name": "T1", "Category": "CatA"},
-        ]))
+        targets = list(
+            domain.tables["NullTarget"].insert(
+                [
+                    {"Name": "T1", "Category": "CatA"},
+                ]
+            )
+        )
 
-        sources = list(domain.tables["NullSource"].insert([
-            {"Label": "Linked", "Target_RID": targets[0]["RID"], "Target_Category": "CatA"},
-            {"Label": "Orphan", "Target_RID": None, "Target_Category": None},
-        ]))
+        sources = list(
+            domain.tables["NullSource"].insert(
+                [
+                    {"Label": "Linked", "Target_RID": targets[0]["RID"], "Target_Category": "CatA"},
+                    {"Label": "Orphan", "Target_RID": None, "Target_Category": None},
+                ]
+            )
+        )
 
         return {"targets": targets, "sources": sources}
 
@@ -271,9 +260,7 @@ class TestNullableCompositeFKs:
 
         df = bag.denormalize_as_dataframe(include_tables=["NullSource", "NullTarget"])
         # Both rows should be present: the linked one AND the orphan with NULLs
-        assert len(df) == 2, (
-            f"Expected 2 rows (LEFT JOIN preserves NULL FK rows), got {len(df)}"
-        )
+        assert len(df) == 2, f"Expected 2 rows (LEFT JOIN preserves NULL FK rows), got {len(df)}"
         labels = set(df["NullSource.Label"].tolist())
         assert labels == {"Linked", "Orphan"}
 
@@ -282,11 +269,12 @@ class TestNullableCompositeFKs:
 # Catalog-side composite FK denormalization
 # ===========================================================================
 
+
 class TestCatalogSideCompositeFKDenormalize:
     """Test composite FK denormalization via live catalog (not just bag).
 
     The existing composite FK tests only exercise the bag path. This verifies
-    that the catalog-side _denormalize_datapath also handles composite FKs.
+    that the catalog-side denormalization also handles composite FKs.
     """
 
     def _create_composite_schema(self, ml: DerivaML) -> None:
@@ -298,9 +286,7 @@ class TestCatalogSideCompositeFKDenormalize:
         if "CatGroup" in domain.tables:
             return
 
-        domain.create_table(
-            TableDef(name="CatGroup", columns=[ColumnDef("Name", BuiltinType.text, nullok=False)])
-        )
+        domain.create_table(TableDef(name="CatGroup", columns=[ColumnDef("Name", BuiltinType.text, nullok=False)]))
         domain.create_table(
             TableDef(
                 name="CatParent",
@@ -345,14 +331,22 @@ class TestCatalogSideCompositeFKDenormalize:
         domain = pb.schemas[ml.default_schema]
 
         groups = list(domain.tables["CatGroup"].insert([{"Name": "G1"}, {"Name": "G2"}]))
-        parents = list(domain.tables["CatParent"].insert([
-            {"Name": "P1", "CatGroup_Ref": groups[0]["RID"]},
-            {"Name": "P2", "CatGroup_Ref": groups[1]["RID"]},
-        ]))
-        children = list(domain.tables["CatChild"].insert([
-            {"Label": "C1", "Parent_RID": parents[0]["RID"], "Parent_Group": groups[0]["RID"]},
-            {"Label": "C2", "Parent_RID": parents[1]["RID"], "Parent_Group": groups[1]["RID"]},
-        ]))
+        parents = list(
+            domain.tables["CatParent"].insert(
+                [
+                    {"Name": "P1", "CatGroup_Ref": groups[0]["RID"]},
+                    {"Name": "P2", "CatGroup_Ref": groups[1]["RID"]},
+                ]
+            )
+        )
+        children = list(
+            domain.tables["CatChild"].insert(
+                [
+                    {"Label": "C1", "Parent_RID": parents[0]["RID"], "Parent_Group": groups[0]["RID"]},
+                    {"Label": "C2", "Parent_RID": parents[1]["RID"], "Parent_Group": groups[1]["RID"]},
+                ]
+            )
+        )
         return {"groups": groups, "parents": parents, "children": children}
 
     def test_catalog_denormalize_composite_fk(self, test_ml: DerivaML, tmp_path):
@@ -376,9 +370,7 @@ class TestCatalogSideCompositeFKDenormalize:
         dataset = _create_dataset_with_members(
             test_ml, "CatChild", [c["RID"] for c in data["children"]], "3-table composite"
         )
-        df = dataset.denormalize_as_dataframe(
-            include_tables=["CatChild", "CatParent", "CatGroup"]
-        )
+        df = dataset.denormalize_as_dataframe(include_tables=["CatChild", "CatParent", "CatGroup"])
         assert len(df) == 2
         assert set(df["CatGroup.Name"].tolist()) == {"G1", "G2"}
 
@@ -386,6 +378,7 @@ class TestCatalogSideCompositeFKDenormalize:
 # ===========================================================================
 # denormalize_columns() preview tests
 # ===========================================================================
+
 
 class TestDenormalizeColumns:
     """Test denormalize_columns() returns correct column metadata without fetching data."""
@@ -405,9 +398,7 @@ class TestDenormalizeColumns:
     def test_columns_multiple_tables(self, dataset_test, tmp_path):
         """denormalize_columns for multiple tables returns all columns."""
         dataset = dataset_test.dataset_description.dataset
-        cols = dataset.denormalize_columns(
-            include_tables=["Subject", "Image", "Observation"]
-        )
+        cols = dataset.denormalize_columns(include_tables=["Subject", "Image", "Observation"])
 
         col_names = [name for name, _ in cols]
         # Should have columns from each table, dot-prefixed
@@ -430,13 +421,9 @@ class TestDenormalizeColumns:
         dataset = dataset_test.dataset_description.dataset
         version = dataset.current_version
 
-        catalog_cols = dataset.denormalize_columns(
-            include_tables=["Subject", "Image", "Observation"]
-        )
+        catalog_cols = dataset.denormalize_columns(include_tables=["Subject", "Image", "Observation"])
         bag = dataset.download_dataset_bag(version, use_minid=False)
-        bag_cols = bag.denormalize_columns(
-            include_tables=["Subject", "Image", "Observation"]
-        )
+        bag_cols = bag.denormalize_columns(include_tables=["Subject", "Image", "Observation"])
 
         catalog_names = {name for name, _ in catalog_cols}
         bag_names = {name for name, _ in bag_cols}
@@ -450,6 +437,7 @@ class TestDenormalizeColumns:
 # ===========================================================================
 # Self-referential FK (hierarchical data)
 # ===========================================================================
+
 
 class TestSelfReferentialFK:
     """Test schemas with self-referential FKs (table references itself).
@@ -488,12 +476,20 @@ class TestSelfReferentialFK:
         pb = ml.pathBuilder()
         domain = pb.schemas[ml.default_schema]
 
-        root = list(domain.tables["HierNode"].insert([
-            {"Name": "Root", "Parent_Node": None},
-        ]))
-        child = list(domain.tables["HierNode"].insert([
-            {"Name": "Child1", "Parent_Node": root[0]["RID"]},
-        ]))
+        root = list(
+            domain.tables["HierNode"].insert(
+                [
+                    {"Name": "Root", "Parent_Node": None},
+                ]
+            )
+        )
+        child = list(
+            domain.tables["HierNode"].insert(
+                [
+                    {"Name": "Child1", "Parent_Node": root[0]["RID"]},
+                ]
+            )
+        )
         return {"root": root, "child": child}
 
     def test_self_referential_fk_no_infinite_loop(self, test_ml: DerivaML):
@@ -513,9 +509,7 @@ class TestSelfReferentialFK:
         data = self._populate_hierarchy(test_ml)
 
         all_rids = [r["RID"] for r in data["root"] + data["child"]]
-        dataset = _create_dataset_with_members(
-            test_ml, "HierNode", all_rids, "Hierarchical test"
-        )
+        dataset = _create_dataset_with_members(test_ml, "HierNode", all_rids, "Hierarchical test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
         df = bag.denormalize_as_dataframe(include_tables=["HierNode"])
@@ -527,6 +521,7 @@ class TestSelfReferentialFK:
 # ===========================================================================
 # Wide schema (many tables, path explosion guard)
 # ===========================================================================
+
 
 class TestWideSchema:
     """Test that path discovery handles wide schemas without path explosion.
@@ -544,9 +539,7 @@ class TestWideSchema:
         if "Hub" in domain.tables:
             return
 
-        domain.create_table(
-            TableDef(name="Hub", columns=[ColumnDef("Name", BuiltinType.text)])
-        )
+        domain.create_table(TableDef(name="Hub", columns=[ColumnDef("Name", BuiltinType.text)]))
 
         for i in range(n_tables):
             domain.create_table(
@@ -587,13 +580,15 @@ class TestWideSchema:
         domain = pb.schemas[test_ml.default_schema]
 
         hubs = list(domain.tables["Hub"].insert([{"Name": "Center"}]))
-        spokes = list(domain.tables["Spoke0"].insert([
-            {"Value": "S0", "Hub_Ref": hubs[0]["RID"]},
-        ]))
-
-        dataset = _create_dataset_with_members(
-            test_ml, "Spoke0", [s["RID"] for s in spokes], "Wide schema test"
+        spokes = list(
+            domain.tables["Spoke0"].insert(
+                [
+                    {"Value": "S0", "Hub_Ref": hubs[0]["RID"]},
+                ]
+            )
         )
+
+        dataset = _create_dataset_with_members(test_ml, "Spoke0", [s["RID"] for s in spokes], "Wide schema test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
         df = bag.denormalize_as_dataframe(include_tables=["Spoke0", "Hub"])

@@ -46,7 +46,7 @@ import pandas as pd
 from deriva.core.ermrest_model import Table
 
 # Deriva imports
-from sqlalchemy import CompoundSelect, Engine, Select, and_, inspect, literal, select, union
+from sqlalchemy import CompoundSelect, Engine, inspect, select, union
 from sqlalchemy.orm import RelationshipProperty, Session
 from sqlalchemy.orm.util import AliasedClass
 
@@ -144,9 +144,9 @@ class DatasetBag:
         # Use provided RID or fall back to the bag's primary dataset
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         self.description = description
-        self.execution_rid = execution_rid or (
-            self.model._get_dataset_execution(self.dataset_rid) or {}
-        ).get("Execution")
+        self.execution_rid = execution_rid or (self.model._get_dataset_execution(self.dataset_rid) or {}).get(
+            "Execution"
+        )
 
         # Normalize dataset_types to always be a list of strings for consistency
         # with the Dataset class interface
@@ -169,8 +169,10 @@ class DatasetBag:
 
     def __repr__(self) -> str:
         """Return a string representation of the DatasetBag for debugging."""
-        return (f"<deriva_ml.DatasetBag object at {hex(id(self))}: rid='{self.dataset_rid}', "
-                f"version='{self.current_version}', types={self.dataset_types}>")
+        return (
+            f"<deriva_ml.DatasetBag object at {hex(id(self))}: rid='{self.dataset_rid}', "
+            f"version='{self.current_version}', types={self.dataset_types}>"
+        )
 
     @property
     def current_version(self) -> DatasetVersion:
@@ -423,7 +425,9 @@ class DatasetBag:
                 nested_datasets = [d["RID"] for d in element_rows]
                 for ds in nested_datasets:
                     nested_dataset = self._catalog.lookup_dataset(ds)
-                    for k, v in nested_dataset.list_dataset_members(recurse=recurse, limit=limit, _visited=_visited).items():
+                    for k, v in nested_dataset.list_dataset_members(
+                        recurse=recurse, limit=limit, _visited=_visited
+                    ).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -534,9 +538,7 @@ class DatasetBag:
             features = [f for f in features if f.feature_name == feature_name]
             if not features:
                 table_name = table if isinstance(table, str) else table.name
-                raise DerivaMLException(
-                    f"Feature '{feature_name}' not found on table '{table_name}'."
-                )
+                raise DerivaMLException(f"Feature '{feature_name}' not found on table '{table_name}'.")
 
         result: dict[str, list[FeatureRecord]] = {}
 
@@ -564,10 +566,7 @@ class DatasetBag:
                     target_rid = getattr(rec, target_col, None)
                     if target_rid is not None:
                         grouped[target_rid].append(rec)
-                records = [
-                    selector(group) if len(group) > 1 else group[0]
-                    for group in grouped.values()
-                ]
+                records = [selector(group) if len(group) > 1 else group[0] for group in grouped.values()]
 
             result[feat.feature_name] = records
 
@@ -761,107 +760,6 @@ class DatasetBag:
             sql_cmd = select(de_table.Execution).where(de_table.Dataset == self.dataset_rid)
             return [r[0] for r in session.execute(sql_cmd).all()]
 
-    def _denormalize(self, include_tables: list[str]) -> Select:
-        """Build a SQL query that joins multiple tables into a denormalized view.
-
-        This method creates a "wide table" by joining related tables together,
-        producing a single query that returns columns from all specified tables.
-        This is useful for machine learning pipelines that need flat data.
-
-        The method:
-        1. Analyzes the schema to find join paths between tables
-        2. Determines the correct join order based on foreign key relationships
-        3. Builds SELECT statements with properly aliased columns
-        4. Creates a UNION if multiple paths exist to the same tables
-
-        Args:
-            include_tables: List of table names to include in the output. Additional
-                tables may be included if they're needed to join the requested tables.
-
-        Returns:
-            Select: A SQLAlchemy query that produces the denormalized result.
-
-        Note:
-            Column names in the result are prefixed with the table name to avoid
-            collisions (e.g., "Image.Filename", "Subject.RID").
-        """
-        # Skip over tables that we don't want to include in the denormalized dataset.
-        # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
-        # table.
-
-        def build_join_on_clause(table_name, join_condition_pairs):
-            """Build a SQLAlchemy ON clause from join condition column pairs.
-
-            For simple FKs: single equality condition.
-            For composite FKs: AND of multiple equality conditions.
-
-            Each ``(fk_col, pk_col)`` pair comes from ``_table_relationship``
-            which always returns the FK column first and the PK column second.
-            We use the column objects' own ``.table.name`` to find the correct
-            ORM classes -- this is more robust than relying on sequential path
-            order, which breaks with branching join trees.
-
-            Args:
-                table_name: Name of the table being joined (the target).
-                join_condition_pairs: Set of (fk_col, pk_col) Column pairs from
-                    _table_relationship(). Each pair represents one column in the FK.
-
-            Returns:
-                SQLAlchemy AND clause for use as join onclause.
-            """
-            conditions = []
-            for fk_col, pk_col in join_condition_pairs:
-                # Use the FK column's table info to get the correct ORM class
-                fk_table_name = fk_col.table.name if hasattr(fk_col.table, 'name') else str(fk_col.table)
-                pk_table_name = pk_col.table.name if hasattr(pk_col.table, 'name') else str(pk_col.table)
-                fk_class = self.model.get_orm_class_by_name(fk_table_name)
-                pk_class = self.model.get_orm_class_by_name(pk_table_name)
-                left = fk_class.__table__.columns[fk_col.name]
-                right = pk_class.__table__.columns[pk_col.name]
-                conditions.append(left == right)
-            return and_(*conditions)
-
-        from deriva_ml.model.catalog import denormalize_column_name
-
-        join_tables, column_specs, multi_schema = self.model._prepare_wide_table(
-            self, self.dataset_rid, include_tables
-        )
-
-        denormalized_columns = [
-            self.model.get_orm_class_by_name(table_name)
-            .__table__.columns[column_name]
-            .label(denormalize_column_name(schema_name, table_name, column_name, multi_schema))
-            for schema_name, table_name, column_name, _type_name in column_specs
-        ]
-        sql_statements = []
-        for key, (path, join_conditions, join_types) in join_tables.items():
-            sql_statement = select(*denormalized_columns).select_from(
-                self.model.get_orm_class_for_table(self._dataset_table)
-            )
-            for table_name in path[1:]:  # Skip over dataset table
-                if table_name not in join_conditions:
-                    continue  # No join condition — skip (not connected)
-                on_clause = build_join_on_clause(
-                    table_name, join_conditions[table_name]
-                )
-                table_class = self.model.get_orm_class_by_name(table_name)
-                # Use LEFT OUTER JOIN for nullable FK columns to preserve all
-                # rows from the left side (e.g., Images with null Observation FK).
-                if join_types.get(table_name) == "left":
-                    sql_statement = sql_statement.outerjoin(table_class, onclause=on_clause)
-                else:
-                    sql_statement = sql_statement.join(table_class, onclause=on_clause)
-            dataset_rid_list = [self.dataset_rid] + [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-            dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
-            sql_statement = sql_statement.where(dataset_class.RID.in_(dataset_rid_list))
-            sql_statements.append(sql_statement)
-        if not sql_statements:
-            # No join paths found — return empty result with correct columns.
-            if denormalized_columns:
-                return select(*denormalized_columns).where(literal(False))
-            return select(literal(1)).where(literal(False))
-        return union(*sql_statements)
-
     def denormalize_as_dataframe(
         self,
         include_tables: list[str],
@@ -923,11 +821,19 @@ class DatasetBag:
         See Also:
             denormalize_as_dict: Generator version for memory-efficient processing.
         """
-        sql_stmt = self._denormalize(include_tables=include_tables)
-        with Session(self.engine) as session:
-            result = session.execute(sql_stmt)
-            rows = [dict(row._mapping) for row in result]
-        return pd.DataFrame(rows)
+        from deriva_ml.local_db.denormalize import denormalize
+
+        children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        result = denormalize(
+            model=self.model,
+            engine=self.engine,
+            orm_resolver=self.model.get_orm_class_by_name,
+            dataset_rid=self.dataset_rid,
+            include_tables=include_tables,
+            dataset=self,
+            dataset_children_rids=children_rids,
+        )
+        return result.to_dataframe()
 
     def denormalize_as_dict(
         self,
@@ -987,11 +893,19 @@ class DatasetBag:
         See Also:
             denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
-        sql_stmt = self._denormalize(include_tables=include_tables)
-        with Session(self.engine) as session:
-            result = session.execute(sql_stmt)
-            for row in result:
-                yield dict(row._mapping)
+        from deriva_ml.local_db.denormalize import denormalize
+
+        children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        result = denormalize(
+            model=self.model,
+            engine=self.engine,
+            orm_resolver=self.model.get_orm_class_by_name,
+            dataset_rid=self.dataset_rid,
+            include_tables=include_tables,
+            dataset=self,
+            dataset_children_rids=children_rids,
+        )
+        yield from result.iter_rows()
 
     # SQLAlchemy type name → ermrest type name mapping.
     _SQLALCHEMY_TO_ERMREST: dict[str, str] = {
@@ -1041,20 +955,15 @@ class DatasetBag:
         """
         from deriva_ml.model.catalog import denormalize_column_name
 
-        _, column_specs, multi_schema = self.model._prepare_wide_table(
-            self, self.dataset_rid, list(include_tables)
-        )
+        _, column_specs, multi_schema = self.model._prepare_wide_table(self, self.dataset_rid, list(include_tables))
 
         result = []
         for schema_name, table_name, col_name, type_name in column_specs:
-            prefixed = denormalize_column_name(
-                schema_name, table_name, col_name, multi_schema
-            )
+            prefixed = denormalize_column_name(schema_name, table_name, col_name, multi_schema)
             # _prepare_wide_table now returns ermrest type names directly,
             # so no mapping needed.
             result.append((prefixed, type_name))
         return result
-
 
     # =========================================================================
     # Asset Restructuring Methods
@@ -1332,10 +1241,7 @@ class DatasetBag:
                         cache[group_key][target_rid] = getattr(selected, use_column)
                     elif enforce_vocabulary:
                         # Multiple different values without selector - error
-                        values_str = ", ".join(
-                            f"'{getattr(r, use_column)}' (exec: {r.Execution})"
-                            for r in records
-                        )
+                        values_str = ", ".join(f"'{getattr(r, use_column)}' (exec: {r.Execution})" for r in records)
                         raise DerivaMLException(
                             f"Asset '{target_rid}' has multiple different values for "
                             f"feature '{records[0].Feature_Name}': {values_str}. "
@@ -1677,9 +1583,7 @@ class DatasetBag:
         asset_dataset_map = self._get_asset_dataset_mapping(asset_table)
 
         # Step 3: Load feature values cache for relevant features
-        feature_cache = self._load_feature_values_cache(
-            asset_table, group_by, enforce_vocabulary, value_selector
-        )
+        feature_cache = self._load_feature_values_cache(asset_table, group_by, enforce_vocabulary, value_selector)
 
         # Step 4: Get all assets reachable through FK paths
         # This uses _get_reachable_assets which traverses FK relationships,
@@ -1708,11 +1612,7 @@ class DatasetBag:
                 # BDBag asset layout: data/asset/{RID}/{table}/{filename}.
                 try:
                     bag_root = Path(self._catalog._database_model.bag_path)
-                    source_path = (
-                        bag_root / "data" / "asset"
-                        / asset.get("RID", "") / asset_table
-                        / Path(filename).name
-                    )
+                    source_path = bag_root / "data" / "asset" / asset.get("RID", "") / asset_table / Path(filename).name
                 except AttributeError:
                     pass  # catalog doesn't have _database_model (e.g. in tests)
 

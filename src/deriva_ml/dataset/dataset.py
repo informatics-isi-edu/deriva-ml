@@ -171,8 +171,10 @@ class Dataset:
 
     def __repr__(self) -> str:
         """Return a string representation of the Dataset for debugging."""
-        return (f"<deriva_ml.Dataset object at {hex(id(self))}: rid='{self.dataset_rid}', "
-                f"version='{self.current_version}', types={self.dataset_types}>")
+        return (
+            f"<deriva_ml.Dataset object at {hex(id(self))}: rid='{self.dataset_rid}', "
+            f"version='{self.current_version}', types={self.dataset_types}>"
+        )
 
     def __hash__(self) -> int:
         """Return hash based on dataset RID for use in sets and as dict keys.
@@ -228,9 +230,7 @@ class Dataset:
         """
         _, atable_path = self._get_dataset_type_association_table()
         ds_types = (
-            atable_path.filter(atable_path.Dataset == self.dataset_rid)
-            .attributes(atable_path.Dataset_Type)
-            .fetch()
+            atable_path.filter(atable_path.Dataset == self.dataset_rid).attributes(atable_path.Dataset_Type).fetch()
         )
         return [ds[MLVocab.dataset_type] for ds in ds_types]
 
@@ -779,198 +779,6 @@ class Dataset:
                         members[k].extend(v)
         return dict(members)
 
-    def _denormalize_datapath(
-        self,
-        include_tables: list[str],
-        version: DatasetVersion | str | None = None,
-    ) -> Generator[dict[str, Any], None, None]:
-        """Denormalize dataset members by joining related tables via multi-hop FK chains.
-
-        This method creates a "wide table" view by following FK relationships through
-        intermediate tables. Unlike the previous implementation, tables do NOT need to
-        be explicit dataset members — they just need to be FK-reachable from a member
-        table via the BFS chain built from include_tables.
-
-        The method:
-        1. Gets dataset members for the primary table (first table with members).
-        2. Uses BFS through include_tables to discover FK chains from primary table.
-        3. For each chain hop, pre-fetches records from the catalog using pathBuilder.
-        4. Builds output rows by walking the FK chain for each primary member.
-
-        Args:
-            include_tables: List of table names to include in the output.
-            version: Dataset version to query. Defaults to current version.
-
-        Yields:
-            dict[str, Any]: Rows with column names prefixed by table name (e.g., "Image_Filename").
-                Tables not reachable via FK from the primary table have NULL values.
-
-        Note:
-            Column names in the result are prefixed with the table name to avoid
-            collisions (e.g., "Image_Filename", "Subject_RID").
-        """
-        # Skip system columns in output
-        skip_columns = {"RCT", "RMT", "RCB", "RMB"}
-
-        # Get all members for the included tables (recursively includes nested datasets)
-        members = self.list_dataset_members(version=version, recurse=True)
-
-        # Build a lookup of columns and schema names for each table
-        from deriva_ml.model.catalog import denormalize_column_name
-
-        table_columns: dict[str, list[str]] = {}
-        table_schemas: dict[str, str] = {}
-        for table_name in include_tables:
-            table = self._ml_instance.model.name_to_table(table_name)
-            table_columns[table_name] = [
-                c.name for c in table.columns if c.name not in skip_columns
-            ]
-            table_schemas[table_name] = table.schema.name
-
-        # Find the primary table (first table in include_tables with dataset members)
-        primary_table = None
-        for table_name in include_tables:
-            if table_name in members and members[table_name]:
-                primary_table = table_name
-                break
-
-        if primary_table is None:
-            # No data at all
-            return
-
-        # Check for ambiguous FK paths before proceeding.
-        # Uses the same graph-based path analysis as the bag-side implementation,
-        # ensuring consistent ambiguity errors between catalog and bag denormalization.
-        _, _, multi_schema = self._ml_instance.model._prepare_wide_table(
-            self, self.dataset_rid, list(include_tables)
-        )
-
-        # BFS from primary table to discover FK chains through include_tables.
-        # fk_relationships maps target_name -> (from_table_name, fk_col, pk_col)
-        fk_relationships: dict[str, tuple] = {}
-        visited = {primary_table}
-        queue = [primary_table]
-        chain_order: list[str] = []
-
-        while queue:
-            current_name = queue.pop(0)
-            current_table = self._ml_instance.model.name_to_table(current_name)
-
-            for target_name in include_tables:
-                if target_name in visited:
-                    continue
-                target_table = self._ml_instance.model.name_to_table(target_name)
-
-                try:
-                    col_pairs = self._ml_instance.model._table_relationship(
-                        current_table, target_table
-                    )
-                    visited.add(target_name)
-                    queue.append(target_name)
-                    chain_order.append(target_name)
-                    fk_relationships[target_name] = (current_name, col_pairs)
-                except DerivaMLException as exc:
-                    # If it's ambiguous (multiple paths), re-raise immediately.
-                    # If it's just "no relationship", continue BFS.
-                    msg = str(exc)
-                    if "ambiguous" in msg.lower() or "multiple" in msg.lower():
-                        raise
-                    # Not directly connected — might be reachable via another table later
-
-        # Pre-fetch records for each table in chain order.
-        # Primary table records come from dataset members (already fetched).
-        # For non-member tables, fetch ALL records from the catalog and index by pk_col.
-        record_indexes: dict[str, dict[str, dict]] = {
-            primary_table: {m["RID"]: m for m in members[primary_table]}
-        }
-
-        pb = self._ml_instance.pathBuilder()
-
-        for target_name in chain_order:
-            from_table_name, col_pairs = fk_relationships[target_name]
-
-            # col_pairs is a list of (fk_col, pk_col) tuples.
-            # For simple FKs: [(fk_col, pk_col)]
-            # For composite FKs: [(fk_col1, pk_col1), (fk_col2, pk_col2), ...]
-            fk_col_names = [fk_col.name for fk_col, _ in col_pairs]
-            pk_col_names = [pk_col.name for _, pk_col in col_pairs]
-
-            # Collect FK values from the source table's records
-            # For composite FKs, the key is a tuple of column values
-            fk_values = set()
-            for record in record_indexes.get(from_table_name, {}).values():
-                key = tuple(record.get(name) for name in fk_col_names)
-                if all(v is not None for v in key):
-                    fk_values.add(key)
-
-            if not fk_values:
-                record_indexes[target_name] = {}
-                continue
-
-            # Fetch ALL records from the target table and index by pk columns
-            target_table_obj = self._ml_instance.model.name_to_table(target_name)
-            pb_target = pb.schemas[target_table_obj.schema.name].tables[target_name]
-            all_target_records = list(pb_target.entities().fetch())
-            record_indexes[target_name] = {
-                tuple(r[name] for name in pk_col_names): r
-                for r in all_target_records
-                if tuple(r[name] for name in pk_col_names) in fk_values
-            }
-
-        # Helper to build prefixed column name
-        def _col(table_name: str, col_name: str) -> str:
-            return denormalize_column_name(
-                table_schemas[table_name], table_name, col_name, multi_schema
-            )
-
-        # Build output rows
-        for member in members[primary_table]:
-            row: dict[str, Any] = {}
-
-            # Add primary table columns
-            for col_name in table_columns[primary_table]:
-                row[_col(primary_table, col_name)] = member.get(col_name)
-
-            # Add columns from each joined table
-            for target_name in include_tables:
-                if target_name == primary_table:
-                    continue
-
-                other_cols = table_columns[target_name]
-
-                # Initialize to None (outer join semantics)
-                for col_name in other_cols:
-                    row[_col(target_name, col_name)] = None
-
-                # Walk the FK chain from primary to this target
-                if target_name in fk_relationships:
-                    # Build path from primary to target by tracing back
-                    path_to_target: list[str] = []
-                    t = target_name
-                    while t != primary_table:
-                        path_to_target.append(t)
-                        t = fk_relationships[t][0]
-                    path_to_target.reverse()
-
-                    # Walk each hop
-                    current_record = member
-                    found = True
-                    for hop_target in path_to_target:
-                        _, hop_col_pairs = fk_relationships[hop_target]
-                        hop_fk_names = [fk_c.name for fk_c, _ in hop_col_pairs]
-                        fk_key = tuple(current_record.get(name) for name in hop_fk_names)
-                        if all(v is not None for v in fk_key) and fk_key in record_indexes.get(hop_target, {}):
-                            current_record = record_indexes[hop_target][fk_key]
-                        else:
-                            found = False
-                            break
-
-                    if found:
-                        for col_name in other_cols:
-                            row[_col(target_name, col_name)] = current_record.get(col_name)
-
-            yield row
-
     def denormalize_as_dataframe(
         self,
         include_tables: list[str],
@@ -1041,8 +849,19 @@ class Dataset:
             denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dict: Generator version for memory-efficient processing.
         """
-        rows = list(self._denormalize_datapath(include_tables, version))
-        return pd.DataFrame(rows)
+        from deriva_ml.local_db.denormalize import denormalize
+
+        children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        result = denormalize(
+            model=self._ml_instance.model,
+            engine=self._ml_instance.workspace.engine,
+            orm_resolver=self._ml_instance.workspace.local_schema.get_orm_class,
+            dataset_rid=self.dataset_rid,
+            include_tables=include_tables,
+            dataset=self,
+            dataset_children_rids=children,
+        )
+        return result.to_dataframe()
 
     def cache_denormalized(
         self,
@@ -1076,17 +895,18 @@ class Dataset:
             # Second call returns cached data instantly
             df = dataset.cache_denormalized(["Image", "Diagnosis"], version="1.0.0")
         """
-        cache_key = f"denorm_{self.rid}_{'_'.join(sorted(include_tables))}"
-        if version:
-            cache_key += f"_v{version.replace('.', '_')}"
-
-        cache = self._ml.working_data
-        if not force and cache.has_table(cache_key):
-            return cache.read_table(cache_key)
-
-        df = self.denormalize_as_dataframe(include_tables, version=version)
-        cache.cache_table(cache_key, df)
-        return df
+        children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        result = self._ml_instance.workspace.cache_denormalized(
+            model=self._ml_instance.model,
+            dataset_rid=self.rid,
+            include_tables=include_tables,
+            version=version,
+            source="catalog",
+            refresh=force,
+            dataset=self,
+            dataset_children_rids=children,
+        )
+        return result.to_dataframe()
 
     def denormalize_as_dict(
         self,
@@ -1144,7 +964,19 @@ class Dataset:
             denormalize_columns: Preview column names and types without fetching data.
             denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
-        yield from self._denormalize_datapath(include_tables, version)
+        from deriva_ml.local_db.denormalize import denormalize
+
+        children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        result = denormalize(
+            model=self._ml_instance.model,
+            engine=self._ml_instance.workspace.engine,
+            orm_resolver=self._ml_instance.workspace.local_schema.get_orm_class,
+            dataset_rid=self.dataset_rid,
+            include_tables=include_tables,
+            dataset=self,
+            dataset_children_rids=children,
+        )
+        yield from result.iter_rows()
 
     def denormalize_columns(
         self,
@@ -1256,9 +1088,7 @@ class Dataset:
             # Get row count via ermrest aggregate
             schema_name = table.schema.name
             table_path = pb.schemas[schema_name].tables[table_name]
-            row_count = table_path.aggregates(
-                Cnt(table_path.RID).alias("cnt")
-            ).fetch()[0]["cnt"]
+            row_count = table_path.aggregates(Cnt(table_path.RID).alias("cnt")).fetch()[0]["cnt"]
 
             entry: dict[str, Any] = {
                 "row_count": row_count,
@@ -1577,7 +1407,7 @@ class Dataset:
         version = DatasetVersion.parse(version) if isinstance(version, str) else version
         version_snapshot_catalog = self._version_snapshot_catalog(version)
         dataset_dataset_path = (
-           version_snapshot_catalog.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
+            version_snapshot_catalog.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
         )
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
@@ -1644,9 +1474,7 @@ class Dataset:
 
         # Query for all executions associated with this dataset
         records = list(
-            dataset_execution_path.filter(dataset_execution_path.Dataset == self.dataset_rid)
-            .entities()
-            .fetch()
+            dataset_execution_path.filter(dataset_execution_path.Dataset == self.dataset_rid).entities().fetch()
         )
 
         return [self._ml_instance.lookup_execution(record["Execution"]) for record in records]
@@ -1771,7 +1599,9 @@ class Dataset:
                 "Configure s3_bucket when creating the DerivaML instance to enable MINID support."
             )
 
-        minid = self._get_dataset_minid(version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout)
+        minid = self._get_dataset_minid(
+            version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout
+        )
 
         bag_path = (
             self._materialize_dataset_bag(minid, use_minid=use_minid, fetch_concurrency=fetch_concurrency)
@@ -1779,6 +1609,7 @@ class Dataset:
             else self._download_dataset_minid(minid, use_minid)
         )
         from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+
         db_model = DatabaseModel(minid, bag_path, self._ml_instance.working_dir)
         return DerivaMLDatabase(db_model).lookup_dataset(self.dataset_rid)
 
@@ -1916,6 +1747,7 @@ class Dataset:
         if loop and loop.is_running():
             # Already inside an event loop (e.g., Jupyter) -- use nest_asyncio
             import nest_asyncio
+
             nest_asyncio.apply()
             all_results = loop.run_until_complete(_run_all_queries())
         else:
@@ -1945,15 +1777,11 @@ class Dataset:
         csv_bytes_by_table: dict[str, int] = {}
         for table_name, sample_rows in sample_rows_by_table.items():
             row_count = len(rids_by_table.get(table_name, set()))
-            csv_bytes_by_table[table_name] = self._estimate_csv_bytes(
-                sample_rows, row_count
-            )
+            csv_bytes_by_table[table_name] = self._estimate_csv_bytes(sample_rows, row_count)
 
         # Determine which tables are assets from the original table_queries
         asset_tables = {
-            table_name
-            for table_name, entries in table_queries.items()
-            if any(is_asset for _, _, is_asset in entries)
+            table_name for table_name, entries in table_queries.items() if any(is_asset for _, _, is_asset in entries)
         }
 
         table_estimates: dict[str, dict[str, Any]] = {}
@@ -2034,6 +1862,7 @@ class Dataset:
 
         # Get cache status
         from deriva_ml.dataset.bag_cache import BagCache
+
         cache = BagCache(self._ml_instance.cache_dir)
         cache_info = cache.cache_status(self.dataset_rid)
 
@@ -2476,8 +2305,7 @@ class Dataset:
                     dest_file.write_text(json.dumps(resp, indent=2), encoding="utf-8")
                 except Exception as e:
                     raise RuntimeError(
-                        f"Failed to download {output_path} from snapshot catalog "
-                        f"({query_path}): {e}"
+                        f"Failed to download {output_path} from snapshot catalog ({query_path}): {e}"
                     ) from e
 
             elif processor_name == "csv":
@@ -2724,7 +2552,9 @@ class Dataset:
         if cached_bag_path.exists():
             self._logger.info(
                 "Local cache hit for %s version %s (spec+snapshot match: %s)",
-                self.dataset_rid, version, cache_dir_name,
+                self.dataset_rid,
+                version,
+                cache_dir_name,
             )
             return DatasetMinid(
                 dataset_version=version,
@@ -2750,13 +2580,18 @@ class Dataset:
             if minid_url:
                 self._logger.info(
                     "Spec hash changed for dataset %s version %s — regenerating MINID bag.",
-                    self.dataset_rid, version,
+                    self.dataset_rid,
+                    version,
                 )
             else:
                 self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
             minid_url = self._create_dataset_minid(
-                version, use_minid=True, exclude_tables=exclude_tables,
-                spec=spec, spec_hash=spec_hash, timeout=timeout,
+                version,
+                use_minid=True,
+                exclude_tables=exclude_tables,
+                spec=spec,
+                spec_hash=spec_hash,
+                timeout=timeout,
             )
             return self._fetch_minid_metadata(version, minid_url)
 
@@ -2771,11 +2606,16 @@ class Dataset:
 
         self._logger.info(
             "Cache miss for %s version %s — generating bag client-side",
-            self.dataset_rid, version,
+            self.dataset_rid,
+            version,
         )
         minid_url = self._create_dataset_minid(
-            version, use_minid=False, exclude_tables=exclude_tables,
-            spec=spec, spec_hash=spec_hash, timeout=timeout,
+            version,
+            use_minid=False,
+            exclude_tables=exclude_tables,
+            spec=spec,
+            spec_hash=spec_hash,
+            timeout=timeout,
         )
         return DatasetMinid(
             dataset_version=version,

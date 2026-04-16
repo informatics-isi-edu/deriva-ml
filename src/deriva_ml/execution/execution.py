@@ -1384,7 +1384,7 @@ class Execution:
     def _get_manifest(self) -> AssetManifest:
         """Get or create the asset manifest for this execution."""
         if not hasattr(self, "_manifest") or self._manifest is None:
-            ws = self._ml_object.working_data.workspace
+            ws = self._ml_object.workspace
             self._manifest = AssetManifest(ws.manifest_store(), self.execution_rid)
         return self._manifest
 

@@ -97,9 +97,7 @@ class JoinNode:
         return edges
 
 
-def denormalize_column_name(
-    schema_name: str, table_name: str, column_name: str, multi_schema: bool
-) -> str:
+def denormalize_column_name(schema_name: str, table_name: str, column_name: str, multi_schema: bool) -> str:
     """Build a prefixed column name for denormalized output.
 
     Uses dot notation to avoid ambiguity with column names that contain
@@ -117,6 +115,7 @@ def denormalize_column_name(
     if multi_schema:
         return f"{schema_name}.{table_name}.{column_name}"
     return f"{table_name}.{column_name}"
+
 
 logger = logging.getLogger(__name__)
 
@@ -309,33 +308,39 @@ class DerivaModel:
                 for col in table.columns:
                     if not include_system_columns and col.name in system_columns:
                         continue
-                    columns.append({
-                        "name": col.name,
-                        "type": str(col.type.typename),
-                        "nullok": col.nullok,
-                        "comment": col.comment or "",
-                    })
+                    columns.append(
+                        {
+                            "name": col.name,
+                            "type": str(col.type.typename),
+                            "nullok": col.nullok,
+                            "comment": col.comment or "",
+                        }
+                    )
 
                 # Get foreign keys
                 foreign_keys = []
                 for fk in table.foreign_keys:
                     fk_cols = [c.name for c in fk.foreign_key_columns]
                     ref_cols = [c.name for c in fk.referenced_columns]
-                    foreign_keys.append({
-                        "columns": fk_cols,
-                        "referenced_table": f"{fk.pk_table.schema.name}.{fk.pk_table.name}",
-                        "referenced_columns": ref_cols,
-                    })
+                    foreign_keys.append(
+                        {
+                            "columns": fk_cols,
+                            "referenced_table": f"{fk.pk_table.schema.name}.{fk.pk_table.name}",
+                            "referenced_columns": ref_cols,
+                        }
+                    )
 
                 # Get features if this is a domain table
                 features = []
                 if self.is_domain_schema(schema_name):
                     try:
                         for f in self.find_features(table):
-                            features.append({
-                                "name": f.feature_name,
-                                "feature_table": f.feature_table.name,
-                            })
+                            features.append(
+                                {
+                                    "name": f.feature_name,
+                                    "feature_table": f.feature_table.name,
+                                }
+                            )
                     except Exception as e:
                         logger.debug(f"Could not enumerate features for table {table.name}: {e}")
 
@@ -619,7 +624,11 @@ class DerivaModel:
         def is_domain_or_dataset_table(table: Table) -> bool:
             return self.is_domain_schema(table.schema.name) or table.name == dataset_table.name
 
-        return [t for a in dataset_table.find_associations() if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)]
+        return [
+            t
+            for a in dataset_table.find_associations()
+            if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)
+        ]
 
     def _build_join_tree(
         self,
@@ -723,20 +732,17 @@ class DerivaModel:
                 built-in is_association() counts system FKs (RCB/RMB → ERMrest_Client),
                 so we use our own check that ignores them.
                 """
-                system_cols = {'RID', 'RCT', 'RMT', 'RCB', 'RMB'}
+                system_cols = {"RID", "RCT", "RMT", "RCB", "RMB"}
                 try:
                     cols = {c.name for c in tbl.columns}
                     fks = list(tbl.foreign_keys)
                     # Domain FKs: those NOT to system tables like ERMrest_Client
-                    domain_fks = [
-                        fk for fk in fks
-                        if fk.pk_table.name not in ('ERMrest_Client', 'ERMrest_Group')
-                    ]
+                    domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
                     # FK column names
                     fk_col_names = set()
                     for fk in domain_fks:
                         for col in fk.columns:
-                            fk_col_names.add(col.name if hasattr(col, 'name') else str(col))
+                            fk_col_names.add(col.name if hasattr(col, "name") else str(col))
                     # Non-system, non-FK columns
                     user_cols = cols - system_cols - fk_col_names
                     # Association = exactly 2 domain FKs and no other user columns
@@ -756,9 +762,7 @@ class DerivaModel:
                 return True
 
             fully_covered = [
-                (sp, ints)
-                for sp, ints in zip(unique, path_intermediates)
-                if _intermediates_covered(sp, ints)
+                (sp, ints) for sp, ints in zip(unique, path_intermediates) if _intermediates_covered(sp, ints)
             ]
 
             if len(fully_covered) == 1:
@@ -820,9 +824,7 @@ class DerivaModel:
 
             raise DerivaMLException(
                 f"Ambiguous path between {element_name} and {target}: "
-                f"found {len(unique)} FK paths:\n"
-                + "\n".join(f"  {d}" for d in path_descriptions)
-                + suggestion
+                f"found {len(unique)} FK paths:\n" + "\n".join(f"  {d}" for d in path_descriptions) + suggestion
             )
 
         # ── Step 3: merge selected paths into a tree ─────────────────────────
@@ -878,9 +880,7 @@ class DerivaModel:
                 else:
                     # Parent not yet in tree — this shouldn't happen since we
                     # process paths from element outward, but handle gracefully
-                    logger.warning(
-                        f"Parent {parent_name} not in tree when adding {child_name}"
-                    )
+                    logger.warning(f"Parent {parent_name} not in tree when adding {child_name}")
 
         return root
 
@@ -901,7 +901,7 @@ class DerivaModel:
            Nullable FK columns produce LEFT JOINs.
         4. **Flatten to legacy format** -- convert the tree to the
            ``(path, join_conditions, join_types)`` tuple expected by
-           ``_denormalize()`` and ``_denormalize_datapath()``.
+           the unified ``denormalize()`` in ``local_db/denormalize.py``.
 
         Args:
             dataset: A DatasetLike object (DatasetBag or Dataset).
@@ -933,8 +933,7 @@ class DerivaModel:
         table_paths = [
             path
             for path in all_paths
-            if path[-1].name in include_tables_set
-            and include_tables_set.intersection({p.name for p in path})
+            if path[-1].name in include_tables_set and include_tables_set.intersection({p.name for p in path})
         ]
 
         # ── Phase 1b: deduplicate association table routes ───────────────────
@@ -965,9 +964,13 @@ class DerivaModel:
                 if existing_assoc.name != assoc_table.name:
                     # Duplicate route via different association table.
                     # Prefer the standard Dataset_{Element} pattern over legacy.
-                    if _is_standard_assoc(assoc_table.name, element.name) and not _is_standard_assoc(existing_assoc.name, element.name):
+                    if _is_standard_assoc(assoc_table.name, element.name) and not _is_standard_assoc(
+                        existing_assoc.name, element.name
+                    ):
                         # Replace existing with standard pattern
-                        deduplicated_paths = [p for p in deduplicated_paths if not (len(p) >= 3 and (p[2].name, p[-1].name) == key)]
+                        deduplicated_paths = [
+                            p for p in deduplicated_paths if not (len(p) >= 3 and (p[2].name, p[-1].name) == key)
+                        ]
                         seen_element_endpoint[key] = (path, assoc_table)
                         deduplicated_paths.append(path)
                     # else: keep existing (either it's standard or both are non-standard)
@@ -982,11 +985,7 @@ class DerivaModel:
             if len(p) >= 3:
                 paths_by_element[p[2].name].append(p)
 
-        paths_by_element = {
-            elem: paths
-            for elem, paths in paths_by_element.items()
-            if elem in include_tables_set
-        }
+        paths_by_element = {elem: paths for elem, paths in paths_by_element.items() if elem in include_tables_set}
 
         # ── Phase 2: build JoinTree per element ──────────────────────────────
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
@@ -1003,7 +1002,7 @@ class DerivaModel:
             # Find the Dataset -> assoc -> element prefix from the first path
             if paths and len(paths[0]) >= 3:
                 dataset_name = paths[0][0].name  # "Dataset"
-                assoc_name = paths[0][1].name    # e.g. "Dataset_Image"
+                assoc_name = paths[0][1].name  # e.g. "Dataset_Image"
             else:
                 dataset_name = "Dataset"
                 assoc_name = None
@@ -1059,9 +1058,7 @@ class DerivaModel:
             table = self.name_to_table(table_name)
             for c in table.columns:
                 if c.name not in skip_columns:
-                    denormalized_columns.append(
-                        (table.schema.name, table_name, c.name, c.type.typename)
-                    )
+                    denormalized_columns.append((table.schema.name, table_name, c.name, c.type.typename))
 
         output_schemas = {s for s, _, _, _ in denormalized_columns if self.is_domain_schema(s)}
         multi_schema = len(output_schemas) > 1
@@ -1110,8 +1107,7 @@ class DerivaModel:
                 path_descriptions.append(f"  {desc}")
             raise DerivaMLException(
                 f"Ambiguous linkage between {table1.name} and {table2.name}: "
-                f"found {len(relationships)} FK relationships:\n"
-                + "\n".join(path_descriptions)
+                f"found {len(relationships)} FK relationships:\n" + "\n".join(path_descriptions)
             )
         return relationships[0]
 
@@ -1177,10 +1173,7 @@ class DerivaModel:
         def find_arcs(table: Table) -> set[Table]:
             """Return reachable tables via FK arcs, deduplicating multi-FK targets."""
             valid_schemas = self.domain_schemas | {self.ml_schema}
-            arc_list = (
-                [fk.pk_table for fk in table.foreign_keys]
-                + [fk.table for fk in table.referenced_by]
-            )
+            arc_list = [fk.pk_table for fk in table.foreign_keys] + [fk.table for fk in table.referenced_by]
             arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
             # Deduplicate: when multiple FKs point to the same target table,
             # keep only one arc. This prevents redundant path branching.
@@ -1220,15 +1213,10 @@ class DerivaModel:
                 continue
             if child in path:
                 # Cycle detected — skip to avoid infinite recursion.
-                logger.warning(
-                    f"Cycle in schema path: {child.name} "
-                    f"path:{[p.name for p in path]}, skipping"
-                )
+                logger.warning(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}, skipping")
                 continue
 
-            paths.extend(
-                self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth)
-            )
+            paths.extend(self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth))
         return paths
 
     def create_table(self, table_def: TableDefinition, schema: str | None = None) -> Table:
@@ -1249,7 +1237,7 @@ class DerivaModel:
         """
         schema = schema or self._require_default_schema()
         # Handle both TableDefinition (dataclass with to_dict) and plain dicts
-        table_dict = table_def.to_dict() if hasattr(table_def, 'to_dict') else table_def
+        table_dict = table_def.to_dict() if hasattr(table_def, "to_dict") else table_def
         return self.model.schemas[schema].create_table(table_dict)
 
     def _define_association(
