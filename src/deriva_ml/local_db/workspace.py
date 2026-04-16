@@ -25,7 +25,10 @@ from deriva_ml.local_db import paths as p
 from deriva_ml.local_db import sqlite_helpers as sh
 
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from deriva_ml.local_db.manifest_store import ManifestStore
+    from deriva_ml.local_db.result_cache import CachedResult, CachedResultMeta, ResultCache
     from deriva_ml.local_db.schema import LocalSchema
 
 logger = logging.getLogger(__name__)
@@ -49,6 +52,7 @@ class Workspace:
         self._engine: Engine | None = None
         self._manifest_store: "ManifestStore | None" = None
         self._local_schema: "LocalSchema | None" = None
+        self._result_cache: "ResultCache | None" = None
         self._closed = False
 
     # ---- paths ----
@@ -252,6 +256,157 @@ class Workspace:
             manifest_path.rename(sidecar)
             migrated += 1
         return migrated
+
+    # ---- result cache ----
+
+    def _get_result_cache(self) -> "ResultCache":
+        """Lazy-init the result cache backed by this workspace's engine."""
+        if self._result_cache is None:
+            from deriva_ml.local_db.result_cache import ResultCache
+
+            self._result_cache = ResultCache(self.engine)
+            self._result_cache.ensure_schema()
+        return self._result_cache
+
+    def cached_table_read(
+        self,
+        table: str,
+        predicate: str | None = None,
+        columns: list[str] | None = None,
+        source: str = "catalog",
+        refresh: bool = False,
+        ttl: "timedelta | None" = None,
+    ) -> "CachedResult":
+        """Read a table from local schema and cache the result.
+
+        On first call, reads all rows from the table in the local schema
+        and stores them in the result cache. Subsequent calls return the
+        cached data without re-reading. Use refresh=True to force re-read.
+
+        Args:
+            table: Table name to read.
+            predicate: Unused for now (reserved for future filter pushdown).
+            columns: Unused for now (reads all columns).
+            source: Source tag for the cache entry.
+            refresh: Force re-read even if cached.
+            ttl: Optional time-to-live for the cache entry.
+        """
+        import time
+
+        from sqlalchemy import select
+
+        from deriva_ml.local_db.result_cache import CachedResultMeta, ResultCache
+
+        if self._local_schema is None:
+            raise RuntimeError("local_schema not built; call build_local_schema() first")
+
+        rc = self._get_result_cache()
+        key = ResultCache.cache_key("table_read", table=table)
+
+        if not refresh and rc.has(key):
+            result = rc.get(key)
+            if result is not None:
+                return result
+
+        sql_table = self._local_schema.find_table(table)
+        with self.engine.connect() as conn:
+            result_rows = conn.execute(select(sql_table)).mappings().all()
+
+        rows = [dict(r) for r in result_rows]
+        col_names = [c.name for c in sql_table.columns]
+
+        meta = CachedResultMeta(
+            cache_key=key,
+            source=source,
+            tool_name="table_read",
+            params={"table": table},
+            columns=col_names,
+            row_count=len(rows),
+            created_at=time.time(),
+            ttl_seconds=int(ttl.total_seconds()) if ttl else None,
+        )
+        rc.store(key, col_names, rows, meta)
+        return rc.get(key)
+
+    def cache_denormalized(
+        self,
+        model: Any,
+        dataset_rid: str,
+        include_tables: list[str],
+        version: str | None = None,
+        source: str = "catalog",
+        slice_id: str | None = None,
+        refresh: bool = False,
+        dataset: Any = None,
+        dataset_children_rids: list[str] | None = None,
+    ) -> "CachedResult":
+        """Run denormalization and cache the result.
+
+        On first call, runs the unified denormalizer and stores the result.
+        Subsequent calls return cached data. Use refresh=True to re-compute.
+        """
+        import time
+
+        from deriva_ml.local_db.denormalize import denormalize as _denormalize
+        from deriva_ml.local_db.result_cache import CachedResultMeta, ResultCache
+
+        if self._local_schema is None:
+            raise RuntimeError("local_schema not built; call build_local_schema() first")
+
+        rc = self._get_result_cache()
+        key = ResultCache.cache_key(
+            "denormalize",
+            dataset_rid=dataset_rid,
+            tables=sorted(include_tables),
+            version=version or "",
+            source=source,
+        )
+
+        if not refresh and rc.has(key):
+            result = rc.get(key)
+            if result is not None:
+                return result
+
+        orm_resolver = self._local_schema.get_orm_class
+        denorm_result = _denormalize(
+            model=model,
+            engine=self.engine,
+            orm_resolver=orm_resolver,
+            dataset_rid=dataset_rid,
+            include_tables=include_tables,
+            dataset=dataset,
+            dataset_children_rids=dataset_children_rids,
+        )
+
+        rows = list(denorm_result.iter_rows())
+        col_names = [name for name, _ in denorm_result.columns]
+        meta = CachedResultMeta(
+            cache_key=key,
+            source=source,
+            tool_name="denormalize",
+            params={"dataset_rid": dataset_rid, "tables": sorted(include_tables), "version": version},
+            columns=col_names,
+            row_count=len(rows),
+            created_at=time.time(),
+        )
+        rc.store(key, col_names, rows, meta)
+        return rc.get(key)
+
+    def list_cached_results(self) -> "list[CachedResultMeta]":
+        """List all non-expired cached result entries."""
+        return self._get_result_cache().list_cached()
+
+    def get_cached_result(self, cache_key: str) -> "CachedResult | None":
+        """Get a cached result handle by key, or None if missing/expired."""
+        return self._get_result_cache().get(cache_key)
+
+    def invalidate_cache(self, cache_key: str | None = None, source: str | None = None) -> int:
+        """Invalidate cache entries by key, source, or all.
+
+        Returns:
+            Count of entries removed.
+        """
+        return self._get_result_cache().invalidate(cache_key=cache_key, source=source)
 
     # ---- lifecycle ----
 

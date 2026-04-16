@@ -317,3 +317,81 @@ class TestWorkspaceClose:
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         ws.close()
         ws.close()  # Should not raise
+
+
+class TestWorkspaceCachedReads:
+    def test_cached_table_read(self, tmp_path: Path, canned_bag_model) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            # Insert test data
+            subject_t = ws.local_schema.find_table("Subject")
+            from sqlalchemy import insert
+
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID="S1", Name="Alice"))
+                conn.execute(insert(subject_t).values(RID="S2", Name="Bob"))
+
+            result = ws.cached_table_read("Subject", source="local")
+            assert result.row_count == 2
+            df = result.to_dataframe()
+            assert len(df) == 2
+            assert "Name" in df.columns
+        finally:
+            ws.close()
+
+    def test_cached_table_read_uses_cache(self, tmp_path: Path, canned_bag_model) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            subject_t = ws.local_schema.find_table("Subject")
+            from sqlalchemy import insert
+
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID="S1", Name="Alice"))
+
+            r1 = ws.cached_table_read("Subject", source="local")
+            r2 = ws.cached_table_read("Subject", source="local")
+            assert r1.cache_key == r2.cache_key
+        finally:
+            ws.close()
+
+    def test_list_cached_results(self, tmp_path: Path, canned_bag_model) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            subject_t = ws.local_schema.find_table("Subject")
+            from sqlalchemy import insert
+
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID="S1", Name="Alice"))
+
+            ws.cached_table_read("Subject", source="local")
+            results = ws.list_cached_results()
+            assert len(results) >= 1
+        finally:
+            ws.close()
+
+    def test_invalidate_cache(self, tmp_path: Path, canned_bag_model) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=["isa", "deriva-ml"])
+            subject_t = ws.local_schema.find_table("Subject")
+            from sqlalchemy import insert
+
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID="S1", Name="Alice"))
+
+            cr = ws.cached_table_read("Subject", source="local")
+            ws.invalidate_cache(cache_key=cr.cache_key)
+            assert len(ws.list_cached_results()) == 0
+        finally:
+            ws.close()
+
+    def test_cached_table_read_requires_schema(self, tmp_path: Path) -> None:
+        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
+        try:
+            with pytest.raises(RuntimeError, match="local_schema not built"):
+                ws.cached_table_read("Subject")
+        finally:
+            ws.close()
