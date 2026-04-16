@@ -88,6 +88,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 #addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"
 addopts = ["-v", "--import-mode=importlib"]
+markers = [
+    "integration: marks tests as requiring a live Deriva catalog (select with -m integration)",
+]
 
 
 [tool.ruff]

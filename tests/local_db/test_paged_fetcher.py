@@ -413,3 +413,132 @@ class TestCardinalityHeuristic:
         with engine.connect() as conn:
             stored = {row[0] for row in conn.execute(select(table.c["RID"])).fetchall()}
         assert stored == set(wanted_rids)
+
+
+# ---------- ErmrestPagedClient URL-construction tests ---------- #
+
+
+class _MockCatalog:
+    """Minimal mock of ErmrestCatalog for adapter unit tests."""
+
+    def __init__(self, *, get_responses=None, post_responses=None):
+        self.get_calls: list[str] = []
+        self.post_calls: list[tuple[str, Any]] = []
+        self._get_responses = get_responses or {}
+        self._post_responses = post_responses or {}
+        self.catalog_id = "1"
+
+    def get(self, url, headers=None):
+        self.get_calls.append(url)
+
+        class R:
+            def __init__(self, data):
+                self._d = data
+
+            def json(self):
+                return self._d
+
+            def raise_for_status(self):
+                return None
+
+        return R(self._get_responses.get(url, []))
+
+    def post(self, url, json=None, headers=None):
+        self.post_calls.append((url, json))
+
+        class R:
+            def __init__(self, data):
+                self._d = data
+
+            def json(self):
+                return self._d
+
+            def raise_for_status(self):
+                return None
+
+        return R(self._post_responses.get(url, []))
+
+
+class TestErmrestPagedClient:
+    def test_count_uses_aggregate_endpoint(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog(
+            get_responses={
+                "/ermrest/catalog/1/aggregate/isa:Image/n:=cnt(*)": [{"n": 42}],
+            }
+        )
+        c = ErmrestPagedClient(catalog=cat, catalog_id="1")
+        assert c.count("isa:Image") == 42
+        assert len(cat.get_calls) == 1
+
+    def test_fetch_page_constructs_correct_url(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog(
+            get_responses={
+                "/ermrest/catalog/1/entity/isa:Image@sort(RID)?limit=10": [{"RID": "R1", "Filename": "f1"}],
+            }
+        )
+        c = ErmrestPagedClient(catalog=cat, catalog_id="1")
+        rows = c.fetch_page("isa:Image", ("RID",), None, None, 10)
+        assert len(rows) == 1
+        assert "sort(RID)" in cat.get_calls[0]
+
+    def test_fetch_page_with_after(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog()
+        c = ErmrestPagedClient(catalog=cat, catalog_id="1")
+        c.fetch_page("isa:Image", ("RID",), ("R5",), None, 10)
+        assert "@after(R5)" in cat.get_calls[0]
+
+    def test_fetch_page_with_predicate(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog()
+        c = ErmrestPagedClient(catalog=cat, catalog_id="1")
+        c.fetch_page("isa:Image", ("RID",), None, "Subject=S1", 10)
+        assert "/Subject=S1@sort" in cat.get_calls[0]
+
+    def test_fetch_rid_batch_get(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog(
+            get_responses={
+                "/ermrest/catalog/1/entity/isa:Image/RID=any(R1,R2)": [{"RID": "R1"}, {"RID": "R2"}],
+            }
+        )
+        c = ErmrestPagedClient(catalog=cat, catalog_id="1")
+        rows = c.fetch_rid_batch("isa:Image", "RID", ["R1", "R2"], method="GET")
+        assert len(rows) == 2
+
+    def test_fetch_rid_batch_raises_on_long_url(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog()
+        c = ErmrestPagedClient(catalog=cat, catalog_id="1")
+        long_rids = [f"R{i:05d}" for i in range(1000)]  # ~8000+ chars
+        with pytest.raises(RuntimeError, match="too long"):
+            c.fetch_rid_batch("isa:Image", "RID", long_rids, method="GET")
+
+    def test_fetch_rid_batch_post(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog(
+            post_responses={
+                "/ermrest/catalog/1/entity/isa:Image": [{"RID": "R1"}],
+            }
+        )
+        c = ErmrestPagedClient(catalog=cat, catalog_id="1")
+        rows = c.fetch_rid_batch("isa:Image", "RID", ["R1"], method="POST")
+        assert len(rows) == 1
+        assert len(cat.post_calls) == 1
+
+    def test_catalog_id_from_attribute(self) -> None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        cat = _MockCatalog()
+        cat.catalog_id = "99"
+        c = ErmrestPagedClient(catalog=cat)  # No explicit catalog_id
+        assert c._catalog_id == "99"
