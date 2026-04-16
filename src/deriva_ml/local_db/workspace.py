@@ -27,6 +27,8 @@ from deriva_ml.local_db import sqlite_helpers as sh
 if TYPE_CHECKING:
     import pandas as pd
 
+    from deriva_ml.local_db.manifest_store import ManifestStore
+
 logger = logging.getLogger(__name__)
 
 WORKING_DB_SCHEMA_VERSION = 1
@@ -97,6 +99,16 @@ class Workspace:
             conn.close()
 
     # ---- legacy compat ----
+
+    def manifest_store(self) -> "ManifestStore":
+        """Return a ManifestStore backed by this workspace's engine (cached)."""
+        if not hasattr(self, "_manifest_store"):
+            from deriva_ml.local_db.manifest_store import ManifestStore
+
+            s = ManifestStore(self.engine)
+            s.ensure_schema()
+            self._manifest_store = s
+        return self._manifest_store
 
     def legacy_working_data_view(self) -> "_LegacyWorkingDataView":
         """Return an adapter exposing the old ``WorkingDataCache`` API.
