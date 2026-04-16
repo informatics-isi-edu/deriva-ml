@@ -10,15 +10,20 @@ from deriva_ml.local_db.denormalize import DenormalizeResult, denormalize
 from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva_ml.local_db.paged_fetcher import PagedFetcher
 from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+from deriva_ml.local_db.result_cache import CachedResult, CachedResultMeta, QueryResult, ResultCache
 from deriva_ml.local_db.schema import LocalSchema
 from deriva_ml.local_db.workspace import Workspace
 
 __all__ = [
+    "CachedResult",
+    "CachedResultMeta",
     "DenormalizeResult",
     "ErmrestPagedClient",
     "LocalSchema",
     "ManifestStore",
     "PagedFetcher",
+    "QueryResult",
+    "ResultCache",
     "Workspace",
     "denormalize",
 ]
