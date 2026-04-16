@@ -460,6 +460,19 @@ class DerivaML(
                 hostname=self.host_name,
                 catalog_id=self.catalog_id,
             )
+            try:
+                n = self._workspace.import_legacy_manifests()
+                if n:
+                    import logging
+                    logging.getLogger("deriva_ml").info(
+                        "Migrated %d legacy asset manifests into %s",
+                        n, self._workspace.working_db_path,
+                    )
+            except Exception as exc:
+                import logging
+                logging.getLogger("deriva_ml").warning(
+                    "Legacy manifest migration failed: %s", exc,
+                )
         return self._workspace.legacy_working_data_view()
 
     def cache_table(self, table_name: str, force: bool = False) -> "pd.DataFrame":

@@ -110,6 +110,44 @@ class Workspace:
             self._manifest_store = s
         return self._manifest_store
 
+    def import_legacy_manifests(self) -> int:
+        """Import any pre-existing ``asset-manifest.json`` files into the DB.
+
+        Scans ``{working_dir}`` recursively for files named exactly
+        ``asset-manifest.json``. For each, parses the JSON, upserts rows into
+        the manifest store, and renames the file to
+        ``{path}.migrated.json``. Idempotent: already-migrated files are
+        skipped.
+
+        Returns:
+            The number of manifests newly migrated.
+        """
+        import json as _json
+
+        from deriva_ml.asset.manifest import AssetEntry, FeatureEntry
+
+        store = self.manifest_store()
+        migrated = 0
+        for manifest_path in self._working_dir.rglob("asset-manifest.json"):
+            try:
+                data = _json.loads(manifest_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.warning("Failed to read %s: %s", manifest_path, exc)
+                continue
+
+            execution_rid = data.get("execution_rid") or manifest_path.parent.name
+            for key, entry_dict in data.get("assets", {}).items():
+                entry = AssetEntry.from_dict(entry_dict)
+                store.add_asset(execution_rid, key, entry)
+            for name, entry_dict in data.get("features", {}).items():
+                entry = FeatureEntry.from_dict(entry_dict)
+                store.add_feature(execution_rid, name, entry)
+
+            sidecar = manifest_path.with_suffix(manifest_path.suffix + ".migrated.json")
+            manifest_path.rename(sidecar)
+            migrated += 1
+        return migrated
+
     def legacy_working_data_view(self) -> "_LegacyWorkingDataView":
         """Return an adapter exposing the old ``WorkingDataCache`` API.
 
