@@ -52,9 +52,9 @@ Observation columns repeat across all images for an observation.
 
 ### Dataset membership acts as a filter
 
-If you call `ds.denormalize(...)` on a Dataset, the dataset's members scope
-which rows are in scope. Only rows reachable from a dataset member via FK
-appear in the output.
+If you call `ds.get_denormalized_as_dataframe(...)` on a Dataset, the
+dataset's members scope which rows are in scope. Only rows reachable from a
+dataset member via FK appear in the output.
 
 If the dataset's members are Images (say 4 of them), you get 4 rows — one per
 member Image, with Observations and Subjects hoisted.
@@ -66,18 +66,26 @@ member Image, with Observations and Subjects hoisted.
 ### On a Dataset or DatasetBag
 
 ```python
-df = ds.denormalize(include_tables=["Subject", "Observation", "Image"])
+df = ds.get_denormalized_as_dataframe(
+    include_tables=["Subject", "Observation", "Image"]
+)
 ```
 
-Returns a pandas DataFrame. Use `ds.denormalize_as_dict(...)` to stream rows.
+Returns a pandas DataFrame. Use `ds.get_denormalized_as_dict(...)` to stream
+rows one at a time.
+
+The method names follow the same conventions as the existing
+`get_table_as_dataframe` / `get_table_as_dict` methods on Dataset and
+DatasetBag — the stem `denormalized` describes the (virtual) table being
+retrieved.
 
 ### Preview without fetching
 
 ```python
-ds.denormalize_columns(["Subject", "Image"])
+ds.list_denormalized_columns(["Subject", "Image"])
 # → [("Subject.RID", "text"), ("Subject.Name", "text"), ("Image.RID", "text"), ...]
 
-ds.denormalize_plan(["Subject", "Image"])
+ds.describe_denormalized(["Subject", "Image"])
 # → {
 #     "row_per": "Image",
 #     "columns": [...],
@@ -86,7 +94,7 @@ ds.denormalize_plan(["Subject", "Image"])
 #     "ambiguities": [],
 #   }
 
-ds.explore_schema()
+ds.list_schema_paths()
 # → {"member_types": [...], "reachable_tables": {...}, "schema_paths": {...}}
 ```
 
@@ -223,14 +231,14 @@ Anchors of types not in `include_tables` are rejected by default (see
 ### "I want Subject columns on each Image row" (hoist upward)
 
 ```python
-ds.denormalize(["Subject", "Image"])
+ds.get_denormalized_as_dataframe(["Subject", "Image"])
 # row_per = Image (auto). Each row = one image, Subject columns repeated.
 ```
 
 ### "I want all diagnoses for each subject"
 
 ```python
-ds.denormalize(["Subject", "Diagnosis"])
+ds.get_denormalized_as_dataframe(["Subject", "Diagnosis"])
 # row_per = Diagnosis (auto — Diagnosis points to Subject).
 # One row per diagnosis; Subject columns repeated across all diagnoses for a subject.
 # Group by Subject.RID in pandas to aggregate.
@@ -240,20 +248,20 @@ ds.denormalize(["Subject", "Diagnosis"])
 
 ```python
 # Schema has Image→Subject direct AND Image→Observation→Subject
-ds.denormalize(["Image", "Subject"])
+ds.get_denormalized_as_dataframe(["Image", "Subject"])
 # ERROR: multiple FK paths.
 
 # Force the multi-hop with columns included:
-ds.denormalize(["Image", "Observation", "Subject"])
+ds.get_denormalized_as_dataframe(["Image", "Observation", "Subject"])
 
 # Force the multi-hop without Observation columns:
-ds.denormalize(["Image", "Subject"], via=["Observation"])
+ds.get_denormalized_as_dataframe(["Image", "Subject"], via=["Observation"])
 ```
 
 ### Feature values on images
 
 ```python
-ds.denormalize(["Image", "Execution_Image_Quality"])
+ds.get_denormalized_as_dataframe(["Image", "Execution_Image_Quality"])
 # row_per = Execution_Image_Quality (auto — it points to Image).
 # One row per feature observation; Image columns repeated for multi-execution images.
 ```
@@ -263,7 +271,7 @@ ds.denormalize(["Image", "Execution_Image_Quality"])
 ```python
 # Dataset has Image members AND Subject members
 # (some subjects with no images in the dataset)
-ds.denormalize(["Subject", "Image"])
+ds.get_denormalized_as_dataframe(["Subject", "Image"])
 # row_per = Image.
 # Output = |member Images| rows (Subjects hoisted) + |orphan Subjects| rows
 # (Image columns NULL).
@@ -272,6 +280,8 @@ ds.denormalize(["Subject", "Image"])
 ### Arbitrary anchors (no dataset)
 
 ```python
+from deriva_ml.local_db.denormalize import Denormalizer
+
 d = Denormalizer.from_rids(["1-ABCD", "2-WXYZ"], ml=ml)
 df = d.as_dataframe(["Subject", "Image"])
 ```
@@ -284,39 +294,41 @@ When you don't know the schema well, use the exploration methods:
 
 ```python
 # What can I put in include_tables?
-info = ds.explore_schema()
-print(info["member_types"])       # dataset element types
+info = ds.list_schema_paths()
+print(info["member_types"])        # dataset element types
 print(info["reachable_tables"])    # FK-reachable tables from each type
 print(info["schema_paths"])        # available FK paths between tables
 
 # What columns will I get for this request?
-ds.denormalize_columns(["Image", "Subject"])
+ds.list_denormalized_columns(["Image", "Subject"])
 
 # Will this request succeed? How big will the output be?
-plan = ds.denormalize_plan(["Image", "Subject"])
+plan = ds.describe_denormalized(["Image", "Subject"])
 if plan["ambiguities"]:
     # Inspect `ambiguities` to see what to add/change
     ...
 print(plan["estimated_row_count"])
 ```
 
-The workflow: `explore_schema` → `denormalize_columns` → `denormalize_plan` →
-`denormalize`. Each step is more expensive but more definitive.
+The workflow: `list_schema_paths` → `list_denormalized_columns` →
+`describe_denormalized` → `get_denormalized_as_dataframe`. Each step is more
+expensive but more definitive.
 
 ---
 
 ## Relationship to earlier APIs
 
-This is the only denormalization API. The earlier method names
-(`denormalize_as_dataframe`, `denormalize_info`) were removed. The
-replacements are:
+This is the only denormalization API. The earlier method names have been
+removed. The replacements use the same `get_*_as_*` / `list_*` /
+`describe_*` conventions as the existing `get_table_as_dataframe` and
+`list_dataset_members` methods on Dataset and DatasetBag:
 
 | Earlier name | Current name |
 |--------------|--------------|
-| `denormalize_as_dataframe(include_tables)` | `denormalize(include_tables, ...)` |
-| `denormalize_info(include_tables)` | `denormalize_plan(include_tables, ...)` |
-| `denormalize_as_dict(include_tables)` | `denormalize_as_dict(include_tables, ...)` — same name, richer rules |
-| `denormalize_columns(include_tables)` | `denormalize_columns(include_tables, ...)` — same name, richer rules |
+| `denormalize_as_dataframe(include_tables)` | `get_denormalized_as_dataframe(include_tables, ...)` |
+| `denormalize_as_dict(include_tables)` | `get_denormalized_as_dict(include_tables, ...)` |
+| `denormalize_columns(include_tables)` | `list_denormalized_columns(include_tables, ...)` |
+| `denormalize_info(include_tables)` | `describe_denormalized(include_tables, ...)` |
 
 Two behavioral changes from the earlier implementations:
 

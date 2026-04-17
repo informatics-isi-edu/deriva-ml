@@ -111,7 +111,7 @@ def as_dataframe(
     via: list[str] | None = None,
     ignore_unrelated_anchors: bool = False,
 ) -> pd.DataFrame:
-    """Materialize the wide table as a pandas DataFrame."""
+    """Materialize the denormalized table as a pandas DataFrame."""
 
 def as_dict(
     self,
@@ -121,7 +121,7 @@ def as_dict(
     via: list[str] | None = None,
     ignore_unrelated_anchors: bool = False,
 ) -> Generator[dict[str, Any], None, None]:
-    """Stream the wide table row-by-row as dicts."""
+    """Stream the denormalized table row-by-row as dicts."""
 
 def columns(
     self,
@@ -132,7 +132,7 @@ def columns(
 ) -> list[tuple[str, str]]:
     """Preview (column_name, type_name) pairs. No data fetch. Model-only."""
 
-def plan(
+def describe(
     self,
     include_tables: list[str],
     *,
@@ -141,20 +141,22 @@ def plan(
 ) -> dict[str, Any]:
     """Dry-run the call. Returns planning metadata (see §5)."""
 
-def explore_schema(
+def list_paths(
     self,
     tables: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Describe FK graph from the dataset's/anchors' reachable tables."""
+    """List FK paths from the dataset's/anchors' reachable tables."""
 ```
 
 ### 2.4 Dataset-side sugar
 
 Add to `Dataset` (in `src/deriva_ml/dataset/dataset.py`) and `DatasetBag`
-(in `src/deriva_ml/dataset/dataset_bag.py`):
+(in `src/deriva_ml/dataset/dataset_bag.py`). Naming aligns with the
+existing `get_table_as_*` and `list_*` conventions already present on
+these classes:
 
 ```python
-def denormalize(
+def get_denormalized_as_dataframe(
     self,
     include_tables: list[str],
     *,
@@ -162,38 +164,71 @@ def denormalize(
     via: list[str] | None = None,
     ignore_unrelated_anchors: bool = False,
 ) -> pd.DataFrame:
-    """Shortcut for ``Denormalizer(self).as_dataframe(...)``."""
+    """Shortcut for ``Denormalizer(self).as_dataframe(...)``.
 
-def denormalize_as_dict(self, ...) -> Generator[dict, None, None]:
-    """Shortcut for ``Denormalizer(self).as_dict(...)``."""
+    Analogous to ``get_table_as_dataframe(table)`` but for a virtual
+    denormalized table constructed from *include_tables*.
+    """
 
-def denormalize_columns(self, ...) -> list[tuple[str, str]]:
-    """Shortcut for ``Denormalizer(self).columns(...)``."""
+def get_denormalized_as_dict(self, ...) -> Generator[dict, None, None]:
+    """Shortcut for ``Denormalizer(self).as_dict(...)``.
 
-def denormalize_plan(self, ...) -> dict[str, Any]:
-    """Shortcut for ``Denormalizer(self).plan(...)``."""
+    Analogous to ``get_table_as_dict(table)``; streams rows one at a time.
+    """
 
-def explore_schema(self, ...) -> dict[str, Any]:
-    """Shortcut for ``Denormalizer(self).explore_schema(...)``."""
+def list_denormalized_columns(self, ...) -> list[tuple[str, str]]:
+    """Shortcut for ``Denormalizer(self).columns(...)``.
+
+    Returns a list of ``(column_name, column_type)`` tuples for the
+    denormalized table that would be produced, without fetching data.
+    """
+
+def describe_denormalized(self, ...) -> dict[str, Any]:
+    """Shortcut for ``Denormalizer(self).describe(...)``.
+
+    Dry-run the denormalization; returns planning metadata (row_per,
+    join path, estimated row count, ambiguities, etc.). See §5.
+    """
+
+def list_schema_paths(self, ...) -> dict[str, Any]:
+    """Shortcut for ``Denormalizer(self).list_paths(...)``.
+
+    Returns a description of FK paths reachable from the dataset's
+    members, useful for picking ``include_tables``. See §6.
+    """
 ```
+
+### 2.4.1 Naming rationale
+
+- `get_*_as_dataframe` / `get_*_as_dict` match the existing pattern for
+  methods that return materialized row data
+  (`get_table_as_dataframe(table)`, `get_table_as_dict(table)`).
+- `list_*` matches the pattern for methods that return lists/iterables
+  of metadata (`list_dataset_members`, `list_dataset_element_types`).
+- `describe_*` is a new verb introduced here for the planner dict. It
+  doesn't conflict with any existing convention and reads naturally for
+  "returns a structured description of what would happen."
+
+The stem `denormalized` (past-participle adjective) is used instead of
+`wide_table` because it's the established term in existing docstrings
+and the `denormalize.py` module name.
 
 ### 2.5 Removed methods
 
-The following methods are **removed outright** from `Dataset` and
-`DatasetBag` and replaced with the §2.4 sugar:
+All denormalize-related methods on `Dataset` and `DatasetBag` are
+renamed to follow the `get_*_as_*` / `list_*` / `describe_*`
+conventions. The old names are **removed outright** (no deprecation):
 
 | Removed | Replacement |
 |---------|-------------|
-| `denormalize_as_dataframe(...)` | `denormalize(...)` |
-| `denormalize_info(...)` | `denormalize_plan(...)` |
-| `denormalize_as_dict(...)` | kept — same name, new body |
-| `denormalize_columns(...)` | kept — same name, new body |
+| `denormalize_as_dataframe(...)` | `get_denormalized_as_dataframe(...)` |
+| `denormalize_as_dict(...)` | `get_denormalized_as_dict(...)` |
+| `denormalize_columns(...)` | `list_denormalized_columns(...)` |
+| `denormalize_info(...)` | `describe_denormalized(...)` |
 
 The `DatasetLike` protocol in `src/deriva_ml/interfaces.py` is updated to
-match: `denormalize_as_dataframe` and `denormalize_info` are removed from
-the abstract surface; `denormalize`, `denormalize_as_dict`,
-`denormalize_columns`, `denormalize_plan`, and `explore_schema` are the
-documented protocol methods.
+match: old method names removed; the new names plus `list_schema_paths`
+become the documented protocol methods.
 
 ## 3. Semantic rules
 
@@ -582,24 +617,27 @@ continue to pass. The two `pytest.mark.skip` tests (for the deleted
 ## 9. Implementation order
 
 1. Introduce `Denormalizer` class with core `as_dataframe`, `as_dict`,
-   `columns`, `plan` methods. Implement new rule system.
-2. Add `explore_schema` method.
-3. Add `from_rids` constructor + RID lookup.
-4. Add sugar methods on `Dataset` and `DatasetBag` (`denormalize`,
-   `denormalize_plan`, `explore_schema`).
-5. Rewrite `denormalize_as_dict` and `denormalize_columns` bodies to
-   delegate to `Denormalizer` (same names, new semantics).
-6. **Remove** `denormalize_as_dataframe` and `denormalize_info` from
-   `Dataset`, `DatasetBag`, and the `DatasetLike` protocol.
-7. Update every in-repo caller of the removed methods to the new names:
-   - `denormalize_as_dataframe(...)` → `denormalize(...)`
-   - `denormalize_info(...)` → `denormalize_plan(...)`
-   Use `grep -rn` to find all callers; expected locations include
-   `tests/dataset/`, possibly `src/deriva_ml/dataset/split.py`, and any
-   notebooks under `docs/`.
-8. Extend unit tests per §8.1.
-9. Remove `xfail` markers from the three integration tests per §8.2.
-10. Run full test suite (unit + live); confirm no regressions.
+   `columns`, `describe`, `list_paths` methods. Implement new rule system.
+2. Add `from_rids` constructor + RID lookup.
+3. Add sugar methods on `Dataset` and `DatasetBag` per §2.4:
+   - `get_denormalized_as_dataframe`
+   - `get_denormalized_as_dict`
+   - `list_denormalized_columns`
+   - `describe_denormalized`
+   - `list_schema_paths`
+4. **Remove** all four old methods from `Dataset`, `DatasetBag`, and
+   the `DatasetLike` protocol:
+   - `denormalize_as_dataframe`
+   - `denormalize_as_dict`
+   - `denormalize_columns`
+   - `denormalize_info`
+5. Update every in-repo caller of the removed methods to the new names
+   (per §2.5 table). Use `grep -rn` to find all callers; expected
+   locations include `tests/dataset/`, possibly
+   `src/deriva_ml/dataset/split.py`, and any notebooks under `docs/`.
+6. Extend unit tests per §8.1.
+7. Remove `xfail` markers from the three integration tests per §8.2.
+8. Run full test suite (unit + live); confirm no regressions.
 
 ### 9.1 Breaking-change summary
 
