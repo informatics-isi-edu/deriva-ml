@@ -168,16 +168,21 @@ def denormalize(
                 )
 
     # Step 2: Build labelled columns from ORM classes.
+    # Previously this loop silently skipped columns whose ORM class couldn't
+    # be resolved, which produced a result whose actual columns didn't match
+    # the advertised `output_columns` metadata. Raise instead so callers get
+    # a clear error and we don't hand back inconsistent data.
     denormalized_columns = []
     for schema_name, table_name, column_name, _type_name in column_specs:
         orm_class = orm_resolver(table_name)
         if orm_class is None:
-            logger.warning(
-                "ORM class not found for table %s; skipping column %s",
-                table_name,
-                column_name,
+            raise RuntimeError(
+                f"ORM class not found for table {table_name!r} (needed for "
+                f"column {column_name!r}). This usually means "
+                f"build_local_schema() wasn't called with a schema that "
+                f"includes this table. Include tables requested: "
+                f"{include_tables!r}."
             )
-            continue
         col = orm_class.__table__.columns[column_name]
         label = denormalize_column_name(schema_name, table_name, column_name, multi_schema)
         denormalized_columns.append(col.label(label))

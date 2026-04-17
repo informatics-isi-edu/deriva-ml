@@ -647,47 +647,21 @@ class TestDuplicateAssociationTables:
 class TestDenormalizeSqlGeneration:
     """Test the SQL generation aspects of _denormalize."""
 
+    @pytest.mark.skip(
+        reason="bag._denormalize() was removed in Phase 2; behavior is now covered "
+        "by the public denormalize_as_dataframe tests which exercise the unified "
+        "denormalize() engine end-to-end."
+    )
     def test_sql_select_structure(self, dataset_test, tmp_path):
-        """Test that _denormalize returns a valid SQLAlchemy Select object."""
-        from sqlalchemy import Select
-        from sqlalchemy.sql.selectable import CompoundSelect
+        """Legacy: tested the deleted _denormalize() private method on DatasetBag."""
 
-        hostname = dataset_test.catalog.hostname
-        catalog_id = dataset_test.catalog.catalog_id
-        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
-
-        dataset_description = dataset_test.dataset_description
-        current_version = dataset_description.dataset.current_version
-        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
-
-        # Call _denormalize directly to get the SQL statement
-        sql_stmt = bag._denormalize(include_tables=["Subject"])
-
-        # Should return a Select or CompoundSelect (union)
-        assert isinstance(sql_stmt, (Select, CompoundSelect)), "Should return SQLAlchemy Select object"
-
+    @pytest.mark.skip(
+        reason="bag._denormalize() was removed in Phase 2; UNION behavior for "
+        "multi-path joins is now handled inside the unified denormalize() engine "
+        "and covered by TestDenormalize.test_simple_denormalize etc."
+    )
     def test_union_for_multiple_paths(self, dataset_test, tmp_path):
-        """Test that multiple paths result in a UNION statement.
-
-        When multiple paths exist through the schema to reach the same tables,
-        the results should be UNIONed together.
-        """
-
-        hostname = dataset_test.catalog.hostname
-        catalog_id = dataset_test.catalog.catalog_id
-        ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
-
-        dataset_description = dataset_test.dataset_description
-        current_version = dataset_description.dataset.current_version
-        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
-
-        # With multiple element types, we should get a union
-        # Observation is needed to disambiguate Image→Subject vs Image→Observation→Subject
-        sql_stmt = bag._denormalize(include_tables=["Subject", "Image", "Observation"])
-
-        # The result should be a CompoundSelect (UNION)
-        # This depends on whether there are multiple paths
-        assert sql_stmt is not None
+        """Legacy: tested the deleted _denormalize() private method on DatasetBag."""
 
 
 class TestCatalogDenormalize:

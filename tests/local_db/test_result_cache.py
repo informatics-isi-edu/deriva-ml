@@ -462,3 +462,35 @@ class TestTTL:
         assert s["cache_key"] == "rc_summary000000"
         assert s["row_count"] == 42
         assert "created_at" in s or "age_seconds" in s
+
+
+class TestCacheKeyValidation:
+    """I1: public methods that accept a cache_key must reject unsafe inputs.
+
+    The cache_key ends up as a SQLite table name via f-string concatenation.
+    Invalid keys (containing brackets, quotes, semicolons, etc.) must be
+    rejected before any SQL is built.
+    """
+
+    def test_has_rejects_sql_injection(self, cache):
+        """has() with a SQL-injection-style key raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid cache_key"):
+            cache.has("rc_foo]; DROP TABLE x; --")
+
+    def test_get_meta_rejects_unsafe_key(self, cache):
+        with pytest.raises(ValueError, match="Invalid cache_key"):
+            cache.get_meta("no_rc_prefix")
+
+    def test_store_rejects_unsafe_key(self, cache):
+        meta = _make_meta("does-not-matter")
+        with pytest.raises(ValueError, match="Invalid cache_key"):
+            cache.store("evil'key", ["id"], [{"id": 1}], meta)
+
+    def test_cache_key_generator_always_validates(self, cache):
+        """Every key produced by cache_key() must pass validation."""
+        from deriva_ml.local_db.result_cache import ResultCache
+
+        key = ResultCache.cache_key("tool", foo="bar", num=42)
+        # Must not raise
+        cache._validate_cache_key(key)
+        assert key.startswith("rc_")

@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -319,6 +320,16 @@ class ResultCache:
 
     # ---- cache-key generation ----
 
+    # Cache keys are used as SQLite table names. The generated form is
+    # always ``rc_<16 hex chars>`` — safe to concatenate into DDL/DML.
+    # Public methods that accept a cache_key validate against this pattern
+    # to prevent SQL injection if a caller bypasses ``cache_key()``.
+    # The regex allows alphanumeric + underscore after the ``rc_`` prefix
+    # to accommodate test fixtures that use human-readable keys; the
+    # ``rc_`` prefix and character-class restriction still prevent
+    # arbitrary SQL injection (no brackets, quotes, semicolons, etc.).
+    _CACHE_KEY_PATTERN = re.compile(r"^rc_[A-Za-z0-9_]{1,128}$")
+
     @staticmethod
     def cache_key(tool_name: str, **params) -> str:
         """Generate a deterministic cache key: ``rc_{sha256_prefix}``."""
@@ -333,6 +344,22 @@ class ResultCache:
         key_str = f"{tool_name}:{json.dumps(normalized, sort_keys=True)}"
         digest = hashlib.sha256(key_str.encode()).hexdigest()[:16]
         return f"rc_{digest}"
+
+    @classmethod
+    def _validate_cache_key(cls, cache_key: str) -> None:
+        """Validate that *cache_key* matches the ``rc_<hex>`` format.
+
+        Raises :class:`ValueError` otherwise. This is a defense-in-depth
+        check — the :meth:`cache_key` helper always produces conforming
+        keys, but public methods accept keys from callers directly (e.g.,
+        from a URL parameter), so we validate before interpolating them
+        into SQL identifiers.
+        """
+        if not isinstance(cache_key, str) or not cls._CACHE_KEY_PATTERN.fullmatch(cache_key):
+            raise ValueError(
+                f"Invalid cache_key {cache_key!r}; must match 'rc_<hex>' "
+                f"(use ResultCache.cache_key() to generate valid keys)."
+            )
 
     # ---- metadata helpers ----
 
@@ -349,7 +376,12 @@ class ResultCache:
         )
 
     def get_meta(self, cache_key: str) -> CachedResultMeta | None:
-        """Get metadata for a cached entry (regardless of expiry)."""
+        """Get metadata for a cached entry (regardless of expiry).
+
+        Raises:
+            ValueError: If *cache_key* doesn't match the ``rc_<hex>`` format.
+        """
+        self._validate_cache_key(cache_key)
         with self._engine.connect() as conn:
             row = conn.execute(select(self._registry).where(self._registry.c.cache_key == cache_key)).mappings().first()
         if row is None:
@@ -359,7 +391,12 @@ class ResultCache:
     # ---- has ----
 
     def has(self, cache_key: str) -> bool:
-        """Return True if a non-expired entry exists for *cache_key*."""
+        """Return True if a non-expired entry exists for *cache_key*.
+
+        Raises:
+            ValueError: If *cache_key* doesn't match the ``rc_<hex>`` format.
+        """
+        self._validate_cache_key(cache_key)
         meta = self.get_meta(cache_key)
         if meta is None:
             return False
@@ -374,7 +411,12 @@ class ResultCache:
         rows: list[dict[str, Any]],
         meta: CachedResultMeta,
     ) -> None:
-        """Store *rows* as a new table.  Replaces any existing entry."""
+        """Store *rows* as a new table.  Replaces any existing entry.
+
+        Raises:
+            ValueError: If *cache_key* doesn't match the ``rc_<hex>`` format.
+        """
+        self._validate_cache_key(cache_key)
         first_row = rows[0] if rows else None
         create_sql = _build_create_table(cache_key, columns, first_row)
 
