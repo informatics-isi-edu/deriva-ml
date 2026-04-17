@@ -27,7 +27,7 @@ from tests.catalog_manager import CatalogManager
 
 
 class TestBagDenormalizeColumns:
-    """Tests for DatasetBag.denormalize_columns() — preview columns without data."""
+    """Tests for DatasetBag.list_denormalized_columns() — preview columns without data."""
 
     # Single-table denormalization avoids FK ambiguity in the demo schema.
     SINGLE_TABLE = ["Image"]
@@ -39,7 +39,7 @@ class TestBagDenormalizeColumns:
         dataset = dataset_desc.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        cols = bag.denormalize_columns(include_tables=self.SINGLE_TABLE)
+        cols = bag.list_denormalized_columns(include_tables=self.SINGLE_TABLE)
 
         assert isinstance(cols, list)
         assert len(cols) > 0
@@ -55,10 +55,10 @@ class TestBagDenormalizeColumns:
         dataset = dataset_desc.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        cols = bag.denormalize_columns(include_tables=self.SINGLE_TABLE)
+        cols = bag.list_denormalized_columns(include_tables=self.SINGLE_TABLE)
         col_names = [name for name, _ in cols]
 
-        df = bag.denormalize_as_dataframe(include_tables=self.SINGLE_TABLE)
+        df = bag.get_denormalized_as_dataframe(include_tables=self.SINGLE_TABLE)
         df_cols = list(df.columns)
 
         assert set(col_names) == set(df_cols), (
@@ -72,7 +72,7 @@ class TestBagDenormalizeColumns:
         dataset = dataset_desc.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        cols = bag.denormalize_columns(include_tables=self.SINGLE_TABLE)
+        cols = bag.list_denormalized_columns(include_tables=self.SINGLE_TABLE)
 
         valid_types = {
             "text",
@@ -370,5 +370,5 @@ class TestNonMaterializedBagAccess:
         bag = dataset.download_dataset_bag(version=version, use_minid=False, materialize=False)
 
         # Use single table to avoid FK path ambiguity
-        df = bag.denormalize_as_dataframe(include_tables=["Image"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["Image"])
         assert isinstance(df, pd.DataFrame)

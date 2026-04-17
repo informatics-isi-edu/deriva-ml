@@ -7,7 +7,7 @@ these correctly — both in bag export (FK path traversal to populate tables) an
 local denormalization (SQL JOIN generation).
 
 Bug reference: The file→biosample FK in FaceBase catalog 19 is composite, causing
-bag.denormalize_as_dataframe(["file", "biosample"]) to return 0 rows because:
+bag.get_denormalized_as_dataframe(["file", "biosample"]) to return 0 rows because:
 1. _table_relationship() uses [0] indexing, dropping the second FK column
 2. Bag export follows incomplete join → biosample table exports with 0 rows
 3. Denormalization can't join through an empty table
@@ -189,7 +189,7 @@ class TestCompositeFKDenormalize:
     def test_denormalize_across_composite_fk(self, test_ml: DerivaML, tmp_path):
         """Denormalization must produce correct rows across composite FKs.
 
-        This is the core bug: bag.denormalize_as_dataframe(["Child", "Parent"])
+        This is the core bug: bag.get_denormalized_as_dataframe(["Child", "Parent"])
         should return 3 rows (one per Child), each joined to their Parent.
         Currently returns 0 rows because the composite FK join is incomplete.
         """
@@ -214,7 +214,7 @@ class TestCompositeFKDenormalize:
         )
 
         # Denormalize Child + Parent — should produce 3 rows
-        df = bag.denormalize_as_dataframe(include_tables=["Child", "Parent"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["Child", "Parent"])
         assert len(df) == 3, (
             f"Expected 3 denormalized rows (one per child), got {len(df)}. "
             "Composite FK join in denormalization is likely incomplete."
@@ -241,7 +241,7 @@ class TestCompositeFKDenormalize:
         bag = dataset.download_dataset_bag(version=version, materialize=False)
 
         # Denormalize all three tables
-        df = bag.denormalize_as_dataframe(include_tables=["Child", "Parent", "Group"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["Child", "Parent", "Group"])
         assert len(df) == 3, (
             f"Expected 3 rows for 3-table chain, got {len(df)}. Composite FK may be breaking the multi-hop join."
         )

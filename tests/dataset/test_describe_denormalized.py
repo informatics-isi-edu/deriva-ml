@@ -1,65 +1,28 @@
-"""Tests for Dataset.denormalize_info().
+"""Tests for describe_denormalized() on DerivaML, Dataset, and DatasetBag.
 
 Unit tests use MagicMock for structure validation.
 Integration tests use the populated_catalog fixture against a real catalog.
+
+Note: ``DerivaML.describe_denormalized`` (mixin) returns the legacy shape
+(columns, join_path, tables, total_rows, total_asset_bytes, total_asset_size)
+aligned with ``estimate_bag_size``. ``Dataset.describe_denormalized`` /
+``DatasetBag.describe_denormalized`` delegate to ``Denormalizer.describe``
+and return the spec §5 shape (row_per, row_per_source, row_per_candidates,
+columns, include_tables, via, join_path, transparent_intermediates,
+ambiguities, estimated_row_count, anchors, source).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
 
 
-def _make_mock_model():
-    """Create a mock DerivaModel with schema traversal support."""
-    model = MagicMock()
-
-    # _prepare_wide_table returns (element_tables, column_specs, multi_schema)
-    model._prepare_wide_table.return_value = (
-        {
-            "Image": (
-                ["Dataset", "Dataset_Image", "Image", "Subject"],
-                {
-                    "Dataset_Image": {("Dataset", "RID")},
-                    "Image": {("Image", "RID")},
-                    "Subject": {("Subject_FK", "RID")},
-                },
-                {"Dataset_Image": "inner", "Image": "inner", "Subject": "left"},
-            )
-        },
-        [
-            ("eye-ai", "Image", "RID", "ermrest_rid"),
-            ("eye-ai", "Image", "Filename", "text"),
-            ("eye-ai", "Subject", "RID", "ermrest_rid"),
-            ("eye-ai", "Subject", "Name", "text"),
-        ],
-        False,  # multi_schema
-    )
-
-    # is_asset checks
-    def mock_is_asset(table_name):
-        return table_name == "Image"
-
-    model.is_asset.side_effect = mock_is_asset
-    return model
-
-
-def _make_mock_dataset(model):
-    """Create a mock Dataset with denormalize_info dependencies."""
-    ds = MagicMock()
-    ds._ml_instance = MagicMock()
-    ds._ml_instance.model = model
-    ds.dataset_rid = "DS-001"
-    return ds
-
-
-class TestDenormalizeInfoReturnStructure:
-    """Tests for the return dict structure of denormalize_info."""
+class TestMixinReturnStructure:
+    """Tests for the legacy (DerivaML mixin) describe_denormalized dict shape."""
 
     def test_returns_columns_and_types(self):
         """Columns list contains (name, type) tuples."""
@@ -94,104 +57,23 @@ class TestDenormalizeInfoReturnStructure:
         assert table_info["asset_bytes"] == 0
 
 
-class TestDenormalizeInfoMethod:
-    """Tests that actually call denormalize_info on a mocked Dataset."""
-
-    def test_calls_prepare_wide_table_and_returns_structure(self):
-        """denormalize_info delegates to _prepare_wide_table and returns expected keys."""
-        from deriva_ml.dataset.dataset import Dataset
-
-        model = _make_mock_model()
-        model.is_association.return_value = False
-
-        # Mock name_to_table to return table objects with schema
-        mock_table = MagicMock()
-        mock_table.schema.name = "eye-ai"
-        model.name_to_table.return_value = mock_table
-
-        # Mock pathBuilder chain
-        mock_pb = MagicMock()
-        # aggregates().fetch() is called for both row count (cnt) and asset size (total)
-        # Return a dict containing both keys so either access pattern works.
-        mock_pb.schemas.__getitem__.return_value.tables.__getitem__.return_value.aggregates.return_value.fetch.return_value = [
-            {"cnt": 100, "total": 5000}
-        ]
-        mock_pb.schemas.__getitem__.return_value.tables.__getitem__.return_value.column_definitions.__getitem__.return_value = MagicMock()
-
-        # Create a Dataset with mocked internals
-        ds = MagicMock(spec=Dataset)
-        ds._ml_instance = MagicMock()
-        ds._ml_instance.model = model
-        ds._ml_instance.pathBuilder.return_value = mock_pb
-        ds.dataset_rid = "DS-001"
-        ds._human_readable_size = Dataset._human_readable_size
-
-        # Call the real method on the mocked instance
-        result = Dataset.denormalize_info(ds, ["Image", "Subject"])
-
-        # Verify it called _prepare_wide_table
-        model._prepare_wide_table.assert_called_once()
-
-        # Verify return structure
-        assert "columns" in result
-        assert "join_path" in result
-        assert "tables" in result
-        assert "total_rows" in result
-        assert "total_asset_bytes" in result
-        assert "total_asset_size" in result
-
-    def test_non_asset_table_gets_zero_asset_bytes(self):
-        """Non-asset tables in the result have asset_bytes: 0."""
-        from deriva_ml.dataset.dataset import Dataset
-
-        model = _make_mock_model()
-        model.is_association.return_value = False
-
-        # Override is_asset: both tables are non-asset
-        model.is_asset.return_value = False
-        model.is_asset.side_effect = None
-
-        mock_table = MagicMock()
-        mock_table.schema.name = "eye-ai"
-        model.name_to_table.return_value = mock_table
-
-        mock_pb = MagicMock()
-        mock_pb.schemas.__getitem__.return_value.tables.__getitem__.return_value.aggregates.return_value.fetch.return_value = [
-            {"cnt": 10}
-        ]
-        mock_pb.schemas.__getitem__.return_value.tables.__getitem__.return_value.column_definitions.__getitem__.return_value = MagicMock()
-
-        ds = MagicMock(spec=Dataset)
-        ds._ml_instance = MagicMock()
-        ds._ml_instance.model = model
-        ds._ml_instance.pathBuilder.return_value = mock_pb
-        ds.dataset_rid = "DS-001"
-        ds._human_readable_size = Dataset._human_readable_size
-
-        result = Dataset.denormalize_info(ds, ["Image", "Subject"])
-
-        # Every table should have asset_bytes key
-        for table_name, info in result["tables"].items():
-            assert "asset_bytes" in info, f"{table_name} missing asset_bytes"
-            assert info["asset_bytes"] == 0
-
-
-class TestDenormalizeInfoMixin:
-    """Tests for the DerivaML-level denormalize_info (no dataset required)."""
+class TestMixinSignature:
+    """Tests for the DerivaML-level describe_denormalized signature."""
 
     def test_mixin_does_not_require_dataset_rid(self):
         """The mixin method takes only include_tables, no dataset."""
-        from deriva_ml.core.mixins.dataset import DatasetMixin
         import inspect
 
-        sig = inspect.signature(DatasetMixin.denormalize_info)
+        from deriva_ml.core.mixins.dataset import DatasetMixin
+
+        sig = inspect.signature(DatasetMixin.describe_denormalized)
         params = list(sig.parameters.keys())
         assert "self" in params
         assert "include_tables" in params
         assert "dataset_rid" not in params
 
 
-class TestDenormalizeInfoAggregateAPI:
+class TestAggregateAPI:
     """Tests that aggregate queries use the correct datapath API.
 
     These tests use spec-constrained mocks that raise AttributeError for
@@ -226,8 +108,8 @@ class TestDenormalizeInfoAggregateAPI:
         assert hasattr(agg, "alias"), "Sum(col) should have .alias() method"
 
 
-class TestDenormalizeInfoIntegration:
-    """Integration tests against a real catalog.
+class TestMixinIntegration:
+    """Integration tests against a real catalog for ``DerivaML.describe_denormalized``.
 
     These tests require a running Deriva server (set DERIVA_HOST env var).
     They use the populated_catalog fixture which provides Subject and Image
@@ -235,11 +117,11 @@ class TestDenormalizeInfoIntegration:
     """
 
     def test_mixin_returns_valid_structure(self, populated_catalog: "DerivaML"):
-        """DerivaML.denormalize_info() returns correct structure with real catalog."""
+        """DerivaML.describe_denormalized() returns correct structure with real catalog."""
         ml = populated_catalog
-        info = ml.denormalize_info(["Image", "Subject"])
+        info = ml.describe_denormalized(["Image", "Subject"])
 
-        # Verify all required keys
+        # Verify all required keys (legacy mixin shape)
         assert "columns" in info
         assert "join_path" in info
         assert "tables" in info
@@ -266,7 +148,7 @@ class TestDenormalizeInfoIntegration:
     def test_mixin_row_counts_are_non_negative(self, populated_catalog: "DerivaML"):
         """Row counts from real catalog should be non-negative integers."""
         ml = populated_catalog
-        info = ml.denormalize_info(["Image", "Subject"])
+        info = ml.describe_denormalized(["Image", "Subject"])
 
         # Row counts should be non-negative integers; some intermediate/
         # association tables may legitimately have 0 rows.
@@ -283,7 +165,7 @@ class TestDenormalizeInfoIntegration:
     def test_mixin_per_table_structure(self, populated_catalog: "DerivaML"):
         """Each table entry has row_count, is_asset, and asset_bytes."""
         ml = populated_catalog
-        info = ml.denormalize_info(["Image", "Subject"])
+        info = ml.describe_denormalized(["Image", "Subject"])
 
         for table_name, table_info in info["tables"].items():
             assert "row_count" in table_info, f"{table_name} missing row_count"
@@ -293,18 +175,71 @@ class TestDenormalizeInfoIntegration:
             assert isinstance(table_info["asset_bytes"], int)
             assert table_info["asset_bytes"] >= 0
 
-    def test_dataset_denormalize_info(self, catalog_with_datasets: "tuple[DerivaML, object]"):
-        """Dataset.denormalize_info() works with a real dataset."""
-        ml, dataset_desc = catalog_with_datasets
-        # Get any dataset from the catalog
+
+class TestDatasetDescribeDenormalized:
+    """Integration tests for ``Dataset.describe_denormalized`` (spec §5 shape).
+
+    Unlike the mixin, ``Dataset.describe_denormalized`` delegates to
+    ``Denormalizer.describe`` and returns the spec §5 plan dict with 12 keys:
+    row_per, row_per_source, row_per_candidates, columns, include_tables,
+    via, join_path, transparent_intermediates, ambiguities,
+    estimated_row_count, anchors, source.
+    """
+
+    SPEC_KEYS = {
+        "row_per",
+        "row_per_source",
+        "row_per_candidates",
+        "columns",
+        "include_tables",
+        "via",
+        "join_path",
+        "transparent_intermediates",
+        "ambiguities",
+        "estimated_row_count",
+        "anchors",
+        "source",
+    }
+
+    def test_dataset_returns_spec_keys(self, catalog_with_datasets: "tuple[DerivaML, object]"):
+        """Dataset.describe_denormalized() returns all spec §5 keys."""
+        ml, _dataset_desc = catalog_with_datasets
         datasets = list(ml.find_datasets())
         assert len(datasets) > 0, "catalog_with_datasets should have datasets"
 
-        # find_datasets returns Dataset objects with .dataset_rid attribute
         dataset = datasets[0]
-        info = dataset.denormalize_info(["Image", "Subject"])
+        info = dataset.describe_denormalized(["Image"])
 
-        assert "columns" in info
-        assert "join_path" in info
-        assert "tables" in info
-        assert info["total_rows"] >= 0
+        missing = self.SPEC_KEYS - set(info.keys())
+        assert not missing, f"Plan dict missing keys: {missing}"
+
+        # columns is a list of (name, type) tuples
+        assert isinstance(info["columns"], list)
+        # include_tables echoes the request
+        assert "Image" in info["include_tables"]
+        # join_path is an ordered list
+        assert isinstance(info["join_path"], list)
+        # ambiguities is a list (empty if none)
+        assert isinstance(info["ambiguities"], list)
+        # anchors is a dict with total + by_type
+        assert isinstance(info["anchors"], dict)
+        assert "total" in info["anchors"]
+        assert "by_type" in info["anchors"]
+        # source is a string tag
+        assert isinstance(info["source"], str)
+
+    def test_dataset_reports_ambiguity_without_raising(self, catalog_with_datasets: "tuple[DerivaML, object]"):
+        """describe_denormalized reports ambiguities in the dict; it never raises."""
+        ml, _ = catalog_with_datasets
+        datasets = list(ml.find_datasets())
+        assert len(datasets) > 0
+
+        dataset = datasets[0]
+        # This combination is ambiguous in the demo schema (Image→Subject has two
+        # paths). describe_denormalized must still return without raising.
+        info = dataset.describe_denormalized(["Image", "Subject"])
+
+        assert "ambiguities" in info
+        # We don't assert it's non-empty here because other test schemas may
+        # not include the diamond; just verify it's well-formed.
+        assert isinstance(info["ambiguities"], list)

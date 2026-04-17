@@ -110,7 +110,7 @@ class TestDeepFKChains:
         dataset = _create_dataset_with_members(test_ml, "ChainA", [r["RID"] for r in data["a"]], "Deep chain test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
-        df = bag.denormalize_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
         assert len(df) == 1
         assert df["ChainA.A_Name"].iloc[0] == "Level1"
         assert df["ChainF.F_Name"].iloc[0] == "Root"
@@ -123,7 +123,7 @@ class TestDeepFKChains:
         dataset = _create_dataset_with_members(
             test_ml, "ChainA", [r["RID"] for r in data["a"]], "Deep chain catalog test"
         )
-        df = dataset.denormalize_as_dataframe(
+        df = dataset.get_denormalized_as_dataframe(
             include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"]
         )
         assert len(df) == 1
@@ -159,7 +159,7 @@ class TestDeepFKChains:
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
         # Include only endpoints: ChainA and ChainF, with intermediates auto-joined
-        df = bag.denormalize_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
         assert len(df) == 1
         assert df["ChainF.F_Name"].iloc[0] == "Root"
 
@@ -258,7 +258,7 @@ class TestNullableCompositeFKs:
         )
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
-        df = bag.denormalize_as_dataframe(include_tables=["NullSource", "NullTarget"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["NullSource", "NullTarget"])
         # Both rows should be present: the linked one AND the orphan with NULLs
         assert len(df) == 2, f"Expected 2 rows (LEFT JOIN preserves NULL FK rows), got {len(df)}"
         labels = set(df["NullSource.Label"].tolist())
@@ -357,7 +357,7 @@ class TestCatalogSideCompositeFKDenormalize:
         dataset = _create_dataset_with_members(
             test_ml, "CatChild", [c["RID"] for c in data["children"]], "Catalog composite FK"
         )
-        df = dataset.denormalize_as_dataframe(include_tables=["CatChild", "CatParent"])
+        df = dataset.get_denormalized_as_dataframe(include_tables=["CatChild", "CatParent"])
         assert len(df) == 2
         assert set(df["CatChild.Label"].tolist()) == {"C1", "C2"}
         assert set(df["CatParent.Name"].tolist()) == {"P1", "P2"}
@@ -370,7 +370,7 @@ class TestCatalogSideCompositeFKDenormalize:
         dataset = _create_dataset_with_members(
             test_ml, "CatChild", [c["RID"] for c in data["children"]], "3-table composite"
         )
-        df = dataset.denormalize_as_dataframe(include_tables=["CatChild", "CatParent", "CatGroup"])
+        df = dataset.get_denormalized_as_dataframe(include_tables=["CatChild", "CatParent", "CatGroup"])
         assert len(df) == 2
         assert set(df["CatGroup.Name"].tolist()) == {"G1", "G2"}
 
@@ -386,7 +386,7 @@ class TestDenormalizeColumns:
     def test_columns_single_table(self, dataset_test, tmp_path):
         """denormalize_columns for a single table returns its columns."""
         dataset = dataset_test.dataset_description.dataset
-        cols = dataset.denormalize_columns(include_tables=["Subject"])
+        cols = dataset.list_denormalized_columns(include_tables=["Subject"])
 
         col_names = [name for name, _ in cols]
         assert "Subject.RID" in col_names
@@ -398,7 +398,7 @@ class TestDenormalizeColumns:
     def test_columns_multiple_tables(self, dataset_test, tmp_path):
         """denormalize_columns for multiple tables returns all columns."""
         dataset = dataset_test.dataset_description.dataset
-        cols = dataset.denormalize_columns(include_tables=["Subject", "Image", "Observation"])
+        cols = dataset.list_denormalized_columns(include_tables=["Subject", "Image", "Observation"])
 
         col_names = [name for name, _ in cols]
         # Should have columns from each table, dot-prefixed
@@ -409,7 +409,7 @@ class TestDenormalizeColumns:
     def test_columns_includes_type_info(self, dataset_test, tmp_path):
         """denormalize_columns returns type information."""
         dataset = dataset_test.dataset_description.dataset
-        cols = dataset.denormalize_columns(include_tables=["Subject"])
+        cols = dataset.list_denormalized_columns(include_tables=["Subject"])
 
         col_dict = dict(cols)
         assert "Subject.Name" in col_dict
@@ -421,9 +421,9 @@ class TestDenormalizeColumns:
         dataset = dataset_test.dataset_description.dataset
         version = dataset.current_version
 
-        catalog_cols = dataset.denormalize_columns(include_tables=["Subject", "Image", "Observation"])
+        catalog_cols = dataset.list_denormalized_columns(include_tables=["Subject", "Image", "Observation"])
         bag = dataset.download_dataset_bag(version, use_minid=False)
-        bag_cols = bag.denormalize_columns(include_tables=["Subject", "Image", "Observation"])
+        bag_cols = bag.list_denormalized_columns(include_tables=["Subject", "Image", "Observation"])
 
         catalog_names = {name for name, _ in catalog_cols}
         bag_names = {name for name, _ in bag_cols}
@@ -512,7 +512,7 @@ class TestSelfReferentialFK:
         dataset = _create_dataset_with_members(test_ml, "HierNode", all_rids, "Hierarchical test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
-        df = bag.denormalize_as_dataframe(include_tables=["HierNode"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["HierNode"])
         assert len(df) == 2
         names = set(df["HierNode.Name"].tolist())
         assert names == {"Root", "Child1"}
@@ -591,6 +591,6 @@ class TestWideSchema:
         dataset = _create_dataset_with_members(test_ml, "Spoke0", [s["RID"] for s in spokes], "Wide schema test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
-        df = bag.denormalize_as_dataframe(include_tables=["Spoke0", "Hub"])
+        df = bag.get_denormalized_as_dataframe(include_tables=["Spoke0", "Hub"])
         assert len(df) == 1
         assert df["Hub.Name"].iloc[0] == "Center"

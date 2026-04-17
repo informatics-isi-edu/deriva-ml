@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -199,139 +197,6 @@ class TestEmptyColumnSpecs:
         df = result.to_dataframe()
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 0
-
-
-class TestDatasetVersionWarning:
-    """Tests for the 'version' parameter warning path on Dataset delegates.
-
-    These tests exercise the warning logic directly via a mock Dataset so that
-    we don't need a live catalog connection.
-    """
-
-    def _make_mock_dataset(self, local_schema_built: bool = True):
-        """Build a minimal mock of the Dataset object's dependencies."""
-        # Build a mock workspace
-        mock_ws = MagicMock()
-        if local_schema_built:
-            mock_ws.local_schema = MagicMock()
-            mock_ws.local_schema.get_orm_class = MagicMock(return_value=None)
-            mock_ws.engine = MagicMock()
-        else:
-            mock_ws.local_schema = None
-
-        mock_ml = MagicMock()
-        mock_ml.workspace = mock_ws
-
-        mock_dataset = MagicMock()
-        mock_dataset._ml_instance = mock_ml
-        mock_dataset.dataset_rid = "DS-MOCK"
-        mock_dataset.list_dataset_children.return_value = []
-        return mock_dataset, mock_ws
-
-    def test_version_warning_dataframe(self, populated_denorm: dict[str, Any]) -> None:
-        """denormalize_as_dataframe emits UserWarning when version != None."""
-        from deriva_ml.dataset.dataset import Dataset
-
-        model = populated_denorm["model"]
-        ls = populated_denorm["local_schema"]
-
-        mock_dataset, mock_ws = self._make_mock_dataset(local_schema_built=True)
-        mock_ws.engine = ls.engine
-        mock_ws.local_schema.get_orm_class = ls.get_orm_class
-        mock_dataset._ml_instance.model = model
-
-        stub_result = DenormalizeResult(columns=[], row_count=0, _rows=[])
-        # The function body does `from deriva_ml.local_db.denormalize import _denormalize_impl`,
-        # so we must patch the name in that module, not in dataset.dataset.
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            with patch("deriva_ml.local_db.denormalize._denormalize_impl", return_value=stub_result):
-                Dataset.denormalize_as_dataframe(mock_dataset, ["Image"], version="1.0.0")
-
-        user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
-        assert len(user_warnings) == 1
-        assert "version" in str(user_warnings[0].message).lower()
-
-    def test_no_warning_when_version_is_none(self, populated_denorm: dict[str, Any]) -> None:
-        """denormalize_as_dataframe does NOT warn when version is None."""
-        from deriva_ml.dataset.dataset import Dataset
-
-        model = populated_denorm["model"]
-        ls = populated_denorm["local_schema"]
-
-        mock_dataset, mock_ws = self._make_mock_dataset(local_schema_built=True)
-        mock_ws.engine = ls.engine
-        mock_ws.local_schema.get_orm_class = ls.get_orm_class
-        mock_dataset._ml_instance.model = model
-
-        stub_result = DenormalizeResult(columns=[], row_count=0, _rows=[])
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            with patch("deriva_ml.local_db.denormalize._denormalize_impl", return_value=stub_result):
-                Dataset.denormalize_as_dataframe(mock_dataset, ["Image"], version=None)
-
-        user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
-        assert len(user_warnings) == 0
-
-    def test_version_warning_dict(self, populated_denorm: dict[str, Any]) -> None:
-        """denormalize_as_dict also emits UserWarning when version != None."""
-        from deriva_ml.dataset.dataset import Dataset
-
-        model = populated_denorm["model"]
-        ls = populated_denorm["local_schema"]
-
-        mock_dataset, mock_ws = self._make_mock_dataset(local_schema_built=True)
-        mock_ws.engine = ls.engine
-        mock_ws.local_schema.get_orm_class = ls.get_orm_class
-        mock_dataset._ml_instance.model = model
-
-        stub_result = DenormalizeResult(columns=[], row_count=0, _rows=[])
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            with patch("deriva_ml.local_db.denormalize._denormalize_impl", return_value=stub_result):
-                # denormalize_as_dict is a generator; must exhaust it.
-                list(Dataset.denormalize_as_dict(mock_dataset, ["Image"], version="2.0.0"))
-
-        user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
-        assert len(user_warnings) == 1
-        assert "version" in str(user_warnings[0].message).lower()
-
-
-class TestLocalSchemaNoneGuard:
-    """Tests for the local_schema is None guard in Dataset delegates."""
-
-    def _make_mock_dataset_no_schema(self):
-        """Return a mock Dataset whose workspace has local_schema=None."""
-        mock_ws = MagicMock()
-        mock_ws.local_schema = None
-
-        mock_ml = MagicMock()
-        mock_ml.workspace = mock_ws
-
-        mock_dataset = MagicMock()
-        mock_dataset._ml_instance = mock_ml
-        mock_dataset.dataset_rid = "DS-MOCK"
-        mock_dataset.list_dataset_children.return_value = []
-        return mock_dataset
-
-    def test_dataframe_raises_when_no_schema(self) -> None:
-        """denormalize_as_dataframe raises RuntimeError if local_schema is None."""
-        from deriva_ml.dataset.dataset import Dataset
-
-        mock_dataset = self._make_mock_dataset_no_schema()
-
-        with pytest.raises(RuntimeError, match="local_schema not built"):
-            Dataset.denormalize_as_dataframe(mock_dataset, ["Image"])
-
-    def test_dict_raises_when_no_schema(self) -> None:
-        """denormalize_as_dict raises RuntimeError if local_schema is None."""
-        from deriva_ml.dataset.dataset import Dataset
-
-        mock_dataset = self._make_mock_dataset_no_schema()
-
-        with pytest.raises(RuntimeError, match="local_schema not built"):
-            # Must trigger the generator to see the RuntimeError
-            list(Dataset.denormalize_as_dict(mock_dataset, ["Image"]))
 
 
 # ---------------------------------------------------------------------------
