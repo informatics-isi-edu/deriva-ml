@@ -24,13 +24,18 @@ tabular-read API, and deleted the legacy working-data cache.
 - `result_cache.py` — `ResultCache`, `CachedResult`, `CachedResultMeta`,
   `QueryResult` for cached tabular reads with TTL, re-query, and
   sort/filter/pagination.
-- `denormalize.py` — unified `denormalize()` function. Replaces both the
+- `denormalize.py` — private `_denormalize_impl()` primitive (the SQL
+  executor) plus the `DenormalizeResult` dataclass. Replaces both the
   old `Dataset._denormalize_datapath` (catalog-side) and
   `DatasetBag._denormalize` (bag-side) with a single implementation.
   Uses `_prepare_wide_table` for join planning and runs SQLAlchemy JOINs
   against local SQLite. Supports three sources: `"catalog"` (fetches rows
   via `PagedFetcher`), `"slice"` (rows from an attached slice), `"local"`
   (caller has already populated rows; used by tests).
+  **Public API**: callers should use the `Denormalizer` class in
+  `denormalizer.py` (added in Task 4 of the denormalization-semantics
+  refactor), which wraps `_denormalize_impl` with Rule 2/5/6 planning
+  guards and orphan-row handling.
 
 ## Layout on disk
 
@@ -69,12 +74,14 @@ DerivaML.workspace  ─>  Workspace
                           ├─ cached_table_read() / cache_denormalized()
                           └─ list_cached_results() / invalidate_cache()
 
-Dataset.denormalize_as_dataframe  ─>  denormalize(source="catalog",
-                                                  paged_client=ErmrestPagedClient)
-DatasetBag.denormalize_as_dataframe ─> denormalize(source="slice")
+Dataset.get_denormalized_as_dataframe ─> Denormalizer(ds).as_dataframe(...)
+                                          └─> _denormalize_impl(source="catalog",
+                                                                paged_client=ErmrestPagedClient)
+DatasetBag.get_denormalized_as_dataframe ─> Denormalizer(bag).as_dataframe(...)
+                                             └─> _denormalize_impl(source="slice")
 ```
 
-## Source modes for `denormalize()`
+## Source modes for `_denormalize_impl()`
 
 - **`"local"`** (default) — caller has already populated the engine's tables.
   Used by unit tests with pre-populated fixtures.
@@ -82,10 +89,10 @@ DatasetBag.denormalize_as_dataframe ─> denormalize(source="slice")
   `PagedClient` (typically `ErmrestPagedClient`). Walks the join plan,
   issues RID-batched fetches per table, and commits rows into the working
   DB before running the SQL join. This is the production path for
-  `Dataset.denormalize_as_dataframe`.
+  `Dataset.get_denormalized_as_dataframe` (via `Denormalizer`).
 - **`"slice"`** — rows are already visible via an attached slice database.
-  Used by `DatasetBag.denormalize_as_dataframe` where the bag's per-schema
-  files are the slice.
+  Used by `DatasetBag.get_denormalized_as_dataframe` where the bag's
+  per-schema files are the slice.
 
 ## Further reading
 
