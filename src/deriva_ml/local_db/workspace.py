@@ -421,6 +421,9 @@ class Workspace:
         dataset: Any = None,
         dataset_children_rids: list[str] | None = None,
         paged_client: Any = None,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
     ) -> "CachedResult":
         """Run denormalization and cache the result.
 
@@ -444,6 +447,14 @@ class Workspace:
             dataset_children_rids: Extra dataset RIDs for the WHERE filter.
             paged_client: Required when ``source='catalog'``. See
                 :func:`_denormalize_impl`.
+            row_per: Optional explicit leaf table (Rule 2). See
+                :class:`~deriva_ml.local_db.denormalizer.Denormalizer`.
+            via: Optional path-only intermediates to disambiguate FK paths
+                (Rule 6) without adding their columns to the output.
+            ignore_unrelated_anchors: Reserved — accepted for protocol
+                compatibility but not yet propagated to the low-level
+                ``_denormalize_impl`` primitive (which does not yet
+                implement anchor classification).
 
         Returns:
             :class:`CachedResult` handle over the cached result table.
@@ -463,6 +474,11 @@ class Workspace:
             tables=sorted(include_tables),
             version=version or "",
             source=source,
+            # Include the new planner knobs so each (row_per, via,
+            # ignore_unrelated_anchors) combination caches independently.
+            row_per=row_per or "",
+            via=sorted(via) if via else [],
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
 
         if not refresh and rc.has(key):
@@ -481,6 +497,8 @@ class Workspace:
             dataset_children_rids=dataset_children_rids,
             source=source,
             paged_client=paged_client,
+            row_per=row_per,
+            via=via,
         )
 
         rows = list(denorm_result.iter_rows())
@@ -489,7 +507,14 @@ class Workspace:
             cache_key=key,
             source=source,
             tool_name="denormalize",
-            params={"dataset_rid": dataset_rid, "tables": sorted(include_tables), "version": version},
+            params={
+                "dataset_rid": dataset_rid,
+                "tables": sorted(include_tables),
+                "version": version,
+                "row_per": row_per,
+                "via": sorted(via) if via else None,
+                "ignore_unrelated_anchors": ignore_unrelated_anchors,
+            },
             columns=col_names,
             row_count=len(rows),
             created_at=time.time(),
