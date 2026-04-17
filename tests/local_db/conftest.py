@@ -117,6 +117,156 @@ def denorm_deriva_model(denorm_model: Model) -> DerivaModel:
     )
 
 
+# ---------------------------------------------------------------------------
+# Diamond-schema fixture (for planner rule tests that need multiple FK paths)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def denorm_schema_diamond(tmp_path: Path) -> Path:
+    """Canned schema with a diamond between Image and Subject.
+
+    Extends :func:`denorm_schema` by adding an ``Observation`` table and
+    an ``Image.Observation`` FK, creating two FK paths from Image to
+    Subject:
+
+    - ``Image → Subject``        (direct FK)
+    - ``Image → Observation → Subject``  (indirect via Observation)
+
+    Used for testing Rule 6 (path ambiguity) in the denormalization
+    planner. Kept separate from :func:`denorm_schema` so that the
+    non-diamond integration tests in ``test_denormalize.py`` continue
+    to exercise the simple chain.
+    """
+    doc = _base_schema_doc()
+
+    # Add Dataset_Image association
+    doc["schemas"]["deriva-ml"]["tables"]["Dataset_Image"] = {
+        "table_name": "Dataset_Image",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Dataset", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Dataset_Image",
+                        "column_name": "Dataset",
+                    }
+                ],
+                "referenced_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Dataset",
+                        "column_name": "RID",
+                    }
+                ],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Dataset_Image",
+                        "column_name": "Image",
+                    }
+                ],
+                "referenced_columns": [
+                    {
+                        "schema_name": "isa",
+                        "table_name": "Image",
+                        "column_name": "RID",
+                    }
+                ],
+            },
+        ],
+    }
+
+    # Add Observation table in isa schema
+    doc["schemas"]["isa"]["tables"]["Observation"] = {
+        "table_name": "Observation",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Date", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "isa",
+                        "table_name": "Observation",
+                        "column_name": "Subject",
+                    }
+                ],
+                "referenced_columns": [
+                    {
+                        "schema_name": "isa",
+                        "table_name": "Subject",
+                        "column_name": "RID",
+                    }
+                ],
+            },
+        ],
+    }
+
+    # Extend Image with Observation FK (creates the diamond)
+    image = doc["schemas"]["isa"]["tables"]["Image"]
+    image["column_definitions"].append({"name": "Observation", "type": {"typename": "text"}, "nullok": True})
+    image["foreign_keys"].append(
+        {
+            "foreign_key_columns": [
+                {
+                    "schema_name": "isa",
+                    "table_name": "Image",
+                    "column_name": "Observation",
+                }
+            ],
+            "referenced_columns": [
+                {
+                    "schema_name": "isa",
+                    "table_name": "Observation",
+                    "column_name": "RID",
+                }
+            ],
+        }
+    )
+
+    out = tmp_path / "schema.json"
+    out.write_text(json.dumps(doc))
+    return out
+
+
+@pytest.fixture
+def denorm_diamond_model(denorm_schema_diamond: Path) -> Model:
+    """ERMrest Model with diamond FK paths (Image → Subject has two routes)."""
+    return Model.fromfile("file-system", denorm_schema_diamond)
+
+
+@pytest.fixture
+def denorm_diamond_deriva_model(denorm_diamond_model: Model) -> DerivaModel:
+    """DerivaModel with the diamond fixture (Observation intermediate)."""
+    return DerivaModel(
+        model=denorm_diamond_model,
+        ml_schema="deriva-ml",
+        domain_schemas={"isa"},
+    )
+
+
 @pytest.fixture
 def denorm_local_schema(denorm_model: Model, tmp_path: Path) -> LocalSchema:
     """LocalSchema with tables from the extended schema."""
