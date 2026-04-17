@@ -326,6 +326,14 @@ class TestListPaths:
         for (source, target), _ in info["schema_paths"].items():
             assert "Image" in (source, target)
 
+    def test_list_paths_reports_association_tables(self, populated_denorm) -> None:
+        """Pure M:N link tables (Dataset_Image) surface in association_tables."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        info = d.list_paths()
+        # The canned schema has Dataset_Image as a pure association.
+        assert "Dataset_Image" in info["association_tables"]
+
 
 # ---------------------------------------------------------------------------
 # Fixtures

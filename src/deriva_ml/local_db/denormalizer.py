@@ -300,14 +300,16 @@ class Denormalizer:
 
         Returns:
             Dict with:
-                member_types: list of dataset element types (if constructed
-                    from a dataset); else empty.
+                member_types: dataset element types (same as ``anchor_types``
+                    for ``from_rids``-constructed Denormalizers).
                 anchor_types: union of all distinct anchor table names.
                 reachable_tables: mapping from each member/anchor type to
                     tables reachable from it via FK.
                 association_tables: names of pure association tables in the
                     schema.
-                feature_tables: names of feature tables (detected heuristically).
+                feature_tables: names of feature tables (via
+                    :meth:`DerivaModel.find_features`). Empty if the model
+                    does not expose ``find_features`` or has no features.
                 schema_paths: mapping from (source_table, target_table) to a
                     list of path descriptions.
         """
@@ -341,20 +343,17 @@ class Denormalizer:
         # association_tables: pure M-to-N linking tables
         association_tables = sorted(t for t in all_table_names if model._is_association_table(t))
 
-        # feature_tables: heuristic — tables whose name contains "_" and
-        # have an FK to a non-association, non-system table plus FK to a
-        # vocabulary term. Approximated by: `is_feature_table` if the model
-        # exposes it, else empty.
+        # feature_tables: derive from DerivaModel.find_features (the canonical
+        # feature-discovery API — see model/catalog.py:510). Each Feature's
+        # .feature_table.name gives the backing table name. Degrades to [] if
+        # the model doesn't expose find_features or the call raises.
         feature_tables: list[str] = []
-        is_feat = getattr(model, "is_feature_table", None)
-        if callable(is_feat):
-            for t in all_table_names:
-                try:
-                    if is_feat(t):
-                        feature_tables.append(t)
-                except Exception:
-                    pass
-        feature_tables.sort()
+        find_feats = getattr(model, "find_features", None)
+        if callable(find_feats):
+            try:
+                feature_tables = sorted({f.feature_table.name for f in find_feats()})
+            except Exception:
+                feature_tables = []
 
         # schema_paths: for every (source, target) pair among anchor_types ×
         # reachable_tables, enumerate FK paths.
