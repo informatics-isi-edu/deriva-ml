@@ -354,6 +354,9 @@ class DerivaMLDenormalizeError(DerivaMLException):
 
     All errors raised by :class:`~deriva_ml.local_db.denormalizer.Denormalizer`
     and related planning functions are instances of this class.
+
+    Example:
+        >>> raise DerivaMLDenormalizeError("Planner failed")
     """
 
 
@@ -384,6 +387,15 @@ class DerivaMLDenormalizeNoSink(DerivaMLDenormalizeError):
     Raised when every table in ``include_tables`` has an outbound FK to
     another table in the set, forming a cycle. Pathological — rare in
     real schemas.
+
+    Args:
+        msg: Descriptive error message. Should identify the tables
+            forming the cycle.
+
+    Example:
+        >>> raise DerivaMLDenormalizeNoSink(
+        ...     "Cycle in FK graph between tables A, B, C"
+        ... )
     """
 
 
