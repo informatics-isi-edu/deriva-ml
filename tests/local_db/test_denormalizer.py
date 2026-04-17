@@ -123,6 +123,10 @@ class TestViaParameter:
         # With via, ambiguity resolved
         df = d.as_dataframe(["Image", "Subject"], via=["Observation"])
         assert isinstance(df, pd.DataFrame)
+        # Concrete proof of resolution: one row per Image + Subject columns hoisted.
+        assert len(df) == 3
+        assert any(c.startswith("Image.") for c in df.columns)
+        assert any(c.startswith("Subject.") for c in df.columns)
         # Observation columns should NOT be present (via adds to join, not output)
         assert not any(c.startswith("Observation.") for c in df.columns)
 
