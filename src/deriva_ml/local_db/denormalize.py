@@ -1,7 +1,16 @@
 """Unified denormalization engine for the local_db layer.
 
-Replaces both ``Dataset._denormalize_datapath`` and ``DatasetBag._denormalize``
-with a single function that builds SQLAlchemy JOINs against local SQLite.
+This module hosts the low-level ``_denormalize_impl`` primitive — the SQL
+executor that materializes a wide table from a dataset's join chain.
+
+**Public API**: :class:`deriva_ml.local_db.denormalizer.Denormalizer` is the
+class-based public API. Callers should construct a ``Denormalizer`` from
+their dataset or RID set; the ``Denormalizer`` internally uses
+``_denormalize_impl``. The free function below is private.
+
+The primitive replaces both ``Dataset._denormalize_datapath`` and
+``DatasetBag._denormalize`` with a single function that builds SQLAlchemy
+JOINs against local SQLite.
 
 The key abstraction is the ``orm_resolver`` callable which maps table names to
 SQLAlchemy ORM classes.  This decouples the denormalizer from where the ORM
@@ -57,8 +66,8 @@ class DenormalizeResult:
 
     Example::
 
-        result = denormalize(model=m, engine=e, orm_resolver=r,
-                             dataset_rid="DS-001", include_tables=["Image", "Subject"])
+        result = _denormalize_impl(model=m, engine=e, orm_resolver=r,
+                                   dataset_rid="DS-001", include_tables=["Image", "Subject"])
         df = result.to_dataframe()       # full DataFrame
         for row in result.iter_rows():   # streaming
             process(row)
@@ -88,8 +97,30 @@ class DenormalizeResult:
         """
         yield from self._rows
 
+    def extend(self, rows: list[dict[str, Any]]) -> "DenormalizeResult":
+        """Return a new :class:`DenormalizeResult` with additional rows appended.
 
-def denormalize(
+        Used when combining phases of denormalization — e.g., the main JOIN
+        result plus orphan rows emitted by LEFT-JOIN-style upstream anchors
+        (:meth:`Denormalizer._emit_orphan_rows`).
+
+        Columns and schema are preserved from ``self``. The returned result's
+        :attr:`row_count` is ``self.row_count + len(rows)``.
+
+        Args:
+            rows: Row dicts to append (same shape as ``self.iter_rows()``).
+
+        Returns:
+            New :class:`DenormalizeResult` — does not mutate ``self``.
+        """
+        return DenormalizeResult(
+            columns=self.columns,
+            row_count=self.row_count + len(rows),
+            _rows=list(self._rows) + list(rows),
+        )
+
+
+def _denormalize_impl(
     model: DerivaModel,
     engine: Engine,
     orm_resolver: Callable[[str], Any],

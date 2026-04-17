@@ -433,7 +433,7 @@ class Workspace:
             include_tables: Tables to include in the wide table.
             version: Optional dataset version (currently ignored; accepted for
                 protocol compatibility with :meth:`Dataset.cache_denormalized`).
-            source: Fetch mode forwarded to :func:`denormalize`.
+            source: Fetch mode forwarded to :func:`_denormalize_impl`.
                 ``"local"`` (default) assumes rows are already present.
                 ``"catalog"`` requires *paged_client* and fetches rows from
                 the live catalog. ``"slice"`` assumes rows are visible via
@@ -443,14 +443,14 @@ class Workspace:
             dataset: ``DatasetLike`` object for join-plan member enumeration.
             dataset_children_rids: Extra dataset RIDs for the WHERE filter.
             paged_client: Required when ``source='catalog'``. See
-                :func:`denormalize`.
+                :func:`_denormalize_impl`.
 
         Returns:
             :class:`CachedResult` handle over the cached result table.
         """
         import time
 
-        from deriva_ml.local_db.denormalize import denormalize as _denormalize
+        from deriva_ml.local_db.denormalize import _denormalize_impl as _denormalize
         from deriva_ml.local_db.result_cache import CachedResultMeta, ResultCache
 
         if self._local_schema is None:

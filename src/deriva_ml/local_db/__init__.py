@@ -10,8 +10,10 @@ tracking.  Key public symbols:
   holds the SQLAlchemy ORM for all catalog tables.
 - :class:`PagedFetcher` + :class:`ErmrestPagedClient`: stream rows from
   ERMrest into local SQLite with keyset pagination and RID-batch fetching.
-- :func:`denormalize` + :class:`DenormalizeResult`: unified denormalization
-  engine that builds SQLAlchemy JOINs against local SQLite.
+- :class:`DenormalizeResult`: return type for denormalization operations.
+  (The public denormalization API is :class:`Denormalizer` in
+  ``denormalizer.py``; the low-level ``_denormalize_impl`` primitive is
+  private to the package.)
 - :class:`ResultCache` + :class:`CachedResult` + :class:`CachedResultMeta`
   + :class:`QueryResult`: result-cache layer storing tabular reads as
   named SQLite tables with TTL and sort/filter/pagination.
@@ -24,7 +26,7 @@ See ``README.md`` in this directory for a short orientation.
 
 from __future__ import annotations
 
-from deriva_ml.local_db.denormalize import DenormalizeResult, denormalize
+from deriva_ml.local_db.denormalize import DenormalizeResult
 from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva_ml.local_db.paged_fetcher import PagedFetcher
 from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
@@ -43,5 +45,4 @@ __all__ = [
     "QueryResult",
     "ResultCache",
     "Workspace",
-    "denormalize",
 ]

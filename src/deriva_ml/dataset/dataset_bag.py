@@ -821,12 +821,12 @@ class DatasetBag:
         See Also:
             denormalize_as_dict: Generator version for memory-efficient processing.
         """
-        from deriva_ml.local_db.denormalize import denormalize
+        from deriva_ml.local_db.denormalize import _denormalize_impl
 
         children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         # source="slice": rows are already present in the bag's local SQLite
         # (populated by SchemaBuilder during download). No catalog fetch needed.
-        result = denormalize(
+        result = _denormalize_impl(
             model=self.model,
             engine=self.engine,
             orm_resolver=self.model.get_orm_class_by_name,
@@ -896,12 +896,12 @@ class DatasetBag:
         See Also:
             denormalize_as_dataframe: Returns all data as a pandas DataFrame.
         """
-        from deriva_ml.local_db.denormalize import denormalize
+        from deriva_ml.local_db.denormalize import _denormalize_impl
 
         children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         # source="slice": rows are already present in the bag's local SQLite
         # (populated by SchemaBuilder during download). No catalog fetch needed.
-        result = denormalize(
+        result = _denormalize_impl(
             model=self.model,
             engine=self.engine,
             orm_resolver=self.model.get_orm_class_by_name,

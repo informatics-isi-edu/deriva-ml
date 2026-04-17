@@ -851,7 +851,7 @@ class Dataset:
         """
         import warnings
 
-        from deriva_ml.local_db.denormalize import denormalize
+        from deriva_ml.local_db.denormalize import _denormalize_impl
         from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
         # Guard: workspace must have a built local_schema before we can use it.
@@ -879,7 +879,7 @@ class Dataset:
         paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
 
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-        result = denormalize(
+        result = _denormalize_impl(
             model=self._ml_instance.model,
             engine=ws.engine,
             orm_resolver=ws.local_schema.get_orm_class,
@@ -999,7 +999,7 @@ class Dataset:
         """
         import warnings
 
-        from deriva_ml.local_db.denormalize import denormalize
+        from deriva_ml.local_db.denormalize import _denormalize_impl
         from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
         # Guard: workspace must have a built local_schema before we can use it.
@@ -1027,7 +1027,7 @@ class Dataset:
         paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
 
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-        result = denormalize(
+        result = _denormalize_impl(
             model=self._ml_instance.model,
             engine=ws.engine,
             orm_resolver=ws.local_schema.get_orm_class,

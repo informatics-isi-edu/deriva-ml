@@ -1254,7 +1254,7 @@ class DerivaModel:
            Nullable FK columns produce LEFT JOINs.
         5. **Flatten to legacy format** -- convert the tree to the
            ``(path, join_conditions, join_types)`` tuple expected by
-           the unified ``denormalize()`` in ``local_db/denormalize.py``.
+           the unified ``_denormalize_impl()`` in ``local_db/denormalize.py``.
 
         Args:
             dataset: A DatasetLike object (DatasetBag or Dataset).

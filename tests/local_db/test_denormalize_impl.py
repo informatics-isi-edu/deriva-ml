@@ -1,4 +1,4 @@
-"""Tests for the unified denormalization engine."""
+"""Tests for ``_denormalize_impl`` — the low-level primitive called by ``Denormalizer``."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from deriva_ml.local_db.denormalize import DenormalizeResult, denormalize
+from deriva_ml.local_db.denormalize import DenormalizeResult, _denormalize_impl
 
 
 class TestDenormalize:
@@ -21,7 +21,7 @@ class TestDenormalize:
         ls = populated_denorm["local_schema"]
         ds_rid = populated_denorm["dataset_rid"]
 
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -45,7 +45,7 @@ class TestDenormalize:
         ls = populated_denorm["local_schema"]
 
         # Use a nonexistent dataset RID
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -63,7 +63,7 @@ class TestDenormalize:
         ls = populated_denorm["local_schema"]
         ds_rid = populated_denorm["dataset_rid"]
 
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -83,7 +83,7 @@ class TestDenormalize:
         ls = populated_denorm["local_schema"]
         ds_rid = populated_denorm["dataset_rid"]
 
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -101,7 +101,7 @@ class TestDenormalize:
         model = populated_denorm["model"]
         ls = populated_denorm["local_schema"]
 
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -120,7 +120,7 @@ class TestDenormalize:
         ls = populated_denorm["local_schema"]
         ds_rid = populated_denorm["dataset_rid"]
 
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -141,7 +141,7 @@ class TestDenormalize:
 
         # DS-001 is the only dataset with data.  Passing it as a child with
         # a fake parent should still return rows.
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -159,7 +159,7 @@ class TestDenormalize:
         ls = populated_denorm["local_schema"]
         ds_rid = populated_denorm["dataset_rid"]
 
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -185,7 +185,7 @@ class TestEmptyColumnSpecs:
         ds_rid = populated_denorm["dataset_rid"]
 
         # An empty include_tables list should produce no column_specs and no rows.
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -241,11 +241,11 @@ class TestDatasetVersionWarning:
         mock_dataset._ml_instance.model = model
 
         stub_result = DenormalizeResult(columns=[], row_count=0, _rows=[])
-        # The function body does `from deriva_ml.local_db.denormalize import denormalize`,
+        # The function body does `from deriva_ml.local_db.denormalize import _denormalize_impl`,
         # so we must patch the name in that module, not in dataset.dataset.
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            with patch("deriva_ml.local_db.denormalize.denormalize", return_value=stub_result):
+            with patch("deriva_ml.local_db.denormalize._denormalize_impl", return_value=stub_result):
                 Dataset.denormalize_as_dataframe(mock_dataset, ["Image"], version="1.0.0")
 
         user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
@@ -267,7 +267,7 @@ class TestDatasetVersionWarning:
         stub_result = DenormalizeResult(columns=[], row_count=0, _rows=[])
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            with patch("deriva_ml.local_db.denormalize.denormalize", return_value=stub_result):
+            with patch("deriva_ml.local_db.denormalize._denormalize_impl", return_value=stub_result):
                 Dataset.denormalize_as_dataframe(mock_dataset, ["Image"], version=None)
 
         user_warnings = [x for x in w if issubclass(x.category, UserWarning)]
@@ -288,7 +288,7 @@ class TestDatasetVersionWarning:
         stub_result = DenormalizeResult(columns=[], row_count=0, _rows=[])
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            with patch("deriva_ml.local_db.denormalize.denormalize", return_value=stub_result):
+            with patch("deriva_ml.local_db.denormalize._denormalize_impl", return_value=stub_result):
                 # denormalize_as_dict is a generator; must exhaust it.
                 list(Dataset.denormalize_as_dict(mock_dataset, ["Image"], version="2.0.0"))
 
@@ -388,7 +388,7 @@ class TestCatalogSource:
             }
         )
 
-        result = denormalize(
+        result = _denormalize_impl(
             model=model,
             engine=ls.engine,
             orm_resolver=ls.get_orm_class,
@@ -417,7 +417,7 @@ class TestCatalogSource:
     def test_catalog_source_requires_paged_client(self, populated_denorm: dict[str, Any]) -> None:
         """source='catalog' without paged_client raises ValueError."""
         with pytest.raises(ValueError, match="paged_client"):
-            denormalize(
+            _denormalize_impl(
                 model=populated_denorm["model"],
                 engine=populated_denorm["local_schema"].engine,
                 orm_resolver=populated_denorm["local_schema"].get_orm_class,
@@ -430,7 +430,7 @@ class TestCatalogSource:
     def test_local_source_does_not_require_paged_client(self, populated_denorm: dict[str, Any]) -> None:
         """source='local' (default) works without a paged_client."""
         # Just verify it doesn't raise — rows come from the fixture.
-        result = denormalize(
+        result = _denormalize_impl(
             model=populated_denorm["model"],
             engine=populated_denorm["local_schema"].engine,
             orm_resolver=populated_denorm["local_schema"].get_orm_class,
@@ -442,7 +442,7 @@ class TestCatalogSource:
 
     def test_slice_source_does_not_require_paged_client(self, populated_denorm: dict[str, Any]) -> None:
         """source='slice' works without a paged_client (rows from attached slice)."""
-        result = denormalize(
+        result = _denormalize_impl(
             model=populated_denorm["model"],
             engine=populated_denorm["local_schema"].engine,
             orm_resolver=populated_denorm["local_schema"].get_orm_class,
@@ -466,10 +466,27 @@ class TestDatasetOrmGuard:
             return real_resolver(name)
 
         with pytest.raises(RuntimeError, match="Dataset ORM"):
-            denormalize(
+            _denormalize_impl(
                 model=populated_denorm["model"],
                 engine=populated_denorm["local_schema"].engine,
                 orm_resolver=broken_resolver,
                 dataset_rid=populated_denorm["dataset_rid"],
                 include_tables=["Image"],
             )
+
+
+def test_denormalize_result_extend() -> None:
+    """DenormalizeResult.extend appends rows and updates row_count."""
+    from deriva_ml.local_db.denormalize import DenormalizeResult
+
+    base = DenormalizeResult(
+        columns=[("A.RID", "text")],
+        row_count=2,
+        _rows=[{"A.RID": "1-A"}, {"A.RID": "1-B"}],
+    )
+    extended = base.extend([{"A.RID": "1-C"}, {"A.RID": "1-D"}])
+    assert extended.row_count == 4
+    assert extended.columns == base.columns
+    assert [r["A.RID"] for r in extended.iter_rows()] == ["1-A", "1-B", "1-C", "1-D"]
+    # Does not mutate the original
+    assert base.row_count == 2
