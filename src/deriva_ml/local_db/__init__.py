@@ -27,6 +27,7 @@ See ``README.md`` in this directory for a short orientation.
 from __future__ import annotations
 
 from deriva_ml.local_db.denormalize import DenormalizeResult
+from deriva_ml.local_db.denormalizer import Denormalizer
 from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva_ml.local_db.paged_fetcher import PagedFetcher
 from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
@@ -38,6 +39,7 @@ __all__ = [
     "CachedResult",
     "CachedResultMeta",
     "DenormalizeResult",
+    "Denormalizer",
     "ErmrestPagedClient",
     "LocalSchema",
     "ManifestStore",
