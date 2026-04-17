@@ -335,9 +335,64 @@ class TestListPaths:
         assert "Dataset_Image" in info["association_tables"]
 
 
+class TestFromRids:
+    """Denormalizer.from_rids constructs from arbitrary RID anchors."""
+
+    def test_from_rids_with_table_tuples(self, populated_denorm) -> None:
+        """(table, RID) pairs skip the lookup."""
+        ml = _FakeMl(populated_denorm)
+        d = Denormalizer.from_rids(
+            [("Image", r) for r in populated_denorm["image_rids"]],
+            ml=ml,
+            dataset_rid=populated_denorm["dataset_rid"],
+        )
+        df = d.as_dataframe(["Image", "Subject"])
+        # 3 Images in fixture — all reachable.
+        assert len(df) == 3
+
+    def test_from_rids_with_separate_deps(self, populated_denorm) -> None:
+        """Escape hatch: pass catalog, workspace, model explicitly."""
+        ls = populated_denorm["local_schema"]
+        d = Denormalizer.from_rids(
+            [("Image", r) for r in populated_denorm["image_rids"]],
+            catalog=None,  # no lookup needed (table supplied)
+            workspace=None,  # fixture provides engine directly
+            model=populated_denorm["model"],
+            engine=ls.engine,
+            orm_resolver=ls.get_orm_class,
+            dataset_rid=populated_denorm["dataset_rid"],
+        )
+        df = d.as_dataframe(["Image", "Subject"])
+        assert len(df) == 3
+
+    def test_from_rids_mixed_forms_not_implemented_yet(self, populated_denorm) -> None:
+        """Bare RIDs require catalog lookup; in this test we'll just use
+        the tuple form (bare-RID lookup is catalog-dependent and exercised
+        in the live integration test suite)."""
+        # Placeholder - mixed forms with bare RIDs need a live catalog.
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+class _FakeMl:
+    """Minimal DerivaML-shaped fixture for from_rids tests."""
+
+    def __init__(self, populated_denorm):
+        self._pd = populated_denorm
+        self.model = populated_denorm["model"]
+
+        class _WS:
+            def __init__(self, ls):
+                self._ls = ls
+                self.local_schema = ls
+                self.engine = ls.engine
+
+        self.workspace = _WS(populated_denorm["local_schema"])
+        self.catalog = None  # bare-RID lookup not needed for tuple anchors
 
 
 class _FakeDataset:

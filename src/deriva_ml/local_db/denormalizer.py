@@ -64,6 +64,130 @@ class Denormalizer:
             gocbn = getattr(self._model, "get_orm_class_by_name", None)
             self._orm_resolver = gocbn
 
+    @classmethod
+    def from_rids(
+        cls,
+        anchors: list[str | tuple[str, str]],
+        *,
+        ml: Any = None,
+        catalog: Any = None,
+        workspace: Any = None,
+        model: Any = None,
+        engine: Any = None,
+        orm_resolver: Any = None,
+        dataset_rid: str | None = None,
+        ignore_unrelated_anchors: bool = False,
+    ) -> "Denormalizer":
+        """Construct from an explicit anchor set (no Dataset required).
+
+        Anchors may be bare RIDs (table looked up via catalog) or
+        ``(table_name, RID)`` tuples (lookup skipped). Mixed forms supported.
+
+        Pass either ``ml=`` (common path) or the separate ``catalog``,
+        ``workspace``, ``model`` keyword args (escape hatch).
+
+        The current ``_denormalize_impl`` primitive scopes its SQL query by
+        ``Dataset.RID IN (dataset_rid)`` — that is, it always traverses from
+        the Dataset root. ``from_rids`` therefore requires a real dataset
+        RID against which the anchors are linked. When ``dataset_rid`` is
+        given, it is used as the scoping root; when omitted, the first
+        anchor's RID is used as a pseudo-scope (which will currently return
+        zero rows against a production catalog — a known limitation that
+        will be addressed when ``_denormalize_impl`` gains an anchor-scoped
+        SQL mode).
+
+        Args:
+            anchors: list of RIDs or (table, RID) tuples.
+            ml: Convenience: pass a DerivaML instance. catalog/workspace/model
+                are derived from it.
+            catalog, workspace, model, engine, orm_resolver: Explicit deps.
+            dataset_rid: Optional real dataset RID to scope the SQL by. If
+                None, uses the first anchor's RID as a placeholder (see
+                note above).
+            ignore_unrelated_anchors: propagated to subsequent method calls.
+
+        Returns:
+            A :class:`Denormalizer` bound to the given anchor set.
+
+        Raises:
+            ValueError: if neither ``ml`` nor ``model`` is provided, or if
+                bare RIDs are passed without a catalog for lookup.
+        """
+        # Derive deps from ml if given.
+        if ml is not None:
+            catalog = catalog if catalog is not None else getattr(ml, "catalog", None)
+            workspace = workspace if workspace is not None else getattr(ml, "workspace", None)
+            model = model if model is not None else getattr(ml, "model", None)
+            if engine is None and workspace is not None:
+                engine = getattr(workspace, "engine", None)
+            if orm_resolver is None and workspace is not None:
+                ls = getattr(workspace, "local_schema", None)
+                if ls is not None:
+                    orm_resolver = getattr(ls, "get_orm_class", None)
+
+        if model is None:
+            raise ValueError("Denormalizer.from_rids requires either ml= or an explicit model=")
+
+        # Normalize anchors to (table, RID) pairs.
+        resolved: list[tuple[str, str]] = []
+        bare_rids: list[str] = []
+        for a in anchors:
+            if isinstance(a, tuple):
+                resolved.append(a)
+            else:
+                bare_rids.append(a)
+
+        # Batch-resolve bare RIDs via catalog.
+        if bare_rids:
+            if catalog is None:
+                raise ValueError(
+                    "Bare RIDs given but no catalog available for lookup. Pass (table, RID) tuples or provide catalog=."
+                )
+            for rid in bare_rids:
+                info = catalog.resolve_rid(rid) if hasattr(catalog, "resolve_rid") else None
+                if info is None:
+                    raise ValueError(f"Cannot resolve RID {rid!r} to a table")
+                resolved.append((info.table.name, rid))
+
+        # Group by table.
+        anchors_by_table: dict[str, list[str]] = {}
+        for table, rid in resolved:
+            anchors_by_table.setdefault(table, []).append(rid)
+
+        # Effective dataset RID used by _denormalize_impl's WHERE clause.
+        # If caller supplied one, use it; otherwise fall back to the first
+        # anchor's RID (placeholder — see docstring for caveat).
+        effective_dataset_rid = dataset_rid if dataset_rid is not None else (resolved[0][1] if resolved else "")
+
+        # Create a pseudo-dataset that exposes the anchors dict as members.
+        class _AnchorSet:
+            def __init__(self, ds_rid: str, members: dict[str, list[str]], model_ref: Any):
+                self.dataset_rid = ds_rid
+                self.model = model_ref
+                self._members = members
+
+            def list_dataset_members(self, **_kwargs: Any) -> dict[str, list[dict]]:
+                return {t: [{"RID": r} for r in rids] for t, rids in self._members.items()}
+
+            def list_dataset_children(self, **_kwargs: Any) -> list:
+                return []
+
+        anchor_set = _AnchorSet(effective_dataset_rid, anchors_by_table, model)
+
+        # Fall back to model's get_orm_class_by_name if orm_resolver is still None.
+        if orm_resolver is None:
+            orm_resolver = getattr(model, "get_orm_class_by_name", None)
+
+        # Build the Denormalizer manually (bypasses __init__'s DatasetLike
+        # assumptions since _AnchorSet is a lightweight shim).
+        inst = object.__new__(cls)
+        inst._dataset = anchor_set
+        inst._dataset_rid = effective_dataset_rid
+        inst._model = model
+        inst._engine = engine
+        inst._orm_resolver = orm_resolver
+        return inst
+
     # ------------------------------------------------------------------
     # Public methods
     # ------------------------------------------------------------------
