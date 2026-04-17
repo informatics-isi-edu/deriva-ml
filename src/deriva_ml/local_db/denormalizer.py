@@ -253,20 +253,21 @@ class Denormalizer:
         # include_tables but != row_per) may have RIDs with no matching
         # row_per row (e.g., a Subject that has no Image). Those RIDs need
         # orphan rows — the table-level classification can't catch this.
-        per_rid_orphans: dict[str, list[str]] = {}
-        for anchor_table, rids in scoping.items():
-            if anchor_table == resolved_row_per:
-                continue
-            if anchor_table not in include_tables:
-                continue
-            # Collect RIDs of this anchor table that actually appear in main.
-            rid_col = f"{anchor_table}.RID"
-            seen: set[str] = set()
+        # Single-pass scan: build {anchor_table: {seen_rids}} in one iteration
+        # rather than re-iterating the main result per anchor table.
+        upstream_anchors = {
+            t: set(rids) for t, rids in scoping.items() if t != resolved_row_per and t in include_tables
+        }
+        seen_by_table: dict[str, set[str]] = {t: set() for t in upstream_anchors}
+        if upstream_anchors:
             for row in main_result.iter_rows():
-                val = row.get(rid_col)
-                if val is not None:
-                    seen.add(val)
-            missing = [r for r in rids if r not in seen]
+                for t, seen in seen_by_table.items():
+                    val = row.get(f"{t}.RID")
+                    if val is not None:
+                        seen.add(val)
+        per_rid_orphans: dict[str, list[str]] = {}
+        for anchor_table, rids in upstream_anchors.items():
+            missing = [r for r in rids if r not in seen_by_table[anchor_table]]
             if missing:
                 per_rid_orphans[anchor_table] = missing
 
@@ -379,7 +380,9 @@ class Denormalizer:
           - All other columns (row_per and tables not equal to anchor_table)
             set to None.
 
-        Uses the same NULL-init pattern as ``Dataset._denormalize_datapath``.
+        Uses a NULL-init pattern (all columns start as None; only the
+        anchor's own columns are populated from its fetched row) — the
+        LEFT-JOIN shape described by Rule 7 case 3.
         """
         from sqlalchemy import select
 
@@ -394,18 +397,22 @@ class Denormalizer:
             list(include_tables),
         )
 
-        # For each orphan anchor table, for each RID, emit one row.
+        # Fetch all orphan rows for each anchor table in one query
+        # (IN(rids)) rather than one connection per RID.
         for anchor_table, rids in orphans.items():
             orm_cls = self._orm_resolver(anchor_table)
             if orm_cls is None:
+                logger.warning(
+                    "orm_resolver returned None for anchor table %r; skipping %d orphan row(s).",
+                    anchor_table,
+                    len(rids),
+                )
                 continue
-            for rid in rids:
-                with self._engine.connect() as conn:
-                    row = (
-                        conn.execute(select(orm_cls.__table__).where(orm_cls.__table__.c.RID == rid)).mappings().first()
-                    )
-                if row is None:
-                    continue
+            if not rids:
+                continue
+            with self._engine.connect() as conn:
+                rows = conn.execute(select(orm_cls.__table__).where(orm_cls.__table__.c.RID.in_(rids))).mappings().all()
+            for row in rows:
                 # Build the output dict: anchor cols populated, others None.
                 out: dict[str, Any] = {}
                 for schema_name, table_name, col_name, _type_name in column_specs:
