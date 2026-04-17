@@ -938,10 +938,10 @@ class DerivaModel:
 
         Unlike :meth:`_fk_neighbors`, this is directional.
 
-        Association tables (M:N link tables) are treated as transparent bridges:
-        if ``Dataset_Image`` has FKs to both ``Dataset`` and ``Image``, then
-        from Dataset's perspective, Dataset_Image AND Image are both downstream
-        (Image is reached through the association).
+        Returns direct downstream neighbors only. Transparent association
+        hopping (seeing past association tables to the tables they link)
+        is NOT done here — that is the responsibility of the caller (see
+        :meth:`_outbound_reachable`).
         """
         valid_schemas = self.domain_schemas | {self.ml_schema}
         tbl = table if hasattr(table, "foreign_keys") else self.name_to_table(table)
@@ -1174,6 +1174,13 @@ class DerivaModel:
             # Enumerate ALL simple paths (no transparency filter) — we need
             # the full picture to detect diamonds even when the user has not
             # requested the intermediate table.
+            #
+            # Note: we intentionally do NOT call ``_enumerate_paths`` here.
+            # That helper applies a transparency filter (intermediates must
+            # be requested or be association tables), which would mask the
+            # very diamonds this rule must warn about. ``_enumerate_paths``
+            # is for consumers who want only "routable" paths given the
+            # current include_tables/via set.
             all_path_tables = self._schema_to_paths(
                 root=self.name_to_table(row_per),
                 max_depth=6,
@@ -1592,7 +1599,7 @@ class DerivaModel:
                 logger.warning(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}, skipping")
                 continue
 
-            paths.extend(self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth))
+            paths.extend(self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth, stop_at))
         if stop_at is not None:
             return [p for p in paths if p and p[-1].name == stop_at]
         return paths
