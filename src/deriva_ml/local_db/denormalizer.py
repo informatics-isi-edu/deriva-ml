@@ -167,16 +167,18 @@ class Denormalizer:
             include_tables, via, join_path, transparent_intermediates,
             ambiguities, estimated_row_count, anchors, source
         """
-        from deriva_ml.core.exceptions import (
-            DerivaMLDenormalizeDownstreamLeaf,
-            DerivaMLDenormalizeMultiLeaf,
-        )
+        from deriva_ml.core.exceptions import DerivaMLDenormalizeError
         from deriva_ml.model.catalog import denormalize_column_name
 
         include = list(include_tables)
         via_list = list(via or [])
 
         # ── row_per resolution ─────────────────────────────────────────────
+        # Dry-run invariant: describe() never raises. Catch all
+        # DerivaMLDenormalizeError subclasses (MultiLeaf, NoSink,
+        # DownstreamLeaf) plus ValueError (raised by _determine_row_per when
+        # row_per is not in include_tables). In every failure mode the
+        # caller still gets a well-formed dict with resolved_row_per=None.
         row_per_source = "explicit" if row_per else "auto-inferred"
         row_per_candidates = self._model._find_sinks(include, via_list)
         try:
@@ -185,7 +187,7 @@ class Denormalizer:
                 via=via_list,
                 row_per=row_per,
             )
-        except (DerivaMLDenormalizeMultiLeaf, DerivaMLDenormalizeDownstreamLeaf):
+        except (DerivaMLDenormalizeError, ValueError):
             resolved_row_per = None
 
         # ── columns (may raise if row_per is None or ambiguity) ────────────
@@ -216,6 +218,9 @@ class Denormalizer:
                 "from": a["from_table"],
                 "to": a["to_table"],
                 "paths": [" → ".join(p) for p in a["paths"]],
+                # Same set of intermediates on both keys today; the split
+                # keeps the intent (include → columns, via → routing only)
+                # explicit so callers can surface the choice to the user.
                 "suggestions": {
                     "add_to_include_tables": a["suggested_intermediates"],
                     "add_to_via": a["suggested_intermediates"],

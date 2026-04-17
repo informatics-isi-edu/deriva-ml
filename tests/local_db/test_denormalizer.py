@@ -246,10 +246,16 @@ class TestDescribe:
         # Ambiguity reported rather than raised (describe is dry-run)
         assert len(plan["ambiguities"]) > 0
         amb = plan["ambiguities"][0]
+        # Tight spec-shape assertions: the downstream consumer (Task 8 +
+        # user-facing docs) relies on this exact structure.
+        assert amb["type"] == "multiple_paths"
         assert amb["from"] == "Image"
         assert amb["to"] == "Subject"
-        assert "paths" in amb
-        assert "suggestions" in amb
+        # paths is a list[str] formatted with the " → " separator.
+        assert isinstance(amb["paths"], list)
+        assert all(isinstance(p, str) and " → " in p for p in amb["paths"])
+        # suggestions has both disambiguation paths (spec §5).
+        assert set(amb["suggestions"].keys()) == {"add_to_include_tables", "add_to_via"}
 
     def test_describe_anchors(self, populated_denorm) -> None:
         ds = _FakeDataset(populated_denorm)
@@ -259,6 +265,31 @@ class TestDescribe:
         assert "by_type" in anc
         assert "total" in anc
         assert anc["by_type"]["Image"] == 3  # 3 image members in fixture
+
+    def test_describe_never_raises_on_bad_row_per(self, populated_denorm) -> None:
+        """row_per not in include_tables → resolved_row_per=None, no ValueError.
+
+        describe is a dry-run — it must hand back a well-formed dict so the
+        user can diagnose, not throw on a typo or stale name.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image"], row_per="Subject")
+        assert plan["row_per"] is None
+        # The rest of the dict is still populated with the 12 spec keys.
+        assert plan["row_per_source"] == "explicit"
+        assert plan["include_tables"] == ["Image"]
+
+    def test_describe_never_raises_on_downstream_leaf(self, populated_denorm) -> None:
+        """row_per with a downstream table in include_tables → None, no raise."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # Subject points to nothing in-set; Image points to Subject.
+        # Explicit row_per=Subject with Image in include_tables is a Rule-5
+        # violation that would raise from as_dataframe — but describe must
+        # swallow it.
+        plan = d.describe(["Image", "Subject"], row_per="Subject")
+        assert plan["row_per"] is None
 
 
 # ---------------------------------------------------------------------------
