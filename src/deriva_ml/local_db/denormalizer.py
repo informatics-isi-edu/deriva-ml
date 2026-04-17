@@ -202,14 +202,41 @@ class Denormalizer:
         via: list[str] | None,
         ignore_unrelated_anchors: bool,
     ) -> DenormalizeResult:
-        """Dispatch to the low-level primitive with planner kwargs wired through.
+        """Four-phase pipeline: planner → anchor classification → SQL → orphans."""
+        # Step 1: planner decisions (row_per, ambiguity checks)
+        resolved_row_per = self._model._determine_row_per(
+            include_tables=list(include_tables),
+            via=list(via or []),
+            row_per=row_per,
+        )
+        ambiguities = self._model._find_path_ambiguities(
+            row_per=resolved_row_per,
+            include_tables=list(include_tables),
+            via=list(via or []),
+        )
+        if ambiguities:
+            from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
 
-        ``_denormalize_impl`` invokes :meth:`DerivaModel._prepare_wide_table`
-        internally, so planner guards (Rules 2 / 5 / 6) surface from there.
-        ``ignore_unrelated_anchors`` is accepted but not yet consumed — that
-        wiring lands in Task 6.
-        """
-        return _denormalize_impl(
+            a = ambiguities[0]
+            raise DerivaMLDenormalizeAmbiguousPath(
+                from_table=a["from_table"],
+                to_table=a["to_table"],
+                paths=a["paths"],
+                suggested_intermediates=a["suggested_intermediates"],
+            )
+
+        # Step 2: anchor classification (Rule 7, Rule 8)
+        anchors = self._anchors_as_dict()
+        scoping, orphans, ignored = self._classify_anchors(
+            anchors,
+            include_tables=list(include_tables),
+            via=list(via or []),
+            row_per=resolved_row_per,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
+        )
+
+        # Step 3: main SQL via _denormalize_impl
+        main_result = _denormalize_impl(
             model=self._model,
             engine=self._engine,
             orm_resolver=self._orm_resolver,
@@ -217,6 +244,176 @@ class Denormalizer:
             include_tables=list(include_tables),
             dataset=self._dataset,
             source="local",
-            row_per=row_per,
-            via=list(via) if via else None,
+            row_per=resolved_row_per,
+            via=list(via or []) or None,
         )
+
+        # Step 4a: Augment orphans with scoping-upstream anchors whose specific
+        # RIDs didn't appear in the main result. An upstream anchor (table in
+        # include_tables but != row_per) may have RIDs with no matching
+        # row_per row (e.g., a Subject that has no Image). Those RIDs need
+        # orphan rows — the table-level classification can't catch this.
+        per_rid_orphans: dict[str, list[str]] = {}
+        for anchor_table, rids in scoping.items():
+            if anchor_table == resolved_row_per:
+                continue
+            if anchor_table not in include_tables:
+                continue
+            # Collect RIDs of this anchor table that actually appear in main.
+            rid_col = f"{anchor_table}.RID"
+            seen: set[str] = set()
+            for row in main_result.iter_rows():
+                val = row.get(rid_col)
+                if val is not None:
+                    seen.add(val)
+            missing = [r for r in rids if r not in seen]
+            if missing:
+                per_rid_orphans[anchor_table] = missing
+
+        # Merge per-RID orphans with table-level orphans.
+        combined_orphans: dict[str, list[str]] = {}
+        for t, rids in orphans.items():
+            combined_orphans.setdefault(t, []).extend(rids)
+        for t, rids in per_rid_orphans.items():
+            combined_orphans.setdefault(t, []).extend(rids)
+
+        # Step 4b: orphan rows (Rule 7 case 3). Uses DenormalizeResult.extend
+        # to keep the combine a one-liner.
+        if combined_orphans:
+            orphan_rows = self._emit_orphan_rows(
+                combined_orphans,
+                include_tables=list(include_tables),
+                row_per=resolved_row_per,
+            )
+            main_result = main_result.extend(orphan_rows)
+
+        return main_result
+
+    def _anchors_as_dict(self) -> dict[str, list[str]]:
+        """Return anchors as table_name -> list of RID strings."""
+        members = self._dataset.list_dataset_members(recurse=True)
+        return {table: [r["RID"] for r in rows] for table, rows in members.items()}
+
+    def _classify_anchors(
+        self,
+        anchors: dict[str, list[str]],
+        *,
+        include_tables: list[str],
+        via: list[str],
+        row_per: str,
+        ignore_unrelated_anchors: bool,
+    ) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]:
+        """Classify anchors by their relationship to row_per (Rule 7 + Rule 8).
+
+        Args:
+            anchors: table_name -> list of RIDs.
+            include_tables, via, row_per: the planner inputs.
+            ignore_unrelated_anchors: if False, raise on Rule-8 cases.
+
+        Returns:
+            Tuple of (scoping_anchors, orphan_anchors, ignored_anchors). Each
+            is a table_name -> list of RIDs dict.
+
+            - scoping_anchors: anchors that scope the main SQL query (their
+              reachable row_per rows go in the output).
+            - orphan_anchors: anchors whose table is in include_tables but can't
+              reach row_per — they emit orphan rows.
+            - ignored_anchors: anchors whose table isn't in include_tables and
+              can't reach row_per — contribute nothing; only populated when
+              ignore_unrelated_anchors=True.
+
+        Raises:
+            DerivaMLDenormalizeUnrelatedAnchor: if any anchor's table has no FK
+                path to include_tables and ignore_unrelated_anchors=False.
+        """
+        from deriva_ml.core.exceptions import DerivaMLDenormalizeUnrelatedAnchor
+
+        scoping: dict[str, list[str]] = {}
+        orphans: dict[str, list[str]] = {}
+        ignored: dict[str, list[str]] = {}
+        unrelated: list[str] = []
+
+        all_tables = set(include_tables) | set(via)
+
+        for table, rids in anchors.items():
+            if table == row_per:
+                scoping[table] = list(rids)
+                continue
+            # Does this table have any FK path into the subgraph?
+            reachable = self._model._outbound_reachable(table, all_tables | {table})
+            if row_per in reachable:
+                # Upstream of row_per and reaches it → scoping
+                scoping[table] = list(rids)
+            elif table in include_tables:
+                # Upstream of row_per (in the subgraph) but no row_per reachable
+                # from this specific anchor — we emit an orphan row per anchor.
+                orphans[table] = list(rids)
+            else:
+                # Anchor's table is not in include_tables — and has no path to
+                # row_per. It would contribute nothing.
+                unrelated.append(table)
+
+        if unrelated and not ignore_unrelated_anchors:
+            raise DerivaMLDenormalizeUnrelatedAnchor(
+                unrelated_tables=sorted(set(unrelated)),
+                include_tables=list(include_tables),
+            )
+        if unrelated:
+            for table in unrelated:
+                ignored[table] = list(anchors[table])
+
+        return scoping, orphans, ignored
+
+    def _emit_orphan_rows(
+        self,
+        orphans: dict[str, list[str]],
+        *,
+        include_tables: list[str],
+        row_per: str,
+    ) -> list[dict[str, Any]]:
+        """Emit one output row per orphan anchor.
+
+        For each orphan RID, fetch its row from the local engine and construct
+        an output dict with:
+          - Anchor's columns populated with the row values.
+          - All other columns (row_per and tables not equal to anchor_table)
+            set to None.
+
+        Uses the same NULL-init pattern as ``Dataset._denormalize_datapath``.
+        """
+        from sqlalchemy import select
+
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        orphan_rows: list[dict[str, Any]] = []
+
+        # Get the full column spec so we know what keys to populate.
+        _, column_specs, multi_schema = self._model._prepare_wide_table(
+            self._dataset,
+            self._dataset_rid,
+            list(include_tables),
+        )
+
+        # For each orphan anchor table, for each RID, emit one row.
+        for anchor_table, rids in orphans.items():
+            orm_cls = self._orm_resolver(anchor_table)
+            if orm_cls is None:
+                continue
+            for rid in rids:
+                with self._engine.connect() as conn:
+                    row = (
+                        conn.execute(select(orm_cls.__table__).where(orm_cls.__table__.c.RID == rid)).mappings().first()
+                    )
+                if row is None:
+                    continue
+                # Build the output dict: anchor cols populated, others None.
+                out: dict[str, Any] = {}
+                for schema_name, table_name, col_name, _type_name in column_specs:
+                    label = denormalize_column_name(schema_name, table_name, col_name, multi_schema)
+                    if table_name == anchor_table:
+                        out[label] = row.get(col_name)
+                    else:
+                        out[label] = None
+                orphan_rows.append(out)
+
+        return orphan_rows

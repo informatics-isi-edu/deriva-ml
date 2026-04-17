@@ -477,6 +477,20 @@ def _base_schema_doc() -> dict:
                             }
                         ],
                     },
+                    "UnrelatedThing": {
+                        "table_name": "UnrelatedThing",
+                        "schema_name": "isa",
+                        "column_definitions": [
+                            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+                            {"name": "RCT", "type": {"typename": "timestamptz"}},
+                            {"name": "RMT", "type": {"typename": "timestamptz"}},
+                            {"name": "RCB", "type": {"typename": "text"}},
+                            {"name": "RMB", "type": {"typename": "text"}},
+                            {"name": "Label", "type": {"typename": "text"}, "nullok": True},
+                        ],
+                        "keys": [{"unique_columns": ["RID"]}],
+                        "foreign_keys": [],
+                    },
                 },
             },
             "deriva-ml": {

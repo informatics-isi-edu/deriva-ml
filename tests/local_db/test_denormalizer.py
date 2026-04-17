@@ -15,6 +15,7 @@ import pytest
 from deriva_ml.core.exceptions import (
     DerivaMLDenormalizeAmbiguousPath,
     DerivaMLDenormalizeDownstreamLeaf,
+    DerivaMLDenormalizeUnrelatedAnchor,
 )
 from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -131,6 +132,75 @@ class TestViaParameter:
         assert not any(c.startswith("Observation.") for c in df.columns)
 
 
+class TestUnrelatedAnchors:
+    """Rule 8: anchors with no FK path to include_tables → error by default."""
+
+    def test_unrelated_anchor_rejected(self, populated_denorm) -> None:
+        # A dataset whose members include an unrelated type.
+        class _HeteroDataset(_FakeDataset):
+            def list_dataset_members(self, **kwargs):
+                return {
+                    "Image": [{"RID": "IMG-1"}],
+                    # UnrelatedThing has no FKs → no path to Subject/Image.
+                    "UnrelatedThing": [{"RID": "UT-1"}],
+                }
+
+        ds = _HeteroDataset(populated_denorm)
+        d = Denormalizer(ds)
+        with pytest.raises(DerivaMLDenormalizeUnrelatedAnchor):
+            d.as_dataframe(["Image", "Subject"])
+
+    def test_unrelated_anchor_ignored_with_flag(self, populated_denorm) -> None:
+        class _HeteroDataset(_FakeDataset):
+            def list_dataset_members(self, **kwargs):
+                return {
+                    "Image": [{"RID": "IMG-1"}],
+                    "UnrelatedThing": [{"RID": "UT-1"}],
+                }
+
+        ds = _HeteroDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # With the flag, no error
+        df = d.as_dataframe(
+            ["Image", "Subject"],
+            ignore_unrelated_anchors=True,
+        )
+        assert isinstance(df, pd.DataFrame)
+
+
+class TestOrphanRows:
+    """Rule 7 case 3: upstream anchor with no row_per reachable → orphan row."""
+
+    def test_orphan_subject_emits_row(self, populated_denorm) -> None:
+        """Subject member with no Image in the dataset → one orphan row."""
+
+        class _WithOrphan(_FakeDataset):
+            def list_dataset_members(self, **kwargs):
+                members = super().list_dataset_members()
+                # Add an orphan Subject whose RID doesn't match any Image's Subject FK.
+                members["Subject"] = list(members["Subject"]) + [{"RID": "ORPHAN-SUBJ"}]
+                return members
+
+        ds = _WithOrphan(populated_denorm)
+        # Insert the orphan Subject row into the engine so _emit_orphan_rows can fetch it.
+        from sqlalchemy.orm import Session
+
+        ls = populated_denorm["local_schema"]
+        subj_cls = ls.get_orm_class("Subject")
+        with Session(ls.engine) as session:
+            session.add(subj_cls(RID="ORPHAN-SUBJ", Name="Orphan"))
+            session.commit()
+
+        d = Denormalizer(ds)
+        df = d.as_dataframe(["Image", "Subject"])
+        # 3 Image rows + 1 orphan Subject row = 4
+        # The orphan row has Image cols NULL and Subject cols populated.
+        orphans = df[df["Image.RID"].isna()]
+        assert len(orphans) == 1
+        # The orphan's Subject.RID should be "ORPHAN-SUBJ".
+        assert orphans.iloc[0]["Subject.RID"] == "ORPHAN-SUBJ"
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -168,8 +238,15 @@ class _FakeDataset:
         carries ``observation_rids``, but Observation is intentionally not
         exposed as a member — it's meant to be reached via ``via=[...]``,
         not as an anchor.
+
+        Honors ``self.dataset_rid``: returns no members if the dataset_rid
+        doesn't match the fixture's (e.g., "NO-SUCH-DS"). This mirrors real
+        ``Dataset.list_dataset_members`` which filters by dataset RID.
         """
         members: dict[str, list[dict]] = {}
+        # Nonexistent dataset → no members.
+        if self.dataset_rid != self._pd["dataset_rid"]:
+            return members
         if "image_rids" in self._pd:
             members["Image"] = [{"RID": r} for r in self._pd["image_rids"]]
         if "subject_rids" in self._pd:
