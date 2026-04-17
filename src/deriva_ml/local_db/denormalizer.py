@@ -289,14 +289,95 @@ class Denormalizer:
         self,
         tables: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Describe the FK graph for exploration. Stub — filled in Task 8."""
-        # Stub: full implementation in Task 8.
+        """Describe the FK graph reachable from the dataset/anchors.
+
+        Useful for picking ``include_tables`` when the user doesn't know the
+        schema. Model-only analysis.
+
+        Args:
+            tables: If given, filter ``schema_paths`` to paths involving at
+                least one of these tables.
+
+        Returns:
+            Dict with:
+                member_types: list of dataset element types (if constructed
+                    from a dataset); else empty.
+                anchor_types: union of all distinct anchor table names.
+                reachable_tables: mapping from each member/anchor type to
+                    tables reachable from it via FK.
+                association_tables: names of pure association tables in the
+                    schema.
+                feature_tables: names of feature tables (detected heuristically).
+                schema_paths: mapping from (source_table, target_table) to a
+                    list of path descriptions.
+        """
+        model = self._model
+        anchors = self._anchors_as_dict()
+        anchor_types = sorted(anchors.keys())
+
+        # member_types: if constructed from a dataset, the dataset's members.
+        # For from_rids, this is the anchor types. Same in both cases.
+        member_types = anchor_types
+
+        # Enumerate all tables in the relevant schemas.
+        all_table_names: set[str] = set()
+        try:
+            ml_schema = getattr(model, "ml_schema", "deriva-ml")
+            domain_schemas = getattr(model, "domain_schemas", [])
+            for sname in [ml_schema, *domain_schemas]:
+                if sname in model.schemas:
+                    for t in model.schemas[sname].tables.values():
+                        all_table_names.add(t.name)
+        except Exception:
+            pass
+
+        # reachable_tables: from each anchor type, which domain tables are
+        # reachable via FK (using the whole schema as the subgraph).
+        reachable_tables: dict[str, list[str]] = {}
+        for t in anchor_types:
+            reach = model._outbound_reachable(t, all_table_names)
+            reachable_tables[t] = sorted(reach)
+
+        # association_tables: pure M-to-N linking tables
+        association_tables = sorted(t for t in all_table_names if model._is_association_table(t))
+
+        # feature_tables: heuristic — tables whose name contains "_" and
+        # have an FK to a non-association, non-system table plus FK to a
+        # vocabulary term. Approximated by: `is_feature_table` if the model
+        # exposes it, else empty.
+        feature_tables: list[str] = []
+        is_feat = getattr(model, "is_feature_table", None)
+        if callable(is_feat):
+            for t in all_table_names:
+                try:
+                    if is_feat(t):
+                        feature_tables.append(t)
+                except Exception:
+                    pass
+        feature_tables.sort()
+
+        # schema_paths: for every (source, target) pair among anchor_types ×
+        # reachable_tables, enumerate FK paths.
+        schema_paths: dict[tuple[str, str], list[dict]] = {}
+        sources = set(anchor_types)
+        if tables is not None:
+            sources |= set(tables)
+        for source in sources:
+            for target in reachable_tables.get(source, []):
+                if tables is not None and source not in tables and target not in tables:
+                    continue
+                paths = model._enumerate_paths(source, target, all_table_names)
+                # Deduplicate
+                unique = list({tuple(p): p for p in paths}.values())
+                schema_paths[(source, target)] = [{"path": p, "direct": len(p) == 2} for p in unique]
+
         return {
-            "member_types": [],
-            "reachable_tables": {},
-            "association_tables": [],
-            "feature_tables": [],
-            "schema_paths": {},
+            "member_types": member_types,
+            "anchor_types": anchor_types,
+            "reachable_tables": reachable_tables,
+            "association_tables": association_tables,
+            "feature_tables": feature_tables,
+            "schema_paths": schema_paths,
         }
 
     # ------------------------------------------------------------------

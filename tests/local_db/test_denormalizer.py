@@ -292,6 +292,41 @@ class TestDescribe:
         assert plan["row_per"] is None
 
 
+class TestListPaths:
+    """list_paths describes the FK graph from the dataset's anchor types."""
+
+    def test_list_paths_keys(self, populated_denorm) -> None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        info = d.list_paths()
+        # Required keys per spec §6
+        for key in [
+            "member_types",
+            "anchor_types",
+            "reachable_tables",
+            "association_tables",
+            "feature_tables",
+            "schema_paths",
+        ]:
+            assert key in info
+
+    def test_list_paths_reports_member_types(self, populated_denorm) -> None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        info = d.list_paths()
+        assert "Image" in info["member_types"]
+        assert "Subject" in info["member_types"]
+
+    def test_list_paths_filter_by_tables(self, populated_denorm) -> None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # When filter is given, schema_paths contains only entries involving
+        # those tables.
+        info = d.list_paths(tables=["Image"])
+        for (source, target), _ in info["schema_paths"].items():
+            assert "Image" in (source, target)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
