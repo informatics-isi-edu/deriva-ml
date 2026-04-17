@@ -201,6 +201,66 @@ class TestOrphanRows:
         assert orphans.iloc[0]["Subject.RID"] == "ORPHAN-SUBJ"
 
 
+class TestDescribe:
+    """Denormalizer.describe returns the full plan dict per spec §5."""
+
+    def test_describe_keys(self, populated_denorm) -> None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"])
+        # Required keys per spec §5
+        for key in [
+            "row_per",
+            "row_per_source",
+            "row_per_candidates",
+            "columns",
+            "include_tables",
+            "via",
+            "join_path",
+            "transparent_intermediates",
+            "ambiguities",
+            "estimated_row_count",
+            "anchors",
+            "source",
+        ]:
+            assert key in plan, f"plan missing key {key}: {list(plan.keys())}"
+
+    def test_describe_row_per_explicit(self, populated_denorm) -> None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"], row_per="Image")
+        assert plan["row_per_source"] == "explicit"
+
+    def test_describe_row_per_auto(self, populated_denorm) -> None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"])
+        assert plan["row_per_source"] == "auto-inferred"
+        assert plan["row_per"] == "Image"
+
+    def test_describe_ambiguity_reported(self, populated_denorm_diamond) -> None:
+        """Diamond schema: ambiguity reported (not raised) on dry-run."""
+        ds = _FakeDataset(populated_denorm_diamond)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"])
+        # Ambiguity reported rather than raised (describe is dry-run)
+        assert len(plan["ambiguities"]) > 0
+        amb = plan["ambiguities"][0]
+        assert amb["from"] == "Image"
+        assert amb["to"] == "Subject"
+        assert "paths" in amb
+        assert "suggestions" in amb
+
+    def test_describe_anchors(self, populated_denorm) -> None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"])
+        anc = plan["anchors"]
+        assert "by_type" in anc
+        assert "total" in anc
+        assert anc["by_type"]["Image"] == 3  # 3 image members in fixture
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

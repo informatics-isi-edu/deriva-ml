@@ -158,22 +158,126 @@ class Denormalizer:
     ) -> dict[str, Any]:
         """Return a planning-metadata dict describing what would happen.
 
-        Stub implementation in this task — extended in Task 7 below.
+        Unlike :meth:`as_dataframe`, ``describe`` does NOT raise on ambiguity —
+        it reports ambiguities in the ``ambiguities`` key so callers can
+        inspect before committing to a real call.
+
+        Returns a dict with these keys (see spec §5):
+            row_per, row_per_source, row_per_candidates, columns,
+            include_tables, via, join_path, transparent_intermediates,
+            ambiguities, estimated_row_count, anchors, source
         """
-        # Minimal implementation: return just the row_per + columns.
-        resolved_row_per = self._model._determine_row_per(
-            include_tables=list(include_tables),
-            via=list(via or []),
-            row_per=row_per,
+        from deriva_ml.core.exceptions import (
+            DerivaMLDenormalizeDownstreamLeaf,
+            DerivaMLDenormalizeMultiLeaf,
         )
-        cols = self.columns(include_tables, row_per=row_per, via=via)
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        include = list(include_tables)
+        via_list = list(via or [])
+
+        # ── row_per resolution ─────────────────────────────────────────────
+        row_per_source = "explicit" if row_per else "auto-inferred"
+        row_per_candidates = self._model._find_sinks(include, via_list)
+        try:
+            resolved_row_per: str | None = self._model._determine_row_per(
+                include_tables=include,
+                via=via_list,
+                row_per=row_per,
+            )
+        except (DerivaMLDenormalizeMultiLeaf, DerivaMLDenormalizeDownstreamLeaf):
+            resolved_row_per = None
+
+        # ── columns (may raise if row_per is None or ambiguity) ────────────
+        try:
+            element_tables, column_specs, multi_schema = self._model._prepare_wide_table(
+                self._dataset,
+                self._dataset_rid,
+                include,
+                row_per=row_per,
+                via=via_list,
+            )
+            cols = [(denormalize_column_name(s, t, c, multi_schema), tp) for s, t, c, tp in column_specs]
+        except Exception:
+            element_tables = {}
+            cols = []
+
+        # ── ambiguities (reported, not raised) ─────────────────────────────
+        ambiguities_raw = []
+        if resolved_row_per is not None:
+            ambiguities_raw = self._model._find_path_ambiguities(
+                row_per=resolved_row_per,
+                include_tables=include,
+                via=via_list,
+            )
+        ambiguities = [
+            {
+                "type": "multiple_paths",
+                "from": a["from_table"],
+                "to": a["to_table"],
+                "paths": [" → ".join(p) for p in a["paths"]],
+                "suggestions": {
+                    "add_to_include_tables": a["suggested_intermediates"],
+                    "add_to_via": a["suggested_intermediates"],
+                },
+            }
+            for a in ambiguities_raw
+        ]
+
+        # ── join path + transparent intermediates ───────────────────────────
+        join_path: list[str] = []
+        transparent: list[str] = []
+        for _, (path_names, _, _) in element_tables.items():
+            for tn in path_names:
+                if tn not in join_path and tn != "Dataset":
+                    join_path.append(tn)
+                    if tn not in include and self._model._is_association_table(tn):
+                        transparent.append(tn)
+
+        # ── anchors summary ─────────────────────────────────────────────────
+        anchors = self._anchors_as_dict()
+        anchors_by_type = {t: len(rids) for t, rids in anchors.items()}
+
+        # ── estimated row count (crude — refined in future work) ────────────
+        # For v1: report how many anchors would be scoping vs orphan.
+        estimated = {
+            "in_scope_row_per_rows": None,
+            "orphan_rows": None,
+            "total": None,
+        }
+        if resolved_row_per is not None:
+            # Count anchors classified as scoping (includes row_per anchors)
+            try:
+                scoping, orphans, _ = self._classify_anchors(
+                    anchors,
+                    include_tables=include,
+                    via=via_list,
+                    row_per=resolved_row_per,
+                    ignore_unrelated_anchors=True,  # describe shouldn't raise
+                )
+                in_scope = sum(len(rids) for table, rids in scoping.items() if table == resolved_row_per)
+                orphan_count = sum(len(rids) for rids in orphans.values())
+                estimated = {
+                    "in_scope_row_per_rows": in_scope,
+                    "orphan_rows": orphan_count,
+                    "total": in_scope + orphan_count,
+                }
+            except Exception:
+                pass
+
         return {
             "row_per": resolved_row_per,
-            "row_per_source": "explicit" if row_per else "auto-inferred",
+            "row_per_source": row_per_source,
+            "row_per_candidates": row_per_candidates,
             "columns": cols,
-            "include_tables": list(include_tables),
-            "via": list(via or []),
-            "ambiguities": [],
+            "include_tables": include,
+            "via": via_list,
+            "join_path": join_path,
+            "transparent_intermediates": transparent,
+            "ambiguities": ambiguities,
+            "estimated_row_count": estimated,
+            "anchors": {"total": sum(anchors_by_type.values()), "by_type": anchors_by_type},
+            "source": "local",  # Task 11 updates this when source is tracked
         }
 
     def list_paths(
