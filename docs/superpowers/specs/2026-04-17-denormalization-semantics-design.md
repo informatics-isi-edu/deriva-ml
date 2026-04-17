@@ -38,11 +38,15 @@ prior ad-hoc behavior of `_prepare_wide_table` path selection.
 
 ### 1.3 Migration posture
 
-Additive with deprecation. `Denormalizer` is introduced as the new public
-class. Existing `Dataset.denormalize_as_dataframe`, `denormalize_as_dict`,
-`denormalize_columns`, and `denormalize_info` become deprecated aliases
-that delegate to `Denormalizer` methods. Same for `DatasetBag`. One-release
-deprecation window.
+Direct replacement. `Denormalizer` is introduced as the new public class.
+The old methods `Dataset.denormalize_as_dataframe`, `denormalize_as_dict`,
+`denormalize_columns`, and `denormalize_info` are **removed outright** and
+replaced with the new sugar methods in §2.4. Same for `DatasetBag`.
+
+No deprecation window — callers are updated to the new API in the same
+change. This is safe because the new API is a superset of the old API
+(every legitimate previous call has an equivalent new form with better
+semantics).
 
 ## 2. The `Denormalizer` class
 
@@ -173,16 +177,23 @@ def explore_schema(self, ...) -> dict[str, Any]:
     """Shortcut for ``Denormalizer(self).explore_schema(...)``."""
 ```
 
-### 2.5 Deprecated aliases
+### 2.5 Removed methods
 
-Keep for one release with `DeprecationWarning`:
+The following methods are **removed outright** from `Dataset` and
+`DatasetBag` and replaced with the §2.4 sugar:
 
-- `Dataset.denormalize_as_dataframe(...)` → `Dataset.denormalize(...)`
-- `Dataset.denormalize_info(...)` → `Dataset.denormalize_plan(...)`
-- Same on `DatasetBag`.
+| Removed | Replacement |
+|---------|-------------|
+| `denormalize_as_dataframe(...)` | `denormalize(...)` |
+| `denormalize_info(...)` | `denormalize_plan(...)` |
+| `denormalize_as_dict(...)` | kept — same name, new body |
+| `denormalize_columns(...)` | kept — same name, new body |
 
-`denormalize_as_dict`, `denormalize_columns` keep the same name (no
-deprecation) since their new forms are identical.
+The `DatasetLike` protocol in `src/deriva_ml/interfaces.py` is updated to
+match: `denormalize_as_dataframe` and `denormalize_info` are removed from
+the abstract surface; `denormalize`, `denormalize_as_dict`,
+`denormalize_columns`, `denormalize_plan`, and `explore_schema` are the
+documented protocol methods.
 
 ## 3. Semantic rules
 
@@ -568,32 +579,43 @@ All existing passing tests in `tests/dataset/test_denormalize.py` must
 continue to pass. The two `pytest.mark.skip` tests (for the deleted
 `bag._denormalize()` private method) remain skipped.
 
-## 9. Migration plan
-
-### 9.1 Implementation order
+## 9. Implementation order
 
 1. Introduce `Denormalizer` class with core `as_dataframe`, `as_dict`,
    `columns`, `plan` methods. Implement new rule system.
 2. Add `explore_schema` method.
 3. Add `from_rids` constructor + RID lookup.
-4. Add sugar methods on `Dataset` and `DatasetBag`.
-5. Update existing `Dataset.denormalize_as_dataframe` etc. to delegate to
-   `Denormalizer` + emit `DeprecationWarning`.
-6. Extend unit tests per §8.1.
-7. Remove `xfail` markers from the three integration tests per §8.2.
-8. Run full test suite (unit + live); confirm no regressions.
+4. Add sugar methods on `Dataset` and `DatasetBag` (`denormalize`,
+   `denormalize_plan`, `explore_schema`).
+5. Rewrite `denormalize_as_dict` and `denormalize_columns` bodies to
+   delegate to `Denormalizer` (same names, new semantics).
+6. **Remove** `denormalize_as_dataframe` and `denormalize_info` from
+   `Dataset`, `DatasetBag`, and the `DatasetLike` protocol.
+7. Update every in-repo caller of the removed methods to the new names:
+   - `denormalize_as_dataframe(...)` → `denormalize(...)`
+   - `denormalize_info(...)` → `denormalize_plan(...)`
+   Use `grep -rn` to find all callers; expected locations include
+   `tests/dataset/`, possibly `src/deriva_ml/dataset/split.py`, and any
+   notebooks under `docs/`.
+8. Extend unit tests per §8.1.
+9. Remove `xfail` markers from the three integration tests per §8.2.
+10. Run full test suite (unit + live); confirm no regressions.
 
-### 9.2 Deprecation timeline
+### 9.1 Breaking-change summary
 
-- **This release**: both APIs work; old API emits `DeprecationWarning`.
-- **Next release**: old API removed.
+The assumption is that no external code uses the old interface, so
+removal is clean. Two semantic changes are in play regardless:
 
-### 9.3 Breaking-change summary
+1. **Ambiguous paths now error.** Previously silent path selection (the
+   direct FK would be picked in diamond cases) now raises. Callers must
+   disambiguate via `include_tables` or `via`.
+2. **Row counts may change in diamond cases.** Calls that happened to
+   work before may produce different (more correct) row counts under the
+   new rules.
 
-Users who relied on silent path selection in diamond schemas will see
-`DerivaMLException` errors instead. The error message tells them how to
-fix their call (add intermediate to `include_tables` or `via`). This is
-a breaking behavior change but with a clear remediation path.
+Neither is a migration concern given the "no external users" assumption
+— they are correctness improvements that propagate automatically to
+tests, which is where regressions would surface.
 
 ## 10. Open questions / future work
 

@@ -305,23 +305,25 @@ The workflow: `explore_schema` → `denormalize_columns` → `denormalize_plan` 
 
 ---
 
-## What's different from `denormalize_as_dataframe`
+## Relationship to earlier APIs
 
-If you were using the legacy `denormalize_as_dataframe(include_tables)`:
+This is the only denormalization API. The earlier method names
+(`denormalize_as_dataframe`, `denormalize_info`) were removed. The
+replacements are:
 
-- **Same API** for the common case. `ds.denormalize(["Image", "Subject"])` works
-  just like `ds.denormalize_as_dataframe(["Image", "Subject"])` used to.
-- **Row counts may change.** Under the new rules, row count is determined by
-  `row_per` (the deepest requested table). Previous behavior sometimes
-  silently inflated rows by using both FK paths in diamond schemas; that's now
-  an error.
-- **Ambiguous paths error instead of silently picking one.** You may see new
-  errors asking you to add an intermediate or `via` table. The error messages
-  say what to do.
-- **`denormalize_as_dataframe` and `denormalize_as_dict` are deprecated.**
-  They still work for one release; they delegate to `denormalize()` and
-  `denormalize_as_dict()` respectively.
-- **Feature tables are now fully supported** in `include_tables`.
+| Earlier name | Current name |
+|--------------|--------------|
+| `denormalize_as_dataframe(include_tables)` | `denormalize(include_tables, ...)` |
+| `denormalize_info(include_tables)` | `denormalize_plan(include_tables, ...)` |
+| `denormalize_as_dict(include_tables)` | `denormalize_as_dict(include_tables, ...)` — same name, richer rules |
+| `denormalize_columns(include_tables)` | `denormalize_columns(include_tables, ...)` — same name, richer rules |
+
+Two behavioral changes from the earlier implementations:
+
+- **Ambiguous FK paths now error** instead of silently picking the shortest
+  one. Use `via` or add an intermediate to `include_tables` to resolve.
+- **Feature tables are fully supported** as leaves (`row_per`). Previously
+  they were not handled specially and some requests failed.
 
 ---
 
