@@ -222,173 +222,134 @@ class DatasetLike(Protocol):
         """
         ...
 
-    def denormalize_as_dataframe(
+    def get_denormalized_as_dataframe(
         self,
         include_tables: list[str],
-        version: Any = None,
-        **kwargs: Any,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
     ) -> pd.DataFrame:
-        """Denormalize the dataset into a single wide table (DataFrame).
+        """Return the dataset as a denormalized wide table (DataFrame).
 
-        Denormalization transforms normalized relational data into a single "wide table"
-        (also called a "flat table" or "denormalized table") by joining related tables
-        together. This produces a DataFrame where each row contains all related information
-        from multiple source tables, with columns from each table combined side-by-side.
+        Denormalization transforms normalized relational data into a single
+        "wide table" by joining related tables on their foreign key
+        relationships. Wide tables are the standard input format for most
+        machine learning frameworks.
 
-        Wide tables are the standard input format for most machine learning frameworks,
-        which expect all features for a single observation to be in one row. This method
-        bridges the gap between normalized database schemas and ML-ready tabular data.
+        Column names are prefixed with the source table using dot notation
+        (e.g., ``Image.Filename``, ``Subject.RID``). When the catalog has
+        multiple domain schemas, the schema name is included too
+        (e.g., ``test-schema.Image.Filename``).
 
-        **How it works:**
-
-        Tables are joined based on their foreign key relationships. For example, if
-        Image has a foreign key to Subject, and Diagnosis has a foreign key to Image,
-        then denormalizing ["Subject", "Image", "Diagnosis"] produces rows where each
-        image appears with its subject's metadata and any associated diagnoses.
-
-        The result uses outer join semantics - if a table has no FK relationship to
-        others, its rows are included with NULL values for unrelated columns.
-
-        **Column naming:**
-
-        To avoid column name collisions (e.g., multiple tables having "RID" or "Name"),
-        all column names are prefixed with their source table name.
+        This is a sugar method that delegates to
+        :class:`~deriva_ml.local_db.denormalizer.Denormalizer`; see that
+        class for the full API and semantic rules.
 
         Args:
-            include_tables: List of table names to include in the output.
-                Tables are joined based on their foreign key relationships.
-                Order doesn't matter - the join order is determined automatically.
-            version: Dataset version to query (Dataset only, ignored by DatasetBag).
-            **kwargs: Additional implementation-specific arguments.
+            include_tables: Tables whose columns appear in the output.
+            row_per: Explicit leaf table. Must be in ``include_tables``.
+                If None, auto-inferred from the FK graph.
+            via: Tables forced into the join chain without contributing
+                columns (useful to disambiguate path ambiguity).
+            ignore_unrelated_anchors: If True, silently drop anchors whose
+                table has no FK path to any requested table.
 
         Returns:
             pd.DataFrame: Wide table with columns from all included tables.
-                Column names are prefixed with the source table name.
-
-        Note:
-            Column names use dot notation (e.g., ``Image.Filename``, ``Subject.RID``).
-            When the catalog has multiple domain schemas, the schema name is included
-            (e.g., ``test-schema.Image.Filename``).
-
-        Example:
-            Suppose you have a dataset with Images linked to Subjects, and each
-            Image has a Diagnosis label::
-
-                # Normalized schema:
-                # Subject: RID, Name, Age
-                # Image: RID, Filename, Subject (FK)
-                # Diagnosis: RID, Image (FK), Label
-
-                # Denormalize into a wide table for ML
-                df = dataset.denormalize_as_dataframe(["Subject", "Image", "Diagnosis"])
-
-                # Result has columns like:
-                # Subject.RID, Subject.Name, Subject.Age,
-                # Image.RID, Image.Filename, Image.Subject,
-                # Diagnosis.RID, Diagnosis.Image, Diagnosis.Label
-
-                # Each row represents one Image with its Subject info and Diagnosis
-                # Ready for use with sklearn, pandas, or other ML tools
 
         See Also:
-            denormalize_columns: Preview column names and types without fetching data.
-            denormalize_as_dict: Generator version for memory-efficient processing.
+            list_denormalized_columns: Preview columns without fetching data.
+            get_denormalized_as_dict: Generator for memory-efficient streaming.
+            describe_denormalized: Dry-run returning planning metadata.
         """
         ...
 
-    def denormalize_as_dict(
+    def get_denormalized_as_dict(
         self,
         include_tables: list[str],
-        version: Any = None,
-        **kwargs: Any,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
     ) -> Generator[dict[str, Any], None, None]:
-        """Denormalize the dataset and yield rows as dictionaries.
+        """Stream the denormalized dataset rows as dicts.
 
-        This is a memory-efficient alternative to denormalize_as_dataframe() that
-        yields one row at a time as a dictionary instead of loading all data into
-        a DataFrame. Use this when processing large datasets that may not fit in
-        memory, or when you want to process rows incrementally.
-
-        Like denormalize_as_dataframe(), this produces a "wide table" representation
-        where each yielded dictionary contains all columns from the joined tables.
-        See denormalize_as_dataframe() for detailed explanation of how denormalization
-        works.
+        Memory-efficient alternative to
+        :meth:`get_denormalized_as_dataframe` that yields one row at a time
+        as a dict. Use for large datasets that may not fit in memory.
 
         Args:
-            include_tables: List of table names to include in the output.
-                Tables are joined based on their foreign key relationships.
-            version: Dataset version to query (Dataset only, ignored by DatasetBag).
-            **kwargs: Additional implementation-specific arguments.
+            include_tables: Tables whose columns appear in the output.
+            row_per: Explicit leaf table. Must be in ``include_tables``.
+            via: Tables forced into the join chain without contributing columns.
+            ignore_unrelated_anchors: See :meth:`get_denormalized_as_dataframe`.
 
         Yields:
-            dict[str, Any]: Dictionary representing one row of the wide table.
-                Keys are column names prefixed by table name.
-
-        Note:
-            Column names use dot notation (e.g., ``Image.Filename``, ``Subject.RID``).
-            When the catalog has multiple domain schemas, the schema name is included
-            (e.g., ``test-schema.Image.Filename``).
-
-        Example:
-            Process a large dataset without loading everything into memory::
-
-                # Stream through rows one at a time
-                for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
-                    image_path = row["Image.Filename"]
-                    label = row["Diagnosis.Label"]
-                    # Process each image-label pair...
-
-                # Or convert to list if you need random access
-                rows = list(dataset.denormalize_as_dict(["Image", "Diagnosis"]))
+            dict[str, Any]: Dictionary per row; keys are ``Table.Column``.
 
         See Also:
-            denormalize_columns: Preview column names and types without fetching data.
-            denormalize_as_dataframe: Returns all data as a pandas DataFrame.
+            list_denormalized_columns: Preview columns without fetching data.
+            get_denormalized_as_dataframe: Returns a pandas DataFrame.
         """
         ...
 
-    def denormalize_columns(
+    def list_denormalized_columns(
         self,
         include_tables: list[str],
-        **kwargs: Any,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
     ) -> list[tuple[str, str]]:
-        """Return the columns that denormalize would produce, without fetching data.
+        """List the columns the denormalized table would have.
 
-        Performs the same validation as :meth:`denormalize_as_dataframe` (table existence,
-        FK path resolution, ambiguity detection) but stops before executing any data
-        queries. Use this to preview column names and debug ``include_tables`` before
-        running an expensive denormalization.
-
-        Column names use dot notation (e.g., ``Image.Filename``). When the catalog
-        has multiple domain schemas, the schema name is included
-        (e.g., ``test-schema.Image.Filename``).
+        Performs the same path validation as
+        :meth:`get_denormalized_as_dataframe` (table existence, FK path
+        resolution, ambiguity detection) but stops before executing any
+        data queries. Model-only — no data fetch.
 
         Args:
-            include_tables: List of table names to include.
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
+            include_tables: Tables whose columns would appear in the output.
+            row_per: Explicit leaf table. Must be in ``include_tables``.
+            via: Tables forced into the join chain without contributing columns.
 
         Returns:
-            List of ``(column_name, column_type)`` tuples.
-            Column names use the same dot notation as :meth:`denormalize_as_dataframe`.
-            Type strings use ermrest type names (``text``, ``int4``, ``float8``, etc.).
+            List of ``(column_name, column_type)`` tuples. Column names use
+            dot notation. Type strings are ermrest type names
+            (``text``, ``int4``, ``float8``, etc.).
 
         Raises:
             DerivaMLException: If tables don't exist or FK paths are ambiguous.
 
-        Example:
-            Preview columns before running an expensive query::
-
-                >>> cols = dataset.denormalize_columns(["Image", "Subject"])
-                >>> for name, dtype in cols:
-                ...     print(f"  {name}: {dtype}")
-                Image.RID: ermrest_rid
-                Image.Filename: text
-                Subject.RID: ermrest_rid
-                Subject.Name: text
-
         See Also:
-            denormalize_as_dataframe: Fetch data as a pandas DataFrame.
-            denormalize_as_dict: Fetch data as a generator of dicts.
+            get_denormalized_as_dataframe: Fetch data as a pandas DataFrame.
+            get_denormalized_as_dict: Fetch data as a generator of dicts.
+        """
+        ...
+
+    def describe_denormalized(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Dry-run a denormalization call; return planning metadata.
+
+        Resolves the FK path, computes column shape, and (when catalog
+        access is available) estimates row counts and asset sizes —
+        without materializing any data.
+        """
+        ...
+
+    def list_schema_paths(
+        self,
+        tables: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """List FK paths reachable from this dataset's members.
+
+        Useful for discovering what tables are available to include in
+        denormalization.
         """
         ...
 

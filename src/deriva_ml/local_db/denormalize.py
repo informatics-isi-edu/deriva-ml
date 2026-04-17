@@ -26,10 +26,10 @@ The ``source`` parameter controls how rows get into the local SQLite engine:
   fixtures.
 - ``"catalog"``: denormalize uses a :class:`PagedClient` to fetch rows from a
   live ERMrest catalog into the local engine before running the join. This is
-  the production path for :meth:`Dataset.denormalize_as_dataframe`.
+  the production path for :meth:`Dataset.get_denormalized_as_dataframe`.
 - ``"slice"``: rows are assumed to already be visible via an attached slice
   database (ATTACH'd into the engine). Used by
-  :meth:`DatasetBag.denormalize_as_dataframe`.
+  :meth:`DatasetBag.get_denormalized_as_dataframe`.
 """
 
 from __future__ import annotations

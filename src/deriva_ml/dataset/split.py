@@ -65,7 +65,7 @@ Example:
 
 See Also:
     - ``sklearn.model_selection.train_test_split``
-    - ``Dataset.denormalize_as_dataframe``
+    - ``Dataset.get_denormalized_as_dataframe``
     - ``Dataset.list_dataset_members``
 """
 
@@ -135,7 +135,7 @@ class SelectionFunction(Protocol):
     - Implementing any balancing or stratification logic
 
     Args:
-        df: Denormalized DataFrame from ``dataset.denormalize_as_dataframe()``.
+        df: Denormalized DataFrame from ``dataset.get_denormalized_as_dataframe()``.
             Columns are prefixed with table names (e.g., ``Image_RID``,
             ``Image_Classification_Image_Class``).
         partition_sizes: Dict mapping partition names (e.g., "Training",
@@ -537,7 +537,7 @@ def split_dataset(
         stratify_by_column: Column name for stratified splitting.
             Must be a column in the denormalized DataFrame using dot notation
             (e.g., ``Image_Classification.Image_Class``). Use
-            :meth:`Dataset.denormalize_columns` to discover available columns.
+            :meth:`Dataset.list_denormalized_columns` to discover available columns.
             Mutually exclusive with ``selection_fn``.
         stratify_missing: Policy for null values in the stratify column.
             ``"error"`` (default) raises if any nulls exist,
@@ -735,7 +735,7 @@ def split_dataset(
 
     if use_denormalization:
         logger.info(f"Denormalizing dataset with tables: {include_tables}")
-        df = source_ds.denormalize_as_dataframe(include_tables)
+        df = source_ds.get_denormalized_as_dataframe(include_tables)
         logger.info(f"Denormalized DataFrame: {len(df)} rows, {len(df.columns)} columns")
 
         if stratify_by_column:

@@ -760,216 +760,101 @@ class DatasetBag:
             sql_cmd = select(de_table.Execution).where(de_table.Dataset == self.dataset_rid)
             return [r[0] for r in session.execute(sql_cmd).all()]
 
-    def denormalize_as_dataframe(
+    def get_denormalized_as_dataframe(
         self,
         include_tables: list[str],
-        version: Any = None,
-        **kwargs: Any,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
     ) -> pd.DataFrame:
-        """Denormalize the dataset bag into a single wide table (DataFrame).
+        """Return the dataset bag as a denormalized wide table (DataFrame).
 
-        Denormalization transforms normalized relational data into a single "wide table"
-        (also called a "flat table" or "denormalized table") by joining related tables
-        together. This produces a DataFrame where each row contains all related information
-        from multiple source tables, with columns from each table combined side-by-side.
-
-        Wide tables are the standard input format for most machine learning frameworks,
-        which expect all features for a single observation to be in one row. This method
-        bridges the gap between normalized database schemas and ML-ready tabular data.
-
-        **How it works:**
-
-        Tables are joined based on their foreign key relationships stored in the bag's
-        schema. For example, if Image has a foreign key to Subject, denormalizing
-        ["Subject", "Image"] produces rows where each image appears with its subject's
-        metadata.
-
-        **Column naming:**
-
-        Column names are prefixed with the source table name using dots to avoid
-        collisions (e.g., "Image.Filename", "Subject.RID"). This differs from the
-        live Dataset class which uses underscores.
-
-        Args:
-            include_tables: List of table names to include in the output. Tables
-                are joined based on their foreign key relationships.
-                Order doesn't matter - the join order is determined automatically.
-            version: Ignored (bags are immutable snapshots of a specific version).
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Returns:
-            pd.DataFrame: Wide table with columns from all included tables.
-
-        Example:
-            Create a training dataset from a downloaded bag::
-
-                >>> # Download and materialize the dataset
-                >>> bag = ml.download_dataset_bag(spec, materialize=True)
-
-                >>> # Denormalize into a wide table
-                >>> df = bag.denormalize_as_dataframe(["Image", "Diagnosis"])
-                >>> print(df.columns.tolist())
-                ['Image.RID', 'Image.Filename', 'Image.URL', 'Diagnosis.RID',
-                 'Diagnosis.Label', 'Diagnosis.Confidence']
-
-                >>> # Access local file paths for images
-                >>> for _, row in df.iterrows():
-                ...     local_path = bag.get_asset_path("Image", row["Image.RID"])
-                ...     label = row["Diagnosis.Label"]
-                ...     # Train on local_path with label
-
-        See Also:
-            denormalize_as_dict: Generator version for memory-efficient processing.
+        Shortcut for ``Denormalizer(self).as_dataframe(include_tables, ...)``.
+        See :class:`~deriva_ml.local_db.denormalizer.Denormalizer` for the
+        full API and semantic rules.
         """
-        from deriva_ml.local_db.denormalize import _denormalize_impl
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-        children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-        # source="slice": rows are already present in the bag's local SQLite
-        # (populated by SchemaBuilder during download). No catalog fetch needed.
-        result = _denormalize_impl(
-            model=self.model,
-            engine=self.engine,
-            orm_resolver=self.model.get_orm_class_by_name,
-            dataset_rid=self.dataset_rid,
-            include_tables=include_tables,
-            dataset=self,
-            dataset_children_rids=children_rids,
-            source="slice",
+        return Denormalizer(self).as_dataframe(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
-        return result.to_dataframe()
 
-    def denormalize_as_dict(
+    def get_denormalized_as_dict(
         self,
         include_tables: list[str],
-        version: Any = None,
-        **kwargs: Any,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
     ) -> Generator[dict[str, Any], None, None]:
-        """Denormalize the dataset bag and yield rows as dictionaries.
+        """Stream the denormalized dataset bag rows as dicts.
 
-        This is a memory-efficient alternative to denormalize_as_dataframe() that
-        yields one row at a time as a dictionary instead of loading all data into
-        a DataFrame. Use this when processing large datasets that may not fit in
-        memory, or when you want to process rows incrementally.
-
-        Like denormalize_as_dataframe(), this produces a "wide table" representation
-        where each yielded dictionary contains all columns from the joined tables.
-        See denormalize_as_dataframe() for detailed explanation of how denormalization
-        works.
-
-        **Column naming:**
-
-        Column names are prefixed with the source table name using dots to avoid
-        collisions (e.g., "Image.Filename", "Subject.RID"). This differs from the
-        live Dataset class which uses underscores.
-
-        Args:
-            include_tables: List of table names to include in the output.
-                Tables are joined based on their foreign key relationships.
-            version: Ignored (bags are immutable snapshots of a specific version).
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Yields:
-            dict[str, Any]: Dictionary representing one row of the wide table.
-                Keys are column names in "Table.Column" format.
-
-        Example:
-            Stream through a large dataset for training::
-
-                >>> bag = ml.download_dataset_bag(spec, materialize=True)
-                >>> for row in bag.denormalize_as_dict(["Image", "Diagnosis"]):
-                ...     # Get local file path for this image
-                ...     local_path = bag.get_asset_path("Image", row["Image.RID"])
-                ...     label = row["Diagnosis.Label"]
-                ...     # Process image and label...
-
-            Build a PyTorch dataset efficiently::
-
-                >>> class BagDataset(torch.utils.data.IterableDataset):
-                ...     def __init__(self, bag, tables):
-                ...         self.bag = bag
-                ...         self.tables = tables
-                ...     def __iter__(self):
-                ...         for row in self.bag.denormalize_as_dict(self.tables):
-                ...             img_path = self.bag.get_asset_path("Image", row["Image.RID"])
-                ...             yield load_image(img_path), row["Diagnosis.Label"]
-
-        See Also:
-            denormalize_as_dataframe: Returns all data as a pandas DataFrame.
+        Shortcut for ``Denormalizer(self).as_dict(include_tables, ...)``.
         """
-        from deriva_ml.local_db.denormalize import _denormalize_impl
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-        children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-        # source="slice": rows are already present in the bag's local SQLite
-        # (populated by SchemaBuilder during download). No catalog fetch needed.
-        result = _denormalize_impl(
-            model=self.model,
-            engine=self.engine,
-            orm_resolver=self.model.get_orm_class_by_name,
-            dataset_rid=self.dataset_rid,
-            include_tables=include_tables,
-            dataset=self,
-            dataset_children_rids=children_rids,
-            source="slice",
+        yield from Denormalizer(self).as_dict(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
-        yield from result.iter_rows()
 
-    # SQLAlchemy type name → ermrest type name mapping.
-    _SQLALCHEMY_TO_ERMREST: dict[str, str] = {
-        "TEXT": "text",
-        "VARCHAR": "text",
-        "STRING": "text",
-        "INTEGER": "int4",
-        "BIGINT": "int8",
-        "SMALLINT": "int2",
-        "FLOAT": "float8",
-        "REAL": "float4",
-        "NUMERIC": "float8",
-        "BOOLEAN": "boolean",
-        "DATE": "date",
-        "DATETIME": "timestamptz",
-        "TIMESTAMP": "timestamptz",
-        "BLOB": "bytea",
-    }
-
-    def denormalize_columns(
+    def list_denormalized_columns(
         self,
         include_tables: list[str],
-        **kwargs: Any,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
     ) -> list[tuple[str, str]]:
-        """Return the columns that denormalize would produce, without fetching data.
+        """List the columns the denormalized table would have.
 
-        Performs the same validation as :meth:`denormalize_as_dataframe` (table existence,
-        FK path resolution, ambiguity detection) but stops before executing any data
-        queries.
-
-        Args:
-            include_tables: List of table names to include.
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Returns:
-            List of ``(column_name, column_type)`` tuples using dot notation.
-            Type strings use ermrest type names (``text``, ``int4``, etc.).
-
-        Example:
-            >>> cols = bag.denormalize_columns(["Image", "Subject"])
-            >>> for name, dtype in cols:
-            ...     print(f"  {name}: {dtype}")
-            Image.RID: ermrest_rid
-            Image.Filename: text
-            Subject.RID: ermrest_rid
-            Subject.Name: text
+        Shortcut for ``Denormalizer(self).columns(include_tables, ...)``.
+        Model-only — no data fetch.
         """
-        from deriva_ml.model.catalog import denormalize_column_name
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-        _, column_specs, multi_schema = self.model._prepare_wide_table(self, self.dataset_rid, list(include_tables))
+        return Denormalizer(self).columns(
+            include_tables,
+            row_per=row_per,
+            via=via,
+        )
 
-        result = []
-        for schema_name, table_name, col_name, type_name in column_specs:
-            prefixed = denormalize_column_name(schema_name, table_name, col_name, multi_schema)
-            # _prepare_wide_table now returns ermrest type names directly,
-            # so no mapping needed.
-            result.append((prefixed, type_name))
-        return result
+    def describe_denormalized(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Dry-run the denormalization; return planning metadata.
+
+        Shortcut for ``Denormalizer(self).describe(include_tables, ...)``.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).describe(
+            include_tables,
+            row_per=row_per,
+            via=via,
+        )
+
+    def list_schema_paths(
+        self,
+        tables: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """List FK paths reachable from this dataset bag's members.
+
+        Shortcut for ``Denormalizer(self).list_paths(tables)``. Useful for
+        discovering what tables are available to include in denormalization.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).list_paths(tables=tables)
 
     # =========================================================================
     # Asset Restructuring Methods

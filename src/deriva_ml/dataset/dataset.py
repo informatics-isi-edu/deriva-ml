@@ -47,7 +47,6 @@ from urllib.parse import urlparse
 # Deriva imports
 import deriva.core.utils.hash_utils as hash_utils
 from deriva.core.asyncio import AsyncErmrestCatalog
-from deriva.core.datapath import Cnt, Sum
 from deriva.core.asyncio.async_catalog import AsyncErmrestSnapshot
 
 if TYPE_CHECKING:
@@ -779,118 +778,102 @@ class Dataset:
                         members[k].extend(v)
         return dict(members)
 
-    def denormalize_as_dataframe(
+    def get_denormalized_as_dataframe(
         self,
         include_tables: list[str],
-        version: DatasetVersion | str | None = None,
-        **kwargs: Any,
-    ) -> pd.DataFrame:
-        """Denormalize the dataset into a single wide table (DataFrame).
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
+    ) -> "pd.DataFrame":
+        """Return the dataset as a denormalized wide table (DataFrame).
 
-        Denormalization transforms normalized relational data into a single "wide table"
-        (also called a "flat table" or "denormalized table") by joining related tables
-        together. This produces a DataFrame where each row contains all related information
-        from multiple source tables, with columns from each table combined side-by-side.
-
-        Wide tables are the standard input format for most machine learning frameworks,
-        which expect all features for a single observation to be in one row. This method
-        bridges the gap between normalized database schemas and ML-ready tabular data.
-
-        **How it works:**
-
-        Tables are joined based on their foreign key relationships. For example, if
-        Image has a foreign key to Subject, and Diagnosis has a foreign key to Image,
-        then denormalizing ["Subject", "Image", "Diagnosis"] produces rows where each
-        image appears with its subject's metadata and any associated diagnoses.
-
-        **Column naming:**
-
-        Column names are prefixed with the source table name using dot notation
-        to avoid collisions (e.g., ``Image.Filename``, ``Subject.RID``). When the
-        catalog has multiple domain schemas, the schema name is also included
-        (e.g., ``test-schema.Image.Filename``).
-
-        Use :meth:`denormalize_columns` to preview the column names and types
-        without fetching data.
-
-        Args:
-            include_tables: List of table names to include in the output. Tables
-                are joined based on their foreign key relationships.
-                Order doesn't matter - the join order is determined automatically.
-            version: Dataset version to query. Defaults to current version.
-                Use this to get a reproducible snapshot of the data.
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Returns:
-            pd.DataFrame: Wide table with columns from all included tables.
-
-        Example:
-            Create a training dataset with images and their labels::
-
-                >>> # Get all images with their diagnoses in one table
-                >>> df = dataset.denormalize_as_dataframe(["Image", "Diagnosis"])
-                >>> print(df.columns.tolist())
-                ['Image.RID', 'Image.Filename', 'Image.URL', 'Diagnosis.RID',
-                 'Diagnosis.Label', 'Diagnosis.Confidence']
-
-                >>> # Use with scikit-learn
-                >>> X = df[["Image.Filename"]]  # Features
-                >>> y = df["Diagnosis.Label"]    # Labels
-
-            Include subject metadata for stratified splitting::
-
-                >>> df = dataset.denormalize_as_dataframe(
-                ...     ["Subject", "Image", "Diagnosis"]
-                ... )
-                >>> # Now df has Subject.Age, Subject.Gender, etc.
-                >>> # for stratified train/test splits by subject
-
-        See Also:
-            denormalize_columns: Preview column names and types without fetching data.
-            denormalize_as_dict: Generator version for memory-efficient processing.
+        Shortcut for ``Denormalizer(self).as_dataframe(include_tables, ...)``.
+        See :class:`~deriva_ml.local_db.denormalizer.Denormalizer` for the
+        full API and semantic rules.
         """
-        import warnings
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-        from deriva_ml.local_db.denormalize import _denormalize_impl
-        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
-
-        # Guard: workspace must have a built local_schema before we can use it.
-        ws = self._ml_instance.workspace
-        if ws.local_schema is None:
-            raise RuntimeError(
-                "Workspace local_schema not built. This usually means the DerivaML workspace was not fully initialized."
-            )
-
-        # The version parameter is accepted for protocol compatibility but is not
-        # yet implemented in the unified denormalization engine.
-        if version is not None:
-            warnings.warn(
-                "The 'version' parameter is not yet supported by the unified "
-                "denormalization engine. Denormalization will use the current "
-                "catalog state, not a pinned version. Version-pinned "
-                "denormalization will be added in a future release.",
-                UserWarning,
-                stacklevel=2,
-            )
-
-        # Build a paged client that fetches rows from the live catalog into
-        # the workspace's local SQLite. Required because the workspace engine
-        # starts empty — without this, the SQL join runs against zero rows.
-        paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
-
-        children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-        result = _denormalize_impl(
-            model=self._ml_instance.model,
-            engine=ws.engine,
-            orm_resolver=ws.local_schema.get_orm_class,
-            dataset_rid=self.dataset_rid,
-            include_tables=include_tables,
-            dataset=self,
-            dataset_children_rids=children,
-            source="catalog",
-            paged_client=paged_client,
+        return Denormalizer(self).as_dataframe(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
-        return result.to_dataframe()
+
+    def get_denormalized_as_dict(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
+    ) -> "Generator[dict[str, Any], None, None]":
+        """Stream the denormalized dataset rows as dicts.
+
+        Shortcut for ``Denormalizer(self).as_dict(include_tables, ...)``.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        yield from Denormalizer(self).as_dict(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
+        )
+
+    def list_denormalized_columns(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -> list[tuple[str, str]]:
+        """List the columns the denormalized table would have.
+
+        Shortcut for ``Denormalizer(self).columns(include_tables, ...)``.
+        Model-only — no data fetch.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).columns(
+            include_tables,
+            row_per=row_per,
+            via=via,
+        )
+
+    def describe_denormalized(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Dry-run the denormalization; return planning metadata.
+
+        Shortcut for ``Denormalizer(self).describe(include_tables, ...)``.
+        See the spec (docs/superpowers/specs/...) for the exact structure.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).describe(
+            include_tables,
+            row_per=row_per,
+            via=via,
+        )
+
+    def list_schema_paths(
+        self,
+        tables: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """List FK paths reachable from this dataset's members.
+
+        Shortcut for ``Denormalizer(self).list_paths(tables)``. Useful for
+        discovering what tables are available to include in denormalization.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).list_paths(tables=tables)
 
     def cache_denormalized(
         self,
@@ -940,241 +923,6 @@ class Dataset:
             paged_client=paged_client,
         )
         return result.to_dataframe()
-
-    def denormalize_as_dict(
-        self,
-        include_tables: list[str],
-        version: DatasetVersion | str | None = None,
-        **kwargs: Any,
-    ) -> Generator[dict[str, Any], None, None]:
-        """Denormalize the dataset and yield rows as dictionaries.
-
-        This is a memory-efficient alternative to denormalize_as_dataframe() that
-        yields one row at a time as a dictionary instead of loading all data into
-        a DataFrame. Use this when processing large datasets that may not fit in
-        memory, or when you want to process rows incrementally.
-
-        Like denormalize_as_dataframe(), this produces a "wide table" representation
-        where each yielded dictionary contains all columns from the joined tables.
-        See denormalize_as_dataframe() for detailed explanation of how denormalization
-        works.
-
-        **Column naming:**
-
-        Column names are prefixed with the source table name using dot notation
-        (e.g., ``Image.Filename``, ``Subject.RID``). See :meth:`denormalize_as_dataframe`
-        for details on multi-schema prefix behavior.
-
-        Args:
-            include_tables: List of table names to include in the output.
-                Tables are joined based on their foreign key relationships.
-            version: Dataset version to query. Defaults to current version.
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Yields:
-            dict[str, Any]: Dictionary representing one row of the wide table.
-                Keys are column names in ``Table.Column`` format.
-
-        Example:
-            Process images one at a time for training::
-
-                >>> for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
-                ...     # Load and preprocess each image
-                ...     img = load_image(row["Image.Filename"])
-                ...     label = row["Diagnosis.Label"]
-                ...     yield img, label  # Feed to training loop
-
-            Count labels without loading all data into memory::
-
-                >>> from collections import Counter
-                >>> labels = Counter()
-                >>> for row in dataset.denormalize_as_dict(["Image", "Diagnosis"]):
-                ...     labels[row["Diagnosis.Label"]] += 1
-                >>> print(labels)
-                Counter({'Normal': 450, 'Abnormal': 150})
-
-        See Also:
-            denormalize_columns: Preview column names and types without fetching data.
-            denormalize_as_dataframe: Returns all data as a pandas DataFrame.
-        """
-        import warnings
-
-        from deriva_ml.local_db.denormalize import _denormalize_impl
-        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
-
-        # Guard: workspace must have a built local_schema before we can use it.
-        ws = self._ml_instance.workspace
-        if ws.local_schema is None:
-            raise RuntimeError(
-                "Workspace local_schema not built. This usually means the DerivaML workspace was not fully initialized."
-            )
-
-        # The version parameter is accepted for protocol compatibility but is not
-        # yet implemented in the unified denormalization engine.
-        if version is not None:
-            warnings.warn(
-                "The 'version' parameter is not yet supported by the unified "
-                "denormalization engine. Denormalization will use the current "
-                "catalog state, not a pinned version. Version-pinned "
-                "denormalization will be added in a future release.",
-                UserWarning,
-                stacklevel=2,
-            )
-
-        # Build a paged client that fetches rows from the live catalog into
-        # the workspace's local SQLite. See denormalize_as_dataframe above
-        # for the rationale.
-        paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
-
-        children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-        result = _denormalize_impl(
-            model=self._ml_instance.model,
-            engine=ws.engine,
-            orm_resolver=ws.local_schema.get_orm_class,
-            dataset_rid=self.dataset_rid,
-            include_tables=include_tables,
-            dataset=self,
-            dataset_children_rids=children,
-            source="catalog",
-            paged_client=paged_client,
-        )
-        yield from result.iter_rows()
-
-    def denormalize_columns(
-        self,
-        include_tables: list[str],
-        **kwargs: Any,
-    ) -> list[tuple[str, str]]:
-        """Return the columns that denormalize would produce, without fetching data.
-
-        Performs the same validation as :meth:`denormalize_as_dataframe` (table existence,
-        FK path resolution, ambiguity detection) but stops before executing any data
-        queries. Use this to preview column names and debug ``include_tables``.
-
-        Args:
-            include_tables: List of table names to include.
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Returns:
-            List of ``(column_name, column_type)`` tuples using dot notation.
-
-        Example:
-            >>> cols = dataset.denormalize_columns(["Image", "Subject"])
-            >>> for name, dtype in cols:
-            ...     print(f"  {name}: {dtype}")
-            Image.RID: ermrest_rid
-            Image.Filename: text
-            Subject.RID: ermrest_rid
-            Subject.Name: text
-        """
-        from deriva_ml.model.catalog import denormalize_column_name
-
-        _, column_specs, multi_schema = self._ml_instance.model._prepare_wide_table(
-            self, self.dataset_rid, list(include_tables)
-        )
-        return [
-            (
-                denormalize_column_name(schema_name, table_name, col_name, multi_schema),
-                type_name,
-            )
-            for schema_name, table_name, col_name, type_name in column_specs
-        ]
-
-    def denormalize_info(
-        self,
-        include_tables: list[str],
-        version: str | None = None,
-    ) -> dict[str, Any]:
-        """Return schema shape and size estimates for a denormalized table.
-
-        Performs the same FK path resolution as :meth:`denormalize_as_dataframe`
-        but returns metadata instead of data. Aligned with :meth:`estimate_bag_size`
-        return structure.
-
-        Note:
-            Row counts are currently catalog-wide (not scoped to dataset
-            members). The ``version`` parameter is accepted for API
-            compatibility but does not yet filter by dataset membership.
-
-        Args:
-            include_tables: List of table names to include in the join.
-            version: Reserved for future dataset-scoped counting. Currently
-                unused — row counts reflect the entire catalog.
-
-        Returns:
-            dict with keys:
-                - columns: list of (column_name, column_type) tuples
-                - join_path: ordered list of table names showing the join chain
-                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
-                - total_rows: total row count across included tables
-                - total_asset_bytes: total asset size in bytes
-                - total_asset_size: human-readable size string
-        """
-        from deriva_ml.model.catalog import denormalize_column_name
-
-        model = self._ml_instance.model
-
-        # Get column specs and join tree from schema
-        element_tables, column_specs, multi_schema = model._prepare_wide_table(
-            self, self.dataset_rid, list(include_tables)
-        )
-
-        # Build columns list
-        columns = [
-            (
-                denormalize_column_name(schema_name, table_name, col_name, multi_schema),
-                type_name,
-            )
-            for schema_name, table_name, col_name, type_name in column_specs
-        ]
-
-        # Extract join path from element_tables.
-        # path_names includes Dataset and association tables; keep only domain tables.
-        join_path: list[str] = []
-        for element_name, (path_names, _, _) in element_tables.items():
-            for table_name in path_names:
-                if table_name not in join_path and table_name != "Dataset":
-                    if not model.is_association(table_name):
-                        join_path.append(table_name)
-
-        # Query row counts per table
-        pb = self._ml_instance.pathBuilder()
-        tables_info: dict[str, dict[str, Any]] = {}
-        total_rows = 0
-        total_asset_bytes = 0
-
-        for table_name in join_path:
-            table = model.name_to_table(table_name)
-            is_asset = model.is_asset(table_name)
-
-            # Get row count via ermrest aggregate
-            schema_name = table.schema.name
-            table_path = pb.schemas[schema_name].tables[table_name]
-            row_count = table_path.aggregates(Cnt(table_path.RID).alias("cnt")).fetch()[0]["cnt"]
-
-            entry: dict[str, Any] = {
-                "row_count": row_count,
-                "is_asset": is_asset,
-                "asset_bytes": 0,
-            }
-
-            if is_asset:
-                result = table_path.aggregates(Sum(table_path.Length).alias("total")).fetch()
-                asset_bytes = result[0]["total"] or 0
-                entry["asset_bytes"] = asset_bytes
-                total_asset_bytes += asset_bytes
-
-            tables_info[table_name] = entry
-            total_rows += row_count
-
-        return {
-            "columns": columns,
-            "join_path": join_path,
-            "tables": tables_info,
-            "total_rows": total_rows,
-            "total_asset_bytes": total_asset_bytes,
-            "total_asset_size": self._human_readable_size(total_asset_bytes),
-        }
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_members(

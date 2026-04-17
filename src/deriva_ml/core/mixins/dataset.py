@@ -173,7 +173,11 @@ class DatasetMixin:
         def is_domain_or_dataset_table(table: Table) -> bool:
             return self.model.is_domain_schema(table.schema.name) or table.name == self._dataset_table.name
 
-        return [t for a in self._dataset_table.find_associations() if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)]
+        return [
+            t
+            for a in self._dataset_table.find_associations()
+            if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)
+        ]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
@@ -205,7 +209,9 @@ class DatasetMixin:
                 raise e
 
         # self.model = self.catalog.getCatalogModel()
-        annotations = CatalogGraph(self, s3_bucket=self.s3_bucket, use_minid=self.use_minid).generate_dataset_download_annotations()  # type: ignore[arg-type]
+        annotations = CatalogGraph(
+            self, s3_bucket=self.s3_bucket, use_minid=self.use_minid
+        ).generate_dataset_download_annotations()  # type: ignore[arg-type]
         self._dataset_table.annotations.update(annotations)
         self.model.model.apply()
         return table
@@ -309,14 +315,14 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
         )
 
-    def denormalize_info(
+    def describe_denormalized(
         self,
         include_tables: list[str],
     ) -> dict[str, Any]:
         """Return schema shape and size estimates for a denormalized table.
 
         This method does NOT require a dataset — it uses global row counts
-        across the entire catalog. Use ``Dataset.denormalize_info()`` for
+        across the entire catalog. Use ``Dataset.describe_denormalized()`` for
         dataset-scoped counts.
 
         Aligned with :meth:`estimate_bag_size` return structure.
@@ -334,6 +340,7 @@ class DatasetMixin:
                 - total_asset_size: human-readable size string
         """
         from deriva.core.datapath import Cnt, Sum
+
         from deriva_ml.dataset.dataset import Dataset
         from deriva_ml.model.catalog import denormalize_column_name
 
@@ -341,9 +348,7 @@ class DatasetMixin:
 
         # _prepare_wide_table doesn't actually use dataset or dataset_rid
         # in its body — it only traverses the schema. Pass None for both.
-        element_tables, column_specs, multi_schema = model._prepare_wide_table(
-            None, None, list(include_tables)
-        )
+        element_tables, column_specs, multi_schema = model._prepare_wide_table(None, None, list(include_tables))
 
         # Build columns list
         columns = [
