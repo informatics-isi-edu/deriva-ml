@@ -785,7 +785,7 @@ class Dataset:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
-    ) -> "pd.DataFrame":
+    ) -> pd.DataFrame:
         """Return the dataset as a denormalized wide table (DataFrame).
 
         Shortcut for ``Denormalizer(self).as_dataframe(include_tables, ...)``.
@@ -808,10 +808,12 @@ class Dataset:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
-    ) -> "Generator[dict[str, Any], None, None]":
+    ) -> Generator[dict[str, Any], None, None]:
         """Stream the denormalized dataset rows as dicts.
 
         Shortcut for ``Denormalizer(self).as_dict(include_tables, ...)``.
+        Use this for large datasets where a full DataFrame won't fit in
+        memory — each row is yielded as soon as it's produced.
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -851,8 +853,13 @@ class Dataset:
     ) -> dict[str, Any]:
         """Dry-run the denormalization; return planning metadata.
 
-        Shortcut for ``Denormalizer(self).describe(include_tables, ...)``.
-        See the spec (docs/superpowers/specs/...) for the exact structure.
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.describe` —
+        returns a plan dict with ``row_per``, ``row_per_source``,
+        ``row_per_candidates``, ``columns``, ``include_tables``, ``via``,
+        ``join_path``, ``transparent_intermediates``, ``ambiguities``,
+        ``estimated_row_count``, ``anchors``, and ``source``. This method
+        never raises on ambiguity — ambiguities are reported in the dict.
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 

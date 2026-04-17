@@ -794,6 +794,8 @@ class DatasetBag:
         """Stream the denormalized dataset bag rows as dicts.
 
         Shortcut for ``Denormalizer(self).as_dict(include_tables, ...)``.
+        Use this for large bags where a full DataFrame won't fit in
+        memory — each row is yielded as soon as it's produced.
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -833,7 +835,10 @@ class DatasetBag:
     ) -> dict[str, Any]:
         """Dry-run the denormalization; return planning metadata.
 
-        Shortcut for ``Denormalizer(self).describe(include_tables, ...)``.
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.describe` —
+        returns the full plan dict (see that method's docstring for the
+        exact 12-key shape). Never raises on ambiguity.
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
