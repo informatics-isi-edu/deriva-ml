@@ -37,9 +37,9 @@
 
 | Path | Change |
 |------|--------|
-| `src/deriva_ml/model/catalog.py` | **Extract** two nested functions to module-level methods on `DerivaModel`: `_is_likely_association` (was nested in `_build_join_tree` at lines 727-751) → `_is_association_table`; `find_arcs` (was nested in `_schema_to_paths` at lines 1173-1188) → `_fk_neighbors`. **Compose** new helpers on top of those + existing `_schema_to_paths` / `_table_relationship`: `_outbound_reachable`, `_enumerate_paths`, `_find_sinks`, `_determine_row_per`, `_find_path_ambiguities`. Update `_prepare_wide_table` to accept `row_per` / `via` and invoke the new rules before the existing tree-building flow. |
+| `src/deriva_ml/model/catalog.py` | **Extract** two nested functions to module-level methods on `DerivaModel`: `_is_likely_association` (was nested in `_build_join_tree` at lines 727-751) → `_is_association_table`; `find_arcs` (was nested in `_schema_to_paths` at lines 1173-1188) → `_fk_neighbors`. **Extend** `_schema_to_paths` with a `stop_at: str \| None` kwarg (endpoint filtering). **Compose** new helpers on top of those + existing `_schema_to_paths` / `_table_relationship`: `_outbound_reachable`, `_enumerate_paths`, `_find_sinks`, `_determine_row_per`, `_find_path_ambiguities`. Update `_prepare_wide_table` to accept `row_per` / `via` and invoke the new rules before the existing tree-building flow. |
 | `src/deriva_ml/core/exceptions.py` | Add `DerivaMLDenormalizeAmbiguousPath`, `DerivaMLDenormalizeMultiLeaf`, `DerivaMLDenormalizeNoSink`, `DerivaMLDenormalizeDownstreamLeaf`, `DerivaMLDenormalizeUnrelatedAnchor` exception classes. |
-| `src/deriva_ml/local_db/denormalize.py` | Rename public `denormalize()` → `_denormalize_impl()`. Keep `DenormalizeResult`, `_MinimalDatasetMock`, helpers. `_denormalize_impl` becomes the private implementation called by `Denormalizer`. |
+| `src/deriva_ml/local_db/denormalize.py` | Rename public `denormalize()` → `_denormalize_impl()`. Keep `DenormalizeResult`, `_MinimalDatasetMock`, helpers. `_denormalize_impl` becomes the private implementation called by `Denormalizer`. Add `DenormalizeResult.extend(rows)` helper so orphan-row combining in `Denormalizer._run` stays a one-liner. |
 | `src/deriva_ml/local_db/__init__.py` | Export `Denormalizer` (new), remove export of free `denormalize` function (replaced by class). |
 | `src/deriva_ml/dataset/dataset.py` | Remove `denormalize_as_dataframe` (~165 lines), `denormalize_as_dict` (~100 lines), `denormalize_columns` (~45 lines), `denormalize_info` (~155 lines). Add sugar methods: `get_denormalized_as_dataframe`, `get_denormalized_as_dict`, `list_denormalized_columns`, `describe_denormalized`, `list_schema_paths`. |
 | `src/deriva_ml/dataset/dataset_bag.py` | Same — remove old methods, add the same sugar methods. |
@@ -76,7 +76,7 @@ BFS/DFS over the FK graph, stop — it already exists.
 
 | Existing routine | Location | Use in new code |
 |------------------|----------|-----------------|
-| `DerivaModel._schema_to_paths(root, max_depth=...)` | `src/deriva_ml/model/catalog.py:1120` | Authoritative FK-path enumerator (DFS, handles cycles, terminates at vocabs). Base for `_enumerate_paths` and `_outbound_reachable`. |
+| `DerivaModel._schema_to_paths(root, max_depth=..., stop_at=...)` | `src/deriva_ml/model/catalog.py:1120` | Authoritative FK-path enumerator (DFS, handles cycles, terminates at vocabs). Base for `_enumerate_paths` and `_outbound_reachable`. Task 2 Step 4a adds the `stop_at` kwarg for endpoint filtering. |
 | `DerivaModel._table_relationship(fk_src, pk_dst)` | `src/deriva_ml/model/catalog.py:1079` | Resolves FK column pairs between two tables. Handles composite FKs + ambiguity detection. Use wherever pairs of joined tables need their FK edge. |
 | `DerivaModel.name_to_table(name)` | `src/deriva_ml/model/catalog.py:371` | Name → Table resolver. Single source of truth — never walk schemas manually. |
 | `DerivaModel.is_vocabulary(tbl)` | `src/deriva_ml/model/catalog.py:399` | Vocabulary detection for path termination. |
@@ -91,6 +91,15 @@ BFS/DFS over the FK graph, stop — it already exists.
 |------------------|------------|-----|
 | `_is_likely_association(tbl)` — nested inside `_build_join_tree` at `catalog.py:727-751` | `DerivaModel._is_association_table(name_or_tbl)` | Both `_prepare_wide_table` and the new `Denormalizer` need it. Nested function cannot be reused. |
 | `find_arcs(table)` — nested inside `_schema_to_paths` at `catalog.py:1173-1188` | `DerivaModel._fk_neighbors(tbl)` | Returns FK-reachable tables (both outbound and inbound, deduplicated by target). The building block for `_outbound_reachable`. |
+
+### Minor interface tweaks (small additions that make reuse cleaner)
+
+Low-risk, purely additive. Zero existing callers affected.
+
+| Existing routine | Added | Payoff |
+|------------------|-------|--------|
+| `_schema_to_paths` | `stop_at: str \| None = None` kwarg (Task 2 Step 4a) | Lets `_enumerate_paths` ask for only paths ending at a specific table directly, avoiding a post-hoc filter. Default `None` preserves original behavior. |
+| `DenormalizeResult` | `extend(rows) -> DenormalizeResult` method (Task 3 Step 3b) | Replaces 3-line manual dataclass rebuild for orphan-row combining with a one-line `main_result.extend(orphans)` call in `Denormalizer._run` (Task 6). |
 
 ### Wrap / compose (new thin helpers delegate to existing)
 
@@ -709,6 +718,44 @@ In `_schema_to_paths`, replace the nested `def find_arcs(table)` and the `find_a
 for child in self._fk_neighbors(root):
 ```
 
+**While you are editing `_schema_to_paths`**, add one more small enhancement — a `stop_at` kwarg that lets the caller ask for only paths ending at a specific table. This lets `_enumerate_paths` become a near one-liner instead of filtering paths after the fact.
+
+Update the signature (adding `stop_at` last, defaulting to `None` for zero behavior change):
+
+```python
+def _schema_to_paths(
+    self,
+    root: Table | None = None,
+    path: list[Table] | None = None,
+    exclude_tables: set[str] | None = None,
+    skip_tables: frozenset[str] | None = None,
+    max_depth: int | None = None,
+    stop_at: str | None = None,     # NEW
+) -> list[list[Table]]:
+```
+
+Update the docstring with:
+
+```
+    stop_at: If given, return only paths whose final table's name equals
+        ``stop_at``. The root-only path ``[root]`` is excluded unless
+        ``root.name == stop_at``. Default ``None`` returns all prefixes
+        (the original behavior).
+```
+
+Implement the filter as a final-return transformation (no traversal changes):
+
+```python
+    # ... existing body ends with `return paths` — replace with:
+    if stop_at is not None:
+        return [p for p in paths if p and p[-1].name == stop_at]
+    return paths
+```
+
+All existing callers pass `stop_at=None` implicitly, so behavior is unchanged.
+The new `_enumerate_paths` will use `stop_at=to_table` to get only the
+paths it cares about.
+
 - [ ] **Step 4b: Add the new planner helpers — each composes the extracted primitives.**
 
 These helpers are all thin compositions of `_fk_neighbors`, `_is_association_table`, `_schema_to_paths`, and `_table_relationship`. No new FK traversal — just filter/orchestrate calls into the existing routines.
@@ -929,12 +976,11 @@ def _enumerate_paths(
 
     **Implementation:** delegates the FK-graph DFS to the existing
     :meth:`_schema_to_paths` (which handles cycle detection, vocabulary
-    termination, schema filtering, and multi-FK deduplication) and then
-    filters / trims the result. Do NOT write a fresh DFS here.
-
-    Association tables not in ``tables_in_set`` are kept as transparent
-    intermediates in the returned path so callers can report them as
-    suggestions.
+    termination, schema filtering, and multi-FK deduplication). Uses the
+    ``stop_at`` kwarg added in Step 4a to avoid filtering paths by
+    endpoint after the fact. Only the transparency filter (intermediates
+    must be requested or association tables) is applied here. Do NOT
+    write a fresh DFS.
 
     Args:
         from_table: path start.
@@ -948,30 +994,20 @@ def _enumerate_paths(
         List of paths, each a list of table-name strings from
         ``from_table`` to ``to_table``.
     """
-    from_tbl = self.name_to_table(from_table)
-
-    # Get every FK path from from_table (and its prefixes) via the existing
-    # authoritative enumerator.
-    all_paths = self._schema_to_paths(root=from_tbl, max_depth=max_depth)
-
+    paths = self._schema_to_paths(
+        root=self.name_to_table(from_table),
+        max_depth=max_depth,
+        stop_at=to_table,
+    )
     result: list[list[str]] = []
-    for path in all_paths:
-        if not path or path[-1].name != to_table:
-            continue
+    for path in paths:
         names = [t.name for t in path]
-        if names[0] != from_table:
-            continue
-        # Accept if every intermediate (between endpoints) is either in the
-        # set or a transparent association table.
-        ok = True
-        for mid in names[1:-1]:
-            if mid in tables_in_set:
-                continue
-            if self._is_association_table(mid):
-                continue
-            ok = False
-            break
-        if ok:
+        # Transparency check: every intermediate is either requested or a
+        # pure association table.
+        if all(
+            mid in tables_in_set or self._is_association_table(mid)
+            for mid in names[1:-1]
+        ):
             result.append(names)
     return result
 ```
@@ -1102,6 +1138,62 @@ Each call site just needs the import line updated and the call changed.
 - [ ] **Step 3: Remove `denormalize` from package exports.**
 
 In `src/deriva_ml/local_db/__init__.py`, remove the `denormalize` name from the `__all__` list and from the imports block. Keep `DenormalizeResult` exported (it's a public return type).
+
+- [ ] **Step 3b: Add `DenormalizeResult.extend()` helper.**
+
+The orphan-row logic in Task 6 needs to append orphan rows to a main result. Rather than rebuilding the dataclass manually at each call site, add a small helper method on `DenormalizeResult` in `src/deriva_ml/local_db/denormalize.py`:
+
+```python
+def extend(self, rows: list[dict[str, Any]]) -> "DenormalizeResult":
+    """Return a new :class:`DenormalizeResult` with additional rows appended.
+
+    Used when combining phases of denormalization — e.g., the main JOIN
+    result plus orphan rows emitted by LEFT-JOIN-style upstream anchors
+    (:meth:`Denormalizer._emit_orphan_rows`).
+
+    Columns and schema are preserved from ``self``. The returned result's
+    :attr:`row_count` is ``self.row_count + len(rows)``.
+
+    Args:
+        rows: Row dicts to append (same shape as ``self.iter_rows()``).
+
+    Returns:
+        New :class:`DenormalizeResult` — does not mutate ``self``.
+    """
+    return DenormalizeResult(
+        columns=self.columns,
+        row_count=self.row_count + len(rows),
+        _rows=list(self._rows) + list(rows),
+    )
+```
+
+Add a quick test in `tests/local_db/test_denormalize_impl.py`:
+
+```python
+def test_denormalize_result_extend() -> None:
+    """DenormalizeResult.extend appends rows and updates row_count."""
+    from deriva_ml.local_db.denormalize import DenormalizeResult
+
+    base = DenormalizeResult(
+        columns=[("A.RID", "text")],
+        row_count=2,
+        _rows=[{"A.RID": "1-A"}, {"A.RID": "1-B"}],
+    )
+    extended = base.extend([{"A.RID": "1-C"}, {"A.RID": "1-D"}])
+    assert extended.row_count == 4
+    assert extended.columns == base.columns
+    assert [r["A.RID"] for r in extended.iter_rows()] == ["1-A", "1-B", "1-C", "1-D"]
+    # Does not mutate the original
+    assert base.row_count == 2
+```
+
+Run:
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize_impl.py::test_denormalize_result_extend -v
+```
+
+Expected: pass.
 
 - [ ] **Step 4: Rename the test file.**
 
@@ -1948,18 +2040,15 @@ def _run(
         via=list(via or []) or None,
     )
 
-    # Step 4: orphan rows
+    # Step 4: orphan rows (Rule 7 case 3). Uses DenormalizeResult.extend
+    # (added in Task 3 Step 3b) to keep the combine a one-liner.
     if orphans:
         orphan_rows = self._emit_orphan_rows(
             orphans,
             include_tables=list(include_tables),
             row_per=resolved_row_per,
         )
-        main_result = DenormalizeResult(
-            columns=main_result.columns,
-            row_count=main_result.row_count + len(orphan_rows),
-            _rows=list(main_result.iter_rows()) + orphan_rows,
-        )
+        main_result = main_result.extend(orphan_rows)
 
     return main_result
 
@@ -3121,7 +3210,8 @@ Review all changes with focus on:
 
    **DRY audit (check against the plan's "Reuse inventory" section):**
    - Does `_enumerate_paths` delegate to `_schema_to_paths` (the
-     authoritative FK-graph DFS), or does it re-implement DFS?
+     authoritative FK-graph DFS) via the new `stop_at` kwarg, or does
+     it re-implement DFS / filter paths post-hoc?
    - Is `_is_association_table` a method on `DerivaModel` (extracted
      from its previous nested definition in `_build_join_tree`), and do
      both the planner and `Denormalizer.list_paths` call the same method?
@@ -3136,6 +3226,9 @@ Review all changes with focus on:
      `DerivaModel._table_relationship`, or re-implemented?
    - Does `_emit_orphan_rows` follow the same NULL-init pattern as
      `Dataset._denormalize_datapath`, or invent its own?
+   - Does `Denormalizer._run` combine orphan rows using
+     `DenormalizeResult.extend(...)`, or does it manually rebuild the
+     dataclass?
    - Does `describe` reuse the shape established by `denormalize_info`
      (columns / join_path / per-table counts), or does it recompute them?
    - Does the anchor-retrieval path use `list_dataset_members` rather
