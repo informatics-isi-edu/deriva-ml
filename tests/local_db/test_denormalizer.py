@@ -12,7 +12,10 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from deriva_ml.core.exceptions import DerivaMLDenormalizeDownstreamLeaf
+from deriva_ml.core.exceptions import (
+    DerivaMLDenormalizeAmbiguousPath,
+    DerivaMLDenormalizeDownstreamLeaf,
+)
 from deriva_ml.local_db.denormalizer import Denormalizer
 
 
@@ -107,6 +110,23 @@ class TestExplicitRowPer:
             d.as_dataframe(["Image", "Subject"], row_per="Subject")
 
 
+class TestViaParameter:
+    """Verify via= is forwarded to the planner and resolves path ambiguity."""
+
+    def test_via_resolves_diamond(self, populated_denorm_diamond) -> None:
+        """Diamond schema: via=['Observation'] should prevent ambiguity error."""
+        ds = _FakeDataset(populated_denorm_diamond)
+        d = Denormalizer(ds)
+        # Without via, diamond raises
+        with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
+            d.as_dataframe(["Image", "Subject"])
+        # With via, ambiguity resolved
+        df = d.as_dataframe(["Image", "Subject"], via=["Observation"])
+        assert isinstance(df, pd.DataFrame)
+        # Observation columns should NOT be present (via adds to join, not output)
+        assert not any(c.startswith("Observation.") for c in df.columns)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -137,11 +157,20 @@ class _FakeDataset:
         return None  # sentinel: tests use the fixture's engine directly
 
     def list_dataset_members(self, **kwargs: Any) -> dict[str, list[dict]]:
-        # All member types in the fixture
-        return {
-            "Image": [{"RID": r} for r in self._pd["image_rids"]],
-            "Subject": [{"RID": r} for r in self._pd["subject_rids"]],
-        }
+        """Return members based on whichever RID lists the fixture supplies.
+
+        Both :func:`populated_denorm` and :func:`populated_denorm_diamond`
+        expose ``image_rids`` + ``subject_rids``. The diamond fixture also
+        carries ``observation_rids``, but Observation is intentionally not
+        exposed as a member — it's meant to be reached via ``via=[...]``,
+        not as an anchor.
+        """
+        members: dict[str, list[dict]] = {}
+        if "image_rids" in self._pd:
+            members["Image"] = [{"RID": r} for r in self._pd["image_rids"]]
+        if "subject_rids" in self._pd:
+            members["Subject"] = [{"RID": r} for r in self._pd["subject_rids"]]
+        return members
 
     def list_dataset_children(self, **kwargs: Any) -> list:
         return []

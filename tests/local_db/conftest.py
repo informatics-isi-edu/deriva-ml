@@ -280,6 +280,22 @@ def denorm_local_schema(denorm_model: Model, tmp_path: Path) -> LocalSchema:
 
 
 @pytest.fixture
+def denorm_diamond_local_schema(denorm_diamond_model: Model, tmp_path: Path) -> LocalSchema:
+    """LocalSchema with tables from the diamond-schema fixture.
+
+    Mirrors :func:`denorm_local_schema` but builds against the diamond
+    model (includes ``Observation`` + ``Image.Observation`` FK).
+    """
+    db_path = tmp_path / "denorm_diamond_db"
+    db_path.mkdir()
+    return LocalSchema.build(
+        model=denorm_diamond_model,
+        schemas=["isa", "deriva-ml"],
+        database_path=db_path,
+    )
+
+
+@pytest.fixture
 def populated_denorm(
     denorm_deriva_model: DerivaModel,
     denorm_local_schema: LocalSchema,
@@ -334,6 +350,78 @@ def populated_denorm(
         "local_schema": ls,
         "dataset_rid": ds_rid,
         "subject_rids": subj_rids,
+        "image_rids": img_rids,
+    }
+
+
+@pytest.fixture
+def populated_denorm_diamond(
+    denorm_diamond_deriva_model: DerivaModel,
+    denorm_diamond_local_schema: LocalSchema,
+) -> dict[str, Any]:
+    """LocalSchema pre-populated with diamond-schema test data.
+
+    Mirrors :func:`populated_denorm` but uses the diamond fixture, which
+    adds an ``Observation`` table and an ``Image.Observation`` FK (creating
+    two FK paths from Image to Subject).
+
+    Returns a dict with:
+        model: DerivaModel (diamond)
+        local_schema: LocalSchema
+        dataset_rid: str
+        subject_rids: list[str]
+        observation_rids: list[str]
+        image_rids: list[str]
+    """
+    ls = denorm_diamond_local_schema
+    engine = ls.engine
+
+    ds_rid = "DS-001"
+    subj_rids = ["SUBJ-A", "SUBJ-B"]
+    obs_rids = ["OBS-1", "OBS-2"]
+    img_rids = ["IMG-1", "IMG-2", "IMG-3"]
+
+    with Session(engine) as session:
+        # Insert subjects
+        subj_cls = ls.get_orm_class("Subject")
+        for rid, name in zip(subj_rids, ["Alice", "Bob"]):
+            session.add(subj_cls(RID=rid, Name=name))
+
+        # Insert observations (OBS-1 -> SUBJ-A, OBS-2 -> SUBJ-B)
+        obs_cls = ls.get_orm_class("Observation")
+        session.add(obs_cls(RID="OBS-1", Subject="SUBJ-A", Date="2026-01-01"))
+        session.add(obs_cls(RID="OBS-2", Subject="SUBJ-B", Date="2026-01-02"))
+
+        # Insert images
+        # IMG-1 -> SUBJ-A + OBS-1, IMG-2 -> SUBJ-B + OBS-2, IMG-3 with NULL FKs
+        img_cls = ls.get_orm_class("Image")
+        session.add(img_cls(RID="IMG-1", Filename="a.png", Subject="SUBJ-A", Observation="OBS-1"))
+        session.add(img_cls(RID="IMG-2", Filename="b.png", Subject="SUBJ-B", Observation="OBS-2"))
+        session.add(img_cls(RID="IMG-3", Filename="c.png", Subject=None, Observation=None))
+
+        # Insert dataset
+        ds_cls = ls.get_orm_class("Dataset")
+        session.add(ds_cls(RID=ds_rid, Description="test diamond dataset"))
+
+        # Insert associations
+        di_cls = ls.get_orm_class("Dataset_Image")
+        for img_rid in img_rids:
+            session.add(
+                di_cls(
+                    RID=f"DI-{img_rid}",
+                    Dataset=ds_rid,
+                    Image=img_rid,
+                )
+            )
+
+        session.commit()
+
+    return {
+        "model": denorm_diamond_deriva_model,
+        "local_schema": ls,
+        "dataset_rid": ds_rid,
+        "subject_rids": subj_rids,
+        "observation_rids": obs_rids,
         "image_rids": img_rids,
     }
 

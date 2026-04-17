@@ -130,6 +130,9 @@ def _denormalize_impl(
     dataset_children_rids: list[str] | None = None,
     source: str = "local",
     paged_client: PagedClient | None = None,
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
 ) -> DenormalizeResult:
     """Unified denormalization: plan joins via ``_prepare_wide_table``, execute locally.
 
@@ -152,6 +155,13 @@ def _denormalize_impl(
             are visible via an attached slice database.
         paged_client: Required when ``source="catalog"``. The client used to
             fetch rows from a live ERMrest catalog.
+        row_per: Optional leaf table override. When None (default),
+            auto-inferred by Rule 2 from sinks in ``include_tables``. See
+            :class:`~deriva_ml.local_db.denormalizer.Denormalizer` for
+            semantic details.
+        via: Optional list of tables forced into the join chain without
+            contributing columns. Used to disambiguate path ambiguity
+            (Rule 6).
 
     Returns:
         :class:`DenormalizeResult` with rows and column metadata.
@@ -173,7 +183,13 @@ def _denormalize_impl(
     if dataset is None:
         dataset = _MinimalDatasetMock(dataset_rid=dataset_rid)
 
-    join_tables, column_specs, multi_schema = model._prepare_wide_table(dataset, dataset_rid, include_tables)
+    join_tables, column_specs, multi_schema = model._prepare_wide_table(
+        dataset,
+        dataset_rid,
+        include_tables,
+        row_per=row_per,
+        via=via,
+    )
 
     # Build a quick lookup from table name to schema name so we can form
     # qualified ERMrest names ("schema:table") for PagedFetcher calls.

@@ -202,23 +202,13 @@ class Denormalizer:
         via: list[str] | None,
         ignore_unrelated_anchors: bool,
     ) -> DenormalizeResult:
-        """Dispatch to the low-level primitive.
+        """Dispatch to the low-level primitive with planner kwargs wired through.
 
-        Pre-validates ``row_per`` / ``via`` by invoking the planner directly
-        (so Rule 2/5/6 errors surface here, not later inside the SQL loop).
-        ``_denormalize_impl`` itself doesn't yet accept ``row_per`` / ``via``
-        — Task 5+ wires those through to the join planner inside the impl.
+        ``_denormalize_impl`` invokes :meth:`DerivaModel._prepare_wide_table`
+        internally, so planner guards (Rules 2 / 5 / 6) surface from there.
+        ``ignore_unrelated_anchors`` is accepted but not yet consumed — that
+        wiring lands in Task 6.
         """
-        # Pre-validate so planner-level errors (Rules 2, 5, 6) surface even
-        # though `_denormalize_impl` doesn't yet plumb row_per/via through.
-        self._model._prepare_wide_table(
-            self._dataset,
-            self._dataset_rid,
-            list(include_tables),
-            row_per=row_per,
-            via=via,
-        )
-
         return _denormalize_impl(
             model=self._model,
             engine=self._engine,
@@ -226,5 +216,7 @@ class Denormalizer:
             dataset_rid=self._dataset_rid,
             include_tables=list(include_tables),
             dataset=self._dataset,
-            source="local",  # fixture tests pre-populate the DB
+            source="local",
+            row_per=row_per,
+            via=list(via) if via else None,
         )
