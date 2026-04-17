@@ -23,6 +23,7 @@ except ImportError:
     ic = lambda *a, **kw: None
 
 from deriva_ml import DerivaML
+from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
 from deriva_ml.execution.execution import ExecutionConfiguration
 
 
@@ -1158,25 +1159,24 @@ class TestAmbiguousPaths:
             bag.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
 
     def test_disambiguation_with_intermediate_changes_path(self, dataset_test, tmp_path):
-        """A1b: Including an intermediate table changes which FK path is used.
+        """A1b: Under Rule 6, the bare ["Image", "Subject"] call raises; the
+        explicit chain call succeeds. Spec §3.6: silent path selection is
+        rejected; disambiguation requires naming an intermediate.
 
-        Without Observation: Image → Subject (direct FK, default).
-        With Observation: Image → Observation → Subject (explicit chain).
-        Both should work, but may produce different row counts due to different
-        join semantics (direct FK vs chain through Observation).
+        (Replaces an older test that compared row counts of two silently-
+        picked paths — that behavior is gone under the new semantics.)
         """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        # Direct path
-        df_direct = bag.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
-        # Explicit chain through Observation
+        # Without an intermediate → Rule 6 raises.
+        with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
+            bag.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
+
+        # Explicit chain through Observation works.
         df_chain = bag.get_denormalized_as_dataframe(include_tables=["Image", "Observation", "Subject"])
-        assert len(df_direct) > 0
         assert len(df_chain) > 0
-        # Both should have Subject columns
-        assert any(c.startswith("Subject.") for c in df_direct.columns)
         assert any(c.startswith("Subject.") for c in df_chain.columns)
 
     def test_including_intermediate_resolves_ambiguity(self, dataset_test, tmp_path):
@@ -1257,22 +1257,18 @@ class TestNewFKPatterns:
     def test_diamond_ambiguity_detected(self, dataset_test, tmp_path):
         """Diamond: Image→Subject has two paths (direct FK and via Observation).
 
-        The existing behavior prefers the direct FK when no intermediate is
-        specified.  This test documents that ["Image", "Subject"] does NOT
-        raise an ambiguity error — the shortest-path heuristic resolves it.
-
-        If the refactored code changes to raise an ambiguity error instead,
-        this test should be updated to expect that error.
+        Under the new semantics (spec §3.6 / Rule 6), the bare
+        ["Image", "Subject"] request now RAISES ``DerivaMLDenormalizeAmbiguousPath``
+        instead of silently preferring the shortest path. Users must
+        disambiguate by adding an intermediate to ``include_tables`` or
+        passing it via ``via=``.
         """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        # Currently the direct FK is preferred silently — no error.
-        df = bag.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
-        assert len(df) > 0, "Direct FK path should produce results"
-        subject_cols = [c for c in df.columns if c.startswith("Subject.")]
-        assert len(subject_cols) > 0, "Expected Subject columns via direct FK"
+        with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
+            bag.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
 
     def test_diamond_resolved_with_intermediate(self, dataset_test, tmp_path):
         """Diamond: Including Observation forces the multi-hop path.
