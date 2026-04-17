@@ -365,12 +365,58 @@ class TestFromRids:
         df = d.as_dataframe(["Image", "Subject"])
         assert len(df) == 3
 
-    def test_from_rids_mixed_forms_not_implemented_yet(self, populated_denorm) -> None:
-        """Bare RIDs require catalog lookup; in this test we'll just use
-        the tuple form (bare-RID lookup is catalog-dependent and exercised
-        in the live integration test suite)."""
-        # Placeholder - mixed forms with bare RIDs need a live catalog.
-        pass
+    def test_from_rids_mixed_forms_with_fake_catalog(self, populated_denorm) -> None:
+        """Mixed tuple + bare RIDs — bare RIDs resolved via catalog.resolve_rid."""
+        ml = _FakeMl(populated_denorm)
+        ml.catalog = _FakeCatalog({"IMG-1": "Image"})
+        d = Denormalizer.from_rids(
+            [
+                ("Image", "IMG-2"),
+                ("Image", "IMG-3"),
+                "IMG-1",  # bare — catalog resolves this to Image
+            ],
+            ml=ml,
+            dataset_rid=populated_denorm["dataset_rid"],
+        )
+        df = d.as_dataframe(["Image", "Subject"])
+        assert len(df) == 3
+
+    # ── Negative-path tests for the docstring's Raises: contract ──────────
+
+    def test_from_rids_rejects_missing_model(self, populated_denorm) -> None:
+        """No ml=, no model= → ValueError."""
+        with pytest.raises(ValueError, match="requires either ml= or an explicit model="):
+            Denormalizer.from_rids([("Image", "IMG-1")])
+
+    def test_from_rids_rejects_bare_rid_without_catalog(self, populated_denorm) -> None:
+        """Bare RID, no catalog → ValueError."""
+        with pytest.raises(ValueError, match="no catalog available"):
+            Denormalizer.from_rids(
+                ["IMG-1"],
+                model=populated_denorm["model"],
+                engine=populated_denorm["local_schema"].engine,
+            )
+
+    def test_from_rids_rejects_unresolvable_bare_rid(self, populated_denorm) -> None:
+        """Bare RID that catalog can't resolve → ValueError (not KeyError)."""
+        ml = _FakeMl(populated_denorm)
+        ml.catalog = _FakeCatalog({})  # empty → every lookup raises
+        with pytest.raises(ValueError, match="Cannot resolve RID 'BOGUS'"):
+            Denormalizer.from_rids(
+                ["BOGUS"],
+                ml=ml,
+                dataset_rid=populated_denorm["dataset_rid"],
+            )
+
+    def test_from_rids_rejects_bad_tuple_arity(self, populated_denorm) -> None:
+        """3-tuple or 1-tuple → ValueError (not opaque unpack error)."""
+        ml = _FakeMl(populated_denorm)
+        with pytest.raises(ValueError, match="must be .table, RID."):
+            Denormalizer.from_rids(
+                [("Image", "IMG-1", "extra")],  # type: ignore[list-item]
+                ml=ml,
+                dataset_rid=populated_denorm["dataset_rid"],
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +439,28 @@ class _FakeMl:
 
         self.workspace = _WS(populated_denorm["local_schema"])
         self.catalog = None  # bare-RID lookup not needed for tuple anchors
+
+
+class _FakeCatalog:
+    """Minimal catalog shim: resolve_rid maps RID -> table_name via a dict.
+
+    Raises KeyError (mirroring ErmrestCatalog's behavior) when the RID is
+    absent, so from_rids' error translation into ValueError is exercised.
+    """
+
+    def __init__(self, rid_to_table: dict[str, str]):
+        self._map = rid_to_table
+
+    def resolve_rid(self, rid: str):
+        if rid not in self._map:
+            raise KeyError(rid)
+
+        # Return a namespace exposing .table.name to mirror the real API.
+        class _TableInfo:
+            def __init__(self, name: str):
+                self.table = type("T", (), {"name": name})()
+
+        return _TableInfo(self._map[rid])
 
 
 class _FakeDataset:

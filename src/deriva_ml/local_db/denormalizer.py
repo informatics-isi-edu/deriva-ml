@@ -76,7 +76,6 @@ class Denormalizer:
         engine: Any = None,
         orm_resolver: Any = None,
         dataset_rid: str | None = None,
-        ignore_unrelated_anchors: bool = False,
     ) -> "Denormalizer":
         """Construct from an explicit anchor set (no Dataset required).
 
@@ -96,22 +95,28 @@ class Denormalizer:
         will be addressed when ``_denormalize_impl`` gains an anchor-scoped
         SQL mode).
 
+        Per-call behavior flags (``row_per``, ``via``,
+        ``ignore_unrelated_anchors``) are supplied to the public methods
+        (:meth:`as_dataframe`, :meth:`as_dict`, etc.) — not to the
+        constructor.
+
         Args:
-            anchors: list of RIDs or (table, RID) tuples.
+            anchors: list of bare RIDs or (table, RID) tuples.
             ml: Convenience: pass a DerivaML instance. catalog/workspace/model
                 are derived from it.
             catalog, workspace, model, engine, orm_resolver: Explicit deps.
             dataset_rid: Optional real dataset RID to scope the SQL by. If
                 None, uses the first anchor's RID as a placeholder (see
                 note above).
-            ignore_unrelated_anchors: propagated to subsequent method calls.
 
         Returns:
             A :class:`Denormalizer` bound to the given anchor set.
 
         Raises:
-            ValueError: if neither ``ml`` nor ``model`` is provided, or if
-                bare RIDs are passed without a catalog for lookup.
+            ValueError: if neither ``ml`` nor ``model`` is provided; if a
+                bare RID is passed without a catalog for lookup; if a bare
+                RID cannot be resolved; or if a tuple anchor does not have
+                exactly two elements.
         """
         # Derive deps from ml if given.
         if ml is not None:
@@ -128,25 +133,35 @@ class Denormalizer:
         if model is None:
             raise ValueError("Denormalizer.from_rids requires either ml= or an explicit model=")
 
-        # Normalize anchors to (table, RID) pairs.
+        # Normalize anchors to (table, RID) pairs. Validate tuple arity so
+        # a 3-tuple (or 1-tuple) surfaces as a clear ValueError here rather
+        # than an opaque unpack error later.
         resolved: list[tuple[str, str]] = []
         bare_rids: list[str] = []
         for a in anchors:
             if isinstance(a, tuple):
+                if len(a) != 2:
+                    raise ValueError(f"Anchor tuples must be (table, RID); got {a!r}")
                 resolved.append(a)
             else:
                 bare_rids.append(a)
 
-        # Batch-resolve bare RIDs via catalog.
+        # Batch-resolve bare RIDs via catalog. ErmrestCatalog.resolve_rid
+        # raises KeyError on not-found; DerivaML.resolve_rid raises
+        # DerivaMLException. Translate both into a friendly ValueError so
+        # the public contract in the docstring's Raises: block holds.
         if bare_rids:
             if catalog is None:
                 raise ValueError(
                     "Bare RIDs given but no catalog available for lookup. Pass (table, RID) tuples or provide catalog=."
                 )
+            if not hasattr(catalog, "resolve_rid"):
+                raise ValueError("catalog= does not expose resolve_rid; cannot look up bare RIDs")
             for rid in bare_rids:
-                info = catalog.resolve_rid(rid) if hasattr(catalog, "resolve_rid") else None
-                if info is None:
-                    raise ValueError(f"Cannot resolve RID {rid!r} to a table")
+                try:
+                    info = catalog.resolve_rid(rid)
+                except Exception as e:
+                    raise ValueError(f"Cannot resolve RID {rid!r} to a table") from e
                 resolved.append((info.table.name, rid))
 
         # Group by table.
