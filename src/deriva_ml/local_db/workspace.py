@@ -415,16 +415,38 @@ class Workspace:
         dataset_rid: str,
         include_tables: list[str],
         version: str | None = None,
-        source: str = "catalog",
+        source: str = "local",
         slice_id: str | None = None,
         refresh: bool = False,
         dataset: Any = None,
         dataset_children_rids: list[str] | None = None,
+        paged_client: Any = None,
     ) -> "CachedResult":
         """Run denormalization and cache the result.
 
         On first call, runs the unified denormalizer and stores the result.
         Subsequent calls return cached data. Use refresh=True to re-compute.
+
+        Args:
+            model: ``DerivaModel`` used by the denormalizer for join planning.
+            dataset_rid: RID of the dataset to denormalize.
+            include_tables: Tables to include in the wide table.
+            version: Optional dataset version (currently ignored; accepted for
+                protocol compatibility with :meth:`Dataset.cache_denormalized`).
+            source: Fetch mode forwarded to :func:`denormalize`.
+                ``"local"`` (default) assumes rows are already present.
+                ``"catalog"`` requires *paged_client* and fetches rows from
+                the live catalog. ``"slice"`` assumes rows are visible via
+                an attached slice database.
+            slice_id: Reserved for future use with source='slice'.
+            refresh: If True, ignore any existing cached entry and re-run.
+            dataset: ``DatasetLike`` object for join-plan member enumeration.
+            dataset_children_rids: Extra dataset RIDs for the WHERE filter.
+            paged_client: Required when ``source='catalog'``. See
+                :func:`denormalize`.
+
+        Returns:
+            :class:`CachedResult` handle over the cached result table.
         """
         import time
 
@@ -457,6 +479,8 @@ class Workspace:
             include_tables=include_tables,
             dataset=dataset,
             dataset_children_rids=dataset_children_rids,
+            source=source,
+            paged_client=paged_client,
         )
 
         rows = list(denorm_result.iter_rows())

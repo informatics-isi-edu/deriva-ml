@@ -824,6 +824,8 @@ class DatasetBag:
         from deriva_ml.local_db.denormalize import denormalize
 
         children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        # source="slice": rows are already present in the bag's local SQLite
+        # (populated by SchemaBuilder during download). No catalog fetch needed.
         result = denormalize(
             model=self.model,
             engine=self.engine,
@@ -832,6 +834,7 @@ class DatasetBag:
             include_tables=include_tables,
             dataset=self,
             dataset_children_rids=children_rids,
+            source="slice",
         )
         return result.to_dataframe()
 
@@ -896,6 +899,8 @@ class DatasetBag:
         from deriva_ml.local_db.denormalize import denormalize
 
         children_rids = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
+        # source="slice": rows are already present in the bag's local SQLite
+        # (populated by SchemaBuilder during download). No catalog fetch needed.
         result = denormalize(
             model=self.model,
             engine=self.engine,
@@ -904,6 +909,7 @@ class DatasetBag:
             include_tables=include_tables,
             dataset=self,
             dataset_children_rids=children_rids,
+            source="slice",
         )
         yield from result.iter_rows()
 

@@ -146,13 +146,26 @@ def denormalize(
 
     # Build a quick lookup from table name to schema name so we can form
     # qualified ERMrest names ("schema:table") for PagedFetcher calls.
+    # We can't rely on column_specs alone because association tables (like
+    # Dataset_Image) appear in the join path but contribute no output
+    # columns — so their schema won't be in column_specs. Use the
+    # model.name_to_table() helper to look up every table's schema.
     table_to_schema: dict[str, str] = {}
     for schema_name, table_name, _col, _type in column_specs:
         table_to_schema[table_name] = schema_name
-    # The Dataset table itself is not in column_specs (its columns are not
-    # included in the output); fill in its schema from the model.
-    if "Dataset" not in table_to_schema:
-        table_to_schema["Dataset"] = getattr(model, "ml_schema", "deriva-ml")
+    # Ensure every table that appears in the join plan has a schema entry.
+    for _key, (path, _join_conditions, _join_types) in join_tables.items():
+        for table_name in path:
+            if table_name in table_to_schema:
+                continue
+            try:
+                t = model.name_to_table(table_name)
+                table_to_schema[table_name] = t.schema.name
+            except Exception:
+                logger.warning(
+                    "Could not resolve schema for table %s; catalog fetch may skip it.",
+                    table_name,
+                )
 
     # Step 2: Build labelled columns from ORM classes.
     denormalized_columns = []

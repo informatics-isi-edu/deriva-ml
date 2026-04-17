@@ -852,6 +852,7 @@ class Dataset:
         import warnings
 
         from deriva_ml.local_db.denormalize import denormalize
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
         # Guard: workspace must have a built local_schema before we can use it.
         ws = self._ml_instance.workspace
@@ -872,6 +873,11 @@ class Dataset:
                 stacklevel=2,
             )
 
+        # Build a paged client that fetches rows from the live catalog into
+        # the workspace's local SQLite. Required because the workspace engine
+        # starts empty — without this, the SQL join runs against zero rows.
+        paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
+
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         result = denormalize(
             model=self._ml_instance.model,
@@ -881,6 +887,8 @@ class Dataset:
             include_tables=include_tables,
             dataset=self,
             dataset_children_rids=children,
+            source="catalog",
+            paged_client=paged_client,
         )
         return result.to_dataframe()
 
@@ -916,16 +924,20 @@ class Dataset:
             # Second call returns cached data instantly
             df = dataset.cache_denormalized(["Image", "Diagnosis"], version="1.0.0")
         """
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+        paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         result = self._ml_instance.workspace.cache_denormalized(
             model=self._ml_instance.model,
-            dataset_rid=self.rid,
+            dataset_rid=self.dataset_rid,
             include_tables=include_tables,
             version=version,
             source="catalog",
             refresh=force,
             dataset=self,
             dataset_children_rids=children,
+            paged_client=paged_client,
         )
         return result.to_dataframe()
 
@@ -988,6 +1000,7 @@ class Dataset:
         import warnings
 
         from deriva_ml.local_db.denormalize import denormalize
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
         # Guard: workspace must have a built local_schema before we can use it.
         ws = self._ml_instance.workspace
@@ -1008,6 +1021,11 @@ class Dataset:
                 stacklevel=2,
             )
 
+        # Build a paged client that fetches rows from the live catalog into
+        # the workspace's local SQLite. See denormalize_as_dataframe above
+        # for the rationale.
+        paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
+
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         result = denormalize(
             model=self._ml_instance.model,
@@ -1017,6 +1035,8 @@ class Dataset:
             include_tables=include_tables,
             dataset=self,
             dataset_children_rids=children,
+            source="catalog",
+            paged_client=paged_client,
         )
         yield from result.iter_rows()
 

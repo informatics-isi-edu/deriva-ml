@@ -332,3 +332,144 @@ class TestLocalSchemaNoneGuard:
         with pytest.raises(RuntimeError, match="local_schema not built"):
             # Must trigger the generator to see the RuntimeError
             list(Dataset.denormalize_as_dict(mock_dataset, ["Image"]))
+
+
+# ---------------------------------------------------------------------------
+# Regression tests — these close the gap that let C1 ship:
+# the prior test suite pre-populated ORM tables in a fixture, so denormalize()
+# "passed" even though it never fetched rows. These tests start with an
+# empty LocalSchema and verify that source="catalog" actually populates rows
+# via PagedFetcher.
+# ---------------------------------------------------------------------------
+
+
+class TestCatalogSource:
+    """Verify source='catalog' actually fetches rows via the paged client.
+
+    THIS IS THE TEST THAT WOULD HAVE CAUGHT THE C1 BUG.
+
+    Unlike the ``populated_denorm`` fixture which pre-inserts rows into the
+    LocalSchema, these tests start with a fresh empty schema and supply a
+    fake paged client. The denormalizer must walk the join plan, fetch rows
+    via the client, and then run the SQL join — exactly what production
+    callers need.
+    """
+
+    def test_catalog_source_fetches_and_joins(
+        self,
+        denorm_deriva_model: Any,
+        denorm_local_schema: Any,
+    ) -> None:
+        """An empty LocalSchema returns rows when source='catalog'."""
+        # Import FakePagedClient from the paged_fetcher tests.
+        from tests.local_db.test_paged_fetcher import FakePagedClient
+
+        ls = denorm_local_schema
+        model = denorm_deriva_model
+        ds_rid = "DS-CAT-001"
+
+        # Provide the rows that a real ERMrest catalog would return, keyed
+        # by ERMrest-qualified "schema:table" names.
+        fake = FakePagedClient(
+            rows_by_table={
+                "deriva-ml:Dataset": [{"RID": ds_rid, "Description": "t"}],
+                "deriva-ml:Dataset_Image": [
+                    {"RID": "DI-1", "Dataset": ds_rid, "Image": "IMG-A"},
+                    {"RID": "DI-2", "Dataset": ds_rid, "Image": "IMG-B"},
+                ],
+                "isa:Image": [
+                    {"RID": "IMG-A", "Filename": "a.png", "Subject": "S-1"},
+                    {"RID": "IMG-B", "Filename": "b.png", "Subject": "S-2"},
+                ],
+                "isa:Subject": [
+                    {"RID": "S-1", "Name": "Alice"},
+                    {"RID": "S-2", "Name": "Bob"},
+                ],
+            }
+        )
+
+        result = denormalize(
+            model=model,
+            engine=ls.engine,
+            orm_resolver=ls.get_orm_class,
+            dataset_rid=ds_rid,
+            include_tables=["Image", "Subject"],
+            source="catalog",
+            paged_client=fake,
+        )
+
+        # KEY ASSERTION: rows come back despite starting from an empty DB.
+        # This is the assertion the prior test suite should have had.
+        assert result.row_count == 2, (
+            "source='catalog' must fetch rows via the paged client; "
+            "returning 0 rows means PagedFetcher was never called."
+        )
+
+        rows = list(result.iter_rows())
+        filenames = {r["Image.Filename"] for r in rows}
+        assert filenames == {"a.png", "b.png"}
+
+        # Verify the client was actually consulted (not just bypassed).
+        assert any(req[0] == "fetch_rid_batch" for req in fake.requests), (
+            "Expected fetch_rid_batch calls on the paged client"
+        )
+
+    def test_catalog_source_requires_paged_client(self, populated_denorm: dict[str, Any]) -> None:
+        """source='catalog' without paged_client raises ValueError."""
+        with pytest.raises(ValueError, match="paged_client"):
+            denormalize(
+                model=populated_denorm["model"],
+                engine=populated_denorm["local_schema"].engine,
+                orm_resolver=populated_denorm["local_schema"].get_orm_class,
+                dataset_rid=populated_denorm["dataset_rid"],
+                include_tables=["Image"],
+                source="catalog",
+                # paged_client omitted — must error
+            )
+
+    def test_local_source_does_not_require_paged_client(self, populated_denorm: dict[str, Any]) -> None:
+        """source='local' (default) works without a paged_client."""
+        # Just verify it doesn't raise — rows come from the fixture.
+        result = denormalize(
+            model=populated_denorm["model"],
+            engine=populated_denorm["local_schema"].engine,
+            orm_resolver=populated_denorm["local_schema"].get_orm_class,
+            dataset_rid=populated_denorm["dataset_rid"],
+            include_tables=["Image"],
+            source="local",
+        )
+        assert result.row_count > 0
+
+    def test_slice_source_does_not_require_paged_client(self, populated_denorm: dict[str, Any]) -> None:
+        """source='slice' works without a paged_client (rows from attached slice)."""
+        result = denormalize(
+            model=populated_denorm["model"],
+            engine=populated_denorm["local_schema"].engine,
+            orm_resolver=populated_denorm["local_schema"].get_orm_class,
+            dataset_rid=populated_denorm["dataset_rid"],
+            include_tables=["Image"],
+            source="slice",
+        )
+        assert result.row_count > 0
+
+
+class TestDatasetOrmGuard:
+    """C3: missing Dataset ORM raises a clear RuntimeError, not a cryptic crash."""
+
+    def test_missing_dataset_orm_raises_runtime_error(self, populated_denorm: dict[str, Any]) -> None:
+        """If orm_resolver returns None for 'Dataset', raise clear error."""
+        real_resolver = populated_denorm["local_schema"].get_orm_class
+
+        def broken_resolver(name: str) -> Any:
+            if name == "Dataset":
+                return None
+            return real_resolver(name)
+
+        with pytest.raises(RuntimeError, match="Dataset ORM"):
+            denormalize(
+                model=populated_denorm["model"],
+                engine=populated_denorm["local_schema"].engine,
+                orm_resolver=broken_resolver,
+                dataset_rid=populated_denorm["dataset_rid"],
+                include_tables=["Image"],
+            )
