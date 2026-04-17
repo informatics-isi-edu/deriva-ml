@@ -37,7 +37,7 @@
 
 | Path | Change |
 |------|--------|
-| `src/deriva_ml/model/catalog.py` | Update `_prepare_wide_table` / `_build_join_tree` to implement new rules: sinks as `row_per` candidates, per-pair path ambiguity with suggestions, downstream detection. Add new exception classes in `core/exceptions.py`. |
+| `src/deriva_ml/model/catalog.py` | **Extract** two nested functions to module-level methods on `DerivaModel`: `_is_likely_association` (was nested in `_build_join_tree` at lines 727-751) → `_is_association_table`; `find_arcs` (was nested in `_schema_to_paths` at lines 1173-1188) → `_fk_neighbors`. **Compose** new helpers on top of those + existing `_schema_to_paths` / `_table_relationship`: `_outbound_reachable`, `_enumerate_paths`, `_find_sinks`, `_determine_row_per`, `_find_path_ambiguities`. Update `_prepare_wide_table` to accept `row_per` / `via` and invoke the new rules before the existing tree-building flow. |
 | `src/deriva_ml/core/exceptions.py` | Add `DerivaMLDenormalizeAmbiguousPath`, `DerivaMLDenormalizeMultiLeaf`, `DerivaMLDenormalizeNoSink`, `DerivaMLDenormalizeDownstreamLeaf`, `DerivaMLDenormalizeUnrelatedAnchor` exception classes. |
 | `src/deriva_ml/local_db/denormalize.py` | Rename public `denormalize()` → `_denormalize_impl()`. Keep `DenormalizeResult`, `_MinimalDatasetMock`, helpers. `_denormalize_impl` becomes the private implementation called by `Denormalizer`. |
 | `src/deriva_ml/local_db/__init__.py` | Export `Denormalizer` (new), remove export of free `denormalize` function (replaced by class). |
@@ -62,6 +62,60 @@
 | `src/deriva_ml/local_db/paged_fetcher_ermrest.py` | Phase 1, no changes. |
 | `src/deriva_ml/local_db/manifest_store.py` | Phase 1, no changes. |
 | `src/deriva_ml/local_db/result_cache.py` | Phase 2, no changes. |
+
+---
+
+## Reuse inventory (DRY — do NOT reimplement)
+
+The codebase already contains the primitives this refactor needs. Every new
+helper must either **reuse as-is**, **extract from where it's currently
+nested**, or **wrap** an existing routine. If you find yourself writing a new
+BFS/DFS over the FK graph, stop — it already exists.
+
+### Must-reuse (as-is)
+
+| Existing routine | Location | Use in new code |
+|------------------|----------|-----------------|
+| `DerivaModel._schema_to_paths(root, max_depth=...)` | `src/deriva_ml/model/catalog.py:1120` | Authoritative FK-path enumerator (DFS, handles cycles, terminates at vocabs). Base for `_enumerate_paths` and `_outbound_reachable`. |
+| `DerivaModel._table_relationship(fk_src, pk_dst)` | `src/deriva_ml/model/catalog.py:1079` | Resolves FK column pairs between two tables. Handles composite FKs + ambiguity detection. Use wherever pairs of joined tables need their FK edge. |
+| `DerivaModel.name_to_table(name)` | `src/deriva_ml/model/catalog.py:371` | Name → Table resolver. Single source of truth — never walk schemas manually. |
+| `DerivaModel.is_vocabulary(tbl)` | `src/deriva_ml/model/catalog.py:399` | Vocabulary detection for path termination. |
+| `DerivaModel.is_asset(tbl)` | `src/deriva_ml/model/catalog.py:482` | Asset-table detection when formatting output columns. |
+| `denormalize_column_name(table, column, multi_schema)` | `src/deriva_ml/model/catalog.py:100` | `{Table}.{col}` / `{schema}.{Table}.{col}` naming. **Do not invent new naming.** |
+| `Dataset.list_dataset_members(...)` | `src/deriva_ml/dataset/dataset.py:701` | Dataset-member retrieval (grouped by element type) — the anchor source when `Denormalizer` is constructed from a dataset. |
+| `Dataset._denormalize_datapath(...)` | `src/deriva_ml/dataset/dataset.py:782` | LEFT-JOIN / NULL-init pattern for row emission. Study before writing `Denormalizer._run()` — the NULL-initialization orphan pattern is already implemented here. |
+
+### Must-extract (currently nested — promote to methods on `DerivaModel`)
+
+| Currently nested | Promote to | Why |
+|------------------|------------|-----|
+| `_is_likely_association(tbl)` — nested inside `_build_join_tree` at `catalog.py:727-751` | `DerivaModel._is_association_table(name_or_tbl)` | Both `_prepare_wide_table` and the new `Denormalizer` need it. Nested function cannot be reused. |
+| `find_arcs(table)` — nested inside `_schema_to_paths` at `catalog.py:1173-1188` | `DerivaModel._fk_neighbors(tbl)` | Returns FK-reachable tables (both outbound and inbound, deduplicated by target). The building block for `_outbound_reachable`. |
+
+### Wrap / compose (new thin helpers delegate to existing)
+
+| New helper | Composes | Notes |
+|------------|----------|-------|
+| `_outbound_reachable(from_table, tables_in_set)` | `_fk_neighbors` + association-transparent filter | BFS over already-available `_fk_neighbors`. ~15 lines. |
+| `_enumerate_paths(from_t, to_t, tables_in_set, max_depth)` | `_schema_to_paths(root=from_t, max_depth=...)` + filter | Filter full path list for paths ending at `to_t`. Do NOT re-implement DFS. |
+| `_find_sinks(include_tables, via)` | `_outbound_reachable` | Sink = table with empty `_outbound_reachable` (minus self) within the set. |
+| `_determine_row_per(include_tables, via, row_per)` | `_find_sinks` + `_outbound_reachable` | Explicit-row_per validation also delegates to `_outbound_reachable`. |
+| `_find_path_ambiguities(row_per, include_tables, via)` | `_enumerate_paths` | For each target, count distinct paths; assemble ambiguity dicts. |
+
+### Must-study (reference implementation, may be wrappable)
+
+- `Dataset.denormalize_as_dataframe` (`src/deriva_ml/dataset/dataset.py:974`) — wraps `_denormalize_datapath` to produce a DataFrame with `denormalize_column_name`-prefixed columns. The new `Denormalizer.as_dataframe` should produce the **same column-naming convention**. Consider whether `Denormalizer` can call `_denormalize_datapath` (after the planner guards) rather than replicate its generator logic.
+- `Dataset.denormalize_info` (`src/deriva_ml/core/mixins/dataset.py:312`) — already produces a plan-dict with columns, join_path, per-table counts. `describe_denormalized` should **extend** this shape with `row_per`, `row_per_source`, `ambiguities`, `orphan_rows`, `anchors` fields — not rewrite it.
+
+### Red-flag checklist
+
+Before every helper function you add, ask:
+- [ ] Am I walking FK edges? → use `_schema_to_paths` or `_fk_neighbors`.
+- [ ] Am I checking if a table is an association? → use extracted `_is_association_table`.
+- [ ] Am I resolving FK columns between two tables? → use `_table_relationship`.
+- [ ] Am I naming an output column? → use `denormalize_column_name`.
+- [ ] Am I fetching dataset member rows? → use `list_dataset_members`.
+- [ ] Am I walking table records to build the wide table? → extend `_denormalize_datapath` or call it directly.
 
 ---
 
@@ -362,6 +416,26 @@ This is the largest single task because the planner is the semantic core. The ru
 - **Rule 6 (path ambiguity):** For every pair (`row_per`, T) where T ∈ `include_tables ∪ via`, enumerate all simple paths through the FK graph (with association tables as transparent edges). If >1 path, raise `DerivaMLDenormalizeAmbiguousPath` with the path list and suggested intermediates (tables in at least one path but not in `include_tables`).
 - **Association tables as transparent intermediates:** pure association tables on a required chain between two requested tables are joined through without contributing columns.
 
+### DRY strategy for this task
+
+The existing planner (`_build_join_tree` at `catalog.py:632`, `_schema_to_paths` at
+`catalog.py:1120`) already does 80% of what these rules need. The task is to:
+
+1. **Extract** two nested functions so they can be reused:
+   - `_is_likely_association` (nested in `_build_join_tree` at lines 727-751)
+     → `DerivaModel._is_association_table`
+   - `find_arcs` (nested in `_schema_to_paths` at lines 1173-1188)
+     → `DerivaModel._fk_neighbors`
+
+2. **Compose** the new helpers (`_outbound_reachable`, `_enumerate_paths`,
+   `_find_sinks`, `_determine_row_per`, `_find_path_ambiguities`) by calling
+   the extracted + existing routines. No new FK traversal code.
+
+3. **Extend** `_prepare_wide_table` with the three guard calls
+   (`_determine_row_per`, `_find_path_ambiguities`) in front of the existing
+   tree-building logic. The existing path-selection / flattening is preserved
+   for the legacy `_denormalize_impl` code path.
+
 - [ ] **Step 1: Write failing planner unit tests.**
 
 Create `tests/local_db/test_planner_rules.py`. These tests use a canned ERMrest `Model` from the existing `denorm_deriva_model` fixture in `tests/local_db/conftest.py`. No live catalog.
@@ -530,9 +604,116 @@ Expected: most fail with `AttributeError` because `_find_sinks`, `_determine_row
 
 Read `src/deriva_ml/model/catalog.py:887-1100` for `_prepare_wide_table` and `src/deriva_ml/model/catalog.py:633-830` for `_build_join_tree`. Note the existing single-method interface.
 
-- [ ] **Step 4: Add the three new helper methods to `DerivaModel`.**
+- [ ] **Step 4a: Extract the two nested helpers to module-level methods on `DerivaModel`.**
 
-In `src/deriva_ml/model/catalog.py`, add these methods to the `DerivaModel` class (locate near `_prepare_wide_table`, around line 887):
+These are currently nested functions that cannot be reused by the new planner code. Promote each to a method on `DerivaModel`.
+
+**First**, extract `_is_likely_association` from `_build_join_tree` (currently at `catalog.py:727-751`). Replace the nested `def _is_likely_association(tbl)` with a call to the new method, and add the method at module-level alongside other `DerivaModel` helpers:
+
+```python
+def _is_association_table(self, name_or_table: str | Table) -> bool:
+    """Check if a table is a pure association (M:N link) table.
+
+    An association table has only system columns (RID/RCT/RMT/RCB/RMB)
+    plus exactly two domain FK columns. ERMrest's built-in
+    ``Table.is_association()`` counts system FKs (RCB/RMB →
+    ERMrest_Client), so we use our own check that ignores them.
+
+    Previously nested inside ``_build_join_tree``; promoted so that
+    denormalization planning can also use it.
+
+    Args:
+        name_or_table: table name (looked up via :meth:`name_to_table`) or
+            a :class:`Table` instance.
+
+    Returns:
+        True if the table is a pure association table.
+    """
+    system_cols = {"RID", "RCT", "RMT", "RCB", "RMB"}
+    try:
+        tbl = (
+            name_or_table
+            if hasattr(name_or_table, "foreign_keys")
+            else self.name_to_table(name_or_table)
+        )
+        cols = {c.name for c in tbl.columns}
+        fks = list(tbl.foreign_keys)
+        domain_fks = [
+            fk for fk in fks
+            if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")
+        ]
+        fk_col_names: set[str] = set()
+        for fk in domain_fks:
+            for col in fk.columns:
+                fk_col_names.add(col.name if hasattr(col, "name") else str(col))
+        user_cols = cols - system_cols - fk_col_names
+        return len(domain_fks) == 2 and len(user_cols) == 0
+    except Exception:
+        return False
+```
+
+Then in `_build_join_tree`, replace the nested `def _is_likely_association(tbl): ...` and the `_is_likely_association(tbl)` call site with:
+
+```python
+# (delete the nested def here — it's now self._is_association_table)
+```
+
+and update the call site in `_intermediates_covered`:
+
+```python
+if tbl is not None and self._is_association_table(tbl):
+```
+
+**Second**, extract `find_arcs` from `_schema_to_paths` (currently at `catalog.py:1173-1188`). The new method follows both outbound and inbound FKs, returning reachable tables deduplicated by target.
+
+```python
+def _fk_neighbors(self, table: str | Table) -> set[Table]:
+    """Return FK-neighbor tables of *table* (outbound + inbound, deduplicated).
+
+    Follows both ``table.foreign_keys`` (outbound) and
+    ``table.referenced_by`` (inbound), filters to valid schemas
+    (``domain_schemas ∪ {ml_schema}``), and deduplicates multi-FK
+    targets — if two FKs both point to Foo, Foo appears once.
+
+    Previously nested inside ``_schema_to_paths``; promoted so that
+    denormalization planning can also use it as the FK-traversal primitive.
+
+    Args:
+        table: table name or Table instance.
+
+    Returns:
+        Set of :class:`Table` objects reachable from *table* via one FK arc.
+    """
+    tbl = table if hasattr(table, "foreign_keys") else self.name_to_table(table)
+    valid_schemas = self.domain_schemas | {self.ml_schema}
+    arc_list = (
+        [fk.pk_table for fk in tbl.foreign_keys]
+        + [fk.table for fk in tbl.referenced_by]
+    )
+    arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
+    # Deduplicate: when multiple FKs point to the same target table, keep
+    # only one. Downstream code handles FK selection via _table_relationship.
+    seen: set[Table] = set()
+    deduped: list[Table] = []
+    for t in arc_list:
+        if t not in seen:
+            seen.add(t)
+            deduped.append(t)
+    return set(deduped)
+```
+
+In `_schema_to_paths`, replace the nested `def find_arcs(table)` and the `find_arcs(root)` call with:
+
+```python
+# (delete the nested def here — it's now self._fk_neighbors)
+for child in self._fk_neighbors(root):
+```
+
+- [ ] **Step 4b: Add the new planner helpers — each composes the extracted primitives.**
+
+These helpers are all thin compositions of `_fk_neighbors`, `_is_association_table`, `_schema_to_paths`, and `_table_relationship`. No new FK traversal — just filter/orchestrate calls into the existing routines.
+
+Add these methods to `DerivaModel` (in `src/deriva_ml/model/catalog.py`, near `_prepare_wide_table` around line 887):
 
 ```python
 def _find_sinks(
@@ -542,34 +723,27 @@ def _find_sinks(
 ) -> list[str]:
     """Find sinks in the FK subgraph on include_tables ∪ via.
 
-    A sink is a table with no outbound FK to any other table in the set,
-    considering association tables not in the set as transparent edges.
+    A sink is a table in ``include_tables`` with no outbound FK to any
+    other table in the set, considering association tables not in the set
+    as transparent edges.
 
-    Intuition: "which requested tables are furthest downstream."
+    Composes :meth:`_outbound_reachable` — does not traverse FKs itself.
 
     Args:
         include_tables: tables whose FK edges are considered.
         via: additional tables that are part of the subgraph (routing only).
 
     Returns:
-        List of table names that are sinks, sorted alphabetically for
-        deterministic test output. Empty if every table has at least one
-        outbound edge to another requested table (cycle — rare).
+        List of sink table names, sorted alphabetically. Empty if a cycle
+        in the subgraph means no sink exists.
     """
     via = via or []
     all_tables = set(include_tables) | set(via)
-    # Reachability: table_name -> set of other table names reachable via
-    # outbound FKs (association tables transparent).
-    reachable_out: dict[str, set[str]] = {t: set() for t in all_tables}
-    for t in all_tables:
-        reachable_out[t] = self._outbound_reachable(t, all_tables)
-
-    # A sink has no outbound edges to OTHER tables in the set.
-    sinks = sorted(
+    return sorted(
         t for t in all_tables
-        if t in include_tables and not (reachable_out[t] - {t})
+        if t in include_tables
+        and not (self._outbound_reachable(t, all_tables) - {t})
     )
-    return sinks
 
 
 def _outbound_reachable(
@@ -579,10 +753,9 @@ def _outbound_reachable(
 ) -> set[str]:
     """Tables in ``tables_in_set`` reachable from ``from_table`` via FKs.
 
-    Follows outbound FKs from ``from_table``. Association tables that are
-    NOT in ``tables_in_set`` are traversed transparently (we see through
-    them to the tables they link). Tables in ``tables_in_set`` are
-    recorded and traversal continues through them.
+    BFS over :meth:`_fk_neighbors` — association tables NOT in
+    ``tables_in_set`` are transparent hops (we traverse past them to see
+    the tables they link). Tables in ``tables_in_set`` are recorded.
 
     Args:
         from_table: starting table.
@@ -591,7 +764,8 @@ def _outbound_reachable(
             transparent.
 
     Returns:
-        Set of table names in ``tables_in_set`` reachable from from_table.
+        Set of names in ``tables_in_set`` reachable from from_table
+        (excluding from_table itself).
     """
     seen: set[str] = set()
     stack: list[str] = [from_table]
@@ -604,49 +778,27 @@ def _outbound_reachable(
             tbl = self.name_to_table(t)
         except Exception:
             continue
-        for fk in tbl.foreign_keys:
-            target_name = fk.pk_table.name
-            if target_name in tables_in_set and target_name != from_table:
+        # Use the extracted _fk_neighbors primitive — no direct FK walking here.
+        for neighbor in self._fk_neighbors(t):
+            target_name = neighbor.name
+            if target_name == from_table:
+                continue
+            if target_name in tables_in_set:
                 seen.add(target_name)
-                # Continue through it — but only if it's an association
-                # table (so we can see past it to further targets).
-                if self._is_association_table(target_name):
+                # Continue through it only if association — so we can see
+                # past it to further requested targets.
+                if self._is_association_table(neighbor):
                     stack.append(target_name)
-            elif self._is_association_table(target_name):
-                # Transparent hop through a non-requested association table
+            elif self._is_association_table(neighbor):
+                # Transparent hop through a non-requested association.
                 stack.append(target_name)
-            # else: a non-requested, non-association table — dead end
+            # else: non-requested, non-association — dead end
     seen.discard(from_table)
-    # Filter to tables that are in the requested set
     return {t for t in seen if t in tables_in_set and t != from_table}
 
 
-def _is_association_table(self, table_name: str) -> bool:
-    """Check if *table_name* is a pure association table.
-
-    Association = only system columns (RID/RCT/RMT/RCB/RMB) and exactly
-    2 domain FKs (not counting system FKs to ERMrest_Client etc.).
-
-    Uses the same logic as the existing ``_is_likely_association`` helper
-    in ``_build_join_tree`` but promoted to a top-level method.
-    """
-    system_cols = {"RID", "RCT", "RMT", "RCB", "RMB"}
-    try:
-        tbl = self.name_to_table(table_name)
-    except Exception:
-        return False
-    cols = {c.name for c in tbl.columns}
-    fks = list(tbl.foreign_keys)
-    domain_fks = [
-        fk for fk in fks
-        if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")
-    ]
-    fk_col_names: set[str] = set()
-    for fk in domain_fks:
-        for col in fk.columns:
-            fk_col_names.add(col.name if hasattr(col, "name") else str(col))
-    user_cols = cols - system_cols - fk_col_names
-    return len(domain_fks) == 2 and len(user_cols) == 0
+# Note: _is_association_table is added in Step 4a above (extracted from
+# _build_join_tree). Do NOT re-define it here.
 
 
 def _determine_row_per(
@@ -773,43 +925,55 @@ def _enumerate_paths(
     tables_in_set: set[str],
     max_depth: int = 6,
 ) -> list[list[str]]:
-    """Enumerate simple FK paths from from_table to to_table.
+    """Enumerate simple FK paths from ``from_table`` to ``to_table``.
 
-    Considers the FK subgraph on ``tables_in_set``. Association tables not
-    in the set are traversed transparently and appear in the returned path
-    (so the caller can report them as intermediates).
+    **Implementation:** delegates the FK-graph DFS to the existing
+    :meth:`_schema_to_paths` (which handles cycle detection, vocabulary
+    termination, schema filtering, and multi-FK deduplication) and then
+    filters / trims the result. Do NOT write a fresh DFS here.
+
+    Association tables not in ``tables_in_set`` are kept as transparent
+    intermediates in the returned path so callers can report them as
+    suggestions.
 
     Args:
         from_table: path start.
         to_table: path end.
-        tables_in_set: tables whose edges count.
-        max_depth: safety limit to prevent pathological schemas.
+        tables_in_set: ``include_tables ∪ via``. Paths passing through
+            tables NOT in this set are accepted only if every intermediate
+            is a pure association table (transparent hop).
+        max_depth: forwarded to ``_schema_to_paths`` as safety cap.
 
     Returns:
-        List of paths, each a list of table names from ``from_table`` to
-        ``to_table``.
+        List of paths, each a list of table-name strings from
+        ``from_table`` to ``to_table``.
     """
-    paths: list[list[str]] = []
+    from_tbl = self.name_to_table(from_table)
 
-    def _dfs(current: str, target: str, path: list[str], depth: int) -> None:
-        if depth > max_depth:
-            return
-        if current == target:
-            paths.append(list(path))
-            return
-        try:
-            tbl = self.name_to_table(current)
-        except Exception:
-            return
-        for fk in tbl.foreign_keys:
-            nxt = fk.pk_table.name
-            if nxt in path:
-                continue  # avoid cycles
-            if nxt == target or nxt in tables_in_set or self._is_association_table(nxt):
-                _dfs(nxt, target, path + [nxt], depth + 1)
+    # Get every FK path from from_table (and its prefixes) via the existing
+    # authoritative enumerator.
+    all_paths = self._schema_to_paths(root=from_tbl, max_depth=max_depth)
 
-    _dfs(from_table, to_table, [from_table], 0)
-    return paths
+    result: list[list[str]] = []
+    for path in all_paths:
+        if not path or path[-1].name != to_table:
+            continue
+        names = [t.name for t in path]
+        if names[0] != from_table:
+            continue
+        # Accept if every intermediate (between endpoints) is either in the
+        # set or a transparent association table.
+        ok = True
+        for mid in names[1:-1]:
+            if mid in tables_in_set:
+                continue
+            if self._is_association_table(mid):
+                continue
+            ok = False
+            break
+        if ok:
+            result.append(names)
+    return result
 ```
 
 - [ ] **Step 5: Run the planner tests.**
@@ -880,9 +1044,21 @@ uv run ruff check src/deriva_ml/model/catalog.py
 git add src/deriva_ml/model/catalog.py tests/local_db/test_planner_rules.py tests/local_db/conftest.py
 git commit -m "feat(denormalize): implement Rule 2/5/6 planner helpers with unit tests
 
-Add _find_sinks, _determine_row_per, _find_path_ambiguities, _enumerate_paths
-as first-class methods on DerivaModel. _prepare_wide_table now accepts
-row_per and via kwargs and invokes the new rules before planning.
+Extract two nested functions to module-level methods on DerivaModel:
+  - _is_likely_association (was nested in _build_join_tree)
+      → DerivaModel._is_association_table
+  - find_arcs (was nested in _schema_to_paths)
+      → DerivaModel._fk_neighbors
+Both _build_join_tree and _schema_to_paths now call the extracted methods.
+
+Add thin composing helpers that reuse the extracted primitives and the
+existing _schema_to_paths / _table_relationship:
+  - _outbound_reachable (BFS on _fk_neighbors)
+  - _enumerate_paths (filter on _schema_to_paths output)
+  - _find_sinks / _determine_row_per / _find_path_ambiguities
+
+_prepare_wide_table accepts row_per and via kwargs and invokes the new
+rules before the existing tree-building flow.
 
 Extends canned test fixture with Observation table to support diamond-path
 test coverage.
@@ -984,6 +1160,21 @@ Introduce the class in a new module `denormalizer.py` to avoid making `denormali
 **Files:**
 - Create: `src/deriva_ml/local_db/denormalizer.py`
 - Create: `tests/local_db/test_denormalizer.py`
+
+**DRY reminders (see Reuse inventory above):**
+- `as_dataframe` / `as_dict` delegate to `_denormalize_impl` — do NOT
+  re-implement the SQL execution loop. `_denormalize_impl` already handles
+  the JOIN construction, row emission with NULL-init, and schema-prefixed
+  column names via `denormalize_column_name`.
+- `columns` invokes `self._model._prepare_wide_table(...)` (model-only
+  planning, no data fetch) and formats with `denormalize_column_name`.
+  Do NOT invent a new schema-prefixing scheme.
+- Anchor retrieval uses `dataset.list_dataset_members(recurse=True)` —
+  `_anchors_as_dict` in Task 6 wraps this.
+- Study `Dataset.denormalize_as_dataframe` (`dataset/dataset.py:974`)
+  before writing `Denormalizer.as_dataframe` — the public shape (column
+  prefixing, row dicts, DataFrame construction) is already defined there.
+  The new class preserves that shape so downstream tools keep working.
 
 - [ ] **Step 1: Write failing tests for the class skeleton.**
 
@@ -1525,6 +1716,21 @@ Implement the anchor-classification logic that rejects unrelated anchors unless 
 **Files:**
 - Modify: `src/deriva_ml/local_db/denormalizer.py` — add `_classify_anchors`, `_emit_orphan_rows`.
 
+**DRY reminders (see Reuse inventory above):**
+- `_classify_anchors` uses `self._model._outbound_reachable` — do NOT walk FKs here.
+- `_emit_orphan_rows` uses `denormalize_column_name` for column labels — do NOT reinvent the `{Table}.{col}` convention.
+- The NULL-init / LEFT-JOIN pattern is already established in
+  `Dataset._denormalize_datapath` (`src/deriva_ml/dataset/dataset.py:941-970`).
+  Read it before writing `_emit_orphan_rows` — your implementation follows
+  the same shape (init everything to None, populate only the anchor's
+  columns from its own row).
+- The orphan anchor's own row is looked up from the local engine via the
+  orm_resolver. The `_populate_from_catalog` helper in `denormalize.py:255`
+  (and `PagedFetcher.fetch_by_rids` in `paged_fetcher.py:174`) is the
+  catalog-side analog if source="catalog" — the existing
+  `_denormalize_impl` already fetches these rows, so in practice the orm
+  table is populated by the time `_emit_orphan_rows` runs.
+
 - [ ] **Step 1: Write failing tests.**
 
 Add to `tests/local_db/test_denormalizer.py`:
@@ -1845,6 +2051,20 @@ The minimal `describe` from Task 4 just returned row_per + columns. The full pla
 - Modify: `src/deriva_ml/local_db/denormalizer.py` — extend `describe`.
 - Modify: `tests/local_db/test_denormalizer.py` — extend `TestDescribe`.
 
+**DRY reminders (see Reuse inventory above):**
+- `describe()` should reuse the existing `Dataset.denormalize_info` shape
+  (`src/deriva_ml/core/mixins/dataset.py:312`) as its starting point —
+  that function already produces `columns`, `join_path`, and per-table
+  counts. Extend with `row_per` / `row_per_source` / `row_per_candidates` /
+  `ambiguities` / `orphan_rows` / `anchors` fields. Do NOT rewrite column
+  generation or join-path construction.
+- All row-count estimation should go through `_classify_anchors` (added
+  in Task 6) — do NOT duplicate anchor classification.
+- Ambiguity detection: call `self._model._find_path_ambiguities(...)`.
+  Unlike `as_dataframe`, `describe` reports ambiguities (dry-run) rather
+  than raising.
+- Use `denormalize_column_name` for all output column labels.
+
 - [ ] **Step 1: Write failing tests.**
 
 Add to `tests/local_db/test_denormalizer.py`:
@@ -2079,6 +2299,18 @@ git commit -m "feat(denormalize): Denormalizer.describe returns full plan dict (
 **Files:**
 - Modify: `src/deriva_ml/local_db/denormalizer.py` — implement `list_paths`.
 - Modify: `tests/local_db/test_denormalizer.py` — add `TestListPaths`.
+
+**DRY reminders (see Reuse inventory above):**
+- `reachable_tables` uses `self._model._outbound_reachable` — do NOT
+  re-walk FKs.
+- `association_tables` uses `self._model._is_association_table`.
+- `schema_paths` uses `self._model._enumerate_paths` — which itself
+  wraps `_schema_to_paths`.
+- `feature_tables` should use `DerivaModel.find_features` /
+  `is_feature_table` if exposed; do NOT heuristic-detect by name parsing.
+- If the `Dataset` has a dedicated `list_dataset_element_types` (see
+  `src/deriva_ml/core/mixins/dataset.py:166`), use that for
+  `member_types`.
 
 - [ ] **Step 1: Write failing tests.**
 
@@ -2878,7 +3110,7 @@ Review all changes with focus on:
    - Is TestOrphanRows actually exercising the Rule-7-case-3 path?
    - Is TestUnrelatedAnchors exercising Rule 8 including the ignore flag?
 
-5. Code quality
+5. Code quality & DRY
    - Is each method in Denormalizer / the planner helpers focused on one
      responsibility?
    - Are there copy-paste duplications between Denormalizer and the
@@ -2886,6 +3118,30 @@ Review all changes with focus on:
    - Do the planner helpers (_find_sinks, _determine_row_per, etc.)
      have clear docstrings with args/returns/raises?
    - Any dead code left over from the old API?
+
+   **DRY audit (check against the plan's "Reuse inventory" section):**
+   - Does `_enumerate_paths` delegate to `_schema_to_paths` (the
+     authoritative FK-graph DFS), or does it re-implement DFS?
+   - Is `_is_association_table` a method on `DerivaModel` (extracted
+     from its previous nested definition in `_build_join_tree`), and do
+     both the planner and `Denormalizer.list_paths` call the same method?
+   - Is `_fk_neighbors` a method on `DerivaModel` (extracted from its
+     previous nested definition in `_schema_to_paths`), and are there any
+     places still walking `table.foreign_keys` + `table.referenced_by`
+     directly that should instead call `_fk_neighbors`?
+   - Are all output column names generated through
+     `deriva_ml.model.catalog.denormalize_column_name`, or is there a new
+     `{table}.{col}` string concatenation?
+   - Are FK edges between two tables resolved through
+     `DerivaModel._table_relationship`, or re-implemented?
+   - Does `_emit_orphan_rows` follow the same NULL-init pattern as
+     `Dataset._denormalize_datapath`, or invent its own?
+   - Does `describe` reuse the shape established by `denormalize_info`
+     (columns / join_path / per-table counts), or does it recompute them?
+   - Does the anchor-retrieval path use `list_dataset_members` rather
+     than querying dataset association tables directly?
+
+   Any "yes it duplicates" finding is an Important-severity issue.
 
 6. Docstring accuracy
    - Do the docstrings on the new methods match the spec's semantic
