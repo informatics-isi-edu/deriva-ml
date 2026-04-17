@@ -25,7 +25,14 @@ Exception Hierarchy:
     │   │   └── DerivaMLDirtyWorkflowError (uncommitted changes)
     │   └── DerivaMLUploadError (asset upload failures)
     │
-    └── DerivaMLReadOnlyError (write operation on read-only resource)
+    ├── DerivaMLReadOnlyError (write operation on read-only resource)
+    │
+    └── DerivaMLDenormalizeError (denormalization planning errors)
+        ├── DerivaMLDenormalizeMultiLeaf
+        ├── DerivaMLDenormalizeNoSink
+        ├── DerivaMLDenormalizeDownstreamLeaf
+        ├── DerivaMLDenormalizeAmbiguousPath
+        └── DerivaMLDenormalizeUnrelatedAnchor
 
 Example:
     >>> from deriva_ml.core.exceptions import DerivaMLException, DerivaMLNotFoundError
@@ -301,8 +308,7 @@ class DerivaMLDirtyWorkflowError(DerivaMLWorkflowError):
 
     def __init__(self, path: str) -> None:
         super().__init__(
-            f"File {path} has uncommitted changes. "
-            f"Commit before running, or use --allow-dirty to override."
+            f"File {path} has uncommitted changes. Commit before running, or use --allow-dirty to override."
         )
         self.path = path
 
@@ -336,3 +342,141 @@ class DerivaMLReadOnlyError(DerivaMLException):
     """
 
     pass
+
+
+# =============================================================================
+# Denormalization Planning Errors
+# =============================================================================
+
+
+class DerivaMLDenormalizeError(DerivaMLException):
+    """Base class for denormalization errors.
+
+    All errors raised by :class:`~deriva_ml.local_db.denormalizer.Denormalizer`
+    and related planning functions are instances of this class.
+    """
+
+
+class DerivaMLDenormalizeMultiLeaf(DerivaMLDenormalizeError):
+    """Multiple candidate tables for ``row_per`` — ambiguous leaf.
+
+    Raised when auto-inference finds more than one table in
+    ``include_tables`` that could serve as the leaf. The user must specify
+    ``row_per`` explicitly.
+
+    Attributes:
+        candidates: list of table names that all qualify as sinks.
+    """
+
+    def __init__(self, candidates: list[str], include_tables: list[str]) -> None:
+        self.candidates = list(candidates)
+        self.include_tables = list(include_tables)
+        super().__init__(
+            f"Multiple candidates for row_per: {candidates}. "
+            f"Specify row_per=... explicitly. "
+            f"(include_tables={include_tables})"
+        )
+
+
+class DerivaMLDenormalizeNoSink(DerivaMLDenormalizeError):
+    """No sink found in the FK subgraph — cycle detected.
+
+    Raised when every table in ``include_tables`` has an outbound FK to
+    another table in the set, forming a cycle. Pathological — rare in
+    real schemas.
+    """
+
+
+class DerivaMLDenormalizeDownstreamLeaf(DerivaMLDenormalizeError):
+    """Explicit ``row_per`` conflicts with a downstream table in ``include_tables``.
+
+    Raised when the user specifies ``row_per=X`` but another table in
+    ``include_tables`` is downstream of X via FK (would require aggregation).
+
+    Attributes:
+        row_per: the explicit row_per value.
+        downstream_tables: tables downstream of row_per that can't be hoisted.
+    """
+
+    def __init__(self, row_per: str, downstream_tables: list[str]) -> None:
+        self.row_per = row_per
+        self.downstream_tables = list(downstream_tables)
+        super().__init__(
+            f"Table(s) {downstream_tables} are downstream of row_per={row_per!r}. "
+            f"One row per {row_per} would require aggregating multiple rows of "
+            f"{downstream_tables} — aggregation is not yet supported. "
+            f"Drop row_per to get one row per {downstream_tables}, or remove "
+            f"{downstream_tables} from include_tables."
+        )
+
+
+class DerivaMLDenormalizeAmbiguousPath(DerivaMLDenormalizeError):
+    """Multiple FK paths between two requested tables — can't silently choose.
+
+    Raised when two or more distinct FK paths exist between ``row_per`` and
+    another requested/via table. Silent path selection is rejected by
+    design; the user must disambiguate by adding tables to ``include_tables``
+    or ``via``.
+
+    Attributes:
+        from_table: the row_per table name.
+        to_table: the table with ambiguous path.
+        paths: list of path descriptions (each a list of table names).
+        suggested_intermediates: tables that appear in at least one path but
+            not in ``include_tables``.
+    """
+
+    def __init__(
+        self,
+        from_table: str,
+        to_table: str,
+        paths: list[list[str]],
+        suggested_intermediates: list[str],
+    ) -> None:
+        self.from_table = from_table
+        self.to_table = to_table
+        self.paths = [list(p) for p in paths]
+        self.suggested_intermediates = list(suggested_intermediates)
+        path_strs = ["\n    " + " → ".join(p) for p in paths]
+        super().__init__(
+            f"Multiple FK paths between {from_table!r} and {to_table!r}:"
+            f"{''.join(path_strs)}\n"
+            f"Resolve by one of:\n"
+            f"  • Add an intermediate to include_tables "
+            f"(its columns will be in output): {suggested_intermediates}\n"
+            f"  • Add an intermediate to via= (path-only, no columns): "
+            f"{suggested_intermediates}\n"
+            f"  • Narrow include_tables so only one path is valid."
+        )
+
+
+class DerivaMLDenormalizeUnrelatedAnchor(DerivaMLDenormalizeError):
+    """Anchor has no FK path to any table in ``include_tables``.
+
+    Raised when the caller passes anchors whose table has no FK relationship
+    to any table in ``include_tables ∪ via``. The anchor would contribute
+    nothing to the output.
+
+    Pass ``ignore_unrelated_anchors=True`` to silently drop them.
+
+    Attributes:
+        unrelated_tables: tables of the unrelated anchors.
+        include_tables: the include_tables argument for reference.
+    """
+
+    def __init__(
+        self,
+        unrelated_tables: list[str],
+        include_tables: list[str],
+    ) -> None:
+        self.unrelated_tables = list(unrelated_tables)
+        self.include_tables = list(include_tables)
+        super().__init__(
+            f"Anchors of table(s) {unrelated_tables} have no FK path to any "
+            f"table in include_tables={include_tables}. They would contribute "
+            f"nothing to the output.\n"
+            f"Options:\n"
+            f"  • Remove these anchors from the anchor set.\n"
+            f"  • Add {unrelated_tables} (or a linking table) to include_tables.\n"
+            f"  • Pass ignore_unrelated_anchors=True to silently drop them."
+        )
