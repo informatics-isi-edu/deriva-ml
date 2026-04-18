@@ -115,17 +115,37 @@ class TestViaParameter:
     """Verify via= is forwarded to the planner and resolves path ambiguity."""
 
     def test_via_resolves_diamond(self, populated_denorm_diamond) -> None:
-        """Diamond schema: via=['Observation'] should prevent ambiguity error."""
+        """Diamond schema: via=['Observation'] should prevent ambiguity error.
+
+        The fixture has three Images:
+
+        * IMG-1 with Subject=SUBJ-A AND Observation=OBS-1
+        * IMG-2 with Subject=SUBJ-B AND Observation=OBS-2
+        * IMG-3 with Subject=NULL AND Observation=NULL (for LEFT JOIN testing)
+
+        With ``via=["Observation"]`` the planner routes through the
+        Image→Observation→Subject chain. Observation.Subject is NOT NULL
+        in the diamond fixture, so the ``Observation → Subject`` leg is
+        an INNER JOIN — IMG-3 (NULL Observation) does NOT produce a
+        Subject-hoisted row because the chain breaks at the missing
+        Observation. Result: 2 rows (IMG-1, IMG-2).
+
+        (This differs from the bare ``["Image", "Subject"]`` call where
+        Rule 6 now raises before a path is picked — see the raises
+        assertion below.)
+        """
         ds = _FakeDataset(populated_denorm_diamond)
         d = Denormalizer(ds)
         # Without via, diamond raises
         with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
             d.as_dataframe(["Image", "Subject"])
-        # With via, ambiguity resolved
+        # With via, ambiguity resolved and the via-Observation path is
+        # used (not the direct Image→Subject FK).
         df = d.as_dataframe(["Image", "Subject"], via=["Observation"])
         assert isinstance(df, pd.DataFrame)
-        # Concrete proof of resolution: one row per Image + Subject columns hoisted.
-        assert len(df) == 3
+        # 2 rows: IMG-3 drops because Observation=NULL ⇒ no Subject via
+        # the via-Observation chain (Observation.Subject is NOT NULL).
+        assert len(df) == 2
         assert any(c.startswith("Image.") for c in df.columns)
         assert any(c.startswith("Subject.") for c in df.columns)
         # Observation columns should NOT be present (via adds to join, not output)

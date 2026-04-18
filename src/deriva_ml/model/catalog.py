@@ -742,6 +742,7 @@ class DerivaModel:
         element_name: str,
         include_tables: set[str],
         all_paths: list[list[Table]],
+        via: set[str] | None = None,
     ) -> JoinNode:
         """Build a JoinTree rooted at *element_name* that reaches all *include_tables*.
 
@@ -762,6 +763,11 @@ class DerivaModel:
             element_name: The dataset element table (tree root), e.g. ``"Image"``.
             include_tables: Set of table names the user wants in the output.
             all_paths: All FK paths from ``_schema_to_paths()``.
+            via: Optional set of table names the caller passed as
+                ``via=`` — path-only routing hints. Intermediates in
+                this set count as "covered" during disambiguation so the
+                user can route through an intermediate without adding
+                its columns to the output.
 
         Returns:
             A ``JoinNode`` tree rooted at the element table.
@@ -769,6 +775,8 @@ class DerivaModel:
         Raises:
             DerivaMLException: If ambiguous paths cannot be resolved.
         """
+        via = via or set()
+        covering = include_tables | via
         element_table = self.name_to_table(element_name)
 
         # ── Step 1: collect sub-paths from element to each include_table ─────
@@ -834,7 +842,8 @@ class DerivaModel:
             def _intermediates_covered(sp: list[Table], ints: tuple[str, ...]) -> bool:
                 sp_tables = {t.name: t for t in sp}
                 for t in ints:
-                    if t in include_tables:
+                    if t in covering:
+                        # In include_tables OR in via= — explicitly routed.
                         continue
                     tbl = sp_tables.get(t)
                     if tbl is not None and self._is_association_table(tbl):
@@ -1675,7 +1684,7 @@ class DerivaModel:
         element_tables: dict[str, tuple[list[str], dict[str, set], dict[str, str]]] = {}
 
         for element_name, paths in paths_by_element.items():
-            tree = self._build_join_tree(element_name, include_tables_set, table_paths)
+            tree = self._build_join_tree(element_name, include_tables_set, table_paths, via=set(via_list))
 
             # ── Phase 3: flatten JoinTree to legacy format ───────────────────
             # Pre-order walk gives us the correct JOIN order.
