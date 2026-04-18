@@ -1411,6 +1411,78 @@ class DerivaModel:
             if len(unique) <= 1:
                 continue
 
+            # Monotonic-direction filter for diamond detection:
+            # A genuine diamond has MULTIPLE paths that each constitute a
+            # valid FK join chain — all-outbound (downstream) hops, with
+            # association tables acting as transparent bridges. Paths that
+            # change direction at an interior vertex are common-neighbor
+            # shortcuts, not join alternatives. For example, with::
+            #
+            #     Image.Observation → Observation  (direct FK)
+            #     Image.Subject → Subject           (direct FK)
+            #     Observation.Subject → Subject     (direct FK)
+            #
+            # the undirected walk ``Image → Subject → Observation`` hops
+            # Image.Subject downstream then Observation.Subject UPSTREAM
+            # (Subject is a shared neighbor). This does not represent an
+            # FK chain from Image to Observation — it represents a
+            # co-occurrence via shared Subject, which is a materially
+            # different query. We exclude such paths from ambiguity
+            # detection so the direct FK Image→Observation isn't
+            # spuriously flagged.
+            #
+            # Association tables remain transparent: the walker handles
+            # them correctly via ``_is_association_table`` check inside
+            # the direction test.
+            def _edge_direction(a: str, b: str) -> str | None:
+                """Return 'down' if a has a direct FK to b (outbound from
+                a); 'up' if b has a direct FK to a (inbound to a); None
+                if there's no direct FK between them."""
+                try:
+                    ta = self.name_to_table(a)
+                    tb = self.name_to_table(b)
+                except Exception:
+                    return None
+                for fk in ta.foreign_keys:
+                    if fk.pk_table == tb:
+                        return "down"
+                for fk in tb.foreign_keys:
+                    if fk.pk_table == ta:
+                        return "up"
+                return None
+
+            def _is_downstream_chain(p: list[str]) -> bool:
+                """Check that the path is all-downstream, treating pure
+                association tables as transparent bridges. A transparent
+                bridge Image ← assoc → Subject counts as a single
+                downstream step (the assoc's referenced_by connects the
+                two sides). Association tables at interior positions
+                don't count as direction changes."""
+                i = 0
+                while i < len(p) - 1:
+                    a, b = p[i], p[i + 1]
+                    # If b is an interior association table, hop across
+                    # it: count the A → assoc → C edge as a single
+                    # transparent bridge and move two steps forward.
+                    if i + 2 < len(p) and self._is_association_table(b):
+                        # A → assoc → C: the bridge is legitimate
+                        # regardless of internal direction; advance past.
+                        i += 2
+                        continue
+                    d = _edge_direction(a, b)
+                    if d != "down":
+                        return False
+                    i += 1
+                return True
+
+            downstream = [p for p in unique if _is_downstream_chain(p)]
+            if len(downstream) <= 1:
+                # Only 0 or 1 downstream paths means no genuine diamond;
+                # other "paths" were common-neighbor shortcuts. Fall back
+                # to the direct/signaled path and don't flag ambiguity.
+                continue
+            unique = downstream
+
             # Disambiguation rule:
             # - A path is "signaled" if at least one of its non-endpoint
             #   intermediates is in ``include_tables ∪ via`` (user explicitly

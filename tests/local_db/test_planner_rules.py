@@ -130,6 +130,38 @@ class TestPathAmbiguity:
         )
         assert result == []
 
+    def test_non_monotonic_path_not_a_diamond(self, denorm_diamond_deriva_model) -> None:
+        """Paths that reverse FK direction at a shared neighbor are NOT diamonds.
+
+        Image↔Observation has two undirected walks:
+
+        * Direct: ``Image → Observation`` (Image.Observation FK, all downstream)
+        * Via shared Subject: ``Image → Subject → Observation`` — this
+          walks ``Image.Subject`` downstream, then ``Observation.Subject``
+          UPSTREAM (Observation has the FK to Subject, so Observation is
+          referenced_by Subject). The direction reverses at Subject.
+
+        A direction reversal at an interior vertex signals a
+        common-neighbor shortcut, not a genuine FK join alternative.
+        Rule 6 should NOT flag this as ambiguity: the direct FK is the
+        only valid monotonic-downstream path from Image to Observation.
+
+        Without this filter, the planner spuriously reports Image↔
+        Observation as ambiguous, forcing every caller to add a
+        disambiguation keyword even when there's a single obvious
+        direct FK.
+        """
+        model = denorm_diamond_deriva_model
+        result = model._find_path_ambiguities(
+            row_per="Image",
+            include_tables=["Image", "Observation"],
+            via=[],
+        )
+        assert result == [], (
+            f"Image↔Observation should have a single downstream FK path "
+            f"(direct), not a diamond. Got: {result}"
+        )
+
 
 class TestPrepareWideTableIntegration:
     """Integration: _prepare_wide_table should raise on ambiguity (Rule 6).
