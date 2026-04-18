@@ -174,7 +174,7 @@ class Denormalizer:
                 try:
                     from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
-                    self._paged_client = ErmrestPagedClient(catalog)
+                    self._paged_client = ErmrestPagedClient(catalog=catalog)
                     self._source = "catalog"
                 except Exception:
                     # If the client can't be built (offline tests, mock
