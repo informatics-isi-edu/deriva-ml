@@ -44,23 +44,64 @@ class Denormalizer:
         """Construct from a ``DatasetLike`` object.
 
         The dataset's members (recursively via ``list_dataset_members``)
-        become the anchor set. The underlying model, engine, and
-        orm_resolver are derived from the dataset.
+        become the anchor set. The underlying model, engine, catalog, and
+        orm_resolver are derived from the dataset. Two shapes are supported:
+
+        - **Live `Dataset` (`dataset._ml_instance` is a DerivaML):** pulls
+          `model`, `catalog`, `engine`, and `orm_resolver` from the ml
+          instance's `workspace.local_schema`. `source` defaults to
+          `"catalog"` so the planner fetches rows from the live catalog
+          via a :class:`PagedClient`.
+        - **`DatasetBag` or canned test fixture:** reads `model`, `engine`,
+          and `_orm_resolver` attributes directly. `source` defaults to
+          `"local"` (rows are assumed already present in the engine).
 
         Args:
-            dataset: A :class:`Dataset` or :class:`DatasetBag` (or any
-                object satisfying the ``DatasetLike`` protocol plus the
-                attributes ``model``, ``engine``, ``_orm_resolver``).
+            dataset: A :class:`Dataset`, :class:`DatasetBag`, or any
+                object satisfying the ``DatasetLike`` protocol.
         """
         self._dataset = dataset
         self._dataset_rid = dataset.dataset_rid
-        self._model = dataset.model
-        # engine / orm_resolver / paged_client are extracted lazily so
-        # test fixtures can inject their own.
+
+        # Prefer direct attributes (DatasetBag, test fixture).
+        # Fall back to `_ml_instance` (live Dataset).
+        ml_instance = getattr(dataset, "_ml_instance", None)
+
+        self._model = getattr(dataset, "model", None)
+        if self._model is None and ml_instance is not None:
+            self._model = getattr(ml_instance, "model", None)
+
         self._engine = getattr(dataset, "engine", None)
         self._orm_resolver = getattr(dataset, "_orm_resolver", None)
-        if self._orm_resolver is None:
-            # Fall back to model's get_orm_class_by_name if available
+        self._paged_client: Any = None
+        self._source = "local"
+
+        if ml_instance is not None:
+            workspace = getattr(ml_instance, "workspace", None)
+            if self._engine is None and workspace is not None:
+                self._engine = getattr(workspace, "engine", None)
+            if self._orm_resolver is None and workspace is not None:
+                local_schema = getattr(workspace, "local_schema", None)
+                if local_schema is not None:
+                    self._orm_resolver = getattr(local_schema, "get_orm_class", None)
+            # Live-catalog path: build a PagedClient so _denormalize_impl
+            # can fetch rows. Matches the pre-refactor
+            # Dataset.denormalize_as_dataframe behavior.
+            catalog = getattr(ml_instance, "catalog", None)
+            if catalog is not None:
+                try:
+                    from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+                    self._paged_client = ErmrestPagedClient(catalog)
+                    self._source = "catalog"
+                except Exception:
+                    # If the client can't be built (offline tests, mock
+                    # catalog), fall back to local mode silently.
+                    self._paged_client = None
+                    self._source = "local"
+
+        if self._orm_resolver is None and self._model is not None:
+            # Last resort — model-level ORM resolver.
             gocbn = getattr(self._model, "get_orm_class_by_name", None)
             self._orm_resolver = gocbn
 
@@ -201,6 +242,12 @@ class Denormalizer:
         inst._model = model
         inst._engine = engine
         inst._orm_resolver = orm_resolver
+        # from_rids doesn't carry an _ml_instance, so default to the local
+        # source mode. If callers want catalog-side fetching they should
+        # pre-populate the engine or extend from_rids with an explicit
+        # paged_client / source pair.
+        inst._source = "local"
+        inst._paged_client = None
         return inst
 
     # ------------------------------------------------------------------
@@ -563,7 +610,9 @@ class Denormalizer:
             ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
 
-        # Step 3: main SQL via _denormalize_impl
+        # Step 3: main SQL via _denormalize_impl. Source + paged_client are
+        # chosen in __init__ — "catalog" for live Datasets (needs PagedClient
+        # to fetch rows before the join), "local" for DatasetBag / fixtures.
         main_result = _denormalize_impl(
             model=self._model,
             engine=self._engine,
@@ -571,7 +620,8 @@ class Denormalizer:
             dataset_rid=self._dataset_rid,
             include_tables=list(include_tables),
             dataset=self._dataset,
-            source="local",
+            source=self._source,
+            paged_client=self._paged_client,
             row_per=resolved_row_per,
             via=list(via or []) or None,
         )

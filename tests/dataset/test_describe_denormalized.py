@@ -1,15 +1,16 @@
-"""Tests for describe_denormalized() on DerivaML, Dataset, and DatasetBag.
+"""Tests for describe_denormalized() and estimate_denormalized_size().
 
 Unit tests use MagicMock for structure validation.
 Integration tests use the populated_catalog fixture against a real catalog.
 
-Note: ``DerivaML.describe_denormalized`` (mixin) returns the legacy shape
-(columns, join_path, tables, total_rows, total_asset_bytes, total_asset_size)
-aligned with ``estimate_bag_size``. ``Dataset.describe_denormalized`` /
-``DatasetBag.describe_denormalized`` delegate to ``Denormalizer.describe``
-and return the spec §5 shape (row_per, row_per_source, row_per_candidates,
-columns, include_tables, via, join_path, transparent_intermediates,
-ambiguities, estimated_row_count, anchors, source).
+Note: ``DerivaML.estimate_denormalized_size`` (mixin, catalog-wide) returns
+the legacy shape (columns, join_path, tables, total_rows, total_asset_bytes,
+total_asset_size) aligned with ``estimate_bag_size``.
+``Dataset.describe_denormalized`` / ``DatasetBag.describe_denormalized``
+delegate to ``Denormalizer.describe`` and return the spec §5 shape
+(row_per, row_per_source, row_per_candidates, columns, include_tables, via,
+join_path, transparent_intermediates, ambiguities, estimated_row_count,
+anchors, source).
 """
 
 from __future__ import annotations
@@ -66,7 +67,7 @@ class TestMixinSignature:
 
         from deriva_ml.core.mixins.dataset import DatasetMixin
 
-        sig = inspect.signature(DatasetMixin.describe_denormalized)
+        sig = inspect.signature(DatasetMixin.estimate_denormalized_size)
         params = list(sig.parameters.keys())
         assert "self" in params
         assert "include_tables" in params
@@ -119,7 +120,7 @@ class TestMixinIntegration:
     def test_mixin_returns_valid_structure(self, populated_catalog: "DerivaML"):
         """DerivaML.describe_denormalized() returns correct structure with real catalog."""
         ml = populated_catalog
-        info = ml.describe_denormalized(["Image", "Subject"])
+        info = ml.estimate_denormalized_size(["Image", "Observation", "Subject"])
 
         # Verify all required keys (legacy mixin shape)
         assert "columns" in info
@@ -148,7 +149,7 @@ class TestMixinIntegration:
     def test_mixin_row_counts_are_non_negative(self, populated_catalog: "DerivaML"):
         """Row counts from real catalog should be non-negative integers."""
         ml = populated_catalog
-        info = ml.describe_denormalized(["Image", "Subject"])
+        info = ml.estimate_denormalized_size(["Image", "Observation", "Subject"])
 
         # Row counts should be non-negative integers; some intermediate/
         # association tables may legitimately have 0 rows.
@@ -165,7 +166,7 @@ class TestMixinIntegration:
     def test_mixin_per_table_structure(self, populated_catalog: "DerivaML"):
         """Each table entry has row_count, is_asset, and asset_bytes."""
         ml = populated_catalog
-        info = ml.describe_denormalized(["Image", "Subject"])
+        info = ml.estimate_denormalized_size(["Image", "Observation", "Subject"])
 
         for table_name, table_info in info["tables"].items():
             assert "row_count" in table_info, f"{table_name} missing row_count"

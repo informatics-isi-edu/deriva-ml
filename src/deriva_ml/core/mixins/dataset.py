@@ -315,15 +315,17 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
         )
 
-    def describe_denormalized(
+    def estimate_denormalized_size(
         self,
         include_tables: list[str],
     ) -> dict[str, Any]:
-        """Return schema shape and size estimates for a denormalized table.
+        """Return schema shape and catalog-wide size estimates for a
+        potential denormalized table.
 
         This method does NOT require a dataset — it uses global row counts
-        across the entire catalog. Use ``Dataset.describe_denormalized()`` for
-        dataset-scoped counts.
+        across the entire catalog. It is the catalog-wide analog of
+        :meth:`Dataset.describe_denormalized`, which returns a dataset-
+        scoped planning dict with a different shape (see spec §5).
 
         Aligned with :meth:`estimate_bag_size` return structure.
 
