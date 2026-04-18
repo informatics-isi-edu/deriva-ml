@@ -737,157 +737,6 @@ class DerivaModel:
                 deduped.append(t)
         return set(deduped)
 
-    # ------------------------------------------------------------------
-    # Path direction-coherence primitives
-    #
-    # Denormalization joins should be direction-coherent: at most one
-    # direction change per path (an "up then back down" hoist-then-
-    # rollup, or pure hoist, or pure rollup). Zigzag paths (up-down-up
-    # or down-up-down) route through a shared ancestor and back to
-    # sibling data — they're valid FK traversals but semantically don't
-    # match denormalization's cardinality model.
-    #
-    # These helpers let the path enumerator filter zigzag paths out
-    # without hardcoding any schema-specific conventions (like
-    # "Dataset is the root"). The rule is purely topological.
-    # ------------------------------------------------------------------
-
-    def _edge_direction(self, from_table: str | Table, to_table: str | Table) -> str | None:
-        """Classify the direction of a single FK edge between two tables.
-
-        An FK edge has one of three directions:
-
-        - ``"along"`` (upstream / hoist): ``from_table`` has an FK pointing
-          at ``to_table``. Traversing the edge goes from many to one
-          (e.g., ``Image → Subject`` where ``Image.Subject`` is an FK to
-          ``Subject.RID``).
-        - ``"against"`` (downstream / rollup): ``to_table`` has an FK
-          pointing at ``from_table``. Traversing the edge goes from one
-          to many (e.g., ``Subject → Image`` following
-          ``Subject.referenced_by[Image.Subject]``).
-        - ``None``: no direct FK edge exists between the two tables.
-
-        When both tables have FKs pointing at each other (bidirectional),
-        ``"along"`` is preferred as the more explicit direction.
-
-        Args:
-            from_table: starting table of the edge.
-            to_table: ending table of the edge.
-
-        Returns:
-            ``"along"``, ``"against"``, or ``None``.
-        """
-        try:
-            src = from_table if hasattr(from_table, "foreign_keys") else self.name_to_table(from_table)
-            dst = to_table if hasattr(to_table, "foreign_keys") else self.name_to_table(to_table)
-        except Exception:
-            return None
-        # Along-FK: src has an FK whose target is dst.
-        for fk in src.foreign_keys:
-            if fk.pk_table == dst:
-                return "along"
-        # Against-FK: dst has an FK whose target is src.
-        for fk in dst.foreign_keys:
-            if fk.pk_table == src:
-                return "against"
-        return None
-
-    def _path_direction_sequence(self, path: list[str | Table]) -> list[str]:
-        """Return the direction sequence of a path, with transparent hops collapsed.
-
-        A **transparent hop** is a two-edge subpath that enters and exits
-        an association table (per :meth:`_is_association_table`). The
-        association acts as a semantic bridge between its two endpoints,
-        so both sub-edges collapse into a single "transparent" entry in
-        the sequence that doesn't count toward direction changes.
-
-        A **regular edge** contributes its classified direction
-        (``"along"`` or ``"against"``) to the sequence.
-
-        Args:
-            path: ordered list of table names (or Table objects) in the path.
-
-        Returns:
-            List of direction tags, one per logical hop.
-            ``"along"`` / ``"against"`` for direct FK edges;
-            ``"transparent"`` for a collapsed association-table hop.
-            Unknown edges (no FK between consecutive nodes) get
-            ``"unknown"``.
-        """
-        if len(path) < 2:
-            return []
-        # Normalize to Table objects for association detection.
-        nodes: list[Any] = []
-        for p in path:
-            try:
-                nodes.append(p if hasattr(p, "foreign_keys") else self.name_to_table(p))
-            except Exception:
-                nodes.append(None)
-
-        directions: list[str] = []
-        i = 0
-        while i < len(nodes) - 1:
-            cur, nxt = nodes[i], nodes[i + 1]
-            # Transparent hop: the NEXT node is an association table we're
-            # passing through. Collapse the current edge and the following
-            # edge into a single transparent entry.
-            if i + 2 < len(nodes) and nxt is not None and self._is_association_table(nxt):
-                directions.append("transparent")
-                i += 2
-                continue
-            # Regular edge.
-            if cur is None or nxt is None:
-                directions.append("unknown")
-            else:
-                directions.append(self._edge_direction(cur, nxt) or "unknown")
-            i += 1
-        return directions
-
-    def _is_direction_coherent(self, path: list[str | Table]) -> bool:
-        """Check if a path has at most one direction change.
-
-        A **direction change** is a switch from ``"along"`` to
-        ``"against"`` (or vice versa) between consecutive non-transparent
-        edges. Transparent association-hops don't count — they collapse
-        out of the sequence before comparison. Paths with fewer than two
-        regular edges are trivially coherent.
-
-        Coherent paths describe valid denormalization joins:
-
-        - Pure hoist (all along-FK): ``Image → Subject → Study``
-        - Pure rollup (all against-FK): ``Site → Study → Subject``
-        - Hoist then rollup (one change): ``Image → Subject → Image'``
-          (siblings via shared parent — a classic M:N traversal)
-
-        Incoherent paths zigzag — typically "up to a shared ancestor,
-        across to sibling context, back down to sibling data" — which
-        isn't denormalization. Example incoherent path:
-        ``Image → Subject → Observation → Subject → Image'`` (along,
-        against, along, against — three direction changes).
-
-        Args:
-            path: ordered list of table names (or Table objects).
-
-        Returns:
-            ``True`` if the path has at most one direction change
-            between consecutive non-transparent edges.
-        """
-        sequence = self._path_direction_sequence(path)
-        # Drop transparent entries — they're neutral bridges.
-        concrete = [d for d in sequence if d != "transparent"]
-        if len(concrete) < 2:
-            return True
-        # Count direction changes between adjacent concrete edges.
-        changes = 0
-        for a, b in zip(concrete, concrete[1:]):
-            # "unknown" edges don't increment the count (we can't
-            # classify them, so we don't penalize).
-            if a == "unknown" or b == "unknown":
-                continue
-            if a != b:
-                changes += 1
-        return changes <= 1
-
     def _build_join_tree(
         self,
         element_name: str,
@@ -1463,16 +1312,8 @@ class DerivaModel:
             names = [t.name for t in path]
             # Transparency filter: every intermediate must be either
             # requested (in tables_in_set) or a pure association.
-            if not all(mid in tables_in_set or self._is_association_table(mid) for mid in names[1:-1]):
-                continue
-            # Direction-coherence filter (Rule 6 refinement): reject
-            # zigzag paths that route up to a shared ancestor and back
-            # down to sibling data. Those are valid FK chains but don't
-            # match denormalization's hoist-or-rollup cardinality model.
-            # See :meth:`_is_direction_coherent` for the definition.
-            if not self._is_direction_coherent(names):
-                continue
-            result.append(names)
+            if all(mid in tables_in_set or self._is_association_table(mid) for mid in names[1:-1]):
+                result.append(names)
         return result
 
     def _find_path_ambiguities(
@@ -1566,16 +1407,7 @@ class DerivaModel:
                 stop_at=t,
             )
             all_paths_named: list[list[str]] = [[tbl.name for tbl in p] for p in all_path_tables]
-            # Apply the direction-coherence filter: zigzag paths (up-
-            # then-across-then-back-down) aren't denormalization routes,
-            # so they shouldn't count as alternative paths for Rule 6
-            # ambiguity detection. This eliminates false positives like
-            # "Image → Subject → Observation" vs
-            # "Image → Dataset_Image → Dataset → Dataset_Subject → Subject → Observation"
-            # — the second is a zigzag through dataset-membership
-            # scaffolding and gets filtered out.
-            coherent = [p for p in all_paths_named if self._is_direction_coherent(p)]
-            unique = list({tuple(p): p for p in coherent}.values())
+            unique = list({tuple(p): p for p in all_paths_named}.values())
             if len(unique) <= 1:
                 continue
 
