@@ -243,6 +243,39 @@ class TestAnchorClassification:
         assert orphans == {}
         assert ignored == {}
 
+    def test_case_4_downstream_anchor_when_row_per_upstream(self, populated_denorm) -> None:
+        """Anchor DOWNSTREAM of row_per is still scoping (direction-agnostic).
+
+        When row_per=Subject and an Image anchor is present, the Image
+        table is DOWNSTREAM of Subject (Image.Subject is an FK to Subject).
+        The anchor still provides a valid filter: "include only Subjects
+        that have one of these Images." Rule 7's reachability check must
+        accept either-direction FK connectivity, not only downstream.
+
+        This reproduces the nested-dataset scenario where a bag contains
+        both Subject and Image members, the user asks for Subject rows
+        only, and the Image anchors must be recognized as related
+        (filter-only) rather than classified as case-6 unrelated.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        scoping, orphans, ignored = d._classify_anchors(
+            anchors={"Subject": ["SUBJ-A"], "Image": ["IMG-1"]},
+            include_tables=["Subject"],
+            via=[],
+            row_per="Subject",
+            ignore_unrelated_anchors=False,
+        )
+        # Image is DOWNSTREAM of Subject but still reaches Subject via
+        # Image.Subject FK — classified as scoping (filter-only).
+        assert "Subject" in scoping
+        assert "Image" in scoping, (
+            "Image anchor should be classified as scoping (filter-only) "
+            "because Image.Subject gives it an upstream FK path to row_per=Subject."
+        )
+        assert orphans == {}
+        assert ignored == {}
+
     def test_case_4_not_in_include_reaches_row_per(self, populated_denorm) -> None:
         """Anchor NOT in include_tables but reaches row_per → scoping (filter-only).
 

@@ -1075,9 +1075,32 @@ class Denormalizer:
                 scoping[table] = list(rids)
                 continue
 
-            # Does this table reach row_per (possibly through the subgraph)?
-            reachable_subgraph = self._model._outbound_reachable(table, subgraph | {table})
-            reaches_row_per = row_per in reachable_subgraph
+            # Rule 7 reachability is direction-agnostic at the anchor-
+            # classification level: an anchor "filters" row_per if there
+            # is ANY FK chain connecting the two, in either direction.
+            #
+            # - Downstream reach (`_outbound_reachable`): anchor's rows
+            #   are referenced by row_per rows (Dataset → Dataset_Image
+            #   → Image reaches Image via membership, or Subject →
+            #   Image reaches Image via Image.Subject FK).
+            # - Upstream reach (`_outbound_reachable` from row_per to
+            #   anchor): anchor is above row_per in the FK hierarchy
+            #   (e.g., Image anchor when row_per=Subject — Image has
+            #   Image.Subject pointing at Subject).
+            #
+            # Both shapes give the anchor's RIDs a valid filter role
+            # over row_per rows. The current engine's join generation
+            # handles both via dataset-membership scoping and FK-chain
+            # traversal.
+            downstream_from_anchor = self._model._outbound_reachable(table, subgraph | {table})
+            reaches_row_per_downstream = row_per in downstream_from_anchor
+            # For the upstream side: does row_per's downstream-reach set
+            # contain the anchor? (row_per's outbound set = everything
+            # row_per hoists OR reaches; that is symmetric to "anchor
+            # can reach row_per via along-FK chain" modulo direction.)
+            downstream_from_row_per = self._model._outbound_reachable(row_per, subgraph | {table})
+            reaches_row_per_upstream = table in downstream_from_row_per
+            reaches_row_per = reaches_row_per_downstream or reaches_row_per_upstream
 
             if reaches_row_per:
                 # Case 2 (table in include_tables) or Case 4 (not): scoping.
@@ -1089,14 +1112,27 @@ class Denormalizer:
                 orphans[table] = list(rids)
                 continue
 
-            # Case 5 vs Case 6: does this table have ANY FK path into the
-            # subgraph? If yes → case 5 (silent drop). If no → case 6 (raise
-            # unless flag).
-            reaches_any_in_subgraph = bool(reachable_subgraph & subgraph)
-            if reaches_any_in_subgraph:
-                # Case 5: table upstream of include_tables ∪ via but doesn't
-                # reach row_per from its specific anchors. Silent drop per
-                # spec §3.8 — no warning, no raise, regardless of flag.
+            # Case 5 vs Case 6: does this table have ANY FK connection
+            # (either direction) to the subgraph? If yes → case 5
+            # (silent drop). If no → case 6 (raise unless flag).
+            connected_downstream = bool(downstream_from_anchor & subgraph)
+            # Upstream connection: is the anchor reachable from any
+            # subgraph table's downstream walk? Cheapest check is per-
+            # subgraph-table, but we already computed it for row_per
+            # above; do a quick survey of the remaining subgraph tables.
+            connected_upstream = table in downstream_from_row_per
+            if not connected_upstream and not connected_downstream:
+                # One more pass: for any OTHER table in the subgraph,
+                # does its downstream reach include the anchor?
+                for s in subgraph:
+                    if s == row_per or s == table:
+                        continue
+                    if table in self._model._outbound_reachable(s, subgraph | {table}):
+                        connected_upstream = True
+                        break
+            if connected_downstream or connected_upstream:
+                # Case 5: table connected to include_tables ∪ via but
+                # doesn't reach row_per. Silent drop per spec §3.8.
                 ignored[table] = list(rids)
             else:
                 # Case 6: no FK path at all.
