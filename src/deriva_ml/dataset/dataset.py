@@ -887,6 +887,10 @@ class Dataset:
         include_tables: list[str],
         version: str | None = None,
         force: bool = False,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
     ) -> pd.DataFrame:
         """Denormalize dataset tables and cache the result locally as SQLite.
 
@@ -895,12 +899,22 @@ class Dataset:
         re-computing the join. Use ``force=True`` to re-compute.
 
         The cache key is derived from the dataset RID, sorted table names,
-        and version, so different combinations are cached independently.
+        version, and the planner knobs (``row_per`` / ``via`` /
+        ``ignore_unrelated_anchors``), so each planner variant caches
+        independently.
 
         Args:
             include_tables: List of table names to include in the join.
             version: Dataset version to query. Defaults to current version.
             force: If True, re-compute even if already cached.
+            row_per: Optional explicit leaf table (Rule 2). If None,
+                auto-inferred from sinks in ``include_tables``.
+            via: Optional path-only intermediates to disambiguate FK paths
+                (Rule 6) without adding their columns to the output.
+            ignore_unrelated_anchors: If True, silently drop dataset
+                members whose table has no FK path to ``include_tables``
+                (Rule 8). Default False raises
+                :class:`DerivaMLDenormalizeUnrelatedAnchor`.
 
         Returns:
             DataFrame with the denormalized wide table.
@@ -913,6 +927,11 @@ class Dataset:
 
             # Second call returns cached data instantly
             df = dataset.cache_denormalized(["Image", "Diagnosis"], version="1.0.0")
+
+            # Diamond-schema disambiguation via an intermediate table:
+            df = dataset.cache_denormalized(
+                ["Image", "Subject"], via=["Observation"]
+            )
         """
         from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
@@ -928,6 +947,9 @@ class Dataset:
             dataset=self,
             dataset_children_rids=children,
             paged_client=paged_client,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
         return result.to_dataframe()
 

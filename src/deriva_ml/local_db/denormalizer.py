@@ -360,13 +360,16 @@ class Denormalizer:
         via_list = list(via or [])
 
         # ── row_per resolution ─────────────────────────────────────────────
-        # Dry-run invariant: describe() never raises. Catch all
-        # DerivaMLDenormalizeError subclasses (MultiLeaf, NoSink,
-        # DownstreamLeaf) plus ValueError (raised by _determine_row_per when
-        # row_per is not in include_tables). In every failure mode the
-        # caller still gets a well-formed dict with resolved_row_per=None.
+        # Dry-run invariant: describe() never raises. Every call that could
+        # fail against planner/catalog/schema state is wrapped in a broad
+        # try/except so the caller always gets a well-formed dict with
+        # sensible defaults (None / [] / {}) in the positions that couldn't
+        # be computed.
         row_per_source = "explicit" if row_per else "auto-inferred"
-        row_per_candidates = self._model._find_sinks(include, via_list)
+        try:
+            row_per_candidates = self._model._find_sinks(include, via_list)
+        except Exception:
+            row_per_candidates = []
         try:
             resolved_row_per: str | None = self._model._determine_row_per(
                 include_tables=include,
@@ -374,6 +377,9 @@ class Denormalizer:
                 row_per=row_per,
             )
         except (DerivaMLDenormalizeError, ValueError):
+            resolved_row_per = None
+        except Exception:
+            # Defensive: model access can raise (catalog unreachable, etc.).
             resolved_row_per = None
 
         # ── columns (may raise if row_per is None or ambiguity) ────────────
@@ -391,13 +397,18 @@ class Denormalizer:
             cols = []
 
         # ── ambiguities (reported, not raised) ─────────────────────────────
-        ambiguities_raw = []
+        ambiguities_raw: list[dict] = []
         if resolved_row_per is not None:
-            ambiguities_raw = self._model._find_path_ambiguities(
-                row_per=resolved_row_per,
-                include_tables=include,
-                via=via_list,
-            )
+            try:
+                ambiguities_raw = self._model._find_path_ambiguities(
+                    row_per=resolved_row_per,
+                    include_tables=include,
+                    via=via_list,
+                )
+            except Exception:
+                # If path enumeration fails (e.g., model access error),
+                # treat as "no ambiguities detected" rather than raising.
+                ambiguities_raw = []
         ambiguities = [
             {
                 "type": "multiple_paths",
@@ -416,17 +427,29 @@ class Denormalizer:
         ]
 
         # ── join path + transparent intermediates ───────────────────────────
+        # A "transparent intermediate" is any table on the join path that
+        # the user did NOT name in include_tables — the join traverses
+        # through it but its columns aren't projected. This includes both
+        # pure association tables AND non-association tables reached only
+        # via `via=` routing (spec §5 example shows "Observation" here —
+        # not an association table).
         join_path: list[str] = []
         transparent: list[str] = []
         for _, (path_names, _, _) in element_tables.items():
             for tn in path_names:
                 if tn not in join_path and tn != "Dataset":
                     join_path.append(tn)
-                    if tn not in include and self._model._is_association_table(tn):
+                    if tn not in include:
                         transparent.append(tn)
 
         # ── anchors summary ─────────────────────────────────────────────────
-        anchors = self._anchors_as_dict()
+        # Anchor retrieval can fail for live datasets (network/catalog
+        # errors). Dry-run invariant: fall back to an empty summary rather
+        # than raise.
+        try:
+            anchors = self._anchors_as_dict()
+        except Exception:
+            anchors = {}
         anchors_by_type = {t: len(rids) for t, rids in anchors.items()}
 
         # ── estimated row count (crude — refined in future work) ────────────
@@ -468,7 +491,7 @@ class Denormalizer:
             "ambiguities": ambiguities,
             "estimated_row_count": estimated,
             "anchors": {"total": sum(anchors_by_type.values()), "by_type": anchors_by_type},
-            "source": "local",  # Task 11 updates this when source is tracked
+            "source": getattr(self, "_source", "local"),
         }
 
     def list_paths(
@@ -684,61 +707,88 @@ class Denormalizer:
     ) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]:
         """Classify anchors by their relationship to row_per (Rule 7 + Rule 8).
 
+        Implements spec §3.7's six cases:
+
+        - Case 1 — table == row_per → scoping
+        - Case 2 — table in include_tables, reaches row_per → scoping
+        - Case 3 — table in include_tables, can't reach row_per → orphan
+          (per-RID emission happens downstream in ``_run``)
+        - Case 4 — table NOT in include_tables, reaches row_per → scoping
+          (filter-only; no orphan row because columns not in output)
+        - Case 5 — table NOT in include_tables, IS upstream of
+          ``include_tables ∪ via`` but can't reach row_per → silently
+          dropped (into ``ignored``) regardless of flag. Per §3.8: case 5
+          contributes no output either way so there's nothing to warn about.
+        - Case 6 — table has NO FK path to ``include_tables ∪ via`` →
+          raise :class:`DerivaMLDenormalizeUnrelatedAnchor` unless
+          ``ignore_unrelated_anchors=True``, in which case add to ``ignored``.
+
         Args:
             anchors: table_name -> list of RIDs.
             include_tables, via, row_per: the planner inputs.
-            ignore_unrelated_anchors: if False, raise on Rule-8 cases.
+            ignore_unrelated_anchors: if False, raise on Rule-8 (case 6) anchors.
 
         Returns:
             Tuple of (scoping_anchors, orphan_anchors, ignored_anchors). Each
             is a table_name -> list of RIDs dict.
 
-            - scoping_anchors: anchors that scope the main SQL query (their
-              reachable row_per rows go in the output).
-            - orphan_anchors: anchors whose table is in include_tables but can't
-              reach row_per — they emit orphan rows.
-            - ignored_anchors: anchors whose table isn't in include_tables and
-              can't reach row_per — contribute nothing; only populated when
-              ignore_unrelated_anchors=True.
-
         Raises:
-            DerivaMLDenormalizeUnrelatedAnchor: if any anchor's table has no FK
-                path to include_tables and ignore_unrelated_anchors=False.
+            DerivaMLDenormalizeUnrelatedAnchor: if any case-6 anchor is
+                present and ``ignore_unrelated_anchors=False``.
         """
         from deriva_ml.core.exceptions import DerivaMLDenormalizeUnrelatedAnchor
 
         scoping: dict[str, list[str]] = {}
         orphans: dict[str, list[str]] = {}
         ignored: dict[str, list[str]] = {}
-        unrelated: list[str] = []
+        # case-6 tables: no FK path to include_tables ∪ via at all.
+        unrelated_case_6: list[str] = []
 
-        all_tables = set(include_tables) | set(via)
+        include_set = set(include_tables)
+        via_set = set(via)
+        subgraph = include_set | via_set
 
         for table, rids in anchors.items():
+            # Case 1: table == row_per → scoping
             if table == row_per:
                 scoping[table] = list(rids)
                 continue
-            # Does this table have any FK path into the subgraph?
-            reachable = self._model._outbound_reachable(table, all_tables | {table})
-            if row_per in reachable:
-                # Upstream of row_per and reaches it → scoping
-                scoping[table] = list(rids)
-            elif table in include_tables:
-                # Upstream of row_per (in the subgraph) but no row_per reachable
-                # from this specific anchor — we emit an orphan row per anchor.
-                orphans[table] = list(rids)
-            else:
-                # Anchor's table is not in include_tables — and has no path to
-                # row_per. It would contribute nothing.
-                unrelated.append(table)
 
-        if unrelated and not ignore_unrelated_anchors:
+            # Does this table reach row_per (possibly through the subgraph)?
+            reachable_subgraph = self._model._outbound_reachable(table, subgraph | {table})
+            reaches_row_per = row_per in reachable_subgraph
+
+            if reaches_row_per:
+                # Case 2 (table in include_tables) or Case 4 (not): scoping.
+                scoping[table] = list(rids)
+                continue
+
+            if table in include_set:
+                # Case 3: in include_tables but can't reach row_per → orphan.
+                orphans[table] = list(rids)
+                continue
+
+            # Case 5 vs Case 6: does this table have ANY FK path into the
+            # subgraph? If yes → case 5 (silent drop). If no → case 6 (raise
+            # unless flag).
+            reaches_any_in_subgraph = bool(reachable_subgraph & subgraph)
+            if reaches_any_in_subgraph:
+                # Case 5: table upstream of include_tables ∪ via but doesn't
+                # reach row_per from its specific anchors. Silent drop per
+                # spec §3.8 — no warning, no raise, regardless of flag.
+                ignored[table] = list(rids)
+            else:
+                # Case 6: no FK path at all.
+                unrelated_case_6.append(table)
+
+        if unrelated_case_6 and not ignore_unrelated_anchors:
             raise DerivaMLDenormalizeUnrelatedAnchor(
-                unrelated_tables=sorted(set(unrelated)),
+                unrelated_tables=sorted(set(unrelated_case_6)),
                 include_tables=list(include_tables),
             )
-        if unrelated:
-            for table in unrelated:
+        if unrelated_case_6:
+            # Flag is set → add case-6 anchors to ignored alongside case-5.
+            for table in unrelated_case_6:
                 ignored[table] = list(anchors[table])
 
         return scoping, orphans, ignored

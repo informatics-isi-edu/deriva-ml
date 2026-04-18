@@ -990,10 +990,29 @@ class DerivaModel:
                 continue
             visited.add(t)
             try:
-                _ = self.name_to_table(t)
+                tbl = self.name_to_table(t)
             except Exception:
                 continue
-            for neighbor in self._downstream_fk_sources(t):
+
+            # When the current node is itself an association table AND it's
+            # not the starting point, hop through both directions: both the
+            # tables that point at it (referenced_by) AND the tables it
+            # points to (foreign_keys). This is the "transparent bridge"
+            # semantics — M:N link tables should be traversable in both
+            # directions so that A→assoc→B discovers B from A.
+            hopping_through_association = t != from_table and self._is_association_table(tbl)
+
+            valid_schemas = self.domain_schemas | {self.ml_schema}
+            neighbors: list[Table] = list(self._downstream_fk_sources(t))
+            if hopping_through_association:
+                # Add the association's outbound FK targets (the "other
+                # side" of the M:N link) so we can see past the bridge.
+                for fk in tbl.foreign_keys:
+                    nxt = fk.pk_table
+                    if nxt.schema.name in valid_schemas:
+                        neighbors.append(nxt)
+
+            for neighbor in neighbors:
                 target_name = neighbor.name
                 if target_name == from_table:
                     continue
