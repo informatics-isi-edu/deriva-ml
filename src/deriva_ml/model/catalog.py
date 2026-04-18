@@ -631,19 +631,29 @@ class DerivaModel:
         ]
 
     def _is_association_table(self, name_or_table: str | Table) -> bool:
-        """Check if a table is a pure association (M:N link) table.
+        """Check if a table is an M:N association (link) table.
 
         An association table (like ``Dataset_Image`` linking ``Dataset``
-        and ``Image``) has only system columns (RID/RCT/RMT/RCB/RMB)
-        plus exactly two domain FK columns. Denormalization treats such
-        tables as **transparent intermediates**: they're joined through
-        but their columns are excluded from the output.
+        and ``Image``) has exactly two domain FKs pointing at the tables
+        it links. Denormalization treats such tables as **transparent
+        intermediates**: they're joined through but their columns are
+        excluded from the output unless the caller explicitly lists them
+        in ``include_tables``.
 
-        This is a stricter check than ermrest's built-in
-        ``Table.is_association()`` — the ermrest version counts the
-        system FKs (RCB/RMB → ERMrest_Client) as part of the arity, so a
-        3-arg "association" in ermrest's eyes is usually a real M:N table
-        in ours. We deliberately ignore those system FKs.
+        **Topology, not purity**: association-ness is determined by the
+        FK arity alone, not by whether the table also carries metadata
+        columns. Real Deriva linkage tables routinely carry annotation
+        data (``Role``, ``Ordinal``, ``Comment``, etc.) while remaining
+        semantically M:N bridges — the check must permit them. If the
+        user wants those metadata columns in the output, they add the
+        table to ``include_tables`` and it's no longer treated as
+        transparent (see the ``transparent_intermediates`` logic in
+        :meth:`Denormalizer.describe`).
+
+        Stricter than ermrest's built-in ``Table.is_association()`` in
+        one direction (we ignore the system FKs RCB/RMB → ERMrest_Client,
+        so a 3-arg "association" in ermrest's eyes is usually a real
+        M:N table in ours), looser in another (we don't require purity).
 
         Extracted from a nested function in :meth:`_build_join_tree` so
         the denormalization planner can also use it.
@@ -653,33 +663,26 @@ class DerivaModel:
                 :meth:`name_to_table`) or a :class:`Table` instance.
 
         Returns:
-            ``True`` if the table has exactly 2 domain FKs and no
-            user-defined columns beyond the system columns.
+            ``True`` if the table has exactly 2 domain FKs.
 
         Example::
 
-            model._is_association_table("Dataset_Image")   # True
-            model._is_association_table("Image")           # False (has data cols)
-            model._is_association_table("Observation")     # False (has data cols + 1 FK)
+            model._is_association_table("Dataset_Image")       # True
+            model._is_association_table("Dataset_Image_Role")  # True — extra Role col OK
+            model._is_association_table("Image")               # False (has ≤1 FK)
+            model._is_association_table("Observation")         # False (has 1 FK)
         """
-        system_cols = {"RID", "RCT", "RMT", "RCB", "RMB"}
         try:
             tbl = name_or_table if hasattr(name_or_table, "foreign_keys") else self.name_to_table(name_or_table)
-            cols = {c.name for c in tbl.columns}
             fks = list(tbl.foreign_keys)
             # Domain FKs exclude the system FKs to ERMrest_Client /
             # ERMrest_Group that every table carries (for RCB/RMB).
             domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
-            # Collect the column names used by domain FKs so we can
-            # subtract them from the "user columns" below.
-            fk_col_names: set[str] = set()
-            for fk in domain_fks:
-                for col in fk.columns:
-                    fk_col_names.add(col.name if hasattr(col, "name") else str(col))
-            # "user_cols" = everything that isn't system + FK. A pure
-            # association table has zero user columns.
-            user_cols = cols - system_cols - fk_col_names
-            return len(domain_fks) == 2 and len(user_cols) == 0
+            # Association-ness is pure FK-arity topology. Metadata
+            # columns on the link table (Role, Ordinal, etc.) don't
+            # disqualify it — the user can pull them into output by
+            # naming the table in include_tables.
+            return len(domain_fks) == 2
         except Exception:
             return False
 
