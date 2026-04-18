@@ -87,7 +87,7 @@ class Denormalizer:
         )
     """
 
-    def __init__(self, dataset: "DatasetLike") -> None:
+    def __init__(self, dataset: "DatasetLike", *, version: Any = None) -> None:
         """Construct from a ``DatasetLike`` object.
 
         The dataset's members (recursively via ``list_dataset_members``)
@@ -95,24 +95,56 @@ class Denormalizer:
         orm_resolver are derived from the dataset. Two shapes are supported:
 
         - **Live `Dataset` (`dataset._ml_instance` is a DerivaML):** pulls
-          `model`, `catalog`, `engine`, and `orm_resolver` from the ml
-          instance's `workspace.local_schema`. `source` defaults to
-          `"catalog"` so the planner fetches rows from the live catalog
-          via a :class:`PagedClient`.
-        - **`DatasetBag` or canned test fixture:** reads `model`, `engine`,
-          and `_orm_resolver` attributes directly. `source` defaults to
-          `"local"` (rows are assumed already present in the engine).
+          ``model``, ``catalog``, ``engine``, and ``orm_resolver`` from the ml
+          instance's ``workspace.local_schema``. ``source`` defaults to
+          ``"catalog"`` so the planner fetches rows via a :class:`PagedClient`.
+          If ``version`` is given, the :class:`ErmrestPagedClient` is built
+          against the **version-snapshot catalog** (matching the pattern
+          used by :meth:`Dataset.list_dataset_members`). Otherwise it uses
+          whichever catalog the DerivaML instance was originally bound to
+          (live or pre-pinned).
+        - **`DatasetBag` or canned test fixture:** reads ``model``,
+          ``engine``, and ``_orm_resolver`` attributes directly. ``source``
+          defaults to ``"local"`` (rows are assumed already present in the
+          engine). ``version`` has no effect for a bag — the bag is already
+          materialized at whatever version it was built from.
 
         Args:
             dataset: A :class:`Dataset`, :class:`DatasetBag`, or any
                 object satisfying the ``DatasetLike`` protocol.
+            version: Optional ``DatasetVersion | str | None``. When given
+                AND ``dataset`` is a live :class:`Dataset`, resolves to
+                the corresponding catalog snapshot so the returned
+                Denormalizer fetches reproducibly. Ignored for
+                DatasetBag / fixtures. Follows the same semantics as
+                :meth:`Dataset.list_dataset_members`'s ``version`` kwarg.
         """
         self._dataset = dataset
         self._dataset_rid = dataset.dataset_rid
+        # Stash the version so _anchors_as_dict can pass it through to
+        # Dataset.list_dataset_members for snapshot-consistent member
+        # enumeration. None is a valid value and means "use the
+        # dataset's default binding".
+        self._version = version
 
         # Prefer direct attributes (DatasetBag, test fixture).
         # Fall back to `_ml_instance` (live Dataset).
         ml_instance = getattr(dataset, "_ml_instance", None)
+
+        # If version is supplied and the dataset knows how to resolve it
+        # to a snapshot-bound DerivaML instance, switch ml_instance to
+        # that snapshot. This matches Dataset.list_dataset_members'
+        # "snapshot-if-version-else-current-instance" pattern exactly.
+        if version is not None and ml_instance is not None:
+            resolver = getattr(dataset, "_version_snapshot_catalog", None)
+            if callable(resolver):
+                try:
+                    ml_instance = resolver(version)
+                except Exception:
+                    # If snapshot resolution fails (bad version string,
+                    # history lookup error), propagate — this is NOT the
+                    # dry-run path, so callers should see the failure.
+                    raise
 
         self._model = getattr(dataset, "model", None)
         if self._model is None and ml_instance is not None:
@@ -132,8 +164,11 @@ class Denormalizer:
                 if local_schema is not None:
                     self._orm_resolver = getattr(local_schema, "get_orm_class", None)
             # Live-catalog path: build a PagedClient so _denormalize_impl
-            # can fetch rows. Matches the pre-refactor
-            # Dataset.denormalize_as_dataframe behavior.
+            # can fetch rows. The catalog here is the ml_instance's
+            # current catalog — which is either the live catalog, the
+            # snapshot chosen by the `version` kwarg above, or whatever
+            # the DerivaML was pre-bound to at construction time. This
+            # three-way source-of-truth mirrors list_dataset_members.
             catalog = getattr(ml_instance, "catalog", None)
             if catalog is not None:
                 try:
@@ -295,6 +330,9 @@ class Denormalizer:
         # paged_client / source pair.
         inst._source = "local"
         inst._paged_client = None
+        # from_rids has no Dataset context → no version resolution;
+        # _anchors_as_dict uses the anchor dict directly anyway.
+        inst._version = None
         return inst
 
     # ------------------------------------------------------------------
@@ -962,10 +1000,21 @@ class Denormalizer:
 
         Delegates to :meth:`~deriva_ml.dataset.Dataset.list_dataset_members`
         with ``recurse=True`` (so nested-dataset members are included
-        per Rule 9) and reshapes the result into the dict form used by
+        per Rule 9) and — if this Denormalizer was constructed with a
+        ``version`` — passes that version through so member enumeration
+        runs against the same snapshot the main SQL join will use.
+
+        Reshapes the result into the dict form used by
         :meth:`_classify_anchors`.
         """
-        members = self._dataset.list_dataset_members(recurse=True)
+        # Pass version through ONLY if it was supplied at construction;
+        # list_dataset_members on DatasetBag doesn't accept version (the
+        # bag is already at a fixed snapshot), so omit the kwarg when
+        # version is None to stay compatible with both shapes.
+        kwargs: dict[str, Any] = {"recurse": True}
+        if self._version is not None:
+            kwargs["version"] = self._version
+        members = self._dataset.list_dataset_members(**kwargs)
         return {table: [r["RID"] for r in rows] for table, rows in members.items()}
 
     def _classify_anchors(

@@ -434,8 +434,14 @@ class Workspace:
             model: ``DerivaModel`` used by the denormalizer for join planning.
             dataset_rid: RID of the dataset to denormalize.
             include_tables: Tables to include in the wide table.
-            version: Optional dataset version (currently ignored; accepted for
-                protocol compatibility with :meth:`Dataset.cache_denormalized`).
+            version: Optional dataset version. Used ONLY for cache-key
+                segregation (different versions cache independently).
+                Snapshot resolution is the caller's responsibility —
+                :meth:`Dataset.cache_denormalized` resolves ``version``
+                to a snapshot-bound catalog via
+                :meth:`Dataset._version_snapshot_catalog` and passes the
+                resulting ``model`` + ``paged_client`` here, so the
+                rows fetched below actually match the version.
             source: Fetch mode forwarded to :func:`_denormalize_impl`.
                 ``"local"`` (default) assumes rows are already present.
                 ``"catalog"`` requires *paged_client* and fetches rows from

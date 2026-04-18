@@ -785,6 +785,7 @@ class Dataset:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        version: DatasetVersion | str | None = None,
     ) -> pd.DataFrame:
         """Return the dataset as a denormalized wide table (DataFrame).
 
@@ -799,6 +800,13 @@ class Dataset:
             via: Optional path-only intermediates (Rule 6).
             ignore_unrelated_anchors: If True, silently drop anchors
                 with no FK path (Rule 8).
+            version: Optional dataset version. When given, queries run
+                against the corresponding catalog snapshot for
+                reproducibility (same semantics as
+                :meth:`list_dataset_members`'s ``version`` kwarg). When
+                None, uses whatever catalog binding the underlying
+                DerivaML instance was constructed with (live or a
+                previously-pinned snapshot).
 
         Returns:
             A :class:`pandas.DataFrame` with one row per ``row_per``
@@ -808,11 +816,14 @@ class Dataset:
 
             dataset = ml.lookup_dataset("28CT")
             df = dataset.get_denormalized_as_dataframe(["Image", "Subject"])
-            print(df["Image.Filename"].head())
+            # Pinned to a specific version for reproducibility:
+            df = dataset.get_denormalized_as_dataframe(
+                ["Image", "Subject"], version="1.0.0"
+            )
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
-        return Denormalizer(self).as_dataframe(
+        return Denormalizer(self, version=version).as_dataframe(
             include_tables,
             row_per=row_per,
             via=via,
@@ -826,6 +837,7 @@ class Dataset:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        version: DatasetVersion | str | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """Stream the denormalized dataset rows as dicts.
 
@@ -842,6 +854,9 @@ class Dataset:
             via: Optional path-only intermediates (Rule 6).
             ignore_unrelated_anchors: If True, silently drop anchors
                 with no FK path (Rule 8).
+            version: Optional dataset version (snapshot-bound queries).
+                Same semantics as
+                :meth:`get_denormalized_as_dataframe`'s ``version``.
 
         Yields:
             ``dict[str, Any]`` per row — keys are ``Table.column``
@@ -854,7 +869,7 @@ class Dataset:
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
-        yield from Denormalizer(self).as_dict(
+        yield from Denormalizer(self, version=version).as_dict(
             include_tables,
             row_per=row_per,
             via=via,
@@ -867,6 +882,7 @@ class Dataset:
         *,
         row_per: str | None = None,
         via: list[str] | None = None,
+        version: DatasetVersion | str | None = None,
     ) -> list[tuple[str, str]]:
         """List the columns the denormalized table would have.
 
@@ -881,6 +897,10 @@ class Dataset:
             include_tables: Tables whose columns appear in the output.
             row_per: Optional explicit leaf table (Rule 2).
             via: Optional path-only intermediates (Rule 6).
+            version: Optional dataset version. Rarely matters for column
+                preview (the schema shape is usually stable across
+                versions) but accepted for symmetry with the other
+                denormalize methods.
 
         Returns:
             List of ``(column_name, column_type)`` tuples.
@@ -888,12 +908,10 @@ class Dataset:
         Example::
 
             cols = dataset.list_denormalized_columns(["Image", "Subject"])
-            # [("Image.RID", "text"), ("Image.Filename", "text"),
-            #  ("Subject.RID", "text"), ("Subject.Name", "text"), ...]
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
-        return Denormalizer(self).columns(
+        return Denormalizer(self, version=version).columns(
             include_tables,
             row_per=row_per,
             via=via,
@@ -905,6 +923,7 @@ class Dataset:
         *,
         row_per: str | None = None,
         via: list[str] | None = None,
+        version: DatasetVersion | str | None = None,
     ) -> dict[str, Any]:
         """Dry-run the denormalization; return planning metadata.
 
@@ -915,10 +934,16 @@ class Dataset:
         ``join_path``, ``transparent_intermediates``, ``ambiguities``,
         ``estimated_row_count``, ``anchors``, and ``source``. This method
         never raises on ambiguity — ambiguities are reported in the dict.
+
+        Args:
+            include_tables: Tables whose columns would appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+            version: Optional dataset version (snapshot-bound queries).
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
-        return Denormalizer(self).describe(
+        return Denormalizer(self, version=version).describe(
             include_tables,
             row_per=row_per,
             via=via,
@@ -927,6 +952,8 @@ class Dataset:
     def list_schema_paths(
         self,
         tables: list[str] | None = None,
+        *,
+        version: DatasetVersion | str | None = None,
     ) -> dict[str, Any]:
         """List FK paths reachable from this dataset's members.
 
@@ -939,6 +966,8 @@ class Dataset:
             tables: Optional filter — when given, ``schema_paths`` in
                 the returned dict includes only entries involving at
                 least one of these tables.
+            version: Optional dataset version. When given, the member
+                enumeration uses the corresponding catalog snapshot.
 
         Returns:
             Dict with 6 keys: ``member_types``, ``anchor_types``,
@@ -950,11 +979,10 @@ class Dataset:
 
             info = dataset.list_schema_paths()
             print(info["member_types"])       # e.g. ["Image", "Subject"]
-            print(info["reachable_tables"])   # {anchor: [tables reachable]}
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
-        return Denormalizer(self).list_paths(tables=tables)
+        return Denormalizer(self, version=version).list_paths(tables=tables)
 
     def cache_denormalized(
         self,
@@ -1009,10 +1037,16 @@ class Dataset:
         """
         from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
 
-        paged_client = ErmrestPagedClient(catalog=self._ml_instance.catalog)
+        # Resolve version → snapshot-bound catalog so fetches are
+        # reproducible per spec-pinned version. When version is None,
+        # falls through to self._ml_instance (whatever the DerivaML was
+        # constructed against — live or pre-pinned). Matches the
+        # pattern used by Dataset.list_dataset_members / _version_snapshot_catalog.
+        version_snapshot_ml = self._version_snapshot_catalog(version)
+        paged_client = ErmrestPagedClient(catalog=version_snapshot_ml.catalog)
         children = [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
         result = self._ml_instance.workspace.cache_denormalized(
-            model=self._ml_instance.model,
+            model=version_snapshot_ml.model,
             dataset_rid=self.dataset_rid,
             include_tables=include_tables,
             version=version,
