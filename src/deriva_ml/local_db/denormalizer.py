@@ -940,6 +940,31 @@ class Denormalizer:
         # Step 3: main SQL via _denormalize_impl. Source + paged_client are
         # chosen in __init__ — "catalog" for live Datasets (needs PagedClient
         # to fetch rows before the join), "local" for DatasetBag / fixtures.
+        #
+        # Nested-dataset scoping: _denormalize_impl's SQL emits
+        # ``WHERE Dataset.RID IN (dataset_rid, ...children)``. Without the
+        # children RIDs, nested-dataset members (rows whose Dataset_X.Dataset
+        # points at a descendant, not the root) never pass the WHERE and the
+        # result comes back empty. Pull the descendant RIDs from the dataset
+        # itself — DatasetLike exposes ``list_dataset_children(recurse=True)``
+        # returning a list of child objects with ``.dataset_rid`` attributes.
+        # Failure here is non-fatal (fixture-style datasets may not implement
+        # it) — fall back to root-only scoping and the caller sees the same
+        # behavior they had before nested support was wired in.
+        dataset_children_rids: list[str] | None = None
+        list_children = getattr(self._dataset, "list_dataset_children", None)
+        if callable(list_children):
+            try:
+                children = list_children(recurse=True)
+                dataset_children_rids = [
+                    getattr(c, "dataset_rid", None) for c in children if getattr(c, "dataset_rid", None)
+                ] or None
+            except Exception:
+                # Fixture-shaped datasets or unusual DatasetLike
+                # implementations may not support recurse; silently fall
+                # back to root-only scoping rather than break denormalize.
+                dataset_children_rids = None
+
         main_result = _denormalize_impl(
             model=self._model,
             engine=self._engine,
@@ -947,6 +972,7 @@ class Denormalizer:
             dataset_rid=self._dataset_rid,
             include_tables=list(include_tables),
             dataset=self._dataset,
+            dataset_children_rids=dataset_children_rids,
             source=self._source,
             paged_client=self._paged_client,
             row_per=resolved_row_per,
