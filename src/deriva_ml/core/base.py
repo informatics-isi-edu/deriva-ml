@@ -474,7 +474,15 @@ class DerivaML(
                     "Legacy manifest migration failed: %s",
                     exc,
                 )
-            # Build the local schema so the ORM is available
+            # Build the local schema so the ORM is available. Refresh the
+            # catalog model first so the ORM reflects the actual catalog
+            # state at the time workspace is lazily first accessed — the
+            # model object captured at DerivaML.__init__ may have been
+            # constructed before later catalog mutations (e.g. the test
+            # harness calling ``add_dataset_element_type`` to create
+            # association tables). Without this refresh, the local schema
+            # misses tables that already exist in the catalog.
+            self.model.refresh_model()
             self._workspace.build_local_schema(
                 model=self.model.model,  # the ERMrest Model object
                 schemas=[self.ml_schema, *self.domain_schemas],

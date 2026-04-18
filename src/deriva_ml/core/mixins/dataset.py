@@ -208,6 +208,26 @@ class DatasetMixin:
             else:
                 raise e
 
+        # If the workspace has already been built (e.g. because a prior
+        # Execution created an AssetManifest that touched .workspace),
+        # its local ORM schema doesn't know about the new association
+        # table. Rebuild it so subsequent catalog-mode denormalize calls
+        # can resolve ``{Dataset_{element}}`` as a join target. Without
+        # this, the next Denormalizer that tries to join through the
+        # new assoc table raises ``KeyError: 'Table Dataset_X not found'``.
+        if getattr(self, "_workspace", None) is not None:
+            ls = getattr(self._workspace, "local_schema", None)
+            if ls is not None:
+                # Fresh model fetch so the rebuild sees the newly-added
+                # association table (the local ermrest Model object may
+                # lag behind if the test harness created this table via
+                # a side channel).
+                self.model.refresh_model()
+                self._workspace.rebuild_schema(
+                    model=self.model.model,
+                    schemas=[self.ml_schema, *self.domain_schemas],
+                )
+
         # self.model = self.catalog.getCatalogModel()
         annotations = CatalogGraph(
             self, s3_bucket=self.s3_bucket, use_minid=self.use_minid

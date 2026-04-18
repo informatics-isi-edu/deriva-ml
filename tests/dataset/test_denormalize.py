@@ -804,6 +804,11 @@ class TestCatalogDenormalize:
 
         When a dataset has nested datasets, the denormalization should include
         members from both the parent and all nested children.
+
+        The dataset's members include File (WWW asset) anchors that have no
+        FK path to Subject — these are legitimately unrelated per Rule 8.
+        Pass ``ignore_unrelated_anchors=True`` to drop them silently so the
+        query returns the Subject rows the user asked for.
         """
         ml_instance, dataset_description = catalog_with_datasets
 
@@ -812,8 +817,12 @@ class TestCatalogDenormalize:
         # Get members including nested
         all_members = dataset.list_dataset_members(recurse=True)
 
-        # Denormalize
-        df = dataset.get_denormalized_as_dataframe(include_tables=["Subject"])
+        # Denormalize — File anchors exist in the membership set but don't
+        # reach Subject via any FK path, so ask the planner to ignore them.
+        df = dataset.get_denormalized_as_dataframe(
+            include_tables=["Subject"],
+            ignore_unrelated_anchors=True,
+        )
 
         # Should include subjects from all nested datasets
         if "Subject" in all_members:
