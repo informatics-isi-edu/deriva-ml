@@ -100,18 +100,32 @@ class DenormalizeResult:
     def extend(self, rows: list[dict[str, Any]]) -> "DenormalizeResult":
         """Return a new :class:`DenormalizeResult` with additional rows appended.
 
-        Used when combining phases of denormalization — e.g., the main JOIN
-        result plus orphan rows emitted by LEFT-JOIN-style upstream anchors
-        (:meth:`Denormalizer._emit_orphan_rows`).
+        Used when combining phases of denormalization — specifically,
+        :meth:`Denormalizer._run` appends orphan rows (Rule 7 case 3)
+        emitted by :meth:`Denormalizer._emit_orphan_rows` to the main
+        JOIN result.
 
-        Columns and schema are preserved from ``self``. The returned result's
-        :attr:`row_count` is ``self.row_count + len(rows)``.
+        **Immutability**: ``self`` is NOT mutated. Columns and schema are
+        shared by reference with the returned instance (they're
+        metadata, not per-row data). Only the row list is a fresh copy.
 
         Args:
-            rows: Row dicts to append (same shape as ``self.iter_rows()``).
+            rows: Row dicts to append. Each row should match the shape
+                produced by :meth:`iter_rows` — keys are
+                ``Table.column`` / ``schema.Table.column`` labels, values
+                are raw Python types.
 
         Returns:
-            New :class:`DenormalizeResult` — does not mutate ``self``.
+            New :class:`DenormalizeResult` with ``row_count = self.row_count +
+            len(rows)`` and concatenated rows.
+
+        Example::
+
+            main_result = _denormalize_impl(...)
+            orphan_rows = [{"Image.RID": None, "Subject.RID": "ORPHAN"}]
+            combined = main_result.extend(orphan_rows)
+            # combined.row_count == main_result.row_count + 1
+            # main_result is unchanged
         """
         return DenormalizeResult(
             columns=self.columns,
@@ -171,6 +185,41 @@ def _denormalize_impl(
         RuntimeError: If the ``"Dataset"`` ORM class cannot be resolved
             (likely because ``build_local_schema`` was not called with the
             ``deriva-ml`` schema).
+        DerivaMLDenormalizeMultiLeaf / NoSink / DownstreamLeaf /
+            AmbiguousPath: planner rule violations raised by
+            ``_prepare_wide_table``.
+
+    Example::
+
+        # Typical local-mode call (rows already in the engine):
+        result = _denormalize_impl(
+            model=model,
+            engine=engine,
+            orm_resolver=local_schema.get_orm_class,
+            dataset_rid="DS-001",
+            include_tables=["Image", "Subject"],
+            source="local",
+        )
+        df = result.to_dataframe()
+
+        # Catalog-mode: fetches rows via PagedClient before the join.
+        result = _denormalize_impl(
+            model=model, engine=engine,
+            orm_resolver=ls.get_orm_class,
+            dataset_rid="DS-001",
+            include_tables=["Image", "Subject"],
+            source="catalog",
+            paged_client=ErmrestPagedClient(catalog),
+            row_per="Image",                 # Rule 2 override
+            via=["Observation"],             # Rule 6 disambiguation
+        )
+
+    Note:
+        Most callers should use the higher-level
+        :class:`~deriva_ml.local_db.denormalizer.Denormalizer` API
+        instead of calling this function directly. The class handles
+        anchor classification, orphan-row emission, and source-mode
+        selection automatically.
     """
     # Validate source / paged_client combination up front so callers get a
     # clear error before we do any work.

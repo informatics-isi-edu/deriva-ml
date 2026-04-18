@@ -336,9 +336,32 @@ class DatasetLike(Protocol):
     ) -> dict[str, Any]:
         """Dry-run a denormalization call; return planning metadata.
 
-        Resolves the FK path, computes column shape, and (when catalog
-        access is available) estimates row counts and asset sizes —
-        without materializing any data.
+        Resolves the FK path, computes the column shape, and estimates
+        row counts without materializing any data. Unlike
+        :meth:`get_denormalized_as_dataframe`, this method does NOT
+        raise on Rule 2/5/6 errors — every failure mode is represented
+        in the returned dict with ``None`` / ``[]`` / ``{}`` in the
+        affected positions so callers can inspect and react.
+
+        Args:
+            include_tables: Tables whose columns would appear in the output.
+            row_per: Optional explicit leaf table.
+            via: Optional path-only intermediates.
+
+        Returns:
+            12-key planning dict (see
+            :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.describe`
+            for the detailed shape): ``row_per``, ``row_per_source``,
+            ``row_per_candidates``, ``columns``, ``include_tables``,
+            ``via``, ``join_path``, ``transparent_intermediates``,
+            ``ambiguities``, ``estimated_row_count``, ``anchors``,
+            ``source``.
+
+        See Also:
+            get_denormalized_as_dataframe: Execute the plan and return a
+                DataFrame (raises on rule violations).
+            list_denormalized_columns: Column shape only (no anchors,
+                no row-count estimation).
         """
         ...
 
@@ -348,8 +371,21 @@ class DatasetLike(Protocol):
     ) -> dict[str, Any]:
         """List FK paths reachable from this dataset's members.
 
-        Useful for discovering what tables are available to include in
-        denormalization.
+        Model-only analysis — no data fetch. Useful for discovering
+        what tables are available to include in denormalization when
+        the user doesn't know the schema.
+
+        Args:
+            tables: Optional filter — when given, ``schema_paths`` in
+                the returned dict includes only entries involving at
+                least one of these tables.
+
+        Returns:
+            6-key dict (see
+            :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.list_paths`
+            for the detailed shape): ``member_types``, ``anchor_types``,
+            ``reachable_tables``, ``association_tables``,
+            ``feature_tables``, ``schema_paths``.
         """
         ...
 

@@ -788,9 +788,27 @@ class Dataset:
     ) -> pd.DataFrame:
         """Return the dataset as a denormalized wide table (DataFrame).
 
-        Shortcut for ``Denormalizer(self).as_dataframe(include_tables, ...)``.
-        See :class:`~deriva_ml.local_db.denormalizer.Denormalizer` for the
-        full API and semantic rules.
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.as_dataframe`.
+        See the ``Denormalizer`` class docstring for the full semantic
+        rules (Rules 1-8) and cardinality details.
+
+        Args:
+            include_tables: Tables whose columns appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+            ignore_unrelated_anchors: If True, silently drop anchors
+                with no FK path (Rule 8).
+
+        Returns:
+            A :class:`pandas.DataFrame` with one row per ``row_per``
+            instance in scope. Columns use ``Table.column`` notation.
+
+        Example::
+
+            dataset = ml.lookup_dataset("28CT")
+            df = dataset.get_denormalized_as_dataframe(["Image", "Subject"])
+            print(df["Image.Filename"].head())
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -811,9 +829,28 @@ class Dataset:
     ) -> Generator[dict[str, Any], None, None]:
         """Stream the denormalized dataset rows as dicts.
 
-        Shortcut for ``Denormalizer(self).as_dict(include_tables, ...)``.
-        Use this for large datasets where a full DataFrame won't fit in
-        memory — each row is yielded as soon as it's produced.
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.as_dict`.
+        Same rules and exceptions as
+        :meth:`get_denormalized_as_dataframe` but yields one dict per
+        row. Use this for large datasets where a full DataFrame won't
+        fit in memory.
+
+        Args:
+            include_tables: Tables whose columns appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+            ignore_unrelated_anchors: If True, silently drop anchors
+                with no FK path (Rule 8).
+
+        Yields:
+            ``dict[str, Any]`` per row — keys are ``Table.column``
+            labels, values are raw Python types.
+
+        Example::
+
+            for row in dataset.get_denormalized_as_dict(["Image", "Subject"]):
+                print(row["Image.RID"], row["Subject.Name"])
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -833,8 +870,26 @@ class Dataset:
     ) -> list[tuple[str, str]]:
         """List the columns the denormalized table would have.
 
-        Shortcut for ``Denormalizer(self).columns(include_tables, ...)``.
-        Model-only — no data fetch.
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.columns`.
+        Model-only — no data fetch, no catalog query. Runs the same
+        Rule 2/5/6 validation as
+        :meth:`get_denormalized_as_dataframe` so planner errors surface
+        early.
+
+        Args:
+            include_tables: Tables whose columns appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+
+        Returns:
+            List of ``(column_name, column_type)`` tuples.
+
+        Example::
+
+            cols = dataset.list_denormalized_columns(["Image", "Subject"])
+            # [("Image.RID", "text"), ("Image.Filename", "text"),
+            #  ("Subject.RID", "text"), ("Subject.Name", "text"), ...]
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -875,8 +930,27 @@ class Dataset:
     ) -> dict[str, Any]:
         """List FK paths reachable from this dataset's members.
 
-        Shortcut for ``Denormalizer(self).list_paths(tables)``. Useful for
-        discovering what tables are available to include in denormalization.
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.list_paths`.
+        Useful for schema exploration — answers "what tables could I
+        include in a denormalization?"
+
+        Args:
+            tables: Optional filter — when given, ``schema_paths`` in
+                the returned dict includes only entries involving at
+                least one of these tables.
+
+        Returns:
+            Dict with 6 keys: ``member_types``, ``anchor_types``,
+            ``reachable_tables``, ``association_tables``,
+            ``feature_tables``, ``schema_paths``. See
+            :meth:`Denormalizer.list_paths` for the detailed shape.
+
+        Example::
+
+            info = dataset.list_schema_paths()
+            print(info["member_types"])       # e.g. ["Image", "Subject"]
+            print(info["reachable_tables"])   # {anchor: [tables reachable]}
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 

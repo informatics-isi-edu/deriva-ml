@@ -454,10 +454,39 @@ class Workspace:
             ignore_unrelated_anchors: Reserved — accepted for protocol
                 compatibility but not yet propagated to the low-level
                 ``_denormalize_impl`` primitive (which does not yet
-                implement anchor classification).
+                implement anchor classification). Included in the cache
+                key so different flag values cache independently.
 
         Returns:
             :class:`CachedResult` handle over the cached result table.
+
+        Example::
+
+            # First call: computes and caches.
+            result = workspace.cache_denormalized(
+                model=model,
+                dataset_rid="DS-001",
+                include_tables=["Image", "Subject"],
+                source="catalog",
+                paged_client=ErmrestPagedClient(catalog),
+                dataset=dataset,
+            )
+            df = result.to_dataframe()
+
+            # Second call with same args: returns cached data instantly.
+            result2 = workspace.cache_denormalized(
+                model=model, dataset_rid="DS-001",
+                include_tables=["Image", "Subject"],
+                source="catalog", paged_client=..., dataset=dataset,
+            )
+
+            # Different planner knobs cache independently:
+            result3 = workspace.cache_denormalized(
+                model=model, dataset_rid="DS-001",
+                include_tables=["Image", "Subject"],
+                via=["Observation"],   # different cache key from above
+                ...
+            )
         """
         import time
 

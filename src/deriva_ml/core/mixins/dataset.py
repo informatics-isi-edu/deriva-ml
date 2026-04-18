@@ -319,27 +319,51 @@ class DatasetMixin:
         self,
         include_tables: list[str],
     ) -> dict[str, Any]:
-        """Return schema shape and catalog-wide size estimates for a
-        potential denormalized table.
+        """Return schema shape + catalog-wide size estimates for a denormalized table.
 
-        This method does NOT require a dataset — it uses global row counts
-        across the entire catalog. It is the catalog-wide analog of
-        :meth:`Dataset.describe_denormalized`, which returns a dataset-
-        scoped planning dict with a different shape (see spec §5).
+        This is the **catalog-wide** analog of
+        :meth:`Dataset.describe_denormalized`. It asks "if I were to
+        denormalize these tables across the entire catalog (not scoped
+        to any specific dataset), what would the result look like and
+        how big would it be?" Useful for rough size estimation before
+        committing to a bag export.
 
-        Aligned with :meth:`estimate_bag_size` return structure.
+        The return shape is aligned with :meth:`estimate_bag_size` and
+        is **NOT the same** as the dataset-scoped 12-key plan dict from
+        :meth:`Dataset.describe_denormalized` (spec §5). Do not confuse
+        the two.
 
         Args:
             include_tables: List of table names to include in the join.
 
         Returns:
-            dict with keys:
-                - columns: list of (column_name, column_type) tuples
-                - join_path: ordered list of table names showing the join chain
-                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
-                - total_rows: total row count across included tables
-                - total_asset_bytes: total asset size in bytes
-                - total_asset_size: human-readable size string
+            dict with these keys:
+
+            - ``columns``: list of ``(column_name, column_type)`` tuples.
+            - ``join_path``: ordered list of domain table names on the
+              join chain (excludes the implicit ``Dataset`` root and
+              any association tables).
+            - ``tables``: ``{table_name: {row_count, is_asset,
+              asset_bytes}}`` — per-table stats for every table in the
+              join path.
+            - ``total_rows``: sum of ``row_count`` across all included
+              tables.
+            - ``total_asset_bytes``: sum of ``asset_bytes``.
+            - ``total_asset_size``: human-readable byte-count string
+              (e.g., ``"1.2 GB"``).
+
+        Example::
+
+            info = ml.estimate_denormalized_size(["Image", "Subject"])
+            print(f"{info['total_rows']} rows across "
+                  f"{len(info['tables'])} tables, "
+                  f"{info['total_asset_size']} of assets")
+
+        See Also:
+            Dataset.describe_denormalized: Dataset-scoped planning dict.
+            Denormalizer.describe: Full dataset-scoped plan with
+                ambiguity reporting.
+            estimate_bag_size: Bag-level size estimation.
         """
         from deriva.core.datapath import Cnt, Sum
 

@@ -26,18 +26,65 @@ logger = logging.getLogger(__name__)
 class Denormalizer:
     """Produce wide-table denormalizations from Deriva datasets or anchor sets.
 
+    The ``Denormalizer`` wraps the lower-level :func:`_denormalize_impl`
+    SQL executor in a class-based API that adds the new semantic rules
+    (Rules 1-8 from the design spec):
+
+    - Rule 2: auto-inferred ``row_per`` (sink-finding)
+    - Rule 5: explicit ``row_per`` with a downstream table in
+      ``include_tables`` raises :class:`DerivaMLDenormalizeDownstreamLeaf`
+    - Rule 6: multiple FK paths between requested tables raises
+      :class:`DerivaMLDenormalizeAmbiguousPath` unless disambiguated via
+      ``include_tables`` or ``via=``
+    - Rule 7: orphan anchors (upstream rows that don't reach ``row_per``)
+      emit LEFT-JOIN-style rows with the row_per-side columns NULL
+    - Rule 8: anchors with no FK path at all raise
+      :class:`DerivaMLDenormalizeUnrelatedAnchor` unless the
+      ``ignore_unrelated_anchors`` flag is set
+
     Construction:
-      - ``Denormalizer(dataset_like)`` — use the dataset's members as anchors
-        and derive catalog/workspace/model from the dataset's bindings.
-      - ``Denormalizer.from_rids(rids, ml=...)`` — arbitrary RID anchors
-        (see classmethod; implemented in a later task).
+
+    - ``Denormalizer(dataset_like)`` — use the dataset's members as the
+      anchor set. Accepts a :class:`~deriva_ml.dataset.Dataset` (live
+      catalog), a :class:`~deriva_ml.dataset.DatasetBag` (downloaded bag),
+      or any object satisfying the :class:`~deriva_ml.interfaces.DatasetLike`
+      protocol.
+    - :meth:`from_rids` — construct from an explicit RID anchor set without
+      a Dataset context (useful for ad-hoc exploration).
 
     Methods:
-      - :meth:`as_dataframe` — materialize as pd.DataFrame.
-      - :meth:`as_dict` — stream rows as dicts.
-      - :meth:`columns` — preview column schema without fetching.
-      - :meth:`describe` — dry-run the call; returns planning metadata.
-      - :meth:`list_paths` — describe the FK graph (for exploration).
+
+    - :meth:`as_dataframe` — materialize the wide table as a
+      :class:`pandas.DataFrame`.
+    - :meth:`as_dict` — stream rows as ``dict[str, Any]`` (memory-efficient
+      for large results).
+    - :meth:`columns` — preview ``(column_name, column_type)`` pairs
+      without fetching data (model-only).
+    - :meth:`describe` — dry-run: returns a 12-key plan dict (spec §5);
+      reports ambiguities rather than raising.
+    - :meth:`list_paths` — describe the reachable FK graph from the
+      anchor set (useful for discovering what can go into
+      ``include_tables``).
+
+    Example::
+
+        # From a live Dataset:
+        ml = DerivaML(hostname="example.org", catalog_id="42")
+        dataset = ml.lookup_dataset("28CT")
+        d = Denormalizer(dataset)
+        df = d.as_dataframe(["Image", "Subject"])
+
+        # Diamond-schema disambiguation via an intermediate:
+        df = d.as_dataframe(["Image", "Subject"], via=["Observation"])
+
+        # Dry-run to inspect the plan before committing:
+        plan = d.describe(["Image", "Subject", "Diagnosis"])
+        print(plan["row_per"], plan["join_path"])
+
+        # From an explicit RID anchor set (no Dataset required):
+        d = Denormalizer.from_rids(
+            [("Image", "1-ABCD"), ("Image", "1-EFGH")], ml=ml,
+        )
     """
 
     def __init__(self, dataset: "DatasetLike") -> None:
@@ -262,24 +309,67 @@ class Denormalizer:
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
     ) -> pd.DataFrame:
-        """Materialize the denormalized table as a pandas DataFrame.
+        """Materialize the denormalized table as a :class:`pandas.DataFrame`.
+
+        Runs the full 4-phase pipeline: planner decisions (Rules 2/5/6) →
+        anchor classification (Rules 7/8) → main SQL join → orphan-row
+        combine.
 
         Args:
             include_tables: Tables whose columns appear in the output.
-                Also determines ``row_per`` unless overridden.
+                Also determines ``row_per`` unless overridden. Columns are
+                labeled ``Table.column`` (or ``schema.Table.column`` when
+                multi-schema).
             row_per: Explicit leaf table. Must be in ``include_tables``.
-                If None, auto-inferred (Rule 2).
+                If None, auto-inferred by Rule 2 (the unique sink in the
+                FK subgraph over ``include_tables ∪ via``).
             via: Tables forced into the join chain without contributing
-                columns. Useful for disambiguating path ambiguity without
+                columns. Used to resolve Rule 6 path ambiguity without
                 cluttering the output.
             ignore_unrelated_anchors: If True, silently drop anchors whose
-                table has no FK path to any requested table. Default False
-                raises :class:`DerivaMLDenormalizeUnrelatedAnchor`.
+                table has no FK path to any requested table. Default
+                False raises :class:`DerivaMLDenormalizeUnrelatedAnchor`
+                (Rule 8).
 
         Returns:
-            A :class:`pandas.DataFrame` with one row per ``row_per`` instance
-            in scope. See the semantic rules (Rules 1–8 in the spec) for
-            the full cardinality and column-projection semantics.
+            A :class:`pandas.DataFrame` with one row per ``row_per``
+            instance in scope, plus any orphan rows from upstream anchors
+            that don't reach a ``row_per`` row (Rule 7 case 3). Upstream
+            table columns are hoisted onto each row; orphan rows have
+            ``row_per``-side columns set to ``NaN``.
+
+        Raises:
+            DerivaMLDenormalizeMultiLeaf: auto-inference finds multiple
+                candidate sinks (Rule 2).
+            DerivaMLDenormalizeNoSink: cycle in the FK subgraph (Rule 2).
+            DerivaMLDenormalizeDownstreamLeaf: explicit ``row_per`` with a
+                downstream table in ``include_tables`` (Rule 5).
+            DerivaMLDenormalizeAmbiguousPath: multiple FK paths between
+                ``row_per`` and another requested table (Rule 6).
+            DerivaMLDenormalizeUnrelatedAnchor: anchor has no FK path to
+                any table in ``include_tables`` (Rule 8) — unless the
+                ``ignore_unrelated_anchors`` flag is set.
+
+        Example::
+
+            d = Denormalizer(dataset)
+
+            # One row per Image, with Subject columns hoisted:
+            df = d.as_dataframe(["Image", "Subject"])
+
+            # Force an intermediate table's columns into the output:
+            df = d.as_dataframe(["Image", "Observation", "Subject"])
+
+            # Route through Observation without adding its columns:
+            df = d.as_dataframe(["Image", "Subject"], via=["Observation"])
+
+            # Pin row_per explicitly (must be the deepest requested table):
+            df = d.as_dataframe(["Image", "Subject"], row_per="Image")
+
+            # Heterogeneous dataset: drop members with no path to Image:
+            df = d.as_dataframe(
+                ["Image", "Subject"], ignore_unrelated_anchors=True
+            )
         """
         result = self._run(
             include_tables,
@@ -299,8 +389,35 @@ class Denormalizer:
     ) -> Generator[dict[str, Any], None, None]:
         """Stream the denormalized table row-by-row as dicts.
 
-        Same semantics as :meth:`as_dataframe` but yields one dict per row.
-        Use for large datasets where a full DataFrame won't fit in memory.
+        Same planner, same rules, same exceptions as :meth:`as_dataframe` —
+        but yields one ``dict[str, Any]`` per row (keyed by the
+        ``Table.column`` / ``schema.Table.column`` label) rather than
+        materializing a DataFrame. Use this when the result set won't fit
+        in memory or when downstream code processes rows one at a time.
+
+        Args:
+            include_tables: Tables whose columns appear in the output.
+            row_per: Explicit leaf table (Rule 2 override).
+            via: Path-only intermediates (Rule 6 disambiguation).
+            ignore_unrelated_anchors: If True, silently drop unrelated
+                anchors (Rule 8).
+
+        Yields:
+            ``dict[str, Any]`` — one per output row. Keys are
+            denormalized column names (``Table.column`` or
+            ``schema.Table.column``); values are raw Python types as
+            returned by SQLAlchemy.
+
+        Raises:
+            Same as :meth:`as_dataframe`. Exceptions surface on the first
+            ``next()`` — all planner validation runs before any row is
+            yielded, since the pipeline builds the full result up front.
+
+        Example::
+
+            d = Denormalizer(dataset)
+            for row in d.as_dict(["Image", "Subject"]):
+                print(row["Image.RID"], row["Subject.Name"])
         """
         result = self._run(
             include_tables,
@@ -317,15 +434,46 @@ class Denormalizer:
         row_per: str | None = None,
         via: list[str] | None = None,
     ) -> list[tuple[str, str]]:
-        """Preview (column_name, type_name) pairs for the denormalized table.
+        """Preview ``(column_name, type_name)`` pairs for the denormalized table.
 
-        Model-only — no data fetch, no catalog query. Runs the same path
-        validation as :meth:`as_dataframe` so ambiguity errors surface
-        here too.
+        Model-only — no data fetch, no catalog query, no anchor classification.
+        Invokes the same planner as :meth:`as_dataframe` so Rules 2/5/6
+        errors surface here too; this makes ``columns`` useful as a cheap
+        validator of ``include_tables`` before committing to a full run.
+
+        For a dry-run that reports ambiguities without raising, use
+        :meth:`describe` instead.
+
+        Args:
+            include_tables: Tables whose columns appear in the output.
+            row_per: Explicit leaf table (Rule 2 override).
+            via: Path-only intermediates (Rule 6 disambiguation).
+
+        Returns:
+            Sorted list of ``(column_name, column_type)`` tuples. Column
+            names use dot notation (``Table.column`` or
+            ``schema.Table.column`` in multi-schema mode) — same shape
+            used by :meth:`as_dataframe` and :meth:`as_dict` output.
+
+        Raises:
+            DerivaMLDenormalizeMultiLeaf / NoSink / DownstreamLeaf /
+            AmbiguousPath: same as :meth:`as_dataframe` (planner rules
+            2/5/6). Rule 7 and Rule 8 errors do NOT fire here — anchor
+            classification happens only when rows are materialized.
+
+        Example::
+
+            d = Denormalizer(dataset)
+            cols = d.columns(["Image", "Subject"])
+            # [("Image.RID", "text"), ("Image.Filename", "text"),
+            #  ("Subject.RID", "text"), ("Subject.Name", "text"), ...]
         """
         from deriva_ml.model.catalog import denormalize_column_name
 
-        # Invokes the planner; raises on ambiguity.
+        # Invoke the planner on the model alone. _prepare_wide_table runs
+        # the Rule 2/5/6 guards and returns the column spec list. Walking
+        # that list with denormalize_column_name gives us the final
+        # dot-prefixed output labels without touching any data.
         element_tables, column_specs, multi_schema = self._model._prepare_wide_table(
             self._dataset,
             self._dataset_rid,
@@ -342,16 +490,67 @@ class Denormalizer:
         row_per: str | None = None,
         via: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Return a planning-metadata dict describing what would happen.
+        """Return a 12-key planning-metadata dict describing what a
+        corresponding :meth:`as_dataframe` call would do.
 
-        Unlike :meth:`as_dataframe`, ``describe`` does NOT raise on ambiguity —
-        it reports ambiguities in the ``ambiguities`` key so callers can
-        inspect before committing to a real call.
+        **Dry-run invariant**: unlike :meth:`as_dataframe`, ``describe``
+        never raises. Every failure mode (planner rule violation,
+        catalog access error, network timeout) is swallowed and
+        represented in the returned dict as ``None`` / ``[]`` / ``{}``
+        in the affected positions. Ambiguities are reported in the
+        ``ambiguities`` list so the caller can inspect before
+        committing to a real call.
 
-        Returns a dict with these keys (see spec §5):
-            row_per, row_per_source, row_per_candidates, columns,
-            include_tables, via, join_path, transparent_intermediates,
-            ambiguities, estimated_row_count, anchors, source
+        Args:
+            include_tables: Tables whose columns would appear in the
+                output. Also determines ``row_per`` unless overridden.
+            row_per: Optional explicit leaf table.
+            via: Optional path-only intermediates.
+
+        Returns:
+            A dict with these 12 keys (see design spec §5):
+
+            - ``row_per``: resolved leaf table name, or ``None`` if the
+              planner couldn't resolve one (e.g., multi-leaf or bad
+              ``row_per`` argument).
+            - ``row_per_source``: ``"explicit"`` if the caller passed
+              ``row_per``, else ``"auto-inferred"``.
+            - ``row_per_candidates``: list of sink tables from Rule 2
+              sink-finding (the choices auto-inference considered).
+            - ``columns``: list of ``(column_name, column_type)`` tuples
+              that :meth:`as_dataframe` would produce.
+            - ``include_tables`` / ``via``: echoes of the inputs.
+            - ``join_path``: ordered list of table names on the join
+              chain (includes intermediates, excludes the implicit
+              ``Dataset`` root).
+            - ``transparent_intermediates``: subset of ``join_path`` that
+              the user did NOT name in ``include_tables`` — their
+              columns are NOT in the output (joined through only).
+            - ``ambiguities``: list of ``{type, from, to, paths,
+              suggestions}`` dicts, one per Rule 6 ambiguity. Empty
+              when the plan is unambiguous.
+            - ``estimated_row_count``: ``{in_scope_row_per_rows,
+              orphan_rows, total}`` — coarse anchor-based estimate.
+              Fields are ``None`` when estimation couldn't be computed.
+            - ``anchors``: ``{total, by_type}`` — counts of anchor RIDs
+              grouped by table.
+            - ``source``: ``"catalog"`` for live Datasets, ``"local"``
+              for DatasetBags / canned fixtures, ``"slice"`` for
+              attached slices.
+
+        Example::
+
+            d = Denormalizer(dataset)
+            plan = d.describe(["Image", "Subject"])
+
+            if plan["ambiguities"]:
+                for amb in plan["ambiguities"]:
+                    print(f"  {amb['from']} → {amb['to']}: {len(amb['paths'])} paths")
+                    print(f"  try adding: {amb['suggestions']['add_to_via']}")
+            else:
+                print(f"row_per = {plan['row_per']}")
+                print(f"join = {' → '.join(plan['join_path'])}")
+                print(f"{plan['estimated_row_count']['total']} rows")
         """
         from deriva_ml.core.exceptions import DerivaMLDenormalizeError
         from deriva_ml.model.catalog import denormalize_column_name
@@ -498,29 +697,57 @@ class Denormalizer:
         self,
         tables: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Describe the FK graph reachable from the dataset/anchors.
+        """Describe the FK graph reachable from this dataset / anchor set.
 
-        Useful for picking ``include_tables`` when the user doesn't know the
-        schema. Model-only analysis.
+        Useful for schema exploration — answers "what tables could I
+        reasonably include in ``include_tables`` given my anchor set?"
+        Model-only analysis: no catalog query, no data fetch.
 
         Args:
-            tables: If given, filter ``schema_paths`` to paths involving at
-                least one of these tables.
+            tables: Optional filter. When given, ``schema_paths`` includes
+                only entries where the source OR target table is in this
+                list. Anchor tables are always kept as traversal starting
+                points regardless of the filter.
 
         Returns:
-            Dict with:
-                member_types: dataset element types (same as ``anchor_types``
-                    for ``from_rids``-constructed Denormalizers).
-                anchor_types: union of all distinct anchor table names.
-                reachable_tables: mapping from each member/anchor type to
-                    tables reachable from it via FK.
-                association_tables: names of pure association tables in the
-                    schema.
-                feature_tables: names of feature tables (via
-                    :meth:`DerivaModel.find_features`). Empty if the model
-                    does not expose ``find_features`` or has no features.
-                schema_paths: mapping from (source_table, target_table) to a
-                    list of path descriptions.
+            A dict with these 6 keys (see design spec §6):
+
+            - ``member_types``: dataset element types (same as
+              ``anchor_types`` for :meth:`from_rids`-constructed
+              Denormalizers).
+            - ``anchor_types``: sorted list of distinct anchor table
+              names.
+            - ``reachable_tables``: ``{anchor_table: [reachable tables
+              downstream via FK, sorted]}``.
+            - ``association_tables``: sorted list of pure M:N association
+              tables in the schema (detected via
+              :meth:`DerivaModel._is_association_table`).
+            - ``feature_tables``: sorted list of feature tables
+              (via :meth:`DerivaModel.find_features`). Empty if the
+              model doesn't expose ``find_features`` or has no features.
+            - ``schema_paths``: ``{(source, target): [{path, direct}]}``
+              — one entry per reachable ``(source, target)`` pair, each
+              value listing the FK paths between them with a ``direct``
+              flag indicating whether the path is a single FK hop.
+
+        Example::
+
+            d = Denormalizer(dataset)
+            info = d.list_paths()
+
+            # What types are in my dataset?
+            print(info["member_types"])  # e.g., ["Image", "Subject"]
+
+            # What can I reach from each type?
+            for anchor, reach in info["reachable_tables"].items():
+                print(f"{anchor} → {reach}")
+
+            # Investigate multiple FK paths to Subject:
+            for (src, tgt), paths in info["schema_paths"].items():
+                if tgt == "Subject":
+                    for p in paths:
+                        print(f"  {src} → {tgt}: {' → '.join(p['path'])}"
+                              f" (direct={p['direct']})")
         """
         model = self._model
         anchors = self._anchors_as_dict()
@@ -600,13 +827,52 @@ class Denormalizer:
         via: list[str] | None,
         ignore_unrelated_anchors: bool,
     ) -> DenormalizeResult:
-        """Four-phase pipeline: planner → anchor classification → SQL → orphans."""
-        # Step 1: planner decisions (row_per, ambiguity checks)
+        """Execute the full 4-phase denormalization pipeline.
+
+        Called by :meth:`as_dataframe` and :meth:`as_dict`. Raises on any
+        planner-rule violation (unlike :meth:`describe`, which reports
+        ambiguities without raising).
+
+        Pipeline:
+
+        1. **Planner decisions** (Rules 2/5/6): resolve ``row_per`` via
+           sink-finding or validate the explicit value, and check for
+           path ambiguities — raises at the first violation.
+        2. **Anchor classification** (Rules 7/8): partition anchors into
+           ``scoping`` (filter), ``orphans`` (Rule 7 case 3), and
+           ``ignored`` (Rule 7 case 5 silent drop / Rule 8 with flag).
+           Raises if Rule 8 fires and the flag is off.
+        3. **Main SQL**: delegate to :func:`_denormalize_impl` with
+           ``row_per`` / ``via`` threaded through. For live Datasets
+           ``source="catalog"`` and a :class:`PagedClient` fetches rows
+           before the join; for DatasetBag / fixtures ``source="local"``
+           and the engine is assumed pre-populated.
+        4. **Orphan-row combine**: both table-level orphans (case 3)
+           AND per-RID orphans (scoping anchors whose specific RIDs
+           didn't appear in the main result) are emitted as LEFT-JOIN-
+           shaped rows and appended via :meth:`DenormalizeResult.extend`.
+
+        Args:
+            include_tables, row_per, via, ignore_unrelated_anchors:
+                forwarded from the public method.
+
+        Returns:
+            The final :class:`DenormalizeResult` — main SQL rows plus
+            any orphan rows appended.
+        """
+        # Step 1: planner decisions (row_per, ambiguity checks).
+        # _determine_row_per either validates an explicit row_per
+        # (raising DownstreamLeaf if a downstream table is in
+        # include_tables) or auto-infers via sink-finding (raising
+        # MultiLeaf / NoSink if ambiguous or cyclic).
         resolved_row_per = self._model._determine_row_per(
             include_tables=list(include_tables),
             via=list(via or []),
             row_per=row_per,
         )
+        # Rule 6: check every (row_per, T) pair for multiple FK paths.
+        # Unlike describe(), we raise on the first ambiguity detected so
+        # callers get a clear error rather than a silently-wrong join.
         ambiguities = self._model._find_path_ambiguities(
             row_per=resolved_row_per,
             include_tables=list(include_tables),
@@ -692,7 +958,13 @@ class Denormalizer:
         return main_result
 
     def _anchors_as_dict(self) -> dict[str, list[str]]:
-        """Return anchors as table_name -> list of RID strings."""
+        """Return the anchor set as ``{table_name: [rid, rid, ...]}``.
+
+        Delegates to :meth:`~deriva_ml.dataset.Dataset.list_dataset_members`
+        with ``recurse=True`` (so nested-dataset members are included
+        per Rule 9) and reshapes the result into the dict form used by
+        :meth:`_classify_anchors`.
+        """
         members = self._dataset.list_dataset_members(recurse=True)
         return {table: [r["RID"] for r in rows] for table, rows in members.items()}
 
@@ -800,17 +1072,36 @@ class Denormalizer:
         include_tables: list[str],
         row_per: str,
     ) -> list[dict[str, Any]]:
-        """Emit one output row per orphan anchor.
+        """Emit one output row per orphan anchor (Rule 7 case 3).
 
-        For each orphan RID, fetch its row from the local engine and construct
-        an output dict with:
-          - Anchor's columns populated with the row values.
-          - All other columns (row_per and tables not equal to anchor_table)
-            set to None.
+        Each orphan row is an :class:`as_dataframe`-shaped dict with:
 
-        Uses a NULL-init pattern (all columns start as None; only the
-        anchor's own columns are populated from its fetched row) — the
-        LEFT-JOIN shape described by Rule 7 case 3.
+        - The anchor's own columns populated from its fetched row.
+        - All other columns (``row_per``-side and any other table in
+          ``include_tables``) set to ``None``.
+
+        This is the LEFT-JOIN shape spec'd by Rule 7 case 3: upstream
+        anchors that don't reach a ``row_per`` row still contribute an
+        output row, preserving their identity for the caller.
+
+        **Implementation detail** — batched fetch: a single
+        ``SELECT ... WHERE RID IN (:rids)`` per anchor table rather than
+        one connection per RID. Skips anchor tables whose ORM class
+        can't be resolved (logs a warning).
+
+        Args:
+            orphans: ``{anchor_table: [orphan RIDs]}`` from
+                :meth:`_classify_anchors` plus the per-RID orphans
+                discovered in :meth:`_run` Step 4a.
+            include_tables: the user's requested tables — determines
+                which output columns appear.
+            row_per: the resolved leaf table (unused here but accepted
+                for symmetry with other helpers).
+
+        Returns:
+            List of output dicts, one per orphan RID that was
+            successfully fetched. Keys are ``Table.column`` /
+            ``schema.Table.column`` labels.
         """
         from sqlalchemy import select
 

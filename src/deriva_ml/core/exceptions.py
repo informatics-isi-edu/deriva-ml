@@ -363,12 +363,21 @@ class DerivaMLDenormalizeError(DerivaMLException):
 class DerivaMLDenormalizeMultiLeaf(DerivaMLDenormalizeError):
     """Multiple candidate tables for ``row_per`` — ambiguous leaf.
 
-    Raised when auto-inference finds more than one table in
-    ``include_tables`` that could serve as the leaf. The user must specify
-    ``row_per`` explicitly.
+    Raised when Rule 2 auto-inference finds more than one sink in
+    ``include_tables`` — i.e., multiple tables tie for "deepest in the
+    FK graph." The user must specify ``row_per`` explicitly to resolve.
 
     Attributes:
         candidates: list of table names that all qualify as sinks.
+        include_tables: the ``include_tables`` argument that triggered
+            the ambiguity, for reference.
+
+    Example:
+        >>> try:
+        ...     d.as_dataframe(["Dataset", "Subject"])
+        ... except DerivaMLDenormalizeMultiLeaf as e:
+        ...     print(f"Pick one of {e.candidates} as row_per")
+        ...     # Then retry: d.as_dataframe(..., row_per="Subject")
     """
 
     def __init__(self, candidates: list[str], include_tables: list[str]) -> None:
@@ -425,17 +434,34 @@ class DerivaMLDenormalizeDownstreamLeaf(DerivaMLDenormalizeError):
 class DerivaMLDenormalizeAmbiguousPath(DerivaMLDenormalizeError):
     """Multiple FK paths between two requested tables — can't silently choose.
 
-    Raised when two or more distinct FK paths exist between ``row_per`` and
-    another requested/via table. Silent path selection is rejected by
-    design; the user must disambiguate by adding tables to ``include_tables``
-    or ``via``.
+    Raised when Rule 6 detects two or more distinct FK paths between
+    ``row_per`` and another requested / via table. Silent path selection
+    is rejected by design — the result shape would be materially
+    different depending on which path is chosen, and callers should be
+    explicit. Disambiguate by adding intermediates to ``include_tables``
+    (their columns are included) or to ``via=`` (path-only, columns
+    excluded).
 
     Attributes:
-        from_table: the row_per table name.
-        to_table: the table with ambiguous path.
-        paths: list of path descriptions (each a list of table names).
-        suggested_intermediates: tables that appear in at least one path but
-            not in ``include_tables``.
+        from_table: the ``row_per`` table name (the "anchor" of the
+            ambiguity).
+        to_table: the requested table with multiple paths.
+        paths: list of path descriptions — each is a list of table
+            names from ``from_table`` to ``to_table``.
+        suggested_intermediates: tables that appear in at least one
+            path but not in ``include_tables`` — any of these could be
+            named in ``include_tables`` or ``via`` to force a choice.
+
+    Example:
+        >>> try:
+        ...     d.as_dataframe(["Image", "Subject"])  # diamond schema
+        ... except DerivaMLDenormalizeAmbiguousPath as e:
+        ...     for p in e.paths:
+        ...         print(" → ".join(p))
+        ...     # Retry routing explicitly through Observation:
+        ...     df = d.as_dataframe(
+        ...         ["Image", "Subject"], via=e.suggested_intermediates[:1]
+        ...     )
     """
 
     def __init__(
@@ -463,17 +489,33 @@ class DerivaMLDenormalizeAmbiguousPath(DerivaMLDenormalizeError):
 
 
 class DerivaMLDenormalizeUnrelatedAnchor(DerivaMLDenormalizeError):
-    """Anchor has no FK path to any table in ``include_tables``.
+    """Anchor has no FK path to any table in ``include_tables ∪ via``.
 
-    Raised when the caller passes anchors whose table has no FK relationship
-    to any table in ``include_tables ∪ via``. The anchor would contribute
-    nothing to the output.
+    Raised when Rule 8 detects anchors whose table has no FK
+    relationship to any requested table — those anchors would
+    contribute nothing to the output, which is almost always a mistake
+    (wrong dataset passed, stale table name, etc.). Pass
+    ``ignore_unrelated_anchors=True`` to silently drop them if the
+    heterogeneity is intentional.
 
-    Pass ``ignore_unrelated_anchors=True`` to silently drop them.
+    Note: this is distinct from Rule 7 case 5 (table has an FK path
+    into ``include_tables ∪ via`` but the specific anchor RIDs don't
+    reach ``row_per``). Case 5 anchors are silently dropped regardless
+    of the flag — only case 6 (no path at all) raises this error.
 
     Attributes:
         unrelated_tables: tables of the unrelated anchors.
-        include_tables: the include_tables argument for reference.
+        include_tables: the ``include_tables`` argument for reference.
+
+    Example:
+        >>> try:
+        ...     d.as_dataframe(["Image", "Subject"])  # dataset has stray types
+        ... except DerivaMLDenormalizeUnrelatedAnchor as e:
+        ...     print(f"Dataset has unrelated members: {e.unrelated_tables}")
+        ...     # Retry, dropping them:
+        ...     df = d.as_dataframe(
+        ...         ["Image", "Subject"], ignore_unrelated_anchors=True
+        ...     )
     """
 
     def __init__(
