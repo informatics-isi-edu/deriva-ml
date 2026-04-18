@@ -243,6 +243,42 @@ class TestAnchorClassification:
         assert orphans == {}
         assert ignored == {}
 
+    def test_empty_anchor_list_is_ignored(self, populated_denorm) -> None:
+        """An anchor table with an empty RID list is skipped entirely.
+
+        ``list_dataset_members`` may return ``{"File": []}`` when the
+        ``Dataset_File`` association table exists but no members were
+        actually added. A zero-RID anchor can't contribute anything to
+        the output — so it should NOT trigger Rule 8's UnrelatedAnchor
+        diagnostic, which warns about anchors "that would contribute
+        nothing." There's nothing to contribute and nothing to warn
+        about.
+
+        Without this skip, the File anchor with an empty RID list would
+        hit the case-6 (no FK path to Subject) branch and raise
+        DerivaMLDenormalizeUnrelatedAnchor even though it holds no data.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # Unknown table name simulates the Dataset_File assoc returning
+        # an empty member list — "Unrelated" is a nonexistent table so
+        # it has no FK path to Subject. If we didn't short-circuit on
+        # empty lists, this would raise.
+        scoping, orphans, ignored = d._classify_anchors(
+            anchors={"Subject": ["SUBJ-A"], "Unrelated": []},
+            include_tables=["Subject"],
+            via=[],
+            row_per="Subject",
+            ignore_unrelated_anchors=False,
+        )
+        assert scoping == {"Subject": ["SUBJ-A"]}
+        assert orphans == {}
+        # "Unrelated" should not appear in any of the result dicts —
+        # empty anchors are simply skipped.
+        assert "Unrelated" not in scoping
+        assert "Unrelated" not in orphans
+        assert "Unrelated" not in ignored
+
     def test_case_4_downstream_anchor_when_row_per_upstream(self, populated_denorm) -> None:
         """Anchor DOWNSTREAM of row_per is still scoping (direction-agnostic).
 

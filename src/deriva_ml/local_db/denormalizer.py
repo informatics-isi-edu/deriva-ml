@@ -1096,6 +1096,18 @@ class Denormalizer:
         subgraph = include_set | via_set
 
         for table, rids in anchors.items():
+            # Skip empty anchor sets entirely. An anchor dict returned by
+            # list_dataset_members may contain a key for every association
+            # table on Dataset (e.g. Dataset_File) even when no members of
+            # that type were added — the dict ends up with e.g.
+            # ``{"File": []}``. Those zero-RID entries can't contribute
+            # anything to the output and should not trigger Rule 8, which
+            # warns about anchors "that would contribute nothing." If the
+            # RID list is empty, there's nothing TO contribute and nothing
+            # to warn about.
+            if not rids:
+                continue
+
             # Case 1: table == row_per → scoping
             if table == row_per:
                 scoping[table] = list(rids)
