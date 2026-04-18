@@ -1793,10 +1793,30 @@ class DerivaModel:
 
             Prevents: Subject -> Dataset_Subject -> Dataset (looping back to root).
             Allows: Dataset -> Dataset_Subject -> Subject (the intended direction).
+
+            Uses :meth:`_is_association_table` (FK-arity topology) rather
+            than ermrest's ``find_associations(pure=True)`` so that non-
+            pure association tables — bridges that carry user metadata
+            like ``Image_Dataset_Legacy`` — are ALSO recognized as
+            dataset-element associations and excluded from upstream
+            traversal. Without this, walking Image → Image_Dataset_Legacy →
+            Dataset creates a phantom "hub" path that spuriously connects
+            Image to any other dataset-member table (e.g. Subject,
+            Observation) through a different Dataset_X association,
+            producing false Rule-6 ambiguities.
             """
             dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
-            assoc_table = [a for a in dataset_table.find_associations() if a.table == n2]
-            return len(assoc_table) == 1 and n1 != dataset_table
+            if n1 == dataset_table:
+                # Outbound from Dataset → Dataset_X is always fine.
+                return False
+            # Is n2 an association table that points at Dataset (i.e. one
+            # of its FK targets is the Dataset root)?
+            if not self._is_association_table(n2):
+                return False
+            for fk in n2.foreign_keys:
+                if fk.pk_table == dataset_table:
+                    return True
+            return False
 
         # Vocabulary tables are terminal — traverse INTO but not OUT.
         if self.is_vocabulary(root):
