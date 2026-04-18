@@ -22,6 +22,11 @@ Generalize the existing `upload_assets` pathway so the same pipeline uploads:
 
 - **Updates or deletes.** V1 is insert-only. Modifying existing catalog rows
   and deleting them are separate design problems and out of scope.
+- **Creating new tables.** The target table must already exist in the
+  catalog before staging begins. V1 is row-level only; no DDL, no new
+  column additions, no schema evolution as part of the stage/upload
+  pipeline. If the target table does not exist, `stage_row` and
+  `asset_file_path` raise at call time.
 - **Full slice upload-back.** The broader "sync arbitrary local changes to
   catalog" problem (Phase 1 §1.1 goal #4, §5 deferred) remains deferred. This
   spec lays the groundwork but only covers new-row inserts.
@@ -33,32 +38,27 @@ Generalize the existing `upload_assets` pathway so the same pipeline uploads:
   dependency.
 - **Auto-generating metadata from sidecar files.** If a user wants per-file
   metadata, they iterate the directory handle and call the existing
-  `AssetFilePath.metadata` setter on each path. See §2.4.3 for the
+  `AssetFilePath.metadata` setter on each path. See §2.4.4 for the
   intended usage pattern.
 
 ### 1.3 Migration posture
 
-Additive. `ManifestStore` is generalized into a single store tracking both
-asset-row and plain-row pending writes; existing `AssetEntry` state
-continues to work unchanged through the generalized API. Existing
-`asset_file_path` and `upload_assets` / `upload_execution_outputs` keep
-their signatures and behavior; directory registration and plain-row staging
-are new surface area.
+No migration. This work ships on a clean slate — there are no in-flight
+`ManifestStore` entries to preserve. The SQLite schema in §2.3 is the
+starting shape, not a target to migrate old rows into. Existing external
+API names (`asset_file_path`, `upload_assets`, `upload_execution_outputs`)
+keep their signatures and behavior so callers don't change; the
+generalization happens entirely beneath those entry points.
 
 ## 2. Architecture
 
 ### 2.1 One store, one upload drain
 
-Today the workspace holds one per-execution `ManifestStore` with
-`AssetEntry` rows describing pending/uploaded/failed asset uploads. Every
-call to `asset_file_path(...)` appends an `AssetEntry`; upload walks the
-entries, uploads files to Hatrac, inserts rows into the asset table.
+The workspace holds one per-execution `PendingRowsStore` (the former
+`ManifestStore`, renamed to reflect its broader role) carrying a single
+pending-row entry shape that subsumes both asset uploads and plain row
+inserts.
 
-The generalization:
-
-- **Rename conceptually:** `ManifestStore` → `PendingRowsStore`. The SQL
-  schema gains a couple of columns; the class gains a couple of methods.
-  Existing behavior is preserved.
 - **Entry shape:** a pending row has `target_schema`, `target_table`,
   `metadata` (the column values), and an **optional** `asset_file_path`
   pointing at a local file. When the file pointer is set, the entry is an
@@ -144,35 +144,94 @@ on `pending_rows` for upload-drain lookup.
 
 ### 2.4 Public API
 
-#### 2.4.1 Plain row staging
+#### 2.4.1 Typed row records
+
+Today's `DerivaML.asset_record_class(asset_table)` returns a dynamically-
+generated Pydantic subclass with fields typed to match the asset table's
+metadata columns (`src/deriva_ml/asset/asset_record.py`). The generalization
+extends this pattern to any insertable table:
+
+```python
+ml.row_record_class(
+    table_name: str,
+    *,
+    schema: str | None = None,
+    include_system_columns: bool = False,   # RID, RCT, RMT, RCB, RMB
+) -> type[RowRecord]
+```
+
+`RowRecord` is a new `BaseModel` subclass (sibling to `AssetRecord`, shared
+base class or a protocol). Fields are derived from the column metadata:
+non-nullable catalog columns become required fields; nullable columns
+become `Optional` with their default; `extra='forbid'` catches typos at
+construction time. The `_map_column_type` helper that already maps
+ERMrest typenames to Python types is reused.
+
+`AssetRecord` (existing) is retained as a specialization for asset tables
+— it only exposes the asset-metadata subset, while `RowRecord` exposes
+every non-system column. Implementation-wise, `asset_record_class` can
+delegate to the same factory with a column filter.
+
+Staging becomes table-schema-aware by construction. The user always has
+a typed model available:
+
+```python
+Subject = ml.row_record_class("Subject")
+record = Subject(Name="Alice", Species="Human")   # validates here
+exe.stage_row("Subject", record)                  # stores validated record
+```
+
+#### 2.4.2 Plain row staging
 
 ```python
 exe.stage_row(
-    target_table: str,                  # e.g. "Subject"
-    metadata: dict | AssetRecord,       # the column values
+    target_table: str,
+    record: RowRecord | dict,
     *,
     description: str | None = None,
 ) -> PendingRow
 ```
 
-Leases a RID, validates required columns, creates a pending entry with
-`asset_file_path=None`. Returns a lightweight `PendingRow` handle carrying
-`.rid`, `.metadata`, `.status`. Metadata can be updated via the handle's
-`.metadata` setter before upload (same write-through semantics as
-`AssetFilePath.metadata`).
+`stage_row` accepts either a typed `RowRecord` instance (preferred, already
+validated by Pydantic at construction) or a plain `dict`. Dicts are not a
+permissive escape hatch — the implementation constructs
+`ml.row_record_class(target_table)(**dict)` internally, so any dict that
+would fail typed-record construction also fails here.
+
+Validation happens at **staging time**, not at upload time. A row that
+isn't a valid insert for `target_table` fails immediately with the same
+Pydantic error the user would see from a direct catalog insert via the
+path builder. This matches the user's mental model of `stage_row` as
+"insert-like semantics, deferred."
+
+Behavior:
+1. Resolve `target_table` against the catalog model. If the table does
+   not exist, raise `DerivaMLException`. (V1 invariant per §1.2: target
+   table must already exist in the catalog.)
+2. Validate `record` against `row_record_class(target_table)`. Raise on
+   failure.
+3. Lease a RID via `ERMrest_RID_Lease`.
+4. Create pending entry with `asset_file_path=None`, `metadata_json=
+   record.model_dump()`, `status='leased'`.
+5. Return `PendingRow` handle.
+
+`PendingRow.metadata = new_record` goes through the same typed
+validation — the setter re-validates, matching today's `AssetFilePath.metadata`
+setter behavior. A typed record is re-materialized on reads.
 
 For bulk staging:
 
 ```python
 exe.stage_rows(
     target_table: str,
-    records: Iterable[dict | AssetRecord],
+    records: Iterable[RowRecord | dict],
 ) -> list[PendingRow]
 ```
 
-Convenience that loops and batches the lease request.
+Convenience that validates every record, leases N RIDs in one batch POST
+to `ERMrest_RID_Lease`, and creates N pending entries.
 
-#### 2.4.2 Asset file registration (unchanged existing API)
+#### 2.4.3 Asset file registration (unchanged existing API)
 
 ```python
 exe.asset_file_path(
@@ -185,7 +244,7 @@ Unchanged signature. Internally: lease a RID, register a pending entry
 with `asset_file_path=<local path>` and `metadata=...`. Existing behavior
 preserved.
 
-#### 2.4.3 Asset directory registration (new)
+#### 2.4.4 Asset directory registration (new)
 
 ```python
 exe.asset_directory_path(
@@ -254,7 +313,7 @@ class AssetDirectoryHandle:
         Subsequent register() / scan() calls raise."""
 ```
 
-#### 2.4.4 Idempotent re-registration across sessions
+#### 2.4.5 Idempotent re-registration across sessions
 
 `asset_directory_path` is idempotent. Calling it again in a new session
 with the same `(execution_rid, target_table, source_dir)` triple returns a
