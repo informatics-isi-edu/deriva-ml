@@ -132,9 +132,7 @@ class TestSchemaValidatorIntegration:
         report = test_ml.validate_schema(strict=False)
 
         # Check no vocabulary term errors
-        vocab_errors = [
-            i for i in report.errors if i.category == "vocabulary_term"
-        ]
+        vocab_errors = [i for i in report.errors if i.category == "vocabulary_term"]
         assert len(vocab_errors) == 0, f"Missing vocabulary terms: {vocab_errors}"
 
     def test_validate_core_tables_exist(self, test_ml):
@@ -150,9 +148,7 @@ class TestSchemaValidatorIntegration:
         report = test_ml.validate_schema(strict=False)
 
         # Check no association table errors
-        assoc_errors = [
-            i for i in report.errors if i.category == "association_table"
-        ]
+        assoc_errors = [i for i in report.errors if i.category == "association_table"]
         assert len(assoc_errors) == 0, f"Missing association tables: {assoc_errors}"
 
     def test_validate_convenience_function(self, test_ml):
@@ -183,19 +179,13 @@ class TestSchemaValidatorIntegration:
         # In non-strict mode, extra tables should be allowed
         report_non_strict = test_ml.validate_schema(strict=False)
         # May have info about extra table but not errors
-        extra_table_errors = [
-            i for i in report_non_strict.errors if i.category == "extra_table"
-        ]
+        extra_table_errors = [i for i in report_non_strict.errors if i.category == "extra_table"]
         assert len(extra_table_errors) == 0
 
         # In strict mode, extra tables should be reported as errors
         report_strict = test_ml.validate_schema(strict=True)
-        extra_table_errors_strict = [
-            i for i in report_strict.errors if i.category == "extra_table"
-        ]
-        assert len(extra_table_errors_strict) >= 1, (
-            f"Strict mode should report extra tables: {report_strict.to_text()}"
-        )
+        extra_table_errors_strict = [i for i in report_strict.errors if i.category == "extra_table"]
+        assert len(extra_table_errors_strict) >= 1, f"Strict mode should report extra tables: {report_strict.to_text()}"
 
     def test_validate_column_types(self, test_ml):
         """Test that column type validation works."""

@@ -1,21 +1,22 @@
-"""Persistent JSON manifest for tracking asset state during execution.
+"""Persistent manifest for tracking asset state during execution.
 
 The manifest is the single source of truth for all asset metadata during
 an execution. It supports:
-- Write-through + fsync on every mutation for crash safety
 - Per-asset status tracking (pending → uploaded with RID)
 - Resume after crash: upload skips entries already marked uploaded
+- SQLite (WAL mode) for crash safety and cross-process visibility
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-from dataclasses import dataclass, field, asdict
-from datetime import date, datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from deriva_ml.local_db.manifest_store import ManifestStore
 
 
 def _json_default(obj: Any) -> Any:
@@ -31,6 +32,7 @@ def _json_default(obj: Any) -> Any:
     if isinstance(obj, Path):
         return str(obj)
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
 
 logger = logging.getLogger(__name__)
 
@@ -77,44 +79,21 @@ class FeatureEntry:
 
 
 class AssetManifest:
-    """Persistent JSON manifest for execution assets.
+    """Per-execution asset+feature manifest, backed by :class:`ManifestStore`.
 
-    Provides write-through + fsync persistence for crash safety. Each mutation
-    (add asset, update metadata, mark uploaded) immediately writes the full
-    manifest to disk.
+    Public API is unchanged from the JSON-backed implementation. Storage
+    swapped to SQLite (WAL mode) for crash safety and cross-process visibility.
 
     Args:
-        path: Filesystem path for the manifest JSON file.
-        execution_rid: RID of the execution this manifest belongs to.
-
-    Example:
-        >>> manifest = AssetManifest(Path("/tmp/manifest.json"), "4SP")
-        >>> manifest.add_asset("Image/scan.jpg", AssetEntry(
-        ...     asset_table="Image", schema="test-schema",
-        ...     asset_types=["Training_Data"],
-        ...     metadata={"Subject": "2-DEF"}
-        ... ))
-        >>> manifest.mark_uploaded("Image/scan.jpg", "1-ABC")
+        store: A ``ManifestStore`` bound to a workspace engine.
+        execution_rid: RID of the execution this manifest covers.
     """
 
-    MANIFEST_VERSION = 1
+    MANIFEST_VERSION = 2  # bumped: storage layer changed
 
-    def __init__(self, path: Path, execution_rid: str) -> None:
-        self._path = path
+    def __init__(self, store: "ManifestStore", execution_rid: str) -> None:
+        self._store = store
         self._execution_rid = execution_rid
-        self._assets: dict[str, AssetEntry] = {}
-        self._features: dict[str, FeatureEntry] = {}
-        self._created_at: str = datetime.now(timezone.utc).isoformat()
-
-        if path.exists():
-            self._load()
-        else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            self._save()
-
-    @property
-    def path(self) -> Path:
-        return self._path
 
     @property
     def execution_rid(self) -> str:
@@ -122,100 +101,46 @@ class AssetManifest:
 
     @property
     def assets(self) -> dict[str, AssetEntry]:
-        """All asset entries, keyed by '{AssetTable}/{filename}'."""
-        return dict(self._assets)
+        return self._store.list_assets(self._execution_rid)
 
     @property
     def features(self) -> dict[str, FeatureEntry]:
-        """All feature entries, keyed by feature name."""
-        return dict(self._features)
+        return self._store.list_features(self._execution_rid)
 
     def pending_assets(self) -> dict[str, AssetEntry]:
-        """Return only assets with status 'pending'."""
-        return {k: v for k, v in self._assets.items() if v.status == "pending"}
+        return self._store.pending_assets(self._execution_rid)
 
     def uploaded_assets(self) -> dict[str, AssetEntry]:
-        """Return only assets with status 'uploaded'."""
-        return {k: v for k, v in self._assets.items() if v.status == "uploaded"}
+        return self._store.uploaded_assets(self._execution_rid)
 
     def add_asset(self, key: str, entry: AssetEntry) -> None:
-        """Add or replace an asset entry. Writes to disk immediately."""
-        self._assets[key] = entry
-        self._save()
+        self._store.add_asset(self._execution_rid, key, entry)
 
     def update_asset_metadata(self, key: str, metadata: dict[str, Any]) -> None:
-        """Update metadata for an existing asset. Writes to disk immediately."""
-        if key not in self._assets:
-            raise KeyError(f"Asset '{key}' not in manifest")
-        self._assets[key].metadata = metadata
-        self._save()
+        self._store.update_asset_metadata(self._execution_rid, key, metadata)
 
     def update_asset_types(self, key: str, asset_types: list[str]) -> None:
-        """Update asset types for an existing asset. Writes to disk immediately."""
-        if key not in self._assets:
-            raise KeyError(f"Asset '{key}' not in manifest")
-        self._assets[key].asset_types = asset_types
-        self._save()
+        self._store.update_asset_types(self._execution_rid, key, asset_types)
 
     def mark_uploaded(self, key: str, rid: str) -> None:
-        """Mark an asset as successfully uploaded with its catalog RID."""
-        if key not in self._assets:
-            raise KeyError(f"Asset '{key}' not in manifest")
-        entry = self._assets[key]
-        entry.status = "uploaded"
-        entry.rid = rid
-        entry.uploaded_at = datetime.now(timezone.utc).isoformat()
-        entry.error = None
-        self._save()
+        self._store.mark_asset_uploaded(self._execution_rid, key, rid)
 
     def mark_failed(self, key: str, error: str) -> None:
-        """Mark an asset as failed with an error message."""
-        if key not in self._assets:
-            raise KeyError(f"Asset '{key}' not in manifest")
-        entry = self._assets[key]
-        entry.status = "failed"
-        entry.error = error
-        self._save()
+        self._store.mark_asset_failed(self._execution_rid, key, error)
 
     def add_feature(self, name: str, entry: FeatureEntry) -> None:
-        """Add or replace a feature entry. Writes to disk immediately."""
-        self._features[name] = entry
-        self._save()
+        self._store.add_feature(self._execution_rid, name, entry)
 
-    def _save(self) -> None:
-        """Write manifest to disk with fsync for crash safety."""
-        data = {
+    def to_json(self) -> dict[str, Any]:
+        """Return a dict mirroring the legacy JSON file format.
+
+        For debugging/postmortems. Serialize with
+        ``json.dumps(manifest.to_json(), default=_json_default)`` to handle
+        datetimes and Path values.
+        """
+        return {
             "version": self.MANIFEST_VERSION,
             "execution_rid": self._execution_rid,
-            "created_at": self._created_at,
-            "assets": {k: v.to_dict() for k, v in self._assets.items()},
-            "features": {k: v.to_dict() for k, v in self._features.items()},
-        }
-        # Write to temp file then rename for atomicity
-        tmp_path = self._path.with_suffix(".tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, default=_json_default)
-            f.flush()
-            os.fsync(f.fileno())
-        tmp_path.rename(self._path)
-
-    def _load(self) -> None:
-        """Load manifest from disk."""
-        with open(self._path, encoding="utf-8") as f:
-            data = json.load(f)
-
-        version = data.get("version", 1)
-        if version != self.MANIFEST_VERSION:
-            logger.warning(
-                f"Manifest version {version} != expected {self.MANIFEST_VERSION}"
-            )
-
-        self._execution_rid = data.get("execution_rid", self._execution_rid)
-        self._created_at = data.get("created_at", self._created_at)
-
-        self._assets = {
-            k: AssetEntry.from_dict(v) for k, v in data.get("assets", {}).items()
-        }
-        self._features = {
-            k: FeatureEntry.from_dict(v) for k, v in data.get("features", {}).items()
+            "assets": {k: v.to_dict() for k, v in self.assets.items()},
+            "features": {k: v.to_dict() for k, v in self.features.items()},
         }

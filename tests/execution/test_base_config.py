@@ -27,9 +27,11 @@ from deriva_ml.execution.base_config import (
 # (Classes defined inside test functions have local qualnames that
 # hydra-zen cannot import.)
 
+
 @dataclass
 class _CustomConfig(BaseConfig):
     """Test subclass for builds() compatibility test."""
+
     threshold: float = 0.5
     num_iterations: int = 100
 
@@ -37,6 +39,7 @@ class _CustomConfig(BaseConfig):
 @dataclass
 class _CustomNBConfig(BaseConfig):
     """Test subclass for notebook_config() test."""
+
     alpha: float = 0.1
 
 
@@ -156,9 +159,7 @@ class TestGetNotebookConfiguration:
 
         with patch("deriva_ml.core.config.HydraConfig") as mock_hydra:
             mock_hydra.get.return_value.runtime.output_dir = "/tmp/hydra_test_ch"
-            config = get_notebook_configuration(
-                config_builds, config_name="test_ch_config"
-            )
+            config = get_notebook_configuration(config_builds, config_name="test_ch_config")
 
         assert isinstance(config.config_choices, dict)
         assert config.config_choices.get("deriva_ml") == "test_ch_deriva"
@@ -169,9 +170,7 @@ class TestGetNotebookConfiguration:
 
         with patch("deriva_ml.core.config.HydraConfig") as mock_hydra:
             mock_hydra.get.return_value.runtime.output_dir = "/tmp/hydra_test_na"
-            config = get_notebook_configuration(
-                config_builds, config_name="test_na_config"
-            )
+            config = get_notebook_configuration(config_builds, config_name="test_na_config")
 
         assert not hasattr(config, "hydra_runtime_output_dir")
 

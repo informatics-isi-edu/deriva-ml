@@ -273,9 +273,7 @@ def table_path(prefix: Path | str, schema: str, table: str) -> Path:
     return path / f"{table}.csv"
 
 
-def asset_table_upload_spec(
-    model: DerivaModel, asset_table: str | Table, chunk_size: int | None = None
-):
+def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_size: int | None = None):
     """Generate upload specification for an asset table.
 
     Args:
@@ -327,9 +325,7 @@ def asset_table_upload_spec(
     return spec
 
 
-def bulk_upload_configuration(
-    model: DerivaModel, chunk_size: int | None = None
-) -> dict[str, Any]:
+def bulk_upload_configuration(model: DerivaModel, chunk_size: int | None = None) -> dict[str, Any]:
     """Return an upload specification for deriva-ml
 
     Args:
@@ -575,11 +571,13 @@ def upload_directory(
                     f"(attempt {attempt}/{max_retries}): {[p for p, _ in failed_files]}"
                 )
                 if progress_callback:
-                    progress_callback(UploadProgress(
-                        phase="retrying",
-                        message=f"Retrying {len(failed_files)} failed upload(s) in {current_delay:.1f}s (attempt {attempt}/{max_retries})",
-                        percent_complete=0,
-                    ))
+                    progress_callback(
+                        UploadProgress(
+                            phase="retrying",
+                            message=f"Retrying {len(failed_files)} failed upload(s) in {current_delay:.1f}s (attempt {attempt}/{max_retries})",
+                            percent_complete=0,
+                        )
+                    )
 
                 time.sleep(current_delay)
                 current_delay *= 2  # Exponential backoff

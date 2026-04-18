@@ -49,6 +49,7 @@ from deriva.core.hatrac_store import HatracStore
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.asset.aux_classes import AssetFilePath
+from deriva_ml.asset.manifest import AssetEntry, AssetManifest
 from deriva_ml.core.base import DerivaML
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
@@ -65,9 +66,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.asset.manifest import AssetManifest, AssetEntry
 from deriva_ml.dataset.upload import (
-    asset_file_path,
     asset_root,
     asset_type_path,
     execution_root,
@@ -75,11 +74,9 @@ from deriva_ml.dataset.upload import (
     feature_value_path,
     flat_asset_dir,
     is_feature_dir,
-    manifest_path,
     normalize_asset_dir,
     table_path,
     upload_directory,
-    upload_staging_root,
 )
 from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
@@ -112,32 +109,14 @@ except ImportError:
 
 # Descriptions for execution metadata files, keyed by original filename.
 _METADATA_DESCRIPTIONS: dict[str, str] = {
-    "config.yaml": (
-        "Resolved Hydra configuration: complete merged config values "
-        "used for this execution"
-    ),
-    "overrides.yaml": (
-        "Hydra overrides: command-line and sweep parameters that "
-        "modified the default configuration"
-    ),
-    "hydra.yaml": (
-        "Hydra runtime config: job name, config group choices, "
-        "sweep parameters, and runtime metadata"
-    ),
-    "configuration.json": (
-        "DerivaML execution configuration: datasets, assets, workflow, "
-        "and config group choices"
-    ),
-    "uv.lock": (
-        "Python dependency lockfile: pinned versions of all packages "
-        "in the execution environment"
-    ),
+    "config.yaml": ("Resolved Hydra configuration: complete merged config values used for this execution"),
+    "overrides.yaml": ("Hydra overrides: command-line and sweep parameters that modified the default configuration"),
+    "hydra.yaml": ("Hydra runtime config: job name, config group choices, sweep parameters, and runtime metadata"),
+    "configuration.json": ("DerivaML execution configuration: datasets, assets, workflow, and config group choices"),
+    "uv.lock": ("Python dependency lockfile: pinned versions of all packages in the execution environment"),
 }
 
-_ENV_SNAPSHOT_DESCRIPTION = (
-    "Runtime environment snapshot: installed packages, OS, platform, "
-    "and Python configuration"
-)
+_ENV_SNAPSHOT_DESCRIPTION = "Runtime environment snapshot: installed packages, OS, platform, and Python configuration"
 
 
 class Execution:
@@ -413,9 +392,7 @@ class Execution:
                     description = self._get_metadata_description(asset.file_name)
 
                 if description and asset.asset_rid:
-                    table_updates.setdefault(table_key, []).append(
-                        {"RID": asset.asset_rid, "Description": description}
-                    )
+                    table_updates.setdefault(table_key, []).append({"RID": asset.asset_rid, "Description": description})
 
         for table_key, updates in table_updates.items():
             schema, table_name = table_key.split("/", 1) if "/" in table_key else ("", table_key)
@@ -789,9 +766,9 @@ class Execution:
             # which uses sorted(model.asset_metadata(asset_table)).
             # Missing metadata values get "None" (matching legacy asset_file_path).
             all_metadata_cols = sorted(self._model.asset_metadata(asset_table_name))
-            metadata_parts = [
-                str(entry.metadata.get(k, "None")) for k in all_metadata_cols
-            ] if all_metadata_cols else []
+            metadata_parts = (
+                [str(entry.metadata.get(k, "None")) for k in all_metadata_cols] if all_metadata_cols else []
+            )
             target_dir = staging_root / entry.schema / asset_table_name
             for part in metadata_parts:
                 target_dir = target_dir / part
@@ -803,6 +780,7 @@ class Execution:
                     target.symlink_to(source.resolve())
                 except (OSError, PermissionError):
                     import shutil
+
                     shutil.copy2(source, target)
 
         return staging_root
@@ -812,6 +790,7 @@ class Execution:
         staging_root = asset_root(self._working_dir, self.execution_rid)
         if staging_root.exists():
             import shutil
+
             shutil.rmtree(staging_root, ignore_errors=True)
 
     def _upload_execution_dirs(
@@ -881,9 +860,7 @@ class Execution:
                     asset_table=asset_table,
                     file_name=file_name,
                     asset_metadata={
-                        k: v
-                        for k, v in status.result.items()
-                        if k in self._model.asset_metadata(table_name)
+                        k: v for k, v in status.result.items() if k in self._model.asset_metadata(table_name)
                     },
                     asset_types=[],
                     asset_rid=rid,
@@ -1091,7 +1068,7 @@ class Execution:
 
         # Use DerivaML instance setting if not explicitly provided
         if clean_folder is None:
-            clean_folder = getattr(self._ml_object, 'clean_execution_dir', True)
+            clean_folder = getattr(self._ml_object, "clean_execution_dir", True)
 
         try:
             self.uploaded_assets = self._upload_execution_dirs(
@@ -1220,7 +1197,9 @@ class Execution:
         with Path(feature_file).open("r") as feature_values:
             entities = [json.loads(line.strip()) for line in feature_values]
         # Update the asset columns in the feature and add to the catalog.
-        self._ml_object.domain_path().tables[feature_table].insert([map_path(e) for e in entities], on_conflict_skip=True)
+        self._ml_object.domain_path().tables[feature_table].insert(
+            [map_path(e) for e in entities], on_conflict_skip=True
+        )
 
     def _update_asset_execution_table(
         self,
@@ -1377,13 +1356,16 @@ class Execution:
         # Register in manifest (write-through + fsync)
         manifest = self._get_manifest()
         manifest_key = f"{asset_name}/{target_name.name}"
-        manifest.add_asset(manifest_key, AssetEntry(
-            asset_table=asset_name,
-            schema=schema,
-            asset_types=asset_types,
-            metadata=metadata_dict,
-            description=description,
-        ))
+        manifest.add_asset(
+            manifest_key,
+            AssetEntry(
+                asset_table=asset_name,
+                schema=schema,
+                asset_types=asset_types,
+                metadata=metadata_dict,
+                description=description,
+            ),
+        )
 
         # Also write legacy asset-type JSONL for backward compatibility with upload
         with Path(asset_type_path(self._working_dir, self.execution_rid, asset_table)).open("a") as f:
@@ -1402,8 +1384,8 @@ class Execution:
     def _get_manifest(self) -> AssetManifest:
         """Get or create the asset manifest for this execution."""
         if not hasattr(self, "_manifest") or self._manifest is None:
-            mp = manifest_path(self._working_dir, self.execution_rid)
-            self._manifest = AssetManifest(mp, self.execution_rid)
+            ws = self._ml_object.workspace
+            self._manifest = AssetManifest(ws.manifest_store(), self.execution_rid)
         return self._manifest
 
     def table_path(self, table: str) -> Path:
@@ -1495,11 +1477,7 @@ class Execution:
         pb = self._ml_object.pathBuilder()
         dataset_exec = pb.schemas[self._ml_object.ml_schema].Dataset_Execution
 
-        records = list(
-            dataset_exec.filter(dataset_exec.Execution == self.execution_rid)
-            .entities()
-            .fetch()
-        )
+        records = list(dataset_exec.filter(dataset_exec.Execution == self.execution_rid).entities().fetch())
 
         return [self._ml_object.lookup_dataset(r["Dataset"]) for r in records]
 
@@ -1698,9 +1676,7 @@ class Execution:
 
         # Query for nested executions, ordered by sequence
         nested = list(
-            execution_execution.filter(execution_execution.Execution == self.execution_rid)
-            .entities()
-            .fetch()
+            execution_execution.filter(execution_execution.Execution == self.execution_rid).entities().fetch()
         )
 
         # Sort by sequence (None values at the end)
@@ -1749,9 +1725,7 @@ class Execution:
         execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
 
         parent_records = list(
-            execution_execution.filter(execution_execution.Nested_Execution == self.execution_rid)
-            .entities()
-            .fetch()
+            execution_execution.filter(execution_execution.Nested_Execution == self.execution_rid).entities().fetch()
         )
 
         parents = []

@@ -51,9 +51,7 @@ def _get_root_rid(catalog_manager: CatalogManager, tmp_path: Path) -> tuple[Deri
 class TestCreateMlWorkspace:
     """Tests for create_ml_workspace."""
 
-    def test_workspace_creation_basic(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_creation_basic(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test creating a workspace with schema and data."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -88,9 +86,7 @@ class TestCreateMlWorkspace:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_with_data(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_data(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test creating a workspace copies data from source."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -121,12 +117,8 @@ class TestCreateMlWorkspace:
             pb_clone = cloned_ml.pathBuilder()
             domain_path_clone = pb_clone.schemas[catalog_manager.domain_schema]
 
-            cloned_subjects = list(
-                domain_path_clone.tables["Subject"].path.entities().fetch()
-            )
-            cloned_images = list(
-                domain_path_clone.tables["Image"].path.entities().fetch()
-            )
+            cloned_subjects = list(domain_path_clone.tables["Subject"].path.entities().fetch())
+            cloned_images = list(domain_path_clone.tables["Image"].path.entities().fetch())
 
             # Subset clone may have fewer rows, but should have some data
             assert len(cloned_subjects) > 0, "Should have some subjects"
@@ -135,9 +127,7 @@ class TestCreateMlWorkspace:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_with_datasets_and_download_bag(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_datasets_and_download_bag(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that datasets in cloned catalog can be downloaded as bags.
 
         Note: When cloning a catalog, the dataset versions reference snapshot IDs
@@ -188,9 +178,7 @@ class TestCreateMlWorkspace:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_add_ml_schema_when_missing(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_add_ml_schema_when_missing(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test adding ML schema to a clone when the source doesn't have it.
 
         This test creates a plain catalog without ML schema, clones it with
@@ -206,9 +194,7 @@ class TestCreateMlWorkspace:
             model = plain_catalog.getCatalogModel()
             model.configure_baseline_catalog()
 
-            assert "deriva-ml" not in model.schemas, (
-                "Plain catalog should not have ML schema"
-            )
+            assert "deriva-ml" not in model.schemas, "Plain catalog should not have ML schema"
 
             # We need to find a table/row to use as root_rid.
             # In a plain catalog with just baseline, use ERMrest_Client from public schema.
@@ -226,9 +212,7 @@ class TestCreateMlWorkspace:
             )
 
             try:
-                assert result.ml_schema_added is True, (
-                    "Result should indicate ML schema was added"
-                )
+                assert result.ml_schema_added is True, "Result should indicate ML schema was added"
 
                 cloned_ml = DerivaML(
                     hostname,
@@ -236,9 +220,7 @@ class TestCreateMlWorkspace:
                     working_dir=tmp_path,
                 )
                 cloned_model = cloned_ml.catalog.getCatalogModel()
-                assert "deriva-ml" in cloned_model.schemas, (
-                    "Clone should have ML schema"
-                )
+                assert "deriva-ml" in cloned_model.schemas, "Clone should have ML schema"
 
                 ml_schema = cloned_model.schemas["deriva-ml"]
                 assert "Dataset" in ml_schema.tables
@@ -251,9 +233,7 @@ class TestCreateMlWorkspace:
         finally:
             plain_catalog.delete_ermrest_catalog(really=True)
 
-    def test_workspace_add_ml_schema_when_exists(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_add_ml_schema_when_exists(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that add_ml_schema is a no-op when ML schema already exists."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -267,9 +247,7 @@ class TestCreateMlWorkspace:
         )
 
         try:
-            assert result.ml_schema_added is False, (
-                "Should not add ML schema when it already exists"
-            )
+            assert result.ml_schema_added is False, "Should not add ML schema when it already exists"
 
             cloned_ml = DerivaML(
                 hostname,
@@ -283,9 +261,7 @@ class TestCreateMlWorkspace:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_preserves_annotations(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_preserves_annotations(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that catalog annotations are preserved during cloning."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -313,16 +289,12 @@ class TestCreateMlWorkspace:
 
             for key in source_annotations:
                 if key not in ["tag:isrd.isi.edu,2019:chaise-config"]:
-                    assert key in cloned_annotations, (
-                        f"Annotation {key} should be preserved in clone"
-                    )
+                    assert key in cloned_annotations, f"Annotation {key} should be preserved in clone"
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_without_annotations(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_without_annotations(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test cloning without preserving annotations."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -347,9 +319,7 @@ class TestCreateMlWorkspace:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_with_alias(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_alias(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test creating a catalog alias during cloning."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -364,9 +334,7 @@ class TestCreateMlWorkspace:
         )
 
         try:
-            assert result.alias == alias_name, (
-                f"Expected alias '{alias_name}', got '{result.alias}'"
-            )
+            assert result.alias == alias_name, f"Expected alias '{alias_name}', got '{result.alias}'"
 
             cloned_ml = DerivaML(
                 hostname,
@@ -377,17 +345,13 @@ class TestCreateMlWorkspace:
 
         finally:
             try:
-                server = DerivaServer(
-                    "https", hostname, credentials=get_credential(hostname)
-                )
+                server = DerivaServer("https", hostname, credentials=get_credential(hostname))
                 server.delete_ermrest_alias(alias_name)
             except Exception:
                 pass
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_exclude_schemas(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_exclude_schemas(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test excluding specific schemas from cloning."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -416,9 +380,7 @@ class TestCreateMlWorkspace:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_result_has_source_info(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_result_has_source_info(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that CloneCatalogResult contains source catalog information."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -433,16 +395,12 @@ class TestCreateMlWorkspace:
         try:
             assert result.source_hostname == hostname
             assert result.source_catalog_id == source_catalog_id
-            assert result.catalog_id != source_catalog_id, (
-                "Clone should have different catalog ID"
-            )
+            assert result.catalog_id != source_catalog_id, "Clone should have different catalog ID"
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_nested_datasets_preserved(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_nested_datasets_preserved(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that nested dataset relationships are preserved in clone."""
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -471,26 +429,16 @@ class TestCreateMlWorkspace:
             cloned_children = cloned_dataset.list_dataset_children()
             cloned_child_rids = {c.dataset_rid for c in cloned_children}
 
-            assert source_child_rids == cloned_child_rids, (
-                "Nested dataset relationships should be preserved"
-            )
+            assert source_child_rids == cloned_child_rids, "Nested dataset relationships should be preserved"
 
-            source_child_types = {
-                c.dataset_rid: set(c.dataset_types) for c in source_children
-            }
-            cloned_child_types = {
-                c.dataset_rid: set(c.dataset_types) for c in cloned_children
-            }
-            assert source_child_types == cloned_child_types, (
-                "Dataset types should be preserved for nested datasets"
-            )
+            source_child_types = {c.dataset_rid: set(c.dataset_types) for c in source_children}
+            cloned_child_types = {c.dataset_rid: set(c.dataset_types) for c in cloned_children}
+            assert source_child_types == cloned_child_types, "Dataset types should be preserved for nested datasets"
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_asset_mode_references(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_asset_mode_references(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that same-server clone uses REFERENCES asset mode."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -503,16 +451,12 @@ class TestCreateMlWorkspace:
         )
 
         try:
-            assert result.asset_mode == AssetCopyMode.REFERENCES, (
-                "Same-server clone should use REFERENCES asset mode"
-            )
+            assert result.asset_mode == AssetCopyMode.REFERENCES, "Same-server clone should use REFERENCES asset mode"
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_vocabulary_terms_preserved(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_vocabulary_terms_preserved(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that vocabulary terms are preserved in clone."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -540,16 +484,13 @@ class TestCreateMlWorkspace:
             cloned_names = {t.name for t in cloned_workflow_types}
 
             assert source_names == cloned_names, (
-                f"Workflow type vocabulary mismatch: "
-                f"source={source_names}, clone={cloned_names}"
+                f"Workflow type vocabulary mismatch: source={source_names}, clone={cloned_names}"
             )
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_reinitializes_dataset_versions(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_reinitializes_dataset_versions(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that dataset versions are incremented after cloning.
 
         Verifies that:
@@ -573,12 +514,8 @@ class TestCreateMlWorkspace:
         )
 
         try:
-            assert result.datasets_reinitialized > 0, (
-                "Should have reinitialized at least one dataset"
-            )
-            assert result.source_snapshot, (
-                "Should include source snapshot ID"
-            )
+            assert result.datasets_reinitialized > 0, "Should have reinitialized at least one dataset"
+            assert result.source_snapshot, "Should include source snapshot ID"
 
             cloned_ml = DerivaML(
                 hostname,
@@ -603,20 +540,12 @@ class TestCreateMlWorkspace:
             pb = cloned_ml.pathBuilder()
             version_table = pb.schemas["deriva-ml"].tables["Dataset_Version"]
             versions = list(
-                version_table.path
-                .filter(version_table.Dataset == source_dataset.dataset_rid)
-                .entities()
-                .fetch()
+                version_table.path.filter(version_table.Dataset == source_dataset.dataset_rid).entities().fetch()
             )
             assert len(versions) > 0, "Should have version records"
 
-            clone_version_record = next(
-                (v for v in versions if "Cloned from" in (v.get("Description") or "")),
-                None
-            )
-            assert clone_version_record is not None, (
-                "Should have a version with 'Cloned from' in description"
-            )
+            clone_version_record = next((v for v in versions if "Cloned from" in (v.get("Description") or "")), None)
+            assert clone_version_record is not None, "Should have a version with 'Cloned from' in description"
             assert result.source_snapshot in clone_version_record["Description"], (
                 "Version description should include source snapshot ID"
             )
@@ -624,9 +553,7 @@ class TestCreateMlWorkspace:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_skip_version_reinitialization(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_skip_version_reinitialization(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test cloning without dataset version reinitialization."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -640,13 +567,10 @@ class TestCreateMlWorkspace:
         )
 
         try:
-            assert result.datasets_reinitialized == 0, (
-                "Should not reinitialize datasets when disabled"
-            )
+            assert result.datasets_reinitialized == 0, "Should not reinitialize datasets when disabled"
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
-
 
 
 class TestCreateMlWorkspaceErrors:
@@ -697,19 +621,23 @@ class TestCloneReport:
                 "missing_references": {"schema:ref_table": 10},
             }
         }
-        report.add_issue(CloneIssue(
-            severity=CloneIssueSeverity.WARNING,
-            category=CloneIssueCategory.ORPHAN_ROWS,
-            message="Test warning",
-            table="schema:table1",
-            row_count=10,
-        ))
-        report.add_issue(CloneIssue(
-            severity=CloneIssueSeverity.ERROR,
-            category=CloneIssueCategory.FK_VIOLATION,
-            message="Test error",
-            table="schema:table2",
-        ))
+        report.add_issue(
+            CloneIssue(
+                severity=CloneIssueSeverity.WARNING,
+                category=CloneIssueCategory.ORPHAN_ROWS,
+                message="Test warning",
+                table="schema:table1",
+                row_count=10,
+            )
+        )
+        report.add_issue(
+            CloneIssue(
+                severity=CloneIssueSeverity.ERROR,
+                category=CloneIssueCategory.FK_VIOLATION,
+                message="Test error",
+                table="schema:table2",
+            )
+        )
 
         result = report.to_dict()
 
@@ -754,13 +682,15 @@ class TestCloneReport:
         report = CloneReport()
         report.tables_restored = {"schema:table1": 100}
         report.fkeys_applied = 10
-        report.add_issue(CloneIssue(
-            severity=CloneIssueSeverity.WARNING,
-            category=CloneIssueCategory.ORPHAN_ROWS,
-            message="Orphan rows deleted",
-            table="schema:table1",
-            row_count=5,
-        ))
+        report.add_issue(
+            CloneIssue(
+                severity=CloneIssueSeverity.WARNING,
+                category=CloneIssueCategory.ORPHAN_ROWS,
+                message="Orphan rows deleted",
+                table="schema:table1",
+                row_count=5,
+            )
+        )
 
         text = report.to_text()
 
@@ -805,9 +735,7 @@ class TestOrphanStrategy:
         assert OrphanStrategy.DELETE.value == "delete"
         assert OrphanStrategy.NULLIFY.value == "nullify"
 
-    def test_workspace_with_orphan_strategy_fail_default(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_orphan_strategy_fail_default(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that FAIL is the default orphan strategy."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -827,9 +755,7 @@ class TestOrphanStrategy:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_result_includes_orphan_stats(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_result_includes_orphan_stats(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that CloneCatalogResult includes orphan statistics."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -842,9 +768,9 @@ class TestOrphanStrategy:
         )
 
         try:
-            assert hasattr(result, 'orphan_rows_removed')
-            assert hasattr(result, 'orphan_rows_nullified')
-            assert hasattr(result, 'fkeys_pruned')
+            assert hasattr(result, "orphan_rows_removed")
+            assert hasattr(result, "orphan_rows_nullified")
+            assert hasattr(result, "fkeys_pruned")
             assert result.orphan_rows_removed >= 0
             assert result.orphan_rows_nullified >= 0
             assert result.fkeys_pruned >= 0
@@ -852,9 +778,7 @@ class TestOrphanStrategy:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_report_attached_to_result(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_report_attached_to_result(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that CloneCatalogResult includes a CloneReport."""
         from deriva_ml.catalog.clone import CloneReport
 
@@ -875,7 +799,6 @@ class TestOrphanStrategy:
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
-
 
 
 class TestOrphanHandlingWithIncoherentPolicies:
@@ -909,9 +832,7 @@ class TestOrphanHandlingWithIncoherentPolicies:
 
             assert isinstance(orphans, set)
 
-    def test_workspace_with_orphan_strategy_delete(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_orphan_strategy_delete(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that clone creates catalog with DELETE strategy."""
         from deriva_ml.catalog.clone import OrphanStrategy
 
@@ -933,9 +854,7 @@ class TestOrphanHandlingWithIncoherentPolicies:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_with_orphan_strategy_nullify(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_orphan_strategy_nullify(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that clone creates catalog with NULLIFY strategy."""
         from deriva_ml.catalog.clone import OrphanStrategy
 
@@ -958,7 +877,6 @@ class TestOrphanHandlingWithIncoherentPolicies:
             _delete_test_catalog(hostname, result.catalog_id)
 
 
-
 class TestThreeStageApproach:
     """Tests for the three-stage cloning approach.
 
@@ -968,9 +886,7 @@ class TestThreeStageApproach:
     3. Apply foreign keys (with orphan handling)
     """
 
-    def test_workspace_applies_all_fks(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_applies_all_fks(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that clone applies foreign keys in stage 3."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -1003,9 +919,7 @@ class TestThreeStageApproach:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_preserves_data_integrity(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_preserves_data_integrity(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that clone preserves referential integrity."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -1027,12 +941,8 @@ class TestThreeStageApproach:
 
             pb_clone = cloned_ml.pathBuilder()
             domain_path_clone = pb_clone.schemas[catalog_manager.domain_schema]
-            cloned_subjects = list(
-                domain_path_clone.tables["Subject"].path.entities().fetch()
-            )
-            cloned_images = list(
-                domain_path_clone.tables["Image"].path.entities().fetch()
-            )
+            cloned_subjects = list(domain_path_clone.tables["Subject"].path.entities().fetch())
+            cloned_images = list(domain_path_clone.tables["Image"].path.entities().fetch())
 
             # Verify FKs are satisfied (images reference valid subjects)
             cloned_subject_rids = {s["RID"] for s in cloned_subjects}
@@ -1045,9 +955,7 @@ class TestThreeStageApproach:
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_report_tracks_table_progress(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_report_tracks_table_progress(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that CloneReport tracks which tables were restored."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -1061,21 +969,16 @@ class TestThreeStageApproach:
 
         try:
             assert result.report is not None
-            assert len(result.report.tables_restored) > 0, (
-                "Should have restored some tables"
-            )
+            assert len(result.report.tables_restored) > 0, "Should have restored some tables"
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
 
-
 class TestPruneHiddenFkeys:
     """Tests for the prune_hidden_fkeys option."""
 
-    def test_workspace_with_prune_hidden_fkeys_false(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_prune_hidden_fkeys_false(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test clone with prune_hidden_fkeys=False (default)."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -1089,16 +992,12 @@ class TestPruneHiddenFkeys:
         )
 
         try:
-            assert result.fkeys_pruned == 0, (
-                "Should not prune FKs with prune_hidden_fkeys=False"
-            )
+            assert result.fkeys_pruned == 0, "Should not prune FKs with prune_hidden_fkeys=False"
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
 
-    def test_workspace_with_prune_hidden_fkeys_true(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_workspace_with_prune_hidden_fkeys_true(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test clone with prune_hidden_fkeys=True."""
         ml, root_rid = _get_root_rid(catalog_manager, tmp_path)
         source_catalog_id = str(catalog_manager.catalog_id)
@@ -1116,7 +1015,6 @@ class TestPruneHiddenFkeys:
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
-
 
 
 class TestLocalizeResult:
@@ -1239,9 +1137,7 @@ class TestLocalizeHelperFunctions:
 
         schemas_mock = MagicMock()
         schemas_mock.__iter__ = MagicMock(return_value=iter(["schema1", "schema2"]))
-        schemas_mock.__getitem__ = MagicMock(
-            side_effect=lambda k: {"schema1": schema1, "schema2": schema2}[k]
-        )
+        schemas_mock.__getitem__ = MagicMock(side_effect=lambda k: {"schema1": schema1, "schema2": schema2}[k])
         pb.schemas = schemas_mock
 
         result = _find_asset_table_path(pb, "TestTable", None)
@@ -1251,9 +1147,7 @@ class TestLocalizeHelperFunctions:
 class TestLocalizeAssets:
     """Tests for localize_assets function."""
 
-    def test_localize_assets_raises_on_missing_table(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_localize_assets_raises_on_missing_table(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that localize_assets raises ValueError for non-existent table."""
         from deriva_ml.catalog.localize import localize_assets
 
@@ -1266,9 +1160,7 @@ class TestLocalizeAssets:
                 asset_rids=["1-ABC"],
             )
 
-    def test_localize_assets_empty_rids(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_localize_assets_empty_rids(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test localize_assets with empty RID list."""
         from deriva_ml.catalog.localize import localize_assets
 
@@ -1285,9 +1177,7 @@ class TestLocalizeAssets:
         assert result.assets_skipped == 0
         assert result.assets_failed == 0
 
-    def test_localize_assets_dry_run(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_localize_assets_dry_run(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test localize_assets dry run mode."""
         from deriva_ml.catalog.localize import localize_assets
 
@@ -1300,10 +1190,7 @@ class TestLocalizeAssets:
         if not images:
             pytest.skip("No images in test catalog")
 
-        remote_images = [
-            img for img in images
-            if img.get("URL") and ml.host_name not in img.get("URL", "")
-        ]
+        remote_images = [img for img in images if img.get("URL") and ml.host_name not in img.get("URL", "")]
 
         if not remote_images:
             image_rids = [images[0]["RID"]]
@@ -1326,9 +1213,7 @@ class TestLocalizeAssets:
             )
             assert result.assets_processed >= 0
 
-    def test_localize_assets_skips_local_assets(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_localize_assets_skips_local_assets(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that localize_assets skips assets already on local host."""
         from deriva_ml.catalog.localize import localize_assets
 
@@ -1341,10 +1226,7 @@ class TestLocalizeAssets:
         if not images:
             pytest.skip("No images in test catalog")
 
-        local_images = [
-            img for img in images
-            if img.get("URL") and ml.host_name in img.get("URL", "")
-        ]
+        local_images = [img for img in images if img.get("URL") and ml.host_name in img.get("URL", "")]
 
         if not local_images:
             pytest.skip("No local images in test catalog")
@@ -1360,9 +1242,7 @@ class TestLocalizeAssets:
         assert result.assets_skipped >= 1
         assert result.assets_processed == 0
 
-    def test_localize_assets_skips_missing_rids(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_localize_assets_skips_missing_rids(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that localize_assets skips RIDs that don't exist."""
         from deriva_ml.catalog.localize import localize_assets
 
@@ -1378,9 +1258,7 @@ class TestLocalizeAssets:
         assert result.assets_skipped >= 1
         assert result.assets_processed == 0
 
-    def test_localize_assets_with_ermrest_catalog(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_localize_assets_with_ermrest_catalog(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test localize_assets accepts ErmrestCatalog directly."""
         from deriva_ml.catalog.localize import _get_catalog_info
 
@@ -1391,9 +1269,7 @@ class TestLocalizeAssets:
         assert ermrest_catalog is not None
         assert hostname == ml.host_name
 
-    def test_get_catalog_info_from_derivaml(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_get_catalog_info_from_derivaml(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test _get_catalog_info extracts info from DerivaML instance."""
         from deriva_ml.catalog.localize import _get_catalog_info
 
@@ -1405,9 +1281,7 @@ class TestLocalizeAssets:
         assert hostname == ml.host_name
         assert credential is not None
 
-    def test_get_catalog_info_from_ermrest_catalog(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_get_catalog_info_from_ermrest_catalog(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test _get_catalog_info extracts info from ErmrestCatalog."""
         from deriva_ml.catalog.localize import _get_catalog_info
 
@@ -1422,9 +1296,7 @@ class TestLocalizeAssets:
 class TestLocalizeAfterClone:
     """Tests for localizing assets after cloning with asset_mode=REFERENCES."""
 
-    def test_clone_refs_then_localize(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_clone_refs_then_localize(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test cloning with refs mode then localizing assets.
 
         This test verifies the workflow:
@@ -1473,4 +1345,3 @@ class TestLocalizeAfterClone:
 
         finally:
             _delete_test_catalog(hostname, result.catalog_id)
-

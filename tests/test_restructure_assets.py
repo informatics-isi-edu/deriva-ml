@@ -37,6 +37,7 @@ def _call(bag: MagicMock, output_dir: Path, **kwargs) -> dict[Path, Path]:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def src_file(tmp_path: Path) -> Path:
     """A single source file on disk."""
@@ -58,6 +59,7 @@ def src_dcm(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 # Default behaviour (regression: manifest now returned instead of Path)
 # ---------------------------------------------------------------------------
+
 
 def test_symlink_returns_manifest(tmp_path: Path, src_file: Path) -> None:
     """Default symlink mode returns a manifest mapping src to the symlink."""
@@ -114,6 +116,7 @@ def test_missing_file_skipped(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # file_transformer
 # ---------------------------------------------------------------------------
+
 
 def test_transformer_called_with_src_and_suggested_dest(tmp_path: Path, src_file: Path) -> None:
     """file_transformer receives (src_path, suggested_dest_path)."""
@@ -217,7 +220,8 @@ def test_split_parent_transparent_in_type_path(tmp_path: Path, src_file: Path) -
     bag._get_asset_dataset_mapping.return_value = {ASSET_RID: TRAIN_RID}
 
     manifest = _call(
-        bag, out_dir,
+        bag,
+        out_dir,
         type_to_dir_map={"Training": "train", "Testing": "test"},
     )
 

@@ -173,7 +173,11 @@ class DatasetMixin:
         def is_domain_or_dataset_table(table: Table) -> bool:
             return self.model.is_domain_schema(table.schema.name) or table.name == self._dataset_table.name
 
-        return [t for a in self._dataset_table.find_associations() if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)]
+        return [
+            t
+            for a in self._dataset_table.find_associations()
+            if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)
+        ]
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
@@ -204,8 +208,30 @@ class DatasetMixin:
             else:
                 raise e
 
+        # If the workspace has already been built (e.g. because a prior
+        # Execution created an AssetManifest that touched .workspace),
+        # its local ORM schema doesn't know about the new association
+        # table. Rebuild it so subsequent catalog-mode denormalize calls
+        # can resolve ``{Dataset_{element}}`` as a join target. Without
+        # this, the next Denormalizer that tries to join through the
+        # new assoc table raises ``KeyError: 'Table Dataset_X not found'``.
+        if getattr(self, "_workspace", None) is not None:
+            ls = getattr(self._workspace, "local_schema", None)
+            if ls is not None:
+                # Fresh model fetch so the rebuild sees the newly-added
+                # association table (the local ermrest Model object may
+                # lag behind if the test harness created this table via
+                # a side channel).
+                self.model.refresh_model()
+                self._workspace.rebuild_schema(
+                    model=self.model.model,
+                    schemas=[self.ml_schema, *self.domain_schemas],
+                )
+
         # self.model = self.catalog.getCatalogModel()
-        annotations = CatalogGraph(self, s3_bucket=self.s3_bucket, use_minid=self.use_minid).generate_dataset_download_annotations()  # type: ignore[arg-type]
+        annotations = CatalogGraph(
+            self, s3_bucket=self.s3_bucket, use_minid=self.use_minid
+        ).generate_dataset_download_annotations()  # type: ignore[arg-type]
         self._dataset_table.annotations.update(annotations)
         self.model.model.apply()
         return table
@@ -309,31 +335,58 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
         )
 
-    def denormalize_info(
+    def estimate_denormalized_size(
         self,
         include_tables: list[str],
     ) -> dict[str, Any]:
-        """Return schema shape and size estimates for a denormalized table.
+        """Return schema shape + catalog-wide size estimates for a denormalized table.
 
-        This method does NOT require a dataset — it uses global row counts
-        across the entire catalog. Use ``Dataset.denormalize_info()`` for
-        dataset-scoped counts.
+        This is the **catalog-wide** analog of
+        :meth:`Dataset.describe_denormalized`. It asks "if I were to
+        denormalize these tables across the entire catalog (not scoped
+        to any specific dataset), what would the result look like and
+        how big would it be?" Useful for rough size estimation before
+        committing to a bag export.
 
-        Aligned with :meth:`estimate_bag_size` return structure.
+        The return shape is aligned with :meth:`estimate_bag_size` and
+        is **NOT the same** as the dataset-scoped 12-key plan dict from
+        :meth:`Dataset.describe_denormalized` (spec §5). Do not confuse
+        the two.
 
         Args:
             include_tables: List of table names to include in the join.
 
         Returns:
-            dict with keys:
-                - columns: list of (column_name, column_type) tuples
-                - join_path: ordered list of table names showing the join chain
-                - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
-                - total_rows: total row count across included tables
-                - total_asset_bytes: total asset size in bytes
-                - total_asset_size: human-readable size string
+            dict with these keys:
+
+            - ``columns``: list of ``(column_name, column_type)`` tuples.
+            - ``join_path``: ordered list of domain table names on the
+              join chain (excludes the implicit ``Dataset`` root and
+              any association tables).
+            - ``tables``: ``{table_name: {row_count, is_asset,
+              asset_bytes}}`` — per-table stats for every table in the
+              join path.
+            - ``total_rows``: sum of ``row_count`` across all included
+              tables.
+            - ``total_asset_bytes``: sum of ``asset_bytes``.
+            - ``total_asset_size``: human-readable byte-count string
+              (e.g., ``"1.2 GB"``).
+
+        Example::
+
+            info = ml.estimate_denormalized_size(["Image", "Subject"])
+            print(f"{info['total_rows']} rows across "
+                  f"{len(info['tables'])} tables, "
+                  f"{info['total_asset_size']} of assets")
+
+        See Also:
+            Dataset.describe_denormalized: Dataset-scoped planning dict.
+            Denormalizer.describe: Full dataset-scoped plan with
+                ambiguity reporting.
+            estimate_bag_size: Bag-level size estimation.
         """
         from deriva.core.datapath import Cnt, Sum
+
         from deriva_ml.dataset.dataset import Dataset
         from deriva_ml.model.catalog import denormalize_column_name
 
@@ -341,9 +394,7 @@ class DatasetMixin:
 
         # _prepare_wide_table doesn't actually use dataset or dataset_rid
         # in its body — it only traverses the schema. Pass None for both.
-        element_tables, column_specs, multi_schema = model._prepare_wide_table(
-            None, None, list(include_tables)
-        )
+        element_tables, column_specs, multi_schema = model._prepare_wide_table(None, None, list(include_tables))
 
         # Build columns list
         columns = [

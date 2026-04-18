@@ -131,11 +131,7 @@ class TestCatalogAnnotations:
         assert vocab_menu is not None
 
         # Check that TestVocab appears in the menu
-        vocab_items = [
-            item.get("name")
-            for item in vocab_menu["children"]
-            if not item.get("header")
-        ]
+        vocab_items = [item.get("name") for item in vocab_menu["children"] if not item.get("header")]
         assert "TestVocab" in vocab_items
 
     def test_apply_catalog_annotations_with_asset(self, test_ml):

@@ -32,9 +32,7 @@ from tests.catalog_manager import CatalogManager
 class TestDeterministicCacheKey:
     """Tests for the spec_hash+snapshot deterministic cache key."""
 
-    def test_cache_dir_uses_deterministic_name(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_cache_dir_uses_deterministic_name(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Downloaded bag directory name includes spec_hash prefix and snapshot."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -54,13 +52,9 @@ class TestDeterministicCacheKey:
         assert parts[0] == dataset.dataset_rid
         # The suffix should contain both spec_hash prefix and snapshot
         suffix = parts[1]
-        assert len(suffix) > 16, (
-            f"Cache dir suffix '{suffix}' should contain spec_hash + snapshot"
-        )
+        assert len(suffix) > 16, f"Cache dir suffix '{suffix}' should contain spec_hash + snapshot"
 
-    def test_second_download_skips_bag_generation(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_second_download_skips_bag_generation(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Second download with same version returns immediately from cache."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -84,9 +78,7 @@ class TestDeterministicCacheKey:
             "Second download should not create new cache directories"
         )
 
-    def test_same_data_same_cache_key(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_same_data_same_cache_key(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Same dataset+version always produces the same cache key."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -103,9 +95,7 @@ class TestDeterministicCacheKey:
         info = dataset.bag_info(version=version)
         assert info["status"] == CacheStatus.cached_materialized.value
 
-    def test_new_version_creates_new_cache_entry(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_new_version_creates_new_cache_entry(self, catalog_manager: CatalogManager, tmp_path: Path):
         """New dataset version creates a different cache entry (new snapshot)."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -117,10 +107,7 @@ class TestDeterministicCacheKey:
 
         # Create v2 by modifying data
         pb = ml.pathBuilder()
-        subjects = [
-            s["RID"]
-            for s in pb.schemas[ml.default_schema].tables["Subject"].path.entities().fetch()
-        ]
+        subjects = [s["RID"] for s in pb.schemas[ml.default_schema].tables["Subject"].path.entities().fetch()]
         if len(subjects) >= 2:
             dataset.add_dataset_members(subjects[-2:])
         v2 = dataset.current_version
@@ -131,17 +118,13 @@ class TestDeterministicCacheKey:
 
         # Should have at least 2 cache entries now
         cache_dirs = list(ml.cache_dir.glob(f"{dataset.dataset_rid}_*"))
-        assert len(cache_dirs) >= 2, (
-            f"Expected >=2 cache entries for different versions, got {len(cache_dirs)}"
-        )
+        assert len(cache_dirs) >= 2, f"Expected >=2 cache entries for different versions, got {len(cache_dirs)}"
 
 
 class TestDeterministicCacheBagInfo:
     """Tests for bag_info interaction with deterministic cache."""
 
-    def test_bag_info_before_download(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_bag_info_before_download(self, catalog_manager: CatalogManager, tmp_path: Path):
         """bag_info shows not_cached before any download."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -151,9 +134,7 @@ class TestDeterministicCacheBagInfo:
         info = dataset.bag_info(version=version)
         assert info["status"] == CacheStatus.not_cached.value
 
-    def test_bag_info_after_deterministic_cache_hit(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_bag_info_after_deterministic_cache_hit(self, catalog_manager: CatalogManager, tmp_path: Path):
         """bag_info shows cached_materialized after deterministic cache is populated."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -168,9 +149,7 @@ class TestDeterministicCacheBagInfo:
         assert info["status"] == CacheStatus.cached_materialized.value
         assert info["cache_path"] is not None
 
-    def test_cache_warming_uses_deterministic_key(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_cache_warming_uses_deterministic_key(self, catalog_manager: CatalogManager, tmp_path: Path):
         """cache() warming creates deterministic cache entry."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -188,9 +167,7 @@ class TestDeterministicCacheBagInfo:
 class TestDeterministicCacheInvalidation:
     """Tests for cache invalidation when spec or snapshot changes."""
 
-    def test_delete_cache_forces_redownload(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_delete_cache_forces_redownload(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Deleting cache directory forces full re-download."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -281,9 +258,7 @@ class TestStaleCacheInvalidation:
     directory name ended with the matching snapshot suffix.
     """
 
-    def test_stale_cache_not_returned_after_schema_change(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_stale_cache_not_returned_after_schema_change(self, catalog_manager: CatalogManager, tmp_path: Path):
         """A cached bag with old spec_hash is NOT returned when spec changes.
 
         Simulates the scenario:
@@ -338,9 +313,7 @@ class TestStaleCacheInvalidation:
         # Clean up stale entry
         shutil.rmtree(stale_dir, ignore_errors=True)
 
-    def test_snapshot_only_dir_not_matched(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_snapshot_only_dir_not_matched(self, catalog_manager: CatalogManager, tmp_path: Path):
         """A cache entry matching only the snapshot suffix is NOT returned.
 
         Ensures the fix works: the old glob pattern {rid}_*_{snapshot} would
@@ -353,9 +326,7 @@ class TestStaleCacheInvalidation:
 
         # Create a decoy cache entry with matching snapshot but wrong spec_hash
         history = dataset.dataset_history()
-        version_record = next(
-            v for v in history if v.dataset_version == str(version)
-        )
+        version_record = next(v for v in history if v.dataset_version == str(version))
         snapshot = version_record.snapshot
         decoy_dir = ml.cache_dir / f"{dataset.dataset_rid}_deadbeefdeadbeef_{snapshot}"
         decoy_bag = decoy_dir / f"Dataset_{dataset.dataset_rid}"

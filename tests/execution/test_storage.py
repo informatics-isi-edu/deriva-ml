@@ -21,7 +21,7 @@ def storage_workflow(test_ml):
     return test_ml.create_workflow(
         name="Storage Test Workflow",
         workflow_type="Storage Test",
-        description="Workflow for testing storage management"
+        description="Workflow for testing storage management",
     )
 
 
@@ -34,6 +34,7 @@ class TestCacheManagement:
         # Ensure cache is empty
         if ml.cache_dir.exists():
             import shutil
+
             for item in ml.cache_dir.iterdir():
                 if item.is_dir():
                     shutil.rmtree(item)
@@ -41,9 +42,9 @@ class TestCacheManagement:
                     item.unlink()
 
         stats = ml.get_cache_size()
-        assert stats['total_bytes'] == 0
-        assert stats['total_mb'] == 0.0
-        assert stats['file_count'] == 0
+        assert stats["total_bytes"] == 0
+        assert stats["total_mb"] == 0.0
+        assert stats["file_count"] == 0
 
     def test_get_cache_size_with_files(self, test_ml):
         """Test get_cache_size calculates size correctly."""
@@ -57,11 +58,12 @@ class TestCacheManagement:
         test_file.write_bytes(test_content)
 
         stats = ml.get_cache_size()
-        assert stats['total_bytes'] >= len(test_content)
-        assert stats['file_count'] >= 1
+        assert stats["total_bytes"] >= len(test_content)
+        assert stats["file_count"] >= 1
 
         # Cleanup
         import shutil
+
         shutil.rmtree(test_dir)
 
     def test_clear_cache_removes_all(self, test_ml):
@@ -78,9 +80,9 @@ class TestCacheManagement:
         assert test_dir.exists()
 
         result = ml.clear_cache()
-        assert result['dirs_removed'] >= 1 or result['files_removed'] >= 1
-        assert result['bytes_freed'] > 0
-        assert result['errors'] == 0
+        assert result["dirs_removed"] >= 1 or result["files_removed"] >= 1
+        assert result["bytes_freed"] > 0
+        assert result["errors"] == 0
 
         # Verify test directory is gone
         assert not test_dir.exists()
@@ -104,10 +106,11 @@ class TestCacheManagement:
             result = ml.clear_cache(older_than_days=365)
             # Files created today should NOT be removed
             # This test verifies the filtering logic works
-            assert test_dir.exists() or result['dirs_removed'] > 0
+            assert test_dir.exists() or result["dirs_removed"] > 0
 
         # Cleanup if still exists
         import shutil
+
         if test_dir.exists():
             shutil.rmtree(test_dir)
 
@@ -142,17 +145,18 @@ class TestExecutionDirManagement:
         # Should find at least our execution
         found = False
         for d in dirs:
-            if d['execution_rid'] == execution.execution_rid:
+            if d["execution_rid"] == execution.execution_rid:
                 found = True
-                assert d['size_bytes'] > 0
-                assert d['file_count'] >= 1
-                assert 'modified' in d
+                assert d["size_bytes"] > 0
+                assert d["file_count"] >= 1
+                assert "modified" in d
                 break
 
         assert found, f"Execution {execution.execution_rid} not found in list"
 
         # Cleanup
         import shutil
+
         if execution.working_dir.exists():
             shutil.rmtree(execution.working_dir)
 
@@ -190,18 +194,18 @@ class TestExecutionDirManagement:
 
         summary = ml.get_storage_summary()
 
-        assert 'working_dir' in summary
-        assert 'cache_dir' in summary
-        assert 'cache_size_mb' in summary
-        assert 'cache_file_count' in summary
-        assert 'execution_dir_count' in summary
-        assert 'execution_size_mb' in summary
-        assert 'total_size_mb' in summary
+        assert "working_dir" in summary
+        assert "cache_dir" in summary
+        assert "cache_size_mb" in summary
+        assert "cache_file_count" in summary
+        assert "execution_dir_count" in summary
+        assert "execution_size_mb" in summary
+        assert "total_size_mb" in summary
 
         # Values should be non-negative
-        assert summary['cache_size_mb'] >= 0
-        assert summary['execution_size_mb'] >= 0
-        assert summary['total_size_mb'] >= 0
+        assert summary["cache_size_mb"] >= 0
+        assert summary["execution_size_mb"] >= 0
+        assert summary["total_size_mb"] >= 0
 
 
 class TestCleanExecutionDirConfig:

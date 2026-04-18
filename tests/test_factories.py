@@ -3,7 +3,6 @@
 These tests verify that the factory functions in tests/factories.py work correctly.
 """
 
-
 from deriva_ml import DerivaML, MLVocab
 from deriva_ml.dataset.aux_classes import DatasetVersion
 from tests.factories import (

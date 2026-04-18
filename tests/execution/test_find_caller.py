@@ -162,7 +162,7 @@ class TestCallerDetectionIntegration:
     def test_subprocess_script_returns_script_path(self):
         """Test that a script run via subprocess returns its own path, not the runner."""
         # Create a temporary script that imports find_caller and prints the result
-        script_content = '''
+        script_content = """
 import sys
 # Add deriva-ml to path if needed
 sys.path.insert(0, "{src_path}")
@@ -171,12 +171,10 @@ from deriva_ml.execution.find_caller import _get_calling_module
 
 result = _get_calling_module()
 print(result)
-'''
+"""
         src_path = Path("/Users/carl/GitHub/deriva-ml/src").resolve()
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content.format(src_path=src_path))
             script_path = f.name
 
@@ -195,9 +193,7 @@ print(result)
             assert result.returncode == 0, f"Script failed: {result.stderr}"
 
             # The output should be the path to our temporary script
-            assert Path(output).resolve() == Path(script_path).resolve(), (
-                f"Expected {script_path}, got {output}"
-            )
+            assert Path(output).resolve() == Path(script_path).resolve(), f"Expected {script_path}, got {output}"
         finally:
             Path(script_path).unlink()
 
@@ -241,9 +237,7 @@ print(result)
 '''
         src_path = Path("/Users/carl/GitHub/deriva-ml/src").resolve()
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content.format(src_path=src_path))
             script_path = f.name
 
@@ -304,9 +298,7 @@ else:
 '''
         src_path = Path("/Users/carl/GitHub/deriva-ml/src").resolve()
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content.format(src_path=src_path))
             script_path = f.name
 
@@ -366,9 +358,7 @@ else:
 '''
         src_path = Path("/Users/carl/GitHub/deriva-ml/src").resolve()
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content.format(src_path=src_path))
             script_path = f.name
 

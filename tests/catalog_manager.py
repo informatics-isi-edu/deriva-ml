@@ -201,13 +201,20 @@ class CatalogManager:
         # asset/element registration. These survive resets; all others are dropped.
         permanent_tables = {
             # Domain tables from create_domain_schema()
-            "Subject", "Image", "Observation", "ClinicalRecord",
-            "ClinicalRecord_Observation", "Image_Dataset_Legacy",
-            "Report", "OCR_Report",
+            "Subject",
+            "Image",
+            "Observation",
+            "ClinicalRecord",
+            "ClinicalRecord_Observation",
+            "Image_Dataset_Legacy",
+            "Report",
+            "OCR_Report",
             # Asset metadata tables (created automatically for Image asset)
-            "Image_Asset_Type", "Image_Execution",
+            "Image_Asset_Type",
+            "Image_Execution",
             # Element type association tables (created by add_dataset_element_type)
-            "Dataset_Subject", "Dataset_Image",
+            "Dataset_Subject",
+            "Dataset_Image",
         }
         self._drop_dynamic_tables(permanent_tables)
 
@@ -256,9 +263,7 @@ class CatalogManager:
             if self.domain_schema not in model.schemas:
                 return
             schema = model.schemas[self.domain_schema]
-            dynamic_tables = {
-                t for t in schema.tables if t not in permanent_tables
-            }
+            dynamic_tables = {t for t in schema.tables if t not in permanent_tables}
             if not dynamic_tables:
                 return
 
@@ -298,8 +303,7 @@ class CatalogManager:
                 if not dropped_any and dynamic_tables:
                     # No progress — remaining tables have circular deps or permanent refs
                     self._logger.warning(
-                        f"No tables dropped in pass {pass_num + 1}, "
-                        f"remaining: {sorted(dynamic_tables)}"
+                        f"No tables dropped in pass {pass_num + 1}, remaining: {sorted(dynamic_tables)}"
                     )
                     break
 
@@ -357,9 +361,7 @@ class CatalogManager:
                 subjects = list(domain_path.tables["Subject"].path.entities().fetch())
                 if len(subjects) > 0:
                     return ml
-                self._logger.info(
-                    "State is POPULATED but Subject table is empty — repopulating"
-                )
+                self._logger.info("State is POPULATED but Subject table is empty — repopulating")
                 self.state = CatalogState.EMPTY
             except Exception:
                 self.state = CatalogState.EMPTY
@@ -480,9 +482,7 @@ def get_populated_ml(manager: CatalogManager, working_dir: Path) -> DerivaML:
     return manager.ensure_populated(working_dir)
 
 
-def get_ml_with_datasets(
-    manager: CatalogManager, working_dir: Path
-) -> tuple[DerivaML, DatasetDescription]:
+def get_ml_with_datasets(manager: CatalogManager, working_dir: Path) -> tuple[DerivaML, DatasetDescription]:
     """Get an ML instance with full dataset hierarchy.
 
     Resets first to ensure clean state, then creates everything.

@@ -55,10 +55,12 @@ class TestDiscoverReachableTables:
         table2.referenced_by = [ref_fk]
 
         model.schemas = {
-            "demo": MagicMock(tables={
-                "Table1": table1,
-                "Table2": table2,
-            })
+            "demo": MagicMock(
+                tables={
+                    "Table1": table1,
+                    "Table2": table2,
+                }
+            )
         }
 
         result = _discover_reachable_tables(
@@ -95,10 +97,12 @@ class TestDiscoverReachableTables:
         table1.referenced_by = [fk]
 
         model.schemas = {
-            "demo": MagicMock(tables={
-                "Table1": table1,
-                "Table2": table2,
-            })
+            "demo": MagicMock(
+                tables={
+                    "Table1": table1,
+                    "Table2": table2,
+                }
+            )
         }
 
         result = _discover_reachable_tables(
@@ -129,10 +133,12 @@ class TestDiscoverReachableTables:
         table1.referenced_by = []
 
         model.schemas = {
-            "demo": MagicMock(tables={
-                "Table1": table1,
-                "Table2": table2,
-            })
+            "demo": MagicMock(
+                tables={
+                    "Table1": table1,
+                    "Table2": table2,
+                }
+            )
         }
 
         result = _discover_reachable_tables(
@@ -231,9 +237,7 @@ class TestExpandTablesWithAssociations:
         table1.schema.name = "demo"
         table1.name = "Table1"
 
-        model.schemas = {
-            "demo": MagicMock(tables={"Table1": table1})
-        }
+        model.schemas = {"demo": MagicMock(tables={"Table1": table1})}
 
         include_tables = ["demo:Table1"]
         all_tables, added = _expand_tables_with_associations(model, include_tables)
@@ -271,10 +275,12 @@ class TestExpandTablesWithAssociations:
         table2.name = "Table2"
 
         model.schemas = {
-            "demo": MagicMock(tables={
-                "Table1": table1,
-                "Table2": table2,
-            })
+            "demo": MagicMock(
+                tables={
+                    "Table1": table1,
+                    "Table2": table2,
+                }
+            )
         }
 
         include_tables = ["demo:Table1", "demo:Table2"]
@@ -302,9 +308,7 @@ class TestExpandTablesWithVocabularies:
         table1 = MagicMock()
         table1.foreign_keys = []
 
-        model.schemas = {
-            "demo": MagicMock(tables={"Table1": table1})
-        }
+        model.schemas = {"demo": MagicMock(tables={"Table1": table1})}
 
         include_tables = ["demo:Table1"]
         all_tables, added = _expand_tables_with_vocabularies(model, include_tables)
@@ -375,10 +379,12 @@ class TestExpandTablesWithVocabularies:
         table1.foreign_keys = [fk]
 
         model.schemas = {
-            "demo": MagicMock(tables={
-                "Table1": table1,
-                "OtherTable": other_table,
-            })
+            "demo": MagicMock(
+                tables={
+                    "Table1": table1,
+                    "OtherTable": other_table,
+                }
+            )
         }
 
         include_tables = ["demo:Table1"]
@@ -555,18 +561,14 @@ class TestCreateMlWorkspaceIntegration:
 
             # Verify data was filtered to reachable rows
             cloned_pb = cloned_ml.pathBuilder()
-            cloned_datasets = list(
-                cloned_pb.schemas["deriva-ml"].tables["Dataset"].path.entities().fetch()
-            )
+            cloned_datasets = list(cloned_pb.schemas["deriva-ml"].tables["Dataset"].path.entities().fetch())
             assert len(cloned_datasets) <= len(datasets)
 
         finally:
             self._delete_catalog(hostname, result.catalog_id)
 
     @pytest.mark.skip(reason="Requires running catalog")
-    def test_create_workspace_with_associations(
-        self, catalog_manager: CatalogManager, tmp_path: Path
-    ):
+    def test_create_workspace_with_associations(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that association tables are automatically included."""
         ml = catalog_manager.ensure_populated(tmp_path / "source")
         source_catalog_id = str(catalog_manager.catalog_id)

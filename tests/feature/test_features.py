@@ -289,8 +289,7 @@ class TestFeatures:
         dataset_rid = dataset_test.dataset_description.dataset.dataset_rid
 
         bag = ml_instance.download_dataset_bag(
-            DatasetSpec(rid=dataset_rid,
-                        version=dataset_test.dataset_description.dataset.current_version)
+            DatasetSpec(rid=dataset_rid, version=dataset_test.dataset_description.dataset.current_version)
         )
 
         # Get the lists of all of the rinds in the datasets....datasets....
@@ -308,7 +307,8 @@ class TestFeatures:
 
         # list_feature_values now returns FeatureRecord instances - use model_dump() for dict access
         catalog_feature_values = {
-            f.model_dump()["RID"] for f in ml_instance.list_feature_values("Subject", "Health")
+            f.model_dump()["RID"]
+            for f in ml_instance.list_feature_values("Subject", "Health")
             if f.model_dump()["Subject"] in subject_rids
         }
 

@@ -26,6 +26,25 @@ export DERIVA_ML_ALLOW_DIRTY=true
 
 **Test catalog**: Tests require a running Deriva catalog server. Set `DERIVA_HOST` to specify the server (defaults to `localhost`). Tests take 30-90 minutes due to real catalog operations.
 
+**Running long test suites from Claude Code**: The full test suite exceeds Claude Code's default 2-minute Bash timeout. Use these strategies:
+1. **Run test subsets incrementally** rather than the full suite at once:
+   ```bash
+   # Unit tests (fast, no catalog needed, ~3 seconds)
+   DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q
+   
+   # Dataset integration tests (needs DERIVA_HOST, ~10-30 minutes)
+   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/ -q --timeout=600
+   
+   # Execution tests (needs DERIVA_HOST, ~10-20 minutes)  
+   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q --timeout=600
+   
+   # Remaining integration tests
+   DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/catalog/ tests/feature/ tests/schema/ tests/core/ -q --timeout=600
+   ```
+2. **Use the Monitor tool** for streaming test output on long runs, or **Bash with `run_in_background=true`** and check progress via Read on the output file.
+3. **Never use a bare `uv run pytest tests/`** with a 2-minute timeout — it will be killed mid-run. Always set `timeout` on the Bash call (up to 600000ms / 10 minutes) or break into subsets.
+4. **Per-test timeout**: Install `pytest-timeout` and use `--timeout=300` to prevent individual tests from hanging.
+
 ## Build and Development Commands
 
 ```bash

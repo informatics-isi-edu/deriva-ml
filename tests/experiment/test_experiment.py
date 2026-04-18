@@ -437,9 +437,7 @@ class TestExperimentFinder:
         experiment_rids = [e.execution_rid for e in experiments]
         assert execution_with_hydra_config.execution_rid in experiment_rids
 
-    def test_find_experiments_excludes_non_hydra_executions(
-        self, completed_execution, execution_with_hydra_config
-    ):
+    def test_find_experiments_excludes_non_hydra_executions(self, completed_execution, execution_with_hydra_config):
         """Test that find_experiments excludes executions without hydra config."""
         ml = completed_execution._ml_object
 
@@ -469,9 +467,7 @@ class TestExperimentFinder:
         for exp in completed:
             assert exp.status == "Completed"
 
-    def test_find_experiments_by_status_filters_correctly(
-        self, execution_with_hydra_config
-    ):
+    def test_find_experiments_by_status_filters_correctly(self, execution_with_hydra_config):
         """Test that status filter excludes experiments with different status."""
         from deriva_ml.core.definitions import Status
 
@@ -484,9 +480,7 @@ class TestExperimentFinder:
         experiment_rids = [e.execution_rid for e in running]
         assert execution_with_hydra_config.execution_rid not in experiment_rids
 
-    def test_find_experiments_by_workflow_rid(
-        self, execution_with_hydra_config, test_workflow
-    ):
+    def test_find_experiments_by_workflow_rid(self, execution_with_hydra_config, test_workflow):
         """Test find_experiments with workflow_rid filter."""
         ml = execution_with_hydra_config._ml_object
 
@@ -497,9 +491,7 @@ class TestExperimentFinder:
         experiment_rids = [e.execution_rid for e in experiments]
         assert execution_with_hydra_config.execution_rid in experiment_rids
 
-    def test_find_experiments_by_workflow_rid_filters_correctly(
-        self, workflow_terms, execution_with_hydra_config
-    ):
+    def test_find_experiments_by_workflow_rid_filters_correctly(self, workflow_terms, execution_with_hydra_config):
         """Test that workflow_rid filter excludes experiments with different workflow.
 
         Note: We can't easily create a workflow with a different checksum in tests
@@ -516,16 +508,12 @@ class TestExperimentFinder:
         experiments = list(ml.find_experiments(workflow_rid=nonexistent_workflow_rid))
 
         # No experiments should be found since no executions use this workflow
-        assert experiments == [], (
-            f"Expected no experiments for non-existent workflow, got {len(experiments)}"
-        )
+        assert experiments == [], f"Expected no experiments for non-existent workflow, got {len(experiments)}"
 
         # Also verify that the execution_with_hydra_config IS found when searching
         # without a workflow filter (already tested elsewhere, but confirms setup)
         all_experiments = list(ml.find_experiments())
-        assert execution_with_hydra_config.execution_rid in [
-            e.execution_rid for e in all_experiments
-        ]
+        assert execution_with_hydra_config.execution_rid in [e.execution_rid for e in all_experiments]
 
     def test_find_experiments_combined_filters(self, execution_with_hydra_config, test_workflow):
         """Test find_experiments with both status and workflow_rid filters."""

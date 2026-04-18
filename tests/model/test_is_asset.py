@@ -1,4 +1,5 @@
 """Tests for strict asset table detection."""
+
 import pytest
 from tempfile import TemporaryDirectory
 

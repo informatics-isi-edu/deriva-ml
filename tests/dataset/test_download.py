@@ -58,8 +58,16 @@ class TestDatasetDownload:
                 members.sort(key=lambda x: x["RID"])
                 assert len(members) == len(bag_elements[t])
                 for m, bm in zip(members, bag_members):
-                    skip_keys = ["Description", "RMT", "RCT", "RCB", "RMB", "Filename", "Acquisition_Date",
-                                 "Acquisition_Time"]
+                    skip_keys = [
+                        "Description",
+                        "RMT",
+                        "RCT",
+                        "RCB",
+                        "RMB",
+                        "Filename",
+                        "Acquisition_Date",
+                        "Acquisition_Time",
+                    ]
                     # For Dataset table entries, also skip Version since it can differ between
                     # the catalog snapshot and the bag
                     if t == "Dataset":
@@ -92,8 +100,7 @@ class TestDatasetDownload:
         # Now look two levels down
         for ds in dataset_description.members["Dataset"]:
             bag_child = db_catalog.lookup_dataset(ds.dataset.dataset_rid)
-            assert set(ds.member_rids["Dataset"]) == set(c.dataset_rid for c in
-                                                         bag_child.list_dataset_children())
+            assert set(ds.member_rids["Dataset"]) == set(c.dataset_rid for c in bag_child.list_dataset_children())
 
         def check_relationships(description: DatasetDescription, bg: DatasetBag):
             """Check relationships between datasets."""
@@ -294,8 +301,7 @@ class TestDatasetDownload:
         for bag_child in bag_children_recursive:
             # Every child should have dataset_types populated (may be empty list, but should match catalog)
             catalog_child = next(
-                (c for c in catalog_children_recursive if c.dataset_rid == bag_child.dataset_rid),
-                None
+                (c for c in catalog_children_recursive if c.dataset_rid == bag_child.dataset_rid), None
             )
             assert catalog_child is not None, f"Child {bag_child.dataset_rid} not found in catalog"
             assert set(bag_child.dataset_types) == set(catalog_child.dataset_types), (
@@ -337,19 +343,16 @@ class TestDatasetDownload:
 
             # Verify dataset_types are preserved (not empty or default)
             assert set(bag_parent.dataset_types) == set(catalog_parent.dataset_types), (
-                f"Parent types mismatch: bag={bag_parent.dataset_types}, "
-                f"catalog={catalog_parent.dataset_types}"
+                f"Parent types mismatch: bag={bag_parent.dataset_types}, catalog={catalog_parent.dataset_types}"
             )
 
             # Verify description is preserved
             assert bag_parent.description == catalog_parent.description, (
-                f"Parent description mismatch: bag={bag_parent.description!r}, "
-                f"catalog={catalog_parent.description!r}"
+                f"Parent description mismatch: bag={bag_parent.description!r}, catalog={catalog_parent.description!r}"
             )
 
             # Verify RID matches
             assert bag_parent.dataset_rid == catalog_parent.dataset_rid
-
 
     def test_non_asset_table_metadata_preserved(self, dataset_test, tmp_path):
         """Non-asset tables reachable via FK paths should be in the bag.
@@ -365,15 +368,13 @@ class TestDatasetDownload:
         # Report is a regular table with Observation FK and Report_Type.
         report_rows = list(bag.get_table_as_dict("Report"))
         assert len(report_rows) > 0, (
-            "Report table should have rows in the bag. "
-            "It is reachable via Subject -> Observation -> Report."
+            "Report table should have rows in the bag. It is reachable via Subject -> Observation -> Report."
         )
 
         # OCR_Report is reachable through Report.
         ocr_rows = list(bag.get_table_as_dict("OCR_Report"))
         assert len(ocr_rows) > 0, (
-            "OCR_Report should be in the bag. It is reachable via "
-            "Subject -> Observation -> Report -> OCR_Report."
+            "OCR_Report should be in the bag. It is reachable via Subject -> Observation -> Report -> OCR_Report."
         )
 
 
@@ -427,8 +428,7 @@ class TestDatabasePathCaching:
 
         # Increment version (this creates a new version in the catalog)
         new_version = dataset.increment_dataset_version(
-            component=VersionPart.minor,
-            description="Test version increment"
+            component=VersionPart.minor, description="Test version increment"
         )
 
         # Download the new version

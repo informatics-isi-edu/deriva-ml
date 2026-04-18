@@ -46,7 +46,7 @@ import pandas as pd
 from deriva.core.ermrest_model import Table
 
 # Deriva imports
-from sqlalchemy import CompoundSelect, Engine, Select, and_, inspect, literal, select, union
+from sqlalchemy import CompoundSelect, Engine, inspect, select, union
 from sqlalchemy.orm import RelationshipProperty, Session
 from sqlalchemy.orm.util import AliasedClass
 
@@ -144,9 +144,9 @@ class DatasetBag:
         # Use provided RID or fall back to the bag's primary dataset
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         self.description = description
-        self.execution_rid = execution_rid or (
-            self.model._get_dataset_execution(self.dataset_rid) or {}
-        ).get("Execution")
+        self.execution_rid = execution_rid or (self.model._get_dataset_execution(self.dataset_rid) or {}).get(
+            "Execution"
+        )
 
         # Normalize dataset_types to always be a list of strings for consistency
         # with the Dataset class interface
@@ -169,8 +169,10 @@ class DatasetBag:
 
     def __repr__(self) -> str:
         """Return a string representation of the DatasetBag for debugging."""
-        return (f"<deriva_ml.DatasetBag object at {hex(id(self))}: rid='{self.dataset_rid}', "
-                f"version='{self.current_version}', types={self.dataset_types}>")
+        return (
+            f"<deriva_ml.DatasetBag object at {hex(id(self))}: rid='{self.dataset_rid}', "
+            f"version='{self.current_version}', types={self.dataset_types}>"
+        )
 
     @property
     def current_version(self) -> DatasetVersion:
@@ -423,7 +425,9 @@ class DatasetBag:
                 nested_datasets = [d["RID"] for d in element_rows]
                 for ds in nested_datasets:
                     nested_dataset = self._catalog.lookup_dataset(ds)
-                    for k, v in nested_dataset.list_dataset_members(recurse=recurse, limit=limit, _visited=_visited).items():
+                    for k, v in nested_dataset.list_dataset_members(
+                        recurse=recurse, limit=limit, _visited=_visited
+                    ).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -534,9 +538,7 @@ class DatasetBag:
             features = [f for f in features if f.feature_name == feature_name]
             if not features:
                 table_name = table if isinstance(table, str) else table.name
-                raise DerivaMLException(
-                    f"Feature '{feature_name}' not found on table '{table_name}'."
-                )
+                raise DerivaMLException(f"Feature '{feature_name}' not found on table '{table_name}'.")
 
         result: dict[str, list[FeatureRecord]] = {}
 
@@ -564,10 +566,7 @@ class DatasetBag:
                     target_rid = getattr(rec, target_col, None)
                     if target_rid is not None:
                         grouped[target_rid].append(rec)
-                records = [
-                    selector(group) if len(group) > 1 else group[0]
-                    for group in grouped.values()
-                ]
+                records = [selector(group) if len(group) > 1 else group[0] for group in grouped.values()]
 
             result[feat.feature_name] = records
 
@@ -761,300 +760,176 @@ class DatasetBag:
             sql_cmd = select(de_table.Execution).where(de_table.Dataset == self.dataset_rid)
             return [r[0] for r in session.execute(sql_cmd).all()]
 
-    def _denormalize(self, include_tables: list[str]) -> Select:
-        """Build a SQL query that joins multiple tables into a denormalized view.
+    def get_denormalized_as_dataframe(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
+    ) -> pd.DataFrame:
+        """Return the dataset bag as a denormalized wide table (DataFrame).
 
-        This method creates a "wide table" by joining related tables together,
-        producing a single query that returns columns from all specified tables.
-        This is useful for machine learning pipelines that need flat data.
-
-        The method:
-        1. Analyzes the schema to find join paths between tables
-        2. Determines the correct join order based on foreign key relationships
-        3. Builds SELECT statements with properly aliased columns
-        4. Creates a UNION if multiple paths exist to the same tables
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.as_dataframe`.
+        Works against the bag's local SQLite (no catalog needed). See the
+        ``Denormalizer`` class docstring for the full semantic rules
+        (Rules 1-8).
 
         Args:
-            include_tables: List of table names to include in the output. Additional
-                tables may be included if they're needed to join the requested tables.
+            include_tables: Tables whose columns appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+            ignore_unrelated_anchors: If True, silently drop anchors
+                with no FK path (Rule 8).
 
         Returns:
-            Select: A SQLAlchemy query that produces the denormalized result.
+            A :class:`pandas.DataFrame` with one row per ``row_per``
+            instance in the bag. Columns use ``Table.column`` notation.
 
-        Note:
-            Column names in the result are prefixed with the table name to avoid
-            collisions (e.g., "Image.Filename", "Subject.RID").
+        Example::
+
+            bag = dataset.download_dataset_bag(version)
+            df = bag.get_denormalized_as_dataframe(["Image", "Subject"])
         """
-        # Skip over tables that we don't want to include in the denormalized dataset.
-        # Also, strip off the Dataset/Dataset_X part of the path so we don't include dataset columns in the denormalized
-        # table.
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-        def build_join_on_clause(table_name, join_condition_pairs):
-            """Build a SQLAlchemy ON clause from join condition column pairs.
-
-            For simple FKs: single equality condition.
-            For composite FKs: AND of multiple equality conditions.
-
-            Each ``(fk_col, pk_col)`` pair comes from ``_table_relationship``
-            which always returns the FK column first and the PK column second.
-            We use the column objects' own ``.table.name`` to find the correct
-            ORM classes -- this is more robust than relying on sequential path
-            order, which breaks with branching join trees.
-
-            Args:
-                table_name: Name of the table being joined (the target).
-                join_condition_pairs: Set of (fk_col, pk_col) Column pairs from
-                    _table_relationship(). Each pair represents one column in the FK.
-
-            Returns:
-                SQLAlchemy AND clause for use as join onclause.
-            """
-            conditions = []
-            for fk_col, pk_col in join_condition_pairs:
-                # Use the FK column's table info to get the correct ORM class
-                fk_table_name = fk_col.table.name if hasattr(fk_col.table, 'name') else str(fk_col.table)
-                pk_table_name = pk_col.table.name if hasattr(pk_col.table, 'name') else str(pk_col.table)
-                fk_class = self.model.get_orm_class_by_name(fk_table_name)
-                pk_class = self.model.get_orm_class_by_name(pk_table_name)
-                left = fk_class.__table__.columns[fk_col.name]
-                right = pk_class.__table__.columns[pk_col.name]
-                conditions.append(left == right)
-            return and_(*conditions)
-
-        from deriva_ml.model.catalog import denormalize_column_name
-
-        join_tables, column_specs, multi_schema = self.model._prepare_wide_table(
-            self, self.dataset_rid, include_tables
+        return Denormalizer(self).as_dataframe(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
 
-        denormalized_columns = [
-            self.model.get_orm_class_by_name(table_name)
-            .__table__.columns[column_name]
-            .label(denormalize_column_name(schema_name, table_name, column_name, multi_schema))
-            for schema_name, table_name, column_name, _type_name in column_specs
-        ]
-        sql_statements = []
-        for key, (path, join_conditions, join_types) in join_tables.items():
-            sql_statement = select(*denormalized_columns).select_from(
-                self.model.get_orm_class_for_table(self._dataset_table)
-            )
-            for table_name in path[1:]:  # Skip over dataset table
-                if table_name not in join_conditions:
-                    continue  # No join condition — skip (not connected)
-                on_clause = build_join_on_clause(
-                    table_name, join_conditions[table_name]
-                )
-                table_class = self.model.get_orm_class_by_name(table_name)
-                # Use LEFT OUTER JOIN for nullable FK columns to preserve all
-                # rows from the left side (e.g., Images with null Observation FK).
-                if join_types.get(table_name) == "left":
-                    sql_statement = sql_statement.outerjoin(table_class, onclause=on_clause)
-                else:
-                    sql_statement = sql_statement.join(table_class, onclause=on_clause)
-            dataset_rid_list = [self.dataset_rid] + [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
-            dataset_class = self.model.get_orm_class_by_name(self._dataset_table.name)
-            sql_statement = sql_statement.where(dataset_class.RID.in_(dataset_rid_list))
-            sql_statements.append(sql_statement)
-        if not sql_statements:
-            # No join paths found — return empty result with correct columns.
-            if denormalized_columns:
-                return select(*denormalized_columns).where(literal(False))
-            return select(literal(1)).where(literal(False))
-        return union(*sql_statements)
-
-    def denormalize_as_dataframe(
+    def get_denormalized_as_dict(
         self,
         include_tables: list[str],
-        version: Any = None,
-        **kwargs: Any,
-    ) -> pd.DataFrame:
-        """Denormalize the dataset bag into a single wide table (DataFrame).
-
-        Denormalization transforms normalized relational data into a single "wide table"
-        (also called a "flat table" or "denormalized table") by joining related tables
-        together. This produces a DataFrame where each row contains all related information
-        from multiple source tables, with columns from each table combined side-by-side.
-
-        Wide tables are the standard input format for most machine learning frameworks,
-        which expect all features for a single observation to be in one row. This method
-        bridges the gap between normalized database schemas and ML-ready tabular data.
-
-        **How it works:**
-
-        Tables are joined based on their foreign key relationships stored in the bag's
-        schema. For example, if Image has a foreign key to Subject, denormalizing
-        ["Subject", "Image"] produces rows where each image appears with its subject's
-        metadata.
-
-        **Column naming:**
-
-        Column names are prefixed with the source table name using dots to avoid
-        collisions (e.g., "Image.Filename", "Subject.RID"). This differs from the
-        live Dataset class which uses underscores.
-
-        Args:
-            include_tables: List of table names to include in the output. Tables
-                are joined based on their foreign key relationships.
-                Order doesn't matter - the join order is determined automatically.
-            version: Ignored (bags are immutable snapshots of a specific version).
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Returns:
-            pd.DataFrame: Wide table with columns from all included tables.
-
-        Example:
-            Create a training dataset from a downloaded bag::
-
-                >>> # Download and materialize the dataset
-                >>> bag = ml.download_dataset_bag(spec, materialize=True)
-
-                >>> # Denormalize into a wide table
-                >>> df = bag.denormalize_as_dataframe(["Image", "Diagnosis"])
-                >>> print(df.columns.tolist())
-                ['Image.RID', 'Image.Filename', 'Image.URL', 'Diagnosis.RID',
-                 'Diagnosis.Label', 'Diagnosis.Confidence']
-
-                >>> # Access local file paths for images
-                >>> for _, row in df.iterrows():
-                ...     local_path = bag.get_asset_path("Image", row["Image.RID"])
-                ...     label = row["Diagnosis.Label"]
-                ...     # Train on local_path with label
-
-        See Also:
-            denormalize_as_dict: Generator version for memory-efficient processing.
-        """
-        sql_stmt = self._denormalize(include_tables=include_tables)
-        with Session(self.engine) as session:
-            result = session.execute(sql_stmt)
-            rows = [dict(row._mapping) for row in result]
-        return pd.DataFrame(rows)
-
-    def denormalize_as_dict(
-        self,
-        include_tables: list[str],
-        version: Any = None,
-        **kwargs: Any,
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
     ) -> Generator[dict[str, Any], None, None]:
-        """Denormalize the dataset bag and yield rows as dictionaries.
+        """Stream the denormalized dataset bag rows as dicts.
 
-        This is a memory-efficient alternative to denormalize_as_dataframe() that
-        yields one row at a time as a dictionary instead of loading all data into
-        a DataFrame. Use this when processing large datasets that may not fit in
-        memory, or when you want to process rows incrementally.
-
-        Like denormalize_as_dataframe(), this produces a "wide table" representation
-        where each yielded dictionary contains all columns from the joined tables.
-        See denormalize_as_dataframe() for detailed explanation of how denormalization
-        works.
-
-        **Column naming:**
-
-        Column names are prefixed with the source table name using dots to avoid
-        collisions (e.g., "Image.Filename", "Subject.RID"). This differs from the
-        live Dataset class which uses underscores.
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.as_dict`.
+        Same rules and exceptions as
+        :meth:`get_denormalized_as_dataframe` but yields one dict per
+        row. Use this for large bags where a full DataFrame won't fit
+        in memory — each row is yielded as soon as it's produced.
 
         Args:
-            include_tables: List of table names to include in the output.
-                Tables are joined based on their foreign key relationships.
-            version: Ignored (bags are immutable snapshots of a specific version).
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
+            include_tables: Tables whose columns appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+            ignore_unrelated_anchors: If True, silently drop anchors
+                with no FK path (Rule 8).
 
         Yields:
-            dict[str, Any]: Dictionary representing one row of the wide table.
-                Keys are column names in "Table.Column" format.
+            ``dict[str, Any]`` per row — keys are ``Table.column``
+            labels, values are raw Python types.
 
-        Example:
-            Stream through a large dataset for training::
+        Example::
 
-                >>> bag = ml.download_dataset_bag(spec, materialize=True)
-                >>> for row in bag.denormalize_as_dict(["Image", "Diagnosis"]):
-                ...     # Get local file path for this image
-                ...     local_path = bag.get_asset_path("Image", row["Image.RID"])
-                ...     label = row["Diagnosis.Label"]
-                ...     # Process image and label...
-
-            Build a PyTorch dataset efficiently::
-
-                >>> class BagDataset(torch.utils.data.IterableDataset):
-                ...     def __init__(self, bag, tables):
-                ...         self.bag = bag
-                ...         self.tables = tables
-                ...     def __iter__(self):
-                ...         for row in self.bag.denormalize_as_dict(self.tables):
-                ...             img_path = self.bag.get_asset_path("Image", row["Image.RID"])
-                ...             yield load_image(img_path), row["Diagnosis.Label"]
-
-        See Also:
-            denormalize_as_dataframe: Returns all data as a pandas DataFrame.
+            for row in bag.get_denormalized_as_dict(["Image", "Subject"]):
+                process(row["Image.RID"], row["Subject.Name"])
         """
-        sql_stmt = self._denormalize(include_tables=include_tables)
-        with Session(self.engine) as session:
-            result = session.execute(sql_stmt)
-            for row in result:
-                yield dict(row._mapping)
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-    # SQLAlchemy type name → ermrest type name mapping.
-    _SQLALCHEMY_TO_ERMREST: dict[str, str] = {
-        "TEXT": "text",
-        "VARCHAR": "text",
-        "STRING": "text",
-        "INTEGER": "int4",
-        "BIGINT": "int8",
-        "SMALLINT": "int2",
-        "FLOAT": "float8",
-        "REAL": "float4",
-        "NUMERIC": "float8",
-        "BOOLEAN": "boolean",
-        "DATE": "date",
-        "DATETIME": "timestamptz",
-        "TIMESTAMP": "timestamptz",
-        "BLOB": "bytea",
-    }
-
-    def denormalize_columns(
-        self,
-        include_tables: list[str],
-        **kwargs: Any,
-    ) -> list[tuple[str, str]]:
-        """Return the columns that denormalize would produce, without fetching data.
-
-        Performs the same validation as :meth:`denormalize_as_dataframe` (table existence,
-        FK path resolution, ambiguity detection) but stops before executing any data
-        queries.
-
-        Args:
-            include_tables: List of table names to include.
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
-
-        Returns:
-            List of ``(column_name, column_type)`` tuples using dot notation.
-            Type strings use ermrest type names (``text``, ``int4``, etc.).
-
-        Example:
-            >>> cols = bag.denormalize_columns(["Image", "Subject"])
-            >>> for name, dtype in cols:
-            ...     print(f"  {name}: {dtype}")
-            Image.RID: ermrest_rid
-            Image.Filename: text
-            Subject.RID: ermrest_rid
-            Subject.Name: text
-        """
-        from deriva_ml.model.catalog import denormalize_column_name
-
-        _, column_specs, multi_schema = self.model._prepare_wide_table(
-            self, self.dataset_rid, list(include_tables)
+        yield from Denormalizer(self).as_dict(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
 
-        result = []
-        for schema_name, table_name, col_name, type_name in column_specs:
-            prefixed = denormalize_column_name(
-                schema_name, table_name, col_name, multi_schema
-            )
-            # _prepare_wide_table now returns ermrest type names directly,
-            # so no mapping needed.
-            result.append((prefixed, type_name))
-        return result
+    def list_denormalized_columns(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -> list[tuple[str, str]]:
+        """List the columns the denormalized table would have.
 
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.columns`.
+        Model-only — no data fetch. Runs the same Rule 2/5/6 validation
+        as :meth:`get_denormalized_as_dataframe` so planner errors
+        surface early.
+
+        Args:
+            include_tables: Tables whose columns appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+
+        Returns:
+            List of ``(column_name, column_type)`` tuples.
+
+        Example::
+
+            cols = bag.list_denormalized_columns(["Image", "Subject"])
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).columns(
+            include_tables,
+            row_per=row_per,
+            via=via,
+        )
+
+    def describe_denormalized(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Dry-run the denormalization; return planning metadata.
+
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.describe` —
+        returns the full plan dict (see that method's docstring for the
+        exact 12-key shape). Never raises on ambiguity.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).describe(
+            include_tables,
+            row_per=row_per,
+            via=via,
+        )
+
+    def list_schema_paths(
+        self,
+        tables: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """List FK paths reachable from this dataset bag's members.
+
+        Shortcut for
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.list_paths`.
+        Useful for schema exploration — answers "what tables could I
+        include in a denormalization of this bag?"
+
+        Args:
+            tables: Optional filter — when given, ``schema_paths`` in
+                the returned dict includes only entries involving at
+                least one of these tables.
+
+        Returns:
+            Dict with 6 keys: ``member_types``, ``anchor_types``,
+            ``reachable_tables``, ``association_tables``,
+            ``feature_tables``, ``schema_paths``. See
+            :meth:`Denormalizer.list_paths` for the detailed shape.
+
+        Example::
+
+            info = bag.list_schema_paths()
+            print(info["member_types"])
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        return Denormalizer(self).list_paths(tables=tables)
 
     # =========================================================================
     # Asset Restructuring Methods
@@ -1332,10 +1207,7 @@ class DatasetBag:
                         cache[group_key][target_rid] = getattr(selected, use_column)
                     elif enforce_vocabulary:
                         # Multiple different values without selector - error
-                        values_str = ", ".join(
-                            f"'{getattr(r, use_column)}' (exec: {r.Execution})"
-                            for r in records
-                        )
+                        values_str = ", ".join(f"'{getattr(r, use_column)}' (exec: {r.Execution})" for r in records)
                         raise DerivaMLException(
                             f"Asset '{target_rid}' has multiple different values for "
                             f"feature '{records[0].Feature_Name}': {values_str}. "
@@ -1677,9 +1549,7 @@ class DatasetBag:
         asset_dataset_map = self._get_asset_dataset_mapping(asset_table)
 
         # Step 3: Load feature values cache for relevant features
-        feature_cache = self._load_feature_values_cache(
-            asset_table, group_by, enforce_vocabulary, value_selector
-        )
+        feature_cache = self._load_feature_values_cache(asset_table, group_by, enforce_vocabulary, value_selector)
 
         # Step 4: Get all assets reachable through FK paths
         # This uses _get_reachable_assets which traverses FK relationships,
@@ -1708,11 +1578,7 @@ class DatasetBag:
                 # BDBag asset layout: data/asset/{RID}/{table}/{filename}.
                 try:
                     bag_root = Path(self._catalog._database_model.bag_path)
-                    source_path = (
-                        bag_root / "data" / "asset"
-                        / asset.get("RID", "") / asset_table
-                        / Path(filename).name
-                    )
+                    source_path = bag_root / "data" / "asset" / asset.get("RID", "") / asset_table / Path(filename).name
                 except AttributeError:
                     pass  # catalog doesn't have _database_model (e.g. in tests)
 

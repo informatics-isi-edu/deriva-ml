@@ -144,9 +144,7 @@ def populated_catalog(catalog_manager: CatalogManager, tmp_path: Path) -> Deriva
 
 
 @pytest.fixture(scope="function")
-def catalog_with_datasets(
-    catalog_manager: CatalogManager, tmp_path: Path
-) -> tuple[DerivaML, DatasetDescription]:
+def catalog_with_datasets(catalog_manager: CatalogManager, tmp_path: Path) -> tuple[DerivaML, DatasetDescription]:
     """Create a DerivaML instance with full dataset hierarchy.
 
     This fixture provides both the ML instance and the DatasetDescription
@@ -162,9 +160,7 @@ def catalog_with_datasets(
 
 
 @pytest.fixture(scope="function")
-def dataset_test(
-    catalog_manager: CatalogManager, tmp_path: Path
-) -> SessionMLDatasetCatalog:
+def dataset_test(catalog_manager: CatalogManager, tmp_path: Path) -> SessionMLDatasetCatalog:
     """Create a dataset test fixture with MLDatasetCatalog-compatible interface.
 
     This provides backward compatibility with tests expecting the MLDatasetCatalog
@@ -294,15 +290,11 @@ class SessionMLDatasetCatalog:
         """Reset and recreate datasets."""
         self._manager.reset()
         # Note: This changes dataset RIDs, which may break some tests
-        _, self.dataset_description = self._manager.ensure_datasets(
-            self.ml_instance.working_dir
-        )
+        _, self.dataset_description = self._manager.ensure_datasets(self.ml_instance.working_dir)
 
 
 @pytest.fixture(scope="function")
-def ml_dataset_catalog(
-    catalog_manager: CatalogManager, tmp_path: Path
-) -> SessionMLDatasetCatalog:
+def ml_dataset_catalog(catalog_manager: CatalogManager, tmp_path: Path) -> SessionMLDatasetCatalog:
     """Create an MLDatasetCatalog-compatible fixture.
 
     This provides the same interface as MLDatasetCatalog for tests that

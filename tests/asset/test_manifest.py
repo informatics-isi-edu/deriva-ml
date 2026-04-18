@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine
 
-from deriva_ml.asset.manifest import AssetManifest, AssetEntry, FeatureEntry
 from deriva_ml.asset.aux_classes import AssetFilePath
+from deriva_ml.asset.manifest import AssetEntry, AssetManifest, FeatureEntry
+from deriva_ml.local_db.manifest_store import ManifestStore
+
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def store(tmp_path):
+    """Create a ManifestStore backed by a temp SQLite DB."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'ws.sqlite'}", future=True)
+    s = ManifestStore(engine)
+    s.ensure_schema()
+    yield s
+    engine.dispose()
+
+
+@pytest.fixture
+def manifest(store):
+    """Create an AssetManifest backed by the store."""
+    return AssetManifest(store, "4SP")
 
 
 # =============================================================================
@@ -19,21 +40,14 @@ from deriva_ml.asset.aux_classes import AssetFilePath
 class TestAssetManifest:
     """Tests for the AssetManifest persistence layer."""
 
-    def test_create_empty_manifest(self, tmp_path):
+    def test_create_empty_manifest(self, manifest):
         """Test creating a new empty manifest."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-
-        assert mp.exists()
         assert manifest.execution_rid == "4SP"
         assert manifest.assets == {}
         assert manifest.features == {}
 
-    def test_add_asset(self, tmp_path):
+    def test_add_asset(self, manifest):
         """Test adding an asset entry."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-
         entry = AssetEntry(
             asset_table="Image",
             schema="test-schema",
@@ -47,28 +61,33 @@ class TestAssetManifest:
         assert manifest.assets["Image/scan.jpg"].metadata == {"Subject": "2-DEF"}
         assert manifest.assets["Image/scan.jpg"].status == "pending"
 
-    def test_manifest_persists_to_disk(self, tmp_path):
-        """Test that manifest survives reload (crash recovery)."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-            asset_types=["Training_Data"],
-            metadata={"Subject": "2-DEF"},
-        ))
+    def test_manifest_persists_across_instances(self, store):
+        """Test that manifest data is visible to a second instance (crash recovery)."""
+        manifest1 = AssetManifest(store, "4SP")
+        manifest1.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+                asset_types=["Training_Data"],
+                metadata={"Subject": "2-DEF"},
+            ),
+        )
 
-        # Reload from disk (simulates crash recovery)
-        manifest2 = AssetManifest(mp, "4SP")
+        # Second instance over the same store should see the data
+        manifest2 = AssetManifest(store, "4SP")
         assert "Image/scan.jpg" in manifest2.assets
         assert manifest2.assets["Image/scan.jpg"].metadata == {"Subject": "2-DEF"}
 
-    def test_mark_uploaded(self, tmp_path):
+    def test_mark_uploaded(self, manifest):
         """Test marking an asset as uploaded."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         manifest.mark_uploaded("Image/scan.jpg", "1-ABC")
 
@@ -77,13 +96,15 @@ class TestAssetManifest:
         assert entry.rid == "1-ABC"
         assert entry.uploaded_at is not None
 
-    def test_mark_failed(self, tmp_path):
+    def test_mark_failed(self, manifest):
         """Test marking an asset as failed."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         manifest.mark_failed("Image/scan.jpg", "upload timeout")
 
@@ -91,11 +112,8 @@ class TestAssetManifest:
         assert entry.status == "failed"
         assert entry.error == "upload timeout"
 
-    def test_pending_and_uploaded_filters(self, tmp_path):
+    def test_pending_and_uploaded_filters(self, manifest):
         """Test filtering assets by status."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-
         manifest.add_asset("Image/a.jpg", AssetEntry(asset_table="Image", schema="s"))
         manifest.add_asset("Image/b.jpg", AssetEntry(asset_table="Image", schema="s"))
         manifest.add_asset("Image/c.jpg", AssetEntry(asset_table="Image", schema="s"))
@@ -109,89 +127,90 @@ class TestAssetManifest:
         assert "Image/a.jpg" in uploaded
         assert "Image/b.jpg" in pending
 
-    def test_update_metadata(self, tmp_path):
+    def test_update_metadata(self, store):
         """Test updating metadata for an existing asset."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest = AssetManifest(store, "4SP")
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         manifest.update_asset_metadata("Image/scan.jpg", {"Subject": "2-DEF"})
         assert manifest.assets["Image/scan.jpg"].metadata == {"Subject": "2-DEF"}
 
-        # Verify persisted
-        manifest2 = AssetManifest(mp, "4SP")
+        # Verify a new instance sees the update
+        manifest2 = AssetManifest(store, "4SP")
         assert manifest2.assets["Image/scan.jpg"].metadata == {"Subject": "2-DEF"}
 
-    def test_update_asset_types(self, tmp_path):
+    def test_update_asset_types(self, manifest):
         """Test updating asset types."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         manifest.update_asset_types("Image/scan.jpg", ["Training_Data", "Labeled"])
         assert manifest.assets["Image/scan.jpg"].asset_types == ["Training_Data", "Labeled"]
 
-    def test_missing_key_raises(self, tmp_path):
+    def test_missing_key_raises(self, manifest):
         """Test that operations on non-existent keys raise KeyError."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-
         with pytest.raises(KeyError):
             manifest.mark_uploaded("nonexistent", "1-A")
 
         with pytest.raises(KeyError):
             manifest.update_asset_metadata("nonexistent", {})
 
-    def test_add_feature(self, tmp_path):
+    def test_add_feature(self, manifest):
         """Test adding a feature entry."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-
-        manifest.add_feature("Diagnosis", FeatureEntry(
-            feature_name="Diagnosis",
-            target_table="Image",
-            schema="test-schema",
-            values_path="features/Image/Diagnosis/Diagnosis.jsonl",
-        ))
+        manifest.add_feature(
+            "Diagnosis",
+            FeatureEntry(
+                feature_name="Diagnosis",
+                target_table="Image",
+                schema="test-schema",
+                values_path="features/Image/Diagnosis/Diagnosis.jsonl",
+            ),
+        )
 
         assert "Diagnosis" in manifest.features
         assert manifest.features["Diagnosis"].target_table == "Image"
 
-    def test_manifest_json_format(self, tmp_path):
-        """Test that the manifest JSON is well-formed and readable."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-            asset_types=["Training_Data"],
-        ))
+    def test_to_json_format(self, manifest):
+        """Test that to_json returns a well-formed dict."""
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+                asset_types=["Training_Data"],
+            ),
+        )
 
-        with open(mp) as f:
-            data = json.load(f)
+        data = manifest.to_json()
 
-        assert data["version"] == 1
+        assert data["version"] == 2
         assert data["execution_rid"] == "4SP"
         assert "Image/scan.jpg" in data["assets"]
         assert data["assets"]["Image/scan.jpg"]["status"] == "pending"
 
-    def test_resume_after_crash(self, tmp_path):
+    def test_resume_after_crash(self, store):
         """Test resume scenario: some assets uploaded, some pending."""
-        mp = tmp_path / "asset-manifest.json"
-
         # First "session" — register and partially upload
-        manifest1 = AssetManifest(mp, "4SP")
+        manifest1 = AssetManifest(store, "4SP")
         manifest1.add_asset("Image/a.jpg", AssetEntry(asset_table="Image", schema="s"))
         manifest1.add_asset("Image/b.jpg", AssetEntry(asset_table="Image", schema="s"))
         manifest1.add_asset("Image/c.jpg", AssetEntry(asset_table="Image", schema="s"))
         manifest1.mark_uploaded("Image/a.jpg", "1-A")
         # "Crash" — manifest1 goes out of scope
 
-        # Second "session" — reload and check state
-        manifest2 = AssetManifest(mp, "4SP")
+        # Second "session" — new instance sees same store state
+        manifest2 = AssetManifest(store, "4SP")
         pending = manifest2.pending_assets()
         uploaded = manifest2.uploaded_assets()
 
@@ -199,52 +218,59 @@ class TestAssetManifest:
         assert len(uploaded) == 1
         assert uploaded["Image/a.jpg"].rid == "1-A"
 
-    def test_description_stored_in_entry(self, tmp_path):
+    def test_description_stored_in_entry(self, manifest):
         """Test that description is stored in asset entry."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-            description="A test scan image",
-        ))
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+                description="A test scan image",
+            ),
+        )
 
         assert manifest.assets["Image/scan.jpg"].description == "A test scan image"
 
-    def test_description_persists_to_disk(self, tmp_path):
-        """Test that description survives reload from disk."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-            description="Persisted description",
-        ))
+    def test_description_persists_across_instances(self, store):
+        """Test that description survives reload (simulates crash recovery)."""
+        manifest = AssetManifest(store, "4SP")
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+                description="Persisted description",
+            ),
+        )
 
-        # Reload from disk (simulates crash recovery)
-        manifest2 = AssetManifest(mp, "4SP")
+        # New instance over the same store
+        manifest2 = AssetManifest(store, "4SP")
         assert manifest2.assets["Image/scan.jpg"].description == "Persisted description"
 
-    def test_description_none_by_default(self, tmp_path):
+    def test_description_none_by_default(self, manifest):
         """Test that description defaults to None when not provided."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         assert manifest.assets["Image/scan.jpg"].description is None
 
-    def test_description_in_json_format(self, tmp_path):
-        """Test that description appears in raw JSON on disk."""
-        mp = tmp_path / "asset-manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-            description="JSON visible description",
-        ))
+    def test_description_in_json_format(self, manifest):
+        """Test that description appears in to_json output."""
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+                description="JSON visible description",
+            ),
+        )
 
-        with open(mp) as f:
-            data = json.load(f)
-
+        data = manifest.to_json()
         assert data["assets"]["Image/scan.jpg"]["description"] == "JSON visible description"
 
 
@@ -340,14 +366,17 @@ class TestAssetFilePathBehavior:
 
         assert afp.metadata == {"Subject": "2-DEF"}
 
-    def test_metadata_property_with_manifest(self, tmp_path):
+    def test_metadata_property_with_manifest(self, store, tmp_path):
         """Test metadata property with manifest binding."""
-        mp = tmp_path / "manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/file.txt", AssetEntry(
-            asset_table="Image", schema="test-schema",
-            metadata={"Subject": "2-DEF"},
-        ))
+        manifest = AssetManifest(store, "4SP")
+        manifest.add_asset(
+            "Image/file.txt",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+                metadata={"Subject": "2-DEF"},
+            ),
+        )
 
         afp = AssetFilePath(
             asset_path=tmp_path / "file.txt",
@@ -365,13 +394,16 @@ class TestAssetFilePathBehavior:
         assert afp.asset_metadata == {"Subject": "3-GHI", "Date": "2026-01-15"}
         assert manifest.assets["Image/file.txt"].metadata == {"Subject": "3-GHI", "Date": "2026-01-15"}
 
-    def test_set_asset_types_with_manifest(self, tmp_path):
+    def test_set_asset_types_with_manifest(self, store, tmp_path):
         """Test set_asset_types updates manifest."""
-        mp = tmp_path / "manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/file.txt", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest = AssetManifest(store, "4SP")
+        manifest.add_asset(
+            "Image/file.txt",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         afp = AssetFilePath(
             asset_path=tmp_path / "file.txt",
@@ -424,6 +456,7 @@ class TestAssetRecord:
     def test_record_model_dump(self):
         """Test that model_dump produces a clean dict for manifest storage."""
         from pydantic import create_model
+
         from deriva_ml.asset.asset_record import AssetRecord
 
         TestRecord = create_model(
@@ -440,7 +473,9 @@ class TestAssetRecord:
     def test_record_optional_fields(self):
         """Test that optional fields default to None."""
         from typing import Optional
+
         from pydantic import create_model
+
         from deriva_ml.asset.asset_record import AssetRecord
 
         TestRecord = create_model(
@@ -463,9 +498,10 @@ class TestAssetRecord:
 class TestAssetRecordWithFilePath:
     """Test using AssetRecord with AssetFilePath metadata setter."""
 
-    def test_set_metadata_from_record(self, tmp_path):
+    def test_set_metadata_from_record(self, store, tmp_path):
         """Test setting AssetFilePath metadata from an AssetRecord."""
         from pydantic import create_model
+
         from deriva_ml.asset.asset_record import AssetRecord
 
         ImageAsset = create_model(
@@ -475,11 +511,14 @@ class TestAssetRecordWithFilePath:
             Acquisition_Date=(str, ...),
         )
 
-        mp = tmp_path / "manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest = AssetManifest(store, "4SP")
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         afp = AssetFilePath(
             asset_path=tmp_path / "scan.jpg",
@@ -500,13 +539,16 @@ class TestAssetRecordWithFilePath:
             "Acquisition_Date": "2026-01-15",
         }
 
-    def test_set_metadata_from_dict(self, tmp_path):
+    def test_set_metadata_from_dict(self, store, tmp_path):
         """Test setting metadata from a plain dict (backward compat)."""
-        mp = tmp_path / "manifest.json"
-        manifest = AssetManifest(mp, "4SP")
-        manifest.add_asset("Image/scan.jpg", AssetEntry(
-            asset_table="Image", schema="test-schema",
-        ))
+        manifest = AssetManifest(store, "4SP")
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="test-schema",
+            ),
+        )
 
         afp = AssetFilePath(
             asset_path=tmp_path / "scan.jpg",
@@ -519,3 +561,60 @@ class TestAssetRecordWithFilePath:
 
         afp.metadata = {"Subject": "2-DEF"}
         assert afp.metadata == {"Subject": "2-DEF"}
+
+
+class TestJsonDefault:
+    """Tests for the _json_default serializer used by to_json()."""
+
+    def test_datetime_serialized(self) -> None:
+        from datetime import datetime, timezone
+
+        from deriva_ml.asset.manifest import _json_default
+
+        dt = datetime(2026, 4, 15, 12, 0, 0, tzinfo=timezone.utc)
+        assert _json_default(dt) == "2026-04-15T12:00:00+00:00"
+
+    def test_date_serialized(self) -> None:
+        from datetime import date
+
+        from deriva_ml.asset.manifest import _json_default
+
+        d = date(2026, 4, 15)
+        assert _json_default(d) == "2026-04-15"
+
+    def test_path_serialized(self) -> None:
+        from pathlib import Path
+
+        from deriva_ml.asset.manifest import _json_default
+
+        p = Path("/tmp/test.txt")
+        assert _json_default(p) == "/tmp/test.txt"
+
+    def test_unknown_type_raises(self) -> None:
+        from deriva_ml.asset.manifest import _json_default
+
+        with pytest.raises(TypeError, match="not JSON serializable"):
+            _json_default(object())
+
+    def test_to_json_with_datetime_metadata(self, store, manifest) -> None:
+        """to_json() + json.dumps with _json_default handles datetime metadata."""
+        import json
+        from datetime import datetime, timezone
+
+        from deriva_ml.asset.manifest import AssetEntry, _json_default
+
+        # Store the asset with plain string metadata (DB can't serialize datetime directly)
+        manifest.add_asset(
+            "Image/scan.jpg",
+            AssetEntry(
+                asset_table="Image",
+                schema="isa",
+                metadata={"date": "2026-01-01T00:00:00+00:00"},
+            ),
+        )
+        # Build a JSON structure that includes a datetime object (simulating catalog data)
+        data = manifest.to_json()
+        # Inject a datetime into the structure to test the serializer path
+        data["assets"]["Image/scan.jpg"]["metadata"]["ts"] = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        result = json.dumps(data, default=_json_default)
+        assert "2026-01-01" in result

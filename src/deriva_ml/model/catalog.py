@@ -97,9 +97,7 @@ class JoinNode:
         return edges
 
 
-def denormalize_column_name(
-    schema_name: str, table_name: str, column_name: str, multi_schema: bool
-) -> str:
+def denormalize_column_name(schema_name: str, table_name: str, column_name: str, multi_schema: bool) -> str:
     """Build a prefixed column name for denormalized output.
 
     Uses dot notation to avoid ambiguity with column names that contain
@@ -117,6 +115,7 @@ def denormalize_column_name(
     if multi_schema:
         return f"{schema_name}.{table_name}.{column_name}"
     return f"{table_name}.{column_name}"
+
 
 logger = logging.getLogger(__name__)
 
@@ -309,33 +308,39 @@ class DerivaModel:
                 for col in table.columns:
                     if not include_system_columns and col.name in system_columns:
                         continue
-                    columns.append({
-                        "name": col.name,
-                        "type": str(col.type.typename),
-                        "nullok": col.nullok,
-                        "comment": col.comment or "",
-                    })
+                    columns.append(
+                        {
+                            "name": col.name,
+                            "type": str(col.type.typename),
+                            "nullok": col.nullok,
+                            "comment": col.comment or "",
+                        }
+                    )
 
                 # Get foreign keys
                 foreign_keys = []
                 for fk in table.foreign_keys:
                     fk_cols = [c.name for c in fk.foreign_key_columns]
                     ref_cols = [c.name for c in fk.referenced_columns]
-                    foreign_keys.append({
-                        "columns": fk_cols,
-                        "referenced_table": f"{fk.pk_table.schema.name}.{fk.pk_table.name}",
-                        "referenced_columns": ref_cols,
-                    })
+                    foreign_keys.append(
+                        {
+                            "columns": fk_cols,
+                            "referenced_table": f"{fk.pk_table.schema.name}.{fk.pk_table.name}",
+                            "referenced_columns": ref_cols,
+                        }
+                    )
 
                 # Get features if this is a domain table
                 features = []
                 if self.is_domain_schema(schema_name):
                     try:
                         for f in self.find_features(table):
-                            features.append({
-                                "name": f.feature_name,
-                                "feature_table": f.feature_table.name,
-                            })
+                            features.append(
+                                {
+                                    "name": f.feature_name,
+                                    "feature_table": f.feature_table.name,
+                                }
+                            )
                     except Exception as e:
                         logger.debug(f"Could not enumerate features for table {table.name}: {e}")
 
@@ -619,13 +624,125 @@ class DerivaModel:
         def is_domain_or_dataset_table(table: Table) -> bool:
             return self.is_domain_schema(table.schema.name) or table.name == dataset_table.name
 
-        return [t for a in dataset_table.find_associations() if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)]
+        return [
+            t
+            for a in dataset_table.find_associations()
+            if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)
+        ]
+
+    def _is_association_table(self, name_or_table: str | Table) -> bool:
+        """Check if a table is an M:N association (link) table.
+
+        An association table (like ``Dataset_Image`` linking ``Dataset``
+        and ``Image``) has exactly two domain FKs pointing at the tables
+        it links. Denormalization treats such tables as **transparent
+        intermediates**: they're joined through but their columns are
+        excluded from the output unless the caller explicitly lists them
+        in ``include_tables``.
+
+        **Topology, not purity**: association-ness is determined by the
+        FK arity alone, not by whether the table also carries metadata
+        columns. Real Deriva linkage tables routinely carry annotation
+        data (``Role``, ``Ordinal``, ``Comment``, etc.) while remaining
+        semantically M:N bridges — the check must permit them. If the
+        user wants those metadata columns in the output, they add the
+        table to ``include_tables`` and it's no longer treated as
+        transparent (see the ``transparent_intermediates`` logic in
+        :meth:`Denormalizer.describe`).
+
+        Stricter than ermrest's built-in ``Table.is_association()`` in
+        one direction (we ignore the system FKs RCB/RMB → ERMrest_Client,
+        so a 3-arg "association" in ermrest's eyes is usually a real
+        M:N table in ours), looser in another (we don't require purity).
+
+        Extracted from a nested function in :meth:`_build_join_tree` so
+        the denormalization planner can also use it.
+
+        Args:
+            name_or_table: table name (looked up via
+                :meth:`name_to_table`) or a :class:`Table` instance.
+
+        Returns:
+            ``True`` if the table has exactly 2 domain FKs.
+
+        Example::
+
+            model._is_association_table("Dataset_Image")       # True
+            model._is_association_table("Dataset_Image_Role")  # True — extra Role col OK
+            model._is_association_table("Image")               # False (has ≤1 FK)
+            model._is_association_table("Observation")         # False (has 1 FK)
+        """
+        try:
+            tbl = name_or_table if hasattr(name_or_table, "foreign_keys") else self.name_to_table(name_or_table)
+            fks = list(tbl.foreign_keys)
+            # Domain FKs exclude the system FKs to ERMrest_Client /
+            # ERMrest_Group that every table carries (for RCB/RMB).
+            domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
+            # Association-ness is pure FK-arity topology. Metadata
+            # columns on the link table (Role, Ordinal, etc.) don't
+            # disqualify it — the user can pull them into output by
+            # naming the table in include_tables.
+            return len(domain_fks) == 2
+        except Exception:
+            return False
+
+    def _fk_neighbors(self, table: str | Table) -> set[Table]:
+        """Return FK-neighbor tables of *table* (outbound + inbound, deduplicated).
+
+        The undirected FK-adjacency primitive used by schema traversal.
+        Follows both ``table.foreign_keys`` (outbound: tables *table*
+        points at) and ``table.referenced_by`` (inbound: tables that
+        point at *table*), filters to valid schemas (``domain_schemas ∪
+        {ml_schema}``), and deduplicates so that multiple FKs between
+        the same two tables count as one edge.
+
+        **Direction-agnostic**: use :meth:`_downstream_fk_sources` for
+        the directional (inbound-only) variant when you need to
+        distinguish upstream from downstream.
+
+        Extracted from a nested ``find_arcs`` in :meth:`_schema_to_paths`
+        so the denormalization planner can reuse it as the FK-traversal
+        primitive.
+
+        Args:
+            table: table name (looked up via :meth:`name_to_table`) or
+                :class:`Table` instance.
+
+        Returns:
+            Set of :class:`Table` objects reachable from *table* via one
+            FK arc (either direction), deduplicated by target.
+
+        Example::
+
+            # For Image, which has Image.Subject → Subject and is
+            # referenced by Dataset_Image.Image:
+            model._fk_neighbors("Image")
+            # {<Table Subject>, <Table Dataset_Image>}
+        """
+        tbl = table if hasattr(table, "foreign_keys") else self.name_to_table(table)
+        valid_schemas = self.domain_schemas | {self.ml_schema}
+        # Outbound edges: tables this table's FKs point at.
+        # Inbound edges: tables that have FKs pointing at this table.
+        arc_list = [fk.pk_table for fk in tbl.foreign_keys] + [fk.table for fk in tbl.referenced_by]
+        # Filter out system/auxiliary schemas (ERMrest_Client, public, etc.).
+        arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
+        # Deduplicate: multi-FK targets (e.g., two FKs pointing at the
+        # same table) should count as one neighbor. Downstream callers
+        # handle specific FK selection via :meth:`_table_relationship`.
+        seen: set[Table] = set()
+        deduped: list[Table] = []
+        for t in arc_list:
+            if t not in seen:
+                seen.add(t)
+                deduped.append(t)
+        return set(deduped)
 
     def _build_join_tree(
         self,
         element_name: str,
         include_tables: set[str],
         all_paths: list[list[Table]],
+        via: set[str] | None = None,
     ) -> JoinNode:
         """Build a JoinTree rooted at *element_name* that reaches all *include_tables*.
 
@@ -646,6 +763,11 @@ class DerivaModel:
             element_name: The dataset element table (tree root), e.g. ``"Image"``.
             include_tables: Set of table names the user wants in the output.
             all_paths: All FK paths from ``_schema_to_paths()``.
+            via: Optional set of table names the caller passed as
+                ``via=`` — path-only routing hints. Intermediates in
+                this set count as "covered" during disambiguation so the
+                user can route through an intermediate without adding
+                its columns to the output.
 
         Returns:
             A ``JoinNode`` tree rooted at the element table.
@@ -653,6 +775,8 @@ class DerivaModel:
         Raises:
             DerivaMLException: If ambiguous paths cannot be resolved.
         """
+        via = via or set()
+        covering = include_tables | via
         element_table = self.name_to_table(element_name)
 
         # ── Step 1: collect sub-paths from element to each include_table ─────
@@ -712,53 +836,23 @@ class DerivaModel:
             # infrastructure that the user shouldn't need to name explicitly —
             # they are transparently included in the join chain.
             #
-            # We detect association tables by checking if the Table object has
-            # exactly 2 FKs (the definition of a pure association table).
-            # This works regardless of model context (bag or catalog).
-            def _is_likely_association(tbl: Table) -> bool:
-                """Check if table is an association table (M:N link table).
-
-                An association table has only system columns (RID, RCT, RMT,
-                RCB, RMB) plus FK columns to the tables it connects.  ERMrest's
-                built-in is_association() counts system FKs (RCB/RMB → ERMrest_Client),
-                so we use our own check that ignores them.
-                """
-                system_cols = {'RID', 'RCT', 'RMT', 'RCB', 'RMB'}
-                try:
-                    cols = {c.name for c in tbl.columns}
-                    fks = list(tbl.foreign_keys)
-                    # Domain FKs: those NOT to system tables like ERMrest_Client
-                    domain_fks = [
-                        fk for fk in fks
-                        if fk.pk_table.name not in ('ERMrest_Client', 'ERMrest_Group')
-                    ]
-                    # FK column names
-                    fk_col_names = set()
-                    for fk in domain_fks:
-                        for col in fk.columns:
-                            fk_col_names.add(col.name if hasattr(col, 'name') else str(col))
-                    # Non-system, non-FK columns
-                    user_cols = cols - system_cols - fk_col_names
-                    # Association = exactly 2 domain FKs and no other user columns
-                    return len(domain_fks) == 2 and len(user_cols) == 0
-                except Exception:
-                    return False
+            # We detect association tables via ``self._is_association_table``
+            # (module-level method that ignores ERMrest system FKs).
 
             def _intermediates_covered(sp: list[Table], ints: tuple[str, ...]) -> bool:
                 sp_tables = {t.name: t for t in sp}
                 for t in ints:
-                    if t in include_tables:
+                    if t in covering:
+                        # In include_tables OR in via= — explicitly routed.
                         continue
                     tbl = sp_tables.get(t)
-                    if tbl is not None and _is_likely_association(tbl):
+                    if tbl is not None and self._is_association_table(tbl):
                         continue  # transparent — doesn't need to be in include_tables
                     return False
                 return True
 
             fully_covered = [
-                (sp, ints)
-                for sp, ints in zip(unique, path_intermediates)
-                if _intermediates_covered(sp, ints)
+                (sp, ints) for sp, ints in zip(unique, path_intermediates) if _intermediates_covered(sp, ints)
             ]
 
             if len(fully_covered) == 1:
@@ -820,9 +914,7 @@ class DerivaModel:
 
             raise DerivaMLException(
                 f"Ambiguous path between {element_name} and {target}: "
-                f"found {len(unique)} FK paths:\n"
-                + "\n".join(f"  {d}" for d in path_descriptions)
-                + suggestion
+                f"found {len(unique)} FK paths:\n" + "\n".join(f"  {d}" for d in path_descriptions) + suggestion
             )
 
         # ── Step 3: merge selected paths into a tree ─────────────────────────
@@ -878,35 +970,601 @@ class DerivaModel:
                 else:
                     # Parent not yet in tree — this shouldn't happen since we
                     # process paths from element outward, but handle gracefully
-                    logger.warning(
-                        f"Parent {parent_name} not in tree when adding {child_name}"
-                    )
+                    logger.warning(f"Parent {parent_name} not in tree when adding {child_name}")
 
         return root
 
+    # ------------------------------------------------------------------
+    # Denormalization planner helpers (Rules 2, 5, 6)
+    #
+    # These methods compose ``_fk_neighbors`` / ``_schema_to_paths`` /
+    # ``_is_association_table`` — they do NOT introduce new FK traversal.
+    # ------------------------------------------------------------------
+
+    def _downstream_fk_sources(self, table: str | Table) -> set[Table]:
+        """Return tables that have an FK pointing AT *table* (directional downstream).
+
+        Denormalization direction vocabulary:
+
+        - **Upstream** = fewer rows per unit. Subject is upstream of Image
+          because each Image has exactly one Subject.
+        - **Downstream** = more rows per unit. Image is downstream of
+          Subject because each Subject can have many Images.
+
+        In ERMrest terms: if ``Image.Subject`` is an FK pointing at
+        ``Subject.RID``, then Image is downstream of Subject — which
+        means Image is in ``Subject.referenced_by``.
+
+        This method returns direct downstream neighbors only — it does
+        NOT do transparent association-table hopping. Callers that need
+        "all reachable downstream tables, hopping through associations"
+        should use :meth:`_outbound_reachable`.
+
+        Compare with :meth:`_fk_neighbors`, which is direction-agnostic
+        and returns both upstream and downstream neighbors.
+
+        Args:
+            table: table name (looked up via :meth:`name_to_table`) or
+                :class:`Table` instance.
+
+        Returns:
+            Set of :class:`Table` objects whose FK points at *table*,
+            filtered to the valid schemas (``domain_schemas ∪
+            {ml_schema}``).
+
+        Example::
+
+            # Subject is pointed at by Image.Subject and Observation.Subject:
+            model._downstream_fk_sources("Subject")
+            # {<Table Image>, <Table Observation>}
+
+            # Image is pointed at by Dataset_Image.Image:
+            model._downstream_fk_sources("Image")
+            # {<Table Dataset_Image>}
+        """
+        valid_schemas = self.domain_schemas | {self.ml_schema}
+        tbl = table if hasattr(table, "foreign_keys") else self.name_to_table(table)
+        targets: set[Table] = set()
+        # Tables with FK pointing at us are downstream
+        for fk in tbl.referenced_by:
+            src = fk.table
+            if src.schema.name not in valid_schemas:
+                continue
+            targets.add(src)
+        return targets
+
+    def _outbound_reachable(
+        self,
+        from_table: str,
+        tables_in_set: set[str],
+    ) -> set[str]:
+        """Return tables in ``tables_in_set`` downstream of ``from_table``.
+
+        BFS reachability over the FK graph in the one-to-many direction.
+        Composes :meth:`_downstream_fk_sources` plus association-
+        transparency logic — does NOT walk FKs directly.
+
+        **Transparent association hops**: when the walker hits an
+        association table (per :meth:`_is_association_table`) that isn't
+        in ``tables_in_set``, it hops through it in BOTH directions —
+        both the tables that point at the association (inbound) AND the
+        tables the association's FKs point at (outbound). This lets
+        ``A → assoc → B`` discover B from A even when A → assoc is an
+        inbound FK and assoc → B is an outbound FK. Without this
+        bidirectional hop, many-to-many relationships (Dataset ↔ Image
+        via Dataset_Image) wouldn't be traversable.
+
+        **Direction matters**: with ``Image.Subject → Subject.RID``:
+
+        - ``_outbound_reachable('Subject', {'Image','Subject'})`` returns
+          ``{'Image'}`` (Image is downstream of Subject).
+        - ``_outbound_reachable('Image', {'Image','Subject'})`` returns
+          ``set()`` (Subject is UPSTREAM of Image, not downstream).
+
+        Args:
+            from_table: starting table (the "upstream" side of the
+                one-to-many relationship).
+            tables_in_set: the subgraph — only tables in this set count
+                as "destinations" in the result. Association tables
+                outside the set are still traversable (transparent).
+
+        Returns:
+            Set of names in ``tables_in_set`` downstream of
+            ``from_table`` (excluding ``from_table`` itself).
+
+        Example::
+
+            # Given schema: Image.Subject → Subject, Dataset ← Dataset_Image → Image
+            subgraph = {"Image", "Subject"}
+            model._outbound_reachable("Subject", subgraph)  # {"Image"}
+            model._outbound_reachable("Image", subgraph)    # set()
+
+            # With Dataset_Image as a transparent hop:
+            subgraph = {"Dataset", "Image"}
+            model._outbound_reachable("Dataset", subgraph)  # {"Image"}
+        """
+        seen_names: set[str] = set()
+        visited: set[str] = set()
+        stack: list[str] = [from_table]
+        while stack:
+            t = stack.pop()
+            if t in visited:
+                continue
+            visited.add(t)
+            try:
+                tbl = self.name_to_table(t)
+            except Exception:
+                continue
+
+            # When the current node is itself an association table AND it's
+            # not the starting point, hop through both directions: both the
+            # tables that point at it (referenced_by) AND the tables it
+            # points to (foreign_keys). This is the "transparent bridge"
+            # semantics — M:N link tables should be traversable in both
+            # directions so that A→assoc→B discovers B from A.
+            hopping_through_association = t != from_table and self._is_association_table(tbl)
+
+            valid_schemas = self.domain_schemas | {self.ml_schema}
+            neighbors: list[Table] = list(self._downstream_fk_sources(t))
+            if hopping_through_association:
+                # Add the association's outbound FK targets (the "other
+                # side" of the M:N link) so we can see past the bridge.
+                for fk in tbl.foreign_keys:
+                    nxt = fk.pk_table
+                    if nxt.schema.name in valid_schemas:
+                        neighbors.append(nxt)
+
+            for neighbor in neighbors:
+                target_name = neighbor.name
+                if target_name == from_table:
+                    continue
+                if target_name in tables_in_set:
+                    seen_names.add(target_name)
+                    # Continue only if this is itself an association (transparent)
+                    if self._is_association_table(neighbor):
+                        stack.append(target_name)
+                elif self._is_association_table(neighbor):
+                    # Transparent hop: continue through the association
+                    stack.append(target_name)
+                # else: non-requested, non-association — dead end
+        return {t for t in seen_names if t in tables_in_set and t != from_table}
+
+    def _find_sinks(
+        self,
+        include_tables: list[str],
+        via: list[str] | None = None,
+    ) -> list[str]:
+        """Find sinks in the FK subgraph on ``include_tables ∪ via`` (Rule 2).
+
+        A **sink** is a table in ``include_tables`` with no outbound FK
+        (in the one-to-many / downstream sense) to any other table in
+        the set. Intuition: the "deepest" table in the requested join —
+        the one that receives FKs from others but doesn't have any
+        others downstream. In star-schema denormalization, the sink is
+        the natural ``row_per`` — one output row per sink row, with
+        upstream columns hoisted.
+
+        Composes :meth:`_outbound_reachable`; does not traverse FKs
+        itself.
+
+        Args:
+            include_tables: requested tables — only these are candidates
+                for the sink role (``via`` tables don't contribute columns).
+            via: optional additional tables that participate in the
+                subgraph for routing but aren't sink candidates.
+
+        Returns:
+            Sorted list of sink table names. Normally exactly one.
+            Multiple sinks → caller should raise
+            :class:`DerivaMLDenormalizeMultiLeaf`. Zero sinks → cycle,
+            caller should raise :class:`DerivaMLDenormalizeNoSink`.
+
+        Example::
+
+            # Chain Subject ← Observation ← Image → sink is Image
+            model._find_sinks(["Subject", "Observation", "Image"])
+            # ["Image"]
+
+            # Unrelated tables → multi-leaf (both are sinks)
+            model._find_sinks(["Dataset", "Subject"])
+            # ["Dataset", "Subject"]
+        """
+        via = via or []
+        all_tables = set(include_tables) | set(via)
+        # A sink is a requested table whose outbound-reach set, minus
+        # itself, is empty — i.e., nothing else in the subgraph is
+        # downstream of it.
+        return sorted(
+            t for t in all_tables if t in include_tables and not (self._outbound_reachable(t, all_tables) - {t})
+        )
+
+    def _determine_row_per(
+        self,
+        include_tables: list[str],
+        via: list[str] | None,
+        row_per: str | None,
+    ) -> str:
+        """Resolve the ``row_per`` table, implementing Rules 2 and 5.
+
+        Two paths:
+
+        - **Explicit** (``row_per`` not None): validate the caller's
+          choice. ``row_per`` must be in ``include_tables``, and no
+          table in ``include_tables`` may be downstream of it (Rule 5 —
+          that would require aggregation, which the current engine
+          doesn't do).
+        - **Auto-infer** (``row_per is None``): apply Rule 2 via
+          sink-finding. Expect exactly one sink.
+
+        Args:
+            include_tables: requested tables.
+            via: optional path-only tables.
+            row_per: caller's explicit leaf, or None to auto-infer.
+
+        Returns:
+            The resolved ``row_per`` table name — guaranteed to be in
+            ``include_tables`` and free of downstream conflicts.
+
+        Raises:
+            ValueError: ``row_per`` is not in ``include_tables``.
+            DerivaMLDenormalizeDownstreamLeaf: explicit ``row_per`` has
+                downstream table(s) in ``include_tables`` (Rule 5).
+            DerivaMLDenormalizeNoSink: no sink found (FK cycle in the
+                subgraph — pathological).
+            DerivaMLDenormalizeMultiLeaf: auto-inference finds more
+                than one candidate sink (Rule 2).
+
+        Example::
+
+            model._determine_row_per(
+                include_tables=["Subject", "Image"], via=[], row_per=None
+            )
+            # "Image" (auto-inferred — Image is the sink)
+
+            # Rule 5: Subject with Image downstream is rejected.
+            model._determine_row_per(
+                include_tables=["Subject", "Image"], via=[], row_per="Subject"
+            )
+            # raises DerivaMLDenormalizeDownstreamLeaf
+        """
+        from deriva_ml.core.exceptions import (
+            DerivaMLDenormalizeDownstreamLeaf,
+            DerivaMLDenormalizeMultiLeaf,
+            DerivaMLDenormalizeNoSink,
+        )
+
+        via = via or []
+        all_tables = set(include_tables) | set(via)
+
+        if row_per is not None:
+            if row_per not in include_tables:
+                raise ValueError(f"row_per={row_per!r} must be in include_tables={include_tables}")
+            downstream = self._outbound_reachable(row_per, all_tables)
+            downstream_in_inc = [t for t in include_tables if t in downstream and t != row_per]
+            if downstream_in_inc:
+                raise DerivaMLDenormalizeDownstreamLeaf(
+                    row_per=row_per,
+                    downstream_tables=sorted(downstream_in_inc),
+                )
+            return row_per
+
+        sinks = self._find_sinks(include_tables, via)
+        if not sinks:
+            raise DerivaMLDenormalizeNoSink(
+                f"No sink found in include_tables={include_tables}. The FK subgraph may contain a cycle."
+            )
+        if len(sinks) > 1:
+            raise DerivaMLDenormalizeMultiLeaf(
+                candidates=sinks,
+                include_tables=list(include_tables),
+            )
+        return sinks[0]
+
+    def _enumerate_paths(
+        self,
+        from_table: str,
+        to_table: str,
+        tables_in_set: set[str],
+        max_depth: int = 6,
+    ) -> list[list[str]]:
+        """Enumerate simple FK paths from ``from_table`` to ``to_table``.
+
+        **Delegates the DFS** to :meth:`_schema_to_paths` (the
+        authoritative FK-graph enumerator — handles cycle detection,
+        vocabulary termination, schema filtering, and multi-FK
+        deduplication). Uses its ``stop_at`` kwarg so inner recursion
+        frames can prune eagerly rather than emitting all prefixes and
+        filtering at the top. **Do NOT write a fresh DFS here.**
+
+        The only additional work is a **transparency filter**: a path
+        is kept only if every intermediate table (non-endpoint nodes)
+        is either in ``tables_in_set`` (the user's requested /
+        via-routed set) or is a pure association table (which acts as
+        a transparent bridge).
+
+        Args:
+            from_table: path start.
+            to_table: path end.
+            tables_in_set: ``include_tables ∪ via``. Paths passing
+                through tables NOT in this set are accepted only if
+                every intermediate is a pure association table.
+            max_depth: forwarded to :meth:`_schema_to_paths` as a
+                safety cap against pathological schemas.
+
+        Returns:
+            List of paths, each a list of table-name strings starting
+            with ``from_table`` and ending with ``to_table``. Empty if
+            no transparent-valid path exists.
+
+        Example::
+
+            # Diamond schema: Image → Subject direct AND Image → Observation → Subject.
+            # With Observation in the set, both paths are valid:
+            model._enumerate_paths("Image", "Subject", {"Image", "Subject", "Observation"})
+            # [["Image", "Subject"], ["Image", "Observation", "Subject"]]
+
+            # With only Image and Subject in the set, the multi-hop path
+            # requires Observation as intermediate but it's not in the
+            # set and not an association → only the direct path survives:
+            model._enumerate_paths("Image", "Subject", {"Image", "Subject"})
+            # [["Image", "Subject"]]
+        """
+        # Delegate the DFS — stop_at tells _schema_to_paths to only
+        # keep paths ending at to_table (inner frames can prune early).
+        paths = self._schema_to_paths(
+            root=self.name_to_table(from_table),
+            max_depth=max_depth,
+            stop_at=to_table,
+        )
+        result: list[list[str]] = []
+        for path in paths:
+            names = [t.name for t in path]
+            # Transparency filter: every intermediate must be either
+            # requested (in tables_in_set) or a pure association.
+            if all(mid in tables_in_set or self._is_association_table(mid) for mid in names[1:-1]):
+                result.append(names)
+        return result
+
+    def _find_path_ambiguities(
+        self,
+        row_per: str,
+        include_tables: list[str],
+        via: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Enumerate path ambiguities between ``row_per`` and other requested tables (Rule 6).
+
+        For each ``T`` in ``include_tables ∪ via`` (``T ≠ row_per``),
+        enumerate all simple FK paths between ``row_per`` and ``T``
+        using :meth:`_schema_to_paths` (full undirected DFS — we do
+        NOT apply the transparency filter here, because we need to see
+        the full picture to detect diamonds the user hasn't yet
+        disambiguated).
+
+        **User-signal disambiguation**: a path is considered "signaled"
+        by the user if at least one of its intermediate tables is in
+        ``include_tables ∪ via`` (pure association tables don't count —
+        those are transparent). If exactly one path is signaled, the
+        user has picked it and there's no ambiguity. If zero or >1 are
+        signaled, we cannot silently choose, so an ambiguity is
+        reported.
+
+        This is distinct from :meth:`_enumerate_paths`, which applies
+        the transparency filter to produce only "routable" paths given
+        the current set. Here we want to see ALL candidates so we can
+        warn about the diamond.
+
+        Args:
+            row_per: the leaf table (resolved earlier by
+                :meth:`_determine_row_per`).
+            include_tables: tables whose paths to ``row_per`` are checked.
+            via: additional tables whose paths are checked (their columns
+                aren't in the output, but they still participate in
+                disambiguation).
+
+        Returns:
+            List of ambiguity dicts — empty when no ambiguities are
+            detected. Each dict has:
+
+            - ``from_table``: always ``row_per``.
+            - ``to_table``: the ``T`` with multiple paths.
+            - ``paths``: list of path lists (each path a list of table
+              names, first element ``row_per``, last element ``T``).
+            - ``suggested_intermediates``: non-endpoint tables that
+              appear in at least one path but are not in
+              ``include_tables`` and are not pure association tables
+              — user could add any of these to ``include_tables`` or
+              ``via`` to disambiguate.
+
+        Example::
+
+            # Diamond: Image→Subject direct AND Image→Observation→Subject.
+            model._find_path_ambiguities(
+                row_per="Image", include_tables=["Image", "Subject"]
+            )
+            # [{"from_table": "Image", "to_table": "Subject",
+            #   "paths": [["Image", "Subject"],
+            #             ["Image", "Observation", "Subject"]],
+            #   "suggested_intermediates": ["Observation"]}]
+
+            # Once Observation is added to include_tables, it "signals"
+            # the multi-hop path → no ambiguity:
+            model._find_path_ambiguities(
+                row_per="Image", include_tables=["Image", "Observation", "Subject"]
+            )
+            # []
+        """
+        via = via or []
+        all_tables = set(include_tables) | set(via)
+        ambiguities: list[dict[str, Any]] = []
+
+        for t in sorted(all_tables):
+            if t == row_per:
+                continue
+            # Enumerate ALL simple paths (no transparency filter) — we need
+            # the full picture to detect diamonds even when the user has not
+            # requested the intermediate table.
+            #
+            # Note: we intentionally do NOT call ``_enumerate_paths`` here.
+            # That helper applies a transparency filter (intermediates must
+            # be requested or be association tables), which would mask the
+            # very diamonds this rule must warn about. ``_enumerate_paths``
+            # is for consumers who want only "routable" paths given the
+            # current include_tables/via set.
+            all_path_tables = self._schema_to_paths(
+                root=self.name_to_table(row_per),
+                max_depth=6,
+                stop_at=t,
+            )
+            all_paths_named: list[list[str]] = [[tbl.name for tbl in p] for p in all_path_tables]
+            unique = list({tuple(p): p for p in all_paths_named}.values())
+            if len(unique) <= 1:
+                continue
+
+            # Monotonic-direction filter for diamond detection:
+            # A genuine diamond has MULTIPLE paths that each constitute a
+            # valid FK join chain — all-outbound (downstream) hops, with
+            # association tables acting as transparent bridges. Paths that
+            # change direction at an interior vertex are common-neighbor
+            # shortcuts, not join alternatives. For example, with::
+            #
+            #     Image.Observation → Observation  (direct FK)
+            #     Image.Subject → Subject           (direct FK)
+            #     Observation.Subject → Subject     (direct FK)
+            #
+            # the undirected walk ``Image → Subject → Observation`` hops
+            # Image.Subject downstream then Observation.Subject UPSTREAM
+            # (Subject is a shared neighbor). This does not represent an
+            # FK chain from Image to Observation — it represents a
+            # co-occurrence via shared Subject, which is a materially
+            # different query. We exclude such paths from ambiguity
+            # detection so the direct FK Image→Observation isn't
+            # spuriously flagged.
+            #
+            # Association tables remain transparent: the walker handles
+            # them correctly via ``_is_association_table`` check inside
+            # the direction test.
+            def _edge_direction(a: str, b: str) -> str | None:
+                """Return 'down' if a has a direct FK to b (outbound from
+                a); 'up' if b has a direct FK to a (inbound to a); None
+                if there's no direct FK between them."""
+                try:
+                    ta = self.name_to_table(a)
+                    tb = self.name_to_table(b)
+                except Exception:
+                    return None
+                for fk in ta.foreign_keys:
+                    if fk.pk_table == tb:
+                        return "down"
+                for fk in tb.foreign_keys:
+                    if fk.pk_table == ta:
+                        return "up"
+                return None
+
+            def _is_downstream_chain(p: list[str]) -> bool:
+                """Check that the path is all-downstream, treating pure
+                association tables as transparent bridges. A transparent
+                bridge Image ← assoc → Subject counts as a single
+                downstream step (the assoc's referenced_by connects the
+                two sides). Association tables at interior positions
+                don't count as direction changes."""
+                i = 0
+                while i < len(p) - 1:
+                    a, b = p[i], p[i + 1]
+                    # If b is an interior association table, hop across
+                    # it: count the A → assoc → C edge as a single
+                    # transparent bridge and move two steps forward.
+                    if i + 2 < len(p) and self._is_association_table(b):
+                        # A → assoc → C: the bridge is legitimate
+                        # regardless of internal direction; advance past.
+                        i += 2
+                        continue
+                    d = _edge_direction(a, b)
+                    if d != "down":
+                        return False
+                    i += 1
+                return True
+
+            downstream = [p for p in unique if _is_downstream_chain(p)]
+            if len(downstream) <= 1:
+                # Only 0 or 1 downstream paths means no genuine diamond;
+                # other "paths" were common-neighbor shortcuts. Fall back
+                # to the direct/signaled path and don't flag ambiguity.
+                continue
+            unique = downstream
+
+            # Disambiguation rule:
+            # - A path is "signaled" if at least one of its non-endpoint
+            #   intermediates is in ``include_tables ∪ via`` (user explicitly
+            #   routed through it). Association tables don't count — they're
+            #   transparent and the user shouldn't need to name them.
+            # - If exactly one path is signaled, the user has picked it → no
+            #   ambiguity.
+            # - Otherwise (0 or >1 signaled), we cannot silently choose →
+            #   ambiguity.
+            def _is_signaled(p: list[str]) -> bool:
+                intermediates = p[1:-1]
+                for mid in intermediates:
+                    if mid in all_tables and not self._is_association_table(mid):
+                        return True
+                return False
+
+            signaled = [p for p in unique if _is_signaled(p)]
+            if len(signaled) == 1:
+                # Exactly one user-signaled path — use it.
+                continue
+
+            # Ambiguity: either no user signal, or conflicting signals.
+            reportable = signaled if len(signaled) > 1 else unique
+            all_intermediates: set[str] = set()
+            for p in reportable:
+                for node in p[1:-1]:
+                    if node not in include_tables and not self._is_association_table(node):
+                        all_intermediates.add(node)
+            ambiguities.append(
+                {
+                    "from_table": row_per,
+                    "to_table": t,
+                    "paths": reportable,
+                    "suggested_intermediates": sorted(all_intermediates),
+                }
+            )
+        return ambiguities
+
     def _prepare_wide_table(
-        self, dataset, dataset_rid: RID, include_tables: list[str]
+        self,
+        dataset,
+        dataset_rid: RID,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
     ) -> tuple[dict[str, Any], list[tuple], bool]:
         """Generate a join plan for denormalizing a dataset into a wide table.
 
         Uses a **JoinTree** approach that preserves path-specific structure:
 
-        1. **Path discovery** -- ``_schema_to_paths()`` discovers all FK paths
+        1. **Planner guards** -- validate ``row_per`` (Rule 2 / Rule 5) and
+           check for path ambiguity (Rule 6) before any join work.
+        2. **Path discovery** -- ``_schema_to_paths()`` discovers all FK paths
            from Dataset through the schema.
-        2. **Path filtering & deduplication** -- keep only paths relevant to
+        3. **Path filtering & deduplication** -- keep only paths relevant to
            *include_tables*, dedup duplicate association table routes.
-        3. **JoinTree construction** -- for each element type, build a tree
+        4. **JoinTree construction** -- for each element type, build a tree
            rooted at the element.  Each node is a table to JOIN; association
            tables are in the tree (for JOIN) but excluded from output columns.
            Nullable FK columns produce LEFT JOINs.
-        4. **Flatten to legacy format** -- convert the tree to the
+        5. **Flatten to legacy format** -- convert the tree to the
            ``(path, join_conditions, join_types)`` tuple expected by
-           ``_denormalize()`` and ``_denormalize_datapath()``.
+           the unified ``_denormalize_impl()`` in ``local_db/denormalize.py``.
 
         Args:
             dataset: A DatasetLike object (DatasetBag or Dataset).
             dataset_rid: RID of the dataset.
             include_tables: List of table names to include in the output.
+            row_per: Explicit leaf table (one row per this table). If None,
+                the sink is auto-inferred from include_tables.
+            via: Additional tables used only for path routing (their columns
+                are NOT included in the output).
 
         Returns:
             ``(element_tables, denormalized_columns, multi_schema)`` where:
@@ -920,10 +1578,44 @@ class DerivaModel:
             - **denormalized_columns** -- list of
               ``(schema_name, table_name, column_name, type_name)`` for the output.
             - **multi_schema** -- True if output spans multiple domain schemas.
+
+        Raises:
+            DerivaMLDenormalizeMultiLeaf / DerivaMLDenormalizeNoSink /
+            DerivaMLDenormalizeDownstreamLeaf: from :meth:`_determine_row_per`.
+            DerivaMLDenormalizeAmbiguousPath: if more than one FK path exists
+                between row_per and a requested table.
         """
         include_tables_set = set(include_tables)
         for t in include_tables_set:
             _ = self.name_to_table(t)  # validate existence
+        via_list = list(via or [])
+        for t in via_list:
+            _ = self.name_to_table(t)  # validate existence
+
+        # ── Phase 0: planner guards (Rules 2, 5, 6) ──────────────────────────
+        # Empty include_tables is a legal degenerate case (caller passes no
+        # requested tables and expects an empty result). Skip guards then.
+        if include_tables:
+            resolved_row_per = self._determine_row_per(
+                include_tables=list(include_tables),
+                via=via_list,
+                row_per=row_per,
+            )
+            ambiguities = self._find_path_ambiguities(
+                row_per=resolved_row_per,
+                include_tables=list(include_tables),
+                via=via_list,
+            )
+            if ambiguities:
+                from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
+
+                a = ambiguities[0]
+                raise DerivaMLDenormalizeAmbiguousPath(
+                    from_table=a["from_table"],
+                    to_table=a["to_table"],
+                    paths=a["paths"],
+                    suggested_intermediates=a["suggested_intermediates"],
+                )
 
         # ── Phase 1: path discovery ──────────────────────────────────────────
         all_paths = self._schema_to_paths()
@@ -933,8 +1625,7 @@ class DerivaModel:
         table_paths = [
             path
             for path in all_paths
-            if path[-1].name in include_tables_set
-            and include_tables_set.intersection({p.name for p in path})
+            if path[-1].name in include_tables_set and include_tables_set.intersection({p.name for p in path})
         ]
 
         # ── Phase 1b: deduplicate association table routes ───────────────────
@@ -965,9 +1656,13 @@ class DerivaModel:
                 if existing_assoc.name != assoc_table.name:
                     # Duplicate route via different association table.
                     # Prefer the standard Dataset_{Element} pattern over legacy.
-                    if _is_standard_assoc(assoc_table.name, element.name) and not _is_standard_assoc(existing_assoc.name, element.name):
+                    if _is_standard_assoc(assoc_table.name, element.name) and not _is_standard_assoc(
+                        existing_assoc.name, element.name
+                    ):
                         # Replace existing with standard pattern
-                        deduplicated_paths = [p for p in deduplicated_paths if not (len(p) >= 3 and (p[2].name, p[-1].name) == key)]
+                        deduplicated_paths = [
+                            p for p in deduplicated_paths if not (len(p) >= 3 and (p[2].name, p[-1].name) == key)
+                        ]
                         seen_element_endpoint[key] = (path, assoc_table)
                         deduplicated_paths.append(path)
                     # else: keep existing (either it's standard or both are non-standard)
@@ -982,18 +1677,14 @@ class DerivaModel:
             if len(p) >= 3:
                 paths_by_element[p[2].name].append(p)
 
-        paths_by_element = {
-            elem: paths
-            for elem, paths in paths_by_element.items()
-            if elem in include_tables_set
-        }
+        paths_by_element = {elem: paths for elem, paths in paths_by_element.items() if elem in include_tables_set}
 
         # ── Phase 2: build JoinTree per element ──────────────────────────────
         skip_columns = {"RCT", "RMT", "RCB", "RMB"}
         element_tables: dict[str, tuple[list[str], dict[str, set], dict[str, str]]] = {}
 
         for element_name, paths in paths_by_element.items():
-            tree = self._build_join_tree(element_name, include_tables_set, table_paths)
+            tree = self._build_join_tree(element_name, include_tables_set, table_paths, via=set(via_list))
 
             # ── Phase 3: flatten JoinTree to legacy format ───────────────────
             # Pre-order walk gives us the correct JOIN order.
@@ -1003,7 +1694,7 @@ class DerivaModel:
             # Find the Dataset -> assoc -> element prefix from the first path
             if paths and len(paths[0]) >= 3:
                 dataset_name = paths[0][0].name  # "Dataset"
-                assoc_name = paths[0][1].name    # e.g. "Dataset_Image"
+                assoc_name = paths[0][1].name  # e.g. "Dataset_Image"
             else:
                 dataset_name = "Dataset"
                 assoc_name = None
@@ -1059,9 +1750,7 @@ class DerivaModel:
             table = self.name_to_table(table_name)
             for c in table.columns:
                 if c.name not in skip_columns:
-                    denormalized_columns.append(
-                        (table.schema.name, table_name, c.name, c.type.typename)
-                    )
+                    denormalized_columns.append((table.schema.name, table_name, c.name, c.type.typename))
 
         output_schemas = {s for s, _, _, _ in denormalized_columns if self.is_domain_schema(s)}
         multi_schema = len(output_schemas) > 1
@@ -1110,8 +1799,7 @@ class DerivaModel:
                 path_descriptions.append(f"  {desc}")
             raise DerivaMLException(
                 f"Ambiguous linkage between {table1.name} and {table2.name}: "
-                f"found {len(relationships)} FK relationships:\n"
-                + "\n".join(path_descriptions)
+                f"found {len(relationships)} FK relationships:\n" + "\n".join(path_descriptions)
             )
         return relationships[0]
 
@@ -1128,6 +1816,7 @@ class DerivaModel:
         exclude_tables: set[str] | None = None,
         skip_tables: frozenset[str] | None = None,
         max_depth: int | None = None,
+        stop_at: str | None = None,
     ) -> list[list[Table]]:
         """Discover all FK paths through the schema graph via depth-first traversal.
 
@@ -1154,6 +1843,10 @@ class DerivaModel:
                 customize which ML schema tables are excluded from traversal.
             max_depth: Maximum path length (number of tables). None = unlimited.
                 Use to protect against pathological schemas with deep chains.
+            stop_at: If given, return only paths whose final table's name equals
+                ``stop_at``. The root-only path ``[root]`` is excluded unless
+                ``root.name == stop_at``. Default ``None`` returns all prefixes
+                (the original behavior).
 
         Returns:
             List of paths, where each path is a list of Table objects starting
@@ -1172,43 +1865,47 @@ class DerivaModel:
 
         # Depth limit check
         if max_depth is not None and len(path) >= max_depth:
+            if stop_at is not None:
+                return [p for p in paths if p and p[-1].name == stop_at]
             return paths
-
-        def find_arcs(table: Table) -> set[Table]:
-            """Return reachable tables via FK arcs, deduplicating multi-FK targets."""
-            valid_schemas = self.domain_schemas | {self.ml_schema}
-            arc_list = (
-                [fk.pk_table for fk in table.foreign_keys]
-                + [fk.table for fk in table.referenced_by]
-            )
-            arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
-            # Deduplicate: when multiple FKs point to the same target table,
-            # keep only one arc. This prevents redundant path branching.
-            # Downstream code (_prepare_wide_table, _table_relationship) handles
-            # the specific FK selection and ambiguity detection.
-            seen = set()
-            deduped = []
-            for t in arc_list:
-                if t not in seen:
-                    seen.add(t)
-                    deduped.append(t)
-            return set(deduped)
 
         def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
             """Check if traversal would loop back to Dataset via an element association.
 
             Prevents: Subject -> Dataset_Subject -> Dataset (looping back to root).
             Allows: Dataset -> Dataset_Subject -> Subject (the intended direction).
+
+            Uses :meth:`_is_association_table` (FK-arity topology) rather
+            than ermrest's ``find_associations(pure=True)`` so that non-
+            pure association tables — bridges that carry user metadata
+            like ``Image_Dataset_Legacy`` — are ALSO recognized as
+            dataset-element associations and excluded from upstream
+            traversal. Without this, walking Image → Image_Dataset_Legacy →
+            Dataset creates a phantom "hub" path that spuriously connects
+            Image to any other dataset-member table (e.g. Subject,
+            Observation) through a different Dataset_X association,
+            producing false Rule-6 ambiguities.
             """
             dataset_table = self.model.schemas[self.ml_schema].tables["Dataset"]
-            assoc_table = [a for a in dataset_table.find_associations() if a.table == n2]
-            return len(assoc_table) == 1 and n1 != dataset_table
+            if n1 == dataset_table:
+                # Outbound from Dataset → Dataset_X is always fine.
+                return False
+            # Is n2 an association table that points at Dataset (i.e. one
+            # of its FK targets is the Dataset root)?
+            if not self._is_association_table(n2):
+                return False
+            for fk in n2.foreign_keys:
+                if fk.pk_table == dataset_table:
+                    return True
+            return False
 
         # Vocabulary tables are terminal — traverse INTO but not OUT.
         if self.is_vocabulary(root):
+            if stop_at is not None:
+                return [p for p in paths if p and p[-1].name == stop_at]
             return paths
 
-        for child in find_arcs(root):
+        for child in self._fk_neighbors(root):
             if child.name in skip_tables:
                 continue
             if child.name in exclude_tables:
@@ -1220,15 +1917,12 @@ class DerivaModel:
                 continue
             if child in path:
                 # Cycle detected — skip to avoid infinite recursion.
-                logger.warning(
-                    f"Cycle in schema path: {child.name} "
-                    f"path:{[p.name for p in path]}, skipping"
-                )
+                logger.warning(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}, skipping")
                 continue
 
-            paths.extend(
-                self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth)
-            )
+            paths.extend(self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth, stop_at))
+        if stop_at is not None:
+            return [p for p in paths if p and p[-1].name == stop_at]
         return paths
 
     def create_table(self, table_def: TableDefinition, schema: str | None = None) -> Table:
@@ -1249,7 +1943,7 @@ class DerivaModel:
         """
         schema = schema or self._require_default_schema()
         # Handle both TableDefinition (dataclass with to_dict) and plain dicts
-        table_dict = table_def.to_dict() if hasattr(table_def, 'to_dict') else table_def
+        table_dict = table_def.to_dict() if hasattr(table_def, "to_dict") else table_def
         return self.model.schemas[schema].create_table(table_dict)
 
     def _define_association(
