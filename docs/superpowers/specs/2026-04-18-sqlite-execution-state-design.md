@@ -121,6 +121,7 @@ Renames introduced by this spec (all hard cutovers):
 | `Execution.list_nested_executions()` | `ExecutionRecord.list_execution_children(recurse=...)` |
 | `ExecutionRecord.list_nested_executions(recurse=...)` | `ExecutionRecord.list_execution_children(recurse=...)` |
 | `ExecutionRecord.list_parent_executions(recurse=...)` | `ExecutionRecord.list_execution_parents(recurse=...)` |
+| `Execution.datasets` as `list[DatasetBag]` | `Execution.datasets` as `DatasetCollection` (RID-keyed mapping + iterable) |
 
 The renamed methods mirror the dataset template
 (`Dataset.list_dataset_parents` / `list_dataset_children`) so hierarchy
@@ -478,6 +479,23 @@ class Execution:
         of restart-safety and offline mode)."""
 
     def abort(self) -> None: ...
+
+    # Input datasets — RID-keyed mapping + iterable
+    @property
+    def datasets(self) -> DatasetCollection:
+        """Materialized input datasets, accessible by RID or by
+        iteration. DatasetCollection behaves as both a Mapping[str,
+        DatasetBag] and an Iterable[DatasetBag]:
+
+            bag = exe.datasets["1-XYZ"]          # RID lookup
+            for bag in exe.datasets: ...          # iteration
+            rids = list(exe.datasets)             # RIDs
+            len(exe.datasets)                     # count
+
+        The returned objects are DatasetBag instances — fully
+        materialized, no .bag property needed. (Replaces today's
+        list[DatasetBag] surface; hard cutover per R5.1.)
+        """
 
     # Row-level writes
     def table(self, name: str, *, schema: str | None = None) -> TableHandle | AssetTableHandle:
@@ -887,6 +905,158 @@ based on the feature review's conclusions. This may be a no-op (if
 the review concludes features route cleanly through the generic
 surface) or a targeted revision of handle and engine specifics.
 
+### 2.14 Implementation technology — SQLAlchemy Core
+
+The new SQLite tables (`executions`, `pending_rows`, `directory_rules`)
+are **library bookkeeping** — fixed schemas defined in code, heavy
+row-level CRUD, no downstream need for object-style attribute access.
+This profile matches the codebase's existing library-bookkeeping
+modules (`ManifestStore`, `ResultCache`, `Workspace`, `PagedFetcher`),
+all of which use **SQLAlchemy Core** with hand-written `Table`
+definitions and explicit `insert()` / `update()` / `select()`
+statements.
+
+The codebase's use of SQLAlchemy ORM is reserved for catalog-table
+mirrors whose columns are discovered at runtime from the ERMrest model
+(`LocalSchema` / `SchemaBuilder`). That use case is not relevant here;
+our schemas are known at code-write time.
+
+**Rules for the new tables:**
+
+- Define tables with `sqlalchemy.Table(...)` on the shared `MetaData`.
+- Use the `execution_state__` table-name prefix (matches
+  `ManifestStore`'s `execution_state__assets` /
+  `execution_state__features` convention; SQLite has no schemas, so
+  prefix-as-namespace is the codebase idiom).
+- Share the existing `Workspace` engine — new tables live in
+  `main.db` alongside manifest and cache tables, not a separate file.
+- Transactions use `with engine.begin() as conn:` (auto-commit on
+  exit, rollback on exception). No ORM `Session`.
+- WAL mode is inherited from `Workspace`; per-mutation fsync semantics
+  are already the default.
+- No Alembic. New-table creation uses `CREATE TABLE IF NOT EXISTS`
+  in a workspace setup function, matching `ManifestStore._ensure_schema`.
+
+**Where ORM-style objects appear in the public API:** classes like
+`Execution`, `ExecutionRecord`, `TableHandle`, `PendingRow`,
+`AssetFilePath`, `UploadJob` are thin Python wrappers that *query*
+the Core tables on property reads. They are not ORM-mapped; they are
+stateless views over SQLite rows. This matches the "read-through
+properties" design in §2.3 — consistent with not caching, and
+incompatible with the ORM identity map.
+
+### 2.15 Documentation requirement for new APIs
+
+Every public method, class, and property introduced by this spec
+MUST ship with a complete docstring including:
+
+1. **One-line summary** of purpose.
+2. **Args section** — every parameter named, with type and semantic
+   meaning.
+3. **Returns section** — type and meaning of the return value.
+4. **Raises section** — every exception this method can raise, with
+   the condition that triggers it.
+5. **At least one runnable Example section** showing realistic usage,
+   not a trivial invocation.
+
+Examples must match the project's existing docstring style (see
+`Dataset.list_dataset_parents` in `src/deriva_ml/dataset/dataset.py`
+for the template). Docstring completeness is a code-review gate;
+incomplete docstrings block spec-compliance review (per the
+subagent-driven-development workflow).
+
+Template:
+
+```python
+def example_method(self, arg1: str, *, opt: bool = False) -> T:
+    """One-line summary of what this method does.
+
+    Longer description if needed — why it exists, when to use it,
+    any non-obvious behavior.
+
+    Args:
+        arg1: What this argument represents and any constraints.
+        opt: What turning this on changes.
+
+    Returns:
+        What the returned value represents.
+
+    Raises:
+        DerivaMLException: When <specific condition>.
+        ValueError: When <specific condition>.
+
+    Example:
+        >>> exe = ml.resume_execution("5-ABC")
+        >>> result = exe.example_method("Image", opt=True)
+        >>> print(result)
+        <expected output>
+    """
+```
+
+This requirement applies to every method signature listed in §§2.7–
+2.11, and every new class (PendingRow, AssetFilePath,
+AssetDirectoryHandle, ExecutionRecord, UploadJob, PendingSummary,
+etc.) added by this spec.
+
+### 2.16 Implementation DRY hierarchy
+
+When implementing any function in this spec, before writing new code
+the author MUST check in this order for existing implementations to
+delegate to:
+
+1. **Existing deriva-ml routines.** Search the codebase (`src/deriva_ml/`)
+   for functions that already do what's needed. Particularly relevant
+   utility modules:
+   - `deriva_ml.core.base` / `core.mixins` — catalog operations,
+     workflow/execution lifecycle, vocab, features, assets.
+   - `deriva_ml.catalog.clone` / `localize` — catalog copying.
+   - `deriva_ml.dataset.dataset` / `dataset_bag` / `catalog_graph` —
+     dataset ops, bag export, graph traversal.
+   - `deriva_ml.local_db.workspace` / `manifest_store` /
+     `result_cache` / `paged_fetcher` — workspace and SQLite helpers.
+   - `deriva_ml.execution.execution` / `execution_record` —
+     execution lifecycle, provenance.
+   - `deriva_ml.schema.create_schema` — schema definition helpers
+     (e.g., `Table.define_association`).
+
+2. **Existing deriva-py routines.** If no deriva-ml routine exists,
+   check the installed deriva-py:
+   - `deriva.core.ermrest_catalog` / `ermrest_model` — catalog model,
+     pathBuilder.
+   - `deriva.core.hatrac_store` — Hatrac operations (idempotent
+     uploads, chunked resume — see §2.11.2 resumability notes).
+   - `deriva.transfer.upload.deriva_upload` — the uploader engine
+     (files, transfer-state, per-chunk resume).
+   - `deriva.core.asyncio.*` — async datapath, async clone.
+   - `bdbag.bdbag_api` — bag creation, materialization, remote file
+     manifest.
+
+3. **Write new code** only when neither (1) nor (2) has a usable
+   function. When writing new code, prefer composition of (1) and
+   (2) primitives over reinventing.
+
+**Specifically for this spec's implementation:**
+
+- Upload engine (§2.11.2) MUST drive `deriva-py`'s uploader
+  (`deriva.transfer.upload.deriva_upload`) and MUST NOT reimplement
+  chunked upload, resume, or Hatrac hash dedup — those are already
+  there. SQLite tracks queue-level state; deriva-py tracks
+  per-chunk state; Hatrac server tracks content-hash dedup.
+- State machine (§2.2) SQLite persistence MUST use `Workspace`'s
+  shared SQLAlchemy engine, not a new engine.
+- RID leasing (§2.6) POSTs MUST use the existing `pathBuilder`
+  interface against `public:ERMrest_RID_Lease`, not hand-rolled HTTP.
+- Association table creation (if any needed during setup) MUST use
+  `Table.define_association()`, not hand-defined columns/FKs.
+- Path-building queries MUST use datapath (`pb.schemas[...]`), not
+  hand-rolled ERMrest URL strings.
+
+Code review gate: a reviewer finding a new function that duplicates
+an existing deriva-ml or deriva-py routine blocks spec-compliance
+review. The implementer documents in the PR description which
+existing routines they evaluated and why they didn't fit, if they
+end up writing new code.
+
 ## 3. Walkthrough — three-script workflow
 
 The motivating workflow: a user connects from home, creates an
@@ -906,7 +1076,7 @@ exe = ml.create_execution(
 )
 
 with exe.execute() as e:
-    bag = e.datasets["1-XYZ"].bag          # download to workspace
+    bag = e.datasets["1-XYZ"]              # DatasetBag (downloaded to workspace)
 # SQLite executions row: rid=5-ABC, status='stopped', mode='online',
 #   config_json=<serialized>, working_dir_rel='execution/5-ABC'.
 # Catalog Execution row synced: status='stopped'.
@@ -925,7 +1095,7 @@ for record in ml.find_incomplete_executions():
 exe = ml.resume_execution("5-ABC")   # from SQLite, no server contact
 
 with exe.execute() as e:
-    bag = e.datasets["1-XYZ"].bag
+    bag = e.datasets["1-XYZ"]              # DatasetBag from workspace (already local)
 
     for image_rid in bag.list_dataset_members()["Image"]:
         img = bag.get_row("Image", image_rid)
@@ -1283,6 +1453,19 @@ Revision highlights:
   - Implementation sequencing: §2.10 (table handles) and §2.11.2 step
     6 (drain) marked provisional pending feature-consistency review
     (§8). Everything else implementable as Phase 1.
+  - Implementation technology (§2.14): SQLAlchemy Core for the new
+    tables, shared with Workspace engine, `execution_state__` table
+    prefix — matches existing library-bookkeeping style
+    (ManifestStore, ResultCache).
+  - Documentation requirement (§2.15): every new public method gets
+    a complete docstring with args, returns, raises, and a runnable
+    Example.
+  - Implementation DRY hierarchy (§2.16): use existing deriva-ml
+    routines before existing deriva-py routines before writing new
+    functions.
+  - Execution.datasets upgraded from `list[DatasetBag]` to
+    `DatasetCollection` — a RID-keyed mapping + iterable. Fixes the
+    walkthrough's `e.datasets["1-XYZ"]` access pattern. Hard cutover.
 
 Concept count after rev 6: **13**.
 
