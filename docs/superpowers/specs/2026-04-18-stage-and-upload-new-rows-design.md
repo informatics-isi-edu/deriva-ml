@@ -26,8 +26,8 @@ Generalize the existing `upload_assets` pathway so the same pipeline uploads:
 - **Creating new tables or columns.** The target table must already exist
   in the catalog schema before staging begins. V1 is row-level only; no
   DDL, no schema evolution as part of the stage/upload pipeline. If the
-  target table does not exist, `stage_row` / `stage_rows` /
-  `asset_file_path` raise at call time.
+  target table does not exist, `ml.table(name)` / `exe.table(name)`
+  raises `DerivaMLTableNotFound` at call time.
 - **Full slice upload-back.** The broader "sync arbitrary local changes
   to catalog" problem (Phase 1 §1.1 goal #4) remains deferred.
 - **Offline editing across disconnected sessions.** Target "work locally
@@ -178,165 +178,244 @@ On reads, the raw dict is handed back to the appropriate `RowRecord`
 subclass (§2.4.1) which coerces ISO-format strings back to
 `datetime`/`date` via its Pydantic type schema.
 
-### 2.4 Public API
+### 2.4 Public API — the `TableHandle` abstraction
 
-#### 2.4.1 Typed row records
+The row-level entry point is a **`TableHandle`** object — a DerivaML
+wrapper over a catalog table that unifies every row-level operation
+(record typing, live insert, deferred stage, asset-file registration,
+pending-row inspection) on one object. Users learn one abstraction and
+one naming pattern; live vs deferred vs asset-attached differ only in
+the verb they call.
 
-A single factory produces a Pydantic model for any insertable catalog
-table:
+#### 2.4.1 Entry points
 
 ```python
-ml.record_class(
+ml.table(
     table_name: str,
     *,
-    schema: str | None = None,          # required if the table name is ambiguous
-    include_system_columns: bool = False,  # RID, RCT, RMT, RCB, RMB
-) -> type[RowRecord]
+    schema: str | None = None,          # required if table name is ambiguous
+) -> TableHandle | AssetTableHandle
+
+exe.table(
+    table_name: str,
+    *,
+    schema: str | None = None,
+) -> TableHandle | AssetTableHandle      # same object, execution-scoped
 ```
 
-`RowRecord` is a new `BaseModel` subclass. Fields are derived from the
-catalog column metadata: non-nullable columns become required; nullable
-columns become `Optional` with their catalog default; `extra='forbid'`
-catches typos at construction time. The existing `_map_column_type`
-helper for ERMrest → Python types is reused.
+- `ml.table(name)` returns a handle bound to the DerivaML instance. Any
+  `stage(...)` or `asset_*` calls on it create pending rows at
+  **workspace level** — scoped to the DerivaML / workspace but not to
+  any specific execution. Useful for catalog-bootstrap workflows:
+  adding vocabulary terms, bulk-inserting Subjects, seeding reference
+  data. Unscoped pending rows are drained via
+  `ml.workspace.flush_pending()` (see §2.4.6).
 
-**`AssetRecord` becomes a subclass of `RowRecord`** with a column filter
-that exposes only the asset-metadata subset. Today's `asset_record_class`
-is retained as an alias that calls `record_class(..., column_filter=
-model.asset_metadata(table))`. Single factory, single drift point.
+- `exe.table(name)` returns a handle bound to the current execution.
+  Any `stage(...)` or `asset_*` calls record pending rows scoped to
+  `execution_rid`; they drain as part of `upload_execution_outputs()`
+  and pick up execution-provenance columns automatically (e.g.
+  `RCB=current_user`, `Execution=<rid>` for association tables that
+  track provenance).
 
-**Schema disambiguation.** If `table_name` appears in multiple schemas
-and `schema` is not supplied, raise `DerivaMLTableNotFound` listing the
-candidates — matches today's `name_to_table` behavior.
+- The handle **subclass** is determined at lookup time:
+  - **`AssetTableHandle`** if the table is an asset table — adds
+    `.asset_file(...)` and `.asset_directory(...)` methods.
+  - **`TableHandle`** otherwise — plain rows only.
 
-#### 2.4.2 Plain row staging
+- **Schema disambiguation.** If `table_name` appears in multiple
+  schemas and `schema` is not supplied, raise `DerivaMLTableNotFound`
+  listing the candidates — matches today's `name_to_table`.
+
+#### 2.4.2 `TableHandle` surface
 
 ```python
-exe.stage_row(
-    target_table: str,
-    record: RowRecord | dict | "handle",
-    *,
-    schema: str | None = None,
-    description: str | None = None,
-    dedupe_key: str | None = None,
-) -> PendingRow
+class TableHandle:
+    schema: str
+    name: str
 
-exe.stage_rows(
-    target_table: str,
-    records: Iterable[RowRecord | dict] | "pd.DataFrame",
-    *,
-    schema: str | None = None,
-    dedupe_key: Callable[[dict], str] | None = None,
-    chunk_size: int = 1000,
-    progress: Callable[[int, int], None] | None = None,
-) -> list[PendingRow]
+    # ----- typed records -----
+
+    def record_class(self, *, include_system_columns: bool = False) -> type[RowRecord]:
+        """Return a dynamically-generated Pydantic model for this table.
+        Fields are derived from catalog column metadata; non-nullable
+        columns are required, nullable are Optional with catalog default,
+        ``extra='forbid'`` catches typos at construction time."""
+
+    # ----- live insert -----
+
+    def insert(
+        self,
+        records: Iterable[RowRecord | dict] | "pd.DataFrame",
+        *,
+        defaults_ok: bool = True,
+        chunk_size: int = 1000,
+    ) -> list[str]:
+        """Insert rows into the catalog now. Returns the assigned RIDs.
+        This is a thin wrapper over deriva-py's pathBuilder ``insert`` so
+        live and deferred inserts can be found side-by-side on the same
+        object. Accepts the same input shapes as ``stage``."""
+
+    # ----- deferred stage -----
+
+    def stage(
+        self,
+        records: RowRecord | dict | Iterable[RowRecord | dict] | "pd.DataFrame",
+        *,
+        dedupe_key: str | Callable[[dict], str] | None = None,
+        description: str | None = None,
+        chunk_size: int = 1000,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> PendingRow | list[PendingRow]:
+        """Record one or more pending rows in the workspace SQLite. RID
+        assignment is deferred (§2.2). Returns a single ``PendingRow`` if
+        ``records`` is scalar; a list if iterable or DataFrame.
+
+        Validates every record through ``self.record_class()``. See
+        §2.4.4 for the typed-record contract, §2.2 for lease lifecycle,
+        and §2.4.5 for dedupe_key semantics."""
+
+    # ----- inspection / discard -----
+
+    def pending(
+        self,
+        *,
+        status: str | list[str] | None = None,
+    ) -> list[PendingRow]:
+        """Pending rows for this table (filtered by status if given)."""
+
+    def discard_pending(
+        self,
+        *,
+        rows: Iterable[PendingRow] | None = None,
+        status: str | list[str] | None = None,
+    ) -> int:
+        """Remove pending rows matching the filter. Returns count."""
 ```
 
-**Accepts a `pandas.DataFrame` natively.** Internally calls
-`df.to_dict(orient="records")`. Same contract as passing an iterable.
+#### 2.4.3 `AssetTableHandle` surface (subclass)
 
-**Validation at staging time.** Every record is validated through
-`ml.record_class(target_table)`:
-- `RowRecord` instances are already validated at construction.
-- `dict` inputs are passed to the typed record constructor, which will
-  raise Pydantic errors for missing required fields, unknown fields
-  (`extra='forbid'`), or type mismatches.
-- A handle (`PendingRow` / `AssetFilePath`) is coerced to its `.rid`
-  via `__get_pydantic_core_schema__` on the handle types — the typed
-  record's FK column accepts either a RID string or a handle; handles
-  materialize via the lazy-lease path (§2.2). Users write
-  `stage_row("Image", {"Subject": subj_handle, ...})` and the right
-  thing happens.
+```python
+class AssetTableHandle(TableHandle):
 
-**Idempotency via `dedupe_key`.** Optional. If supplied, the entry's
-`key` column is set to the dedupe key (instead of an auto-hash). On
-`stage_row` with a matching dedupe_key for the same `(execution_rid,
-target_table)` triple:
-- If the existing entry is in `staged | leasing | leased` — return the
-  existing handle unchanged.
-- If the existing entry is in `uploading | uploaded` — raise
-  `DerivaMLException` with a clear message.
-- If `failed` — update metadata and reset to `staged`.
+    def asset_file(
+        self,
+        file_name: str | Path,
+        metadata: RowRecord | dict | None = None,
+        *,
+        asset_types: list[str] | str | None = None,
+        copy_file: bool = False,
+        rename_file: str | None = None,
+        description: str | None = None,
+        **kwargs,            # legacy per-column metadata kwargs
+    ) -> AssetFilePath:
+        """Register a single file for upload. Returns an AssetFilePath
+        bound to a pending row (same lifecycle as stage). Signature
+        matches today's ``exe.asset_file_path`` minus the leading table-
+        name positional argument, which is implicit in the handle.
+
+        ``metadata=`` / ``**kwargs`` are validated through
+        ``self.record_class()``."""
+
+    def asset_directory(
+        self,
+        source_dir: str | Path,
+        *,
+        asset_types: list[str] | str | None = None,
+        glob: str = "*",
+        recurse: bool = False,
+        copy_files: bool = False,
+    ) -> AssetDirectoryHandle:
+        """Register a directory of files for upload. Takes NO metadata
+        kwargs — zero-ceremony by default; per-file metadata is set via
+        the returned handle's ``set_metadata(...)`` batch API or
+        AssetFilePath.metadata setter. See §2.4.7."""
+```
+
+#### 2.4.4 Records and validation
+
+Typed records are obtained from the handle:
+
+```python
+Subject = ml.table("Subject").record_class()
+record = Subject(Name="Alice", Species="Human")   # validates here
+ml.table("Subject").stage(record)                  # stores validated record
+```
+
+`RowRecord` is a `BaseModel` subclass with fields derived from the
+catalog's column metadata. The existing `_map_column_type` helper for
+ERMrest → Python types is reused.
+
+**`AssetRecord` is a `RowRecord` subclass** with a column filter
+restricting to asset-metadata columns. An `AssetTableHandle` exposes
+both:
+- `.record_class()` — full schema, all non-system columns
+- `.record_class(columns="asset_metadata")` — same filter as today's
+  `ml.asset_record_class(table)`
+
+Today's `ml.asset_record_class(table)` is retained as a thin alias
+delegating to `ml.table(table).record_class(columns="asset_metadata")`.
+
+**`stage` accepts three input shapes:**
+1. A `RowRecord` instance (preferred; already validated).
+2. A `dict` — passed through the typed record constructor; same
+   validation result.
+3. A `PendingRow` / `AssetFilePath` **handle** as a column value inside
+   a dict or record — coerced to the handle's RID, triggering lazy
+   lease (§2.2). Handle references across the same `stage` call are
+   coalesced into one batched lease POST.
+
+#### 2.4.5 Idempotency via `dedupe_key`
+
+Optional kwarg on `stage(...)`. If provided, the entry's key column in
+SQLite is set to the dedupe key instead of an auto-hash. Subsequent
+`stage` calls with a matching key (same scope: `(execution_rid OR
+None, schema, table)`) resolve as:
+
+- Existing `staged | leasing | leased` → return existing handle.
+- Existing `uploading | uploaded` → raise `DerivaMLException`.
+- Existing `failed` → update metadata, reset to `staged`.
 
 Notebook re-runs with explicit dedupe keys become idempotent.
+`dedupe_key` can be a string (for `stage(record)`) or a callable
+`(dict) -> str` (for `stage(records_iter)`).
 
-**Behavior:**
-1. Resolve `target_table` against the catalog model. Raise
-   `DerivaMLTableNotFound` if not present.
-2. Validate each record via `record_class(target_table)` (raises on
-   failure).
-3. Write pending entries to SQLite with `status='staged'`, `rid=None`,
-   `lease_token` set, `metadata_json` serialized per §2.3.1.
-4. Do NOT acquire RIDs yet (§2.2).
-5. Return list of `PendingRow` handles.
+#### 2.4.6 Workspace- vs execution-scoped pending rows
 
-#### 2.4.3 Handle FK coercion
+- `ml.table(name).stage(...)` — pending rows have `execution_rid=None`.
+  They drain via `ml.workspace.flush_pending(mode=...)`. No execution-
+  provenance columns auto-filled.
+- `exe.table(name).stage(...)` — pending rows have
+  `execution_rid=<current>`. They drain as part of
+  `upload_execution_outputs(...)`. Execution-provenance columns
+  auto-filled for association tables that track them.
 
-A `PendingRow` or `AssetFilePath` passed as a column value in another
-`stage_*` call is coerced by forcing a lease:
+Both share the same `pending_rows` SQLite table, the same drain logic
+(§2.5), and the same RID-leasing path (§2.2). The scope is purely a
+filter on which entries are drained by which call.
 
-```python
-subj = exe.stage_row("Subject", {"Name": "Alice"})   # status=staged, rid=None
-exe.stage_row("Image", {"Subject": subj, "Filename": "a.jpg"})
-# → subj's rid is materialized (batched server POST); Image record validates.
-```
+`ml.workspace.flush_pending(mode="strict" | "best_effort")` drains
+workspace-scoped entries (entries with `execution_rid=None`). It does
+not touch execution-scoped entries.
 
-Handle-as-FK lookups are coalesced: if N pending rows reference handles
-in the same `stage_rows` call, one batched lease POST services all of
-them.
+#### 2.4.7 Asset directory handle
 
-#### 2.4.4 Asset file registration (existing API, internals updated)
-
-```python
-exe.asset_file_path(
-    asset_name, file_name, ...,
-    metadata=None, ...,
-) -> AssetFilePath
-```
-
-Signature unchanged. Internals updated: writes a pending entry with
-`asset_file_path=<local path>`, `status='staged'`, `rid=None`. The lease
-is deferred exactly as for `stage_row`; this preserves the
-no-network-at-call-time contract today's callers depend on.
-
-#### 2.4.5 Asset directory registration (new)
-
-```python
-exe.asset_directory_path(
-    asset_name: str,
-    source_dir: str | Path,
-    *,
-    asset_types: list[str] | str | None = None,
-    glob: str = "*",
-    recurse: bool = False,
-    copy_files: bool = False,
-) -> AssetDirectoryHandle
-```
-
-Deliberately takes **no metadata kwargs**. Two intents:
-
-- **Zero-ceremony.** `asset_name` + `source_dir`. Every file becomes a
-  pending row using only file-derived columns (MD5, URL, Length,
-  Filename). If the asset table requires user-supplied columns, upload-
-  time re-validation fails loudly listing what's missing.
-- **Per-file metadata.** Caller registers the directory, then sets
-  metadata — either one file at a time via `.metadata = ...` or in
-  batch via `handle.set_metadata(...)` (§2.4.6).
+Unchanged from revision 2's design, but rooted in the new abstraction:
 
 ```python
 class AssetDirectoryHandle:
     path: Path
     rule_id: int
-    asset_name: str
+    table: AssetTableHandle       # the handle this rule belongs to
 
     def register(self, file: str | Path) -> AssetFilePath:
-        """Eagerly register a specific file; return its handle."""
+        """Eagerly register a specific file."""
 
     def scan(self) -> list[AssetFilePath]:
-        """Walk source_dir, register any new files. Idempotent."""
+        """Walk source_dir, register new files. Idempotent."""
 
     def pending(self) -> list[AssetFilePath]:
-        """All handles under this rule whose status is not uploaded/failed."""
+        """Pending entries under this rule."""
 
     def set_metadata(
         self,
@@ -349,57 +428,90 @@ class AssetDirectoryHandle:
         One SQLite transaction. Accepts:
         - dict — applied identically to every pending file
         - callable(Path) -> dict | RowRecord — per-file resolver
-        - DataFrame — indexed by filename (``filename_col`` identifies the
-          column to match, or the index if it's already the filename).
-          Each row's remaining columns become the file's metadata.
-        Each resolved value is validated through the typed record class."""
+        - DataFrame — indexed by filename (``filename_col`` identifies
+          the column to match, or the index if already the filename).
+          Remaining columns become the file's metadata.
+        Each resolved value is validated through the table's record_class."""
 
     def close(self) -> None:
-        """Final scan, then mark rule status=closed."""
+        """Final scan, mark rule status=closed."""
 ```
 
 **Deleted files between scans.** `scan()` does not auto-remove pending
-rows whose files no longer exist. At upload time, a missing file for an
-asset-row entry is a per-row failure with a clear `error` message.
+rows whose files no longer exist. At upload time, a missing file for
+an asset-row entry surfaces as a per-row failure with a clear `error`
+message.
 
-#### 2.4.6 Batch metadata setters
+**Idempotent re-registration across sessions.** Keyed by `(scope,
+target_table, source_dir)` where `scope` is either `execution_rid` or
+the literal `workspace`. Identical parameters → return existing
+handle. Any parameter differs → raise `DerivaMLException` with the
+diff.
 
-Iterate-and-set on `handle.pending()` is still supported (the §2.4.4
-`AssetFilePath.metadata` setter) but `handle.set_metadata(...)` is the
-preferred batch API. It runs one SQLite transaction across N files, one
-set of typed-record validations, and one write path — avoiding N×
-roundtrips for the common case.
+#### 2.4.8 Workflow examples
 
-#### 2.4.7 Pending-row inspection and discard (public)
-
+**Live insert of a single row:**
 ```python
-exe.list_pending(
-    *,
-    table: str | None = None,
-    status: str | list[str] | None = None,
-) -> list[PendingRow | AssetFilePath]
-
-exe.discard_pending(
-    *,
-    table: str | None = None,
-    rows: Iterable[PendingRow | AssetFilePath] | None = None,
-    status: str | list[str] | None = None,
-) -> int   # returns count discarded
+ml.table("Subject").insert([{"Name": "Alice"}])       # returns [rid]
 ```
 
-`list_pending` returns handles for entries matching the filter. Used for
-triage after a failed upload (`status='failed'`) or inspection before
-upload.
+**Stage a batch of rows from a DataFrame:**
+```python
+exe.table("Prediction").stage(predictions_df)         # deferred
+```
 
-`discard_pending` removes entries from SQLite. Does NOT reclaim any
-already-acquired server-side leases (per §2.2 known-limit statement).
+**Stage a row referencing another staged row via handle coercion:**
+```python
+subj = exe.table("Subject").stage({"Name": "Alice"})
+exe.table("Image").asset_file("scan.jpg", Subject=subj, Acquisition_Date="...")
+```
 
-#### 2.4.8 Idempotent directory re-registration across sessions
+**Zero-ceremony asset directory upload:**
+```python
+dir_handle = exe.table("Image").asset_directory("/outputs/scans")
+# ... files accumulate ...
+exe.upload_execution_outputs()
+```
 
-`asset_directory_path` keyed by `(execution_rid, target_table,
-source_dir)`:
-- Identical parameters → return existing handle.
-- Any parameter differs → raise `DerivaMLException` with the diff.
+**Per-file metadata via batch setter:**
+```python
+dir_handle = exe.table("Image").asset_directory("/outputs/scans")
+dir_handle.set_metadata(labels_df)   # labels_df indexed by filename
+```
+
+**Bulk vocabulary bootstrap (workspace-scoped, no execution):**
+```python
+asset_types = ml.table("Asset_Type")
+asset_types.stage([{"Name": f"Label_{i}"} for i in range(100)])
+ml.workspace.flush_pending()
+```
+
+**Triage after a failed upload:**
+```python
+for row in ml.table("Subject").pending(status="failed"):
+    print(row.error, row.metadata)
+    ml.table("Subject").discard_pending(rows=[row])
+```
+
+#### 2.4.9 Backward-compatibility shims
+
+Existing public methods remain callable and delegate to the new
+abstraction. No external caller needs to change to ship this.
+
+```python
+# exe.asset_file_path(asset_name, file, ...) — existing
+# becomes equivalent to:
+exe.table(asset_name).asset_file(file, ...)
+
+# ml.asset_record_class(table) — existing
+# becomes equivalent to:
+ml.table(table).record_class(columns="asset_metadata")
+```
+
+The shim layer is a half-dozen lines; the real work lives on the new
+handles. Once the handle API is documented and callers have migrated,
+the shims can be deprecated in a future release. For V1 they stay with
+a deprecation-documentation-only mark (no runtime warning).
 
 ### 2.5 Upload drain
 
@@ -507,10 +619,11 @@ the insert.
 **Lease validity.** Leased RIDs stay valid indefinitely server-side; no
 client-side expiration to worry about.
 
-**Inspection & triage.** `exe.list_pending(status='failed')` returns the
-failed entries with their `error` messages. Users edit metadata or fix
-referenced data, then call `exe.retry_failed()` or
-`exe.discard_pending(...)`.
+**Inspection & triage.** `handle.pending(status='failed')` on any
+`TableHandle` returns failed entries with their `error` messages; or
+`ml.workspace.list_pending(status='failed')` across all tables.
+Users edit metadata or fix referenced data, then call
+`exe.retry_failed()` or `handle.discard_pending(...)`.
 
 ### 2.8 Relationship to workspace and executions
 
@@ -559,16 +672,23 @@ primary key); they do not hold their own state.
 | `AssetRecord` factory | Retained as specialization of `RowRecord` |
 | `GenericUploader` + `table_regex` CSV insert | Reused unchanged |
 | `upload_directory` drain | Reused unchanged |
-| `asset_file_path(...)` signature | Unchanged |
+| `exe.asset_file_path(...)` signature | Unchanged (shim delegates to handle) |
+| `ml.asset_record_class(...)` signature | Unchanged (shim delegates to handle) |
 | `AssetFilePath` class | Extended with lazy-lease `rid` |
 | Workspace SQLite (WAL) | Unchanged |
 | `ERMrest_RID_Lease` server table | Accessed for leasing |
-| `record_class(table)` factory | **New** |
+| `ml.table(name)` / `exe.table(name)` | **New** entry point |
+| `TableHandle` / `AssetTableHandle` | **New** row-level abstraction |
+| `TableHandle.insert(...)` | **New** (pathBuilder passthrough) |
+| `TableHandle.stage(...)` | **New** (DataFrame-native, deferred) |
+| `TableHandle.record_class(...)` | **New** (replaces `ml.record_class`) |
+| `AssetTableHandle.asset_file(...)` | **New** (replaces `exe.asset_file_path`) |
+| `AssetTableHandle.asset_directory(...)` | **New** |
+| `AssetDirectoryHandle` + `set_metadata(...)` | **New** |
 | `RowRecord` base class | **New** |
-| `stage_row` / `stage_rows` (DataFrame-native) | **New** |
-| `asset_directory_path` + `AssetDirectoryHandle` | **New** |
-| `handle.set_metadata(...)` batch setter | **New** |
-| `exe.list_pending` / `exe.discard_pending` | **New** |
+| `handle.pending(...)` / `discard_pending(...)` | **New** per-table triage |
+| `ml.workspace.list_pending(...)` | **New** cross-table triage |
+| `ml.workspace.flush_pending(...)` | **New** workspace-scoped drain |
 | `exe.retry_failed()` | **New** |
 | Lazy + batched + crash-safe RID leasing | **New** |
 | Handle-as-FK-value coercion | **New** |
@@ -603,35 +723,68 @@ per-file scan results.
 
 ## 4. Algorithms
 
-### 4.1 `exe.stage_row(table, record)`
+### 4.1 `ml.table(name)` / `exe.table(name)` handle construction
 
 ```
-1. Resolve table against model. Raise DerivaMLTableNotFound if missing.
-2. If record is a dict: record = record_class(table)(**record)  # validates
-   If record is a RowRecord: pass through (already validated)
-   If record contains handle-valued columns: record is unchanged
-     (handle coercion happens at write time via __get_pydantic_core_schema__)
-3. Generate lease_token = uuid4().
-4. Write pending_rows entry: execution_rid, target_schema, target_table,
-   key=<hash or dedupe_key>, rid=NULL, lease_token, metadata_json,
-   status='staged', created_at=now().
-5. Return PendingRow(conn, row_id).
+1. Resolve name against model using name_to_table(name, schema=schema).
+   - Raise DerivaMLTableNotFound if absent.
+   - Raise DerivaMLTableNotFound (ambiguous) if multiple schemas match
+     and schema= was not supplied.
+2. If the table is an asset table (model.is_asset(table)):
+     return AssetTableHandle(ml, table, scope=<execution_rid or None>).
+   Else:
+     return TableHandle(ml, table, scope=<execution_rid or None>).
+3. Handles are lightweight: hold a DerivaML/Execution reference, a
+   Table reference, and the scope. All row-level state lives in SQLite.
 ```
 
-### 4.2 `exe.stage_rows(table, records_or_df)`
+### 4.2 `TableHandle.stage(records, dedupe_key=...)`
 
 ```
-1. If records_or_df is DataFrame: convert to list of dicts via
-   to_dict(orient='records').
+1. Normalize records:
+   - If DataFrame: convert via to_dict(orient='records').
+   - If single RowRecord / dict: wrap in a list (scalar input).
+   - If Iterable: materialize per chunk (see below).
 2. For chunk of `chunk_size` records:
-   a. Validate each: record_class(table)(**rec) or pass if RowRecord.
-   b. BEGIN TRANSACTION.
-   c. Insert N pending_rows entries in one transaction with
-      lease_token per row, status='staged'.
-   d. COMMIT.
-   e. If progress callback provided: progress(done, total)
-3. Return list of PendingRow handles.
+   a. For each rec:
+      - If RowRecord: pass through (already validated).
+      - If dict: rec = self.record_class()(**rec)  (validates, raises).
+      - Handle-valued columns in rec remain as handles; coercion
+        happens when handle.__get_pydantic_core_schema__ resolves
+        during record construction or when writing to SQLite.
+   b. If dedupe_key given: resolve per §2.4.5. Existing matching
+      entries short-circuit into the return list.
+   c. Generate lease_token = uuid4() for each new entry.
+   d. BEGIN TRANSACTION.
+   e. Insert N pending_rows entries: scope=self.scope (execution_rid
+      or NULL), target_schema, target_table, key=<hash or dedupe_key>,
+      rid=NULL, lease_token, metadata_json serialized per §2.3.1,
+      status='staged', created_at=now().
+   f. COMMIT.
+   g. If progress callback: progress(done_so_far, total).
+3. Return PendingRow (scalar input) or list[PendingRow] (iterable/DF).
 ```
+
+### 4.3 `AssetTableHandle.asset_file(file, metadata=...)` /
+### `AssetTableHandle.asset_directory(dir, ...)`
+
+`asset_file` is equivalent to `stage` with an attached file path:
+
+```
+1. Validate file_name, determine staging path (existing logic from
+   today's asset_file_path).
+2. Symlink or copy file into assets/{AssetTable}/.
+3. Construct metadata record via self.record_class(
+      columns="asset_metadata")(**{metadata_dict, **kwargs}).
+4. Generate lease_token.
+5. Write pending_rows entry with asset_file_path set, rule_id=NULL,
+   status='staged'. Same schema as §4.2.
+6. Return AssetFilePath bound to the entry.
+```
+
+`asset_directory` creates a directory_rules row and returns a handle;
+per-file registration is lazy (via register()/scan()) and follows §4.2
+with the additional `rule_id` linkage.
 
 ### 4.3 Handle `.rid` materialization (lazy lease)
 
@@ -668,59 +821,125 @@ See §2.5 step-by-step.
 
 ### 5.1 Unit tests (no live catalog)
 
+Handle construction and dispatch:
+- `ml.table(name)` returns `TableHandle` for plain tables,
+  `AssetTableHandle` for asset tables.
+- `ml.table(name, schema=s)` resolves ambiguous names; missing
+  `schema=` for ambiguous names raises `DerivaMLTableNotFound`.
+- `exe.table(name).scope == execution_rid`; `ml.table(name).scope is None`.
+- `TableHandle` does not expose `asset_file` / `asset_directory` (only
+  `AssetTableHandle` does).
+
+Store and record:
 - `PendingRowsStore` schema creation, entry CRUD, status transitions.
 - Directory rule registration: idempotent, parameter-drift rejection.
-- `PendingRow.metadata` setter round-trips through SQLite.
-- `record_class(table)` produces valid Pydantic model for every column
-  type in `_map_column_type`.
-- `record_class` schema disambiguation: ambiguous name raises.
-- Handle FK coercion: typed record accepts handle, coerces to rid.
-- Inter-table topological sort: DAG, multiple roots, cycle detection.
-- Required-column validator identifies missing columns.
-- Lazy-lease path with mocked server: unleased handle reads trigger
-  batched POST; leased entries not re-leased.
-- Lease reconciliation: simulated POST success + SQLite crash → on
-  startup, lease is adopted.
-- Serialization roundtrip for every type handled by `_json_default`.
-- `handle.set_metadata(dict | callable | DataFrame)` batch path.
-- `stage_row` with `dedupe_key`: second call returns existing handle;
-  after upload, second call raises.
-- `exe.list_pending` / `discard_pending` filter combinations.
-- Empty batches: `stage_rows([])`, `stage_rows(empty_df)`.
-- Large batches: `stage_rows(10000 records)` — throughput + memory.
+- `TableHandle.record_class()` produces valid Pydantic model for every
+  column type in `_map_column_type`.
+- `AssetTableHandle.record_class(columns="asset_metadata")` filters to
+  asset-metadata columns only; base class otherwise identical.
+
+Stage and validation:
+- `stage(dict)` validates through record_class and raises on missing
+  required, unknown fields, type mismatch.
+- `stage(record)` passes through without re-validation (already typed).
+- `stage(df)` converts and preserves order.
+- Empty inputs: `stage([])`, `stage(empty_df)` succeed as no-ops.
+- Large batches: `stage(10000_record_iterable)` — chunked, progress
+  callback fires, memory stays bounded.
+
+Handle FK coercion:
+- Handle passed as column value in another `stage` call → coerces to
+  `.rid`, triggers batched lease POST.
+- N handles in one `stage(batch)` call coalesce to one lease POST.
+- Coerced handles materialize RID once; subsequent reads return cached
+  value from SQLite.
+
+dedupe_key:
+- `stage(record, dedupe_key="k")` twice → second call returns existing
+  handle unchanged.
+- After upload, `stage(record, dedupe_key="k")` raises.
+- `stage(rec, dedupe_key="k")` on a `status='failed'` entry resets to
+  `status='staged'` and updates metadata.
+
+Lazy lease + reconciliation:
+- Lazy-lease path with mocked server: unleased handle `.rid` read
+  triggers batched POST; already-leased entries not re-leased.
+- Two-phase lease: SQLite `status='leasing'` written before POST; on
+  POST failure (exception), status reverts to `'staged'`.
+- Startup reconciliation: simulated POST success + crash before SQLite
+  update → on workspace open, lease query adopts the RID.
+
+Inter-table dependencies:
+- Topological sort: DAG, multiple roots, single root with chain.
+- Cycle detection: inter-table cycle raises `DerivaMLCycleError` with
+  cycle listed.
+
+Directory handle:
+- `asset_directory(dir).register(file)` — eager.
+- `asset_directory(dir).scan()` — idempotent, only new files registered.
+- `set_metadata(dict | callable | DataFrame)` batch path; one SQLite
+  transaction; each resolved value validated through record_class.
+- Deleted files between scans: not auto-removed; upload surfaces as
+  per-row failure.
+- Symlinked source directory: `scan()` follows symlinks consistently.
+
+Serialization:
+- Roundtrip for every type handled by `AssetManifest._json_default`
+  (datetime, date, Path, dict, Pydantic BaseModel).
+- `bytea` column in record → `stage()` raises `NotImplementedError`.
+
+Inspection / discard:
+- `handle.pending(status=...)` filter combinations.
+- `handle.discard_pending(...)` removes entries; server-side leases
+  NOT reclaimed (acknowledged limit).
+- Cross-table inspection via `ml.workspace.list_pending(...)`.
+
+Compatibility shims:
+- `exe.asset_file_path(asset_name, file, ...)` delegates to
+  `exe.table(asset_name).asset_file(file, ...)`; behavior identical.
+- `ml.asset_record_class(table)` delegates to
+  `ml.table(table).record_class(columns="asset_metadata")`; same class.
 
 ### 5.2 Integration tests (live catalog)
 
-- `stage_row` inserts a Subject; server returns matching RID.
-- `stage_rows(df)` bulk-inserts 100 rows via DataFrame path.
-- Intra-batch FK: stage Subject + Image referencing subject handle;
-  upload; verify server-side Image.Subject = Subject.RID.
-- `asset_directory_path` zero-ceremony: register dir of 10 files; upload
-  fails with clear missing-column message when the asset table needs
-  more; succeeds when it doesn't.
-- Per-file metadata via `handle.set_metadata(df)`.
-- `handle.register()` incremental + `handle.scan()` final sweep.
+- `ml.table("Subject").insert([{...}])` inserts and returns RIDs (thin
+  pathBuilder passthrough).
+- `exe.table("Subject").stage({...})` + `upload_execution_outputs()`
+  inserts with matching RID after upload.
+- `exe.table("Prediction").stage(df)` bulk-inserts 100 rows via
+  DataFrame path.
+- Intra-batch FK: stage Subject, stage Image referencing subject
+  handle; upload; verify server-side Image.Subject = Subject.RID.
+- `exe.table("Image").asset_directory("/outputs/scans")` zero-ceremony:
+  register 10 files; upload fails with clear missing-column message
+  when Image requires user-supplied columns, succeeds when it doesn't.
+- Per-file metadata via `dir_handle.set_metadata(df)`.
+- Workspace-scoped stage: `ml.table("Asset_Type").stage([...])` +
+  `ml.workspace.flush_pending()` — rows inserted without an execution.
 - Parameter-drift across sessions raises.
-- Stale-schema: stage a row, add a required column to the catalog
-  table, `upload_execution_outputs` surfaces the new required column
-  in re-validation error.
+- Stale-schema: stage a row, server adds a required column, upload
+  surfaces the new required column in re-validation error.
 - Inter-table cycle: stage rows A→B, B→A → `DerivaMLCycleError`.
 - Partial failure best-effort mode: 1 of 10 FK-invalid → 9 upload, 1
   marked failed, no abort.
 - Partial failure strict mode: same → level aborts, partial inserts
-  remain, `list_pending(status='failed')` shows the failure.
-- `retry_failed()` happy path.
+  remain, `handle.pending(status='failed')` shows the failure.
+- `exe.retry_failed()` happy path.
 - Lease timeout: stub server to delay POST; staging completes offline,
   lease acquired when `.rid` read or upload starts.
-- File deleted between `register` and upload: per-row upload failure.
-- Symlinked source directory: `scan()` follows symlinks consistently.
+- File deleted between `register` and upload: per-row upload failure
+  with `FileNotFoundError` in `error` message.
+- Execution-scoped vs workspace-scoped dedupe_key: same key in
+  different scopes does not collide.
 
 ### 5.3 Regression
 
-- Existing `asset_file_path` tests pass unchanged.
-- Existing `upload_execution_outputs` asset-upload tests pass unchanged.
-- Existing `ManifestStore` tests updated for renamed class + new columns
-  (non-breaking).
+- Existing `exe.asset_file_path` tests pass unchanged (via shim).
+- Existing `ml.asset_record_class` tests pass unchanged (via shim).
+- Existing `upload_execution_outputs` asset-upload tests pass
+  unchanged.
+- Existing `ManifestStore` tests updated for renamed class + new
+  columns (non-breaking).
 
 ## 6. Open questions and known limits
 
@@ -730,9 +949,9 @@ See §2.5 step-by-step.
   future spec.
 - **Intra-table FK cycles:** unsupported. Users must split across
   batches.
-- **Binary columns (`bytea`):** unsupported; `stage_row` raises
-  `NotImplementedError`. Asset-table routes for binary payloads are the
-  supported path.
+- **Binary columns (`bytea`):** unsupported; `TableHandle.stage(...)`
+  raises `NotImplementedError`. Asset-table routes for binary payloads
+  are the supported path.
 - **CSV-based insert roundtrip:** see §2.6 risk-column list. V2 can
   swap to direct `pathBuilder` insert without public-API change.
 - **Orphaned server-side leases:** possible only if client loses its
