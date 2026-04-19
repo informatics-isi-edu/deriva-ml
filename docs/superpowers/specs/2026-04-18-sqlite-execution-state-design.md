@@ -1,8 +1,41 @@
 # SQLite-backed execution state: registry, pending rows, and stage-and-upload
 
-**Status:** Draft, pending review (revision 5 — expanded scope).
+**Status:** Draft, pending review (revision 6 — API consistency pass).
 **Date:** 2026-04-18.
 **Scope:** Design spec. Implementation plan follows separately.
+
+## 0. Design guideline — friction in service of reproducibility
+
+Before any specific design choice, the governing principle:
+
+> When ergonomics conflict with reproducibility, robustness, or provenance,
+> reproducibility wins. Small amounts of user friction — declaring a metric
+> before recording it, naming a dataset version explicitly, explicitly
+> uploading at a moment the user chooses — are acceptable costs when they
+> produce a catalog record that is unambiguous, queryable, and
+> reconstructable after the fact. DerivaML is not optimizing for "fastest
+> to first result"; it is optimizing for "every result is a durable,
+> reviewable artifact."
+
+Concretely, this guideline means:
+
+- Controlled vocabularies over free-form strings, even at the cost of a
+  declaration step (features, metrics, params, asset types, dataset
+  types).
+- Explicit declaration over auto-creation, when auto-creation would admit
+  typos into the provenance record.
+- Explicit state transitions over implicit ones (no auto-upload on
+  context-manager exit; the user decides when to commit results to the
+  catalog).
+- Version pinning over "latest" defaults, when ambiguity would break
+  reproducibility of a past result.
+- Named entities with provenance (datasets with RIDs, executions with
+  workflow FKs) over anonymous data.
+
+When proposing an ergonomic convenience, the check is: *does this erode
+the catalog's guarantee that any past result can be reconstructed and
+reviewed?* If yes, the convenience is rejected or modified until it
+doesn't.
 
 ## 1. Goals and scope
 
@@ -13,13 +46,14 @@ execution state — enabling robust offline workflows where scripts split
 across processes, machines, and network conditions still reach a
 correct upload.
 
-Three capabilities, one coherent design:
+Four capabilities, one coherent design:
 
 1. **Execution registry in SQLite.** The workspace keeps a table of
    known-local executions. Enumeration (`list_executions`,
    `find_incomplete_executions`) and resumption
    (`resume_execution(rid)`) read from SQLite, not from scanning the
-   filesystem tree. Status transitions are atomic SQLite writes.
+   filesystem tree. Status transitions are atomic SQLite writes with
+   catalog sync in online mode.
 
 2. **Pending-row staging in SQLite.** New rows destined for the
    catalog — both asset rows (file + metadata) and plain rows —
@@ -30,8 +64,17 @@ Three capabilities, one coherent design:
 3. **One write verb, two modes.** `handle.insert(records)` is the
    single write method. In online mode, rows reach the catalog by the
    time `.insert()` returns. In offline mode, rows stage and wait for
-   `exe.upload_execution_outputs()`. The user's code is identical in
-   both modes; mode only changes timing.
+   upload. The user's code is identical in both modes; mode only
+   changes timing.
+
+4. **Upload as an async, restartable, bandwidth-aware operation.**
+   Upload is a first-class long-running operation, not a terminal step.
+   Scoped forms (`exe.upload_outputs()`, `record.upload_outputs()`),
+   workspace-wide form (`ml.upload_pending(...)`), non-blocking form
+   (`ml.start_upload(...)` → `UploadJob`), and a `deriva-ml upload`
+   CLI all share one engine. Resumability is provided by the
+   combination of SQLite queue state and deriva-py's per-chunk
+   upload-state file.
 
 Design principle: the code to write a row is the same whether the user
 is connected or offline, and the same whether they're in the create
@@ -43,46 +86,73 @@ SQLite carries state across processes.
 - **Updates or deletes.** Insert-only. Modifying existing catalog rows
   or deleting them is a separate future problem.
 - **Creating new tables or columns.** Target table must already exist
-  in the catalog schema. `exe.table(name)` raises `DerivaMLTableNotFound`
-  at call time if absent.
+  in the catalog schema. `exe.table(name)` / `ml.table(name)` raises
+  `DerivaMLTableNotFound` at call time if absent.
 - **Full slice upload-back.** The broader "sync arbitrary local
   changes" problem remains deferred.
 - **Filesystem watching.** Directory registration doesn't watch for
   file arrivals; files are surfaced via explicit `register(file)` or
   scan-at-upload.
 - **Auto-detecting connection state.** Mode is explicit
-  (`mode="online"` vs `mode="offline"`). The library does not silently
-  defer writes on server timeout.
+  (`ConnectionMode.online` vs `ConnectionMode.offline`). The library
+  does not silently defer writes on server timeout.
 - **Cross-workspace sharing.** Executions are scoped to the workspace
   they were created in; the user copying a working directory between
   machines is their concern to handle.
+- **Separate upload provenance.** Upload events are not recorded as a
+  separate catalog entity. Evidence that upload happened manifests via
+  Execution.status transitions and row creation timestamps already on
+  every Deriva row.
 
-### 1.3 Migration posture
+### 1.3 Compatibility and deprecation posture
 
-No migration. Clean slate — no in-flight `ManifestStore` entries to
-preserve. External names (`exe.asset_file_path`, `ml.asset_record_class`,
-`ml.restore_execution`, `upload_execution_outputs`, `exe.table_path`)
-keep their signatures as thin shims delegating to the new APIs.
+Per the project-wide deprecation policy, this refactor uses **hard
+cutovers** for renamed / restructured APIs. No shim layer. Breaking
+changes are enumerated in `CHANGELOG.md` under "Breaking changes" with
+replacement pointers.
+
+Renames introduced by this spec (all hard cutovers):
+
+| Removed | Replaced by |
+|---|---|
+| `ml.restore_execution(rid)` | `ml.resume_execution(rid)` |
+| `exe.upload_execution_outputs(...)` | `exe.upload_outputs(...)` |
+| `exe.retry_failed()` | `exe.upload_outputs(retry_failed=True)` |
+| `Execution.list_nested_executions()` | `ml.list_nested_executions(of=exe_rid)` |
+| `Execution.find_ancestors()` | `ml.find_execution_ancestors(of=exe_rid)` |
+
+No migration code. Clean slate — no in-flight `ManifestStore` entries
+to preserve.
 
 ## 2. Architecture
 
 ### 2.1 Online mode vs offline mode
 
-`DerivaML` gains a `mode` parameter:
+Connection mode is an enumeration:
 
 ```python
-DerivaML(..., mode="online" | "offline")     # default: "online"
+from deriva_ml import ConnectionMode
+
+DerivaML(
+    ...,
+    mode: ConnectionMode | str = ConnectionMode.online,
+)
+# Accepts either the enum or the string literals "online" / "offline";
+# strings are coerced. Default: ConnectionMode.online.
 ```
 
-**Online mode.** Plain-row writes go live to the catalog by the time
-`.insert()` returns — the library drains the pending entry inline
-after staging. Asset-row writes still stage and wait for upload
+**Online mode (default).** Plain-row writes go live to the catalog by
+the time `.insert()` returns — the library drains the pending entry
+inline after staging. Asset-row writes still stage and wait for upload
 (Hatrac is a two-phase pipeline; draining per file would defeat
-batching).
+batching). Execution status transitions also sync to the catalog's
+Execution row atomically with the SQLite transition.
 
 **Offline mode.** Every write stages into the workspace SQLite and
-stays there until `exe.upload_execution_outputs()` drains it. The
-server is only contacted for RID leases and final uploads.
+stays there until an upload operation drains it. The server is only
+contacted for RID leases and final uploads. Status transitions update
+SQLite only, marked with `sync_pending=True`; the next time the
+workspace runs online, pending syncs flush (see §2.2).
 
 **Creating executions requires online mode.** An Execution row has to
 be created on the server (the RID is server-assigned), which can't
@@ -93,12 +163,83 @@ happen offline. The supported split-script workflow is:
 2. Scripts 2..N (any mode): `resume_execution(rid)` re-hydrates from
    SQLite; writes stage per the current mode.
 3. Final script (online): `resume_execution(rid)` +
-   `upload_execution_outputs()` drains everything.
+   `exe.upload_outputs()` drains everything.
 
-Any `create_execution` call while `mode="offline"` raises
+Any `create_execution` call while `mode=ConnectionMode.offline` raises
 `DerivaMLOfflineError` with a clear message.
 
-### 2.2 Workspace SQLite as authoritative state
+### 2.2 Execution state machine with catalog sync
+
+Execution lifecycle and status live in a dedicated state-machine
+module (`deriva_ml/execution/state_machine.py`). SQLite is the
+authoritative local state; the catalog is synced in online mode and
+eventually-consistent in offline mode.
+
+**States:**
+
+```
+created → running → {stopped, failed} → {pending_upload → {uploaded, failed}}
+                                      ↘ aborted
+```
+
+**Sync rules:**
+
+- **Online mode.** Every status transition is a single logical
+  operation: update SQLite `executions.status` and PUT the catalog's
+  Execution row in the same transition path. If the catalog PUT fails
+  (network blip, server down), the SQLite transition still commits
+  with `sync_pending=1` set. The next time a state transition or
+  reconciliation runs successfully, pending syncs flush first.
+
+- **Offline mode.** SQLite transitions commit with `sync_pending=1`
+  unconditionally. The catalog is never contacted.
+
+- **Just-in-time reconciliation.** When a workspace opens (or
+  `resume_execution(rid)` is called), the library checks for
+  disagreement between SQLite and catalog Execution state *only for
+  the execution in question*, not workspace-wide. This keeps startup
+  fast and surfaces disagreements at the moment the user is about to
+  act on them.
+
+**Disagreement handling** (six cases — rules are explicit, user is
+prompted on unexpected mismatch):
+
+| SQLite says | Catalog says | Interpretation | Action |
+|---|---|---|---|
+| `running` | `aborted` | Externally aborted | Set SQLite `aborted`, raise on resume |
+| `pending_upload` | `uploaded` | Uploaded by another process | Set SQLite `uploaded`, clear pending rows |
+| `running` | `failed` | Externally failed | Set SQLite `failed`, retain error from catalog |
+| `stopped` | `running` | Stale catalog (pre-crash) | Set catalog `stopped` (sync forward) |
+| `stopped` | (no row) | Orphaned | Raise `DerivaMLStateInconsistency` with guidance |
+| anything else | anything else | Unexpected | Raise `DerivaMLStateInconsistency`; user intervention |
+
+Scope for R1.1 implementation: 3–4 days.
+
+### 2.3 Execution fields as SQLite read-through
+
+The `Execution` object's user-visible lifecycle fields — `status`,
+`start_time`, `stop_time`, `error` — become **read-through properties**
+backed by SQLite. Every read issues a SELECT; no in-memory caching.
+This keeps multiple processes holding the same execution RID consistent
+with each other.
+
+```python
+class Execution:
+    @property
+    def status(self) -> ExecutionStatus: ...  # reads SQLite
+    @property
+    def start_time(self) -> datetime | None: ...
+    @property
+    def stop_time(self) -> datetime | None: ...
+    @property
+    def error(self) -> str | None: ...
+```
+
+No setter surface: state transitions go through the state machine.
+
+Scope for R1.2 implementation: 2–4 hours.
+
+### 2.4 Workspace SQLite as authoritative state
 
 Everything that matters for resuming an execution lives in SQLite:
 
@@ -107,6 +248,7 @@ Everything that matters for resuming an execution lives in SQLite:
 - Directory-rule entries
 - Lease tokens for crash-safe RID allocation
 - Status for every row and every execution
+- `sync_pending` flags for catalog reconciliation
 
 The filesystem tree (`{working_dir}/deriva-ml/execution/{rid}/`) is a
 **derived artifact**: asset files live there for the uploader to
@@ -117,11 +259,11 @@ or edited externally, SQLite is consulted, not the tree.
 This inverts today's model, where file-tree scanning (`os.listdir`)
 was the enumeration mechanism.
 
-### 2.3 SQLite schema
+### 2.5 SQLite schema
 
 Three tables in the workspace SQLite:
 
-#### 2.3.1 `executions`
+#### 2.5.1 `executions`
 
 One row per known-local execution.
 
@@ -137,25 +279,13 @@ One row per known-local execution.
 | `start_time` / `stop_time` | lifecycle timestamps |
 | `last_activity` | updated on every pending-row insert/upload |
 | `error` | last error message if `status='failed'` |
+| `sync_pending` | bool; catalog hasn't caught up with SQLite |
 | `created_at` | when the local registry knew about it |
 
-Indexes: `(status)`, `(workflow_rid)`, `(last_activity)`.
+Indexes: `(status)`, `(workflow_rid)`, `(last_activity)`,
+`(sync_pending) WHERE sync_pending=1`.
 
-Status transitions:
-
-```
-create_execution (online only) → created
-.execute() context entered     → running
-.execute() context exited OK   → stopped
-.execute() context exited w/ error → failed
-upload_execution_outputs starts → pending_upload
-upload_execution_outputs succeeds → uploaded
-user calls exe.abort()         → aborted
-```
-
-Transitions are atomic SQLite writes. No half-written JSON files.
-
-#### 2.3.2 `pending_rows`
+#### 2.5.2 `pending_rows`
 
 One row per pending catalog-row insert, keyed to an execution.
 
@@ -178,7 +308,7 @@ One row per pending catalog-row insert, keyed to an execution.
 
 Indexes: `(execution_rid, status)`, `(execution_rid, target_table)`.
 
-#### 2.3.3 `directory_rules`
+#### 2.5.3 `directory_rules`
 
 One row per registered asset directory.
 
@@ -193,7 +323,7 @@ One row per registered asset directory.
 | `status` | `active \| closed` |
 | `created_at` | timestamp |
 
-### 2.4 RID leasing (lazy, batched, crash-safe)
+### 2.6 RID leasing (lazy, batched, crash-safe)
 
 Pending rows eventually carry a real, server-assigned RID from
 `public:ERMrest_RID_Lease`. Leases are acquired **lazily** — deferred
@@ -214,57 +344,204 @@ entries still in `status='leasing'` trigger reconciliation: query
 Lease POSTs are batched and chunked (`PENDING_ROWS_LEASE_CHUNK`,
 default 500).
 
-### 2.5 Public API — Execution registry
+### 2.7 Public API — `DerivaML` top level
 
 ```python
-ml.list_executions(
-    *,
-    status: str | list[str] | None = None,
-    workflow_rid: str | None = None,
-    mode: str | None = None,
-    since: datetime | None = None,
-) -> list[ExecutionRecord]
-    """Return all known-local executions matching the filters. Reads
-    from SQLite; no server contact required."""
+class DerivaML:
+    def __init__(self, ..., mode: ConnectionMode | str = ConnectionMode.online):
+        ...
 
-ml.find_incomplete_executions() -> list[ExecutionRecord]
-    """Sugar over list_executions(status=[...]) returning every
-    execution not fully uploaded: status in
-    (created, running, stopped, pending_upload, failed)."""
+    # Connection / model
+    @property
+    def mode(self) -> ConnectionMode: ...
 
-ml.resume_execution(execution_rid: str) -> Execution
-    """Re-hydrate an Execution from SQLite registry state. Works in
-    both online and offline modes; the execution's recorded mode is
-    independent of the current DerivaML instance's mode. Raises
-    DerivaMLException if no matching registry row exists. Does NOT
-    contact the server — resume is purely local.
+    def table(self, name: str, *, schema: str | None = None) -> TableHandle | AssetTableHandle:
+        """Schema-introspection sibling of exe.table(). Same return
+        types. Writes on a handle returned by ml.table() raise
+        DerivaMLNoExecutionContext — there's no execution to scope
+        them to. Supports: handle.record_class(), handle.name,
+        handle.schema, and asset-type introspection on
+        AssetTableHandle."""
 
-    New canonical name; `restore_execution` becomes a shim."""
+    # Execution construction — kwargs form or config-object form (both supported)
+    def create_execution(
+        self,
+        config: ExecutionConfiguration | None = None,
+        *,
+        datasets: list[DatasetSpecConfig | str] | None = None,
+        assets: list[AssetRIDConfig | str] | None = None,
+        workflow: Workflow | str | None = None,
+        description: str | None = None,
+    ) -> Execution:
+        """Online-only. Kwargs form builds an ExecutionConfiguration
+        internally; string shorthand 'RID@version' is accepted for
+        datasets. Mixing `config` with kwargs raises TypeError.
 
-ml.gc_executions(
-    *,
-    older_than: timedelta | None = None,
-    status: str | list[str] | None = None,
-    delete_working_dir: bool = False,
-) -> int
-    """Remove execution registry rows matching the filter. By default
-    only deletes registry state; pass delete_working_dir=True to also
-    remove the on-disk execution root."""
+        In offline mode raises DerivaMLOfflineError."""
+
+    # Registry
+    def list_executions(
+        self, *,
+        status: ExecutionStatus | list[ExecutionStatus] | None = None,
+        workflow_rid: str | None = None,
+        mode: ConnectionMode | None = None,
+        since: datetime | None = None,
+    ) -> list[ExecutionRecord]: ...
+
+    def find_incomplete_executions(self) -> list[ExecutionRecord]: ...
+
+    def resume_execution(self, execution_rid: str) -> Execution:
+        """Re-hydrate an Execution from SQLite. Works in both modes;
+        the execution's recorded mode is independent of the current
+        DerivaML instance's mode. Runs just-in-time reconciliation
+        (§2.2) for this execution before returning. Raises
+        DerivaMLException if no matching registry row exists."""
+
+    def gc_executions(
+        self, *,
+        older_than: timedelta | None = None,
+        status: ExecutionStatus | list[ExecutionStatus] | None = None,
+        delete_working_dir: bool = False,
+    ) -> int: ...
+
+    # Hierarchy queries (moved off Execution per R2.1)
+    def list_nested_executions(
+        self, *, of: str,                       # parent execution RID
+    ) -> list[ExecutionRecord]: ...
+
+    def find_execution_ancestors(self, *, of: str) -> list[ExecutionRecord]: ...
+
+    # Pending / upload inspection
+    def pending_summary(self) -> WorkspacePendingSummary:
+        """Workspace-wide summary: per-execution pending row/file counts."""
+
+    def list_pending_uploads(self) -> list[UploadTarget]:
+        """Flat list of (execution_rid, table, row_count, file_count,
+        bytes) tuples — one per (execution, table) group with pending
+        items."""
+
+    # Upload operations
+    def upload_pending(
+        self, *,
+        execution_rids: list[str] | None = None,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: int | None = None,
+        parallel_files: int = 4,
+    ) -> UploadReport:
+        """Blocking upload of pending state. `execution_rids=None`
+        means all pending. Runs in-process. Idempotent — safe to
+        re-run after crash; resumes via SQLite queue state and
+        deriva-py's per-chunk resume file."""
+
+    def start_upload(self, **kwargs) -> UploadJob:
+        """Non-blocking form. Spawns a worker thread in the current
+        process, returns an UploadJob handle. Same kwargs as
+        upload_pending. The thread dies if the process exits; to
+        survive process exit, use deriva-ml upload CLI from a shell."""
+
+    def get_upload_job(self, job_id: str) -> UploadJob: ...
+    def list_upload_jobs(self, *, status: str | None = None) -> list[UploadJob]: ...
 ```
 
-`ExecutionRecord` is a dataclass with the registry columns plus
-convenience counts (`pending_rows`, `failed_rows`, etc.) derived from
-`pending_rows`.
-
-### 2.6 Public API — Table handle (row-level writes)
+### 2.8 Public API — Execution
 
 ```python
-exe.table(
-    table_name: str,
-    *,
-    schema: str | None = None,
-) -> TableHandle | AssetTableHandle
+class Execution:
+    # Identity / configuration
+    @property
+    def rid(self) -> str: ...
+    @property
+    def configuration(self) -> ExecutionConfiguration: ...
+    @property
+    def mode(self) -> ConnectionMode: ...
+
+    # Lifecycle fields (SQLite read-through, §2.3)
+    @property
+    def status(self) -> ExecutionStatus: ...
+    @property
+    def start_time(self) -> datetime | None: ...
+    @property
+    def stop_time(self) -> datetime | None: ...
+    @property
+    def error(self) -> str | None: ...
+
+    # Context manager for the running phase
+    def execute(self) -> AbstractContextManager[Execution]:
+        """Enter: status → running (synced to catalog online). Exit OK:
+        status → stopped. Exit with exception: status → failed.
+        On exit, emits INFO log with pending_summary() contents if
+        anything is staged. Does NOT auto-upload (per R6.3, in service
+        of restart-safety and offline mode)."""
+
+    def abort(self) -> None: ...
+
+    # Row-level writes
+    def table(self, name: str, *, schema: str | None = None) -> TableHandle | AssetTableHandle:
+        """Execution-scoped handle. Same class as ml.table() returns,
+        but writes are scoped to this execution and are permitted."""
+
+    # Pending / upload inspection & drain
+    def pending_summary(self) -> PendingSummary: ...
+
+    def upload_outputs(
+        self, *,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: int | None = None,
+        parallel_files: int = 4,
+    ) -> UploadReport:
+        """Sugar for ml.upload_pending(execution_rids=[self.rid], ...)."""
+
+    # __repr__ includes pending counts (per R6.3)
+    def __repr__(self) -> str:
+        # "<Execution EXE-A status=stopped pending=15rows/2files>"
+        ...
 ```
+
+### 2.9 Public API — `ExecutionRecord`
+
+`ExecutionRecord` is the restored-from-SQLite handle — a frozen
+dataclass with the registry columns plus convenience counts derived
+from `pending_rows`:
+
+```python
+@dataclass(frozen=True)
+class ExecutionRecord:
+    rid: str
+    workflow_rid: str | None
+    description: str | None
+    status: ExecutionStatus
+    mode: ConnectionMode
+    working_dir_rel: str
+    start_time: datetime | None
+    stop_time: datetime | None
+    last_activity: datetime
+    error: str | None
+    sync_pending: bool
+    created_at: datetime
+    # Derived
+    pending_rows: int
+    failed_rows: int
+    pending_files: int
+    failed_files: int
+
+    def pending_summary(self) -> PendingSummary: ...
+    def upload_outputs(self, **kwargs) -> UploadReport:
+        """Sugar for ml.upload_pending(execution_rids=[self.rid], ...)."""
+```
+
+### 2.10 Public API — Table handles (row-level writes)
+
+```python
+ml.table(name, schema=None) -> TableHandle | AssetTableHandle       # no execution scope
+exe.table(name, schema=None) -> TableHandle | AssetTableHandle      # execution-scoped
+```
+
+Same class hierarchy for both entry points. The only difference: handles
+returned by `ml.table(...)` have no execution to bind writes to, so
+`.insert(...)` and asset-file methods raise `DerivaMLNoExecutionContext`
+with a message pointing at `exe.table(...)`. Read-only methods
+(`record_class()`, `name`, `schema`, asset-type introspection) work on
+both.
 
 Returns `AssetTableHandle` if the table is an asset table,
 `TableHandle` otherwise. Asset-specific methods appear only on
@@ -273,16 +550,14 @@ Returns `AssetTableHandle` if the table is an asset table,
 Ambiguous `table_name` without `schema=` raises
 `DerivaMLTableNotFound` listing candidates.
 
-#### 2.6.1 `TableHandle` surface
+#### 2.10.1 `TableHandle` surface
 
 ```python
 class TableHandle:
     name: str
     schema: str
 
-    def record_class(
-        self, *, include_system_columns: bool = False,
-    ) -> type[RowRecord]:
+    def record_class(self, *, include_system_columns: bool = False) -> type[RowRecord]:
         """Dynamically-generated Pydantic model for this table. Fields
         from non-nullable columns are required; nullable are Optional.
         extra='forbid' catches typos."""
@@ -295,32 +570,22 @@ class TableHandle:
         chunk_size: int = 1000,
         progress: Callable[[int, int], None] | None = None,
     ) -> PendingRow | list[PendingRow]:
-        """Write rows.
+        """Write rows. Raises DerivaMLNoExecutionContext on handles
+        obtained via ml.table(). On exe.table() handles:
         - Online mode: rows reach the catalog by the time .insert()
           returns.
         - Offline mode: rows stage in workspace SQLite; upload drains
-          them at exe.upload_execution_outputs().
+          them at exe.upload_outputs().
         Accepts scalar / Iterable / DataFrame; returns scalar or list
         accordingly. Validation via self.record_class() at call time;
         invalid records raise regardless of mode."""
 
-    def pending(
-        self, *, status: str | list[str] | None = None,
-    ) -> list[PendingRow]:
-        """Pending rows for this table, filtered by status. Includes
-        staged/leasing/leased and any in failed awaiting retry."""
-
-    def discard_pending(
-        self,
-        *,
-        rows: Iterable[PendingRow] | None = None,
-        status: str | list[str] | None = None,
-    ) -> int:
-        """Remove pending rows matching the filter. Does not reclaim
-        already-acquired server leases."""
+    def pending(self, *, status: str | list[str] | None = None) -> list[PendingRow]: ...
+    def discard_pending(self, *, rows: Iterable[PendingRow] | None = None,
+                        status: str | list[str] | None = None) -> int: ...
 ```
 
-#### 2.6.2 `AssetTableHandle` surface (extends `TableHandle`)
+#### 2.10.2 `AssetTableHandle` surface (extends `TableHandle`)
 
 ```python
 class AssetTableHandle(TableHandle):
@@ -349,14 +614,10 @@ class AssetTableHandle(TableHandle):
         glob: str = "*",
         recurse: bool = False,
         copy_files: bool = False,
-    ) -> AssetDirectoryHandle:
-        """Register a directory of files for upload. Takes NO metadata
-        kwargs; zero-ceremony default. For per-file metadata, use the
-        returned handle's register() or set_metadata(), or iterate
-        pending() and set .metadata per file."""
+    ) -> AssetDirectoryHandle: ...
 ```
 
-#### 2.6.3 `AssetDirectoryHandle`
+#### 2.10.3 `AssetDirectoryHandle`
 
 ```python
 class AssetDirectoryHandle:
@@ -364,36 +625,21 @@ class AssetDirectoryHandle:
     rule_id: int
     table: AssetTableHandle
 
-    def register(self, file: str | Path) -> AssetFilePath:
-        """Eagerly register a specific file. Use when you need the
-        handle to reference its .rid from another row's insert."""
-
-    def scan(self) -> list[AssetFilePath]:
-        """Walk source_dir (respecting glob / recurse), register new
-        files not yet seen under this rule. Idempotent."""
-
-    def pending(self) -> list[AssetFilePath]:
-        """All AssetFilePaths under this rule not yet uploaded."""
+    def register(self, file: str | Path) -> AssetFilePath: ...
+    def scan(self) -> list[AssetFilePath]: ...
+    def pending(self) -> list[AssetFilePath]: ...
 
     def set_metadata(
-        self,
-        source: "pd.DataFrame",
-        *,
-        filename_col: str = "Filename",
-    ) -> None:
-        """Batch-set metadata across all pending files under this rule.
-        One SQLite transaction. DataFrame indexed by filename; other
-        columns become metadata. Each resolved value validated through
-        record_class."""
+        self, source: "pd.DataFrame", *, filename_col: str = "Filename",
+    ) -> None: ...
 
-    def close(self) -> None:
-        """Final scan, mark rule closed. Further register/scan raise."""
+    def close(self) -> None: ...
 ```
 
-Deleted files between scans are not auto-removed; upload surfaces
-them as per-row failures.
+Deleted files between scans are not auto-removed; upload surfaces them
+as per-row failures.
 
-#### 2.6.4 Handle read properties
+#### 2.10.4 Handle read properties
 
 Both `PendingRow` and `AssetFilePath` expose:
 
@@ -409,88 +655,156 @@ issues a SELECT, every write commits an UPDATE. Consistent across
 multiple handles pointing at the same entry. Bulk operations use the
 batch setters.
 
-### 2.7 Upload drain
+### 2.11 `PendingSummary` and upload operations
 
-`exe.upload_execution_outputs()`:
-
-1. **Status transition.** Execution `status` → `pending_upload`.
-2. **Final scan.** For every active `AssetDirectoryHandle` rule, run
-   `scan()` to pick up files written since last register/scan.
-3. **Re-validation.** Re-fetch the catalog model; re-validate each
-   pending row's `metadata_json` against the typed record class.
-   Catches schema drift (required column added, FK tightened).
-4. **Batch-lease.** Remaining `status='staged'` rows have RIDs leased
-   in chunked POSTs.
-5. **Inter-table FK topological sort.** Build a DAG over pending
-   rows. Cycle → `DerivaMLCycleError` listing the cycle's tables.
-   Intra-table FK cycles unsupported (§7).
-6. **Materialize staging tree + invoke existing upload pipeline** per
-   topological level. Files to Hatrac, URL/MD5 patching, ERMrest row
-   inserts via `GenericUploader`.
-7. **Reconcile status.** Each row → `uploaded` or `failed`. On first
-   level with failures, the drain aborts after recording all failures
-   in that level. Execution `status` → `uploaded` (all succeeded) or
-   `failed` (any failed).
-
-**Transaction semantics.** Each row insert is its own transaction.
-No batch rollback. Partial success after a crash is the expected
-state; per-row `status` in SQLite enables resumability across
-processes and machines.
-
-**`retry_failed()`.** Convenience on `Execution` — resets
-`status='failed'` entries to `status='leased'` and re-runs
-`upload_execution_outputs`.
-
-### 2.8 Online-mode inline drain
-
-In online mode, `.insert(plain_rows)` also drains the entries it
-created before returning. Implementation: after staging N rows,
-`_drain_pending(execution_rid, entry_ids=[...])` runs steps 4–7 of
-§2.7 restricted to those entries.
-
-Asset-file calls (`.asset_file(...)`, `.asset_directory(...)`) do NOT
-drain eagerly even in online mode — they always defer until
-`upload_execution_outputs`.
-
-So in practice:
-
-- Online + `.insert(plain_row)` → row is in catalog by return.
-- Online + `.asset_file(file, ...)` → staged; reaches catalog at
-  `upload_execution_outputs`.
-- Offline + anything → staged; nothing reaches catalog until
-  `upload_execution_outputs`.
-
-### 2.9 Error handling
-
-V1 is fail-fast: the drain aborts after the first level with failures.
-Pending rows not yet attempted keep their status for inspection and
-retry. A best-effort mode is deferred (§7).
-
-`handle.pending(status='failed')` for triage. `error` carries the
-message. User edits metadata or fixes referenced rows, then
-`exe.retry_failed()`.
-
-### 2.10 Backward-compatibility shims
-
-Existing public methods become thin shims delegating to the new
-surface. No caller changes required.
+#### 2.11.1 PendingSummary dataclasses
 
 ```python
-# exe.asset_file_path(asset_name, file, ...):
-exe.table(asset_name).asset_file(file, ...)
+@dataclass(frozen=True)
+class PendingRowCount:
+    table: str                    # "deriva-ml:Image"
+    pending: int
+    failed: int
+    uploaded: int
 
-# ml.asset_record_class(table):
-exe.table(table).record_class()
+@dataclass(frozen=True)
+class PendingAssetCount:
+    table: str
+    pending_files: int
+    failed_files: int
+    uploaded_files: int
+    total_bytes_pending: int
 
-# ml.restore_execution(rid):
-ml.resume_execution(rid)
+@dataclass(frozen=True)
+class PendingSummary:
+    execution_rid: str
+    rows: list[PendingRowCount]
+    assets: list[PendingAssetCount]
+    diagnostics: list[str]
 
-# exe.table_path(name):
-exe.table(name).upload_csv_path()
+    @property
+    def has_pending(self) -> bool: ...
+    @property
+    def total_pending_rows(self) -> int: ...
+    @property
+    def total_pending_files(self) -> int: ...
 
-# ml.find_executions(...):   # existing, server-side enumeration
-# delegates to ml.list_executions(...) when called locally.
+    def render(self) -> str: ...     # human-readable multi-line
+
+@dataclass(frozen=True)
+class WorkspacePendingSummary:
+    per_execution: list[PendingSummary]
+    @property
+    def total_executions_with_pending(self) -> int: ...
+    def render(self) -> str: ...
 ```
+
+#### 2.11.2 Upload engine
+
+All upload surfaces (`exe.upload_outputs`, `ml.upload_pending`,
+`ml.start_upload`, CLI) drive one internal engine:
+
+```
+_upload_engine(ml, execution_rids, retry_failed, bandwidth_mbps, parallel):
+  1. Enumerate pending items from SQLite for the selected executions:
+     - pending_rows in status staged/leasing/leased/failed-if-retry
+     - asset files in status staged/uploading/failed-if-retry
+  2. For each table, final scan of AssetDirectoryHandle rules.
+  3. Re-validate each pending row's metadata against current catalog
+     schema (catches drift between stage and upload).
+  4. Batch-lease RIDs for any status='staged' rows.
+  5. Build inter-table FK DAG; topological sort. Cycle →
+     DerivaMLCycleError.
+  6. For each topological level, in parallel (bounded by
+     parallel_files):
+     - For asset files: call deriva-py uploader (idempotent, resumable
+       at chunk granularity).
+     - For plain rows: materialize staging CSV, invoke upload pipeline.
+     - Update SQLite row status per-item with fsync.
+  7. On first level with failures, drain aborts after recording all
+     failures in that level. Execution status → uploaded (all
+     succeeded) or failed (any failed).
+```
+
+**Resumability.** Deriva-py's uploader writes per-chunk state to
+`.deriva-upload-state-{hostname}.json` with fsync; killed mid-chunk,
+a re-run resumes from the next chunk. Server-side Hatrac rejects
+duplicate content by hash, so any item the client thinks needs upload
+but which is already there is a cheap HEAD + skip. The engine combines
+these with SQLite's queue-level state to make the whole pipeline
+idempotent: re-running `upload_pending` after any kind of crash
+converges to the same final state without duplication.
+
+#### 2.11.3 UploadJob (non-blocking form)
+
+```python
+class UploadJob:
+    id: str
+    status: Literal["running", "paused", "completed", "failed", "cancelled"]
+
+    def progress(self) -> UploadProgress: ...
+    def pause(self) -> None: ...
+    def resume(self) -> None: ...
+    def cancel(self) -> None: ...     # finishes current in-flight, stops new
+    def wait(self, timeout: float | None = None) -> UploadReport: ...
+
+@dataclass(frozen=True)
+class UploadProgress:
+    total_rows: int
+    uploaded_rows: int
+    total_bytes: int
+    uploaded_bytes: int
+    current_mbps: float
+    eta_seconds: float | None
+    current_file: str | None
+    failures: list[str]
+```
+
+`UploadJob` state lives in SQLite (`upload_jobs` table); the worker
+thread updates it. If the process dies, state survives and
+`ml.get_upload_job(id).resume()` restarts work from where the queue
+left off.
+
+#### 2.11.4 CLI
+
+```
+deriva-ml upload [--execution RID]... [--retry-failed]
+                 [--bandwidth-mbps N] [--parallel N]
+                 [--host HOSTNAME] [--catalog CATALOG_ID]
+```
+
+Wraps `upload_pending`. Ships as a console-script entry point.
+Supports shell backgrounding (`nohup deriva-ml upload &`,
+launchd/systemd units) for operator-driven uploads on a
+network-managed schedule.
+
+### 2.12 Context-manager exit behavior (R6.3)
+
+On `with exe.execute() as e:` exit:
+
+1. Update execution status (`stopped` on clean exit, `failed` on
+   exception).
+2. Compute `pending_summary()`; if `has_pending`, emit INFO log:
+
+   ```
+   INFO [Execution EXE-A] exited with pending uploads:
+     rows:    Image (12 pending, 0 failed)
+              Subject (3 pending, 0 failed)
+     assets:  Execution_Metadata (2 files, 4.2MB pending)
+     Call exe.upload_outputs() to flush, or exe.pending_summary() for details.
+   ```
+
+3. `Execution.__repr__` reflects pending counts.
+
+**No auto-upload on exit.** Rationale per guideline §0: auto-upload
+at exit conflicts with two important properties:
+- **Offline mode** — the user may not be connected.
+- **Restart after failure** — an auto-upload that fails at exit
+  destroys the ability to retry from a clean state, and blocks exit
+  on a long-running operation.
+
+An opt-in `create_execution(upload_on_exit=True)` is deferred to a
+future version if usage patterns demand it. The default is explicit.
 
 ## 3. Walkthrough — three-script workflow
 
@@ -503,29 +817,25 @@ they upload.
 **Script 1 — create the execution (online):**
 
 ```python
-ml = DerivaML(hostname="example.org", catalog_id="42")   # default: online
+ml = DerivaML(hostname="example.org", catalog_id="42")    # default: online
 exe = ml.create_execution(
-    ExecutionConfiguration(
-        datasets=[DatasetSpecConfig(rid="1-XYZ", version="1.0.0")],
-        workflow=my_workflow,
-        description="Segmentation run 2026-04-18",
-    )
+    datasets=["1-XYZ@1.0.0"],                              # kwargs form
+    workflow=my_workflow,
+    description="Segmentation run 2026-04-18",
 )
 
 with exe.execute() as e:
     bag = e.datasets["1-XYZ"].bag          # download to workspace
 # SQLite executions row: rid=5-ABC, status='stopped', mode='online',
 #   config_json=<serialized>, working_dir_rel='execution/5-ABC'.
+# Catalog Execution row synced: status='stopped'.
 ```
-
-User captures `exe.execution_rid` somehow — prints, notebook, copies
-to laptop. They can also always look it up via
-`ml.list_executions()`.
 
 **Script 2 — offline computation:**
 
 ```python
-ml = DerivaML(hostname="example.org", catalog_id="42", mode="offline")
+ml = DerivaML(hostname="example.org", catalog_id="42",
+              mode=ConnectionMode.offline)
 
 for record in ml.find_incomplete_executions():
     print(record.rid, record.status, record.description)
@@ -534,7 +844,7 @@ for record in ml.find_incomplete_executions():
 exe = ml.resume_execution("5-ABC")   # from SQLite, no server contact
 
 with exe.execute() as e:
-    bag = e.datasets["1-XYZ"].bag    # already local
+    bag = e.datasets["1-XYZ"].bag
 
     for image_rid in bag.list_dataset_members()["Image"]:
         img = bag.get_row("Image", image_rid)
@@ -548,66 +858,66 @@ with exe.execute() as e:
 
         exe.table("Prediction").insert({
             "Image": image_rid,
-            "Mask": mask.rid,           # lazy-leased; batches on read
+            "Mask": mask.rid,
             "Confidence": conf,
         })
+# Exit INFO log:
+#   [Execution 5-ABC] exited with pending uploads:
+#     rows:    Prediction (N pending, 0 failed)
+#     assets:  Segmentation_Mask (N files, ~M MB pending)
 # SQLite state after script 2:
-#   executions.5-ABC.status = 'stopped'
-#   pending_rows: N masks + N predictions, status='staged' / 'leased'
+#   executions.5-ABC.status = 'stopped', sync_pending=1
+#   pending_rows: 2N rows, status='staged' / 'leased'
 ```
-
-In `mode="offline"`, `.insert()` stages Prediction rows rather than
-going live. `.asset_file()` would have deferred anyway. Lease POSTs
-for `mask.rid` reads need the server briefly; the user can batch
-these by avoiding `.rid` reads until reconnection, in which case the
-upload drain issues them all in one shot.
 
 **Script 3 — upload (online):**
 
 ```python
 ml = DerivaML(hostname="example.org", catalog_id="42")   # online
 
-for record in ml.find_incomplete_executions():
-    print(record.rid, record.status, record.pending_rows)
-# Prints: 5-ABC  stopped  <N+N pending>
+print(ml.pending_summary().render())
+# Workspace pending summary:
+#   Execution 5-ABC (stopped):
+#     rows:    Prediction (N pending)
+#     assets:  Segmentation_Mask (N files, ~M MB pending)
 
-exe = ml.resume_execution("5-ABC")
-exe.upload_execution_outputs()
-# Drain:
-#   - final scan (no-op; no directory rules)
-#   - re-validate metadata against fresh catalog model
-#   - lease any remaining RIDs
-#   - FK topo-sort: Masks before Predictions
-#   - materialize staging tree, invoke upload pipeline
-#   - status: pending_rows → uploaded; executions.5-ABC → uploaded
+ml.upload_pending(execution_rids=["5-ABC"])
+# Drain runs; status transitions to 'uploaded'.
 ```
 
-The execution RID (`5-ABC`) is preserved across all three scripts
-because it's stored in `executions.rid` in SQLite. Every
-`pending_rows.execution_rid` points at it. The upload writes rows
-with correct provenance.
+Or, operator-driven from a shell (say, an overnight schedule):
+
+```
+$ deriva-ml upload --host example.org --catalog 42 --execution 5-ABC \
+                   --bandwidth-mbps 50 --parallel 4
+```
+
+Same engine; different driver.
 
 ## 4. Algorithms
 
 ### 4.1 Handle construction
 
 ```
-exe.table(name, schema=None):
+ml.table(name, schema=None) / exe.table(name, schema=None):
   1. Resolve via model.name_to_table(name, schema=schema). Raise
      DerivaMLTableNotFound if missing or ambiguous-without-schema.
-  2. If model.is_asset(table): return AssetTableHandle(exe, table).
-     Else:                      return TableHandle(exe, table).
-  Handles hold exe + table references. No cached state.
+  2. If model.is_asset(table): return AssetTableHandle(self, table).
+     Else:                      return TableHandle(self, table).
+  Handles hold the owner (ml or exe) and table reference. No cached state.
+  ml-bound handles set .execution = None; write methods check and raise
+  DerivaMLNoExecutionContext.
 ```
 
 ### 4.2 `TableHandle.insert(records)`
 
 ```
-1. Normalize records:
+1. If self.execution is None: raise DerivaMLNoExecutionContext.
+2. Normalize records:
    - DataFrame → list of dicts.
    - Scalar → list of one (flag: scalar_input).
    - Iterable → materialize in chunks.
-2. For each chunk:
+3. For each chunk:
    a. For each rec:
       - RowRecord: pass through.
       - dict: rec = self.record_class()(**rec). Raises on failure.
@@ -617,23 +927,23 @@ exe.table(name, schema=None):
       status='staged', rid=NULL.
    e. COMMIT.
    f. progress(done, total) if provided.
-3. Update executions.last_activity = now().
-4. If exe.ml.mode == 'online':
+4. Update executions.last_activity = now().
+5. If self.execution.mode == ConnectionMode.online:
    _drain_pending(execution_rid, entry_ids=[...]).
-5. Return scalar handle or list.
+6. Return scalar handle or list.
 ```
 
 ### 4.3 `AssetTableHandle.asset_file(file, ...)`
 
 ```
-1. Validate file, determine staging path.
-2. Symlink/copy file to assets/{AssetTable}/.
-3. Construct metadata record via self.record_class()(
-   **{metadata, **kwargs}).
-4. Generate lease_token.
-5. Write pending_rows with asset_file_path set, status='staged'.
-6. Update executions.last_activity.
-7. Return AssetFilePath bound to the entry. No drain.
+1. If self.execution is None: raise DerivaMLNoExecutionContext.
+2. Validate file, determine staging path.
+3. Symlink/copy file to assets/{AssetTable}/.
+4. Construct metadata record via self.record_class()(**{metadata, **kwargs}).
+5. Generate lease_token.
+6. Write pending_rows with asset_file_path set, status='staged'.
+7. Update executions.last_activity.
+8. Return AssetFilePath bound to the entry. No drain.
 ```
 
 ### 4.4 Lazy `.rid` materialization
@@ -663,15 +973,28 @@ exe.table(name, schema=None):
 ```
 1. Query executions WHERE rid=<rid>.
 2. If not found: raise DerivaMLException("Execution {rid} not in workspace").
-3. Load configuration from executions.config_json.
-4. Construct Execution object bound to self.
-5. Execution carries exe.execution_rid=<rid>. Any exe.table(...)
-   calls scope pending rows to this rid.
-6. Do NOT contact the server.
-7. Return Execution.
+3. Just-in-time reconciliation:
+   a. If executions.sync_pending=1 and mode=online:
+      Flush SQLite state to catalog Execution row. Clear sync_pending.
+   b. Else if mode=online:
+      GET catalog Execution row. Compare status with SQLite. Apply
+      disagreement rules (§2.2). Raise on unexpected mismatch.
+4. Load configuration from executions.config_json.
+5. Construct Execution object bound to self.
+6. Return Execution.
 ```
 
 ### 4.7 Execution lifecycle transitions
+
+Every transition is a single call to `state_machine.transition(rid,
+target_status, **metadata)` which:
+1. Opens SQLite transaction.
+2. Validates current→target is legal.
+3. Updates SQLite row (status, timestamp, error, etc.).
+4. If online mode: PUTs catalog Execution row; on PUT failure sets
+   sync_pending=1, commits SQLite anyway.
+5. If offline mode: sets sync_pending=1, commits SQLite.
+6. Commits transaction.
 
 ```
 create_execution:
@@ -679,54 +1002,67 @@ create_execution:
   2. POST Execution row to catalog → rid=<assigned>.
   3. Serialize ExecutionConfiguration to config_json.
   4. INSERT executions row: rid, status='created', mode, config_json,
-     start_time=NULL, last_activity=now().
+     start_time=NULL, last_activity=now(), sync_pending=0.
   5. Return Execution.
 
 .execute() context enter:
-  UPDATE executions SET status='running', start_time=now()
-     WHERE rid=<rid>.
+  transition(rid, 'running', start_time=now())
 
 .execute() context exit OK:
-  UPDATE executions SET status='stopped', stop_time=now()
-     WHERE rid=<rid>.
+  transition(rid, 'stopped', stop_time=now())
+  + emit exit log; update __repr__ via pending_summary.
 
 .execute() context exit w/ exception:
-  UPDATE executions SET status='failed', stop_time=now(), error=<msg>
-     WHERE rid=<rid>.
+  transition(rid, 'failed', stop_time=now(), error=<msg>)
 
-upload_execution_outputs start:
-  UPDATE executions SET status='pending_upload' WHERE rid=<rid>.
+upload_outputs start:
+  transition(rid, 'pending_upload')
 
-upload_execution_outputs OK:
-  UPDATE executions SET status='uploaded' WHERE rid=<rid>.
+upload_outputs OK:
+  transition(rid, 'uploaded')
 
-upload_execution_outputs w/ failures:
-  UPDATE executions SET status='failed', error=<msg> WHERE rid=<rid>.
-  (retry_failed resets individual rows back to 'leased'.)
+upload_outputs w/ failures:
+  transition(rid, 'failed', error=<msg>)
 
 exe.abort():
-  UPDATE executions SET status='aborted' WHERE rid=<rid>.
-  Pending rows remain; user can discard_pending or resume.
+  transition(rid, 'aborted')
 ```
 
 ## 5. Testing
 
 ### 5.1 Unit tests (no live catalog)
 
-Registry:
-- `create_execution` writes SQLite row.
+Registry + state machine:
+- `create_execution` writes SQLite row; catalog PUT mocked.
 - `resume_execution(rid)` reads from SQLite; works without server.
 - `resume_execution(missing_rid)` raises.
-- `list_executions()` returns all rows; filter combinations work.
+- `list_executions()` with each filter combination.
 - `find_incomplete_executions()` returns expected status set.
 - `gc_executions(older_than=...)` removes matching rows.
-- Lifecycle transitions produce correct status sequences.
-- Crash between `running` and `stopped`: restart → status still
-  `running`; user intervention required (`abort()` or new `execute()`).
+- Each lifecycle transition produces correct status sequence.
+- State-machine validates current→target legality; illegal raises.
+- `sync_pending` set on PUT failure; cleared on successful flush.
+- Disagreement rules: each of the six cases produces expected outcome.
+- Read-through properties: status/start_time/stop_time/error reflect
+  SQLite mutations by another process.
+
+Connection mode:
+- `ConnectionMode.online` (default), `ConnectionMode.offline` accepted.
+- String literals "online"/"offline" coerced.
+- Invalid values raise pydantic validation error.
+
+Kwargs form of create_execution:
+- `create_execution(config=X)` works.
+- `create_execution(datasets=[...], workflow=...)` works.
+- Mixing `config` with other kwargs raises TypeError.
+- String shorthand `"RID@version"` coerces to DatasetSpecConfig.
 
 Handle dispatch:
 - `exe.table(plain)` → `TableHandle`; no asset methods.
 - `exe.table(asset)` → `AssetTableHandle`; asset methods present.
+- `ml.table(plain).insert(...)` → `DerivaMLNoExecutionContext`.
+- `ml.table(asset).asset_file(...)` → `DerivaMLNoExecutionContext`.
+- `ml.table(plain).record_class()` works.
 - Ambiguous name without schema raises.
 
 Insert:
@@ -752,39 +1088,74 @@ Directory handle:
 - `set_metadata(df)` validates every resolved value.
 - Deleted file → not auto-removed; upload surfaces failure.
 
-Compatibility shims:
-- `exe.asset_file_path(...)` delegates.
-- `ml.asset_record_class(...)` delegates.
-- `ml.restore_execution(...)` delegates to `ml.resume_execution(...)`.
+PendingSummary & exit behavior:
+- `pending_summary()` correct counts across tables.
+- Context-manager exit logs INFO when `has_pending`.
+- `__repr__` includes pending counts.
+- No auto-upload on exit (regression guard).
+
+Upload engine:
+- `upload_pending(execution_rids=[...])` drives engine; correct final
+  status.
+- `retry_failed=True` picks up `status='failed'` entries.
+- Crash mid-drain: re-run converges (SQLite status preserved).
+- Topological order respected; FK cycle raises `DerivaMLCycleError`.
+- Bandwidth limit honored (rate-limited egress).
+
+UploadJob:
+- `start_upload` returns running job.
+- `progress()` reports per-item counts.
+- `pause()` / `resume()` / `cancel()` transitions.
+- Process-exit + `get_upload_job(id).resume()` picks up.
+
+CLI:
+- `deriva-ml upload --execution RID` runs to completion.
+- `--bandwidth-mbps N` respected.
 
 ### 5.2 Integration tests (live catalog)
 
 Online mode:
-- `ml.create_execution(config)` writes SQLite + server.
+- `ml.create_execution(kwargs)` writes SQLite + server.
 - `exe.table("Subject").insert({...})` reaches catalog before return.
-- `exe.table("Image").asset_file(...)` + `upload_execution_outputs()`:
+- `exe.table("Image").asset_file(...)` + `exe.upload_outputs()`:
   file in Hatrac, row in catalog.
+- Status sync: each transition visible in catalog Execution row.
 
 Offline mode:
-- Same code with `mode="offline"`: rows reach catalog at
-  `upload_execution_outputs()`, not at `.insert()` time.
-- `create_execution` with `mode="offline"` raises.
+- Same code with `mode=ConnectionMode.offline`: rows reach catalog at
+  `exe.upload_outputs()`, not at `.insert()` time.
+- `create_execution` with `mode=ConnectionMode.offline` raises.
+- On reconnect (online resume_execution), sync_pending flushed.
 
 Split-script workflow:
-- Script A (online): create_execution, download bag, print exe.rid.
+- Script A (online): create_execution kwargs form, download bag.
 - Script B (offline): resume_execution(rid), insert rows, exit.
-- Script C (online): resume_execution(rid), upload_execution_outputs.
+- Script C (online, separate process):
+  `ml.upload_pending(execution_rids=[rid])`.
 - Verify: catalog Subject rows have correct `Execution` FK / RCB;
   RID assigned in script B matches catalog.
+
+Separate-process upload:
+- Script A (online): create execution, stage rows.
+- Script B (subprocess `deriva-ml upload`): drains.
+- Script A sees `uploaded` status after B completes.
 
 Resumption robustness:
 - Crash mid-insert: re-open workspace → `find_incomplete_executions`
   surfaces the execution; `resume_execution` works; pending_rows
   intact.
 - Crash mid-upload: `find_incomplete_executions` surfaces it;
-  `retry_failed` completes the remaining work.
+  `upload_outputs(retry_failed=True)` completes the remaining work.
 - Corrupted configuration.json on disk: `resume_execution` still
   works (reads from SQLite).
+- Kill during large-file upload: resume picks up at chunk boundary
+  (deriva-py state + server dedupe).
+
+Disagreement scenarios:
+- External abort of execution: SQLite says running, catalog says
+  aborted → SQLite updated, resume raises.
+- External upload completion: SQLite says pending_upload, catalog says
+  uploaded → SQLite updated, pending rows cleared.
 
 Edge cases:
 - Inter-table FK cycle raises `DerivaMLCycleError`.
@@ -794,46 +1165,55 @@ Edge cases:
 
 ### 5.3 Regression
 
-- Existing `exe.asset_file_path` tests (via shim).
-- Existing `ml.restore_execution` tests (via shim).
-- Existing `ml.find_executions` tests (via shim).
-- Existing `upload_execution_outputs` asset tests.
+After hard-cutover renames, all existing tests that referenced the old
+names are updated as part of the rename PR (not shim-tested).
 
-## 6. Key simplifications from earlier revisions
+## 6. Evolution from earlier revisions
 
-The spec reached rev 5 through several pivots. Summary of rejected
-complexity:
+Revision highlights:
 
-- **Separate `stage` and `insert` verbs** (rev 2/3) — collapsed. One
-  `insert` handles both, online vs offline is a mode.
-- **Workspace-scoped pending rows** (rev 3) — dropped. Everything is
-  execution-scoped.
-- **`dedupe_key` for notebook idempotency** — dropped. Users
-  `discard_pending` + re-run.
-- **`best_effort` upload mode** — dropped. Fail-fast is V1.
-- **Handle-as-FK implicit coercion** — dropped. Users pass `.rid`
-  explicitly. Self-documenting at the call site.
-- **`TableHandle.insert` as pathBuilder passthrough** — dropped. The
-  one `insert` does the right thing for the current mode.
-- **Forwarding catalog metadata through TableHandle** — dropped.
-  Users reach `ml.model` for schema metadata; `TableHandle` is for
-  operations only.
-- **Sidecar CSV metadata for directories** — dropped. SQLite is the
-  single metadata source; users who have a CSV convert it to a
-  DataFrame and call `set_metadata(df)`.
+- **Rev 2/3:** Separate `stage` and `insert` verbs. Collapsed in rev 4.
+- **Rev 3:** Workspace-scoped pending rows. Dropped in rev 4;
+  everything is execution-scoped.
+- **Rev 4:** `dedupe_key`, `best_effort` mode, handle-as-FK coercion,
+  sidecar CSV metadata. All dropped for rev 5 simplicity.
+- **Rev 5:** Reached 10-concept API with single write verb.
+- **Rev 6 (this revision):** API-consistency pass against the
+  cross-cutting analysis:
+  - `ConnectionMode` enum (stricter than string).
+  - Execution state machine as a dedicated module with catalog sync
+    and `sync_pending` reconciliation.
+  - Execution lifecycle fields as SQLite read-through.
+  - Hierarchy queries moved from `Execution` to `ml.*`.
+  - `ml.table()` as schema-introspection sibling of `exe.table()`.
+  - `retry_failed` merged into `upload_outputs` / `upload_pending`.
+  - `create_execution` kwargs form alongside config-object form.
+  - Metrics and params as first-class concepts parallel to features
+    (deferred to follow-on task, §8).
+  - `pending_summary` on `Execution`, `ExecutionRecord`, and
+    workspace-level.
+  - Upload as async-capable operation with `ml.upload_pending`,
+    `ml.start_upload` / `UploadJob`, CLI, all sharing one engine.
+  - Hard deprecation policy (no shims).
+  - Reproducibility-over-ergonomics guideline (§0) captured.
 
-Concept count after rev 5: **10**.
+Concept count after rev 6: **13**.
 
-1. `DerivaML(..., mode="online"|"offline")` — mode at construction.
+1. `DerivaML(..., mode=ConnectionMode.online|offline)` — mode at
+   construction.
 2. `ml.list_executions() / find_incomplete_executions() / resume_execution()` — registry.
-3. `ml.create_execution()` — online only.
-4. `exe.table(name)` — row-level entry point.
-5. `TableHandle / AssetTableHandle` — asset variant adds file methods.
-6. `handle.record_class()` — typed record.
-7. `handle.insert(records)` — one write verb.
-8. `handle.pending() / discard_pending()` — triage.
-9. `handle.asset_file() / asset_directory()` — asset-specific.
-10. `exe.upload_execution_outputs()` — drain.
+3. `ml.create_execution(...)` — online only, kwargs or config form.
+4. `ml.table(name)` — schema-introspection (read-only).
+5. `exe.table(name)` — row-level entry point, execution-scoped writes.
+6. `TableHandle / AssetTableHandle` — asset variant adds file methods.
+7. `handle.record_class()` — typed record.
+8. `handle.insert(records)` — one write verb.
+9. `handle.pending() / discard_pending()` — triage.
+10. `handle.asset_file() / asset_directory()` — asset-specific.
+11. `exe.pending_summary() / ml.pending_summary()` — inspection.
+12. `exe.upload_outputs() / ml.upload_pending() / ml.start_upload() +
+    UploadJob / deriva-ml upload` — drain.
+13. `ml.list_nested_executions(of=...) / find_execution_ancestors(of=...)` — hierarchy.
 
 ## 7. Known limits
 
@@ -841,8 +1221,8 @@ Concept count after rev 5: **10**.
 - **Intra-table FK cycles:** unsupported. Users split into batches.
 - **Binary columns (`bytea`):** unsupported; `insert()` raises
   `NotImplementedError`. Asset-table route is the supported path.
-- **CSV-based insert roundtrip (§2.7 step 6):** transitional. V2 can
-  swap to direct `pathBuilder` insert without public-API change.
+- **CSV-based insert roundtrip (§2.11.2 step 6):** transitional. V2
+  can swap to direct `pathBuilder` insert without public-API change.
 - **Orphaned server leases:** possible only if client loses its
   workspace state after a successful lease POST. Not reconcilable
   from the client; server-side GC is an ERMrest concern.
@@ -852,3 +1232,70 @@ Concept count after rev 5: **10**.
   deferred. V2 can add these when users hit their absence.
 - **Cross-machine workspace sync:** user's concern; the library does
   not replicate `workspace.db` between machines.
+- **Upload on context-manager exit:** intentionally not auto; an
+  opt-in `upload_on_exit=True` is deferred to future revision.
+
+## 8. Scoped follow-on: Feature system + Metric/Param + SQLite consistency
+
+Deferred to a dedicated design task after this spec lands.
+
+**Scope:** Revisit the feature system, introduce `Metric` and `Param`
+as first-class concepts parallel to features, and ensure consistency
+of all three (features, metrics, params) against the SQLite-backed
+staging layer.
+
+**Specifically:**
+
+### 8.1 Metric and Param as first-class concepts
+
+Row-form complement to execution metadata files. Subject is the run
+(not data rows, so not features); content is scalar and queryable
+(not files or metadata blobs).
+
+**Parallel to features** to minimize cognitive load:
+
+| Action | Feature | Metric | Param |
+|---|---|---|---|
+| Declare | `ml.create_feature(target_table, name, metadata)` | `ml.create_metric(name, unit, higher_is_better, description)` | `ml.create_param(name, unit, description)` |
+| Record | `exe.add_feature_value(name, target, **v)` | `exe.record_metric(name, value, step=None)` | `exe.record_param(name, value)` |
+| List | `ml.list_features()` | `ml.list_metrics()` | `ml.list_params()` |
+| Readback | `bag.feature_values(name)` | `exe.metrics(name=None)` | `exe.params()` |
+
+**Schema:**
+- Vocabulary tables `Metric_Name`, `Param_Name` (curated, not
+  auto-populated, parallel to `Feature_Name`).
+- Single shared data tables `ExecutionMetric`, `ExecutionParam` (FK
+  to vocabulary; fixed scalar shape for query efficiency).
+- Metric vocab carries `Unit` and `Higher_Is_Better` to enable
+  unit-aware queries and automatic best-run selection.
+
+**Typo safety:** `record_metric` on an undeclared name raises
+`DerivaMLInvalidTerm` — same behavior as `add_feature_value` on an
+undeclared feature. Per guideline §0: the declaration step is
+acceptable friction in service of vocabulary integrity.
+
+### 8.2 SQLite integration
+
+All three (features, metrics, params) stage through SQLite
+`pending_rows` identically. Drain through the same upload engine.
+Offline-safe. Typed via `record_class()`.
+
+### 8.3 Readback shapes
+
+Determine long-format vs wide-format conventions for
+`exe.metrics(name=None)`, cross-run comparison helpers
+(`ml.compare_metrics(...)`), and ensure the `DatasetBag` readback
+surface stays consistent with the live-catalog surface.
+
+### 8.4 Task deliverables
+
+A separate spec at `docs/superpowers/specs/YYYY-MM-DD-feature-metric-param-consistency.md`
+covering:
+- Full schema for `Metric_Name`, `Param_Name`, `ExecutionMetric`,
+  `ExecutionParam`.
+- Full API surface (create/record/list/readback for each).
+- SQLite staging integration.
+- Cross-concept consistency review (shared naming conventions,
+  parallel error handling, shared underlying machinery).
+- Migration: no changes to existing feature API; metric/param are
+  additive.
