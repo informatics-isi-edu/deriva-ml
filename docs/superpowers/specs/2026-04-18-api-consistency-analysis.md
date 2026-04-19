@@ -374,20 +374,29 @@ schema-migration note for catalogs that don't yet have them.
 
 **ML finding F7 (weekly).** Today's `execution.py` docstring says in
 ALL CAPS: "This method must be called AFTER exiting the context
-manager, not inside it." That's a warning that the shape is wrong.
+manager, not inside it." Users forget; nothing gets uploaded.
 
-**Fix.** Change the default to auto-upload on clean exit:
-```python
-with exe.execute() as e:
-    ...
-# online mode + clean exit → auto-upload happens here
-# failed exit or offline mode → no auto-upload
-```
+**Non-fix: auto-upload on exit.** Rejected per user review. Two
+reasons:
 
-Let advanced users opt out: `with exe.execute(auto_upload=False): ...`.
+1. Auto-upload breaks offline mode — a `with exe.execute():` in
+   offline mode would either fail (no server) or silently skip,
+   making behavior differ from online mode and violating rev-5's
+   "same code online or offline" principle.
+2. Auto-upload destroys restart-on-failure workflows. Keeping upload
+   as a separate explicit step preserves the triage → fix → retry
+   cycle.
 
-**Scope.** Half day; modify `__exit__` to call `upload_execution_outputs`
-conditionally.
+**Fix: surface the state at exit, don't act.**
+
+- `Execution.__exit__` logs an INFO message noting how many pending
+  rows exist and reminding the user of the next step
+  (`upload_execution_outputs()` or `resume_execution(rid)` later).
+- `Execution.__repr__` after exit includes pending-row count for
+  interactive visibility.
+- Rev-6 spec documents explicitly: exit does NOT upload.
+
+**Scope.** Half day.
 
 ## 4. Technical debt (V2+)
 
@@ -470,7 +479,10 @@ or shortly after rev 5 and meaningfully improve user experience:
 
 1. **`create_execution` kwargs form** (§3.7 above).
 2. **`log_metric` / `log_param` primitives** (§3.8 above).
-3. **Auto-upload on context-manager exit** (§3.9 above).
+3. **Surface pending-row state at context-manager exit** (§3.9
+   above) — log message + `__repr__` update, NOT auto-upload.
+   Auto-upload was rejected because it breaks offline mode and
+   destroys restart-on-failure workflows.
 
 If scheduling permits, consider an `ml_run` decorator (ML
 recommendation #4) for one-stop-shop script scaffolding:
@@ -530,7 +542,8 @@ Neither review suggested reversing any rev-5 decision.
 after** (each reduces lines-per-script or eliminates a common footgun):
 1. `create_execution` kwargs form
 2. `log_metric` / `log_param` primitives
-3. Auto-upload on context-manager exit
+3. Surface pending-row state at context-manager exit (log + `__repr__`
+   only; auto-upload was considered and rejected)
 
 **Tech debt to track explicitly** (companion document):
 - Handle-type consolidation, shim removal calendar, `AssetFilePath`

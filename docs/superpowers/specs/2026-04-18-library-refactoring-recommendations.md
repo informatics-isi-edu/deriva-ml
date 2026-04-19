@@ -332,26 +332,52 @@ existing catalogs.
 **Priority.** High. Single biggest "MLflow expectations unmet" gap
 (ML review recommendation #2).
 
-### R6.3 — Auto-upload on context-manager exit (medium priority)
+### R6.3 — Surface pending-row state at context-manager exit (medium priority)
 
 **Problem.** Existing `upload_execution_outputs` docstring says in
 ALL CAPS: "must be called AFTER exiting the context manager, not
-inside it." That's a warning the shape is wrong. Users forget; nothing
-gets uploaded.
+inside it." Users forget that upload is a separate step from
+`with exe.execute(): ...` and nothing ends up in the catalog.
 
-**Fix.** Default behavior on clean exit in online mode: auto-upload.
-```python
-with exe.execute() as e:
-    ...
-# online + clean exit → auto-upload happens here
-# failed exit or offline mode → no auto-upload
-```
+**Non-fix: auto-upload on exit.** Explicitly rejected. Two reasons:
 
-Opt-out: `with exe.execute(auto_upload=False):`.
+1. **Breaks offline mode.** A `with exe.execute():` in offline mode
+   completes without server access. Auto-upload on exit would either
+   fail (no connection) or silently skip — either way behaving
+   differently from online mode, which violates the rev-5 principle
+   that code is the same online or offline.
 
-**Scope.** Half day; modify `Execution.__exit__`.
+2. **Destroys restart-on-failure.** Keeping upload as a separate
+   explicit step preserves the triage workflow: user's computation
+   exits cleanly, they inspect pending rows, fix any issues, call
+   `exe.upload_execution_outputs()` when ready. Auto-upload would
+   commit everything before the user has a chance to intervene.
 
-**Priority.** Medium. Eliminates a daily footgun (ML review F7).
+**Fix instead: surface the state, don't act on it.**
+
+1. On clean `Execution.__exit__`, if any pending rows exist, log an
+   informational message at INFO level:
+   > `Execution 5-ABC exited with 125 pending rows. Call
+   > exe.upload_execution_outputs() to upload, or resume later with
+   > ml.resume_execution('5-ABC').`
+   If no pending rows, the message is a simple "exited cleanly."
+   If in offline mode, message mentions that upload requires
+   reconnecting.
+
+2. `Execution.__repr__` after exit shows pending-row count:
+   `<Execution 5-ABC stopped; 125 pending rows>`. Interactive users
+   see the state.
+
+3. Rev-6 spec documents explicitly: context-manager exit does NOT
+   upload. Users control upload timing. This supports both offline
+   mode and restart-on-failure.
+
+**Scope.** Half day; modify `Execution.__exit__` and `__repr__`, add
+the log-message boilerplate.
+
+**Priority.** Medium. Addresses the user-facing problem (users
+forgetting to upload) without introducing the correctness problems
+auto-upload would create.
 
 ### R6.4 — `ml_run` decorator (lower priority, V2 candidate)
 
@@ -437,7 +463,9 @@ yet leased) for scripts that want to inspect without side effects.
 **Ship with rev 5 or immediately after (high ML value):**
 - R6.1 create_execution kwargs
 - R6.2 log_metric / log_param primitives
-- R6.3 Auto-upload on context-manager exit
+- R6.3 Surface pending-row state at context-manager exit (log +
+  repr only; auto-upload rejected — breaks offline mode, destroys
+  restart-on-failure)
 
 **V2 targets:**
 - R2.2 Move add_files to ml.
