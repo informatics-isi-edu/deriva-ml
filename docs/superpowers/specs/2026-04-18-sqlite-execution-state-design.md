@@ -118,8 +118,15 @@ Renames introduced by this spec (all hard cutovers):
 | `ml.restore_execution(rid)` | `ml.resume_execution(rid)` |
 | `exe.upload_execution_outputs(...)` | `exe.upload_outputs(...)` |
 | `exe.retry_failed()` | `exe.upload_outputs(retry_failed=True)` |
-| `Execution.list_nested_executions()` | `ml.list_nested_executions(of=exe_rid)` |
-| `Execution.find_ancestors()` | `ml.find_execution_ancestors(of=exe_rid)` |
+| `Execution.list_nested_executions()` | `ExecutionRecord.list_execution_children(recurse=...)` |
+| `ExecutionRecord.list_nested_executions(recurse=...)` | `ExecutionRecord.list_execution_children(recurse=...)` |
+| `ExecutionRecord.list_parent_executions(recurse=...)` | `ExecutionRecord.list_execution_parents(recurse=...)` |
+
+The renamed methods mirror the dataset template
+(`Dataset.list_dataset_parents` / `list_dataset_children`) so hierarchy
+traversal reads the same across subjects. `add_nested_execution` (the
+write side) keeps its name; its MCP tool surface will be updated in a
+separate task.
 
 No migration code. Clean slate — no in-flight `ManifestStore` entries
 to preserve.
@@ -404,12 +411,9 @@ class DerivaML:
         delete_working_dir: bool = False,
     ) -> int: ...
 
-    # Hierarchy queries (moved off Execution per R2.1)
-    def list_nested_executions(
-        self, *, of: str,                       # parent execution RID
-    ) -> list[ExecutionRecord]: ...
-
-    def find_execution_ancestors(self, *, of: str) -> list[ExecutionRecord]: ...
+    # Hierarchy queries live on ExecutionRecord — see §2.9. Per R2.1
+    # they are removed from Execution entirely (users needing them on a
+    # live execution go via exe.as_record().list_execution_children()).
 
     # Pending / upload inspection
     def pending_summary(self) -> WorkspacePendingSummary:
@@ -527,9 +531,29 @@ class ExecutionRecord:
     def pending_summary(self) -> PendingSummary: ...
     def upload_outputs(self, **kwargs) -> UploadReport:
         """Sugar for ml.upload_pending(execution_rids=[self.rid], ...)."""
+
+    # Hierarchy traversal — mirrors Dataset.list_dataset_parents /
+    # list_dataset_children. Single method per direction; recurse=True
+    # walks the full chain. Visited-set recursion guard prevents cycles.
+    def list_execution_parents(
+        self, *, recurse: bool = False,
+    ) -> list["ExecutionRecord"]:
+        """Parent executions (via Execution_Execution association
+        table). recurse=True returns the full ancestor chain."""
+
+    def list_execution_children(
+        self, *, recurse: bool = False,
+    ) -> list["ExecutionRecord"]:
+        """Child (nested) executions. recurse=True returns the full
+        descendant tree."""
 ```
 
 ### 2.10 Public API — Table handles (row-level writes)
+
+> **Provisional — see §2.13.** The handle class hierarchy may grow a
+> feature-aware write path when the feature-consistency review (§8)
+> concludes. Today's design is implementable as-is; finalization
+> awaits that review.
 
 ```python
 ml.table(name, schema=None) -> TableHandle | AssetTableHandle       # no execution scope
@@ -701,6 +725,11 @@ class WorkspacePendingSummary:
 
 #### 2.11.2 Upload engine
 
+> **Step 6 is provisional — see §2.13.** The generic per-level drain
+> may gain a feature-specific pre-insert validation hook when the
+> feature-consistency review (§8) concludes. Phase 1 implements the
+> generic flow below; Phase 2 revises step 6 if the review requires.
+
 All upload surfaces (`exe.upload_outputs`, `ml.upload_pending`,
 `ml.start_upload`, CLI) drive one internal engine:
 
@@ -805,6 +834,58 @@ at exit conflicts with two important properties:
 
 An opt-in `create_execution(upload_on_exit=True)` is deferred to a
 future version if usage patterns demand it. The default is explicit.
+
+### 2.13 Implementation sequencing — provisional sections
+
+Per §8, a follow-on design task reviews the existing feature system
+(and adds Metric/Param) against the SQLite staging layer. That review
+may surface changes to how row-level writes and the upload drain
+integrate with features. To avoid blocking the independent 85% of this
+spec on that review, two sections are marked **provisional** — stable
+enough to implement against, but subject to revision when the feature
+review concludes:
+
+- **§2.10 — Table handles.** The `TableHandle` / `AssetTableHandle`
+  surface may grow a feature-aware write path, or gain rules
+  prohibiting direct `.insert(...)` on feature-storage tables.
+  Today's design treats all tables uniformly; the feature review
+  decides whether that holds.
+- **§2.11.2 — Upload engine step 6.** The generic per-topological-level
+  drain may need a hook for feature-specific pre-insert validation
+  (e.g., target-table row existence check). Today's engine is fully
+  generic.
+
+**What is *not* provisional** (implement first, no feature dependency):
+
+- §2.1 Connection mode enum
+- §2.2 State machine module with catalog sync and reconciliation
+- §2.3 Read-through lifecycle properties
+- §2.4 Workspace SQLite as authoritative state
+- §2.5 SQLite schema (the schema is open to extension, not change)
+- §2.6 RID leasing (lazy, batched, crash-safe)
+- §2.7 `DerivaML` top-level API (`create_execution`, registry,
+  `ml.pending_summary`, `ml.upload_pending`, `ml.start_upload`, CLI
+  entry point)
+- §2.8 `Execution` lifecycle surface (context manager, abort,
+  lifecycle fields)
+- §2.9 `ExecutionRecord` (including hierarchy traversal)
+- §2.11.1 `PendingSummary` dataclasses
+- §2.11.3 `UploadJob` machinery
+- §2.11.4 `deriva-ml upload` CLI
+- §2.12 Context-manager exit behavior
+
+**Implementation plan sequencing:**
+
+Phase 1 implements the non-provisional sections end to end, with the
+table-handle surface stubbed at the minimum needed to exercise the
+upload engine (a plain `TableHandle.insert` is enough). Users can
+stage rows, drain uploads, resume after crash, and run offline
+workflows for plain rows and assets before the feature review lands.
+
+Phase 2 (after feature review) finalizes §2.10 and §2.11.2 step 6
+based on the feature review's conclusions. This may be a no-op (if
+the review concludes features route cleanly through the generic
+surface) or a targeted revision of handle and engine specifics.
 
 ## 3. Walkthrough — three-script workflow
 
@@ -1184,7 +1265,10 @@ Revision highlights:
   - Execution state machine as a dedicated module with catalog sync
     and `sync_pending` reconciliation.
   - Execution lifecycle fields as SQLite read-through.
-  - Hierarchy queries moved from `Execution` to `ml.*`.
+  - Hierarchy queries removed from `Execution`; live on
+    `ExecutionRecord` as `list_execution_parents` /
+    `list_execution_children`, mirroring the dataset pattern
+    (`list_dataset_parents` / `list_dataset_children`).
   - `ml.table()` as schema-introspection sibling of `exe.table()`.
   - `retry_failed` merged into `upload_outputs` / `upload_pending`.
   - `create_execution` kwargs form alongside config-object form.
@@ -1196,6 +1280,9 @@ Revision highlights:
     `ml.start_upload` / `UploadJob`, CLI, all sharing one engine.
   - Hard deprecation policy (no shims).
   - Reproducibility-over-ergonomics guideline (§0) captured.
+  - Implementation sequencing: §2.10 (table handles) and §2.11.2 step
+    6 (drain) marked provisional pending feature-consistency review
+    (§8). Everything else implementable as Phase 1.
 
 Concept count after rev 6: **13**.
 
@@ -1213,7 +1300,7 @@ Concept count after rev 6: **13**.
 11. `exe.pending_summary() / ml.pending_summary()` — inspection.
 12. `exe.upload_outputs() / ml.upload_pending() / ml.start_upload() +
     UploadJob / deriva-ml upload` — drain.
-13. `ml.list_nested_executions(of=...) / find_execution_ancestors(of=...)` — hierarchy.
+13. `ExecutionRecord.list_execution_parents() / list_execution_children()` — hierarchy traversal, mirroring `Dataset.list_dataset_parents / list_dataset_children`.
 
 ## 7. Known limits
 
