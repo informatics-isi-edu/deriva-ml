@@ -391,14 +391,14 @@ class DerivaML:
     def list_executions(
         self, *,
         status: ExecutionStatus | list[ExecutionStatus] | None = None,
-        workflow_rid: str | None = None,
+        workflow_rid: RID | None = None,
         mode: ConnectionMode | None = None,
         since: datetime | None = None,
     ) -> list[ExecutionRecord]: ...
 
     def find_incomplete_executions(self) -> list[ExecutionRecord]: ...
 
-    def resume_execution(self, execution_rid: str) -> Execution:
+    def resume_execution(self, execution_rid: RID) -> Execution:
         """Re-hydrate an Execution from SQLite. Works in both modes;
         the execution's recorded mode is independent of the current
         DerivaML instance's mode. Runs just-in-time reconciliation
@@ -428,7 +428,7 @@ class DerivaML:
     # Upload operations
     def upload_pending(
         self, *,
-        execution_rids: list[str] | None = None,
+        execution_rids: list[RID] | None = None,
         retry_failed: bool = False,
         bandwidth_limit_mbps: int | None = None,
         parallel_files: int = 4,
@@ -528,8 +528,8 @@ from `pending_rows`:
 ```python
 @dataclass(frozen=True)
 class ExecutionRecord:
-    rid: str
-    workflow_rid: str | None
+    rid: RID
+    workflow_rid: RID | None
     description: str | None
     status: ExecutionStatus
     mode: ConnectionMode
@@ -719,7 +719,7 @@ class PendingAssetCount:
 
 @dataclass(frozen=True)
 class PendingSummary:
-    execution_rid: str
+    execution_rid: RID
     rows: list[PendingRowCount]
     assets: list[PendingAssetCount]
     diagnostics: list[str]
@@ -752,7 +752,7 @@ All upload surfaces (`exe.upload_outputs`, `ml.upload_pending`,
 `ml.start_upload`, CLI) drive one internal engine:
 
 ```
-_upload_engine(ml, execution_rids, retry_failed, bandwidth_mbps, parallel):
+_upload_engine(ml, execution_rids, retry_failed, bandwidth_limit_mbps, parallel_files):
   1. Enumerate pending items from SQLite for the selected executions:
      - pending_rows in status staged/leasing/leased/failed-if-retry
      - asset files in status staged/uploading/failed-if-retry
@@ -1056,6 +1056,172 @@ an existing deriva-ml or deriva-py routine blocks spec-compliance
 review. The implementer documents in the PR description which
 existing routines they evaluated and why they didn't fit, if they
 end up writing new code.
+
+### 2.17 Argument naming and ordering conventions
+
+Consistency across method signatures is a code-review gate. The
+following rules apply to every new or modified method in this spec
+and should be used as the default pattern for future DerivaML work.
+
+#### 2.17.1 Argument names — canonical vocabulary
+
+RIDs use the full `_rid` suffix matching the entity name. Types are
+the `RID` typedef from `deriva_ml` (aliases `str`), not bare `str`:
+
+| Use | Name | Type |
+|---|---|---|
+| Execution identifier | `execution_rid` | `RID` |
+| List of execution identifiers | `execution_rids` | `list[RID]` |
+| Dataset identifier | `dataset_rid` | `RID` |
+| Workflow identifier | `workflow_rid` | `RID` |
+| Asset identifier | `asset_rid` | `RID` |
+| Any generic RID | `rid` | `RID` |
+
+Do NOT use: `exec_rid`, `exec_id`, `execution_id`, `ExecutionRID`,
+or any other variant. The codebase uses `execution_rid` everywhere
+(`src/deriva_ml/core/mixins/execution.py`, `asset/manifest.py`,
+`interfaces.py`), and this spec stays consistent.
+
+Other canonical parameter names:
+
+| Use | Name | Type |
+|---|---|---|
+| Table name (catalog table) | `table_name` or `name` on handles | `str` |
+| Schema name (catalog schema) | `schema` | `str \| None` |
+| Column name | `column_name` | `str` |
+| Feature / metric / param name | `name` on the respective handle | `str` |
+| Vocabulary term name | `term_name` or `name` in context | `str` |
+| File path (local) | `file` or `file_path` if disambiguation needed | `Path \| str` |
+| Directory path (local) | `source_dir` for inputs, `dest_dir` for outputs | `Path \| str` |
+| Asset types (plural, vocab terms) | `asset_types` | `list[str] \| str \| None` |
+| Single asset type | `asset_type` | `str` |
+| Status filter | `status` | `T \| list[T] \| None` (T = the status enum) |
+| Recursive traversal | `recurse` | `bool` |
+| Time cutoff for filtering | `since` (lower bound) / `older_than` (delta) | `datetime` / `timedelta` |
+| Parallelism knob (files/workers) | `parallel_files` / `parallel_workers` | `int` |
+| Bandwidth cap | `bandwidth_limit_mbps` (in API) / `--bandwidth-mbps` (in CLI) | `int \| None` |
+| Retry-previously-failed toggle | `retry_failed` | `bool` |
+| Progress callback | `progress` | `Callable[[int, int], None] \| None` |
+| Chunk / batch size | `chunk_size` | `int` |
+| Descriptive text | `description` | `str \| None` |
+| Copy file vs symlink | `copy_file` (one) / `copy_files` (many) | `bool` |
+
+**Mode value.** Always `mode`; accepts `ConnectionMode | str`; string
+coerced. Internal attribute `self._mode: ConnectionMode`.
+
+**Filter plural form.** When a method accepts a list of something
+for filtering, use the plural noun (`execution_rids`, `statuses`),
+never `rid_list` / `status_list`. The list is implied by the plural.
+
+#### 2.17.2 Argument ordering
+
+Within any method signature, arguments appear in this order, with
+keyword-only (`*,`) separating positional from keyword:
+
+1. **Positional required — subject of the operation.** Usually
+   one argument: the thing the verb acts on. Examples:
+   - `insert(records)` — subject is `records`.
+   - `asset_file(file, metadata=None)` — subject is `file`.
+   - `resume_execution(execution_rid)` — subject is the RID.
+
+2. **Positional optional — direct modifier of the subject.**
+   Occasionally needed. Kept positional only when "obvious second
+   argument" is true (e.g., `asset_file(file, metadata)` because the
+   metadata is the direct companion to the file). When in doubt,
+   put it keyword-only.
+
+3. **`*,` separator.** Always present unless the method has ≤1
+   argument total. This protects against silent breakage when
+   reordering keyword-only arguments in a future revision.
+
+4. **Keyword-only — identifying / scoping arguments.** Things that
+   narrow "which" or "where":
+   - `schema`, `status`, `workflow_rid`, `since`, `older_than`,
+     `execution_rids`.
+
+5. **Keyword-only — behavioral options.** Things that control how
+   the operation runs:
+   - `recurse`, `retry_failed`, `chunk_size`, `parallel_files`,
+     `bandwidth_limit_mbps`, `progress`, `copy_file`.
+
+6. **Keyword-only — catch-all.** `**kwargs` when used (e.g., for
+   metadata passthrough on `asset_file`). Appears last.
+
+Example — shape that follows the convention:
+
+```python
+def asset_file(
+    self,
+    file: str | Path,                                # (1) subject
+    metadata: RowRecord | dict | None = None,        # (2) direct modifier
+    *,                                               # (3) barrier
+    asset_types: list[str] | str | None = None,     # (4) scoping
+    copy_file: bool = False,                         # (5) behavior
+    rename_file: str | None = None,                  # (5) behavior
+    description: str | None = None,                  # (5) behavior
+    **kwargs,                                        # (6) catch-all
+) -> AssetFilePath: ...
+```
+
+Example — upload method following the convention:
+
+```python
+def upload_pending(
+    self,
+    *,                                               # no positional
+    execution_rids: list[RID] | None = None,        # (4) scoping
+    retry_failed: bool = False,                      # (5) behavior
+    bandwidth_limit_mbps: int | None = None,         # (5) behavior
+    parallel_files: int = 4,                         # (5) behavior
+    progress: Callable[[int, int], None] | None = None,  # (5) behavior
+) -> UploadReport: ...
+```
+
+#### 2.17.3 Return-value conventions
+
+- **Methods that return a single entity** on success or raise — no
+  `Optional`. Use `raise` for not-found, not `return None`.
+  Example: `resume_execution(execution_rid) -> Execution` (raises
+  `DerivaMLException`, doesn't return None).
+- **Lookup methods where absence is legitimate** — return `Optional`.
+  Example: `lookup_execution(execution_rid) -> ExecutionRecord | None`
+  only if the library genuinely supports "it's fine if it's not
+  there."
+- **Collection accessors (lists, dicts)** — empty collection when
+  nothing matches. Not None. `list_executions(status="failed")`
+  returns `[]`, not `None`.
+- **Accepts-one-or-many** — mirror on return: scalar input → scalar
+  return, iterable input → list return. `TableHandle.insert` is the
+  template: `insert(single_record) -> PendingRow`,
+  `insert(list_of_records) -> list[PendingRow]`.
+
+#### 2.17.4 Defaults and Nullability
+
+- Boolean options default to the safer/less-surprising value:
+  `recurse=False`, `retry_failed=False`, `copy_file=False`,
+  `delete_working_dir=False`, `upload_on_exit=False`.
+- Numeric throttles default to the library's conservative value:
+  `chunk_size=1000`, `parallel_files=4`. `bandwidth_limit_mbps=None`
+  means unlimited.
+- `None` on optional scoping arguments means "all" (or "match any"):
+  `execution_rids=None` uploads all pending; `status=None` matches
+  any.
+- Raise early on incompatible combinations (`mode=offline` +
+  `create_execution` → `DerivaMLOfflineError`; mixing `config` with
+  kwargs → `TypeError`). Don't silently "do what seems reasonable."
+
+#### 2.17.5 Existing-code cleanup scope
+
+Where this spec introduces new methods, the conventions above are
+binding. Where this spec touches adjacent older methods that don't
+follow the conventions, the implementer fixes naming as part of the
+diff they're already writing (per R5.1 aggressive deprecation — hard
+cutover, no shims, breaking change in CHANGELOG). Methods untouched
+by this spec are not renamed preemptively; a separate cleanup pass
+can address them if needed.
+
+Code-review gate: a reviewer finding a new method whose signature
+doesn't follow §2.17 blocks code-quality review.
 
 ## 3. Walkthrough — three-script workflow
 
@@ -1466,6 +1632,13 @@ Revision highlights:
   - Execution.datasets upgraded from `list[DatasetBag]` to
     `DatasetCollection` — a RID-keyed mapping + iterable. Fixes the
     walkthrough's `e.datasets["1-XYZ"]` access pattern. Hard cutover.
+  - Argument naming + ordering conventions (§2.17): canonical
+    vocabulary (`execution_rid`, `dataset_rid`, `schema`,
+    `asset_types`, `recurse`, `retry_failed`, `bandwidth_limit_mbps`,
+    etc.), canonical ordering (subject positional → `*,` →
+    scoping → behavior → catch-all), return-value rules,
+    defaults/nullability rules, adjacent-old-method cleanup policy.
+    Code-review gate.
 
 Concept count after rev 6: **13**.
 
