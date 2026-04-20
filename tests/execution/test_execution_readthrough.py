@@ -86,3 +86,45 @@ def test_status_raises_if_registry_gone(test_ml):
 
     with pytest.raises(DerivaMLStateInconsistency):
         _ = exe.status
+
+
+def test_execute_enter_transitions_to_running(test_ml):
+    """Entering `with exe.execute():` transitions status created → running,
+    exiting cleanly transitions running → stopped.
+    """
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = _make_exe(test_ml, "E2 enter test")
+    assert exe.status is ExecutionStatus.created
+
+    with exe.execute() as _e:
+        assert exe.status is ExecutionStatus.running
+
+    assert exe.status is ExecutionStatus.stopped
+
+
+def test_execute_exit_with_exception_transitions_to_failed(test_ml):
+    """Exiting the execute() context with an exception transitions to
+    `failed` and captures the error message. The exception propagates
+    (new __exit__ returns False, unlike the legacy True-suppression)."""
+    import pytest
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = _make_exe(test_ml, "E2 failure test")
+
+    with pytest.raises(RuntimeError):
+        with exe.execute():
+            raise RuntimeError("boom")
+
+    assert exe.status is ExecutionStatus.failed
+    # error message captured:
+    assert "boom" in (exe.error or "")
+
+
+def test_abort_transitions_to_aborted(test_ml):
+    """abort() is a new public method; legal from any non-terminal state."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = _make_exe(test_ml, "E2 abort test")
+    exe.abort()
+    assert exe.status is ExecutionStatus.aborted

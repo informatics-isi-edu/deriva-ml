@@ -51,6 +51,7 @@ from pydantic import ConfigDict, validate_call
 from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.asset.manifest import AssetEntry, AssetManifest
 from deriva_ml.core.base import DerivaML
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     RID,
@@ -81,6 +82,8 @@ from deriva_ml.dataset.upload import (
 from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record import ExecutionRecord
+from deriva_ml.execution.state_machine import transition
+from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
@@ -607,6 +610,40 @@ class Execution:
         return ExecutionStatus(row["status"])
 
     @property
+    def error(self) -> str | None:
+        """Last error message for this execution, read from SQLite.
+
+        Parallels ``status`` — no caching, every read hits the workspace
+        registry. Populated by ``__exit__`` when an exception occurs
+        (see spec §2.8 / §2.12).
+
+        Returns:
+            The error message string, or None if no error has been
+            recorded for this execution.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd or never created).
+
+        Example:
+            >>> with exe.execute():
+            ...     raise RuntimeError("boom")
+            >>> exe.error
+            'RuntimeError: boom'
+        """
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        return row["error"]
+
+    @property
     def execution_record(self) -> ExecutionRecord | None:
         """Get the ExecutionRecord for catalog operations.
 
@@ -767,9 +804,18 @@ class Execution:
 
         Example:
             >>> execution.update_status(Status.running, "Processing sample 1 of 10")
+
+        Note:
+            Legacy compatibility shim. The authoritative lifecycle
+            status now lives in SQLite and is driven by
+            ``state_machine.transition()`` via ``__enter__`` /
+            ``__exit__`` / ``abort``. ``update_status`` still writes
+            the catalog-side Status vocabulary (title-case) for
+            callers that haven't been migrated (e.g., multirun runner
+            internals, dataset download progress reporting). It does
+            not touch the SQLite registry — the authoritative
+            lifecycle state is unchanged by this call.
         """
-        # TODO(E2): replace in-memory mutation with state_machine.transition()
-        # self._status = status   # removed; status lives in SQLite now (see status property).
         self._logger.info(msg)
 
         if self._dry_run:
@@ -1517,8 +1563,22 @@ class Execution:
         return table_path(self._working_dir, schema=table_schema, table=table)
 
     def execute(self) -> Execution:
-        """Initiate an execution with the provided configuration. Can be used in a context manager."""
-        self.execution_start()
+        """Return self so this Execution can be used as a context manager.
+
+        Per spec §2.8, the lifecycle transitions (created → running →
+        stopped/failed) live on ``__enter__`` / ``__exit__``. ``execute()``
+        itself is a no-op that simply returns ``self`` so usage reads
+        naturally as ``with exe.execute() as e: ...``.
+
+        Returns:
+            This Execution instance, which is itself a context manager.
+
+        Example:
+            >>> with exe.execute() as e:
+            ...     # e.status is ExecutionStatus.running
+            ...     pass
+            >>> # e.status is ExecutionStatus.stopped (or failed on exception)
+        """
         return self
 
     @validate_call
@@ -1874,37 +1934,171 @@ class Execution:
         ]
         return "\n".join(items)
 
-    def __enter__(self):
-        """
-        Method invoked when entering the context.
+    def __enter__(self) -> "Execution":
+        """Begin the execution: status created → running.
+
+        Routes through ``state_machine.transition()`` so the SQLite
+        write, online-mode catalog sync, and allowed-transition
+        validation all run in a single atomic step. Sets
+        ``start_time`` in the same transaction.
+
+        Dry-run executions skip the transition entirely — there is no
+        SQLite registry row for a dry-run (sentinel RID), so there is
+        nothing to transition. The legacy ``start_time`` attribute is
+        still set for observability.
 
         Returns:
-        - self: The instance itself.
+            This Execution instance.
 
+        Raises:
+            InvalidTransitionError: If the execution is not currently
+                in ``ExecutionStatus.created``.
+
+        Example:
+            >>> with exe.execute() as e:
+            ...     e.status
+            <ExecutionStatus.running>
         """
-        self.execution_start()
+        from datetime import datetime, timezone
+
+        if self._dry_run:
+            self.start_time = datetime.now()
+            return self
+
+        current = self.status  # read-through from SQLite
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(
+                self._ml_object.catalog
+                if self._ml_object._mode is ConnectionMode.online
+                else None
+            ),
+            execution_rid=self.execution_rid,
+            current=current,
+            target=ExecutionStatus.running,
+            mode=self._ml_object._mode,
+            extra_fields={"start_time": datetime.now(timezone.utc)},
+        )
+        # Keep the legacy instance attribute in sync for any callers
+        # that still read ``exe.start_time`` directly (E3 converts this
+        # to a SQLite read-through property).
+        self.start_time = datetime.now()
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> bool:
-        """
-        Method invoked when exiting the context.
+        """End the execution: status running → stopped (clean) or failed.
+
+        On clean exit, transitions to ``stopped``. On exception, transitions
+        to ``failed`` and stores the exception message in the ``error``
+        column. Per spec §2.12 / R6.3, returns False to propagate any
+        exception (unlike the legacy ``__exit__`` which returned True to
+        suppress). After the transition, emits an INFO log summarizing
+        pending rows/files if any are still staged (the full
+        ``PendingSummary`` render lands in Group G; this is the
+        placeholder.)
 
         Args:
-           exc_type: Exception type.
-           exc_value: Exception value.
-           exc_tb: Exception traceback.
+           exc_type: Exception type (or None on clean exit).
+           exc_value: Exception value (or None on clean exit).
+           exc_tb: Exception traceback (or None on clean exit).
 
         Returns:
-           bool: True if execution completed successfully, False otherwise.
+           False — always. Any exception propagates to the caller.
         """
-        if not exc_type:
-            self.update_status(Status.running, "Successfully run Ml.")
-            self.execution_stop()
-            return True
-        else:
-            self.update_status(
-                Status.failed,
-                f"Exception type: {exc_type}, Exception value: {exc_value}",
-            )
-            logging.error(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
+        from datetime import datetime, timezone
+
+        if self._dry_run:
+            self.stop_time = datetime.now()
+            if exc_value is not None:
+                logging.error(
+                    "Dry-run execution failed: %s: %s",
+                    exc_type.__name__, exc_value,
+                )
             return False
+
+        current = self.status
+        now = datetime.now(timezone.utc)
+
+        if exc_value is None:
+            target = ExecutionStatus.stopped
+            extra = {"stop_time": now}
+        else:
+            target = ExecutionStatus.failed
+            extra = {"stop_time": now, "error": f"{exc_type.__name__}: {exc_value}"}
+
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(
+                self._ml_object.catalog
+                if self._ml_object._mode is ConnectionMode.online
+                else None
+            ),
+            execution_rid=self.execution_rid,
+            current=current,
+            target=target,
+            mode=self._ml_object._mode,
+            extra_fields=extra,
+        )
+
+        # Keep the legacy instance attribute in sync for callers that
+        # still read ``exe.stop_time`` directly (E3 converts to SQLite
+        # read-through property).
+        self.stop_time = datetime.now()
+
+        # Emit the pending-summary INFO log per §2.12 / R6.3. Full
+        # PendingSummary object lands in Group G; this is a placeholder.
+        store = self._ml_object.workspace.execution_state_store()
+        counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
+        if counts["pending_rows"] or counts["pending_files"]:
+            logging.getLogger("deriva_ml.execution").info(
+                "[Execution %s] exited with pending: "
+                "%d rows, %d files. Call exe.upload_outputs() to flush.",
+                self.execution_rid,
+                counts["pending_rows"], counts["pending_files"],
+            )
+
+        if exc_value is not None:
+            logging.error(
+                "Execution %s failed: %s: %s",
+                self.execution_rid, exc_type.__name__, exc_value,
+            )
+
+        # Propagate any exception.
+        return False
+
+    def abort(self) -> None:
+        """Mark this execution as aborted.
+
+        Legal from any non-terminal status (``created``, ``running``,
+        ``stopped``, ``failed``). Pending rows are NOT discarded —
+        the user can inspect them and decide whether to recover via
+        ``resume_execution`` or discard via ``gc_executions``.
+
+        Dry-run executions have no SQLite registry row, so abort() is
+        a no-op for them.
+
+        Raises:
+            InvalidTransitionError: If the current status doesn't allow
+                abort (e.g., status='uploaded' — terminal).
+
+        Example:
+            >>> exe = ml.resume_execution("EXE-A")
+            >>> exe.abort()
+            >>> exe.status
+            <ExecutionStatus.aborted>
+        """
+        if self._dry_run:
+            return
+
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(
+                self._ml_object.catalog
+                if self._ml_object._mode is ConnectionMode.online
+                else None
+            ),
+            execution_rid=self.execution_rid,
+            current=self.status,
+            target=ExecutionStatus.aborted,
+            mode=self._ml_object._mode,
+        )
