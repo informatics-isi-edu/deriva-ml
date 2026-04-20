@@ -4705,4 +4705,950 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task Group E — Read-through lifecycle + `DatasetCollection` + hierarchy renames
+
+Converts `Execution`'s in-memory `status`, `start_time`, `stop_time`, and
+`error` fields to SQLite read-through properties (spec §2.3). Wraps
+`exe.datasets` in a `DatasetCollection` (RID-keyed mapping + iterable,
+per spec §2.8 / R-datasets-mapping). Renames hierarchy traversal to
+match the dataset template (R-hierarchy).
+
+### Task E1: Read-through `status` property
+
+**Files:**
+- Modify: `src/deriva_ml/execution/execution.py`
+- Test: `tests/execution/test_execution_readthrough.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_execution_readthrough.py`:
+
+```python
+"""Tests for SQLite-backed read-through properties on Execution."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+
+def test_status_reads_from_sqlite(test_ml):
+    """Mutating SQLite via state-machine transition must be visible
+    via exe.status without any cache invalidation."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = test_ml.create_execution(
+        description="readthrough test",
+        workflow="__test_workflow__",
+    )
+
+    # Direct SQLite mutation (simulating state_machine.transition):
+    store = test_ml.workspace.execution_state_store()
+    store.update_execution(exe.execution_rid, status=ExecutionStatus.running)
+
+    # exe.status must reflect the change on the very next read.
+    assert exe.status is ExecutionStatus.running
+
+    store.update_execution(exe.execution_rid, status=ExecutionStatus.stopped)
+    assert exe.status is ExecutionStatus.stopped
+
+
+def test_status_reflects_second_process(test_ml):
+    """Two Execution instances bound to the same rid must see the
+    same SQLite row — no per-instance caching."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe_a = test_ml.create_execution(
+        description="two-views",
+        workflow="__test_workflow__",
+    )
+    exe_b = test_ml.resume_execution(exe_a.execution_rid)
+
+    store = test_ml.workspace.execution_state_store()
+    store.update_execution(exe_a.execution_rid, status=ExecutionStatus.running)
+
+    assert exe_a.status is ExecutionStatus.running
+    assert exe_b.status is ExecutionStatus.running
+
+
+def test_status_raises_if_registry_gone(test_ml):
+    """If the SQLite registry row is deleted (gc), the read-through
+    property surfaces clearly rather than returning stale cache."""
+    import pytest
+    from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+    exe = test_ml.create_execution(
+        description="gone",
+        workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    store.delete_execution(exe.execution_rid)
+
+    with pytest.raises(DerivaMLStateInconsistency):
+        _ = exe.status
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v
+```
+
+Expected: FAIL — existing Execution.status is an in-memory attribute; mutating SQLite doesn't reflect.
+
+- [ ] **Step 3: Convert `status` to a property**
+
+In `src/deriva_ml/execution/execution.py`:
+
+1. Locate the existing `self._status = Status.created` assignment in `Execution.__init__` (around line 216 per grounding). Remove it — the state lives in SQLite now.
+
+2. Locate the existing `status` property or attribute (if any). If `status` is a plain attribute, convert it; if it's already a property, replace the body.
+
+3. Add the property:
+
+```python
+@property
+def status(self) -> "ExecutionStatus":
+    """Current execution status, read from SQLite on every access.
+
+    No caching — a mutation from another process (e.g., `deriva-ml
+    upload` running in a shell) is visible on the next read.
+
+    Returns:
+        The ExecutionStatus value from the workspace registry.
+
+    Raises:
+        DerivaMLStateInconsistency: If the executions row for this
+            rid is missing (gc'd or never created).
+
+    Example:
+        >>> exe = ml.resume_execution("5-ABC")
+        >>> exe.status
+        <ExecutionStatus.stopped>
+    """
+    from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    store = self._ml_object.workspace.execution_state_store()
+    row = store.get_execution(self.execution_rid)
+    if row is None:
+        raise DerivaMLStateInconsistency(
+            f"Execution {self.execution_rid} no longer in workspace registry. "
+            f"It may have been garbage-collected or the workspace was "
+            f"recreated. Use ml.list_executions() to see current state."
+        )
+    return ExecutionStatus(row["status"])
+```
+
+4. Anywhere in the existing `Execution` body that assigns `self._status = ...` (e.g., inside `update_status`, `__enter__`, `__exit__`), replace the assignment with a call to `state_machine.transition(...)`. For this task, simplify by deleting the `self._status = new_status` lines and marking those call sites for Task E2 to complete. A comment placeholder:
+
+```python
+# TODO(E2): replace in-memory mutation with state_machine.transition()
+# self._status = Status.running   # removed; status lives in SQLite now
+```
+
+**Note:** Several tests in `tests/execution/test_execution.py` may break temporarily because `self._status` is gone and the transitions in `__enter__`/`__exit__` are placeholders. Run the full execution test suite at end of Step 4 and expect those breaks; Task E2 fixes them.
+
+- [ ] **Step 4: Run the new readthrough tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v
+```
+
+Expected: 3 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/execution.py tests/execution/test_execution_readthrough.py
+git commit -m "feat(execution): status is SQLite read-through property
+
+No in-memory caching; every read hits the workspace registry. Two
+Execution instances for the same RID see the same state
+consistently; inter-process mutations visible on next read. Missing
+registry row raises DerivaMLStateInconsistency.
+
+Existing self._status = ... assignments in __enter__/__exit__/
+update_status replaced with TODO comments; Task E2 wires
+state_machine.transition() into those sites.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task E2: Wire `state_machine.transition` into lifecycle methods
+
+**Files:**
+- Modify: `src/deriva_ml/execution/execution.py`
+- Test: `tests/execution/test_execution_readthrough.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_readthrough.py`:
+
+```python
+def test_execute_enter_transitions_to_running(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = test_ml.create_execution(
+        description="lifecycle",
+        workflow="__test_workflow__",
+    )
+    assert exe.status is ExecutionStatus.created
+
+    with exe.execute() as _e:
+        assert exe.status is ExecutionStatus.running
+
+    assert exe.status is ExecutionStatus.stopped
+
+
+def test_execute_exit_with_exception_transitions_to_failed(test_ml):
+    import pytest
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = test_ml.create_execution(
+        description="lifecycle-fail",
+        workflow="__test_workflow__",
+    )
+
+    with pytest.raises(RuntimeError):
+        with exe.execute():
+            raise RuntimeError("boom")
+
+    assert exe.status is ExecutionStatus.failed
+    # error message captured:
+    assert "boom" in (exe.error or "")
+
+
+def test_abort_transitions_to_aborted(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = test_ml.create_execution(
+        description="abort-test",
+        workflow="__test_workflow__",
+    )
+    exe.abort()
+    assert exe.status is ExecutionStatus.aborted
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v -k "execute_enter or execute_exit or abort"
+```
+
+Expected: FAIL — transitions don't happen yet.
+
+- [ ] **Step 3: Wire `transition()` into `__enter__` / `__exit__` / `abort`**
+
+In `src/deriva_ml/execution/execution.py`:
+
+1. Add imports at the top:
+
+```python
+from deriva_ml.execution.state_machine import transition
+from deriva_ml.execution.state_store import ExecutionStatus
+```
+
+2. Locate `__enter__` (around line 1771 per grounding). Replace its body:
+
+```python
+def __enter__(self) -> "Execution":
+    """Begin the execution: status → running (synced to catalog online)."""
+    from datetime import datetime, timezone
+
+    current = self.status  # reads SQLite
+    transition(
+        store=self._ml_object.workspace.execution_state_store(),
+        catalog=(
+            self._ml_object.catalog
+            if self._ml_object._mode is ConnectionMode.online
+            else None
+        ),
+        execution_rid=self.execution_rid,
+        current=current,
+        target=ExecutionStatus.running,
+        mode=self._ml_object._mode,
+        extra_fields={"start_time": datetime.now(timezone.utc)},
+    )
+    return self
+```
+
+3. Locate `__exit__` (around line 1782). Replace its body:
+
+```python
+def __exit__(self, exc_type, exc_val, exc_tb):
+    """End the execution: status → stopped (clean) or failed (exception)."""
+    from datetime import datetime, timezone
+
+    current = self.status
+    now = datetime.now(timezone.utc)
+
+    if exc_val is None:
+        target = ExecutionStatus.stopped
+        extra = {"stop_time": now}
+    else:
+        target = ExecutionStatus.failed
+        extra = {"stop_time": now, "error": f"{exc_type.__name__}: {exc_val}"}
+
+    transition(
+        store=self._ml_object.workspace.execution_state_store(),
+        catalog=(
+            self._ml_object.catalog
+            if self._ml_object._mode is ConnectionMode.online
+            else None
+        ),
+        execution_rid=self.execution_rid,
+        current=current,
+        target=target,
+        mode=self._ml_object._mode,
+        extra_fields=extra,
+    )
+
+    # Emit the pending-summary INFO log per §2.12 / R6.3. (Full
+    # PendingSummary object lands in Group G — this task logs a
+    # placeholder message; Group G replaces with the full render.)
+    store = self._ml_object.workspace.execution_state_store()
+    counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
+    if counts["pending_rows"] or counts["pending_files"]:
+        logging.getLogger("deriva_ml.execution").info(
+            "[Execution %s] exited with pending: "
+            "%d rows, %d files. Call exe.upload_outputs() to flush.",
+            self.execution_rid,
+            counts["pending_rows"], counts["pending_files"],
+        )
+
+    # Propagate the exception if any.
+    return False
+```
+
+4. Add `abort()` method:
+
+```python
+def abort(self) -> None:
+    """Mark this execution as aborted.
+
+    Legal from created/running/stopped/failed. Pending rows are not
+    discarded; the user can inspect them and decide whether to
+    recover via resume_execution or discard via gc.
+
+    Raises:
+        InvalidTransitionError: If the current status doesn't allow
+            abort (e.g., status='uploaded' — terminal).
+
+    Example:
+        >>> exe = ml.resume_execution("EXE-A")
+        >>> exe.abort()
+        >>> exe.status
+        <ExecutionStatus.aborted>
+    """
+    transition(
+        store=self._ml_object.workspace.execution_state_store(),
+        catalog=(
+            self._ml_object.catalog
+            if self._ml_object._mode is ConnectionMode.online
+            else None
+        ),
+        execution_rid=self.execution_rid,
+        current=self.status,
+        target=ExecutionStatus.aborted,
+        mode=self._ml_object._mode,
+    )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v
+```
+
+Expected: 6 passed.
+
+- [ ] **Step 5: Run the existing execution test suite for regressions**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/ -q --timeout=300
+```
+
+Expected: either all pass, or any failures relate to assertions on the old `self._status` attribute. Fix those assertions by replacing `exe._status` with `exe.status` (behavior identical from callers' perspective).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/deriva_ml/execution/execution.py tests/execution/test_execution_readthrough.py
+git commit -m "feat(execution): __enter__/__exit__/abort use state_machine.transition
+
+Lifecycle methods now route through the state machine for validation,
+SQLite write, and catalog sync. On exit, emits the pending-summary
+INFO log (placeholder render — Group G wires the full PendingSummary
+object). abort() is a new public method legal from any non-terminal
+state.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task E3: `start_time`, `stop_time`, `error` as read-through properties
+
+**Files:**
+- Modify: `src/deriva_ml/execution/execution.py`
+- Test: `tests/execution/test_execution_readthrough.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_readthrough.py`:
+
+```python
+def test_start_stop_time_readthrough(test_ml):
+    exe = test_ml.create_execution(
+        description="times",
+        workflow="__test_workflow__",
+    )
+    assert exe.start_time is None
+    assert exe.stop_time is None
+
+    with exe.execute():
+        assert exe.start_time is not None
+        assert exe.stop_time is None
+
+    assert exe.stop_time is not None
+    assert exe.stop_time >= exe.start_time
+
+
+def test_error_readthrough(test_ml):
+    import pytest
+
+    exe = test_ml.create_execution(
+        description="err",
+        workflow="__test_workflow__",
+    )
+    assert exe.error is None
+
+    with pytest.raises(ValueError):
+        with exe.execute():
+            raise ValueError("kaboom")
+
+    assert exe.error is not None
+    assert "kaboom" in exe.error
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v -k "time or error"
+```
+
+Expected: FAIL — `start_time`, `stop_time`, `error` are stale instance attributes.
+
+- [ ] **Step 3: Convert to properties**
+
+In `src/deriva_ml/execution/execution.py`:
+
+1. Remove the `self.start_time = ...` / `self.stop_time = ...` / `self._error = ...` assignments from `__init__`. The state lives in SQLite.
+
+2. Add three properties:
+
+```python
+@property
+def start_time(self) -> "datetime | None":
+    """Start time from SQLite, or None if not yet started.
+
+    Reads on every access (see status docstring for rationale).
+    """
+    from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+    store = self._ml_object.workspace.execution_state_store()
+    row = store.get_execution(self.execution_rid)
+    if row is None:
+        raise DerivaMLStateInconsistency(
+            f"Execution {self.execution_rid} not in workspace registry"
+        )
+    return row["start_time"]
+
+@property
+def stop_time(self) -> "datetime | None":
+    """Stop time from SQLite, or None if not yet stopped/failed."""
+    from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+    store = self._ml_object.workspace.execution_state_store()
+    row = store.get_execution(self.execution_rid)
+    if row is None:
+        raise DerivaMLStateInconsistency(
+            f"Execution {self.execution_rid} not in workspace registry"
+        )
+    return row["stop_time"]
+
+@property
+def error(self) -> "str | None":
+    """Last error message from SQLite, or None if no error recorded."""
+    from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+    store = self._ml_object.workspace.execution_state_store()
+    row = store.get_execution(self.execution_rid)
+    if row is None:
+        raise DerivaMLStateInconsistency(
+            f"Execution {self.execution_rid} not in workspace registry"
+        )
+    return row["error"]
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v
+```
+
+Expected: 8 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/execution.py tests/execution/test_execution_readthrough.py
+git commit -m "feat(execution): start_time / stop_time / error as read-through
+
+Parallel to status — no caching, SQLite on every read. Raises
+DerivaMLStateInconsistency if registry row vanishes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task E4: `DatasetCollection` — RID-keyed mapping over `DatasetBag`s
+
+**Files:**
+- Create: `src/deriva_ml/execution/dataset_collection.py`
+- Modify: `src/deriva_ml/execution/execution.py` (expose `datasets` as `DatasetCollection`)
+- Test: `tests/execution/test_dataset_collection.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_dataset_collection.py`:
+
+```python
+"""Tests for DatasetCollection — RID-keyed mapping + iterable of
+DatasetBags accessible via exe.datasets."""
+
+from __future__ import annotations
+
+import pytest
+
+
+class _FakeBag:
+    """Stand-in for DatasetBag for isolated unit tests."""
+    def __init__(self, rid: str):
+        self.dataset_rid = rid
+
+
+def test_collection_rid_lookup():
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    bag_a = _FakeBag("1-AAA")
+    bag_b = _FakeBag("1-BBB")
+    coll = DatasetCollection([bag_a, bag_b])
+
+    assert coll["1-AAA"] is bag_a
+    assert coll["1-BBB"] is bag_b
+
+
+def test_collection_missing_key_raises():
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    coll = DatasetCollection([_FakeBag("1-AAA")])
+    with pytest.raises(KeyError) as exc:
+        _ = coll["NOPE"]
+    # Error message lists what IS available.
+    assert "1-AAA" in str(exc.value)
+
+
+def test_collection_iteration_yields_bags():
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    bag_a = _FakeBag("1-AAA")
+    bag_b = _FakeBag("1-BBB")
+    coll = DatasetCollection([bag_a, bag_b])
+
+    assert list(coll) == [bag_a, bag_b]
+
+
+def test_collection_len():
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    assert len(DatasetCollection([])) == 0
+    assert len(DatasetCollection([_FakeBag("1")])) == 1
+    assert len(DatasetCollection([_FakeBag("1"), _FakeBag("2")])) == 2
+
+
+def test_collection_contains():
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    coll = DatasetCollection([_FakeBag("1-AAA")])
+    assert "1-AAA" in coll
+    assert "NOPE" not in coll
+
+
+def test_collection_keys_values():
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    bags = [_FakeBag("A"), _FakeBag("B")]
+    coll = DatasetCollection(bags)
+    assert list(coll.keys()) == ["A", "B"]
+    assert list(coll.values()) == bags
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_dataset_collection.py -v
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement `DatasetCollection`**
+
+Create `src/deriva_ml/execution/dataset_collection.py`:
+
+```python
+"""RID-keyed mapping + iterable over DatasetBag instances.
+
+Per spec §2.8. Returned by Execution.datasets so users can write
+`bag = exe.datasets["1-XYZ"]` (primary access pattern) or iterate
+with `for bag in exe.datasets:`. Replaces the previous
+list[DatasetBag] exposure (hard cutover per R5.1).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+
+
+class DatasetCollection(Mapping):
+    """Immutable RID-keyed mapping plus iterable of DatasetBags.
+
+    Backed by a list — the bags are already materialized when the
+    collection is constructed. No lazy loading; no mutation after
+    construction.
+
+    Iteration yields bags (not keys, which is the Mapping default).
+    This matches the intuition "iterate the datasets I materialized",
+    which is overwhelmingly what callers want. Use ``.keys()`` for
+    RIDs and ``.items()`` for (rid, bag) pairs.
+
+    Attributes:
+        (None public — use subscript, iter, len, keys, values, items.)
+
+    Example:
+        >>> for bag in exe.datasets:
+        ...     print(bag.dataset_rid, len(bag.list_dataset_members()))
+        >>> specific = exe.datasets["1-XYZ"]
+        >>> "1-XYZ" in exe.datasets
+        True
+    """
+
+    def __init__(self, bags: "list[DatasetBag]") -> None:
+        """Build from a list of DatasetBag instances.
+
+        Args:
+            bags: Already-materialized bags, in the order the user
+                declared them in ExecutionConfiguration.datasets.
+                Multiple bags with the same dataset_rid are not
+                supported; the last wins on __getitem__.
+        """
+        # Preserve order for iteration.
+        self._bags = list(bags)
+        # Dict for O(1) RID lookup.
+        self._by_rid = {b.dataset_rid: b for b in self._bags}
+
+    def __getitem__(self, rid: str) -> "DatasetBag":
+        try:
+            return self._by_rid[rid]
+        except KeyError:
+            # More helpful than KeyError('1-XYZ') alone.
+            available = ", ".join(self._by_rid) or "(none)"
+            raise KeyError(
+                f"dataset {rid!r} not in this execution's inputs. "
+                f"Available: {available}"
+            ) from None
+
+    def __iter__(self) -> "Iterator[DatasetBag]":
+        # Mapping's default would iterate keys; we override to iterate
+        # values (bags) because that's the overwhelmingly common use.
+        return iter(self._bags)
+
+    def __len__(self) -> int:
+        return len(self._bags)
+
+    def __contains__(self, rid: object) -> bool:
+        return rid in self._by_rid
+
+    def keys(self):
+        """Dataset RIDs in declaration order."""
+        return list(self._by_rid.keys())
+
+    def values(self):
+        """DatasetBag instances in declaration order."""
+        return list(self._bags)
+
+    def items(self):
+        """(rid, bag) pairs in declaration order."""
+        return [(b.dataset_rid, b) for b in self._bags]
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_dataset_collection.py -v
+```
+
+Expected: 6 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/dataset_collection.py tests/execution/test_dataset_collection.py
+git commit -m "feat(execution): DatasetCollection RID-keyed mapping
+
+Backed by list + dict; iteration yields DatasetBags (overriding
+Mapping default). KeyError on missing RID lists what IS available.
+No mutation after construction. Wired into exe.datasets in next task.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task E5: Hook `DatasetCollection` into `Execution.datasets` + hierarchy renames
+
+**Files:**
+- Modify: `src/deriva_ml/execution/execution.py` (replace `self.datasets = []` + `_initialize_execution`)
+- Modify: `src/deriva_ml/execution/execution_record.py` (rename `list_parent_executions` / `list_nested_executions`)
+- Test: `tests/execution/test_dataset_collection.py` (extend)
+- Test: `tests/execution/test_execution_hierarchy.py` (new)
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `tests/execution/test_dataset_collection.py`:
+
+```python
+def test_exe_datasets_is_collection(test_ml_with_real_dataset):
+    """Integration-style: after create_execution + enter, exe.datasets
+    is a DatasetCollection with RID-keyed lookup."""
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    # test_ml_with_real_dataset is a fixture providing a DerivaML
+    # with one DatasetSpec already materialized (see tests/conftest.py
+    # — will need a new fixture if missing).
+    exe = test_ml_with_real_dataset["execution"]
+    rid = test_ml_with_real_dataset["dataset_rid"]
+
+    with exe.execute():
+        assert isinstance(exe.datasets, DatasetCollection)
+        assert rid in exe.datasets
+        bag = exe.datasets[rid]
+        assert bag.dataset_rid == rid
+```
+
+Create `tests/execution/test_execution_hierarchy.py`:
+
+```python
+"""Tests for ExecutionRecord.list_execution_parents /
+list_execution_children (renamed from list_parent_executions /
+list_nested_executions)."""
+
+from __future__ import annotations
+
+
+def test_list_execution_parents_symbol(test_ml):
+    """New name exists; old name is gone."""
+    # Use the v2 dataclass lookup — or the old class once merged.
+    # For Phase 1, verify on the new dataclass path.
+    from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+
+    # v2 dataclass doesn't own list_* methods directly yet — in this
+    # plan the methods live on the live-catalog-backed
+    # ExecutionRecord (execution_record.py); we rename those. Grab
+    # that class:
+    from deriva_ml.execution.execution_record import ExecutionRecord as LiveER
+
+    assert hasattr(LiveER, "list_execution_parents"), \
+        "list_execution_parents should exist"
+    assert hasattr(LiveER, "list_execution_children"), \
+        "list_execution_children should exist"
+    assert not hasattr(LiveER, "list_parent_executions"), \
+        "list_parent_executions should be removed (R5.1 hard cutover)"
+    assert not hasattr(LiveER, "list_nested_executions"), \
+        "list_nested_executions should be removed (R5.1 hard cutover)"
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_dataset_collection.py tests/execution/test_execution_hierarchy.py -v
+```
+
+Expected: both fail — `exe.datasets` is still a list; old hierarchy names still present.
+
+- [ ] **Step 3: Replace `self.datasets = []` with `DatasetCollection`**
+
+In `src/deriva_ml/execution/execution.py`:
+
+1. Locate `self.datasets: list[DatasetBag] = []` in `__init__` (around line 222 per grounding). Remove it.
+
+2. Locate `_initialize_execution` (around line 401). Replace `self.datasets.append(...)` pattern with list-then-wrap:
+
+```python
+def _initialize_execution(self, reload: "RID | None" = None) -> None:
+    # ... existing docstring and code up to the dataset loop ...
+
+    # Materialize dataset bags — kept as a list internally, exposed
+    # as a DatasetCollection via the public .datasets property.
+    bags = []
+    for dataset in self.configuration.datasets:
+        self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
+        bag = self.download_dataset_bag(dataset)
+        bags.append(bag)
+        self.dataset_rids.append(dataset.rid)
+    self._datasets_list = bags
+
+    # ... remainder of existing body unchanged ...
+```
+
+3. Add the public `datasets` property. If a `datasets` attribute is still referenced via `self.datasets` anywhere in the existing body, rename those internal uses to `self._datasets_list`, and add the property:
+
+```python
+@property
+def datasets(self) -> "DatasetCollection":
+    """Input datasets as a RID-keyed mapping + iterable.
+
+    Replaces the previous list[DatasetBag] exposure (hard cutover).
+    Pattern:
+
+        >>> bag = exe.datasets["1-XYZ"]          # RID lookup
+        >>> for bag in exe.datasets: ...          # iterate bags
+        >>> rids = exe.datasets.keys()            # list RIDs
+
+    Returns:
+        A DatasetCollection wrapping the materialized DatasetBags.
+
+    Example:
+        >>> for bag in exe.datasets:
+        ...     print(bag.dataset_rid)
+    """
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+    return DatasetCollection(self._datasets_list)
+```
+
+- [ ] **Step 4: Rename hierarchy methods on `ExecutionRecord` (live-catalog class)**
+
+In `src/deriva_ml/execution/execution_record.py`:
+
+1. Rename `list_parent_executions` → `list_execution_parents`. Update the method signature, docstring, and any internal references.
+2. Rename `list_nested_executions` → `list_execution_children`. Update the method signature, docstring, and any internal references.
+
+Add updated Tier-1 docstrings per §2.15:
+
+```python
+def list_execution_parents(
+    self,
+    *,
+    recurse: bool = False,
+) -> "Iterable[ExecutionRecord]":
+    """Parent executions that this execution is nested under.
+
+    Mirrors Dataset.list_dataset_parents — same recurse semantics,
+    same visited-set cycle guard.
+
+    Args:
+        recurse: If True, walk the full ancestor chain.
+
+    Returns:
+        Iterable of ExecutionRecord objects for parent executions.
+        Empty iterable if this execution is not nested under any.
+
+    Raises:
+        DerivaMLException: If this record is not bound to a catalog.
+
+    Example:
+        >>> for parent in record.list_execution_parents():
+        ...     print(parent.execution_rid)
+    """
+    # ... existing body, just renamed ...
+
+
+def list_execution_children(
+    self,
+    *,
+    recurse: bool = False,
+) -> "Iterable[ExecutionRecord]":
+    """Child executions nested under this one.
+
+    Mirrors Dataset.list_dataset_children.
+
+    Args:
+        recurse: If True, walk the full descendant tree.
+
+    Returns:
+        Iterable of ExecutionRecord objects for child executions.
+
+    Raises:
+        DerivaMLException: If this record is not bound to a catalog.
+
+    Example:
+        >>> for child in record.list_execution_children(recurse=True):
+        ...     print(child.execution_rid)
+    """
+    # ... existing body, just renamed ...
+```
+
+3. Also remove `Execution.list_nested_executions` if it exists in `execution.py` (around line 1644 per grounding) — per R2.1 the hierarchy queries live on `ExecutionRecord` only. Users who have a live `Execution` obtain the record via the existing path (e.g., `exe._execution_record`, or a new `exe.as_record()` method in Task E6 below).
+
+- [ ] **Step 5: Update all callers**
+
+```bash
+grep -rln "list_parent_executions\|list_nested_executions" src/ tests/ | xargs -I{} echo "review {}"
+```
+
+For each hit, rename to the new method names. `add_nested_execution` keeps its name (it's a write verb, not a list method — §2.17 mapping).
+
+- [ ] **Step 6: Run tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/ -q --timeout=300
+```
+
+Expected: all pass.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add -A
+git commit -m "feat(execution)!: DatasetCollection + hierarchy method rename
+
+BREAKING CHANGE:
+- exe.datasets is now a DatasetCollection (Mapping[rid, DatasetBag]
+  + Iterable[DatasetBag]), not list[DatasetBag]. Access by RID:
+  exe.datasets['1-XYZ'] instead of exe.datasets[0].
+- ExecutionRecord.list_parent_executions → list_execution_parents.
+- ExecutionRecord.list_nested_executions → list_execution_children.
+- Execution.list_nested_executions removed (per R2.1; use
+  record.list_execution_children).
+
+Renames mirror the Dataset template (list_dataset_parents /
+list_dataset_children). Hard cutover per R5.1. Added in CHANGELOG
+breaking changes in Group H.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+*(End of Task Group E — read-through properties + DatasetCollection + hierarchy renames.)*
+
+---
+
 
