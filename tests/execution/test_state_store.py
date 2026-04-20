@@ -130,3 +130,27 @@ def test_workspace_exposes_execution_state_store(tmp_path):
         assert ws.execution_state_store() is store
     finally:
         ws.close()
+
+
+def test_execution_status_values():
+    from deriva_ml.execution.state_store import ExecutionStatus
+    assert ExecutionStatus.created.value == "created"
+    assert ExecutionStatus.running.value == "running"
+    assert ExecutionStatus.stopped.value == "stopped"
+    assert ExecutionStatus.failed.value == "failed"
+    assert ExecutionStatus.pending_upload.value == "pending_upload"
+    assert ExecutionStatus.uploaded.value == "uploaded"
+    assert ExecutionStatus.aborted.value == "aborted"
+
+
+def test_pending_row_status_values():
+    from deriva_ml.execution.state_store import PendingRowStatus
+    for name in ["staged", "leasing", "leased",
+                 "uploading", "uploaded", "failed"]:
+        assert getattr(PendingRowStatus, name).value == name
+
+
+def test_directory_rule_status_values():
+    from deriva_ml.execution.state_store import DirectoryRuleStatus
+    assert DirectoryRuleStatus.active.value == "active"
+    assert DirectoryRuleStatus.closed.value == "closed"

@@ -18,6 +18,7 @@ from the Workspace engine configuration.
 from __future__ import annotations
 
 import logging
+from enum import StrEnum
 
 from sqlalchemy import (
     Boolean,
@@ -34,6 +35,53 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
+
+
+class ExecutionStatus(StrEnum):
+    """Lifecycle status for an Execution (see spec §2.2).
+
+    Transitions are:
+        created → running → {stopped, failed} →
+            {pending_upload → {uploaded, failed}}
+        created → aborted
+        running → aborted
+
+    Values are lowercase strings for direct storage in SQLite and for
+    clean comparison against ERMrest's Status vocabulary terms.
+    """
+    created = "created"
+    running = "running"
+    stopped = "stopped"
+    failed = "failed"
+    pending_upload = "pending_upload"
+    uploaded = "uploaded"
+    aborted = "aborted"
+
+
+class PendingRowStatus(StrEnum):
+    """Per-pending-row status (see spec §2.5.2).
+
+    Transitions are:
+        staged → leasing → leased → uploading → {uploaded, failed}
+    """
+    staged = "staged"
+    leasing = "leasing"
+    leased = "leased"
+    uploading = "uploading"
+    uploaded = "uploaded"
+    failed = "failed"
+
+
+class DirectoryRuleStatus(StrEnum):
+    """Per-directory-rule status (see spec §2.5.3).
+
+    A rule is `active` until `close()` is called; closed rules reject
+    further register/scan calls but their existing pending_rows can
+    still drain.
+    """
+    active = "active"
+    closed = "closed"
+
 
 EXECUTIONS_TABLE = "execution_state__executions"
 PENDING_ROWS_TABLE = "execution_state__pending_rows"
