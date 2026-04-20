@@ -33,12 +33,12 @@ The plan is structured into eight task groups. Within each group, tasks are bite
 | **B** | SQLite schema: `executions`, `pending_rows`, `directory_rules` tables | 5 tasks |
 | **C** | Execution state machine module + `sync_pending` reconciliation | 7 tasks |
 | **D** | Execution registry public API (`list_executions`, `resume_execution`, `gc_executions`, `find_incomplete_executions`) | 6 tasks |
-| **E** | Execution read-through lifecycle properties + `DatasetCollection` + hierarchy renames | 5 tasks |
+| **E** | Execution read-through lifecycle properties + `DatasetCollection` + hierarchy renames + `__repr__` | 6 tasks |
 | **F** | RID leasing (lazy, batched, crash-safe) against `public:ERMrest_RID_Lease` | 6 tasks |
 | **G** | Upload engine + `PendingSummary` + `UploadJob` + `ml.upload_pending` / `ml.start_upload` | 8 tasks |
 | **H** | `deriva-ml upload` CLI + integration tests + CHANGELOG | 5 tasks |
 
-**Total ≈ 46 tasks. Estimated 3–4 weeks of focused work.**
+**Total ≈ 47 tasks. Estimated 3–4 weeks of focused work.**
 
 Provisional sections (§2.10 full table-handle surface, §2.11.2 step 6 feature-aware drain) get minimal Phase 1 implementation — just enough to let Groups F/G work. Full finalization is Phase 2, after the feature-consistency spec.
 
@@ -5647,7 +5647,106 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
-*(End of Task Group E — read-through properties + DatasetCollection + hierarchy renames.)*
+### Task E6: `Execution.__repr__` reflects pending counts
+
+Per spec §2.12 / R6.3.
+
+**Files:**
+- Modify: `src/deriva_ml/execution/execution.py`
+- Test: `tests/execution/test_execution_readthrough.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_readthrough.py`:
+
+```python
+def test_repr_includes_status_and_pending(test_ml):
+    from datetime import datetime, timezone
+
+    exe = test_ml.create_execution(
+        description="repr", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+
+    r = repr(exe)
+    assert exe.execution_rid in r
+    assert "created" in r   # status
+    assert "1" in r         # pending count
+```
+
+- [ ] **Step 2: Run test**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v -k repr_includes
+```
+
+Expected: FAIL — existing `__repr__` (if any) doesn't include pending counts.
+
+- [ ] **Step 3: Implement `__repr__`**
+
+In `src/deriva_ml/execution/execution.py` on `Execution`:
+
+```python
+def __repr__(self) -> str:
+    """One-line summary including status and pending counts.
+
+    Pending counts read SQLite — no caching. Example output::
+
+        <Execution EXE-A status=stopped pending=15rows/2files>
+
+    Returns:
+        Compact repr string suitable for logs and interactive use.
+    """
+    try:
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            return f"<Execution {self.execution_rid} status=? (not in registry)>"
+        counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
+        pending_part = ""
+        if counts["pending_rows"] or counts["pending_files"]:
+            pending_part = (
+                f" pending={counts['pending_rows']}rows/"
+                f"{counts['pending_files']}files"
+            )
+        return (
+            f"<Execution {self.execution_rid} "
+            f"status={row['status']}{pending_part}>"
+        )
+    except Exception:  # repr must not raise
+        return f"<Execution {self.execution_rid}>"
+```
+
+- [ ] **Step 4: Run tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_readthrough.py -v
+```
+
+Expected: passes.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/execution.py tests/execution/test_execution_readthrough.py
+git commit -m "feat(execution): __repr__ shows status + pending counts
+
+Per spec §2.12 / R6.3. Pending counts read SQLite; repr never raises
+(wraps reads in try/except to degrade gracefully if the registry is
+corrupted).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+*(End of Task Group E — read-through properties + DatasetCollection + hierarchy renames + __repr__.)*
 
 ---
 
