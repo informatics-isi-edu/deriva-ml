@@ -500,3 +500,17 @@ def test_create_catalog_execution_posts_and_returns_rid():
     body = cat.post_calls[0]["json"]
     assert body[0]["Workflow"] == "WFL-1"
     assert body[0]["Description"] == "a test run"
+
+
+def test_public_api_exported():
+    import deriva_ml.execution.state_machine as sm
+    expected = {
+        "ALLOWED_TRANSITIONS",
+        "InvalidTransitionError",
+        "validate_transition",
+        "transition",
+        "flush_pending_sync",
+        "reconcile_with_catalog",
+        "create_catalog_execution",
+    }
+    assert expected.issubset(set(sm.__all__))

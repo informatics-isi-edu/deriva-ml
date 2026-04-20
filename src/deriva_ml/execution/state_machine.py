@@ -19,7 +19,7 @@ wires them together without owning lifecycle of either.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone  # noqa: F401  (used in C2-C6)
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from deriva_ml.core.exceptions import (
@@ -30,12 +30,23 @@ from deriva_ml.core.exceptions import (
 from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
-    from deriva.core import ErmrestCatalog  # noqa: F401  (used in C2-C6)
+    from deriva.core import ErmrestCatalog  # noqa: F401  (string-annotation only)
 
-    from deriva_ml.core.connection_mode import ConnectionMode  # noqa: F401  (used in C2-C6)
-    from deriva_ml.execution.state_store import ExecutionStateStore  # noqa: F401  (used in C2-C6)
+    from deriva_ml.core.connection_mode import ConnectionMode  # noqa: F401  (string-annotation only)
+    from deriva_ml.execution.state_store import ExecutionStateStore  # noqa: F401  (string-annotation only)
 
 logger = logging.getLogger(__name__)
+
+
+__all__ = [
+    "ALLOWED_TRANSITIONS",
+    "InvalidTransitionError",
+    "validate_transition",
+    "transition",
+    "flush_pending_sync",
+    "reconcile_with_catalog",
+    "create_catalog_execution",
+]
 
 
 class InvalidTransitionError(DerivaMLException):
