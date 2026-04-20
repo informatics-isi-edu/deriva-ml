@@ -224,7 +224,7 @@ class Execution:
         self._execution_record: ExecutionRecord | None = None  # Lazily created after RID is assigned
 
         self.dataset_rids: List[RID] = []
-        self.datasets: list[DatasetBag] = []
+        self._datasets_list: list[DatasetBag] = []
 
         self._working_dir = self._ml_object.working_dir
         self._cache_dir = self._ml_object.cache_dir
@@ -388,7 +388,7 @@ class Execution:
         instance.execution_rid = execution_rid
         instance._dry_run = False
         # Fields the existing class expects to exist:
-        instance.datasets = []
+        instance._datasets_list = []
         instance.dataset_rids = []
         instance.asset_paths = {}
         instance.configuration = None  # Group E loads from config_json
@@ -510,7 +510,7 @@ class Execution:
         # Materialize bdbag
         for dataset in self.configuration.datasets:
             self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
-            self.datasets.append(self.download_dataset_bag(dataset))
+            self._datasets_list.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
 
         # Update execution info
@@ -721,6 +721,41 @@ class Execution:
         return value
 
     @property
+    def datasets(self) -> "DatasetCollection":
+        """Input datasets as a RID-keyed mapping + iterable.
+
+        Replaces the previous ``list[DatasetBag]`` exposure (hard
+        cutover per spec R5.1). The returned collection behaves like a
+        ``Mapping[str, DatasetBag]`` (keyed by ``dataset_rid``) and is
+        also iterable, yielding ``DatasetBag`` values in insertion
+        order.
+
+        Returns:
+            A ``DatasetCollection`` wrapping the materialized
+            ``DatasetBag`` objects that were downloaded during
+            execution initialization.
+
+        Example:
+            >>> # RID lookup (primary access pattern)
+            >>> bag = exe.datasets["1-XYZ"]
+            >>> # Iterate bags in insertion order
+            >>> for bag in exe.datasets:
+            ...     print(bag.dataset_rid)
+            >>> # Introspect which RIDs are present
+            >>> rids = list(exe.datasets.keys())
+            >>> # Count
+            >>> n = len(exe.datasets)
+
+        Migration note:
+            Callers that previously indexed by position
+            (``exe.datasets[0]``) must switch to either
+            ``list(exe.datasets)[0]`` or the RID-keyed lookup
+            ``exe.datasets[rid]``.
+        """
+        from deriva_ml.execution.dataset_collection import DatasetCollection
+        return DatasetCollection(self._datasets_list)
+
+    @property
     def execution_record(self) -> ExecutionRecord | None:
         """Get the ExecutionRecord for catalog operations.
 
@@ -787,10 +822,10 @@ class Execution:
             ...         # No datasets downloaded, use live catalog
             ...         pass
         """
-        if not self.datasets:
+        if not self._datasets_list:
             return None
         # Use the first dataset's model as the primary
-        return DerivaMLDatabase(self.datasets[0].model)
+        return DerivaMLDatabase(self._datasets_list[0].model)
 
     @property
     def catalog(self) -> "DerivaML":
@@ -1914,121 +1949,47 @@ class Execution:
 
             execution_execution.insert([record])
 
-    def list_nested_executions(
-        self,
-        recurse: bool = False,
-        _visited: set[RID] | None = None,
-    ) -> list["ExecutionRecord"]:
-        """List all nested (child) executions of this execution.
-
-        Args:
-            recurse: If True, recursively return all descendant executions.
-            _visited: Internal parameter to track visited executions and prevent infinite recursion.
-
-        Returns:
-            List of nested ExecutionRecord objects, ordered by sequence if available.
-            To get full Execution objects with lifecycle management, use resume_execution().
-
-        Example:
-            >>> children = parent_exec.list_nested_executions()
-            >>> all_descendants = parent_exec.list_nested_executions(recurse=True)
-        """
-        if self._execution_record is not None:
-            return list(self._execution_record.list_nested_executions(recurse=recurse, _visited=_visited))
-
-        # Fallback for dry_run mode
-        if _visited is None:
-            _visited = set()
-
-        if self.execution_rid in _visited:
-            return []
-        _visited.add(self.execution_rid)
-
-        pb = self._ml_object.pathBuilder()
-        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
-
-        # Query for nested executions, ordered by sequence
-        nested = list(
-            execution_execution.filter(execution_execution.Execution == self.execution_rid).entities().fetch()
-        )
-
-        # Sort by sequence (None values at the end)
-        nested.sort(key=lambda x: (x.get("Sequence") is None, x.get("Sequence")))
-
-        children = []
-        for record in nested:
-            child = self._ml_object.lookup_execution(record["Nested_Execution"])
-            children.append(child)
-            if recurse:
-                children.extend(child.list_nested_executions(recurse=True, _visited=_visited))
-
-        return children
-
-    def list_parent_executions(
-        self,
-        recurse: bool = False,
-        _visited: set[RID] | None = None,
-    ) -> list["ExecutionRecord"]:
-        """List all parent executions that contain this execution as a nested child.
-
-        Args:
-            recurse: If True, recursively return all ancestor executions.
-            _visited: Internal parameter to track visited executions and prevent infinite recursion.
-
-        Returns:
-            List of parent ExecutionRecord objects.
-            To get full Execution objects with lifecycle management, use resume_execution().
-
-        Example:
-            >>> parents = child_exec.list_parent_executions()
-            >>> all_ancestors = child_exec.list_parent_executions(recurse=True)
-        """
-        if self._execution_record is not None:
-            return list(self._execution_record.list_parent_executions(recurse=recurse, _visited=_visited))
-
-        # Fallback for dry_run mode
-        if _visited is None:
-            _visited = set()
-
-        if self.execution_rid in _visited:
-            return []
-        _visited.add(self.execution_rid)
-
-        pb = self._ml_object.pathBuilder()
-        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
-
-        parent_records = list(
-            execution_execution.filter(execution_execution.Nested_Execution == self.execution_rid).entities().fetch()
-        )
-
-        parents = []
-        for record in parent_records:
-            parent = self._ml_object.lookup_execution(record["Execution"])
-            parents.append(parent)
-            if recurse:
-                parents.extend(parent.list_parent_executions(recurse=True, _visited=_visited))
-
-        return parents
-
     def is_nested(self) -> bool:
         """Check if this execution is nested within another execution.
 
+        Hierarchy queries live on :class:`ExecutionRecord` only (per spec
+        R2.1). This shortcut delegates to
+        ``self._execution_record.is_nested()`` when available.
+
         Returns:
             True if this execution has at least one parent execution.
+
+        Raises:
+            DerivaMLException: If this Execution has no bound
+                ExecutionRecord (e.g. a dry-run execution).
         """
-        if self._execution_record is not None:
-            return self._execution_record.is_nested()
-        return len(self.list_parent_executions()) > 0
+        if self._execution_record is None:
+            raise DerivaMLException(
+                "is_nested requires a bound ExecutionRecord. "
+                "Hierarchy queries are not available in dry-run mode."
+            )
+        return self._execution_record.is_nested()
 
     def is_parent(self) -> bool:
         """Check if this execution has nested child executions.
 
+        Hierarchy queries live on :class:`ExecutionRecord` only (per spec
+        R2.1). This shortcut delegates to
+        ``self._execution_record.is_parent()`` when available.
+
         Returns:
             True if this execution has at least one nested execution.
+
+        Raises:
+            DerivaMLException: If this Execution has no bound
+                ExecutionRecord (e.g. a dry-run execution).
         """
-        if self._execution_record is not None:
-            return self._execution_record.is_parent()
-        return len(self.list_nested_executions()) > 0
+        if self._execution_record is None:
+            raise DerivaMLException(
+                "is_parent requires a bound ExecutionRecord. "
+                "Hierarchy queries are not available in dry-run mode."
+            )
+        return self._execution_record.is_parent()
 
     def __str__(self):
         items = [

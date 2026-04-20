@@ -20,7 +20,7 @@ Example:
 
     Query nested executions::
 
-        >>> children = record.list_nested_executions()
+        >>> children = record.list_execution_children()
         >>> for child in children:
         ...     print(f"{child.execution_rid}: {child.status}")
 """
@@ -85,9 +85,9 @@ class ExecutionRecord(BaseModel):
         Query relationships::
 
             >>> # Get child executions
-            >>> children = record.list_nested_executions()
+            >>> children = record.list_execution_children()
             >>> # Get parent executions
-            >>> parents = record.list_parent_executions()
+            >>> parents = record.list_execution_parents()
             >>> # Get input datasets
             >>> datasets = record.list_input_datasets()
 
@@ -312,7 +312,7 @@ class ExecutionRecord(BaseModel):
             >>> if record.is_nested():
             ...     print("This is a child execution")
         """
-        return len(list(self.list_parent_executions())) > 0
+        return len(list(self.list_execution_parents())) > 0
 
     def is_parent(self) -> bool:
         """Check if this execution has any child executions.
@@ -324,29 +324,46 @@ class ExecutionRecord(BaseModel):
             >>> if record.is_parent():
             ...     print("This execution has children")
         """
-        return len(list(self.list_nested_executions())) > 0
+        return len(list(self.list_execution_children())) > 0
 
-    def list_nested_executions(
+    def list_execution_children(
         self, recurse: bool = False, _visited: set[RID] | None = None
     ) -> Iterable["ExecutionRecord"]:
         """List child executions nested under this execution.
 
-        Args:
-            recurse: If True, recursively list all descendants.
-            _visited: Internal parameter to track visited nodes and prevent cycles.
+        Mirrors the dataset-hierarchy template (``list_dataset_children``)
+        per spec §2.9/§2.17 — renamed from ``list_nested_executions`` in
+        the R5.1 hard cutover; there is no backward-compat alias.
 
-        Returns:
-            Iterable of ExecutionRecord objects for child executions.
+        Args:
+            recurse: If True, recursively list all descendants, yielding
+                each descendant exactly once even when the hierarchy
+                contains a cycle (the ``_visited`` set guards against
+                infinite recursion).
+            _visited: Internal parameter to track visited nodes and
+                prevent cycles. Callers normally leave this at its
+                default of ``None``.
+
+        Yields:
+            ExecutionRecord: Child executions. When ``recurse`` is
+            False, only direct children; when True, all descendants in
+            depth-first order.
 
         Raises:
-            DerivaMLException: If not bound to a catalog.
+            DerivaMLException: If this record is not bound to a catalog
+                (e.g. a bare ``ExecutionRecord`` built without
+                ``_ml_instance``).
 
         Example:
-            >>> for child in record.list_nested_executions():
-            ...     print(f"Child: {child.execution_rid}")
-            >>> # Get all descendants
-            >>> for desc in record.list_nested_executions(recurse=True):
-            ...     print(f"Descendant: {desc.execution_rid}")
+            Direct children only::
+
+                >>> for child in record.list_execution_children():
+                ...     print(f"Child: {child.execution_rid}")
+
+            All descendants::
+
+                >>> for desc in record.list_execution_children(recurse=True):
+                ...     print(f"Descendant: {desc.execution_rid}")
         """
         if self._ml_instance is None:
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")
@@ -387,26 +404,46 @@ class ExecutionRecord(BaseModel):
             )
             yield child
             if recurse:
-                yield from child.list_nested_executions(recurse=True, _visited=_visited)
+                yield from child.list_execution_children(recurse=True, _visited=_visited)
 
-    def list_parent_executions(
+    def list_execution_parents(
         self, recurse: bool = False, _visited: set[RID] | None = None
     ) -> Iterable["ExecutionRecord"]:
         """List parent executions that this execution is nested under.
 
-        Args:
-            recurse: If True, recursively list all ancestors.
-            _visited: Internal parameter to track visited nodes and prevent cycles.
+        Mirrors the dataset-hierarchy template (``list_dataset_parents``)
+        per spec §2.9/§2.17 — renamed from ``list_parent_executions`` in
+        the R5.1 hard cutover; there is no backward-compat alias.
 
-        Returns:
-            Iterable of ExecutionRecord objects for parent executions.
+        Args:
+            recurse: If True, recursively list all ancestors, yielding
+                each ancestor exactly once even when the hierarchy
+                contains a cycle (the ``_visited`` set guards against
+                infinite recursion).
+            _visited: Internal parameter to track visited nodes and
+                prevent cycles. Callers normally leave this at its
+                default of ``None``.
+
+        Yields:
+            ExecutionRecord: Parent executions. When ``recurse`` is
+            False, only direct parents; when True, all ancestors in
+            depth-first order.
 
         Raises:
-            DerivaMLException: If not bound to a catalog.
+            DerivaMLException: If this record is not bound to a catalog
+                (e.g. a bare ``ExecutionRecord`` built without
+                ``_ml_instance``).
 
         Example:
-            >>> for parent in record.list_parent_executions():
-            ...     print(f"Parent: {parent.execution_rid}")
+            Direct parents only::
+
+                >>> for parent in record.list_execution_parents():
+                ...     print(f"Parent: {parent.execution_rid}")
+
+            All ancestors::
+
+                >>> for anc in record.list_execution_parents(recurse=True):
+                ...     print(f"Ancestor: {anc.execution_rid}")
         """
         if self._ml_instance is None:
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")
@@ -447,7 +484,7 @@ class ExecutionRecord(BaseModel):
             )
             yield parent
             if recurse:
-                yield from parent.list_parent_executions(recurse=True, _visited=_visited)
+                yield from parent.list_execution_parents(recurse=True, _visited=_visited)
 
     def add_nested_execution(self, child: "ExecutionRecord | RID", sequence: int | None = None) -> None:
         """Add a child execution nested under this execution.

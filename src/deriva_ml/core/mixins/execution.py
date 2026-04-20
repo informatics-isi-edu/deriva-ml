@@ -280,8 +280,8 @@ class ExecutionMixin:
 
             Query relationships::
 
-                >>> children = list(record.list_nested_executions())
-                >>> parents = list(record.list_parent_executions())
+                >>> children = list(record.list_execution_children())
+                >>> parents = list(record.list_execution_parents())
         """
         # Import here to avoid circular dependency
         from deriva_ml.execution.execution_record import ExecutionRecord

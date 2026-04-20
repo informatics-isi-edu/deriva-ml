@@ -1039,7 +1039,8 @@ class TestExecutionDatasets:
         execution = ml.create_execution(config)
         with execution.execute() as exe:
             assert len(exe.datasets) == 1
-            assert exe.datasets[0].dataset_rid == dataset_rid
+            # DatasetCollection supports both RID-keyed lookup and iteration
+            assert exe.datasets[dataset_rid].dataset_rid == dataset_rid
 
     def test_execution_with_multiple_datasets(self, dataset_test, tmp_path):
         """Test execution with multiple dataset specifications."""
@@ -1453,7 +1454,7 @@ class TestExecutionNesting:
         sequences = sorted([r["Sequence"] for r in records])
         assert sequences == [0, 1, 2]
 
-    def test_list_nested_executions(self, workflow_terms, test_workflow):
+    def test_list_execution_children(self, workflow_terms, test_workflow):
         """Test listing nested executions."""
         ml = workflow_terms
 
@@ -1474,15 +1475,15 @@ class TestExecutionNesting:
             child_rids.append(child_exec.execution_rid)
             parent_exec.add_nested_execution(child_exec, sequence=i)
 
-        # List children
-        children = parent_exec.list_nested_executions()
+        # List children (hierarchy queries live on ExecutionRecord per R2.1)
+        children = list(parent_exec.execution_record.list_execution_children())
 
         assert len(children) == 2
         # Verify they are returned in sequence order
         assert children[0].execution_rid == child_rids[0]
         assert children[1].execution_rid == child_rids[1]
 
-    def test_list_parent_executions(self, workflow_terms, test_workflow):
+    def test_list_execution_parents(self, workflow_terms, test_workflow):
         """Test listing parent executions."""
         ml = workflow_terms
 
@@ -1500,13 +1501,13 @@ class TestExecutionNesting:
 
         parent_exec.add_nested_execution(child_exec, sequence=0)
 
-        # List parents from child's perspective
-        parents = child_exec.list_parent_executions()
+        # List parents from child's perspective (hierarchy on ExecutionRecord)
+        parents = list(child_exec.execution_record.list_execution_parents())
 
         assert len(parents) == 1
         assert parents[0].execution_rid == parent_exec.execution_rid
 
-    def test_list_nested_executions_recurse(self, workflow_terms, test_workflow):
+    def test_list_execution_children_recurse(self, workflow_terms, test_workflow):
         """Test recursively listing nested executions."""
         ml = workflow_terms
 
@@ -1534,18 +1535,22 @@ class TestExecutionNesting:
         parent_exec.add_nested_execution(child_exec, sequence=0)
 
         # Non-recursive should only return direct children
-        direct_children = grandparent_exec.list_nested_executions(recurse=False)
+        direct_children = list(
+            grandparent_exec.execution_record.list_execution_children(recurse=False)
+        )
         assert len(direct_children) == 1
         assert direct_children[0].execution_rid == parent_exec.execution_rid
 
         # Recursive should return all descendants
-        all_descendants = grandparent_exec.list_nested_executions(recurse=True)
+        all_descendants = list(
+            grandparent_exec.execution_record.list_execution_children(recurse=True)
+        )
         assert len(all_descendants) == 2
         descendant_rids = [d.execution_rid for d in all_descendants]
         assert parent_exec.execution_rid in descendant_rids
         assert child_exec.execution_rid in descendant_rids
 
-    def test_list_parent_executions_recurse(self, workflow_terms, test_workflow):
+    def test_list_execution_parents_recurse(self, workflow_terms, test_workflow):
         """Test recursively listing parent executions."""
         ml = workflow_terms
 
@@ -1573,12 +1578,16 @@ class TestExecutionNesting:
         parent_exec.add_nested_execution(child_exec, sequence=0)
 
         # Non-recursive should only return direct parent
-        direct_parents = child_exec.list_parent_executions(recurse=False)
+        direct_parents = list(
+            child_exec.execution_record.list_execution_parents(recurse=False)
+        )
         assert len(direct_parents) == 1
         assert direct_parents[0].execution_rid == parent_exec.execution_rid
 
         # Recursive should return all ancestors
-        all_ancestors = child_exec.list_parent_executions(recurse=True)
+        all_ancestors = list(
+            child_exec.execution_record.list_execution_parents(recurse=True)
+        )
         assert len(all_ancestors) == 2
         ancestor_rids = [a.execution_rid for a in all_ancestors]
         assert parent_exec.execution_rid in ancestor_rids

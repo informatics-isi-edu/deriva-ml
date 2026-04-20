@@ -66,3 +66,20 @@ def test_collection_keys_values():
     coll = DatasetCollection(bags)
     assert list(coll.keys()) == ["A", "B"]
     assert list(coll.values()) == bags
+
+
+def test_datasets_property_returns_collection():
+    """The public datasets property returns a DatasetCollection."""
+    import inspect
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+    from deriva_ml.execution.execution import Execution
+
+    # Class-level property check.
+    descriptor = inspect.getattr_static(Execution, "datasets")
+    assert isinstance(descriptor, property), "datasets should be a property"
+
+    # Smoke: bypass __init__ and verify the property wraps _datasets_list.
+    exe = Execution.__new__(Execution)
+    exe._datasets_list = []
+    assert isinstance(exe.datasets, DatasetCollection)
+    assert len(exe.datasets) == 0
