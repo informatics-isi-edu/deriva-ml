@@ -361,3 +361,34 @@ def test_create_execution_offline_raises(catalog_manager, tmp_path):
             description="can't",
             workflow="any-url",  # doesn't need to exist — offline check fires first
         )
+
+
+def test_create_execution_writes_registry_row(test_ml):
+    """After create_execution, the workspace SQLite must have the row."""
+    from deriva_ml import MLVocab as vc
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    test_ml.add_term(
+        vc.workflow_type,
+        "Test Workflow",
+        description="for D7 registry-write test",
+    )
+    wf = test_ml.create_workflow(
+        name="D7 Registry Test Workflow",
+        workflow_type="Test Workflow",
+        description="for D7 registry-write test",
+    )
+
+    exe = test_ml.create_execution(
+        workflow=wf,
+        description="registry test",
+    )
+    store = test_ml.workspace.execution_state_store()
+    row = store.get_execution(exe.execution_rid)
+    assert row is not None
+    assert row["rid"] == exe.execution_rid
+    # Initial status is 'created'.
+    assert row["status"] == ExecutionStatus.created
+    assert row["mode"] == "online"
+    assert row["config_json"]  # non-empty
+    assert row["working_dir_rel"].startswith("execution/")

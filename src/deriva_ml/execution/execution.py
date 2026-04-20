@@ -305,6 +305,56 @@ class Execution:
 
         self._initialize_execution(reload)
 
+        # Register the execution in the workspace SQLite registry.
+        # Per spec §2.4, SQLite is authoritative for local state; the
+        # file-tree exists but we do NOT rely on listing the filesystem
+        # to enumerate executions anymore.
+        # Skip when: dry_run (sentinel RID not valid) or reload
+        # (restore_execution path — the row may already exist, and we
+        # shouldn't blow away whatever status/history it already has).
+        if not self._dry_run and reload is None:
+            from datetime import datetime, timezone
+
+            from deriva_ml.execution.state_store import ExecutionStatus
+
+            store = self._ml_object.workspace.execution_state_store()
+            now = datetime.now(timezone.utc)
+
+            # Serialize the ExecutionConfiguration. Pydantic v2 dumps to
+            # a plain dict; model_dump_json then serializes. Includes
+            # the RID + version info so a reconstructed configuration
+            # from a resume_execution call is faithful.
+            config_json = self.configuration.model_dump_json()
+
+            try:
+                store.insert_execution(
+                    rid=self.execution_rid,
+                    workflow_rid=self.workflow_rid,
+                    description=self.configuration.description,
+                    config_json=config_json,
+                    status=ExecutionStatus.created,
+                    mode=self._ml_object._mode,
+                    working_dir_rel=f"execution/{self.execution_rid}",
+                    created_at=now,
+                    last_activity=now,
+                )
+            except Exception as exc:
+                # The catalog row is already created at this point —
+                # don't leave a catalog Execution with no SQLite sibling.
+                # Log and re-raise; the user can recover via
+                # lookup_execution, but workspace-based resume is
+                # impaired until the row is re-registered manually.
+                import logging
+                logger = logging.getLogger("deriva_ml.execution")
+                logger.error(
+                    "create_execution %s: catalog POST succeeded but "
+                    "SQLite registry write FAILED (%s). Execution can "
+                    "be recovered via ml.lookup_execution(rid) + manual "
+                    "adoption.",
+                    self.execution_rid, exc,
+                )
+                raise
+
     @classmethod
     def _from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
         """Bind an Execution to an existing SQLite registry row.

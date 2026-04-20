@@ -169,7 +169,10 @@ class ExecutionStateStore:
             Column("id", Integer, primary_key=True, autoincrement=True),
             Column(
                 "execution_rid", String,
-                ForeignKey(f"{EXECUTIONS_TABLE}.rid"),
+                ForeignKey(
+                    f"{EXECUTIONS_TABLE}.rid",
+                    name="fk_pending_rows_execution_rid_fkey",
+                ),
                 nullable=False,
             ),
             Column("key", String, nullable=False),
@@ -188,7 +191,10 @@ class ExecutionStateStore:
             Column("uploaded_at", DateTime(timezone=True), nullable=True),
             Column(
                 "rule_id", Integer,
-                ForeignKey(f"{DIRECTORY_RULES_TABLE}.id"),
+                ForeignKey(
+                    f"{DIRECTORY_RULES_TABLE}.id",
+                    name="fk_pending_rows_rule_id_fkey",
+                ),
                 nullable=True,
             ),
             Index("ix_pending_execution_rid_status", "execution_rid", "status"),
@@ -202,7 +208,10 @@ class ExecutionStateStore:
             Column("id", Integer, primary_key=True, autoincrement=True),
             Column(
                 "execution_rid", String,
-                ForeignKey(f"{EXECUTIONS_TABLE}.rid"),
+                ForeignKey(
+                    f"{EXECUTIONS_TABLE}.rid",
+                    name="fk_directory_rules_execution_rid_fkey",
+                ),
                 nullable=False,
             ),
             Column("target_schema", String, nullable=False),
