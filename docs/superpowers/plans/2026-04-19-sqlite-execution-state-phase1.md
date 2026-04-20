@@ -3136,4 +3136,1573 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task Group D — Execution registry public API
+
+Wires the state machine and state store into `DerivaML` public methods:
+`list_executions`, `find_incomplete_executions`, `resume_execution`,
+`gc_executions`, plus the new `create_execution` with kwargs form.
+
+The existing `src/deriva_ml/core/mixins/execution.py` has
+`create_execution`, `restore_execution`, `lookup_execution` today.
+This group replaces `restore_execution` with `resume_execution`
+(hard cutover, R5.1), adds the new methods, and threads the state
+machine through `create_execution`.
+
+### Task D1: `ExecutionRecord` dataclass (registry row projection)
+
+**Files:**
+- Create: `src/deriva_ml/execution/execution_record_v2.py` (new; see Task D8 for merge-back plan)
+- Test: `tests/execution/test_execution_record_v2.py`
+
+**Note:** There's an existing `ExecutionRecord` at `src/deriva_ml/execution/execution_record.py`. That class is a catalog-backed wrapper (queries the server). The new dataclass is SQLite-backed and represents the registry row. To avoid a giant rename-and-refactor in one commit, we build the new one alongside in D1, then in Task D8 we merge them (the existing ExecutionRecord gets updated to subclass or replace its internals). Tests in Groups D–H reference the new dataclass; the old class stays untouched until D8.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_execution_record_v2.py`:
+
+```python
+"""Tests for the SQLite-backed ExecutionRecord dataclass."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+
+
+def test_execution_record_has_registry_fields():
+    from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    now = datetime.now(timezone.utc)
+    rec = ExecutionRecord(
+        rid="EXE-A",
+        workflow_rid="WFL-1",
+        description="test",
+        status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        start_time=now,
+        stop_time=now,
+        last_activity=now,
+        error=None,
+        sync_pending=False,
+        created_at=now,
+        pending_rows=0,
+        failed_rows=0,
+        pending_files=0,
+        failed_files=0,
+    )
+    assert rec.rid == "EXE-A"
+    assert rec.status is ExecutionStatus.stopped
+    assert rec.mode is ConnectionMode.online
+    assert rec.pending_rows == 0
+
+
+def test_execution_record_is_frozen():
+    from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    now = datetime.now(timezone.utc)
+    rec = ExecutionRecord(
+        rid="X", workflow_rid=None, description=None,
+        status=ExecutionStatus.created, mode=ConnectionMode.online,
+        working_dir_rel="execution/X",
+        start_time=None, stop_time=None, last_activity=now,
+        error=None, sync_pending=False, created_at=now,
+        pending_rows=0, failed_rows=0, pending_files=0, failed_files=0,
+    )
+    with pytest.raises((AttributeError, TypeError)):
+        rec.rid = "Y"
+
+
+def test_from_row_constructs_from_sqlite_dict():
+    from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    now = datetime.now(timezone.utc)
+    row = {
+        "rid": "EXE-A",
+        "workflow_rid": "WFL-1",
+        "description": "test",
+        "status": "stopped",
+        "mode": "online",
+        "working_dir_rel": "execution/EXE-A",
+        "start_time": now,
+        "stop_time": now,
+        "last_activity": now,
+        "error": None,
+        "sync_pending": False,
+        "created_at": now,
+        "config_json": "{}",
+    }
+    rec = ExecutionRecord.from_row(
+        row,
+        pending_rows=3, failed_rows=0,
+        pending_files=1, failed_files=0,
+    )
+    assert rec.rid == "EXE-A"
+    assert rec.status is ExecutionStatus.stopped
+    assert rec.mode is ConnectionMode.online
+    assert rec.pending_rows == 3
+    assert rec.pending_files == 1
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_record_v2.py -v
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement the dataclass**
+
+Create `src/deriva_ml/execution/execution_record_v2.py`:
+
+```python
+"""SQLite-backed ExecutionRecord — a registry row with derived counts.
+
+Per spec §2.9. A frozen dataclass projection of one execution_state__
+row plus convenience counts from pending_rows. Returned by
+DerivaML.list_executions, ml.find_incomplete_executions, and as the
+handle for resume_execution's just-in-time reconciliation input.
+
+This class will eventually replace the catalog-backed ExecutionRecord
+in execution_record.py (Task D8 merges). Built alongside to keep this
+refactor reviewable.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from deriva_ml.core.connection_mode import ConnectionMode
+from deriva_ml.execution.state_store import ExecutionStatus
+
+if TYPE_CHECKING:
+    from deriva_ml.core.base import DerivaML
+
+
+@dataclass(frozen=True)
+class ExecutionRecord:
+    """Frozen snapshot of an execution's registry row plus pending counts.
+
+    A value object — no mutation, no server reads on property access.
+    If you need lifecycle fields that change over time (live status,
+    etc.), use the Execution object returned by resume_execution.
+
+    Attributes:
+        rid: Server-assigned Execution RID.
+        workflow_rid: Workflow FK; None if not set.
+        description: Free-form description from the configuration.
+        status: Current lifecycle status as of this snapshot.
+        mode: ConnectionMode the execution was last active under.
+        working_dir_rel: Relative path to the execution root.
+        start_time / stop_time: Lifecycle timestamps, None if absent.
+        last_activity: Last pending-row mutation time.
+        error: Last error message if status in (failed,).
+        sync_pending: True if SQLite is ahead of the catalog.
+        created_at: When the local registry first knew about this row.
+        pending_rows: Count of non-asset pending rows not yet uploaded.
+        failed_rows: Count of non-asset rows in status='failed'.
+        pending_files: Count of asset-file rows not yet uploaded.
+        failed_files: Count of asset-file rows in status='failed'.
+
+    Example:
+        >>> records = ml.find_incomplete_executions()
+        >>> for r in records:
+        ...     print(r.rid, r.status, r.pending_rows)
+    """
+
+    rid: str
+    workflow_rid: str | None
+    description: str | None
+    status: ExecutionStatus
+    mode: ConnectionMode
+    working_dir_rel: str
+    start_time: datetime | None
+    stop_time: datetime | None
+    last_activity: datetime
+    error: str | None
+    sync_pending: bool
+    created_at: datetime
+    pending_rows: int
+    failed_rows: int
+    pending_files: int
+    failed_files: int
+
+    @classmethod
+    def from_row(
+        cls,
+        row: dict,
+        *,
+        pending_rows: int = 0,
+        failed_rows: int = 0,
+        pending_files: int = 0,
+        failed_files: int = 0,
+    ) -> "ExecutionRecord":
+        """Construct from a SQLite executions row + pending counts.
+
+        Args:
+            row: Dict returned by ExecutionStateStore.get_execution or
+                list_executions. Must contain all the executions
+                columns.
+            pending_rows / failed_rows: Non-asset row counts. Zero if
+                the caller hasn't queried pending_rows.
+            pending_files / failed_files: Asset-file row counts.
+
+        Returns:
+            A frozen ExecutionRecord instance.
+        """
+        return cls(
+            rid=row["rid"],
+            workflow_rid=row["workflow_rid"],
+            description=row["description"],
+            status=ExecutionStatus(row["status"]),
+            mode=ConnectionMode(row["mode"]),
+            working_dir_rel=row["working_dir_rel"],
+            start_time=row["start_time"],
+            stop_time=row["stop_time"],
+            last_activity=row["last_activity"],
+            error=row["error"],
+            sync_pending=bool(row["sync_pending"]),
+            created_at=row["created_at"],
+            pending_rows=pending_rows,
+            failed_rows=failed_rows,
+            pending_files=pending_files,
+            failed_files=failed_files,
+        )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_record_v2.py -v
+```
+
+Expected: 3 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/execution_record_v2.py tests/execution/test_execution_record_v2.py
+git commit -m "feat(execution): add SQLite-backed ExecutionRecord dataclass
+
+Per spec §2.9. Frozen dataclass projection of one execution_state__
+row with pending/failed counts. from_row classmethod converts a
+SQLite row dict to an instance. Lives in execution_record_v2.py;
+existing catalog-backed ExecutionRecord in execution_record.py stays
+until Task D8 merges.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D2: Pending-counts query helper on `ExecutionStateStore`
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_store.py`
+- Test: `tests/execution/test_state_store.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_state_store.py`:
+
+```python
+def test_count_pending_by_kind(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    # Two plain rows: one staged, one failed.
+    id1 = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    id2 = store.insert_pending_row(
+        execution_rid="EXE-A", key="k2",
+        target_schema="s", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.update_pending_row(id2, status=PendingRowStatus.failed)
+
+    # Two asset rows: one staged, one uploaded.
+    id3 = store.insert_pending_row(
+        execution_rid="EXE-A", key="f1",
+        target_schema="s", target_table="Image",
+        metadata_json="{}", created_at=now,
+        asset_file_path="/tmp/a.png",
+    )
+    id4 = store.insert_pending_row(
+        execution_rid="EXE-A", key="f2",
+        target_schema="s", target_table="Image",
+        metadata_json="{}", created_at=now,
+        asset_file_path="/tmp/b.png",
+    )
+    store.update_pending_row(id4, status=PendingRowStatus.uploaded)
+
+    counts = store.count_pending_by_kind(execution_rid="EXE-A")
+    # Plain rows: 1 pending (staged/leasing/leased/uploading), 1 failed.
+    # Asset rows: 1 pending, 0 failed (the uploaded one doesn't count).
+    assert counts == {
+        "pending_rows": 1,
+        "failed_rows": 1,
+        "pending_files": 1,
+        "failed_files": 0,
+    }
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_store.py -v -k count_pending
+```
+
+Expected: FAIL with `AttributeError`.
+
+- [ ] **Step 3: Implement `count_pending_by_kind`**
+
+Append to `ExecutionStateStore` in `src/deriva_ml/execution/state_store.py`:
+
+```python
+    def count_pending_by_kind(
+        self,
+        *,
+        execution_rid: str,
+    ) -> dict[str, int]:
+        """Return per-kind counts of non-terminal pending rows.
+
+        A "pending" row is in one of staged/leasing/leased/uploading
+        (not yet terminally uploaded or failed). A "failed" row is
+        specifically in status='failed'. Rows in status='uploaded'
+        are excluded from both counts.
+
+        "plain" vs "asset" is determined by asset_file_path — non-null
+        means it's an asset row.
+
+        Args:
+            execution_rid: Scoping. Required — pending rows are
+                execution-scoped.
+
+        Returns:
+            A dict with keys pending_rows, failed_rows, pending_files,
+            failed_files. Missing keys default to 0 (which is what the
+            aggregate returns when nothing matches).
+
+        Example:
+            >>> store.count_pending_by_kind(execution_rid="EXE-A")
+            {'pending_rows': 5, 'failed_rows': 0,
+             'pending_files': 12, 'failed_files': 1}
+        """
+        from sqlalchemy import case, func, select
+
+        pending_statuses = [
+            str(PendingRowStatus.staged),
+            str(PendingRowStatus.leasing),
+            str(PendingRowStatus.leased),
+            str(PendingRowStatus.uploading),
+        ]
+        failed_status = str(PendingRowStatus.failed)
+
+        # A single aggregate query, branched by asset_file_path IS NULL.
+        # case() produces 1 or 0 for each row matching the branch; sum
+        # gives the count. This is ~4x faster than 4 separate queries
+        # for large pending_rows tables.
+        is_plain = self.pending_rows.c.asset_file_path.is_(None)
+        is_asset = self.pending_rows.c.asset_file_path.isnot(None)
+        status_col = self.pending_rows.c.status
+
+        stmt = select(
+            func.coalesce(
+                func.sum(
+                    case((is_plain & status_col.in_(pending_statuses), 1), else_=0)
+                ),
+                0,
+            ).label("pending_rows"),
+            func.coalesce(
+                func.sum(
+                    case((is_plain & (status_col == failed_status), 1), else_=0)
+                ),
+                0,
+            ).label("failed_rows"),
+            func.coalesce(
+                func.sum(
+                    case((is_asset & status_col.in_(pending_statuses), 1), else_=0)
+                ),
+                0,
+            ).label("pending_files"),
+            func.coalesce(
+                func.sum(
+                    case((is_asset & (status_col == failed_status), 1), else_=0)
+                ),
+                0,
+            ).label("failed_files"),
+        ).where(self.pending_rows.c.execution_rid == execution_rid)
+
+        with self.engine.connect() as conn:
+            row = conn.execute(stmt).mappings().first()
+        return {
+            "pending_rows": int(row["pending_rows"]),
+            "failed_rows": int(row["failed_rows"]),
+            "pending_files": int(row["pending_files"]),
+            "failed_files": int(row["failed_files"]),
+        }
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_store.py -v
+```
+
+Expected: 19 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_store.py tests/execution/test_state_store.py
+git commit -m "feat(state_store): count_pending_by_kind() single-query aggregate
+
+Returns {pending_rows, failed_rows, pending_files, failed_files} in
+one aggregate query. asset_file_path IS NULL discriminates plain vs
+asset rows. ~4x faster than four separate COUNT queries for large
+pending_rows tables.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D3: `DerivaML.list_executions()`
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/execution.py`
+- Test: `tests/execution/test_execution_registry.py` (new file)
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_execution_registry.py`:
+
+```python
+"""Tests for DerivaML execution registry API (list, find_incomplete,
+resume, gc, create with kwargs)."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+
+def _insert_test_execution(ws, rid, status, mode="online", workflow_rid=None):
+    """Helper to insert an executions row without going through
+    catalog.  Used only in unit tests."""
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    store = ws.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid=rid, workflow_rid=workflow_rid, description=f"test {rid}",
+        config_json="{}",
+        status=ExecutionStatus(status) if isinstance(status, str) else status,
+        mode=ConnectionMode(mode) if isinstance(mode, str) else mode,
+        working_dir_rel=f"execution/{rid}",
+        created_at=now, last_activity=now,
+    )
+
+
+def test_list_executions_empty(test_ml):
+    assert test_ml.list_executions() == []
+
+
+def test_list_executions_returns_dataclass(test_ml):
+    from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+
+    rows = test_ml.list_executions()
+    assert len(rows) == 1
+    assert isinstance(rows[0], ExecutionRecord)
+    assert rows[0].rid == "EXE-A"
+    assert rows[0].status is ExecutionStatus.stopped
+
+
+def test_list_executions_status_filter(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.running)
+    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.uploaded)
+    _insert_test_execution(test_ml.workspace, "C", ExecutionStatus.failed)
+
+    incomplete = test_ml.list_executions(
+        status=[ExecutionStatus.running, ExecutionStatus.failed],
+    )
+    rids = {r.rid for r in incomplete}
+    assert rids == {"A", "C"}
+
+
+def test_find_incomplete_executions(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.running)
+    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.uploaded)
+    _insert_test_execution(test_ml.workspace, "C", ExecutionStatus.stopped)
+    _insert_test_execution(test_ml.workspace, "D", ExecutionStatus.aborted)
+    _insert_test_execution(test_ml.workspace, "E", ExecutionStatus.pending_upload)
+
+    rows = test_ml.find_incomplete_executions()
+    rids = {r.rid for r in rows}
+    # Incomplete = anything not terminally uploaded/aborted.
+    # That's {created, running, stopped, failed, pending_upload}.
+    # C is stopped, E is pending_upload, A is running.
+    assert rids == {"A", "C", "E"}
+
+
+def test_list_executions_carries_pending_counts(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid="EXE-A", key="k1", target_schema="s",
+        target_table="Subject", metadata_json="{}", created_at=now,
+    )
+
+    rows = test_ml.list_executions()
+    assert len(rows) == 1
+    assert rows[0].pending_rows == 1
+    assert rows[0].pending_files == 0
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v
+```
+
+Expected: FAIL with `AttributeError: 'DerivaML' object has no attribute 'list_executions'`.
+
+- [ ] **Step 3: Implement `list_executions` and `find_incomplete_executions`**
+
+In `src/deriva_ml/core/mixins/execution.py`, add:
+
+```python
+# Near the top of the file, with the other imports:
+from datetime import datetime
+from deriva_ml.core.connection_mode import ConnectionMode
+from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+from deriva_ml.execution.state_store import ExecutionStatus
+
+
+# Inside the ExecutionMixin class, add methods. Place them near
+# restore_execution / lookup_execution for locality.
+
+def list_executions(
+    self,
+    *,
+    status: "ExecutionStatus | list[ExecutionStatus] | None" = None,
+    workflow_rid: "str | None" = None,
+    mode: "ConnectionMode | None" = None,
+    since: "datetime | None" = None,
+) -> list[ExecutionRecord]:
+    """Return known-local executions matching the filters.
+
+    Reads from the workspace SQLite registry — no server contact.
+    Works in both online and offline mode.
+
+    Args:
+        status: Single ExecutionStatus or list to filter; None = all.
+        workflow_rid: Match only executions tagged with this Workflow
+            RID; None = all.
+        mode: ConnectionMode the execution was last active under;
+            None = all.
+        since: Return only executions with last_activity >= this
+            timestamp (timezone-aware). None = no time filter.
+
+    Returns:
+        List of ExecutionRecord dataclasses — one per matching row.
+        Empty list if nothing matches. Pending-row counts are derived
+        in the same pass.
+
+    Example:
+        >>> from deriva_ml.execution.state_store import ExecutionStatus
+        >>> failed = ml.list_executions(status=ExecutionStatus.failed)
+        >>> for rec in failed:
+        ...     print(rec.rid, rec.error)
+    """
+    store = self.workspace.execution_state_store()
+    rows = store.list_executions(
+        status=status, workflow_rid=workflow_rid,
+        mode=mode, since=since,
+    )
+    return [
+        ExecutionRecord.from_row(row, **store.count_pending_by_kind(execution_rid=row["rid"]))
+        for row in rows
+    ]
+
+
+def find_incomplete_executions(self) -> list[ExecutionRecord]:
+    """Sugar over list_executions for everything not terminally done.
+
+    Returns executions in status in (created, running, stopped,
+    failed, pending_upload) — the set of things a user would want to
+    either resume, retry, or clean up. Excludes uploaded (terminal
+    success) and aborted (terminal cleanup).
+
+    Returns:
+        List of ExecutionRecord for incomplete runs.
+
+    Example:
+        >>> for rec in ml.find_incomplete_executions():
+        ...     print(rec.rid, rec.status, rec.pending_rows)
+    """
+    return self.list_executions(
+        status=[
+            ExecutionStatus.created,
+            ExecutionStatus.running,
+            ExecutionStatus.stopped,
+            ExecutionStatus.failed,
+            ExecutionStatus.pending_upload,
+        ],
+    )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v
+```
+
+Expected: 5 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/core/mixins/execution.py tests/execution/test_execution_registry.py
+git commit -m "feat(execution): list_executions + find_incomplete_executions
+
+SQLite-only registry queries — no server contact. Returns the new
+ExecutionRecord dataclass with pending/failed counts derived in the
+same pass via count_pending_by_kind.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D4: `DerivaML.resume_execution()` with reconciliation
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/execution.py`
+- Test: `tests/execution/test_execution_registry.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_registry.py`:
+
+```python
+def test_resume_execution_reads_from_sqlite(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+
+    exe = test_ml.resume_execution("EXE-A")
+    assert exe.execution_rid == "EXE-A"
+
+
+def test_resume_execution_missing_raises(test_ml):
+    from deriva_ml.core.exceptions import DerivaMLException
+
+    import pytest
+    with pytest.raises(DerivaMLException) as exc:
+        test_ml.resume_execution("EXE-NOPE")
+    assert "EXE-NOPE" in str(exc.value)
+
+
+def test_resume_execution_offline_skips_reconcile(test_ml_offline):
+    """Offline resume must not contact the server."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(
+        test_ml_offline.workspace, "EXE-A",
+        ExecutionStatus.stopped, mode="offline",
+    )
+
+    # Just must not raise — offline reconcile is a no-op.
+    exe = test_ml_offline.resume_execution("EXE-A")
+    assert exe.execution_rid == "EXE-A"
+
+
+def test_resume_execution_online_flushes_sync_pending(test_ml, monkeypatch):
+    """If sync_pending=True on resume (online), flush to catalog."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+    # Simulate prior offline transition.
+    test_ml.workspace.execution_state_store().update_execution(
+        "EXE-A", sync_pending=True,
+    )
+
+    flushed_calls = []
+    reconcile_calls = []
+
+    def _fake_flush(*, store, catalog, execution_rid):
+        flushed_calls.append(execution_rid)
+        store.update_execution(execution_rid, sync_pending=False)
+
+    def _fake_reconcile(*, store, catalog, execution_rid):
+        reconcile_calls.append(execution_rid)
+
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.flush_pending_sync", _fake_flush,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.reconcile_with_catalog", _fake_reconcile,
+    )
+
+    exe = test_ml.resume_execution("EXE-A")
+    assert flushed_calls == ["EXE-A"]
+    # Reconcile runs AFTER flush (so we compare catalog vs synced state).
+    assert reconcile_calls == ["EXE-A"]
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v -k resume
+```
+
+Expected: FAIL with `AttributeError: 'DerivaML' object has no attribute 'resume_execution'`.
+
+- [ ] **Step 3: Implement `resume_execution`**
+
+In `src/deriva_ml/core/mixins/execution.py`, add imports:
+
+```python
+from deriva_ml.execution.state_machine import (
+    flush_pending_sync,
+    reconcile_with_catalog,
+)
+```
+
+Add the method:
+
+```python
+def resume_execution(self, execution_rid: "RID") -> "Execution":
+    """Re-hydrate an Execution from the workspace SQLite registry.
+
+    Works in both online and offline modes. The execution's recorded
+    mode is independent of the current DerivaML instance's mode — a
+    user can create an execution online, run it offline, then upload
+    online, all via the same RID.
+
+    Before returning, runs just-in-time state reconciliation
+    (spec §2.2): if online and sync_pending=True, flushes SQLite to
+    the catalog; then checks for catalog/SQLite disagreement and
+    applies the disagreement rules.
+
+    Args:
+        execution_rid: Server-assigned Execution RID returned by a
+            prior create_execution call.
+
+    Returns:
+        An Execution object bound to this DerivaML instance, with
+        lifecycle fields as SQLite read-through properties (see
+        spec §2.3).
+
+    Raises:
+        DerivaMLException: If no matching executions row exists in
+            the workspace registry.
+        DerivaMLStateInconsistency: If just-in-time reconciliation
+            surfaces a disagreement outside the six documented cases
+            (see state_machine.reconcile_with_catalog).
+
+    Example:
+        >>> ml = DerivaML(hostname="example.org", catalog_id="42")
+        >>> exe = ml.resume_execution("5-ABC")
+        >>> exe.status
+        <ExecutionStatus.stopped>
+        >>> exe.upload_outputs()
+    """
+    from deriva_ml.core.exceptions import DerivaMLException
+    from deriva_ml.execution.execution import Execution
+
+    store = self.workspace.execution_state_store()
+    row = store.get_execution(execution_rid)
+    if row is None:
+        raise DerivaMLException(
+            f"Execution {execution_rid} is not in the workspace registry. "
+            f"Either it was never created on this workspace, or it was "
+            f"garbage-collected. Use ml.list_executions() to see what's "
+            f"available locally."
+        )
+
+    # Just-in-time reconciliation. Online only — offline mode has no
+    # catalog to compare against.
+    if self._mode is ConnectionMode.online:
+        # Order matters: flush first (push our newer state) before
+        # reconcile (which would otherwise see stale catalog state
+        # as a disagreement). See spec §4.6 step 3.
+        if row["sync_pending"]:
+            flush_pending_sync(
+                store=store, catalog=self.catalog,
+                execution_rid=execution_rid,
+            )
+        reconcile_with_catalog(
+            store=store, catalog=self.catalog,
+            execution_rid=execution_rid,
+        )
+
+    # Construct Execution bound to this DerivaML — it reads lifecycle
+    # fields from SQLite via read-through properties (Group E).
+    return Execution._from_registry(
+        ml_object=self, execution_rid=execution_rid,
+    )
+```
+
+**Note:** `Execution._from_registry` is created in Task E1 (read-through lifecycle fields). Until then, this test will fail with an AttributeError on `_from_registry`. To enable isolated testing of `resume_execution` before Group E lands, Group E's first task introduces `_from_registry` *before* modifying the Execution public properties. Adjust ordering of Groups D/E if desired, but the plan as written dispatches D4 after E1 for this reason — see ordering note at the top of Group E.
+
+Alternative for a standalone D4: implement a temporary `Execution._from_registry` returning an existing-Execution-shaped object in D4 itself, to be replaced in E1. The test above checks only `exe.execution_rid`, which the existing class already supports.
+
+- [ ] **Step 3a: Add temporary `_from_registry` classmethod on existing `Execution`**
+
+In `src/deriva_ml/execution/execution.py`, add this classmethod on `Execution` (near the existing `__init__`). This minimal version lets Group D finish independently; Group E replaces the body:
+
+```python
+@classmethod
+def _from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
+    """Bind an Execution to an existing SQLite registry row.
+
+    Distinct from create_execution: does NOT contact the catalog and
+    does NOT POST a new row. Called by ml.resume_execution.
+
+    Temporary implementation for Group D — Group E replaces the body
+    to wire up read-through lifecycle properties.
+    """
+    # Minimal construction: skip the existing __init__'s catalog
+    # interactions. Store the rid and ml_object so Group E has a
+    # starting point.
+    instance = cls.__new__(cls)
+    instance._ml_object = ml_object
+    instance.execution_rid = execution_rid
+    instance._dry_run = False
+    # Fields the existing class expects to exist:
+    instance.datasets = []
+    instance.dataset_rids = []
+    instance.asset_paths = {}
+    instance.configuration = None   # Group E loads from config_json
+    instance._working_dir = ml_object.working_dir
+    instance._cache_dir = ml_object.cache_dir
+    return instance
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v
+```
+
+Expected: 9 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/core/mixins/execution.py src/deriva_ml/execution/execution.py tests/execution/test_execution_registry.py
+git commit -m "feat(execution): DerivaML.resume_execution with JIT reconcile
+
+SQLite-registry read + online-mode flush_pending_sync +
+reconcile_with_catalog. Temporary Execution._from_registry
+classmethod enables Group D to finish standalone; Group E will
+replace the body to wire read-through lifecycle properties.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D5: `DerivaML.gc_executions()`
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/execution.py`
+- Modify: `src/deriva_ml/execution/state_store.py` (add `delete_execution`)
+- Test: `tests/execution/test_execution_registry.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_registry.py`:
+
+```python
+def test_gc_executions_deletes_matching(test_ml):
+    from datetime import timedelta
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    # Three uploaded executions of different ages.
+    _insert_test_execution(test_ml.workspace, "OLD", ExecutionStatus.uploaded)
+    _insert_test_execution(test_ml.workspace, "NEW", ExecutionStatus.uploaded)
+    _insert_test_execution(test_ml.workspace, "RUN", ExecutionStatus.running)
+
+    # Backdate OLD so it matches older_than.
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.update_execution(
+        "OLD",
+        last_activity=now - timedelta(days=30),
+        created_at=now - timedelta(days=30),
+    )
+
+    n = test_ml.gc_executions(
+        status=ExecutionStatus.uploaded,
+        older_than=timedelta(days=7),
+    )
+    assert n == 1
+    rids = {r.rid for r in test_ml.list_executions()}
+    assert rids == {"NEW", "RUN"}
+
+
+def test_gc_executions_status_only(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.aborted)
+    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.running)
+
+    n = test_ml.gc_executions(status=ExecutionStatus.aborted)
+    assert n == 1
+    assert {r.rid for r in test_ml.list_executions()} == {"B"}
+
+
+def test_gc_executions_delete_working_dir(test_ml, tmp_path):
+    from deriva_ml.execution.state_store import ExecutionStatus
+    from pathlib import Path
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.uploaded)
+
+    # Create the working directory files.
+    work = Path(test_ml.working_dir) / "execution/EXE-A"
+    work.mkdir(parents=True)
+    (work / "scratch.txt").write_text("hi")
+    assert work.exists()
+
+    n = test_ml.gc_executions(
+        status=ExecutionStatus.uploaded,
+        delete_working_dir=True,
+    )
+    assert n == 1
+    assert not work.exists()
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v -k gc
+```
+
+Expected: FAIL with `AttributeError: gc_executions`.
+
+- [ ] **Step 3: Add `delete_execution` helper to `ExecutionStateStore`**
+
+Append to `ExecutionStateStore` in `src/deriva_ml/execution/state_store.py`:
+
+```python
+    def delete_execution(self, execution_rid: str) -> None:
+        """Delete an execution row and all its pending_rows /
+        directory_rules.
+
+        Foreign keys cascade via ON DELETE, but SQLite only honors
+        that with PRAGMA foreign_keys=ON (which the workspace sets).
+        Belt-and-suspenders: we explicitly delete children first, so
+        the ORDER of deletions is predictable and so callers running
+        without FK-on get sensible behavior.
+
+        Args:
+            execution_rid: Which execution to remove.
+        """
+        from sqlalchemy import delete
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                delete(self.pending_rows).where(
+                    self.pending_rows.c.execution_rid == execution_rid
+                )
+            )
+            conn.execute(
+                delete(self.directory_rules).where(
+                    self.directory_rules.c.execution_rid == execution_rid
+                )
+            )
+            conn.execute(
+                delete(self.executions).where(
+                    self.executions.c.rid == execution_rid
+                )
+            )
+```
+
+- [ ] **Step 4: Add `gc_executions` on `DerivaML`**
+
+In `src/deriva_ml/core/mixins/execution.py`, add:
+
+```python
+def gc_executions(
+    self,
+    *,
+    older_than: "timedelta | None" = None,
+    status: "ExecutionStatus | list[ExecutionStatus] | None" = None,
+    delete_working_dir: bool = False,
+) -> int:
+    """Garbage-collect execution registry rows matching the filters.
+
+    By default only removes registry state (SQLite rows and their
+    pending_rows / directory_rules). Pass delete_working_dir=True to
+    also `rm -rf` the on-disk execution root under the workspace.
+
+    Does NOT touch the catalog. Executions uploaded to the catalog
+    remain there regardless of local gc.
+
+    Args:
+        older_than: If set, only gc executions whose last_activity is
+            older than this timedelta.
+        status: Filter by status (single or list); None = any status.
+            Typical: pass ExecutionStatus.uploaded to clean up after
+            successful uploads.
+        delete_working_dir: If True, remove the per-execution working
+            directory from disk. Defaults to False (registry-only).
+
+    Returns:
+        The number of executions removed.
+
+    Example:
+        >>> from datetime import timedelta
+        >>> from deriva_ml.execution.state_store import ExecutionStatus
+        >>> n = ml.gc_executions(
+        ...     status=ExecutionStatus.uploaded,
+        ...     older_than=timedelta(days=30),
+        ...     delete_working_dir=True,
+        ... )
+        >>> print(f"cleaned {n} old executions")
+    """
+    import shutil
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    store = self.workspace.execution_state_store()
+
+    # Build the filter list. If older_than is set, compute the cutoff.
+    since = None  # inverse: we want older-than, not newer-than
+    rows = store.list_executions(status=status)
+    if older_than is not None:
+        cutoff = datetime.now(timezone.utc) - older_than
+        rows = [r for r in rows if r["last_activity"] < cutoff]
+
+    for row in rows:
+        if delete_working_dir:
+            wd = Path(self.working_dir) / row["working_dir_rel"]
+            if wd.exists():
+                shutil.rmtree(wd)
+        store.delete_execution(row["rid"])
+
+    return len(rows)
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v
+```
+
+Expected: 12 passed.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/deriva_ml/core/mixins/execution.py src/deriva_ml/execution/state_store.py tests/execution/test_execution_registry.py
+git commit -m "feat(execution): gc_executions + state_store.delete_execution
+
+gc_executions removes registry rows matching (status, older_than).
+delete_working_dir=True also rm -rf the per-execution working dir.
+Delete_execution clears children explicitly (pending_rows,
+directory_rules) then the executions row — belt and suspenders beyond
+FK cascade.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D6: `create_execution` accepts both config-object and kwargs forms
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/execution.py` (existing `create_execution`)
+- Modify: `src/deriva_ml/execution/execution_configuration.py` (string shorthand parser)
+- Test: `tests/execution/test_execution_registry.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_registry.py`:
+
+```python
+def test_create_execution_kwargs_form_accepts_string_shorthand(test_ml):
+    """datasets=["RID@version"] should coerce to DatasetSpecConfig."""
+    from deriva_ml.execution import ExecutionConfiguration
+    from deriva_ml.dataset import DatasetSpecConfig
+
+    # Build the config the kwargs form should produce.
+    expected = ExecutionConfiguration(
+        datasets=[DatasetSpecConfig(rid="1-XYZ", version="1.0.0")],
+        workflow=test_ml.lookup_workflow_by_url("__test_workflow__"),
+        description="kwargs form",
+    )
+
+    exe = test_ml.create_execution(
+        datasets=["1-XYZ@1.0.0"],
+        workflow="__test_workflow__",
+        description="kwargs form",
+    )
+    assert exe.configuration.datasets[0].rid == expected.datasets[0].rid
+    assert exe.configuration.datasets[0].version == expected.datasets[0].version
+
+
+def test_create_execution_rejects_mixed_forms(test_ml):
+    import pytest
+    from deriva_ml.execution import ExecutionConfiguration
+
+    cfg = ExecutionConfiguration(
+        workflow=test_ml.lookup_workflow_by_url("__test_workflow__"),
+        description="cfg",
+    )
+
+    with pytest.raises(TypeError) as exc:
+        test_ml.create_execution(cfg, datasets=["X@1.0.0"])
+    assert "cannot mix" in str(exc.value).lower() or "exactly one" in str(exc.value).lower()
+
+
+def test_create_execution_offline_raises(test_ml_offline):
+    from deriva_ml.core.exceptions import DerivaMLOfflineError
+    import pytest
+
+    with pytest.raises(DerivaMLOfflineError):
+        test_ml_offline.create_execution(
+            description="can't",
+            workflow="__test_workflow__",
+        )
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v -k create_execution
+```
+
+Expected: FAIL with `TypeError` (unexpected kwarg) or similar.
+
+- [ ] **Step 3: Add string-shorthand parser to `DatasetSpecConfig`**
+
+In `src/deriva_ml/execution/execution_configuration.py` (or wherever
+`DatasetSpecConfig` is defined — from grounding it's in the dataset
+module; search for it):
+
+```python
+@classmethod
+def from_shorthand(cls, s: str) -> "DatasetSpecConfig":
+    """Parse 'RID@version' into a DatasetSpecConfig.
+
+    Accepts both 'RID' (no version, means 'latest') and 'RID@version'.
+    Used by the create_execution kwargs form.
+
+    Args:
+        s: The shorthand string.
+
+    Returns:
+        A DatasetSpecConfig instance.
+
+    Raises:
+        ValueError: If the string contains more than one '@' or is empty.
+
+    Example:
+        >>> DatasetSpecConfig.from_shorthand("1-XYZ@2.0.0")
+        DatasetSpecConfig(rid='1-XYZ', version='2.0.0', ...)
+        >>> DatasetSpecConfig.from_shorthand("1-XYZ")
+        DatasetSpecConfig(rid='1-XYZ', version=None, ...)
+    """
+    if not s:
+        raise ValueError("empty dataset shorthand")
+    parts = s.split("@")
+    if len(parts) == 1:
+        return cls(rid=parts[0])
+    if len(parts) == 2:
+        return cls(rid=parts[0], version=parts[1])
+    raise ValueError(f"dataset shorthand has too many '@' separators: {s!r}")
+```
+
+- [ ] **Step 4: Add kwargs form + offline guard to `create_execution`**
+
+In `src/deriva_ml/core/mixins/execution.py`, locate the existing
+`create_execution` method (line 71 per grounding). Modify its signature
+and body to accept both forms:
+
+```python
+def create_execution(
+    self,
+    configuration: "ExecutionConfiguration | None" = None,
+    *,
+    datasets: "list[DatasetSpecConfig | str] | None" = None,
+    assets: "list[AssetRIDConfig | str] | None" = None,
+    workflow: "Workflow | str | None" = None,
+    description: "str | None" = None,
+    dry_run: bool = False,
+) -> "Execution":
+    """Create a new execution and register it in SQLite.
+
+    Accepts either a pre-built ExecutionConfiguration (the
+    config-object form) OR kwargs that the method assembles into an
+    ExecutionConfiguration (the kwargs form). Mixing is not allowed
+    and raises TypeError — pick one or the other.
+
+    Creating executions requires online mode because the Execution
+    RID is server-assigned.
+
+    Args:
+        configuration: A pre-built ExecutionConfiguration. If this is
+            provided, all the kwargs below must be None.
+        datasets: Kwargs form only. List of DatasetSpecConfig or
+            "RID@version" strings; strings are coerced.
+        assets: Kwargs form only. List of AssetRIDConfig or "RID"
+            strings.
+        workflow: Kwargs form only. A Workflow object, or a string
+            that the method looks up via lookup_workflow_by_url.
+        description: Kwargs form only. Passes through to
+            ExecutionConfiguration.
+        dry_run: Pre-existing arg; does not write to the catalog.
+
+    Returns:
+        A new Execution object bound to this DerivaML instance with
+        status=created in the workspace registry.
+
+    Raises:
+        TypeError: If configuration is given alongside kwargs.
+        DerivaMLOfflineError: If the current mode is offline.
+
+    Example (config form):
+        >>> cfg = ExecutionConfiguration(
+        ...     datasets=[DatasetSpecConfig(rid="1-XYZ", version="1.0.0")],
+        ...     workflow=my_workflow,
+        ...     description="First run",
+        ... )
+        >>> exe = ml.create_execution(cfg)
+
+    Example (kwargs form):
+        >>> exe = ml.create_execution(
+        ...     datasets=["1-XYZ@1.0.0"],
+        ...     workflow=my_workflow,
+        ...     description="First run",
+        ... )
+    """
+    from deriva_ml.core.exceptions import DerivaMLOfflineError
+    from deriva_ml.execution import ExecutionConfiguration
+    from deriva_ml.dataset import DatasetSpecConfig
+    from deriva_ml.execution import AssetRIDConfig
+
+    if self._mode is ConnectionMode.offline:
+        raise DerivaMLOfflineError(
+            "create_execution requires online mode — the Execution RID is "
+            "server-assigned. Switch to ConnectionMode.online to create, "
+            "then you can run offline scripts via resume_execution."
+        )
+
+    kwargs_provided = any(
+        x is not None for x in (datasets, assets, workflow, description)
+    )
+    if configuration is not None and kwargs_provided:
+        raise TypeError(
+            "create_execution: cannot mix configuration= with "
+            "datasets/assets/workflow/description kwargs; pass exactly one form."
+        )
+
+    if configuration is None:
+        # Kwargs form: build ExecutionConfiguration.
+        ds_specs = []
+        for d in (datasets or []):
+            if isinstance(d, str):
+                ds_specs.append(DatasetSpecConfig.from_shorthand(d))
+            else:
+                ds_specs.append(d)
+        as_specs = []
+        for a in (assets or []):
+            if isinstance(a, str):
+                as_specs.append(AssetRIDConfig(rid=a))
+            else:
+                as_specs.append(a)
+        wf = workflow
+        if isinstance(wf, str):
+            wf = self.lookup_workflow_by_url(wf)
+
+        configuration = ExecutionConfiguration(
+            datasets=ds_specs,
+            assets=as_specs,
+            workflow=wf,
+            description=description,
+        )
+
+    # Existing body: create Execution, register in catalog, register
+    # in SQLite workspace. The SQLite registry insert is Task D7.
+    return Execution(
+        ml_object=self,
+        configuration=configuration,
+        dry_run=dry_run,
+    )
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v -k create_execution
+```
+
+Expected: 3 new passing tests.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/deriva_ml/core/mixins/execution.py src/deriva_ml/execution/execution_configuration.py tests/execution/test_execution_registry.py
+git commit -m "feat(execution): create_execution accepts kwargs + string shorthand
+
+Per spec §2.7 / R6.1. Both forms supported: configuration=X OR
+datasets=[...], workflow=..., description=... kwargs. Mixing raises
+TypeError. Offline mode raises DerivaMLOfflineError. String shorthand
+'RID@version' coerces to DatasetSpecConfig via from_shorthand.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D7: `create_execution` writes SQLite registry row
+
+**Files:**
+- Modify: `src/deriva_ml/execution/execution.py` (existing `Execution.__init__`)
+- Test: `tests/execution/test_execution_registry.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_registry.py`:
+
+```python
+def test_create_execution_writes_registry_row(test_ml):
+    """After create_execution, the workspace SQLite must have the row."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = test_ml.create_execution(
+        workflow="__test_workflow__",
+        description="registry test",
+    )
+    store = test_ml.workspace.execution_state_store()
+    row = store.get_execution(exe.execution_rid)
+    assert row is not None
+    assert row["rid"] == exe.execution_rid
+    # Initial status is 'created'.
+    assert row["status"] == ExecutionStatus.created
+    assert row["mode"] == "online"
+    assert row["config_json"]  # non-empty
+    assert row["working_dir_rel"].startswith("execution/")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py::test_create_execution_writes_registry_row -v
+```
+
+Expected: FAIL — row not in SQLite (create_execution doesn't know about the registry yet).
+
+- [ ] **Step 3: Add SQLite insert to `Execution.__init__`**
+
+In `src/deriva_ml/execution/execution.py`, at the end of `Execution.__init__`
+(after the existing execution-root directory creation), add:
+
+```python
+        # Register the execution in the workspace SQLite registry.
+        # Per spec §2.4, SQLite is authoritative for local state; the
+        # file-tree exists but we do NOT rely on listing the filesystem
+        # to enumerate executions anymore.
+        if not self._dry_run:
+            from datetime import datetime, timezone
+            import json
+
+            from deriva_ml.core.connection_mode import ConnectionMode
+            from deriva_ml.execution.state_store import ExecutionStatus
+
+            store = self._ml_object.workspace.execution_state_store()
+            now = datetime.now(timezone.utc)
+
+            # Serialize the ExecutionConfiguration. Pydantic v2 dumps to
+            # a plain dict; json.dumps then serializes. Include the rid
+            # + version info so a reconstructed configuration from a
+            # resume_execution call is faithful.
+            config_json = self.configuration.model_dump_json()
+
+            try:
+                store.insert_execution(
+                    rid=self.execution_rid,
+                    workflow_rid=self.workflow_rid,
+                    description=self.configuration.description,
+                    config_json=config_json,
+                    status=ExecutionStatus.created,
+                    mode=self._ml_object._mode,
+                    working_dir_rel=f"execution/{self.execution_rid}",
+                    created_at=now,
+                    last_activity=now,
+                )
+            except Exception as exc:
+                # The catalog row is already created at this point —
+                # don't leave a catalog Execution with no SQLite sibling.
+                # Log; the user can still restore via lookup_execution,
+                # but workspace-based resume is impaired until the row
+                # is re-registered manually or via a future adopt helper.
+                logger = logging.getLogger("deriva_ml.execution")
+                logger.error(
+                    "create_execution %s: catalog POST succeeded but "
+                    "SQLite registry write FAILED (%s). The execution "
+                    "can be recovered via ml.lookup_execution(rid) and "
+                    "manual adoption.",
+                    self.execution_rid, exc,
+                )
+                raise
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v
+```
+
+Expected: 13 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/execution.py tests/execution/test_execution_registry.py
+git commit -m "feat(execution): create_execution writes SQLite registry row
+
+Post-catalog-POST, the new executions row is written to the workspace
+SQLite registry with status='created', mode from the DerivaML instance,
+and config_json = ExecutionConfiguration.model_dump_json(). Dry-run
+mode skips the registry write.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task D8: Hard-cutover rename `restore_execution` → `resume_execution`
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/execution.py`
+- Modify: `src/deriva_ml/mcp/` (any MCP tool referencing restore_execution — check)
+- Modify: `tests/execution/test_execution.py` (existing tests)
+- Modify: any callers in `src/deriva_ml/` found by grep
+
+- [ ] **Step 1: Find all callers of `restore_execution`**
+
+```bash
+grep -rn "restore_execution" /Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/src/ /Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/tests/
+```
+
+Expected: Listed in grounding — mixins/execution.py:194, plus test files.
+
+- [ ] **Step 2: Write a guard test that the old name is removed**
+
+Create/extend `tests/execution/test_execution_registry.py`:
+
+```python
+def test_restore_execution_symbol_removed(test_ml):
+    """Per R5.1 aggressive deprecation, restore_execution is removed."""
+    assert not hasattr(test_ml, "restore_execution"), (
+        "restore_execution should have been removed in D8; "
+        "use resume_execution (see CHANGELOG breaking changes)."
+    )
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py::test_restore_execution_symbol_removed -v
+```
+
+Expected: FAIL — `restore_execution` still present.
+
+- [ ] **Step 4: Delete `restore_execution` from ExecutionMixin**
+
+In `src/deriva_ml/core/mixins/execution.py` (line 194 per grounding), delete the entire `restore_execution` method definition. Do NOT leave a shim.
+
+- [ ] **Step 5: Update every caller**
+
+For each file yielded by Step 1, replace `restore_execution` with `resume_execution`. Representative sites (check grep output for the complete list):
+
+- `tests/execution/test_execution.py` — callers update method name only (signature unchanged: `ml.restore_execution(rid)` → `ml.resume_execution(rid)`).
+- Any `src/deriva_ml/mcp/*.py` tool mapping.
+- Docstrings and docs that mention `restore_execution`.
+
+Use a single mechanical replacement:
+
+```bash
+# Dry-run first to review:
+grep -rln "restore_execution" src/ tests/ | xargs sed -n 's/restore_execution/resume_execution/gp'
+
+# Apply:
+grep -rln "restore_execution" src/ tests/ | xargs sed -i '' 's/restore_execution/resume_execution/g'
+```
+
+(`-i ''` is the macOS BSD sed incantation; on Linux use `-i` alone.)
+
+- [ ] **Step 6: Run the full test-execution suite**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/ -q --timeout=300
+```
+
+Expected: all pass, including the new guard test.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add -A
+git commit -m "refactor(execution)!: rename restore_execution → resume_execution
+
+BREAKING CHANGE: restore_execution is removed. Use resume_execution.
+Per spec §1.3, R5.1 — hard cutover, no shim. See CHANGELOG breaking
+changes section (added in Group H).
+
+All callers in src/ and tests/ updated. MCP tool mappings (if any)
+updated.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+*(End of Task Group D — execution registry API on DerivaML.)*
+
+---
+
 
