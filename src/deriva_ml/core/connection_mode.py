@@ -30,6 +30,3 @@ class ConnectionMode(StrEnum):
 
     online = "online"
     offline = "offline"
-
-    def __str__(self) -> str:
-        return self.value
