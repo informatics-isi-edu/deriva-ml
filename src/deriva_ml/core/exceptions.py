@@ -9,7 +9,8 @@ Exception Hierarchy:
     │
     ├── DerivaMLConfigurationError (configuration and initialization)
     │   ├── DerivaMLSchemaError (schema/catalog structure issues)
-    │   └── DerivaMLAuthenticationError (authentication failures)
+    │   ├── DerivaMLAuthenticationError (authentication failures)
+    │   └── DerivaMLOfflineError (online-only operation in offline mode)
     │
     ├── DerivaMLDataError (data access and validation)
     │   ├── DerivaMLNotFoundError (entity not found)
@@ -107,6 +108,24 @@ class DerivaMLAuthenticationError(DerivaMLConfigurationError):
 
     Example:
         >>> raise DerivaMLAuthenticationError("Failed to authenticate with catalog")
+    """
+
+    pass
+
+
+class DerivaMLOfflineError(DerivaMLConfigurationError):
+    """Raised when an operation that requires online mode is attempted
+    while the DerivaML instance is in offline mode.
+
+    Example:
+        Creating an execution requires an online mode because the
+        Execution RID must be server-assigned::
+
+            >>> ml = DerivaML(..., mode=ConnectionMode.offline)
+            >>> ml.create_execution(config)
+            Traceback (most recent call last):
+                ...
+            DerivaMLOfflineError: create_execution requires online mode
     """
 
     pass
