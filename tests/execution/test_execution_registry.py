@@ -228,3 +228,136 @@ def test_gc_executions_delete_working_dir(test_ml):
     )
     assert n == 1
     assert not work.exists()
+
+
+# =============================================================================
+# D6: create_execution kwargs form + offline guard
+# =============================================================================
+
+
+def test_dataset_spec_from_shorthand():
+    """Unit test the string-coercion path without constructing an Execution."""
+    import pytest
+
+    from deriva_ml.dataset import DatasetSpec
+
+    # Use a valid RID format (matches the ERMrest RID regex).
+    a = DatasetSpec.from_shorthand("1-ABCD@1.0.0")
+    assert a.rid == "1-ABCD"
+    assert str(a.version) == "1.0.0"
+
+    b = DatasetSpec.from_shorthand("1-ABCD")
+    assert b.rid == "1-ABCD"
+    # Bare RID means no explicit version; default is 0.0.0.
+    assert str(b.version) == "0.0.0"
+
+    with pytest.raises(ValueError):
+        DatasetSpec.from_shorthand("")
+    with pytest.raises(ValueError):
+        DatasetSpec.from_shorthand("1-ABCD@1.0.0@extra")
+
+
+def test_create_execution_kwargs_form_builds_config(test_ml):
+    """Kwargs form with a Workflow object builds an ExecutionConfiguration.
+
+    Doesn't test string shorthand (covered by the unit test above) —
+    just confirms kwargs form successfully assembles into a usable
+    ExecutionConfiguration for a no-datasets run.
+    """
+    from deriva_ml import MLVocab as vc
+
+    test_ml.add_term(
+        vc.workflow_type,
+        "Test Workflow",
+        description="for D6 kwargs-form test",
+    )
+    wf = test_ml.create_workflow(
+        name="D6 Test Workflow",
+        workflow_type="Test Workflow",
+        description="for D6 kwargs-form test",
+    )
+
+    exe = test_ml.create_execution(
+        workflow=wf,  # Workflow object — skips lookup_workflow_by_url path
+        description="kwargs form",
+    )
+    assert exe.configuration.description == "kwargs form"
+    assert exe.configuration.workflow.url == wf.url
+
+
+def test_create_execution_kwargs_form_workflow_string_lookup(test_ml):
+    """workflow=string should route through lookup_workflow_by_url."""
+    from deriva_ml import MLVocab as vc
+
+    test_ml.add_term(
+        vc.workflow_type,
+        "Test Workflow",
+        description="for D6 string lookup test",
+    )
+    wf = test_ml.create_workflow(
+        name="D6 String Workflow",
+        workflow_type="Test Workflow",
+        description="for D6 string lookup test",
+    )
+    # Register the workflow in the catalog so lookup_workflow_by_url
+    # can find it. (add_workflow is idempotent on checksum.)
+    test_ml.add_workflow(wf)
+
+    exe = test_ml.create_execution(
+        workflow=wf.url,
+        description="string workflow",
+    )
+    assert exe.configuration.workflow.url == wf.url
+
+
+def test_create_execution_rejects_mixed_forms(test_ml):
+    import pytest
+
+    from deriva_ml import MLVocab as vc
+    from deriva_ml.execution import ExecutionConfiguration
+
+    test_ml.add_term(
+        vc.workflow_type,
+        "Test Workflow",
+        description="for mixed-form rejection",
+    )
+    wf = test_ml.create_workflow(
+        name="D6 Mixed Test",
+        workflow_type="Test Workflow",
+        description="for mixed-form rejection",
+    )
+
+    cfg = ExecutionConfiguration(
+        workflow=wf,
+        description="cfg",
+    )
+
+    with pytest.raises(TypeError) as exc:
+        test_ml.create_execution(cfg, datasets=["1-ABCD@1.0.0"])
+    assert (
+        "cannot mix" in str(exc.value).lower()
+        or "exactly one" in str(exc.value).lower()
+    )
+
+
+def test_create_execution_offline_raises(catalog_manager, tmp_path):
+    import pytest
+
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.core.exceptions import DerivaMLOfflineError
+
+    catalog_manager.reset()
+    ml_offline = DerivaML(
+        catalog_manager.hostname,
+        catalog_manager.catalog_id,
+        default_schema=catalog_manager.domain_schema,
+        working_dir=tmp_path,
+        use_minid=False,
+        mode=ConnectionMode.offline,
+    )
+
+    with pytest.raises(DerivaMLOfflineError):
+        ml_offline.create_execution(
+            description="can't",
+            workflow="any-url",  # doesn't need to exist — offline check fires first
+        )

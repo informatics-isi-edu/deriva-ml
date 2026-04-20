@@ -27,6 +27,8 @@ from deriva_ml.execution.state_machine import (
 from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
+    from deriva_ml.asset.aux_classes import AssetSpec
+    from deriva_ml.dataset.aux_classes import DatasetSpec
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.execution.workflow import Workflow
@@ -79,42 +81,170 @@ class ExecutionMixin:
         )
 
     def create_execution(
-        self, configuration: ExecutionConfiguration, workflow: "Workflow | RID | None" = None, dry_run: bool = False
+        self,
+        configuration: "ExecutionConfiguration | None" = None,
+        *,
+        datasets: "list[DatasetSpec | str] | None" = None,
+        assets: "list[AssetSpec | str] | None" = None,
+        workflow: "Workflow | RID | str | None" = None,
+        description: "str | None" = None,
+        dry_run: bool = False,
     ) -> "Execution":
         """Create an execution environment.
 
-        Initializes a local compute environment for executing an ML or analytic routine.
-        This has several side effects:
+        Initializes a local compute environment for executing an ML or
+        analytic routine. Accepts either a pre-built
+        :class:`ExecutionConfiguration` (the config-object form) or
+        individual keyword arguments that the method assembles into an
+        ``ExecutionConfiguration`` (the kwargs form). Mixing the two
+        forms is rejected with ``TypeError`` — pick one.
 
-        1. Downloads datasets specified in the configuration to the cache directory.
-           If no version is specified, creates a new minor version for the dataset.
+        Creating executions requires online mode because the Execution
+        RID is server-assigned.
+
+        Side effects:
+
+        1. Downloads datasets specified in the configuration to the
+           cache directory. If no version is specified, creates a new
+           minor version for the dataset.
         2. Downloads any execution assets to the working directory.
-        3. Creates an execution record in the catalog (unless dry_run=True).
+        3. Creates an execution record in the catalog (unless
+           ``dry_run=True``).
 
         Args:
-            configuration: ExecutionConfiguration specifying execution parameters.
-            workflow: Optional Workflow object or RID if not present in configuration.
-            dry_run: If True, skip creating catalog records and uploading results.
+            configuration: A pre-built ExecutionConfiguration. If this
+                is provided, all of the kwargs below (except
+                ``dry_run``) must be None.
+            datasets: Kwargs form only. List of :class:`DatasetSpec`
+                or ``"RID@version"`` shorthand strings; strings are
+                coerced via :meth:`DatasetSpec.from_shorthand`.
+            assets: Kwargs form only. List of :class:`AssetSpec` or
+                bare RID strings; strings are coerced to
+                ``AssetSpec(rid=...)``.
+            workflow: A :class:`Workflow` object, a Workflow RID, or a
+                workflow URL string. Strings that look like URLs are
+                resolved via :meth:`lookup_workflow_by_url`. Accepted
+                in both forms — in the config-object form it
+                supplements / overrides ``configuration.workflow``; in
+                the kwargs form it is the workflow for the execution.
+            description: Kwargs form only. Human-readable description
+                of the execution.
+            dry_run: If True, skip creating catalog records and
+                uploading results.
 
         Returns:
-            Execution: An execution object for managing the execution lifecycle.
+            An :class:`Execution` object for managing the execution
+            lifecycle.
+
+        Raises:
+            TypeError: If ``configuration`` is given alongside
+                ``datasets``, ``assets``, or ``description`` kwargs.
+            DerivaMLOfflineError: If the current connection mode is
+                :attr:`ConnectionMode.offline`.
 
         Example:
-            >>> config = ExecutionConfiguration(
-            ...     workflow=workflow,
-            ...     description="Process samples",
-            ...     datasets=[DatasetSpec(rid="4HM")],
-            ... )
-            >>> with ml.create_execution(config) as execution:
-            ...     # Run analysis
-            ...     pass
-            >>> execution.upload_execution_outputs()
+            Config-object form::
+
+                >>> config = ExecutionConfiguration(
+                ...     workflow=workflow,
+                ...     description="Process samples",
+                ...     datasets=[DatasetSpec(rid="4HM", version="1.0.0")],
+                ... )
+                >>> with ml.create_execution(config) as execution:
+                ...     # Run analysis
+                ...     pass
+                >>> execution.upload_execution_outputs()
+
+            Kwargs form (equivalent)::
+
+                >>> with ml.create_execution(
+                ...     datasets=["4HM@1.0.0"],
+                ...     workflow=workflow,
+                ...     description="Process samples",
+                ... ) as execution:
+                ...     # Run analysis
+                ...     pass
         """
         # Import here to avoid circular dependency
+        from deriva_ml.asset.aux_classes import AssetSpec
+        from deriva_ml.core.exceptions import DerivaMLOfflineError
+        from deriva_ml.dataset.aux_classes import DatasetSpec
         from deriva_ml.execution.execution import Execution
+        from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+        from deriva_ml.execution.workflow import Workflow as WorkflowClass
+
+        # Offline guard first — the error should be about the mode,
+        # not a downstream validation issue.
+        if self._mode is ConnectionMode.offline:
+            raise DerivaMLOfflineError(
+                "create_execution requires online mode — the Execution "
+                "RID is server-assigned. Switch to "
+                "ConnectionMode.online to create, then you can run "
+                "offline scripts via resume_execution."
+            )
+
+        # Reject mixed forms. Note: ``workflow`` and ``dry_run`` are
+        # accepted in both forms (workflow had legacy config-form
+        # support; dry_run is universal). Only the kwargs-only fields
+        # gate the mixing check.
+        kwargs_form_only = any(
+            x is not None for x in (datasets, assets, description)
+        )
+        if configuration is not None and kwargs_form_only:
+            raise TypeError(
+                "create_execution: cannot mix configuration= with "
+                "datasets/assets/description kwargs; pass exactly one "
+                "form."
+            )
+
+        # Resolve a string workflow to a Workflow object (used by both forms).
+        resolved_workflow = workflow
+        if isinstance(resolved_workflow, str):
+            resolved_workflow = self.lookup_workflow_by_url(resolved_workflow)
+
+        if configuration is None:
+            # Kwargs form: assemble an ExecutionConfiguration.
+            ds_specs: list[DatasetSpec] = []
+            for d in datasets or []:
+                if isinstance(d, str):
+                    ds_specs.append(DatasetSpec.from_shorthand(d))
+                else:
+                    ds_specs.append(d)
+            as_specs: list[AssetSpec] = []
+            for a in assets or []:
+                if isinstance(a, str):
+                    as_specs.append(AssetSpec(rid=a))
+                else:
+                    as_specs.append(a)
+
+            configuration = ExecutionConfiguration(
+                datasets=ds_specs,
+                assets=as_specs,
+                workflow=resolved_workflow
+                if isinstance(resolved_workflow, WorkflowClass)
+                else None,
+                description=description or "",
+            )
+            # If workflow is a RID (not a Workflow or string URL),
+            # pass it through the legacy workflow= parameter so
+            # Execution.__init__ can raise its own clear error
+            # (our job is just assembly, not re-validation).
+            workflow_for_execution = (
+                resolved_workflow
+                if not isinstance(resolved_workflow, WorkflowClass)
+                else None
+            )
+        else:
+            # Config-object form: preserve legacy behaviour.
+            workflow_for_execution = resolved_workflow
 
         # Create and store an execution instance
-        self._execution = Execution(configuration, self, workflow=workflow, dry_run=dry_run)  # type: ignore[arg-type]
+        self._execution = Execution(
+            configuration,
+            self,
+            workflow=workflow_for_execution,
+            dry_run=dry_run,
+        )  # type: ignore[arg-type]
         return self._execution
 
     def lookup_execution(self, execution_rid: RID) -> "ExecutionRecord":

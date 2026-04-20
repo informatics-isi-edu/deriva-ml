@@ -269,6 +269,53 @@ class DatasetSpec(BaseModel):
     def serialize_version(self, version: DatasetVersion) -> dict[str, Any]:
         return version.to_dict()
 
+    @classmethod
+    def from_shorthand(cls, s: str) -> "DatasetSpec":
+        """Parse ``'RID@version'`` into a :class:`DatasetSpec`.
+
+        Used by the :meth:`DerivaML.create_execution` kwargs form so
+        callers can write ``datasets=["1-XYZ@1.0.0"]`` instead of
+        instantiating a full ``DatasetSpec`` by hand. Accepts both
+        ``'RID'`` (bare RID; version defaults to ``0.0.0``) and
+        ``'RID@version'`` (semantic version string).
+
+        Args:
+            s: The shorthand string. Must contain at most one ``'@'``
+                separator and a non-empty RID portion.
+
+        Returns:
+            A :class:`DatasetSpec` instance.
+
+        Raises:
+            ValueError: If the string is empty or contains more than
+                one ``'@'`` separator.
+
+        Example:
+            Parse a shorthand with explicit version::
+
+                >>> spec = DatasetSpec.from_shorthand("1-XYZ@2.0.0")
+                >>> spec.rid
+                '1-XYZ'
+                >>> str(spec.version)
+                '2.0.0'
+
+            Parse a bare RID (version defaults to ``0.0.0``)::
+
+                >>> spec = DatasetSpec.from_shorthand("1-XYZ")
+                >>> spec.rid
+                '1-XYZ'
+        """
+        if not s:
+            raise ValueError("empty dataset shorthand")
+        parts = s.split("@")
+        if len(parts) == 1:
+            return cls(rid=parts[0], version="0.0.0")
+        if len(parts) == 2:
+            return cls(rid=parts[0], version=parts[1])
+        raise ValueError(
+            f"dataset shorthand has too many '@' separators: {s!r}"
+        )
+
 
 # Interface for hydra-zen
 @hydrated_dataclass(DatasetSpec)
