@@ -400,3 +400,28 @@ def test_restore_execution_symbol_removed(test_ml):
         "restore_execution should have been removed in D8; "
         "use resume_execution (see CHANGELOG breaking changes)."
     )
+
+
+def test_resume_execution_per_rid_lease_reconcile(test_ml, monkeypatch):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+
+    # Stub the preceding reconcile step — our synthetic EXE-A is not
+    # in the catalog, so the real reconcile_with_catalog would blow up
+    # and the F6 hook would never run.
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.reconcile_with_catalog",
+        lambda *, store, catalog, execution_rid: None,
+    )
+
+    calls: list[str | None] = []
+
+    def _spy(*, store, catalog, execution_rid):
+        calls.append(execution_rid)
+
+    from deriva_ml.execution import lease_orchestrator
+    monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
+
+    test_ml.resume_execution("EXE-A")
+    assert "EXE-A" in calls  # scoped reconciliation for this execution
