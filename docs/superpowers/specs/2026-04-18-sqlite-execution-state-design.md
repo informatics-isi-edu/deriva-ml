@@ -947,32 +947,102 @@ incompatible with the ORM identity map.
 
 ### 2.15 Documentation requirement for new APIs
 
+Documentation is explicitly written to help future contributors —
+human and LLM agent alike — understand and correctly use the code
+without spelunking through implementation bodies. Good docstrings
+reduce the cost of every subsequent read and modification; they are
+a durable investment repaid on every session that touches the code.
+
+The requirement has three tiers, scaled to the audience and the
+complexity of the function:
+
+**Tier 1 — Public API (methods, classes, properties):**
+
 Every public method, class, and property introduced by this spec
 MUST ship with a complete docstring including:
 
 1. **One-line summary** of purpose.
 2. **Args section** — every parameter named, with type and semantic
-   meaning.
+   meaning (not just type-repeat; the meaning).
 3. **Returns section** — type and meaning of the return value.
 4. **Raises section** — every exception this method can raise, with
    the condition that triggers it.
 5. **At least one runnable Example section** showing realistic usage,
    not a trivial invocation.
+6. **Non-obvious behavior** — offline/online difference, side effects,
+   idempotency, server contact, performance characteristics when they
+   surprise — whatever a caller needs to know that isn't visible in
+   the signature.
 
-Examples must match the project's existing docstring style (see
+**Tier 2 — Important private methods (complex logic, non-obvious
+invariants):**
+
+Private methods (`_leading_underscore`) that encode complex logic,
+enforce non-obvious invariants, or participate in multi-step protocols
+get a full docstring with Args/Returns/Raises. Example is optional if
+the method is internal-only and the calling convention is obvious
+from the class context, but include one when non-obvious.
+
+Candidates that require Tier 2 docstrings in this spec's implementation:
+- State-machine transition logic (validation of allowed transitions,
+  catalog-sync ordering, `sync_pending` invariants).
+- RID-lease two-phase acquisition (token generation, status
+  transitions, crash-recovery reconciliation).
+- Upload-engine staging and topological-sort loop.
+- Disagreement resolution during just-in-time reconciliation.
+- Any method that accesses SQLite in a non-obvious order (e.g.,
+  must fsync before catalog PUT, must hold transaction across X and Y).
+
+Trivial private helpers (`_ensure_list`, one-liner accessors) do not
+need this; a one-line docstring is fine.
+
+**Tier 3 — Inline comments on non-obvious logic:**
+
+Inline comments explain the **why**, not the **what**. The what is
+usually visible in the code; the why is what saves the next reader
+time. Write inline comments for:
+
+- Transaction ordering constraints (`# Must commit SQLite before
+  catalog PUT: see §2.2 reconciliation`).
+- Idempotency invariants (`# Safe to re-run after crash; deriva-py
+  chunk-state resumes mid-file; Hatrac hash-dedup handles already-
+  uploaded files`).
+- FK topology assumptions (`# Topological sort relies on FK DAG
+  being acyclic; intra-table cycles are rejected at stage time`).
+- Workarounds for upstream behavior (`# pathBuilder fetch returns
+  empty list when table is empty — don't treat as error`).
+- Performance-motivated choices (`# Batched in chunks of 500 to stay
+  under ERMrest URL length limit`).
+- Edge cases where the code looks wrong but is right (`# Yes, we
+  catch and swallow here — the reconciliation step will retry`).
+
+Do NOT write inline comments for code that's self-evident from
+naming and structure. The target is non-obvious logic, not
+translation.
+
+**Style alignment:**
+
+Examples and docstrings match the project's existing style. See
 `Dataset.list_dataset_parents` in `src/deriva_ml/dataset/dataset.py`
-for the template). Docstring completeness is a code-review gate;
-incomplete docstrings block spec-compliance review (per the
-subagent-driven-development workflow).
+as the Tier-1 template. Google-style sections (`Args:`, `Returns:`,
+`Raises:`, `Example:`).
 
-Template:
+**Code-review gates:**
+
+- Tier 1 missing or incomplete: blocks spec-compliance review.
+- Tier 2 missing on a complex method: blocks code-quality review.
+- Tier 3: the code-quality reviewer flags non-obvious logic that
+  lacks an explanatory comment; implementer adds and re-submits.
+
+Tier 1 template:
 
 ```python
 def example_method(self, arg1: str, *, opt: bool = False) -> T:
     """One-line summary of what this method does.
 
     Longer description if needed — why it exists, when to use it,
-    any non-obvious behavior.
+    any non-obvious behavior (e.g., 'does not contact the server',
+    'holds the lease-reconciliation lock for the duration').
 
     Args:
         arg1: What this argument represents and any constraints.
@@ -993,10 +1063,52 @@ def example_method(self, arg1: str, *, opt: bool = False) -> T:
     """
 ```
 
-This requirement applies to every method signature listed in §§2.7–
-2.11, and every new class (PendingRow, AssetFilePath,
-AssetDirectoryHandle, ExecutionRecord, UploadJob, PendingSummary,
-etc.) added by this spec.
+Tier 2 template (private, complex):
+
+```python
+def _acquire_leases(self, pending_ids: list[int]) -> None:
+    """Lease RIDs for the given pending_rows in two phases.
+
+    Writes status='leasing' + lease_token first, then POSTs to
+    ERMrest_RID_Lease, then updates rid + status='leased' on success.
+    The intermediate status enables crash recovery: entries still in
+    'leasing' after restart trigger reconciliation via lease_token
+    lookup (see _reconcile_pending_leases).
+
+    Args:
+        pending_ids: Internal IDs from pending_rows.id to lease.
+            Must all belong to the same execution (caller enforces).
+
+    Raises:
+        DerivaMLException: If the lease POST fails non-transiently.
+            Transient failures leave entries in 'leasing' status for
+            the next reconciliation pass to recover.
+    """
+```
+
+Tier 3 inline-comment style:
+
+```python
+# Must set status='leasing' BEFORE the POST: if we crashed after the
+# POST landed but before we wrote the returned RID, reconciliation
+# needs the lease_token to find our leases on the server.
+stmt = update(pending_rows).where(...).values(status='leasing', lease_token=token)
+conn.execute(stmt)
+conn.commit()
+
+response = catalog.post("...", json=[{"ID": token} for _ in pending_ids])
+
+# ERMrest returns RIDs in the same order as the request; pair by index
+# rather than by ID-lookup, which would be O(N^2).
+for pending_id, assigned_rid in zip(pending_ids, response):
+    ...
+```
+
+**Applies to:** every method signature listed in §§2.7–2.11, every
+new class (PendingRow, AssetFilePath, AssetDirectoryHandle,
+ExecutionRecord, UploadJob, PendingSummary, etc.), every non-trivial
+private method introduced by this spec's implementation, and every
+span of code that meets the Tier 3 criteria above.
 
 ### 2.16 Implementation DRY hierarchy
 
@@ -1623,9 +1735,12 @@ Revision highlights:
     tables, shared with Workspace engine, `execution_state__` table
     prefix — matches existing library-bookkeeping style
     (ManifestStore, ResultCache).
-  - Documentation requirement (§2.15): every new public method gets
-    a complete docstring with args, returns, raises, and a runnable
-    Example.
+  - Documentation requirement (§2.15): three-tier policy — full
+    docstring + example on public API (Tier 1); full docstring on
+    important/complex private methods (Tier 2); inline "why"
+    comments on non-obvious logic (Tier 3). Explicitly sized to
+    help future contributors, including LLM agents, use the code
+    correctly without spelunking.
   - Implementation DRY hierarchy (§2.16): use existing deriva-ml
     routines before existing deriva-py routines before writing new
     functions.
