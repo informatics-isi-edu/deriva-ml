@@ -253,3 +253,111 @@ def test_list_executions_filters_by_status(tmp_path):
     rows = store.list_executions(status=[ExecutionStatus.running, ExecutionStatus.stopped])
     rids = {r["rid"] for r in rows}
     assert rids == {"A", "B"}
+
+
+def test_insert_pending_row(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    pending_id = store.insert_pending_row(
+        execution_rid="EXE-A",
+        key="k1",
+        target_schema="deriva-ml",
+        target_table="Subject",
+        metadata_json='{"Name": "x"}',
+        created_at=now,
+    )
+    assert isinstance(pending_id, int)
+    assert pending_id > 0
+
+    rows = store.list_pending_rows(execution_rid="EXE-A")
+    assert len(rows) == 1
+    assert rows[0]["status"] == str(PendingRowStatus.staged)
+    assert rows[0]["target_table"] == "Subject"
+
+
+def test_list_pending_rows_filter_by_status(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    id1 = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    id2 = store.insert_pending_row(
+        execution_rid="EXE-A", key="k2",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+
+    store.update_pending_row(id1, status=PendingRowStatus.uploaded)
+    staged = store.list_pending_rows(
+        execution_rid="EXE-A", status=PendingRowStatus.staged,
+    )
+    assert {r["id"] for r in staged} == {id2}
+
+
+def test_insert_directory_rule(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, DirectoryRuleStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    rule_id = store.insert_directory_rule(
+        execution_rid="EXE-A",
+        target_schema="deriva-ml",
+        target_table="Mask",
+        source_dir="/tmp/masks",
+        glob="*.png",
+        recurse=False,
+        copy_files=False,
+        asset_types_json=None,
+        created_at=now,
+    )
+    assert isinstance(rule_id, int)
+
+    rules = store.list_directory_rules(execution_rid="EXE-A")
+    assert len(rules) == 1
+    assert rules[0]["status"] == str(DirectoryRuleStatus.active)

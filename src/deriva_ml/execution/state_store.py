@@ -391,3 +391,224 @@ class ExecutionStateStore:
         with self.engine.connect() as conn:
             rows = conn.execute(stmt).mappings().all()
         return [dict(r) for r in rows]
+
+    # ─── pending_rows CRUD ──────────────────────────────────────────
+
+    def insert_pending_row(
+        self,
+        *,
+        execution_rid: str,
+        key: str,
+        target_schema: str,
+        target_table: str,
+        metadata_json: str,
+        created_at: datetime,
+        rid: str | None = None,
+        lease_token: str | None = None,
+        asset_file_path: str | None = None,
+        asset_types_json: str | None = None,
+        description: str | None = None,
+        status: PendingRowStatus = PendingRowStatus.staged,
+        rule_id: int | None = None,
+    ) -> int:
+        """Insert one pending_rows entry.
+
+        Args:
+            execution_rid: FK to executions.rid.
+            key: Stable identifier for dedup (auto-hash for ad-hoc
+                rows; rule_id+filename for directory-sourced rows).
+            target_schema / target_table: Catalog target.
+            metadata_json: Serialized column values.
+            created_at: UTC timestamp.
+            rid: Leased RID, None until leased.
+            lease_token: Token for two-phase lease reconciliation.
+            asset_file_path: Local file path, None for plain rows.
+            asset_types_json: Serialized asset-type terms.
+            description: Optional human-readable description.
+            status: Initial status, defaults to 'staged'.
+            rule_id: FK to directory_rules.id, None if not from a rule.
+
+        Returns:
+            The auto-assigned integer id of the new pending_rows row.
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                insert(self.pending_rows).values(
+                    execution_rid=execution_rid, key=key,
+                    target_schema=target_schema, target_table=target_table,
+                    rid=rid, lease_token=lease_token,
+                    metadata_json=metadata_json,
+                    asset_file_path=asset_file_path,
+                    asset_types_json=asset_types_json,
+                    description=description,
+                    status=str(status),
+                    created_at=created_at,
+                    rule_id=rule_id,
+                )
+            )
+            # SQLite returns the auto-increment id via lastrowid.
+            return int(result.inserted_primary_key[0])
+
+    def update_pending_row(self, pending_id: int, **fields: object) -> None:
+        """Partial update of a pending_rows entry.
+
+        Status / token / rid / timestamps are the common callers. Enum
+        values are coerced to strings.
+
+        Args:
+            pending_id: The integer id of the row to update.
+            **fields: Columns to set.
+
+        Raises:
+            KeyError: If a kwarg doesn't match a pending_rows column.
+        """
+        valid_cols = {c.name for c in self.pending_rows.columns}
+        unknown = set(fields) - valid_cols
+        if unknown:
+            raise KeyError(f"unknown columns on pending_rows: {unknown}")
+
+        coerced = {
+            k: str(v) if isinstance(v, PendingRowStatus) else v
+            for k, v in fields.items()
+        }
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.pending_rows)
+                .where(self.pending_rows.c.id == pending_id)
+                .values(**coerced)
+            )
+
+    def list_pending_rows(
+        self,
+        *,
+        execution_rid: str,
+        status: "PendingRowStatus | list[PendingRowStatus] | None" = None,
+        target_table: str | None = None,
+    ) -> list[dict]:
+        """Return pending_rows entries scoped to one execution.
+
+        Args:
+            execution_rid: Required — pending rows are always scoped
+                to a specific execution.
+            status: Filter to a status or list of statuses.
+            target_table: Filter to a single target table.
+
+        Returns:
+            List of dicts — empty if nothing matches.
+        """
+        stmt = select(self.pending_rows).where(
+            self.pending_rows.c.execution_rid == execution_rid
+        )
+        if status is not None:
+            if isinstance(status, PendingRowStatus):
+                statuses = [str(status)]
+            else:
+                statuses = [str(s) for s in status]
+            stmt = stmt.where(self.pending_rows.c.status.in_(statuses))
+        if target_table is not None:
+            stmt = stmt.where(self.pending_rows.c.target_table == target_table)
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(stmt).mappings().all()
+        return [dict(r) for r in rows]
+
+    # ─── directory_rules CRUD ───────────────────────────────────────
+
+    def insert_directory_rule(
+        self,
+        *,
+        execution_rid: str,
+        target_schema: str,
+        target_table: str,
+        source_dir: str,
+        glob: str,
+        recurse: bool,
+        copy_files: bool,
+        asset_types_json: str | None,
+        created_at: datetime,
+        status: DirectoryRuleStatus = DirectoryRuleStatus.active,
+    ) -> int:
+        """Insert one directory_rules entry; return its auto id.
+
+        Args:
+            execution_rid: FK to executions.rid.
+            target_schema / target_table: Catalog target for rows
+                produced by this rule.
+            source_dir: Local directory to scan.
+            glob: Pattern for files under source_dir.
+            recurse: Whether to scan recursively.
+            copy_files: Whether to copy files into workspace staging
+                or reference in place.
+            asset_types_json: Serialized asset-type terms applied
+                to every file registered under this rule.
+            created_at: UTC timestamp.
+            status: Initial status, defaults to 'active'.
+
+        Returns:
+            The auto-assigned integer id.
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                insert(self.directory_rules).values(
+                    execution_rid=execution_rid,
+                    target_schema=target_schema, target_table=target_table,
+                    source_dir=source_dir,
+                    glob=glob, recurse=recurse, copy_files=copy_files,
+                    asset_types_json=asset_types_json,
+                    status=str(status),
+                    created_at=created_at,
+                )
+            )
+            return int(result.inserted_primary_key[0])
+
+    def update_directory_rule(self, rule_id: int, **fields: object) -> None:
+        """Partial update of a directory_rules entry.
+
+        Args:
+            rule_id: The integer id of the rule to update.
+            **fields: Columns to set.
+
+        Raises:
+            KeyError: If a kwarg doesn't match a directory_rules column.
+        """
+        valid_cols = {c.name for c in self.directory_rules.columns}
+        unknown = set(fields) - valid_cols
+        if unknown:
+            raise KeyError(f"unknown columns on directory_rules: {unknown}")
+        coerced = {
+            k: str(v) if isinstance(v, DirectoryRuleStatus) else v
+            for k, v in fields.items()
+        }
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.directory_rules)
+                .where(self.directory_rules.c.id == rule_id)
+                .values(**coerced)
+            )
+
+    def list_directory_rules(
+        self,
+        *,
+        execution_rid: str,
+        status: "DirectoryRuleStatus | None" = None,
+    ) -> list[dict]:
+        """List directory_rules for one execution, optionally filtered.
+
+        Args:
+            execution_rid: Required scoping.
+            status: Filter to this status, or None for all.
+
+        Returns:
+            List of dicts — empty if nothing matches.
+        """
+        stmt = select(self.directory_rules).where(
+            self.directory_rules.c.execution_rid == execution_rid
+        )
+        if status is not None:
+            stmt = stmt.where(self.directory_rules.c.status == str(status))
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(stmt).mappings().all()
+        return [dict(r) for r in rows]
