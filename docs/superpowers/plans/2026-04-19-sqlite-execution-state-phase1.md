@@ -176,11 +176,21 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task A2: Add `mode` parameter to `DerivaML.__init__`
+### Task A2: Add `mode` parameter to `DerivaML.__init__` and `DerivaMLConfig`
 
 **Files:**
 - Modify: `src/deriva_ml/core/base.py` (around current `DerivaML.__init__`)
+- Modify: `src/deriva_ml/core/config.py` (add `mode` field to `DerivaMLConfig`)
 - Test: `tests/core/test_connection_mode.py` (extend)
+
+**`DerivaMLConfig` symmetry:** Every kwarg on `DerivaML.__init__` is
+mirrored as a field on `DerivaMLConfig` (used by
+`DerivaML.instantiate(config)` and hydra-zen). The task adds `mode`
+to both — omitting it from `DerivaMLConfig` would leave offline mode
+unreachable via the config-driven path. Add `mode: ConnectionMode | str =
+ConnectionMode.online` as a field on `DerivaMLConfig` alongside the
+other optional fields; pydantic v2 coerces string literals to the
+StrEnum automatically.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -236,7 +246,11 @@ Expected: FAIL with `TypeError: __init__() got an unexpected keyword argument 'm
 
 - [ ] **Step 3: Add `mode` to `DerivaML.__init__`**
 
-In `src/deriva_ml/core/base.py`, locate `DerivaML.__init__`. Add `mode` as a keyword-only argument with default `ConnectionMode.online`, coerce string input, and store as `self._mode`.
+In `src/deriva_ml/core/base.py`, locate `DerivaML.__init__`. Add `mode`
+as the final parameter with default `ConnectionMode.online` and store
+as `self._mode`. Matching the existing `DerivaML.__init__` style, the
+parameter is positional-or-keyword (no `*,` barrier) — the other ~16
+parameters follow the same convention.
 
 ```python
 # Near top of base.py imports:
@@ -246,12 +260,14 @@ from deriva_ml.core.connection_mode import ConnectionMode
 def __init__(
     self,
     # ... existing args ...
-    *,
     mode: ConnectionMode | str = ConnectionMode.online,
-    # ... remaining args ...
 ):
+    # Coerce at the top so later __init__ logic (and future mixin
+    # overrides) can read self._mode. ConnectionMode(mode) is idempotent
+    # on enum inputs and coerces strings uniformly — no isinstance
+    # check needed because ConnectionMode is a StrEnum.
+    self._mode = ConnectionMode(mode)
     # ... existing init body ...
-    self._mode = ConnectionMode(mode) if isinstance(mode, str) else mode
 
 # Add property:
 @property
