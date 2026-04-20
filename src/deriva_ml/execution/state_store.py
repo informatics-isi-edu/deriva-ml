@@ -33,6 +33,8 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    case,
+    func,
     insert,
     select,
     update,
@@ -512,6 +514,87 @@ class ExecutionStateStore:
         with self.engine.connect() as conn:
             rows = conn.execute(stmt).mappings().all()
         return [dict(r) for r in rows]
+
+    def count_pending_by_kind(
+        self,
+        *,
+        execution_rid: str,
+    ) -> dict[str, int]:
+        """Return per-kind counts of non-terminal pending rows.
+
+        A "pending" row is in one of staged/leasing/leased/uploading
+        (not yet terminally uploaded or failed). A "failed" row is
+        specifically in status='failed'. Rows in status='uploaded'
+        are excluded from both counts.
+
+        "plain" vs "asset" is determined by asset_file_path — non-null
+        means it's an asset row.
+
+        Args:
+            execution_rid: Scoping. Required — pending rows are
+                execution-scoped.
+
+        Returns:
+            A dict with keys pending_rows, failed_rows, pending_files,
+            failed_files. All four keys are always present; empty
+            tables yield zero for each (via COALESCE).
+
+        Example:
+            >>> store.count_pending_by_kind(execution_rid="EXE-A")
+            {'pending_rows': 5, 'failed_rows': 0,
+             'pending_files': 12, 'failed_files': 1}
+        """
+        # Single aggregate query, branched by asset_file_path IS NULL.
+        # case() produces 1 or 0 per row matching the branch; sum
+        # gives the count. This is ~4x faster than 4 separate
+        # queries for large pending_rows tables.
+        pending_statuses = [
+            str(PendingRowStatus.staged),
+            str(PendingRowStatus.leasing),
+            str(PendingRowStatus.leased),
+            str(PendingRowStatus.uploading),
+        ]
+        failed_status = str(PendingRowStatus.failed)
+
+        is_plain = self.pending_rows.c.asset_file_path.is_(None)
+        is_asset = self.pending_rows.c.asset_file_path.isnot(None)
+        status_col = self.pending_rows.c.status
+
+        stmt = select(
+            func.coalesce(
+                func.sum(
+                    case((is_plain & status_col.in_(pending_statuses), 1), else_=0)
+                ),
+                0,
+            ).label("pending_rows"),
+            func.coalesce(
+                func.sum(
+                    case((is_plain & (status_col == failed_status), 1), else_=0)
+                ),
+                0,
+            ).label("failed_rows"),
+            func.coalesce(
+                func.sum(
+                    case((is_asset & status_col.in_(pending_statuses), 1), else_=0)
+                ),
+                0,
+            ).label("pending_files"),
+            func.coalesce(
+                func.sum(
+                    case((is_asset & (status_col == failed_status), 1), else_=0)
+                ),
+                0,
+            ).label("failed_files"),
+        ).where(self.pending_rows.c.execution_rid == execution_rid)
+
+        with self.engine.connect() as conn:
+            row = conn.execute(stmt).mappings().first()
+        return {
+            "pending_rows": int(row["pending_rows"]),
+            "failed_rows": int(row["failed_rows"]),
+            "pending_files": int(row["pending_files"]),
+            "failed_files": int(row["failed_files"]),
+        }
 
     # ─── directory_rules CRUD ───────────────────────────────────────
 

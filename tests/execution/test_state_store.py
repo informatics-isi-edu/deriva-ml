@@ -361,3 +361,60 @@ def test_insert_directory_rule(tmp_path):
     rules = store.list_directory_rules(execution_rid="EXE-A")
     assert len(rules) == 1
     assert rules[0]["status"] == str(DirectoryRuleStatus.active)
+
+
+def test_count_pending_by_kind(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    # Two plain rows: one staged, one failed.
+    id1 = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    id2 = store.insert_pending_row(
+        execution_rid="EXE-A", key="k2",
+        target_schema="s", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.update_pending_row(id2, status=PendingRowStatus.failed)
+
+    # Two asset rows: one staged, one uploaded.
+    id3 = store.insert_pending_row(
+        execution_rid="EXE-A", key="f1",
+        target_schema="s", target_table="Image",
+        metadata_json="{}", created_at=now,
+        asset_file_path="/tmp/a.png",
+    )
+    id4 = store.insert_pending_row(
+        execution_rid="EXE-A", key="f2",
+        target_schema="s", target_table="Image",
+        metadata_json="{}", created_at=now,
+        asset_file_path="/tmp/b.png",
+    )
+    store.update_pending_row(id4, status=PendingRowStatus.uploaded)
+
+    counts = store.count_pending_by_kind(execution_rid="EXE-A")
+    # Plain rows: 1 pending (staged/leasing/leased/uploading), 1 failed.
+    # Asset rows: 1 pending, 0 failed (the uploaded one doesn't count).
+    assert counts == {
+        "pending_rows": 1,
+        "failed_rows": 1,
+        "pending_files": 1,
+        "failed_files": 0,
+    }
