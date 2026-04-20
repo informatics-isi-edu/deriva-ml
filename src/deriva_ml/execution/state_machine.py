@@ -23,7 +23,7 @@ from datetime import datetime, timezone  # noqa: F401  (used in C2-C6)
 from typing import TYPE_CHECKING
 
 from deriva_ml.core.exceptions import (
-    DerivaMLDataError,  # noqa: F401  (used in C2-C6)
+    DerivaMLDataError,
     DerivaMLException,
     DerivaMLStateInconsistency,
 )
@@ -499,3 +499,54 @@ def reconcile_with_catalog(
             f"(SQLite={sqlite_status}, catalog={catalog_status}) not "
             f"covered by reconciliation rules. Human intervention required."
         )
+
+
+def create_catalog_execution(
+    *,
+    catalog: "ErmrestCatalog",
+    workflow_rid: str | None,
+    description: str | None,
+) -> str:
+    """POST a new row to the catalog's Execution table and return
+    its server-assigned RID.
+
+    This is the one place in the state machine that actually creates a
+    new execution — all other transitions modify an existing row. It
+    is callable only in online mode (the caller enforces).
+
+    Args:
+        catalog: Live ErmrestCatalog.
+        workflow_rid: Workflow FK. May be None only if the catalog's
+            Execution.Workflow column is nullable (Deriva-ML's
+            schema requires it, but other catalogs may differ).
+        description: Human-readable description. Passes through to the
+            Execution.Description column.
+
+    Returns:
+        The RID assigned by the server.
+
+    Raises:
+        DerivaMLDataError: If the catalog's POST response lacks a RID.
+        Exception: On HTTP failure (caller may want to retry).
+
+    Example:
+        >>> rid = create_catalog_execution(
+        ...     catalog=ml.catalog,
+        ...     workflow_rid="WFL-1",
+        ...     description="first training run",
+        ... )
+        >>> rid
+        'EXE-NEW'
+    """
+    body = [{
+        "Workflow": workflow_rid,
+        "Description": description,
+        "Status": str(ExecutionStatus.created),
+    }]
+    response = catalog.post("/entity/deriva-ml:Execution", json=body)
+    inserted = response.json()
+    if not inserted or "RID" not in inserted[0]:
+        raise DerivaMLDataError(
+            "catalog POST to Execution returned no RID; unable to continue"
+        )
+    return inserted[0]["RID"]

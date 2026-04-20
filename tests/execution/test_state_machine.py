@@ -468,3 +468,35 @@ def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
     # SQLite unchanged.
     assert store.get_execution("EXE-A")["status"] == "stopped"
     assert any("reconcile" in r.message.lower() for r in caplog.records)
+
+
+class _MockCatalogWithInsert(_MockCatalog):
+    """Mock that records POSTs to Execution and returns a fake RID."""
+    def __init__(self, *, assigned_rid: str = "EXE-NEW", **kw):
+        super().__init__(**kw)
+        self.assigned_rid = assigned_rid
+        self.post_calls: list[dict] = []
+
+    def post(self, path: str, json=None, **_kw):
+        self.post_calls.append({"path": path, "json": json})
+        class _R:
+            def __init__(self, rid): self._rid = rid
+            def json(self): return [{"RID": self._rid, **(json[0] if json else {})}]
+            status_code = 201
+        return _R(self.assigned_rid)
+
+
+def test_create_catalog_execution_posts_and_returns_rid():
+    from deriva_ml.execution.state_machine import create_catalog_execution
+
+    cat = _MockCatalogWithInsert(assigned_rid="EXE-NEW")
+    rid = create_catalog_execution(
+        catalog=cat,
+        workflow_rid="WFL-1",
+        description="a test run",
+    )
+    assert rid == "EXE-NEW"
+    assert len(cat.post_calls) == 1
+    body = cat.post_calls[0]["json"]
+    assert body[0]["Workflow"] == "WFL-1"
+    assert body[0]["Description"] == "a test run"
