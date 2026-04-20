@@ -339,3 +339,163 @@ def flush_pending_sync(
 
     store.update_execution(execution_rid, sync_pending=False)
     logger.debug("flush_pending_sync %s: synced", execution_rid)
+
+
+# Disagreement resolution table (spec §2.2 — six cases).
+#
+# Rows are keyed by (sqlite_status, catalog_status) tuples. Value is
+# a literal action name:
+#   'adopt'        — SQLite adopts the catalog's status
+#   'push'         — SQLite state is newer; set sync_pending=True
+#   (missing)      — outside the rule table; caller raises DerivaMLStateInconsistency
+#
+# Sync-pending handling is layered on top: if sqlite.sync_pending was
+# True we generally 'push' regardless of catalog state.
+
+_DISAGREEMENT_RULES: dict[tuple[ExecutionStatus, ExecutionStatus], str] = {
+    # Externally aborted while we thought we were running.
+    (ExecutionStatus.running, ExecutionStatus.aborted): "adopt",
+    # Another process completed the upload.
+    (ExecutionStatus.pending_upload, ExecutionStatus.uploaded): "adopt",
+    # External failure signal.
+    (ExecutionStatus.running, ExecutionStatus.failed): "adopt",
+    # We stopped cleanly; catalog still says running (our earlier PUT
+    # never landed).
+    (ExecutionStatus.stopped, ExecutionStatus.running): "push",
+    # Same story at other cleanly-terminal SQLite states.
+    (ExecutionStatus.failed, ExecutionStatus.running): "push",
+    (ExecutionStatus.uploaded, ExecutionStatus.pending_upload): "push",
+    (ExecutionStatus.uploaded, ExecutionStatus.running): "push",
+    (ExecutionStatus.aborted, ExecutionStatus.running): "push",
+}
+
+
+def reconcile_with_catalog(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    execution_rid: str,
+) -> None:
+    """Compare a single execution's SQLite state with the catalog and
+    apply the disagreement rules (spec §2.2).
+
+    Called on resume_execution when online, before returning the
+    Execution to the user. Keeps startup fast by acting per-execution
+    rather than workspace-wide.
+
+    Behavior:
+    - If SQLite and catalog agree: no-op.
+    - If sqlite.sync_pending is True: respect it, leave alone (the
+      caller's flush_pending_sync will handle it).
+    - Otherwise look up (sqlite_status, catalog_status) in the
+      disagreement table:
+        * 'adopt' → SQLite adopts the catalog's status.
+        * 'push' → mark sync_pending=True (caller will flush).
+        * (missing) → raise DerivaMLStateInconsistency.
+    - If the catalog GET fails transiently: log a warning and return.
+    - If the catalog row is missing: raise DerivaMLStateInconsistency.
+
+    Args:
+        store: The ExecutionStateStore.
+        catalog: Live ErmrestCatalog.
+        execution_rid: Which execution to reconcile.
+
+    Raises:
+        DerivaMLStateInconsistency: Catalog row missing (orphan), or
+            disagreement is outside the known rule table.
+
+    Example:
+        >>> # On resume_execution in online mode:
+        >>> reconcile_with_catalog(
+        ...     store=ws.execution_state_store(),
+        ...     catalog=ml.catalog,
+        ...     execution_rid="EXE-A",
+        ... )
+    """
+    sqlite_row = store.get_execution(execution_rid)
+    if sqlite_row is None:
+        raise DerivaMLStateInconsistency(
+            f"reconcile: execution {execution_rid} not in SQLite"
+        )
+    sqlite_status = ExecutionStatus(sqlite_row["status"])
+
+    try:
+        # URL filter on RID — returns a list of 0 or 1 rows.
+        response = catalog.get(
+            f"/entity/deriva-ml:Execution/RID={execution_rid}"
+        )
+        rows = response.json()
+    except Exception as exc:
+        logger.warning(
+            "reconcile %s: catalog GET failed (%s); leaving SQLite as-is",
+            execution_rid, exc,
+        )
+        return
+
+    if not rows:
+        # Orphan: SQLite has the row, catalog doesn't. This is
+        # usually a clone/copy gone wrong or a catalog-side delete.
+        # Don't guess; ask the user to resolve.
+        raise DerivaMLStateInconsistency(
+            f"Execution {execution_rid} exists in SQLite (status={sqlite_status}) "
+            f"but has no row in the catalog. Either the catalog was "
+            f"re-initialized, or the workspace was copied from elsewhere. "
+            f"To adopt SQLite state, manually insert the catalog row; "
+            f"to discard, call ml.gc_executions(status='aborted')."
+        )
+
+    catalog_row = rows[0]
+    # Catalog Status is a vocab term; its string value matches our enum.
+    try:
+        catalog_status = ExecutionStatus(catalog_row.get("Status", ""))
+    except ValueError:
+        # Catalog has a Status we don't recognize. Surface rather than guess.
+        raise DerivaMLStateInconsistency(
+            f"Execution {execution_rid}: catalog Status="
+            f"{catalog_row.get('Status')!r} is not a recognized "
+            f"ExecutionStatus value"
+        )
+
+    # Happy path: they agree.
+    if sqlite_status == catalog_status:
+        return
+
+    # SQLite was waiting to push — this disagreement is expected.
+    if sqlite_row["sync_pending"]:
+        # We'll flush later; don't treat the catalog as authoritative.
+        logger.debug(
+            "reconcile %s: disagreement (SQLite=%s, catalog=%s) is "
+            "expected because sync_pending=True; leaving for flush",
+            execution_rid, sqlite_status, catalog_status,
+        )
+        return
+
+    rule = _DISAGREEMENT_RULES.get((sqlite_status, catalog_status))
+    if rule == "adopt":
+        # Catalog is authoritative. Include any error/timing from the
+        # catalog row so the user's Execution.error reflects reality.
+        store.update_execution(
+            execution_rid,
+            status=catalog_status,
+            error=catalog_row.get("Status_Detail"),
+            sync_pending=False,
+        )
+        logger.info(
+            "reconcile %s: adopted catalog state %s (was %s in SQLite)",
+            execution_rid, catalog_status, sqlite_status,
+        )
+    elif rule == "push":
+        # SQLite is newer; mark for flush. The resume flow will
+        # invoke flush_pending_sync after reconcile.
+        store.update_execution(execution_rid, sync_pending=True)
+        logger.info(
+            "reconcile %s: SQLite ahead (SQLite=%s, catalog=%s); "
+            "marked sync_pending for flush",
+            execution_rid, sqlite_status, catalog_status,
+        )
+    else:
+        raise DerivaMLStateInconsistency(
+            f"Execution {execution_rid}: unexpected state disagreement "
+            f"(SQLite={sqlite_status}, catalog={catalog_status}) not "
+            f"covered by reconciliation rules. Human intervention required."
+        )

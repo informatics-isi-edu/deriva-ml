@@ -280,3 +280,191 @@ def test_flush_pending_sync_noop_when_not_pending(tmp_path):
     cat = _MockCatalog()
     flush_pending_sync(store=store, catalog=cat, execution_rid="EXE-A")
     assert len(cat.put_calls) == 0
+
+
+class _MockCatalogWithGet(_MockCatalog):
+    """Extends the mock with a configurable GET response."""
+    def __init__(self, *, get_row: dict | None | str = None, **kw):
+        super().__init__(**kw)
+        # get_row: dict = returned row, None = 404/no row, "raise" = raise
+        self._get_row = get_row
+
+    def get(self, path: str, **_kw):
+        if self._get_row == "raise":
+            raise RuntimeError("simulated 500")
+        class _R:
+            def __init__(self, row):
+                self._row = row
+            def json(self):
+                return [self._row] if self._row is not None else []
+            status_code = 200
+        return _R(self._get_row)
+
+
+def test_reconcile_no_disagreement(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "stopped"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    # Unchanged.
+    assert store.get_execution("EXE-A")["status"] == "stopped"
+
+
+def test_reconcile_catalog_says_aborted(tmp_path):
+    """SQLite=running, catalog=aborted → SQLite flips to aborted."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "aborted"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    assert store.get_execution("EXE-A")["status"] == "aborted"
+
+
+def test_reconcile_catalog_says_uploaded(tmp_path):
+    """SQLite=pending_upload, catalog=uploaded → SQLite flips to uploaded."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.pending_upload,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "uploaded"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    assert store.get_execution("EXE-A")["status"] == "uploaded"
+
+
+def test_reconcile_sqlite_stopped_catalog_running(tmp_path):
+    """SQLite=stopped, catalog=running (stale) → push SQLite to catalog."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "running"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    # SQLite unchanged; sync_pending set so next flush pushes.
+    assert store.get_execution("EXE-A")["status"] == "stopped"
+    assert store.get_execution("EXE-A")["sync_pending"] is True
+
+
+def test_reconcile_catalog_missing_raises(tmp_path):
+    """SQLite has the row; catalog doesn't → orphan, raise."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    cat = _MockCatalogWithGet(get_row=None)
+    with pytest.raises(DerivaMLStateInconsistency):
+        reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+
+
+def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
+    """Transient catalog error → reconcile skips cleanly (caller decides)."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row="raise")
+    import logging
+    with caplog.at_level(logging.WARNING):
+        reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    # SQLite unchanged.
+    assert store.get_execution("EXE-A")["status"] == "stopped"
+    assert any("reconcile" in r.message.lower() for r in caplog.records)
