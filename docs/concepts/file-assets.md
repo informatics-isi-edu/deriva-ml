@@ -295,7 +295,7 @@ The working directory is cleaned up after `upload_execution_outputs(clean_folder
 
 If a model crashes between `asset_file_path()` and `upload_execution_outputs()`, the manifest preserves the registration state. On retry:
 
-1. Restore the execution: `exe = ml.restore_execution(execution_rid)`
+1. Resume the execution: `exe = ml.resume_execution(execution_rid)`
 2. Call `upload_execution_outputs()` — it reads the manifest and uploads all pending assets
 3. Assets already marked as uploaded are skipped automatically
 

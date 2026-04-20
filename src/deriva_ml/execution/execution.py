@@ -310,7 +310,7 @@ class Execution:
         # file-tree exists but we do NOT rely on listing the filesystem
         # to enumerate executions anymore.
         # Skip when: dry_run (sentinel RID not valid) or reload
-        # (restore_execution path — the row may already exist, and we
+        # (resume_execution path — the row may already exist, and we
         # shouldn't blow away whatever status/history it already has).
         if not self._dry_run and reload is None:
             from datetime import datetime, timezone
@@ -1746,7 +1746,7 @@ class Execution:
 
         Returns:
             List of nested ExecutionRecord objects, ordered by sequence if available.
-            To get full Execution objects with lifecycle management, use restore_execution().
+            To get full Execution objects with lifecycle management, use resume_execution().
 
         Example:
             >>> children = parent_exec.list_nested_executions()
@@ -1796,7 +1796,7 @@ class Execution:
 
         Returns:
             List of parent ExecutionRecord objects.
-            To get full Execution objects with lifecycle management, use restore_execution().
+            To get full Execution objects with lifecycle management, use resume_execution().
 
         Example:
             >>> parents = child_exec.list_parent_executions()

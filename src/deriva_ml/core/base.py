@@ -1615,7 +1615,7 @@ class DerivaML(
     # - create_feature, feature_record_class, delete_feature, lookup_feature, list_feature_values -> FeatureMixin
     # - find_datasets, create_dataset, lookup_dataset, delete_dataset, list_dataset_element_types,
     #   add_dataset_element_type, download_dataset_bag -> DatasetMixin
-    # - _update_status, create_execution, restore_execution -> ExecutionMixin
+    # - _update_status, create_execution, resume_execution -> ExecutionMixin
     # - add_files, list_files, _bootstrap_versions, _synchronize_dataset_versions, _set_version_snapshot -> FileMixin
 
 

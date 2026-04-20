@@ -392,3 +392,11 @@ def test_create_execution_writes_registry_row(test_ml):
     assert row["mode"] == "online"
     assert row["config_json"]  # non-empty
     assert row["working_dir_rel"].startswith("execution/")
+
+
+def test_restore_execution_symbol_removed(test_ml):
+    """Per R5.1 aggressive deprecation, restore_execution is removed."""
+    assert not hasattr(test_ml, "restore_execution"), (
+        "restore_execution should have been removed in D8; "
+        "use resume_execution (see CHANGELOG breaking changes)."
+    )

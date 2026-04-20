@@ -1110,30 +1110,6 @@ class TestExecutionFeatures:
 
 
 # =============================================================================
-# TestExecutionRestore - Execution Restoration Tests
-# =============================================================================
-
-
-class TestExecutionRestore:
-    """Tests for restoring previous executions."""
-
-    def test_restore_execution(self, basic_execution, tmp_path):
-        """Test restoring a previous execution."""
-        ml = basic_execution._ml_object
-
-        # Create and complete an execution
-        with basic_execution.execute() as exe:
-            original_rid = exe.execution_rid
-            create_test_asset(exe, "original.txt", "Original content")
-
-        basic_execution.upload_execution_outputs()
-
-        # Create a new ML instance and restore
-        restored = ml.restore_execution(original_rid)
-        assert restored.execution_rid == original_rid
-
-
-# =============================================================================
 # TestExecutionDryRun - Dry Run Mode Tests
 # =============================================================================
 

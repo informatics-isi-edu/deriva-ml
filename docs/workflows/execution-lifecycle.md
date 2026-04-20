@@ -643,13 +643,13 @@ with ml.create_execution(config) as exe:
 exe.upload_execution_outputs()
 ```
 
-## Restoring Executions
+## Resuming Executions
 
 Resume working with a previous execution:
 
 ```python
-# Restore by RID
-exe = ml.restore_execution("1-XYZ")
+# Resume by RID
+exe = ml.resume_execution("1-XYZ")
 
 # Continue working
 exe.asset_file_path("Model", "continued_model.pt")
@@ -761,7 +761,7 @@ all_descendants = parent.list_nested_executions(recurse=True)
 
 Each item in the returned list is an `ExecutionRecord` with properties like
 `execution_rid`, `status`, and `description`. To get a full `Execution` object
-with lifecycle management, use `ml.restore_execution(child.execution_rid)`.
+with lifecycle management, use `ml.resume_execution(child.execution_rid)`.
 
 ## Complete Example
 
