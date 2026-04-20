@@ -154,3 +154,102 @@ def test_directory_rule_status_values():
     from deriva_ml.execution.state_store import DirectoryRuleStatus
     assert DirectoryRuleStatus.active.value == "active"
     assert DirectoryRuleStatus.closed.value == "closed"
+
+
+def test_insert_execution_row(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A",
+        workflow_rid="WFL-1",
+        description="test",
+        config_json='{"foo": "bar"}',
+        status=ExecutionStatus.created,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row is not None
+    assert row["rid"] == "EXE-A"
+    assert row["status"] == "created"
+    assert row["mode"] == "online"
+
+
+def test_get_execution_missing_returns_none(tmp_path):
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    assert store.get_execution("NOPE") is None
+
+
+def test_update_execution_status(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    store.update_execution(
+        rid="EXE-A",
+        status=ExecutionStatus.running,
+        start_time=now,
+        sync_pending=True,
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row["status"] == "running"
+    assert row["sync_pending"] is True
+    assert row["start_time"] is not None
+
+
+def test_list_executions_filters_by_status(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+
+    now = datetime.now(timezone.utc)
+    for rid, status in [
+        ("A", ExecutionStatus.running),
+        ("B", ExecutionStatus.stopped),
+        ("C", ExecutionStatus.uploaded),
+    ]:
+        store.insert_execution(
+            rid=rid, workflow_rid=None, description=None,
+            config_json="{}", status=status,
+            mode=ConnectionMode.online, working_dir_rel=f"execution/{rid}",
+            created_at=now, last_activity=now,
+        )
+
+    rows = store.list_executions(status=[ExecutionStatus.running, ExecutionStatus.stopped])
+    rids = {r["rid"] for r in rows}
+    assert rids == {"A", "B"}
