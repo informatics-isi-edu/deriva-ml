@@ -2002,6 +2002,40 @@ class Execution:
         ]
         return "\n".join(items)
 
+    def __repr__(self) -> str:
+        """One-line summary including status and pending counts.
+
+        Pending counts read SQLite — no caching. Example output::
+
+            <Execution EXE-A status=stopped pending=15rows/2files>
+
+        Omits the pending suffix when there are no pending rows or
+        files. Always guards against exceptions — ``repr`` MUST NOT
+        raise, so reads that would raise (e.g., the registry row is
+        missing) degrade to ``<Execution EXE-A>``.
+
+        Returns:
+            Compact repr string suitable for logs and interactive use.
+        """
+        try:
+            store = self._ml_object.workspace.execution_state_store()
+            row = store.get_execution(self.execution_rid)
+            if row is None:
+                return f"<Execution {self.execution_rid} status=? (not in registry)>"
+            counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
+            pending_part = ""
+            if counts["pending_rows"] or counts["pending_files"]:
+                pending_part = (
+                    f" pending={counts['pending_rows']}rows/"
+                    f"{counts['pending_files']}files"
+                )
+            return (
+                f"<Execution {self.execution_rid} "
+                f"status={row['status']}{pending_part}>"
+            )
+        except Exception:  # repr must not raise
+            return f"<Execution {self.execution_rid}>"
+
     def __enter__(self) -> "Execution":
         """Begin the execution: status created → running.
 

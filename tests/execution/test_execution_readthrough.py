@@ -147,3 +147,22 @@ def test_start_stop_time_readthrough(test_ml):
 
     assert exe.stop_time is not None
     assert exe.stop_time >= exe.start_time
+
+
+def test_repr_includes_status_and_pending(test_ml):
+    """__repr__ shows the rid + status + pending counts."""
+    from datetime import datetime, timezone
+
+    exe = _make_exe(test_ml, "repr")
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+
+    r = repr(exe)
+    assert exe.execution_rid in r
+    assert "created" in r   # status (SQLite is lowercase ExecutionStatus)
+    assert "1" in r         # pending count
