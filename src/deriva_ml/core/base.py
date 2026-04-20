@@ -353,6 +353,26 @@ class DerivaML(
         self.status = Status.pending.value
         self.clean_execution_dir = clean_execution_dir
 
+        # Reconcile any pending_rows stuck in 'leasing' from a prior
+        # crash. Workspace-wide sweep; per-execution reconciliation
+        # runs additionally on resume_execution (Group D).
+        if self._mode is ConnectionMode.online:
+            from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+
+            try:
+                reconcile_pending_leases(
+                    store=self.workspace.execution_state_store(),
+                    catalog=self.catalog,
+                    execution_rid=None,
+                )
+            except Exception as exc:
+                # Best-effort. If reconciliation itself fails, log and
+                # move on — the user's operation can still proceed;
+                # the next acquire_leases call will retry.
+                logging.getLogger("deriva_ml").warning(
+                    "startup lease reconciliation failed (%s); continuing", exc,
+                )
+
     def __del__(self) -> None:
         """Cleanup method to handle incomplete executions."""
         try:

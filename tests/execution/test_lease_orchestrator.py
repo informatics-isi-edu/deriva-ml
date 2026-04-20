@@ -291,3 +291,82 @@ def test_reconcile_pending_leases_workspace_wide(tmp_path):
         row = store.list_pending_rows(execution_rid=rid)[0]
         assert row["status"] == str(PendingRowStatus.leased)
         assert row["rid"] == expected_r
+
+
+def test_workspace_open_reconciles_leases(test_ml, monkeypatch):
+    """On DerivaML construction (online), startup sweep runs."""
+    calls: list[str | None] = []
+
+    def _spy(*, store, catalog, execution_rid):
+        calls.append(execution_rid)
+
+    from deriva_ml.execution import lease_orchestrator
+    monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
+
+    # Creating a DerivaML instance should trigger the sweep.
+    # test_ml is already constructed; construct another one to observe.
+    from deriva_ml import DerivaML
+    DerivaML(
+        hostname=test_ml.host_name,
+        catalog_id=test_ml.catalog_id,
+        working_dir=test_ml.working_dir,
+    )
+    # Sweep scoped workspace-wide (execution_rid=None).
+    assert None in calls
+
+
+def test_offline_workspace_skips_lease_reconcile(monkeypatch, tmp_path):
+    """In offline mode there's no server to query — skip the sweep."""
+    from deriva_ml.execution import lease_orchestrator
+    calls: list[str | None] = []
+    def _spy(**_kw): calls.append(_kw.get("execution_rid"))
+    monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
+
+    # DerivaML.__init__ still contacts the server regardless of mode
+    # (model reflection, credential discovery). Stub the network-bound
+    # bits so we can exercise the offline-skip branch of the lease hook
+    # without a live catalog. See spec §2.1 — true offline init is a
+    # future task; for now we verify only that the hook's online gate
+    # does the right thing.
+    import deriva_ml.core.base as base_mod
+
+    class _FakeModel:
+        schemas = {}
+        annotations: dict = {}
+        def apply(self): pass
+
+    class _FakeCatalog:
+        catalog_id = "1"
+        def getCatalogModel(self): return _FakeModel()
+
+    class _FakeServer:
+        def __init__(self, *a, **kw): pass
+        def get_authn_session(self): return None
+        def connect_ermrest(self, cid): return _FakeCatalog()
+
+    # Stub DerivaServer constructor and credential lookup so init
+    # doesn't hit the network.
+    monkeypatch.setattr(base_mod, "DerivaServer", _FakeServer)
+    monkeypatch.setattr(base_mod, "get_credential", lambda hostname: {})
+
+    # Stub DerivaModel so schema introspection doesn't run.
+    from deriva_ml.model import catalog as catalog_mod
+
+    class _FakeDerivaModel:
+        def __init__(self, *a, **kw):
+            self.domain_schemas = frozenset()
+            self.default_schema = None
+            self.ml_schema = kw.get("ml_schema", "deriva-ml")
+            self.schemas = {}
+        def refresh_model(self): pass
+
+    monkeypatch.setattr(catalog_mod, "DerivaModel", _FakeDerivaModel)
+
+    from deriva_ml import ConnectionMode, DerivaML
+    DerivaML(
+        hostname="offline.example",
+        catalog_id="1",
+        working_dir=str(tmp_path),
+        mode=ConnectionMode.offline,
+    )
+    assert calls == []
