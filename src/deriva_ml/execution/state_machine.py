@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 from deriva_ml.core.exceptions import (
     DerivaMLDataError,  # noqa: F401  (used in C2-C6)
     DerivaMLException,
-    DerivaMLStateInconsistency,  # noqa: F401  (used in C2-C6)
+    DerivaMLStateInconsistency,
 )
 from deriva_ml.execution.state_store import ExecutionStatus
 
@@ -196,5 +196,95 @@ def transition(
         )
         return
 
-    # Online path deferred to Task C3.
-    raise NotImplementedError("online transition lands in Task C3")
+    # Online: SQLite first, then catalog PUT. If PUT fails, leave
+    # sync_pending=True so a later call (or resume_execution)
+    # flushes. We never let catalog failure roll back SQLite — the
+    # local view is the source of truth; the catalog catches up.
+    #
+    # Ordering note: we commit SQLite BEFORE the catalog PUT. If we
+    # crashed between the commit and the PUT, sync_pending would stay
+    # True (we set it preemptively) and the next online operation
+    # would push. The reverse ordering (catalog first) creates an
+    # unrecoverable window where the catalog has moved but SQLite
+    # hasn't — a later crash would lose the catalog transition.
+    store.update_execution(
+        execution_rid,
+        status=target,
+        sync_pending=True,  # preemptively True; cleared after successful PUT
+        **extra_fields,
+    )
+
+    # Compose the catalog PUT body from the SQLite row we just wrote.
+    # Only the columns the catalog Execution row knows about go here —
+    # Status and lifecycle timestamps — not SQLite-only fields like
+    # sync_pending or config_json.
+    body = _catalog_body_for_execution(
+        store=store,
+        execution_rid=execution_rid,
+    )
+    try:
+        catalog.put(
+            "/entity/deriva-ml:Execution",
+            json=body,
+        )
+    except Exception as exc:  # network blip, 5xx, etc.
+        logger.warning(
+            "execution %s: catalog sync FAILED (%s); SQLite committed, "
+            "sync_pending stays True for later flush",
+            execution_rid, exc,
+        )
+        return
+
+    # PUT succeeded — clear sync_pending.
+    store.update_execution(execution_rid, sync_pending=False)
+    logger.debug(
+        "online transition %s: %s → %s (synced)",
+        execution_rid, current, target,
+    )
+
+
+def _catalog_body_for_execution(
+    *,
+    store: "ExecutionStateStore",
+    execution_rid: str,
+) -> list[dict]:
+    """Build the ERMrest PUT body for an execution's catalog row.
+
+    Reads the current SQLite state and projects to the catalog's
+    column set. Kept as a helper so transition() stays focused on
+    orchestration and so tests can assert on body contents.
+
+    Args:
+        store: The ExecutionStateStore to read from.
+        execution_rid: Which execution's row to project.
+
+    Returns:
+        A list of one dict suitable as the ``json=`` body for a
+        catalog PUT on ``/entity/deriva-ml:Execution``.
+
+    Raises:
+        DerivaMLStateInconsistency: If the SQLite row vanished
+            between the preceding update and this read (concurrent
+            delete — shouldn't happen in practice but we fail
+            loudly rather than PUT a partial body).
+    """
+    row = store.get_execution(execution_rid)
+    if row is None:
+        # Caller just updated SQLite; this would only happen on a
+        # concurrent delete. Surface clearly rather than putting a
+        # partial body to the catalog.
+        raise DerivaMLStateInconsistency(
+            f"executions row {execution_rid} vanished between write and PUT"
+        )
+    # Catalog Execution schema: RID (PK), Status, Start_Time, End_Time,
+    # Duration, ... — see src/deriva_ml/schema/create_schema.py for
+    # the canonical column list. We update only the columns we own
+    # here; the catalog is responsible for RCB/RMT etc.
+    return [{
+        "RID": row["rid"],
+        "Status": row["status"],
+        "Start_Time": row["start_time"],
+        "End_Time": row["stop_time"],
+        # Status_Detail: prefer error if present, else description.
+        "Status_Detail": row["error"] or row["description"],
+    }]

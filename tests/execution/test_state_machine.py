@@ -129,3 +129,91 @@ def test_transition_rejects_invalid(tmp_path):
             target=ExecutionStatus.running,
             mode=ConnectionMode.offline,
         )
+
+
+class _MockCatalog:
+    """Minimal mock for ErmrestCatalog exposing just what transition() uses."""
+    def __init__(self, *, put_should_fail: bool = False):
+        self.put_should_fail = put_should_fail
+        self.put_calls: list[dict] = []
+
+    def put(self, path: str, json: object = None, **_kw):
+        if self.put_should_fail:
+            raise RuntimeError("simulated network failure")
+        self.put_calls.append({"path": path, "json": json})
+        return None
+
+
+def test_online_transition_syncs_catalog(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    cat = _MockCatalog()
+    transition(
+        store=store, catalog=cat, execution_rid="EXE-A",
+        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        mode=ConnectionMode.online, extra_fields={"start_time": now},
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row["status"] == "running"
+    # Online: sync succeeded, no pending flag.
+    assert row["sync_pending"] is False
+    # Catalog was put-updated.
+    assert len(cat.put_calls) == 1
+    body = cat.put_calls[0]["json"]
+    assert isinstance(body, list) and len(body) == 1
+    assert body[0]["RID"] == "EXE-A"
+    assert body[0]["Status"] == "running"
+
+
+def test_online_transition_soft_fails_on_catalog_error(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    cat = _MockCatalog(put_should_fail=True)
+    # SQLite transition must still succeed; the catalog failure is
+    # soft — user gets sync_pending=True for the next pass to flush.
+    transition(
+        store=store, catalog=cat, execution_rid="EXE-A",
+        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        mode=ConnectionMode.online,
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row["status"] == "running"
+    assert row["sync_pending"] is True
