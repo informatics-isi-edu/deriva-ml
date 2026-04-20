@@ -267,10 +267,12 @@ class DerivaML(
                 literals ``"online"`` or ``"offline"``; any other value raises
                 ``ValueError``. See spec §2.1.
         """
-        # Coerce and store connection mode (see spec §2.1).
+        # Store connection mode (see spec §2.1).
         # Done before catalog connection so subclasses/mixins can read
         # ``self._mode`` during their own setup if needed.
-        self._mode = ConnectionMode(mode) if isinstance(mode, str) else mode
+        # ``ConnectionMode(x)`` is idempotent on enum members and coerces
+        # strings ("online"/"offline") uniformly; unknown strings raise ValueError.
+        self._mode = ConnectionMode(mode)
 
         # Get or use provided credentials for server access
         self.credential = credential or get_credential(hostname)

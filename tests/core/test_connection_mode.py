@@ -75,3 +75,33 @@ def test_derivaml_rejects_invalid_mode(catalog_manager, tmp_path):
             working_dir=tmp_path,
             mode="hybrid",
         )
+
+
+def test_derivaml_config_accepts_mode():
+    """DerivaMLConfig mirrors DerivaML.__init__'s mode parameter.
+
+    Hydra-zen instantiation goes through this config class; without
+    mode here, offline mode would be unreachable via DerivaML.instantiate().
+    """
+    from unittest.mock import patch
+
+    from deriva_ml import ConnectionMode
+    from deriva_ml.core.config import DerivaMLConfig
+
+    # DerivaMLConfig's model validator touches HydraConfig; stub it so we
+    # can construct the config outside a Hydra run (same pattern used in
+    # tests/core/test_hydra_zen_config.py).
+    with patch("deriva_ml.core.config.HydraConfig") as mock_hydra:
+        mock_hydra.get.return_value.runtime.output_dir = "/tmp/hydra_output"
+
+        # Default is online.
+        c1 = DerivaMLConfig(hostname="h", catalog_id="1")
+        assert ConnectionMode(c1.mode) is ConnectionMode.online
+
+        # Accepts enum.
+        c2 = DerivaMLConfig(hostname="h", catalog_id="1", mode=ConnectionMode.offline)
+        assert ConnectionMode(c2.mode) is ConnectionMode.offline
+
+        # Accepts string (pydantic coerces to StrEnum).
+        c3 = DerivaMLConfig(hostname="h", catalog_id="1", mode="offline")
+        assert ConnectionMode(c3.mode) is ConnectionMode.offline
