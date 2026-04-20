@@ -27,7 +27,8 @@ def test_pending_asset_count_fields():
 
 def test_pending_summary_has_pending_true_when_any():
     from deriva_ml.execution.pending_summary import (
-        PendingAssetCount, PendingRowCount, PendingSummary,
+        PendingRowCount,
+        PendingSummary,
     )
 
     empty = PendingSummary(
@@ -45,7 +46,9 @@ def test_pending_summary_has_pending_true_when_any():
 
 def test_pending_summary_total_counts():
     from deriva_ml.execution.pending_summary import (
-        PendingAssetCount, PendingRowCount, PendingSummary,
+        PendingAssetCount,
+        PendingRowCount,
+        PendingSummary,
     )
 
     s = PendingSummary(
@@ -68,7 +71,9 @@ def test_pending_summary_total_counts():
 
 def test_pending_summary_render_has_key_parts():
     from deriva_ml.execution.pending_summary import (
-        PendingAssetCount, PendingRowCount, PendingSummary,
+        PendingAssetCount,
+        PendingRowCount,
+        PendingSummary,
     )
 
     s = PendingSummary(
@@ -91,7 +96,8 @@ def test_pending_summary_render_has_key_parts():
 
 def test_workspace_pending_summary():
     from deriva_ml.execution.pending_summary import (
-        PendingSummary, WorkspacePendingSummary,
+        PendingSummary,
+        WorkspacePendingSummary,
     )
 
     ws = WorkspacePendingSummary(per_execution=[

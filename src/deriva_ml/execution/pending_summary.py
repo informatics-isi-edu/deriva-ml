@@ -8,8 +8,7 @@ engine for pre-flight reporting.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
