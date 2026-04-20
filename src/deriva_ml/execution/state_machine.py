@@ -288,3 +288,54 @@ def _catalog_body_for_execution(
         # Status_Detail: prefer error if present, else description.
         "Status_Detail": row["error"] or row["description"],
     }]
+
+
+def flush_pending_sync(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    execution_rid: str,
+) -> None:
+    """Push a single execution's SQLite state to the catalog.
+
+    Called when we've opened online and notice this execution has
+    sync_pending=True (accumulated from offline transitions, or from
+    a previous online transition whose PUT failed).
+
+    Idempotent: no-op if sync_pending is already False. If the PUT
+    fails, sync_pending stays True for the next attempt.
+
+    Args:
+        store: ExecutionStateStore holding the row.
+        catalog: Live ErmrestCatalog.
+        execution_rid: Which execution to flush.
+
+    Raises:
+        DerivaMLStateInconsistency: If the execution row has vanished
+            from the SQLite store (concurrent delete or missing row).
+
+    Example:
+        >>> # After resuming an execution online that last ran offline:
+        >>> flush_pending_sync(store=store, catalog=ml.catalog,
+        ...                    execution_rid="EXE-A")
+    """
+    row = store.get_execution(execution_rid)
+    if row is None:
+        raise DerivaMLStateInconsistency(
+            f"flush_pending_sync: execution {execution_rid} not in SQLite"
+        )
+    if not row["sync_pending"]:
+        return
+
+    body = _catalog_body_for_execution(store=store, execution_rid=execution_rid)
+    try:
+        catalog.put("/entity/deriva-ml:Execution", json=body)
+    except Exception as exc:
+        logger.warning(
+            "flush_pending_sync %s: catalog PUT failed (%s); will retry later",
+            execution_rid, exc,
+        )
+        return
+
+    store.update_execution(execution_rid, sync_pending=False)
+    logger.debug("flush_pending_sync %s: synced", execution_rid)

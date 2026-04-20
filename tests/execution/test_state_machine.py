@@ -217,3 +217,66 @@ def test_online_transition_soft_fails_on_catalog_error(tmp_path):
     row = store.get_execution("EXE-A")
     assert row["status"] == "running"
     assert row["sync_pending"] is True
+
+
+def test_flush_pending_sync_pushes_catalog(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import flush_pending_sync, transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    # Do an offline transition: SQLite has sync_pending=True.
+    transition(
+        store=store, catalog=None, execution_rid="EXE-A",
+        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        mode=ConnectionMode.offline,
+    )
+    assert store.get_execution("EXE-A")["sync_pending"] is True
+
+    # Now flush it against a live (mock) catalog.
+    cat = _MockCatalog()
+    flush_pending_sync(store=store, catalog=cat, execution_rid="EXE-A")
+
+    assert store.get_execution("EXE-A")["sync_pending"] is False
+    assert len(cat.put_calls) == 1
+
+
+def test_flush_pending_sync_noop_when_not_pending(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import flush_pending_sync
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+        sync_pending=False,
+    )
+
+    cat = _MockCatalog()
+    flush_pending_sync(store=store, catalog=cat, execution_rid="EXE-A")
+    assert len(cat.put_calls) == 0
