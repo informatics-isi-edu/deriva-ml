@@ -128,3 +128,84 @@ def acquire_leases_for_execution(
         "acquire_leases: %d rows leased for execution %s",
         len(rows_to_lease), execution_rid,
     )
+
+
+def reconcile_pending_leases(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    execution_rid: str | None = None,
+) -> None:
+    """Recover from a crash during the two-phase lease protocol.
+
+    Finds pending_rows in status='leasing' (the intermediate state
+    between SQLite write and POST response) and asks ERMrest_RID_Lease
+    whether each token made it to the server.
+
+    Per-token outcomes:
+    - Token exists on server → adopt the server RID, status → 'leased'.
+    - Token doesn't exist → POST never landed, revert to 'staged' so
+      the next acquire_leases reissues.
+
+    Call sites:
+    - On workspace open (no execution_rid arg: sweep all executions) — F5.
+    - On resume_execution of a specific rid (pass execution_rid) — F6.
+
+    Args:
+        store: ExecutionStateStore.
+        catalog: Live ErmrestCatalog.
+        execution_rid: If None, reconcile across the whole workspace.
+            Otherwise scope to one execution (cheaper — typical for
+            resume_execution JIT reconciliation).
+
+    Example:
+        >>> # Workspace-wide startup reconciliation:
+        >>> reconcile_pending_leases(store=store, catalog=ml.catalog)
+        >>> # Per-execution on resume:
+        >>> reconcile_pending_leases(
+        ...     store=store, catalog=ml.catalog,
+        ...     execution_rid="EXE-A",
+        ... )
+    """
+    leasing_rows = store.list_leasing_rows(execution_rid=execution_rid)
+    if not leasing_rows:
+        return
+
+    tokens = [r["lease_token"] for r in leasing_rows if r["lease_token"]]
+    if not tokens:
+        # Shouldn't happen — leasing rows always carry tokens — but
+        # be defensive.
+        return
+
+    # Query ERMrest_RID_Lease for the tokens we expect to find there.
+    # Use a filter clause: ID=t1;ID=t2;... (ERMrest's in-list syntax).
+    # Chunked to stay under URL length limits.
+    from deriva_ml.execution.rid_lease import PENDING_ROWS_LEASE_CHUNK
+
+    found_by_token: dict[str, str] = {}
+    for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
+        chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
+        filter_clause = ";".join(f"ID={t}" for t in chunk)
+        path = f"/entity/public:ERMrest_RID_Lease/{filter_clause}"
+        response = catalog.get(path)
+        for row in response.json():
+            found_by_token[row["ID"]] = row["RID"]
+
+    # Apply outcomes.
+    for row in leasing_rows:
+        token = row["lease_token"]
+        if token in found_by_token:
+            store.finalize_pending_lease(
+                lease_token=token,
+                assigned_rid=found_by_token[token],
+            )
+        else:
+            store.revert_pending_leasing(lease_token=token)
+
+    logger.info(
+        "lease reconciliation: %d rows, %d adopted, %d reverted (execution_rid=%s)",
+        len(leasing_rows),
+        len(found_by_token),
+        len(leasing_rows) - len(found_by_token),
+        execution_rid or "all",
+    )

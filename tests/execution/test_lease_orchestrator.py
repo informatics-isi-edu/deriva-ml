@@ -138,3 +138,110 @@ def test_acquire_leases_reverts_on_post_failure(tmp_path):
         assert r["status"] == str(PendingRowStatus.staged), \
             "orchestrator must revert on POST failure"
         assert r["lease_token"] is None
+
+
+class _MockCatalogWithGet:
+    """Mock exposing GET for querying ERMrest_RID_Lease by token."""
+    def __init__(self, *, rows_by_id: dict[str, str] | None = None):
+        self.rows_by_id = rows_by_id or {}  # token → RID
+        self.get_paths: list[str] = []
+
+    def get(self, path: str, **_kw):
+        self.get_paths.append(path)
+        # Parse out the ID filter from the URL (ID=T1;ID=T2...).
+        import re
+        ids_param = re.search(r"ID=([^&]+)", path)
+        tokens = ids_param.group(1).split(";") if ids_param else []
+        tokens = [re.sub(r"^ID=", "", t) for t in tokens if t]
+        rows = [
+            {"ID": t, "RID": self.rows_by_id[t]}
+            for t in tokens
+            if t in self.rows_by_id
+        ]
+        class _R:
+            def __init__(self, rows): self._rows = rows
+            def json(self): return self._rows
+        return _R(rows)
+
+
+def test_reconcile_pending_leases_adopts_server_assigned(tmp_path):
+    """Row status='leasing' whose token exists on the server →
+    promoted to 'leased' with the server's RID."""
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T-FOUND")
+
+    cat = _MockCatalogWithGet(rows_by_id={"T-FOUND": "R-LATE"})
+    reconcile_pending_leases(store=store, catalog=cat, execution_rid="EXE-A")
+
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.leased)
+    assert row["rid"] == "R-LATE"
+
+
+def test_reconcile_pending_leases_reverts_missing(tmp_path):
+    """Row status='leasing' whose token doesn't exist on the server →
+    reverted to 'staged'."""
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T-ORPHAN")
+
+    cat = _MockCatalogWithGet(rows_by_id={})  # nothing on server
+    reconcile_pending_leases(store=store, catalog=cat, execution_rid="EXE-A")
+
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.staged)
+    assert row["lease_token"] is None
+
+
+def test_reconcile_pending_leases_workspace_wide(tmp_path):
+    """execution_rid=None reconciles across all executions."""
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+    from deriva_ml.execution.state_store import PendingRowStatus, ExecutionStatus
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    store = _setup_store(tmp_path)  # creates EXE-A
+    now = datetime.now(timezone.utc)
+    # Add a second execution.
+    store.insert_execution(
+        rid="EXE-B", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-B",
+        created_at=now, last_activity=now,
+    )
+    pid_a = store.insert_pending_row(
+        execution_rid="EXE-A", key="ka",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    pid_b = store.insert_pending_row(
+        execution_rid="EXE-B", key="kb",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid_a, lease_token="TA")
+    store.mark_pending_leasing(pid_b, lease_token="TB")
+
+    cat = _MockCatalogWithGet(rows_by_id={"TA": "R-A", "TB": "R-B"})
+    reconcile_pending_leases(store=store, catalog=cat, execution_rid=None)
+
+    for rid, expected_r in [("EXE-A", "R-A"), ("EXE-B", "R-B")]:
+        row = store.list_pending_rows(execution_rid=rid)[0]
+        assert row["status"] == str(PendingRowStatus.leased)
+        assert row["rid"] == expected_r
