@@ -10,7 +10,8 @@ Exception Hierarchy:
     ├── DerivaMLConfigurationError (configuration and initialization)
     │   ├── DerivaMLSchemaError (schema/catalog structure issues)
     │   ├── DerivaMLAuthenticationError (authentication failures)
-    │   └── DerivaMLOfflineError (online-only operation in offline mode)
+    │   ├── DerivaMLOfflineError (online-only operation in offline mode)
+    │   └── DerivaMLNoExecutionContext (write attempted on read-only handle)
     │
     ├── DerivaMLDataError (data access and validation)
     │   ├── DerivaMLNotFoundError (entity not found)
@@ -19,7 +20,8 @@ Exception Hierarchy:
     │   │   └── DerivaMLInvalidTerm (vocabulary term not found)
     │   ├── DerivaMLTableTypeError (wrong table type)
     │   ├── DerivaMLValidationError (data validation failures)
-    │   └── DerivaMLCycleError (cycle detected in relationships)
+    │   ├── DerivaMLCycleError (cycle detected in relationships)
+    │   └── DerivaMLStateInconsistency (SQLite/catalog state disagreement)
     │
     ├── DerivaMLExecutionError (execution lifecycle)
     │   ├── DerivaMLWorkflowError (workflow issues)
@@ -129,6 +131,28 @@ class DerivaMLOfflineError(DerivaMLConfigurationError):
             Traceback (most recent call last):
                 ...
             DerivaMLOfflineError: create_execution requires online mode
+    """
+
+    pass
+
+
+class DerivaMLNoExecutionContext(DerivaMLConfigurationError):
+    """Exception raised when an execution-scoped operation is attempted without an execution context.
+
+    Handles returned by ``ml.table(name)`` are read-only — useful for schema
+    introspection — but their ``.insert(...)`` and asset-file methods raise
+    this exception. Use ``exe.table(name)`` to get a handle bound to an
+    execution that permits writes.
+
+    Example:
+        Calling a write method on a read-only handle raises this error::
+
+            >>> handle = ml.table("Subject")
+            >>> handle.record_class()              # OK
+            >>> handle.insert({"Name": "x"})       # raises
+            Traceback (most recent call last):
+                ...
+            DerivaMLNoExecutionContext: ml.table() handles are read-only; use exe.table() for writes
     """
 
     pass
@@ -277,6 +301,26 @@ class DerivaMLCycleError(DerivaMLDataError):
     def __init__(self, cycle_nodes: list[str], msg: str = "Cycle detected") -> None:
         super().__init__(f"{msg}: {cycle_nodes}")
         self.cycle_nodes = cycle_nodes
+
+
+class DerivaMLStateInconsistency(DerivaMLDataError):
+    """Exception raised when workspace SQLite state and catalog state disagree in an unresolvable way.
+
+    The six disagreement cases enumerated in spec §2.2 are handled automatically
+    by the reconciliation logic (see ``state_machine.reconcile_with_catalog``);
+    anything outside those rules surfaces as this exception with enough
+    information for a human to intervene.
+
+    Example:
+        A catalog-side delete of an in-flight execution produces this error::
+
+            >>> exe = ml.resume_execution("EXE-A")
+            Traceback (most recent call last):
+                ...
+            DerivaMLStateInconsistency: Execution EXE-A: SQLite status 'running' but catalog returned no Execution row
+    """
+
+    pass
 
 
 # =============================================================================
