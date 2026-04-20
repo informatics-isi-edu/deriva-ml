@@ -213,7 +213,9 @@ class Execution:
         self._logger = ml_object._logger
         self.start_time = None
         self.stop_time = None
-        self._status = Status.created
+        # NOTE(E1): self._status intentionally removed — execution status
+        # now lives in SQLite (see `status` property below). Every read
+        # hits the workspace registry; no in-memory copy is kept.
         self.uploaded_assets: dict[str, list[AssetFilePath]] | None = None
         self.configuration.argv = sys.argv
         self._execution_record: ExecutionRecord | None = None  # Lazily created after RID is assigned
@@ -391,7 +393,8 @@ class Execution:
         instance._cache_dir = ml_object.cache_dir
         instance.start_time = None
         instance.stop_time = None
-        instance._status = Status.created
+        # NOTE(E1): self._status intentionally not set — status lives in
+        # SQLite and is read through the `status` property.
         instance.uploaded_assets = None
         instance._execution_record = None
         instance.workflow_rid = None
@@ -572,26 +575,36 @@ class Execution:
         self.update_status(Status.pending, "Initialize status finished.")
 
     @property
-    def status(self) -> Status:
-        """Get the current execution status.
+    def status(self) -> "ExecutionStatus":
+        """Current execution status, read from SQLite on every access.
+
+        No caching — a mutation from another process (e.g., ``deriva-ml
+        upload`` running in a shell) is visible on the next read.
 
         Returns:
-            Status: The current status (Created, Running, Completed, Failed, etc.).
-        """
-        if self._execution_record is not None:
-            return self._execution_record.status
-        return self._status
+            The ExecutionStatus value from the workspace registry.
 
-    @status.setter
-    def status(self, value: Status) -> None:
-        """Set the execution status.
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd or never created).
 
-        Args:
-            value: The new status value.
+        Example:
+            >>> exe = ml.resume_execution("5-ABC")
+            >>> exe.status
+            <ExecutionStatus.stopped>
         """
-        self._status = value
-        if self._execution_record is not None:
-            self._execution_record._status = value
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+        from deriva_ml.execution.state_store import ExecutionStatus
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        return ExecutionStatus(row["status"])
 
     @property
     def execution_record(self) -> ExecutionRecord | None:
@@ -755,7 +768,8 @@ class Execution:
         Example:
             >>> execution.update_status(Status.running, "Processing sample 1 of 10")
         """
-        self._status = status
+        # TODO(E2): replace in-memory mutation with state_machine.transition()
+        # self._status = status   # removed; status lives in SQLite now (see status property).
         self._logger.info(msg)
 
         if self._dry_run:
