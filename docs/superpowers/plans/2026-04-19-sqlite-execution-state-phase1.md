@@ -29,7 +29,7 @@ The plan is structured into eight task groups. Within each group, tasks are bite
 
 | Group | Scope | Est. size |
 |---|---|---|
-| **A** | `ConnectionMode` enum + DerivaML mode parameter | 4 tasks |
+| **A** | `ConnectionMode` enum + DerivaML mode parameter + `core/enums.py` modernization | 5 tasks |
 | **B** | SQLite schema: `executions`, `pending_rows`, `directory_rules` tables | 5 tasks |
 | **C** | Execution state machine module + `sync_pending` reconciliation | 7 tasks |
 | **D** | Execution registry public API (`list_executions`, `resume_execution`, `gc_executions`, `find_incomplete_executions`) | 6 tasks |
@@ -38,7 +38,7 @@ The plan is structured into eight task groups. Within each group, tasks are bite
 | **G** | Upload engine + `PendingSummary` + `UploadJob` + `ml.upload_pending` / `ml.start_upload` | 8 tasks |
 | **H** | `deriva-ml upload` CLI + integration tests + CHANGELOG | 5 tasks |
 
-**Total ≈ 47 tasks. Estimated 3–4 weeks of focused work.**
+**Total ≈ 48 tasks. Estimated 3–4 weeks of focused work.**
 
 Provisional sections (§2.10 full table-handle surface, §2.11.2 step 6 feature-aware drain) get minimal Phase 1 implementation — just enough to let Groups F/G work. Full finalization is Phase 2, after the feature-consistency spec.
 
@@ -465,7 +465,184 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
-*(End of Task Group A — `ConnectionMode` enum + mode parameter + new exceptions.)*
+### Task A5: Modernize `core/enums.py` — `BaseStrEnum` → `StrEnum`
+
+Context: code-quality review of A1 surfaced that `core/enums.py` uses
+the pre-Python-3.11 `BaseStrEnum = (str, Enum)` pattern. Python 3.12+
+is already required (`pyproject.toml`). `StrEnum` is the modern idiom
+and the one Group B's new enums (`ExecutionStatus`, `PendingRowStatus`,
+`DirectoryRuleStatus`) should use. Fixing the old file now keeps the
+codebase consistent and lets B3 land into a uniform convention
+instead of adding a third enum style.
+
+Mechanical refactor — no behavior change except `str()` now returns the
+value string for members of classes that were previously plain `Enum`
+(e.g., `UploadState`). That matches or strengthens the existing
+docstring contracts; any test that relied on `str(UploadState.X)`
+returning `"UploadState.X"` would need updating.
+
+**Files:**
+- Modify: `src/deriva_ml/core/enums.py`
+- Test: `tests/core/test_enums_modernize.py` (new; guards str-value behavior)
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/core/test_enums_modernize.py`:
+
+```python
+"""Guards for the core/enums.py modernization to StrEnum.
+
+After this refactor, every string-valued enum class in core/enums.py
+uses enum.StrEnum as its base. str(MemberX) returns its value string
+(not 'ClassName.MemberX'). Membership semantics and value lookup
+behavior are unchanged.
+"""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+def test_base_str_enum_is_gone():
+    """The legacy BaseStrEnum helper is removed — StrEnum is used directly."""
+    from deriva_ml.core import enums
+    assert not hasattr(enums, "BaseStrEnum"), (
+        "BaseStrEnum should be removed in A5; use enum.StrEnum directly."
+    )
+
+
+def test_status_is_str_enum():
+    from deriva_ml.core.enums import Status
+    assert issubclass(Status, StrEnum)
+
+
+def test_mlvocab_is_str_enum():
+    from deriva_ml.core.enums import MLVocab
+    assert issubclass(MLVocab, StrEnum)
+
+
+def test_mlasset_is_str_enum():
+    from deriva_ml.core.enums import MLAsset
+    assert issubclass(MLAsset, StrEnum)
+
+
+def test_mltable_is_str_enum():
+    from deriva_ml.core.enums import MLTable
+    assert issubclass(MLTable, StrEnum)
+
+
+def test_execmetadatatype_is_str_enum():
+    from deriva_ml.core.enums import ExecMetadataType
+    assert issubclass(ExecMetadataType, StrEnum)
+
+
+def test_execassettype_is_str_enum():
+    from deriva_ml.core.enums import ExecAssetType
+    assert issubclass(ExecAssetType, StrEnum)
+
+
+def test_uploadstate_is_str_enum():
+    """UploadState was plain Enum pre-A5 — now StrEnum for consistency."""
+    from deriva_ml.core.enums import UploadState
+    assert issubclass(UploadState, StrEnum)
+
+
+def test_str_returns_value_not_dotted_name():
+    """StrEnum.__str__ returns the value, not 'ClassName.MEMBER'."""
+    from deriva_ml.core.enums import Status, MLVocab
+    # Sample a few members; pick any concrete value in the class.
+    s = next(iter(Status))
+    v = next(iter(MLVocab))
+    assert str(s) == s.value
+    assert str(v) == v.value
+
+
+def test_value_lookup_still_works():
+    """Member-by-value lookup (e.g., `Status("Completed")`) is unchanged."""
+    from deriva_ml.core.enums import Status
+    # Pick any member by its value and confirm round-trip.
+    s = next(iter(Status))
+    assert Status(s.value) is s
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_enums_modernize.py -v
+```
+
+Expected: FAILs on the `StrEnum` checks (classes currently subclass `BaseStrEnum` or plain `Enum`).
+
+- [ ] **Step 3: Convert `core/enums.py`**
+
+Edit `src/deriva_ml/core/enums.py`:
+
+1. Change the import line from `from enum import Enum` to `from enum import StrEnum`.
+
+2. Delete the `BaseStrEnum` class definition (and its docstring).
+
+3. Update the module-level `Classes:` docstring to remove the `BaseStrEnum` entry.
+
+4. For every class that currently says `class X(BaseStrEnum):`, change to `class X(StrEnum):`. Affected classes: `Status`, `MLVocab`, `MLAsset`, `MLTable`, `ExecMetadataType`, `ExecAssetType`.
+
+5. For `class UploadState(Enum):` — change to `class UploadState(StrEnum):`. Verify its members already have string values; if any use non-string values (e.g., `auto()`), keep them as-is but use plain `Enum` for that one class and update the test to match. Inspect first:
+
+```bash
+sed -n '/^class UploadState/,/^class /p' src/deriva_ml/core/enums.py | head -30
+```
+
+If all values are strings, convert to `StrEnum`. If not, leave UploadState as `Enum` and delete the `test_uploadstate_is_str_enum` test.
+
+- [ ] **Step 4: Delete any now-stale `str(member)` assertions elsewhere**
+
+Some existing tests may assert `str(MyEnum.X) == "MyEnum.X"`. Those would break under `StrEnum`. Search and fix:
+
+```bash
+grep -rn "str(.*\.[A-Z_][A-Z_]*)\s*==\s*['\"][A-Za-z]*\." tests/ src/ 2>/dev/null || true
+```
+
+Inspect each hit; update the assertion to expect the value string instead of the dotted name. If no hits found, skip.
+
+- [ ] **Step 5: Run the new guard tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_enums_modernize.py -v
+```
+
+Expected: all pass.
+
+- [ ] **Step 6: Run the broader unit-test suite for regressions**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/ tests/model/ tests/asset/ tests/local_db/ -q --timeout=300
+```
+
+Expected: all pass. Fix any regressions in situ (a regression means a
+test was relying on the legacy `str(Enum.X) == 'EnumClass.X'` form).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/deriva_ml/core/enums.py tests/core/test_enums_modernize.py
+git commit -m "refactor(core): modernize enums.py to StrEnum (Python 3.12+)
+
+Replace BaseStrEnum = (str, Enum) with enum.StrEnum for every string-
+valued enum in core/enums.py. StrEnum's __str__ returns the value
+(not 'ClassName.MEMBER'), so str() contract becomes consistent with
+ConnectionMode (A1). UploadState promoted from plain Enum to StrEnum
+for cross-codebase uniformity.
+
+Rationale: code-quality reviewer on Task A1 flagged the two
+conventions. Python 3.12+ is required (pyproject.toml), so BaseStrEnum
+is legacy. Consolidating now keeps B3's new enums consistent with
+the rest of the codebase.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+*(End of Task Group A — `ConnectionMode` enum + mode parameter + new exceptions + enums modernization.)*
 
 ---
 
@@ -943,6 +1120,15 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/deriva_ml/execution/state_store.py`
 - Test: `tests/execution/test_state_store.py` (extend)
+
+**Location rationale:** These three enums are tightly coupled to the
+SQLite table definitions in `state_store.py` — their values are the
+actual string literals stored in the `status` columns and referenced
+by index lookups. They are not domain-level vocabularies like
+`Status` / `MLVocab` in `core/enums.py` (which encode catalog-side
+terminology). Co-location with the table definitions wins over
+central placement. Subclass `StrEnum` directly (same idiom as the
+modernized `core/enums.py` after Task A5).
 
 - [ ] **Step 1: Write the failing test**
 
