@@ -1743,4 +1743,1397 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task Group C — Execution state machine
+
+Implements the state-transition module (`state_machine.py`) that owns
+execution lifecycle status. Every transition is an atomic SQLite
+write; in online mode, the catalog `Execution` row is synced in the
+same path with soft-fail handling (sets `sync_pending=True` on
+catalog-PUT failure). Just-in-time reconciliation runs on
+`resume_execution` (called in Group D).
+
+### Task C1: Allowed-transition table + validator
+
+**Files:**
+- Create: `src/deriva_ml/execution/state_machine.py`
+- Test: `tests/execution/test_state_machine.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_state_machine.py`:
+
+```python
+"""Tests for the execution state machine."""
+
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.execution.state_machine import (
+    ALLOWED_TRANSITIONS,
+    InvalidTransitionError,
+    validate_transition,
+)
+from deriva_ml.execution.state_store import ExecutionStatus
+
+
+def test_allowed_transitions_cover_all_happy_paths():
+    # created → running → stopped → pending_upload → uploaded
+    assert (ExecutionStatus.created, ExecutionStatus.running) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.running, ExecutionStatus.stopped) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.stopped, ExecutionStatus.pending_upload) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.pending_upload, ExecutionStatus.uploaded) in ALLOWED_TRANSITIONS
+
+
+def test_allowed_transitions_cover_failure_paths():
+    assert (ExecutionStatus.running, ExecutionStatus.failed) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.pending_upload, ExecutionStatus.failed) in ALLOWED_TRANSITIONS
+
+
+def test_allowed_transitions_cover_abort():
+    # Abort legal from created, running, stopped, failed
+    for start in [ExecutionStatus.created, ExecutionStatus.running,
+                  ExecutionStatus.stopped, ExecutionStatus.failed]:
+        assert (start, ExecutionStatus.aborted) in ALLOWED_TRANSITIONS
+
+
+def test_retry_from_failed_back_to_pending_upload():
+    # retry_failed → pending_upload is legal (upload retry path)
+    assert (ExecutionStatus.failed, ExecutionStatus.pending_upload) in ALLOWED_TRANSITIONS
+
+
+def test_validate_transition_accepts_allowed():
+    validate_transition(
+        current=ExecutionStatus.running,
+        target=ExecutionStatus.stopped,
+    )  # must not raise
+
+
+def test_validate_transition_rejects_disallowed():
+    with pytest.raises(InvalidTransitionError) as exc:
+        validate_transition(
+            current=ExecutionStatus.uploaded,
+            target=ExecutionStatus.running,  # can't go back to running
+        )
+    msg = str(exc.value)
+    assert "uploaded" in msg
+    assert "running" in msg
+
+
+def test_invalid_transition_error_is_deriva_ml_exception():
+    from deriva_ml.core.exceptions import DerivaMLException
+    assert issubclass(InvalidTransitionError, DerivaMLException)
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement the state machine primitives**
+
+Create `src/deriva_ml/execution/state_machine.py`:
+
+```python
+"""Execution-lifecycle state machine.
+
+Per spec §2.2. All transitions go through this module; direct updates
+to executions.status from elsewhere are a bug. The module:
+
+- Defines the allowed (from, to) pairs as a set-based table.
+- Validates transitions at call time.
+- Owns the SQLite-write + catalog-sync path (with sync_pending
+  soft-fail on catalog failure).
+- Provides the disagreement-resolution logic used by just-in-time
+  reconciliation in resume_execution.
+
+Why a module and not a class: the state machine is functional —
+transitions take (store, catalog, rid, target, metadata). The
+ExecutionStateStore and ErmrestCatalog live elsewhere; this module
+wires them together without owning lifecycle of either.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
+from deriva_ml.core.exceptions import (
+    DerivaMLDataError,
+    DerivaMLException,
+    DerivaMLStateInconsistency,
+)
+from deriva_ml.execution.state_store import ExecutionStatus
+
+if TYPE_CHECKING:
+    from deriva.core import ErmrestCatalog
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import ExecutionStateStore
+
+logger = logging.getLogger(__name__)
+
+
+class InvalidTransitionError(DerivaMLException):
+    """Raised when a requested status transition is not in the
+    allowed table.
+
+    This is a programming error, not a runtime-data error — allowed
+    transitions are a compile-time decision and something outside the
+    state machine tried to bypass the rules.
+    """
+
+
+# Allowed transitions. Kept explicit (not derived) so the table is
+# the single source of truth and easy to read.
+#
+# The state diagram (spec §2.2):
+#
+#     created → running → {stopped, failed} → pending_upload → {uploaded, failed}
+#                                                      ↑             │
+#                                                      └──── retry ──┘
+#     created / running / stopped / failed → aborted (terminal)
+#     failed → pending_upload (retry_failed path)
+
+ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozenset({
+    # Happy path
+    (ExecutionStatus.created, ExecutionStatus.running),
+    (ExecutionStatus.running, ExecutionStatus.stopped),
+    (ExecutionStatus.stopped, ExecutionStatus.pending_upload),
+    (ExecutionStatus.pending_upload, ExecutionStatus.uploaded),
+
+    # Failure paths
+    (ExecutionStatus.running, ExecutionStatus.failed),
+    (ExecutionStatus.pending_upload, ExecutionStatus.failed),
+
+    # Retry from upload failure back into upload
+    (ExecutionStatus.failed, ExecutionStatus.pending_upload),
+
+    # Abort is legal from any pre-terminal state. 'uploaded' is
+    # terminal — we don't allow abort after successful upload.
+    (ExecutionStatus.created, ExecutionStatus.aborted),
+    (ExecutionStatus.running, ExecutionStatus.aborted),
+    (ExecutionStatus.stopped, ExecutionStatus.aborted),
+    (ExecutionStatus.failed, ExecutionStatus.aborted),
+})
+
+
+def validate_transition(
+    *,
+    current: ExecutionStatus,
+    target: ExecutionStatus,
+) -> None:
+    """Verify that (current → target) is in the allowed table.
+
+    Args:
+        current: The execution's current status (as read from SQLite).
+        target: The requested new status.
+
+    Raises:
+        InvalidTransitionError: If the pair is not in
+            ALLOWED_TRANSITIONS. Message includes both states.
+
+    Example:
+        >>> validate_transition(
+        ...     current=ExecutionStatus.running,
+        ...     target=ExecutionStatus.stopped,
+        ... )  # returns None, no raise
+    """
+    if (current, target) not in ALLOWED_TRANSITIONS:
+        raise InvalidTransitionError(
+            f"Illegal execution transition {current} → {target}. "
+            f"See spec §2.2 for the allowed transition graph."
+        )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: 7 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_machine.py tests/execution/test_state_machine.py
+git commit -m "feat(state_machine): allowed-transition table + validator
+
+Per spec §2.2. Explicit (from, to) pairs, not derived. InvalidTransitionError
+raised when outside code tries to bypass the rules.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task C2: `transition()` — SQLite-only path (catalog sync deferred to C3)
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_machine.py`
+- Test: `tests/execution/test_state_machine.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_state_machine.py`:
+
+```python
+def test_transition_writes_sqlite(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    # Offline mode: no catalog argument, no sync attempt.
+    transition(
+        store=store,
+        catalog=None,                # offline → skip catalog sync
+        execution_rid="EXE-A",
+        current=ExecutionStatus.created,
+        target=ExecutionStatus.running,
+        mode=ConnectionMode.offline,
+        extra_fields={"start_time": now},
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row["status"] == "running"
+    assert row["start_time"] is not None
+    # Offline transitions always set sync_pending=True.
+    assert row["sync_pending"] is True
+
+
+def test_transition_rejects_invalid(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import (
+        InvalidTransitionError, transition,
+    )
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.uploaded,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    with pytest.raises(InvalidTransitionError):
+        transition(
+            store=store, catalog=None, execution_rid="EXE-A",
+            current=ExecutionStatus.uploaded,
+            target=ExecutionStatus.running,
+            mode=ConnectionMode.offline,
+        )
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v -k transition
+```
+
+Expected: FAIL with `ImportError: cannot import name 'transition'`.
+
+- [ ] **Step 3: Add `transition()` (offline-only for now)**
+
+Append to `src/deriva_ml/execution/state_machine.py`:
+
+```python
+def transition(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog | None",
+    execution_rid: str,
+    current: ExecutionStatus,
+    target: ExecutionStatus,
+    mode: "ConnectionMode",
+    extra_fields: dict | None = None,
+) -> None:
+    """Transition an execution's status, writing SQLite and syncing
+    the catalog when online.
+
+    This is the single entry point for all lifecycle status changes.
+    Direct writes to executions.status bypass validation and catalog
+    sync; don't do it.
+
+    Args:
+        store: The ExecutionStateStore owning the SQLite row.
+        catalog: The ErmrestCatalog for syncing. Pass None in offline
+            mode (attempting to pass a non-None catalog in offline
+            mode is a programming error and raises).
+        execution_rid: Which execution to transition.
+        current: The status we believe the execution is in. The state
+            machine does NOT re-read SQLite to determine `current`;
+            the caller passed it, typically from a just-prior read.
+            This lets the caller do its own consistency check if
+            needed.
+        target: The status to transition to.
+        mode: ConnectionMode. Online → also PUT catalog row; offline
+            → only update SQLite, set sync_pending=True.
+        extra_fields: Additional executions columns to update in the
+            same transaction (start_time, stop_time, error, etc.).
+
+    Raises:
+        InvalidTransitionError: If (current, target) is not in
+            ALLOWED_TRANSITIONS.
+        ValueError: If mode=offline but catalog is not None, or
+            mode=online but catalog is None. These are caller bugs.
+
+    Example:
+        >>> transition(
+        ...     store=store, catalog=ml.catalog,
+        ...     execution_rid="EXE-A",
+        ...     current=ExecutionStatus.running,
+        ...     target=ExecutionStatus.stopped,
+        ...     mode=ConnectionMode.online,
+        ...     extra_fields={"stop_time": datetime.now(timezone.utc)},
+        ... )
+    """
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    validate_transition(current=current, target=target)
+
+    # Consistency: offline must pass catalog=None, online must pass
+    # a real catalog. Mismatches indicate a caller bug.
+    if mode is ConnectionMode.offline and catalog is not None:
+        raise ValueError("offline mode must pass catalog=None")
+    if mode is ConnectionMode.online and catalog is None:
+        raise ValueError("online mode requires a catalog")
+
+    now = datetime.now(timezone.utc)
+    extra_fields = dict(extra_fields or {})
+    extra_fields.setdefault("last_activity", now)
+
+    if mode is ConnectionMode.offline:
+        # Offline: only SQLite. Set sync_pending so that the next
+        # online opportunity will push this status to the catalog.
+        store.update_execution(
+            execution_rid,
+            status=target,
+            sync_pending=True,
+            **extra_fields,
+        )
+        logger.debug(
+            "offline transition %s: %s → %s (sync_pending)",
+            execution_rid, current, target,
+        )
+        return
+
+    # Online path deferred to Task C3.
+    raise NotImplementedError("online transition lands in Task C3")
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: 9 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_machine.py tests/execution/test_state_machine.py
+git commit -m "feat(state_machine): transition() with offline-only path
+
+Validates the transition via ALLOWED_TRANSITIONS, writes SQLite with
+sync_pending=True. Online path is a NotImplementedError placeholder
+that Task C3 fills in. Consistency checks reject mode/catalog
+mismatches as caller bugs.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task C3: Online-mode catalog sync in `transition()` (soft-fail on PUT)
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_machine.py`
+- Test: `tests/execution/test_state_machine.py` (extend)
+
+- [ ] **Step 1: Write the failing test (mocked catalog)**
+
+Append to `tests/execution/test_state_machine.py`:
+
+```python
+class _MockCatalog:
+    """Minimal mock for ErmrestCatalog exposing just what transition() uses."""
+    def __init__(self, *, put_should_fail: bool = False):
+        self.put_should_fail = put_should_fail
+        self.put_calls: list[dict] = []
+
+    def put(self, path: str, json: object = None, **_kw):
+        if self.put_should_fail:
+            raise RuntimeError("simulated network failure")
+        self.put_calls.append({"path": path, "json": json})
+        return None
+
+
+def test_online_transition_syncs_catalog(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    cat = _MockCatalog()
+    transition(
+        store=store, catalog=cat, execution_rid="EXE-A",
+        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        mode=ConnectionMode.online, extra_fields={"start_time": now},
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row["status"] == "running"
+    # Online: sync succeeded, no pending flag.
+    assert row["sync_pending"] is False
+    # Catalog was put-updated.
+    assert len(cat.put_calls) == 1
+    body = cat.put_calls[0]["json"]
+    assert isinstance(body, list) and len(body) == 1
+    assert body[0]["RID"] == "EXE-A"
+    assert body[0]["Status"] == "running"
+
+
+def test_online_transition_soft_fails_on_catalog_error(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    cat = _MockCatalog(put_should_fail=True)
+    # SQLite transition must still succeed; the catalog failure is
+    # soft — user gets sync_pending=True for the next pass to flush.
+    transition(
+        store=store, catalog=cat, execution_rid="EXE-A",
+        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        mode=ConnectionMode.online,
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row["status"] == "running"
+    assert row["sync_pending"] is True
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v -k online
+```
+
+Expected: FAIL with `NotImplementedError` from the placeholder.
+
+- [ ] **Step 3: Implement the online path**
+
+In `src/deriva_ml/execution/state_machine.py`, replace the
+`NotImplementedError` line in `transition()` with the online-sync
+block:
+
+```python
+    # Online: SQLite first, then catalog PUT. If PUT fails, leave
+    # sync_pending=True so a later call (or resume_execution)
+    # flushes. We never let catalog failure roll back SQLite — the
+    # local view is the source of truth; the catalog catches up.
+    #
+    # Ordering note: we commit SQLite BEFORE the catalog PUT. If we
+    # crashed between the commit and the PUT, sync_pending would stay
+    # True (we set it preemptively) and the next online operation
+    # would push. The reverse ordering (catalog first) creates an
+    # unrecoverable window where the catalog has moved but SQLite
+    # hasn't — a later crash would lose the catalog transition.
+    store.update_execution(
+        execution_rid,
+        status=target,
+        sync_pending=True,  # preemptively True; cleared after successful PUT
+        **extra_fields,
+    )
+
+    # Compose the catalog PUT body from the SQLite row we just wrote.
+    # Only the columns the catalog Execution row knows about go here —
+    # Status and lifecycle timestamps — not SQLite-only fields like
+    # sync_pending or config_json.
+    body = _catalog_body_for_execution(
+        store=store,
+        execution_rid=execution_rid,
+    )
+    try:
+        catalog.put(
+            f"/entity/deriva-ml:Execution",
+            json=body,
+        )
+    except Exception as exc:  # network blip, 5xx, etc.
+        logger.warning(
+            "execution %s: catalog sync FAILED (%s); SQLite committed, "
+            "sync_pending stays True for later flush",
+            execution_rid, exc,
+        )
+        return
+
+    # PUT succeeded — clear sync_pending.
+    store.update_execution(execution_rid, sync_pending=False)
+    logger.debug(
+        "online transition %s: %s → %s (synced)",
+        execution_rid, current, target,
+    )
+
+
+def _catalog_body_for_execution(
+    *,
+    store: "ExecutionStateStore",
+    execution_rid: str,
+) -> list[dict]:
+    """Build the ERMrest PUT body for an execution's catalog row.
+
+    Reads the current SQLite state and projects to the catalog's
+    column set. Kept as a helper so transition() stays focused on
+    orchestration and so tests can assert on body contents.
+    """
+    row = store.get_execution(execution_rid)
+    if row is None:
+        # Caller just updated SQLite; this would only happen on a
+        # concurrent delete. Surface clearly rather than putting a
+        # partial body to the catalog.
+        raise DerivaMLStateInconsistency(
+            f"executions row {execution_rid} vanished between write and PUT"
+        )
+    # Catalog Execution schema: RID (PK), Status, Start_Time, End_Time,
+    # Duration, ... — see src/deriva_ml/schema/create_schema.py for
+    # the canonical column list. We update only the columns we own
+    # here; the catalog is responsible for RCB/RMT etc.
+    return [{
+        "RID": row["rid"],
+        "Status": row["status"],
+        "Start_Time": row["start_time"],
+        "End_Time": row["stop_time"],
+        # Status_Detail: prefer error if present, else description.
+        "Status_Detail": row["error"] or row["description"],
+    }]
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: 11 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_machine.py tests/execution/test_state_machine.py
+git commit -m "feat(state_machine): online catalog sync with soft-fail
+
+SQLite commits first, then catalog PUT; on PUT failure sync_pending
+stays True for a later flush. _catalog_body_for_execution projects
+the SQLite row to catalog's Execution column set.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task C4: `flush_pending_sync()` — push queued offline transitions
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_machine.py`
+- Test: `tests/execution/test_state_machine.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_state_machine.py`:
+
+```python
+def test_flush_pending_sync_pushes_catalog(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import flush_pending_sync, transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    # Do an offline transition: SQLite has sync_pending=True.
+    transition(
+        store=store, catalog=None, execution_rid="EXE-A",
+        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        mode=ConnectionMode.offline,
+    )
+    assert store.get_execution("EXE-A")["sync_pending"] is True
+
+    # Now flush it against a live (mock) catalog.
+    cat = _MockCatalog()
+    flush_pending_sync(store=store, catalog=cat, execution_rid="EXE-A")
+
+    assert store.get_execution("EXE-A")["sync_pending"] is False
+    assert len(cat.put_calls) == 1
+
+
+def test_flush_pending_sync_noop_when_not_pending(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import flush_pending_sync
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+        sync_pending=False,
+    )
+
+    cat = _MockCatalog()
+    flush_pending_sync(store=store, catalog=cat, execution_rid="EXE-A")
+    assert len(cat.put_calls) == 0
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v -k flush
+```
+
+Expected: FAIL with `ImportError`.
+
+- [ ] **Step 3: Add `flush_pending_sync()`**
+
+Append to `src/deriva_ml/execution/state_machine.py`:
+
+```python
+def flush_pending_sync(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    execution_rid: str,
+) -> None:
+    """Push a single execution's SQLite state to the catalog.
+
+    Called when we've opened online and notice this execution has
+    sync_pending=True (accumulated from offline transitions, or from
+    a previous online transition whose PUT failed).
+
+    Idempotent: no-op if sync_pending is already False. If the PUT
+    fails, sync_pending stays True for the next attempt.
+
+    Args:
+        store: ExecutionStateStore holding the row.
+        catalog: Live ErmrestCatalog.
+        execution_rid: Which execution to flush.
+
+    Raises:
+        DerivaMLStateInconsistency: If the execution row has vanished.
+
+    Example:
+        >>> # After resuming an execution online that last ran offline:
+        >>> flush_pending_sync(store=store, catalog=ml.catalog,
+        ...                    execution_rid="EXE-A")
+    """
+    row = store.get_execution(execution_rid)
+    if row is None:
+        raise DerivaMLStateInconsistency(
+            f"flush_pending_sync: execution {execution_rid} not in SQLite"
+        )
+    if not row["sync_pending"]:
+        return
+
+    body = _catalog_body_for_execution(store=store, execution_rid=execution_rid)
+    try:
+        catalog.put(f"/entity/deriva-ml:Execution", json=body)
+    except Exception as exc:
+        logger.warning(
+            "flush_pending_sync %s: catalog PUT failed (%s); will retry later",
+            execution_rid, exc,
+        )
+        return
+
+    store.update_execution(execution_rid, sync_pending=False)
+    logger.debug("flush_pending_sync %s: synced", execution_rid)
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: 13 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_machine.py tests/execution/test_state_machine.py
+git commit -m "feat(state_machine): flush_pending_sync()
+
+Idempotent flush of a single execution's sync_pending=True row to the
+catalog. Called from resume_execution (Group D) when reopening online.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task C5: Disagreement-resolution rules (`reconcile_with_catalog`)
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_machine.py`
+- Test: `tests/execution/test_state_machine.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_state_machine.py`:
+
+```python
+class _MockCatalogWithGet(_MockCatalog):
+    """Extends the mock with a configurable GET response."""
+    def __init__(self, *, get_row: dict | None | str = None, **kw):
+        super().__init__(**kw)
+        # get_row: dict = returned row, None = 404/no row, "raise" = raise
+        self._get_row = get_row
+
+    def get(self, path: str, **_kw):
+        if self._get_row == "raise":
+            raise RuntimeError("simulated 500")
+        class _R:
+            def __init__(self, row):
+                self._row = row
+            def json(self):
+                return [self._row] if self._row is not None else []
+            status_code = 200
+        return _R(self._get_row)
+
+
+def test_reconcile_no_disagreement(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "stopped"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    # Unchanged.
+    assert store.get_execution("EXE-A")["status"] == "stopped"
+
+
+def test_reconcile_catalog_says_aborted(tmp_path):
+    """SQLite=running, catalog=aborted → SQLite flips to aborted."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "aborted"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    assert store.get_execution("EXE-A")["status"] == "aborted"
+
+
+def test_reconcile_catalog_says_uploaded(tmp_path):
+    """SQLite=pending_upload, catalog=uploaded → SQLite flips to uploaded."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.pending_upload,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "uploaded"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    assert store.get_execution("EXE-A")["status"] == "uploaded"
+
+
+def test_reconcile_sqlite_stopped_catalog_running(tmp_path):
+    """SQLite=stopped, catalog=running (stale) → push SQLite to catalog."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "running"})
+    reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    # SQLite unchanged; sync_pending set so next flush pushes.
+    assert store.get_execution("EXE-A")["status"] == "stopped"
+    assert store.get_execution("EXE-A")["sync_pending"] is True
+
+
+def test_reconcile_catalog_missing_raises(tmp_path):
+    """SQLite has the row; catalog doesn't → orphan, raise."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    cat = _MockCatalogWithGet(get_row=None)
+    with pytest.raises(DerivaMLStateInconsistency):
+        reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+
+
+def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
+    """Transient catalog error → reconcile skips cleanly (caller decides)."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_machine import reconcile_with_catalog
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.stopped,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now, sync_pending=False,
+    )
+
+    cat = _MockCatalogWithGet(get_row="raise")
+    import logging
+    with caplog.at_level(logging.WARNING):
+        reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
+    # SQLite unchanged.
+    assert store.get_execution("EXE-A")["status"] == "stopped"
+    assert any("reconcile" in r.message.lower() for r in caplog.records)
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v -k reconcile
+```
+
+Expected: FAIL with `ImportError`.
+
+- [ ] **Step 3: Implement `reconcile_with_catalog()`**
+
+Append to `src/deriva_ml/execution/state_machine.py`:
+
+```python
+# Disagreement resolution table (spec §2.2 — six cases).
+#
+# Rows are keyed by (sqlite_status, catalog_status) tuples. Value is
+# a literal action name:
+#   'noop'         — states agree, do nothing
+#   'adopt'        — SQLite adopts the catalog's status
+#   'push'         — SQLite state is newer; set sync_pending=True
+#   'raise'        — unexpected; surface to the user for intervention
+#
+# Sync-pending handling is layered on top: if sqlite.sync_pending was
+# True we generally 'push' regardless of catalog state.
+
+_DISAGREEMENT_RULES: dict[tuple[ExecutionStatus, ExecutionStatus], str] = {
+    # Externally aborted while we thought we were running.
+    (ExecutionStatus.running, ExecutionStatus.aborted): "adopt",
+    # Another process completed the upload.
+    (ExecutionStatus.pending_upload, ExecutionStatus.uploaded): "adopt",
+    # External failure signal.
+    (ExecutionStatus.running, ExecutionStatus.failed): "adopt",
+    # We stopped cleanly; catalog still says running (our earlier PUT
+    # never landed).
+    (ExecutionStatus.stopped, ExecutionStatus.running): "push",
+    # Same story at other cleanly-terminal SQLite states.
+    (ExecutionStatus.failed, ExecutionStatus.running): "push",
+    (ExecutionStatus.uploaded, ExecutionStatus.pending_upload): "push",
+    (ExecutionStatus.uploaded, ExecutionStatus.running): "push",
+    (ExecutionStatus.aborted, ExecutionStatus.running): "push",
+}
+
+
+def reconcile_with_catalog(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    execution_rid: str,
+) -> None:
+    """Compare a single execution's SQLite state with the catalog and
+    apply the disagreement rules (spec §2.2).
+
+    Called on resume_execution when online, before returning the
+    Execution to the user. Keeps startup fast by acting per-execution
+    rather than workspace-wide.
+
+    Args:
+        store: The ExecutionStateStore.
+        catalog: Live ErmrestCatalog.
+        execution_rid: Which execution to reconcile.
+
+    Raises:
+        DerivaMLStateInconsistency: Catalog row missing (orphan), or
+            disagreement is outside the known rule table.
+
+    Example:
+        >>> # On resume_execution in online mode:
+        >>> reconcile_with_catalog(
+        ...     store=ws.execution_state_store(),
+        ...     catalog=ml.catalog,
+        ...     execution_rid="EXE-A",
+        ... )
+    """
+    sqlite_row = store.get_execution(execution_rid)
+    if sqlite_row is None:
+        raise DerivaMLStateInconsistency(
+            f"reconcile: execution {execution_rid} not in SQLite"
+        )
+    sqlite_status = ExecutionStatus(sqlite_row["status"])
+
+    try:
+        # URL filter on RID — returns a list of 0 or 1 rows.
+        response = catalog.get(
+            f"/entity/deriva-ml:Execution/RID={execution_rid}"
+        )
+        rows = response.json()
+    except Exception as exc:
+        logger.warning(
+            "reconcile %s: catalog GET failed (%s); leaving SQLite as-is",
+            execution_rid, exc,
+        )
+        return
+
+    if not rows:
+        # Orphan: SQLite has the row, catalog doesn't. This is
+        # usually a clone/copy gone wrong or a catalog-side delete.
+        # Don't guess; ask the user to resolve.
+        raise DerivaMLStateInconsistency(
+            f"Execution {execution_rid} exists in SQLite (status={sqlite_status}) "
+            f"but has no row in the catalog. Either the catalog was "
+            f"re-initialized, or the workspace was copied from elsewhere. "
+            f"To adopt SQLite state, manually insert the catalog row; "
+            f"to discard, call ml.gc_executions(status='aborted')."
+        )
+
+    catalog_row = rows[0]
+    # Catalog Status is a vocab term; its string value matches our enum.
+    try:
+        catalog_status = ExecutionStatus(catalog_row.get("Status", ""))
+    except ValueError:
+        # Catalog has a Status we don't recognize. Surface rather than guess.
+        raise DerivaMLStateInconsistency(
+            f"Execution {execution_rid}: catalog Status="
+            f"{catalog_row.get('Status')!r} is not a recognized "
+            f"ExecutionStatus value"
+        )
+
+    # Happy path: they agree.
+    if sqlite_status == catalog_status:
+        return
+
+    # SQLite was waiting to push — this disagreement is expected.
+    if sqlite_row["sync_pending"]:
+        # We'll flush later; don't treat the catalog as authoritative.
+        logger.debug(
+            "reconcile %s: disagreement (SQLite=%s, catalog=%s) is "
+            "expected because sync_pending=True; leaving for flush",
+            execution_rid, sqlite_status, catalog_status,
+        )
+        return
+
+    rule = _DISAGREEMENT_RULES.get((sqlite_status, catalog_status))
+    if rule == "adopt":
+        # Catalog is authoritative. Include any error/timing from the
+        # catalog row so the user's Execution.error reflects reality.
+        store.update_execution(
+            execution_rid,
+            status=catalog_status,
+            error=catalog_row.get("Status_Detail"),
+            sync_pending=False,
+        )
+        logger.info(
+            "reconcile %s: adopted catalog state %s (was %s in SQLite)",
+            execution_rid, catalog_status, sqlite_status,
+        )
+    elif rule == "push":
+        # SQLite is newer; mark for flush. The resume flow will
+        # invoke flush_pending_sync after reconcile.
+        store.update_execution(execution_rid, sync_pending=True)
+        logger.info(
+            "reconcile %s: SQLite ahead (SQLite=%s, catalog=%s); "
+            "marked sync_pending for flush",
+            execution_rid, sqlite_status, catalog_status,
+        )
+    else:
+        raise DerivaMLStateInconsistency(
+            f"Execution {execution_rid}: unexpected state disagreement "
+            f"(SQLite={sqlite_status}, catalog={catalog_status}) not "
+            f"covered by reconciliation rules. Human intervention required."
+        )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: 19 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_machine.py tests/execution/test_state_machine.py
+git commit -m "feat(state_machine): reconcile_with_catalog disagreement rules
+
+Six-case table per spec §2.2: adopt, push, raise. Respects
+sync_pending as a 'leave alone, flush later' hint. Transient catalog
+errors log and return (reconcile is best-effort, not a barrier).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task C6: `create_catalog_execution()` helper (online-only row insert)
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_machine.py`
+- Test: `tests/execution/test_state_machine.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_state_machine.py`:
+
+```python
+class _MockCatalogWithInsert(_MockCatalog):
+    """Mock that records POSTs to Execution and returns a fake RID."""
+    def __init__(self, *, assigned_rid: str = "EXE-NEW", **kw):
+        super().__init__(**kw)
+        self.assigned_rid = assigned_rid
+        self.post_calls: list[dict] = []
+
+    def post(self, path: str, json=None, **_kw):
+        self.post_calls.append({"path": path, "json": json})
+        class _R:
+            def __init__(self, rid): self._rid = rid
+            def json(self): return [{"RID": self._rid, **(json[0] if json else {})}]
+            status_code = 201
+        return _R(self.assigned_rid)
+
+
+def test_create_catalog_execution_posts_and_returns_rid():
+    from deriva_ml.execution.state_machine import create_catalog_execution
+
+    cat = _MockCatalogWithInsert(assigned_rid="EXE-NEW")
+    rid = create_catalog_execution(
+        catalog=cat,
+        workflow_rid="WFL-1",
+        description="a test run",
+    )
+    assert rid == "EXE-NEW"
+    assert len(cat.post_calls) == 1
+    body = cat.post_calls[0]["json"]
+    assert body[0]["Workflow"] == "WFL-1"
+    assert body[0]["Description"] == "a test run"
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v -k create_catalog_execution
+```
+
+Expected: FAIL with `ImportError`.
+
+- [ ] **Step 3: Implement `create_catalog_execution()`**
+
+Append to `src/deriva_ml/execution/state_machine.py`:
+
+```python
+def create_catalog_execution(
+    *,
+    catalog: "ErmrestCatalog",
+    workflow_rid: str | None,
+    description: str | None,
+) -> str:
+    """POST a new row to the catalog's Execution table and return
+    its server-assigned RID.
+
+    This is the one place in the state machine that actually creates a
+    new execution — all other transitions modify an existing row. It
+    is callable only in online mode (the caller enforces).
+
+    Args:
+        catalog: Live ErmrestCatalog.
+        workflow_rid: Workflow FK. May be None only if the catalog's
+            Execution.Workflow column is nullable (Deriva-ML's
+            schema requires it, but other catalogs may differ).
+        description: Human-readable description. Passes through to the
+            Execution.Description column.
+
+    Returns:
+        The RID assigned by the server.
+
+    Raises:
+        Exception: On HTTP failure (caller may want to retry).
+
+    Example:
+        >>> rid = create_catalog_execution(
+        ...     catalog=ml.catalog,
+        ...     workflow_rid="WFL-1",
+        ...     description="first training run",
+        ... )
+        >>> rid
+        'EXE-NEW'
+    """
+    body = [{
+        "Workflow": workflow_rid,
+        "Description": description,
+        "Status": str(ExecutionStatus.created),
+    }]
+    response = catalog.post(f"/entity/deriva-ml:Execution", json=body)
+    inserted = response.json()
+    if not inserted or "RID" not in inserted[0]:
+        raise DerivaMLDataError(
+            "catalog POST to Execution returned no RID; unable to continue"
+        )
+    return inserted[0]["RID"]
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: 20 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_machine.py tests/execution/test_state_machine.py
+git commit -m "feat(state_machine): create_catalog_execution() helper
+
+Online-only: POSTs to catalog Execution table, returns assigned RID.
+Sole entry point for new execution creation; all other transitions
+modify existing rows.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task C7: Module-level re-exports + `__all__`
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_machine.py`
+- Test: `tests/execution/test_state_machine.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_state_machine.py`:
+
+```python
+def test_public_api_exported():
+    import deriva_ml.execution.state_machine as sm
+    expected = {
+        "ALLOWED_TRANSITIONS",
+        "InvalidTransitionError",
+        "validate_transition",
+        "transition",
+        "flush_pending_sync",
+        "reconcile_with_catalog",
+        "create_catalog_execution",
+    }
+    assert expected.issubset(set(sm.__all__))
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v -k public_api
+```
+
+Expected: FAIL with `AttributeError: module has no attribute '__all__'`.
+
+- [ ] **Step 3: Add `__all__`**
+
+At the top of `src/deriva_ml/execution/state_machine.py` (after imports), add:
+
+```python
+__all__ = [
+    "ALLOWED_TRANSITIONS",
+    "InvalidTransitionError",
+    "validate_transition",
+    "transition",
+    "flush_pending_sync",
+    "reconcile_with_catalog",
+    "create_catalog_execution",
+]
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_machine.py -v
+```
+
+Expected: 21 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_machine.py tests/execution/test_state_machine.py
+git commit -m "chore(state_machine): add __all__ for explicit exports
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+*(End of Task Group C — state machine with catalog sync + reconciliation.)*
+
+---
+
 
