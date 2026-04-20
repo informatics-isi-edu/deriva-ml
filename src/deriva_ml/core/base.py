@@ -45,6 +45,7 @@ deriva_tags = _core_utils.tag
 GlobusNativeLogin = _globus_auth_utils.GlobusNativeLogin
 
 from deriva_ml.core.config import DerivaMLConfig
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition, VocabularyTableDef
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
@@ -228,6 +229,7 @@ class DerivaML(
         use_minid: bool | None = None,
         check_auth: bool = True,
         clean_execution_dir: bool = True,
+        mode: ConnectionMode | str = ConnectionMode.online,
     ) -> None:
         """Initializes a DerivaML instance.
 
@@ -259,7 +261,17 @@ class DerivaML(
             check_auth: Check if the user has access to the catalog.
             clean_execution_dir: Whether to automatically clean up execution working directories
                 after successful upload. Defaults to True. Set to False to retain local copies.
+            mode: Connection mode for this instance. ``ConnectionMode.online`` (default)
+                sends writes to the catalog eagerly; ``ConnectionMode.offline`` stages
+                writes into local SQLite for later upload. Accepts the string
+                literals ``"online"`` or ``"offline"``; any other value raises
+                ``ValueError``. See spec §2.1.
         """
+        # Coerce and store connection mode (see spec §2.1).
+        # Done before catalog connection so subclasses/mixins can read
+        # ``self._mode`` during their own setup if needed.
+        self._mode = ConnectionMode(mode) if isinstance(mode, str) else mode
+
         # Get or use provided credentials for server access
         self.credential = credential or get_credential(hostname)
 
@@ -408,6 +420,21 @@ class DerivaML(
             logging_level=self._logging_level,
             deriva_logging_level=self._deriva_logging_level,
         )
+
+    @property
+    def mode(self) -> ConnectionMode:
+        """Current connection mode.
+
+        Returns:
+            The ConnectionMode this DerivaML instance was constructed
+            with. Drives whether writes go live to the catalog (online)
+            or stage in SQLite for later upload (offline). See spec §2.1.
+
+        Example:
+            >>> ml.mode is ConnectionMode.online
+            True
+        """
+        return self._mode
 
     @property
     def _dataset_table(self) -> Table:
