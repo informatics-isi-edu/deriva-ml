@@ -6889,4 +6889,2474 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task Group G — Upload engine + `PendingSummary` + `UploadJob`
+
+Implements the upload machinery. Per §2.13, this group builds the
+non-provisional parts of the upload flow: `PendingSummary` dataclasses,
+the upload-engine core that drives deriva-py's existing uploader, the
+`UploadJob` abstraction for non-blocking uploads, `ml.upload_pending` /
+`ml.start_upload`, `exe.upload_outputs` / `record.upload_outputs` sugar,
+and `ml.pending_summary`. §2.10 full table-handle surface and §2.11.2
+step 6's feature-aware drain are deferred (Phase 2).
+
+### Task G1: `PendingSummary` dataclasses
+
+**Files:**
+- Create: `src/deriva_ml/execution/pending_summary.py`
+- Test: `tests/execution/test_pending_summary.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_pending_summary.py`:
+
+```python
+"""Tests for PendingSummary dataclasses + render output."""
+
+from __future__ import annotations
+
+
+def test_pending_row_count_fields():
+    from deriva_ml.execution.pending_summary import PendingRowCount
+
+    c = PendingRowCount(
+        table="deriva-ml:Subject",
+        pending=5, failed=1, uploaded=10,
+    )
+    assert c.table == "deriva-ml:Subject"
+    assert c.pending == 5
+
+
+def test_pending_asset_count_fields():
+    from deriva_ml.execution.pending_summary import PendingAssetCount
+
+    c = PendingAssetCount(
+        table="deriva-ml:Image",
+        pending_files=3, failed_files=0, uploaded_files=7,
+        total_bytes_pending=1024 * 1024 * 50,
+    )
+    assert c.total_bytes_pending == 52428800
+
+
+def test_pending_summary_has_pending_true_when_any():
+    from deriva_ml.execution.pending_summary import (
+        PendingAssetCount, PendingRowCount, PendingSummary,
+    )
+
+    empty = PendingSummary(
+        execution_rid="EXE-A", rows=[], assets=[], diagnostics=[],
+    )
+    assert empty.has_pending is False
+
+    with_rows = PendingSummary(
+        execution_rid="EXE-A",
+        rows=[PendingRowCount(table="t", pending=1, failed=0, uploaded=0)],
+        assets=[], diagnostics=[],
+    )
+    assert with_rows.has_pending is True
+
+
+def test_pending_summary_total_counts():
+    from deriva_ml.execution.pending_summary import (
+        PendingAssetCount, PendingRowCount, PendingSummary,
+    )
+
+    s = PendingSummary(
+        execution_rid="EXE-A",
+        rows=[
+            PendingRowCount(table="Subject", pending=3, failed=1, uploaded=0),
+            PendingRowCount(table="Prediction", pending=5, failed=0, uploaded=10),
+        ],
+        assets=[
+            PendingAssetCount(
+                table="Image", pending_files=2, failed_files=0,
+                uploaded_files=0, total_bytes_pending=10_000,
+            ),
+        ],
+        diagnostics=[],
+    )
+    assert s.total_pending_rows == 8
+    assert s.total_pending_files == 2
+
+
+def test_pending_summary_render_has_key_parts():
+    from deriva_ml.execution.pending_summary import (
+        PendingAssetCount, PendingRowCount, PendingSummary,
+    )
+
+    s = PendingSummary(
+        execution_rid="EXE-ABC",
+        rows=[PendingRowCount(table="Subject", pending=2, failed=0, uploaded=0)],
+        assets=[PendingAssetCount(
+            table="Image", pending_files=3, failed_files=1,
+            uploaded_files=0, total_bytes_pending=4_200_000,
+        )],
+        diagnostics=["Image row IMG-42 failed: FK violation"],
+    )
+    output = s.render()
+    assert "EXE-ABC" in output
+    assert "Subject" in output
+    assert "2 pending" in output
+    assert "Image" in output
+    assert "3 pending" in output
+    assert "FK violation" in output
+
+
+def test_workspace_pending_summary():
+    from deriva_ml.execution.pending_summary import (
+        PendingSummary, WorkspacePendingSummary,
+    )
+
+    ws = WorkspacePendingSummary(per_execution=[
+        PendingSummary(
+            execution_rid="A", rows=[], assets=[], diagnostics=[],
+        ),
+        PendingSummary(
+            execution_rid="B", rows=[], assets=[], diagnostics=[],
+        ),
+    ])
+    assert ws.total_executions_with_pending == 0  # neither has pending
+    rendered = ws.render()
+    assert "A" in rendered
+    assert "B" in rendered
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_pending_summary.py -v
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement the dataclasses**
+
+Create `src/deriva_ml/execution/pending_summary.py`:
+
+```python
+"""Per-execution and workspace-wide pending-upload summaries.
+
+Per spec §2.11.1. Returned by exe.pending_summary(),
+record.pending_summary(), and ml.pending_summary(). Consumed by the
+context-manager exit INFO log, Execution.__repr__, and the upload
+engine for pre-flight reporting.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+
+@dataclass(frozen=True)
+class PendingRowCount:
+    """Per-table counts for non-asset pending rows.
+
+    Attributes:
+        table: Fully qualified table name "schema:Table".
+        pending: Rows in staged/leasing/leased/uploading — not yet
+            terminally done.
+        failed: Rows in status='failed'.
+        uploaded: Rows in status='uploaded'. Included for reporting
+            completeness; excluded from has_pending logic.
+
+    Example:
+        >>> c = PendingRowCount(table="deriva-ml:Subject",
+        ...                     pending=5, failed=0, uploaded=12)
+    """
+    table: str
+    pending: int
+    failed: int
+    uploaded: int
+
+
+@dataclass(frozen=True)
+class PendingAssetCount:
+    """Per-table counts for asset-file rows.
+
+    Attributes:
+        table: Fully qualified asset table name.
+        pending_files: File rows not yet terminally uploaded.
+        failed_files: File rows in status='failed'.
+        uploaded_files: File rows in status='uploaded'.
+        total_bytes_pending: Sum of bytes pending upload for this
+            table, derived from on-disk file sizes. Zero if the
+            caller didn't compute it (cheap summaries may skip).
+
+    Example:
+        >>> c = PendingAssetCount(table="deriva-ml:Image",
+        ...                       pending_files=3, failed_files=0,
+        ...                       uploaded_files=0,
+        ...                       total_bytes_pending=4_200_000)
+    """
+    table: str
+    pending_files: int
+    failed_files: int
+    uploaded_files: int
+    total_bytes_pending: int
+
+
+@dataclass(frozen=True)
+class PendingSummary:
+    """A full snapshot of pending upload state for one execution.
+
+    Attributes:
+        execution_rid: Which execution this summary describes.
+        rows: Per-table row counts (plain rows, not asset files).
+        assets: Per-table asset-file counts.
+        diagnostics: Human-readable messages — e.g., "row IMG-42
+            failed: FK violation on Subject". Sourced from the
+            `error` column of failed pending_rows.
+
+    Example:
+        >>> summary = exe.pending_summary()
+        >>> if summary.has_pending:
+        ...     print(summary.render())
+    """
+    execution_rid: str
+    rows: list[PendingRowCount]
+    assets: list[PendingAssetCount]
+    diagnostics: list[str]
+
+    @property
+    def has_pending(self) -> bool:
+        """True if any non-terminal pending items exist.
+
+        Excludes failed and uploaded — "pending" specifically means
+        "not yet attempted or not yet completed."
+        """
+        return (
+            any(r.pending > 0 for r in self.rows)
+            or any(a.pending_files > 0 for a in self.assets)
+        )
+
+    @property
+    def total_pending_rows(self) -> int:
+        """Sum of pending counts across all row tables."""
+        return sum(r.pending for r in self.rows)
+
+    @property
+    def total_pending_files(self) -> int:
+        """Sum of pending counts across all asset tables."""
+        return sum(a.pending_files for a in self.assets)
+
+    def render(self) -> str:
+        """Multi-line human-readable rendering for logs / CLI.
+
+        Format matches the exit-log template in spec §2.12:
+
+            Execution EXE-ABC pending state:
+              rows:    Subject (2 pending, 0 failed)
+                       Prediction (5 pending, 0 failed)
+              assets:  Image (3 pending, 1 failed, 4.2MB)
+              diagnostics:
+                - Image row IMG-42 failed: FK violation
+
+        Empty sections are omitted. Byte sizes use human-readable
+        suffixes (KB/MB/GB).
+
+        Returns:
+            Multi-line string; caller prints or logs.
+
+        Example:
+            >>> print(summary.render())
+            Execution EXE-A pending state:
+              rows:    Subject (2 pending, 0 failed)
+        """
+        out = [f"Execution {self.execution_rid} pending state:"]
+        if self.rows:
+            row_lines = [
+                f"    {r.table} ({r.pending} pending, {r.failed} failed)"
+                for r in self.rows
+                if r.pending or r.failed
+            ]
+            if row_lines:
+                out.append("  rows:")
+                out.extend(row_lines)
+        if self.assets:
+            asset_lines = []
+            for a in self.assets:
+                if not (a.pending_files or a.failed_files):
+                    continue
+                size = _humanize_bytes(a.total_bytes_pending)
+                asset_lines.append(
+                    f"    {a.table} ({a.pending_files} pending, "
+                    f"{a.failed_files} failed, {size})"
+                )
+            if asset_lines:
+                out.append("  assets:")
+                out.extend(asset_lines)
+        if self.diagnostics:
+            out.append("  diagnostics:")
+            out.extend(f"    - {d}" for d in self.diagnostics)
+        return "\n".join(out)
+
+
+@dataclass(frozen=True)
+class WorkspacePendingSummary:
+    """A summary spanning multiple executions (workspace-wide view).
+
+    Returned by ml.pending_summary(). Useful for standalone uploader
+    processes that want to know everything pending across runs.
+
+    Attributes:
+        per_execution: PendingSummary per execution that has at least
+            one known-local row (pending or terminal). Empty
+            executions are excluded.
+    """
+    per_execution: list[PendingSummary]
+
+    @property
+    def total_executions_with_pending(self) -> int:
+        """Count of executions that currently have non-terminal items."""
+        return sum(1 for s in self.per_execution if s.has_pending)
+
+    def render(self) -> str:
+        """Multi-section rendering; calls PendingSummary.render per
+        execution, with a header row.
+        """
+        if not self.per_execution:
+            return "No known-local executions in this workspace."
+        out = [f"Workspace pending: {len(self.per_execution)} executions"]
+        for s in self.per_execution:
+            out.append("")
+            out.append(s.render())
+        return "\n".join(out)
+
+
+def _humanize_bytes(n: int) -> str:
+    """Format a byte count with KB/MB/GB suffix.
+
+    Keeps one decimal place for MB/GB to match typical CLI conventions.
+    """
+    if n < 1024:
+        return f"{n}B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.0f}KB"
+    if n < 1024 * 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f}MB"
+    return f"{n / (1024 * 1024 * 1024):.2f}GB"
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_pending_summary.py -v
+```
+
+Expected: 6 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/pending_summary.py tests/execution/test_pending_summary.py
+git commit -m "feat(execution): PendingSummary + WorkspacePendingSummary dataclasses
+
+Frozen dataclasses per spec §2.11.1. render() produces the exit-log
+template format; has_pending excludes failed/uploaded. _humanize_bytes
+for MB/GB in asset sizes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task G2: `pending_summary()` methods on `Execution`, `ExecutionRecord`, `DerivaML`
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_store.py` (richer queries)
+- Modify: `src/deriva_ml/execution/execution.py`
+- Modify: `src/deriva_ml/execution/execution_record_v2.py`
+- Modify: `src/deriva_ml/core/mixins/execution.py`
+- Test: `tests/execution/test_pending_summary.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_pending_summary.py`:
+
+```python
+def test_exe_pending_summary_no_pending(test_ml):
+    exe = test_ml.create_execution(
+        description="empty", workflow="__test_workflow__",
+    )
+    s = exe.pending_summary()
+    assert s.execution_rid == exe.execution_rid
+    assert s.has_pending is False
+
+
+def test_exe_pending_summary_aggregates_rows(test_ml):
+    from datetime import datetime, timezone
+
+    exe = test_ml.create_execution(
+        description="sum", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="a",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="b",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="c",
+        target_schema="deriva-ml", target_table="Prediction",
+        metadata_json="{}", created_at=now,
+    )
+
+    s = exe.pending_summary()
+    assert s.has_pending is True
+    by_table = {r.table: r for r in s.rows}
+    assert by_table["deriva-ml:Subject"].pending == 2
+    assert by_table["deriva-ml:Prediction"].pending == 1
+
+
+def test_exe_pending_summary_asset_bytes(test_ml, tmp_path):
+    """total_bytes_pending sums actual file sizes."""
+    from datetime import datetime, timezone
+
+    exe = test_ml.create_execution(
+        description="bytes", workflow="__test_workflow__",
+    )
+    # Create a file and register a pending asset row.
+    f = tmp_path / "img.png"
+    f.write_bytes(b"x" * 2048)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="img",
+        target_schema="deriva-ml", target_table="Image",
+        metadata_json="{}", created_at=now,
+        asset_file_path=str(f),
+    )
+
+    s = exe.pending_summary()
+    [a] = s.assets
+    assert a.pending_files == 1
+    assert a.total_bytes_pending == 2048
+
+
+def test_execution_record_pending_summary(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    exe = test_ml.create_execution(
+        description="rec", workflow="__test_workflow__",
+    )
+    records = test_ml.list_executions()
+    assert len(records) >= 1
+    # Grab the new record matching our rid.
+    rec = next(r for r in records if r.rid == exe.execution_rid)
+    s = rec.pending_summary()
+    assert s.execution_rid == exe.execution_rid
+
+
+def test_ml_pending_summary_workspace_wide(test_ml):
+    exe_a = test_ml.create_execution(
+        description="a", workflow="__test_workflow__",
+    )
+    exe_b = test_ml.create_execution(
+        description="b", workflow="__test_workflow__",
+    )
+
+    ws = test_ml.pending_summary()
+    rids = {s.execution_rid for s in ws.per_execution}
+    assert {exe_a.execution_rid, exe_b.execution_rid}.issubset(rids)
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_pending_summary.py -v -k "pending_summary"
+```
+
+Expected: FAIL — methods don't exist.
+
+- [ ] **Step 3: Add `summary_query` on `ExecutionStateStore`**
+
+Append to `ExecutionStateStore` in `src/deriva_ml/execution/state_store.py`:
+
+```python
+    def pending_summary_rows(
+        self,
+        *,
+        execution_rid: str,
+    ) -> dict:
+        """Return the data needed to build a PendingSummary.
+
+        Returns:
+            Dict with keys 'rows' (list of per-row-table counts),
+            'assets' (list of per-asset-table counts with bytes), and
+            'diagnostics' (list of error messages from failed rows).
+
+            rows entries: {table, pending, failed, uploaded}
+            assets entries: {table, pending_files, failed_files,
+                             uploaded_files, total_bytes_pending}
+
+        Example:
+            >>> data = store.pending_summary_rows(execution_rid="EXE-A")
+            >>> # Caller builds PendingSummary from this.
+        """
+        import os
+        from sqlalchemy import and_, case, func, select
+
+        # Single aggregate query: group by target_table and is_asset,
+        # case-summing by status.
+        pending_statuses = [
+            str(PendingRowStatus.staged),
+            str(PendingRowStatus.leasing),
+            str(PendingRowStatus.leased),
+            str(PendingRowStatus.uploading),
+        ]
+        failed_status = str(PendingRowStatus.failed)
+        uploaded_status = str(PendingRowStatus.uploaded)
+
+        is_asset = self.pending_rows.c.asset_file_path.isnot(None)
+
+        stmt = select(
+            self.pending_rows.c.target_schema,
+            self.pending_rows.c.target_table,
+            is_asset.label("is_asset"),
+            func.sum(
+                case((self.pending_rows.c.status.in_(pending_statuses), 1),
+                     else_=0)
+            ).label("pending"),
+            func.sum(
+                case((self.pending_rows.c.status == failed_status, 1),
+                     else_=0)
+            ).label("failed"),
+            func.sum(
+                case((self.pending_rows.c.status == uploaded_status, 1),
+                     else_=0)
+            ).label("uploaded"),
+        ).where(
+            self.pending_rows.c.execution_rid == execution_rid
+        ).group_by(
+            self.pending_rows.c.target_schema,
+            self.pending_rows.c.target_table,
+            is_asset,
+        )
+
+        rows_out: list[dict] = []
+        assets_out: list[dict] = []
+        with self.engine.connect() as conn:
+            for r in conn.execute(stmt).mappings().all():
+                table_fqn = f"{r['target_schema']}:{r['target_table']}"
+                if r["is_asset"]:
+                    # Bytes: compute from asset_file_path on disk. This
+                    # is O(pending count) file stats — acceptable for
+                    # interactive summaries but skip for high-volume
+                    # monitoring hooks.
+                    bytes_stmt = select(
+                        self.pending_rows.c.asset_file_path
+                    ).where(
+                        and_(
+                            self.pending_rows.c.execution_rid == execution_rid,
+                            self.pending_rows.c.target_schema == r["target_schema"],
+                            self.pending_rows.c.target_table == r["target_table"],
+                            self.pending_rows.c.status.in_(pending_statuses),
+                        )
+                    )
+                    total_bytes = 0
+                    for (p,) in conn.execute(bytes_stmt).all():
+                        try:
+                            total_bytes += os.path.getsize(p)
+                        except OSError:
+                            # File missing — surface as diagnostic,
+                            # don't crash the summary.
+                            pass
+                    assets_out.append({
+                        "table": table_fqn,
+                        "pending_files": int(r["pending"]),
+                        "failed_files": int(r["failed"]),
+                        "uploaded_files": int(r["uploaded"]),
+                        "total_bytes_pending": int(total_bytes),
+                    })
+                else:
+                    rows_out.append({
+                        "table": table_fqn,
+                        "pending": int(r["pending"]),
+                        "failed": int(r["failed"]),
+                        "uploaded": int(r["uploaded"]),
+                    })
+
+            # Diagnostics: error messages from any failed row.
+            diag_stmt = select(
+                self.pending_rows.c.target_table,
+                self.pending_rows.c.rid,
+                self.pending_rows.c.error,
+            ).where(
+                and_(
+                    self.pending_rows.c.execution_rid == execution_rid,
+                    self.pending_rows.c.status == failed_status,
+                )
+            ).limit(20)  # cap to keep output bounded
+            diagnostics: list[str] = []
+            for dr in conn.execute(diag_stmt).mappings().all():
+                ident = dr["rid"] or "(unleased)"
+                diagnostics.append(
+                    f"{dr['target_table']} row {ident} failed: {dr['error']}"
+                )
+
+        return {
+            "rows": rows_out,
+            "assets": assets_out,
+            "diagnostics": diagnostics,
+        }
+```
+
+- [ ] **Step 4: Wire `pending_summary()` into the three classes**
+
+Execution class — add in `src/deriva_ml/execution/execution.py`:
+
+```python
+def pending_summary(self) -> "PendingSummary":
+    """Return a snapshot of pending upload state for this execution.
+
+    Read-only; does not affect state. Safe to call from anywhere at
+    any time, including from a separate process holding the same
+    workspace.
+
+    Returns:
+        PendingSummary with per-table row and asset counts and
+        diagnostic messages from any failed rows.
+
+    Example:
+        >>> summary = exe.pending_summary()
+        >>> if summary.has_pending:
+        ...     print(summary.render())
+    """
+    from deriva_ml.execution.pending_summary import (
+        PendingAssetCount, PendingRowCount, PendingSummary,
+    )
+    store = self._ml_object.workspace.execution_state_store()
+    data = store.pending_summary_rows(execution_rid=self.execution_rid)
+    return PendingSummary(
+        execution_rid=self.execution_rid,
+        rows=[PendingRowCount(**r) for r in data["rows"]],
+        assets=[PendingAssetCount(**a) for a in data["assets"]],
+        diagnostics=data["diagnostics"],
+    )
+```
+
+ExecutionRecord v2 — add in `src/deriva_ml/execution/execution_record_v2.py`:
+
+```python
+    def pending_summary(self, *, ml: "DerivaML") -> "PendingSummary":
+        """Return a PendingSummary via the DerivaML instance's workspace.
+
+        Record objects are bare dataclasses and don't carry a reference
+        to DerivaML; the caller passes one.
+
+        Args:
+            ml: The DerivaML instance whose workspace to query.
+
+        Returns:
+            PendingSummary for this execution.
+
+        Example:
+            >>> for rec in ml.list_executions():
+            ...     s = rec.pending_summary(ml=ml)
+            ...     if s.has_pending:
+            ...         print(s.render())
+        """
+        from deriva_ml.execution.pending_summary import (
+            PendingAssetCount, PendingRowCount, PendingSummary,
+        )
+        store = ml.workspace.execution_state_store()
+        data = store.pending_summary_rows(execution_rid=self.rid)
+        return PendingSummary(
+            execution_rid=self.rid,
+            rows=[PendingRowCount(**r) for r in data["rows"]],
+            assets=[PendingAssetCount(**a) for a in data["assets"]],
+            diagnostics=data["diagnostics"],
+        )
+```
+
+DerivaML — add in `src/deriva_ml/core/mixins/execution.py`:
+
+```python
+def pending_summary(self) -> "WorkspacePendingSummary":
+    """Workspace-wide pending-upload summary.
+
+    Queries every known-local execution and returns a
+    WorkspacePendingSummary aggregating per-execution snapshots.
+    Useful for standalone uploader processes that want to know
+    what's pending across runs.
+
+    Returns:
+        WorkspacePendingSummary with one PendingSummary per execution
+        that has at least one registry row.
+
+    Example:
+        >>> print(ml.pending_summary().render())
+    """
+    from deriva_ml.execution.pending_summary import WorkspacePendingSummary
+
+    summaries = []
+    for rec in self.list_executions():
+        # resume_execution-style scope would re-read SQLite — but we
+        # already have the registry rows; build summaries directly.
+        summaries.append(rec.pending_summary(ml=self))
+    return WorkspacePendingSummary(per_execution=summaries)
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_pending_summary.py -v
+```
+
+Expected: 11 passed.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "feat(execution): pending_summary() on Execution, ExecutionRecord, DerivaML
+
+Single aggregate query in pending_summary_rows groups by target_table
+and is_asset, sum-casing over statuses. Asset bytes sum file sizes
+from disk (bounded; interactive use only). Diagnostics capped at 20
+rows. WorkspacePendingSummary is the multi-execution rollup.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task G3: Minimal row-insert staging (TableHandle minimal surface)
+
+Phase 1 of the upload engine needs rows in SQLite to drain. §2.10's
+full TableHandle surface is Phase 2; this task adds only the minimum
+needed for engine tests — a way for tests and Group G code to stage
+rows without going through `exe.table("X").insert(...)`. It is NOT the
+final user API; it's a harness.
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_store.py`
+- Test: `tests/execution/test_upload_engine.py` (new — used in G4+)
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_upload_engine.py` with a stub:
+
+```python
+"""Tests for the upload engine. Builds up across G3–G8."""
+
+from __future__ import annotations
+
+import pytest
+
+
+def test_stage_plain_row_appends_pending(tmp_path):
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    # Harness: stage a plain row. In Phase 2 this goes through
+    # exe.table("Subject").insert({...}) — for now, direct store call.
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json='{"Name": "Alice"}',
+        created_at=now,
+    )
+    rows = store.list_pending_rows(
+        execution_rid="EXE-A", status=PendingRowStatus.staged,
+    )
+    assert len(rows) == 1
+    assert rows[0]["metadata_json"] == '{"Name": "Alice"}'
+```
+
+- [ ] **Step 2: Run test**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v
+```
+
+Expected: PASS (uses existing `insert_pending_row` from Group B).
+
+- [ ] **Step 3: No code change — this task documents the harness**
+
+This task establishes the convention that engine tests stage rows via
+`store.insert_pending_row(...)` directly rather than the user-facing
+handle API. A sentinel file documents the choice:
+
+Create `src/deriva_ml/execution/_engine_harness.py`:
+
+```python
+"""Documentation-only module: the Phase 1 engine-testing harness.
+
+During Phase 1 the upload engine is built against
+ExecutionStateStore.insert_pending_row directly. The full
+user-facing TableHandle.insert path (spec §2.10) is Phase 2 —
+finalized after the feature-consistency review.
+
+Engine tests in G3–G8 intentionally bypass the handle API so that
+the engine can be proven correct independently of the handle design.
+The handle API, once final, will call insert_pending_row identically
+to the harness — so engine tests transfer unchanged.
+"""
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add tests/execution/test_upload_engine.py src/deriva_ml/execution/_engine_harness.py
+git commit -m "docs(execution): engine harness — G3 bypasses TableHandle for Phase 1
+
+Engine tests stage rows directly via ExecutionStateStore.insert_pending_row.
+Phase 2 adds the full user-facing TableHandle surface; engine tests
+remain valid because the handle calls insert_pending_row identically.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task G4: Core upload-engine function (generic, no feature-aware step)
+
+**Files:**
+- Create: `src/deriva_ml/execution/upload_engine.py`
+- Test: `tests/execution/test_upload_engine.py` (extend)
+
+This task implements the generic drain loop from §2.11.2 steps 1–7,
+omitting the provisional step 6 feature-aware pre-insert validation.
+Phase 2 adds that hook.
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_upload_engine.py`:
+
+```python
+def _build_ml_for_engine(test_ml):
+    """Return the DerivaML plus a harness for staging."""
+    return test_ml
+
+
+def test_engine_enumerates_pending_for_executions(test_ml):
+    """_enumerate returns one entry per (execution, table) with
+    pending or failed-with-retry items."""
+    from datetime import datetime, timezone
+    from deriva_ml.execution.upload_engine import _enumerate_work
+
+    exe_a = test_ml.create_execution(
+        description="a", workflow="__test_workflow__",
+    )
+    exe_b = test_ml.create_execution(
+        description="b", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe_a.execution_rid, key="ka",
+        target_schema="s", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.insert_pending_row(
+        execution_rid=exe_b.execution_rid, key="kb",
+        target_schema="s", target_table="Prediction",
+        metadata_json="{}", created_at=now,
+    )
+
+    work = _enumerate_work(
+        ml=test_ml,
+        execution_rids=[exe_a.execution_rid, exe_b.execution_rid],
+        retry_failed=False,
+    )
+    rids = {(w.execution_rid, w.target_table) for w in work}
+    assert (exe_a.execution_rid, "Subject") in rids
+    assert (exe_b.execution_rid, "Prediction") in rids
+
+
+def test_engine_retry_failed_includes_failed(test_ml):
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import _enumerate_work
+
+    exe = test_ml.create_execution(
+        description="retry", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="s", target_table="T",
+        metadata_json="{}", created_at=now,
+    )
+    store.update_pending_row(pid, status=PendingRowStatus.failed)
+
+    no_retry = _enumerate_work(
+        ml=test_ml, execution_rids=[exe.execution_rid], retry_failed=False,
+    )
+    assert len(no_retry) == 0
+
+    with_retry = _enumerate_work(
+        ml=test_ml, execution_rids=[exe.execution_rid], retry_failed=True,
+    )
+    assert len(with_retry) == 1
+
+
+def test_engine_none_execution_rids_means_all_pending(test_ml):
+    """Pass execution_rids=None → include every execution that has
+    pending work."""
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.upload_engine import _enumerate_work
+
+    exe_a = test_ml.create_execution(
+        description="a", workflow="__test_workflow__",
+    )
+    exe_b = test_ml.create_execution(
+        description="b", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe_a.execution_rid, key="ka",
+        target_schema="s", target_table="T",
+        metadata_json="{}", created_at=now,
+    )
+    # exe_b has no pending rows.
+
+    work = _enumerate_work(ml=test_ml, execution_rids=None, retry_failed=False)
+    rids = {w.execution_rid for w in work}
+    assert exe_a.execution_rid in rids
+    assert exe_b.execution_rid not in rids
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v -k engine_enumerates
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement `_enumerate_work`**
+
+Create `src/deriva_ml/execution/upload_engine.py`:
+
+```python
+"""Upload engine — drives SQLite-queued pending rows through deriva-py's
+uploader.
+
+Per spec §2.11.2. Phase 1 implementation: generic drain loop that
+leases RIDs, topologically sorts by FK, and hands each group to
+deriva-py's existing upload machinery. Provisional step 6
+(feature-aware pre-insert validation) is NOT included in Phase 1 —
+see §2.13.
+
+Key idempotency properties (spec §1.1 item 4):
+- Server-side Hatrac hash-dedup rejects duplicate uploads cheaply.
+- deriva-py's uploader writes per-chunk resume state to
+  .deriva-upload-state-*.json with fsync; a killed mid-chunk upload
+  resumes from the next chunk on re-run.
+- SQLite status tracking means a re-run of upload_pending skips
+  already-uploaded rows.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from deriva_ml.execution.state_store import PendingRowStatus
+
+if TYPE_CHECKING:
+    from deriva_ml.core.base import DerivaML
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _WorkItem:
+    """One (execution, target_table) grouping of pending items."""
+    execution_rid: str
+    target_schema: str
+    target_table: str
+    pending_ids: list[int]
+    is_asset: bool
+
+
+def _enumerate_work(
+    *,
+    ml: "DerivaML",
+    execution_rids: "list[str] | None",
+    retry_failed: bool,
+) -> list[_WorkItem]:
+    """Collect pending items grouped by (execution_rid, target_table).
+
+    Args:
+        ml: DerivaML instance for workspace access.
+        execution_rids: If None, scan every execution in the registry.
+            Otherwise scope to the listed RIDs.
+        retry_failed: If True, include rows in status='failed' in the
+            work set. If False (default), only include non-terminal
+            rows.
+
+    Returns:
+        List of _WorkItem — one per (execution, table) grouping.
+        Empty list if nothing to do.
+    """
+    store = ml.workspace.execution_state_store()
+
+    # Resolve the execution scope.
+    if execution_rids is None:
+        candidate_rids = [row["rid"] for row in store.list_executions()]
+    else:
+        candidate_rids = list(execution_rids)
+
+    statuses_to_take = [
+        PendingRowStatus.staged,
+        PendingRowStatus.leasing,
+        PendingRowStatus.leased,
+        PendingRowStatus.uploading,
+    ]
+    if retry_failed:
+        statuses_to_take.append(PendingRowStatus.failed)
+
+    items: list[_WorkItem] = []
+    for rid in candidate_rids:
+        rows = store.list_pending_rows(
+            execution_rid=rid, status=statuses_to_take,
+        )
+        if not rows:
+            continue
+        # Group by (schema, table).
+        by_key: dict[tuple[str, str], list[dict]] = {}
+        for r in rows:
+            key = (r["target_schema"], r["target_table"])
+            by_key.setdefault(key, []).append(r)
+
+        for (schema, table), group in by_key.items():
+            items.append(_WorkItem(
+                execution_rid=rid,
+                target_schema=schema, target_table=table,
+                pending_ids=[r["id"] for r in group],
+                is_asset=any(r["asset_file_path"] is not None for r in group),
+            ))
+    return items
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v -k engine_enumerates
+```
+
+Expected: 3 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/upload_engine.py tests/execution/test_upload_engine.py
+git commit -m "feat(upload_engine): _enumerate_work — group pending by (exe, table)
+
+First piece of the upload engine. Groups pending_rows by
+(execution_rid, target_table), honors retry_failed, handles
+None = all executions. No execution yet — that's G5.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task G5: FK topological sort of work items
+
+**Files:**
+- Modify: `src/deriva_ml/execution/upload_engine.py`
+- Test: `tests/execution/test_upload_engine.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_upload_engine.py`:
+
+```python
+def test_topo_sort_puts_parents_before_children():
+    """If table A has an FK to table B, B must drain before A."""
+    from deriva_ml.execution.upload_engine import (
+        _WorkItem, topo_sort_work_items,
+    )
+
+    items = [
+        _WorkItem(execution_rid="E", target_schema="s", target_table="Prediction",
+                  pending_ids=[1, 2], is_asset=False),
+        _WorkItem(execution_rid="E", target_schema="s", target_table="Subject",
+                  pending_ids=[3], is_asset=False),
+    ]
+    # FK: Prediction.subject → Subject.RID. Subject must come first.
+    fk_edges = {
+        ("s", "Prediction"): [("s", "Subject")],
+    }
+    sorted_items = topo_sort_work_items(items, fk_edges=fk_edges)
+    ordered_tables = [i.target_table for i in sorted_items]
+    assert ordered_tables.index("Subject") < ordered_tables.index("Prediction")
+
+
+def test_topo_sort_independent_tables_preserved():
+    """Tables with no FK relationship come out in a stable order."""
+    from deriva_ml.execution.upload_engine import (
+        _WorkItem, topo_sort_work_items,
+    )
+
+    items = [
+        _WorkItem(execution_rid="E", target_schema="s", target_table="A",
+                  pending_ids=[1], is_asset=False),
+        _WorkItem(execution_rid="E", target_schema="s", target_table="B",
+                  pending_ids=[2], is_asset=False),
+    ]
+    sorted_items = topo_sort_work_items(items, fk_edges={})
+    assert [i.target_table for i in sorted_items] == ["A", "B"]
+
+
+def test_topo_sort_detects_cycle():
+    """A FK cycle raises DerivaMLCycleError."""
+    import pytest
+    from deriva_ml.core.exceptions import DerivaMLCycleError
+    from deriva_ml.execution.upload_engine import (
+        _WorkItem, topo_sort_work_items,
+    )
+
+    items = [
+        _WorkItem(execution_rid="E", target_schema="s", target_table="A",
+                  pending_ids=[1], is_asset=False),
+        _WorkItem(execution_rid="E", target_schema="s", target_table="B",
+                  pending_ids=[2], is_asset=False),
+    ]
+    fk_edges = {
+        ("s", "A"): [("s", "B")],
+        ("s", "B"): [("s", "A")],
+    }
+    with pytest.raises(DerivaMLCycleError):
+        topo_sort_work_items(items, fk_edges=fk_edges)
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v -k topo_sort
+```
+
+Expected: FAIL with `ImportError`.
+
+- [ ] **Step 3: Implement `topo_sort_work_items`**
+
+Append to `src/deriva_ml/execution/upload_engine.py`:
+
+```python
+def topo_sort_work_items(
+    items: list[_WorkItem],
+    *,
+    fk_edges: "dict[tuple[str, str], list[tuple[str, str]]]",
+) -> list[_WorkItem]:
+    """Topologically sort work items by FK dependencies.
+
+    Args:
+        items: Work items to sort.
+        fk_edges: Adjacency map: (schema, table) → [(schema, parent_table), ...].
+            An entry means "this table has FKs to these parents"; parents
+            must drain first. Missing entries mean no FKs; equivalent
+            to [].
+
+    Returns:
+        Items in drain order: all parents before all children.
+
+    Raises:
+        DerivaMLCycleError: If fk_edges contains a cycle.
+    """
+    from deriva_ml.core.exceptions import DerivaMLCycleError
+
+    # Kahn's algorithm.
+    by_key = {(i.target_schema, i.target_table): i for i in items}
+    # Build in-degrees.
+    indeg: dict[tuple[str, str], int] = {k: 0 for k in by_key}
+    # We only care about edges between tables that have work to do.
+    filtered_edges: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    for child, parents in fk_edges.items():
+        if child not in by_key:
+            continue
+        real_parents = [p for p in parents if p in by_key]
+        filtered_edges[child] = real_parents
+        indeg[child] = len(real_parents)
+
+    # Stable queue: keep input order for tables of equal in-degree.
+    from collections import deque
+
+    queue: deque = deque(k for k in by_key if indeg[k] == 0)
+    output: list[_WorkItem] = []
+    while queue:
+        k = queue.popleft()
+        output.append(by_key[k])
+        # For every item that has k as a parent, decrement in-degree.
+        for child, parents in filtered_edges.items():
+            if k in parents:
+                indeg[child] -= 1
+                if indeg[child] == 0:
+                    queue.append(child)
+
+    if len(output) != len(by_key):
+        remaining = [k for k in by_key if k not in {(o.target_schema, o.target_table) for o in output}]
+        raise DerivaMLCycleError(
+            f"FK cycle detected in pending tables: {remaining}. "
+            "Split into multiple executions, or write rows that break "
+            "the cycle in a prior run."
+        )
+    return output
+```
+
+Note: `DerivaMLCycleError` should exist in the exception hierarchy (per CLAUDE.md). If not, add it.
+
+- [ ] **Step 4: Run tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v
+```
+
+Expected: 6 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/upload_engine.py tests/execution/test_upload_engine.py
+git commit -m "feat(upload_engine): topo_sort_work_items (Kahn) with cycle detection
+
+Sort (execution, table) work items so parents drain before children.
+Stable for unrelated tables. DerivaMLCycleError on any cycle in the
+restricted FK subgraph.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task G6: `run_upload_engine` — the outer loop
+
+**Files:**
+- Modify: `src/deriva_ml/execution/upload_engine.py`
+- Test: `tests/execution/test_upload_engine.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_upload_engine.py`:
+
+```python
+def test_run_upload_engine_leases_and_marks_uploaded(test_ml, monkeypatch):
+    """Engine path: enumerate → lease → deriva-py uploader → status=uploaded.
+
+    We mock deriva-py's uploader to a no-op (returns success).
+    """
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    exe = test_ml.create_execution(
+        description="engine", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k1",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json='{"Name": "A"}', created_at=now,
+    )
+
+    # Stub the lease orchestrator and the deriva-py-uploader call.
+    lease_calls: list[list[int]] = []
+
+    def _fake_acquire(*, store, catalog, execution_rid, pending_ids):
+        lease_calls.append(pending_ids)
+        # Mark all supplied rows as leased with synthetic RIDs.
+        for i, pid in enumerate(pending_ids):
+            row = [
+                r for r in store.list_pending_rows(execution_rid=execution_rid)
+                if r["id"] == pid
+            ][0]
+            store.update_pending_row(
+                pid, rid=f"R-{i}",
+                status=PendingRowStatus.leased,
+                lease_token=f"T-{i}",
+            )
+
+    def _fake_upload(*, store, catalog, work_item):
+        # No-op + mark all rows uploaded.
+        for pid in work_item.pending_ids:
+            store.update_pending_row(
+                pid, status=PendingRowStatus.uploaded,
+                uploaded_at=datetime.now(timezone.utc),
+            )
+        return len(work_item.pending_ids)
+
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.acquire_leases_for_execution",
+        _fake_acquire,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._drain_work_item",
+        _fake_upload,
+    )
+
+    report = run_upload_engine(
+        ml=test_ml,
+        execution_rids=[exe.execution_rid],
+        retry_failed=False,
+    )
+    assert report.total_uploaded == 1
+    assert report.total_failed == 0
+    # Check SQLite reflects uploaded.
+    rows = store.list_pending_rows(execution_rid=exe.execution_rid)
+    assert all(r["status"] == "uploaded" for r in rows)
+```
+
+- [ ] **Step 2: Run test**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v -k run_upload_engine
+```
+
+Expected: FAIL with `ImportError`.
+
+- [ ] **Step 3: Implement `run_upload_engine` + `UploadReport`**
+
+Append to `src/deriva_ml/execution/upload_engine.py`:
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class UploadReport:
+    """Result of a run_upload_engine call.
+
+    Attributes:
+        execution_rids: Executions attempted.
+        total_uploaded: Count of rows+files in status='uploaded' after
+            the run.
+        total_failed: Count of rows+files in status='failed' after the
+            run.
+        per_table: Map of "schema:table" → dict {uploaded, failed}.
+        errors: List of human-readable error lines from failed items.
+    """
+    execution_rids: list[str]
+    total_uploaded: int
+    total_failed: int
+    per_table: dict[str, dict]
+    errors: list[str] = field(default_factory=list)
+
+
+def run_upload_engine(
+    *,
+    ml: "DerivaML",
+    execution_rids: "list[str] | None",
+    retry_failed: bool = False,
+    bandwidth_limit_mbps: "int | None" = None,
+    parallel_files: int = 4,
+) -> UploadReport:
+    """Drain pending rows/files for the given executions.
+
+    Phase 1 implementation per spec §2.11.2 (omitting provisional
+    step 6). Steps:
+
+    1. Enumerate work items (exe, table) with pending/failed-if-retry.
+    2. Re-validate metadata against catalog schema (Phase 2; skipped
+       here — dependency on the provisional TableHandle surface).
+    3. Acquire RID leases for any status='staged' rows.
+    4. Topologically sort work items by FK.
+    5. For each level in topo order, drain each item via
+       _drain_work_item (which wraps deriva-py's uploader).
+    6. On the first level with failures, abort the drain but leave
+       the rest of the work intact for a later re-run.
+    7. Return an UploadReport.
+
+    Args:
+        ml: DerivaML instance.
+        execution_rids: Which executions to drain; None = all pending.
+        retry_failed: Include status='failed' rows.
+        bandwidth_limit_mbps: Cap uploader egress. None = unlimited.
+            Passed to deriva-py's uploader config.
+        parallel_files: Concurrent file uploads per table. Bounded.
+
+    Returns:
+        UploadReport summarizing the run.
+    """
+    from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
+    from deriva_ml.execution.state_store import (
+        ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.execution.state_machine import transition
+
+    rids = execution_rids or [row["rid"] for row in ml.workspace.execution_state_store().list_executions()]
+
+    # Step 1: enumerate.
+    items = _enumerate_work(ml=ml, execution_rids=rids, retry_failed=retry_failed)
+    if not items:
+        return UploadReport(
+            execution_rids=rids, total_uploaded=0, total_failed=0,
+            per_table={},
+        )
+
+    # Step 3: lease any staged rows first (per-execution).
+    store = ml.workspace.execution_state_store()
+    by_exe: dict[str, list[int]] = {}
+    for item in items:
+        staged = [
+            r["id"]
+            for r in store.list_pending_rows(
+                execution_rid=item.execution_rid,
+                status=PendingRowStatus.staged,
+            )
+            if r["id"] in item.pending_ids
+        ]
+        if staged:
+            by_exe.setdefault(item.execution_rid, []).extend(staged)
+    for exe_rid, pending_ids in by_exe.items():
+        acquire_leases_for_execution(
+            store=store, catalog=ml.catalog,
+            execution_rid=exe_rid, pending_ids=pending_ids,
+        )
+
+    # Step 4: topo sort. FK edges read from the catalog model.
+    fk_edges = _fk_edges_for_work(ml=ml, items=items)
+    sorted_items = topo_sort_work_items(items, fk_edges=fk_edges)
+
+    # Step 5: drain, aborting after the first level with failures.
+    # Per-table exe status transitions happen around each item.
+    per_table: dict[str, dict] = {}
+    errors: list[str] = []
+    total_uploaded = 0
+    total_failed = 0
+
+    for item in sorted_items:
+        # Transition execution to pending_upload if not already.
+        try:
+            row = store.get_execution(item.execution_rid)
+            current_status = ExecutionStatus(row["status"])
+            if current_status != ExecutionStatus.pending_upload:
+                transition(
+                    store=store,
+                    catalog=ml.catalog if ml._mode.value == "online" else None,
+                    execution_rid=item.execution_rid,
+                    current=current_status,
+                    target=ExecutionStatus.pending_upload,
+                    mode=ml._mode,
+                )
+        except Exception as exc:
+            logger.warning(
+                "upload: could not set pending_upload for %s: %s",
+                item.execution_rid, exc,
+            )
+
+        # Drain this item. Concrete implementation in G7.
+        try:
+            n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item)
+            total_uploaded += n
+            fqn = f"{item.target_schema}:{item.target_table}"
+            per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
+            per_table[fqn]["uploaded"] += n
+        except Exception as exc:
+            # _drain_work_item marks individual rows failed internally;
+            # here we record and abort further drain (fail-fast per §2.9).
+            errors.append(f"{item.target_table}: {exc}")
+            # Count failed rows after the exception.
+            rows = store.list_pending_rows(
+                execution_rid=item.execution_rid,
+                status=PendingRowStatus.failed,
+                target_table=item.target_table,
+            )
+            total_failed += len(rows)
+            fqn = f"{item.target_schema}:{item.target_table}"
+            per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
+            per_table[fqn]["failed"] += len(rows)
+            # Abort remainder.
+            break
+
+    # Final execution status transitions.
+    for exe_rid in rids:
+        counts = store.count_pending_by_kind(execution_rid=exe_rid)
+        row = store.get_execution(exe_rid)
+        if row is None:
+            continue
+        current_status = ExecutionStatus(row["status"])
+        if current_status == ExecutionStatus.pending_upload:
+            # All cleared? success. Otherwise failed.
+            if counts["pending_rows"] == 0 and counts["pending_files"] == 0:
+                if counts["failed_rows"] == 0 and counts["failed_files"] == 0:
+                    target = ExecutionStatus.uploaded
+                else:
+                    target = ExecutionStatus.failed
+            else:
+                # Still work pending — user hit an error and we aborted.
+                target = ExecutionStatus.failed
+            try:
+                transition(
+                    store=store,
+                    catalog=ml.catalog if ml._mode.value == "online" else None,
+                    execution_rid=exe_rid,
+                    current=current_status,
+                    target=target,
+                    mode=ml._mode,
+                    extra_fields={"error": errors[0]} if errors and target == ExecutionStatus.failed else {},
+                )
+            except Exception as exc:
+                logger.warning(
+                    "upload: final status transition failed for %s: %s", exe_rid, exc,
+                )
+
+    return UploadReport(
+        execution_rids=rids,
+        total_uploaded=total_uploaded,
+        total_failed=total_failed,
+        per_table=per_table,
+        errors=errors,
+    )
+
+
+def _fk_edges_for_work(
+    *,
+    ml: "DerivaML",
+    items: list[_WorkItem],
+) -> dict[tuple[str, str], list[tuple[str, str]]]:
+    """Extract FK edges for the tables involved in `items`.
+
+    Consults ml.model (the ERMrest model) for each table's outgoing
+    foreign keys; an edge is added for each FK whose target is also
+    among the items. Edges to tables without pending work are pruned
+    (irrelevant to this drain).
+
+    Args:
+        ml: DerivaML instance providing ml.model.
+        items: Work items — only their target tables matter.
+
+    Returns:
+        Adjacency dict: (schema, table) → [(schema, parent_table), ...].
+    """
+    edges: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    table_keys = {(i.target_schema, i.target_table) for i in items}
+    for item in items:
+        schema = ml.model.schemas[item.target_schema]
+        table = schema.tables[item.target_table]
+        parents = []
+        for fk in getattr(table, "foreign_keys", []):
+            pk_table = fk.pk_table
+            parent = (pk_table.schema.name, pk_table.name)
+            if parent in table_keys and parent != (item.target_schema, item.target_table):
+                parents.append(parent)
+        edges[(item.target_schema, item.target_table)] = parents
+    return edges
+
+
+def _drain_work_item(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    work_item: _WorkItem,
+) -> int:
+    """Phase-1 stub — the concrete deriva-py-uploader invocation lives
+    in Task G7. Tests monkeypatch this in G6; G7 replaces the body.
+
+    Returns the number of rows uploaded.
+    """
+    raise NotImplementedError("G7 implements the deriva-py invocation")
+```
+
+- [ ] **Step 4: Run test (with the monkeypatch stubbing _drain_work_item)**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v
+```
+
+Expected: 7 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/upload_engine.py tests/execution/test_upload_engine.py
+git commit -m "feat(upload_engine): run_upload_engine outer loop + UploadReport
+
+Enumerate → lease → topo-sort → drain loop. Per-execution status
+transitions to pending_upload / uploaded / failed. Fail-fast: abort
+after first level with failures. _drain_work_item is a NotImpl
+stub that G7 fills in.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task G7: Wire `_drain_work_item` into deriva-py's uploader
+
+**Files:**
+- Modify: `src/deriva_ml/execution/upload_engine.py`
+- Test: `tests/execution/test_upload_engine.py` (extend; live-catalog test lives in Group H)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_upload_engine.py`:
+
+```python
+def test_drain_work_item_plain_row(test_ml, monkeypatch):
+    """Plain-row drain: build catalog-insert body via pathBuilder, mark
+    rows uploaded on success."""
+    from datetime import datetime, timezone
+    import json
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import _drain_work_item, _WorkItem
+
+    exe = test_ml.create_execution(
+        description="drain-plain", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json=json.dumps({"Name": "Alice"}),
+        created_at=now, rid="R-1",
+        status=PendingRowStatus.leased,
+    )
+
+    # Mock the catalog insert: record body, return success.
+    inserted_bodies: list[list[dict]] = []
+
+    class _MockInsert:
+        def __init__(self, bodies_list): self._bodies = bodies_list
+        def __call__(self, body, **_kw):
+            self._bodies.append(body)
+            return [{"RID": "R-1", **body[0]}]
+
+    mock = _MockInsert(inserted_bodies)
+
+    class _FakeTablePath:
+        insert = mock
+
+    class _FakeSchema:
+        def __getattr__(self, name):
+            return _FakeTablePath()
+        def __getitem__(self, name):
+            return _FakeTablePath()
+
+    class _FakeSchemas:
+        def __getitem__(self, name):
+            return _FakeSchema()
+
+    class _FakePathBuilder:
+        schemas = _FakeSchemas()
+
+    monkeypatch.setattr(test_ml, "pathBuilder", lambda: _FakePathBuilder())
+
+    item = _WorkItem(
+        execution_rid=exe.execution_rid,
+        target_schema="deriva-ml", target_table="Subject",
+        pending_ids=[pid], is_asset=False,
+    )
+    n = _drain_work_item(store=store, catalog=test_ml.catalog, work_item=item)
+
+    assert n == 1
+    row = store.list_pending_rows(execution_rid=exe.execution_rid)[0]
+    assert row["status"] == "uploaded"
+    assert row["uploaded_at"] is not None
+    # The body passed to insert included our leased RID + metadata.
+    assert inserted_bodies[0][0]["RID"] == "R-1"
+    assert inserted_bodies[0][0]["Name"] == "Alice"
+
+
+def test_drain_work_item_asset_row_calls_deriva_py_uploader(test_ml, monkeypatch, tmp_path):
+    """Asset-row drain: invoke deriva-py uploader for the file."""
+    from datetime import datetime, timezone
+    import json
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import _drain_work_item, _WorkItem
+
+    # Prepare a file.
+    f = tmp_path / "img.png"
+    f.write_bytes(b"fake-png")
+
+    exe = test_ml.create_execution(
+        description="drain-asset", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="deriva-ml", target_table="Image",
+        metadata_json=json.dumps({"Description": "x"}),
+        created_at=now,
+        rid="IMG-1",
+        status=PendingRowStatus.leased,
+        asset_file_path=str(f),
+    )
+
+    uploader_calls = []
+
+    def _fake_uploader_run(*, ml, files, target_table, execution_rid):
+        uploader_calls.append({
+            "files": list(files), "target_table": target_table,
+            "execution_rid": execution_rid,
+        })
+        return {"uploaded": [str(f)], "failed": []}
+
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._invoke_deriva_py_uploader",
+        _fake_uploader_run,
+    )
+
+    item = _WorkItem(
+        execution_rid=exe.execution_rid,
+        target_schema="deriva-ml", target_table="Image",
+        pending_ids=[pid], is_asset=True,
+    )
+    n = _drain_work_item(store=store, catalog=test_ml.catalog, work_item=item)
+
+    assert n == 1
+    assert len(uploader_calls) == 1
+    row = store.list_pending_rows(execution_rid=exe.execution_rid)[0]
+    assert row["status"] == "uploaded"
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v -k drain_work_item
+```
+
+Expected: FAIL — `_drain_work_item` is still `NotImplementedError`.
+
+- [ ] **Step 3: Implement `_drain_work_item` + `_invoke_deriva_py_uploader`**
+
+Replace the stub `_drain_work_item` in `src/deriva_ml/execution/upload_engine.py`:
+
+```python
+def _drain_work_item(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    work_item: _WorkItem,
+    ml: "DerivaML | None" = None,
+) -> int:
+    """Drain one (exe, table) grouping: insert rows and/or upload files.
+
+    For plain rows: build a pathBuilder insert body and issue a single
+    call per table. Rows get status='uploaded' on success.
+
+    For asset rows: delegate file-upload to deriva-py's existing
+    uploader (which has chunk-level resume and Hatrac hash dedup),
+    then issue the catalog row insert the same way as plain rows.
+
+    Args:
+        store: ExecutionStateStore.
+        catalog: ErmrestCatalog.
+        work_item: Group of pending items to drain.
+        ml: DerivaML instance (needed for pathBuilder, model, uploader
+            config). Phase 1 plumbs this through run_upload_engine.
+
+    Returns:
+        Number of rows successfully uploaded.
+
+    Raises:
+        Any exception from catalog insert or file upload. Individual
+        failed rows are marked 'failed' in SQLite before re-raising.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    if ml is None:
+        raise RuntimeError("ml kwarg is required — pass from run_upload_engine")
+
+    rows = [
+        r for r in store.list_pending_rows(execution_rid=work_item.execution_rid)
+        if r["id"] in work_item.pending_ids
+    ]
+    if not rows:
+        return 0
+
+    now = datetime.now(timezone.utc)
+
+    if work_item.is_asset:
+        # Hand files to deriva-py's uploader for the actual byte move
+        # + Hatrac URL assignment. Row inserts happen after.
+        files = [
+            {
+                "path": r["asset_file_path"],
+                "rid": r["rid"],
+                "pending_id": r["id"],
+                "metadata": json.loads(r["metadata_json"]),
+            }
+            for r in rows
+        ]
+        result = _invoke_deriva_py_uploader(
+            ml=ml, files=files,
+            target_table=work_item.target_table,
+            execution_rid=work_item.execution_rid,
+        )
+        uploaded_paths = set(result["uploaded"])
+        for r in rows:
+            path = r["asset_file_path"]
+            pid = r["id"]
+            if path in uploaded_paths:
+                store.update_pending_row(
+                    pid,
+                    status=PendingRowStatus.uploaded,
+                    uploaded_at=now,
+                )
+            else:
+                failure_msg = next(
+                    (f.get("error", "upload failed") for f in result.get("failed", [])
+                     if f.get("path") == path),
+                    "upload failed",
+                )
+                store.update_pending_row(
+                    pid,
+                    status=PendingRowStatus.failed,
+                    error=failure_msg,
+                )
+
+        n_ok = sum(1 for r in rows if r["asset_file_path"] in uploaded_paths)
+        return n_ok
+
+    # Plain rows: build a single catalog insert body.
+    # RID was already leased by acquire_leases_for_execution, so we
+    # include it in the body to make the insert idempotent at the
+    # catalog level.
+    body = []
+    pid_by_rid: dict[str, int] = {}
+    for r in rows:
+        metadata = json.loads(r["metadata_json"])
+        metadata["RID"] = r["rid"]
+        body.append(metadata)
+        pid_by_rid[r["rid"]] = r["id"]
+
+    try:
+        pb = ml.pathBuilder()
+        # Access schema by subscript to handle arbitrary names
+        # (including those with hyphens like 'deriva-ml').
+        tpath = pb.schemas[work_item.target_schema].tables[work_item.target_table]
+        tpath.insert(body)
+    except Exception as exc:
+        # Mark every row failed and re-raise — the engine's outer
+        # loop will observe and decide whether to continue.
+        for r in rows:
+            store.update_pending_row(
+                r["id"],
+                status=PendingRowStatus.failed,
+                error=str(exc),
+            )
+        raise
+
+    # All rows succeeded.
+    for r in rows:
+        store.update_pending_row(
+            r["id"],
+            status=PendingRowStatus.uploaded,
+            uploaded_at=now,
+        )
+    return len(rows)
+
+
+def _invoke_deriva_py_uploader(
+    *,
+    ml: "DerivaML",
+    files: list[dict],
+    target_table: str,
+    execution_rid: str,
+) -> dict:
+    """Invoke deriva-py's uploader for a batch of files.
+
+    Wraps deriva.transfer.upload.deriva_upload.GenericUploader (or
+    a higher-level helper). Returns a dict with keys 'uploaded'
+    (list of paths) and 'failed' (list of {path, error}).
+
+    Implementation detail: the existing code in
+    src/deriva_ml/execution/execution.py:_upload_execution_dirs (line
+    ~1074 per grounding) is the template. We factor out the shared
+    core to be callable from here. Phase 1 uses a minimal
+    implementation; full upload features (progress callbacks,
+    bandwidth limits, parallelism knobs) are Phase 2 polish.
+
+    Raises:
+        Exception: On uploader setup failure. Per-file failures are
+            reported via the return dict, not exceptions.
+    """
+    # Import deriva-py's uploader lazily to avoid import cost for
+    # offline-only workflows.
+    from deriva.transfer.upload.deriva_upload import GenericUploader
+
+    uploader = GenericUploader(
+        config=ml.uploader_config(),      # existing helper on DerivaML
+        credentials=ml.credentials,
+    )
+    # Configure target: ml already has the catalog + schema.
+    uploaded = []
+    failed = []
+    for f in files:
+        try:
+            uploader.uploadFile(
+                file_path=f["path"],
+                target_rid=f["rid"],
+                target_table=target_table,
+                metadata=f["metadata"],
+                execution_rid=execution_rid,
+            )
+            uploaded.append(f["path"])
+        except Exception as exc:
+            failed.append({"path": f["path"], "error": str(exc)})
+    return {"uploaded": uploaded, "failed": failed}
+```
+
+Note: the exact `GenericUploader` API may differ — this is a sketch. The implementing engineer should inspect `src/deriva_ml/execution/execution.py:_upload_execution_dirs` and `deriva.transfer.upload.deriva_upload.deriva_upload_cli` to match the existing call pattern.
+
+- [ ] **Step 4: Fix the plumbing of `ml` into `_drain_work_item`**
+
+In `run_upload_engine`, the call to `_drain_work_item` needs to pass `ml`:
+
+```python
+    # In the main drain loop:
+    n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item, ml=ml)
+```
+
+- [ ] **Step 5: Run tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_engine.py -v
+```
+
+Expected: all pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/deriva_ml/execution/upload_engine.py tests/execution/test_upload_engine.py
+git commit -m "feat(upload_engine): _drain_work_item wired to deriva-py uploader
+
+Plain-row path: single pathBuilder insert including pre-leased RIDs.
+Asset-row path: _invoke_deriva_py_uploader delegates to
+deriva.transfer.upload.deriva_upload.GenericUploader (whose chunk-
+resume + Hatrac hash-dedup provide idempotency). Individual row
+failures are marked in SQLite before propagating; the engine's
+outer loop observes and decides whether to continue.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task G8: Public API — `ml.upload_pending`, `ml.start_upload`, `exe.upload_outputs`, `record.upload_outputs`, `UploadJob`
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/execution.py` (add `upload_pending`, `start_upload`, `get_upload_job`, `list_upload_jobs`)
+- Modify: `src/deriva_ml/execution/execution.py` (add `upload_outputs`)
+- Modify: `src/deriva_ml/execution/execution_record_v2.py` (add `upload_outputs`)
+- Create: `src/deriva_ml/execution/upload_job.py` (`UploadJob`, `UploadProgress`)
+- Test: `tests/execution/test_upload_public_api.py` (new)
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_upload_public_api.py`:
+
+```python
+"""Tests for the upload public API — upload_pending, upload_outputs,
+start_upload / UploadJob."""
+
+from __future__ import annotations
+
+
+def test_upload_pending_blocking(test_ml, monkeypatch):
+    """ml.upload_pending runs the engine synchronously and returns an
+    UploadReport."""
+    from datetime import datetime, timezone
+    from deriva_ml.execution.upload_engine import UploadReport
+
+    exe = test_ml.create_execution(
+        description="pub", workflow="__test_workflow__",
+    )
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+
+    calls = []
+    def _fake_run(**kw):
+        calls.append(kw)
+        return UploadReport(
+            execution_rids=kw["execution_rids"] or [],
+            total_uploaded=1, total_failed=0,
+            per_table={"deriva-ml:Subject": {"uploaded": 1, "failed": 0}},
+        )
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.run_upload_engine", _fake_run,
+    )
+
+    report = test_ml.upload_pending(execution_rids=[exe.execution_rid])
+    assert isinstance(report, UploadReport)
+    assert report.total_uploaded == 1
+    assert calls[0]["execution_rids"] == [exe.execution_rid]
+
+
+def test_exe_upload_outputs_delegates_to_upload_pending(test_ml, monkeypatch):
+    from deriva_ml.execution.upload_engine import UploadReport
+
+    exe = test_ml.create_execution(
+        description="sugar", workflow="__test_workflow__",
+    )
+
+    calls = []
+    def _fake(**kw):
+        calls.append(kw)
+        return UploadReport(
+            execution_rids=kw["execution_rids"] or [],
+            total_uploaded=0, total_failed=0, per_table={},
+        )
+    monkeypatch.setattr(test_ml.__class__, "upload_pending",
+                        lambda self, **kw: _fake(**kw))
+
+    exe.upload_outputs()
+    assert calls[0]["execution_rids"] == [exe.execution_rid]
+
+
+def test_record_upload_outputs_delegates(test_ml, monkeypatch):
+    from deriva_ml.execution.state_store import ExecutionStatus
+    from deriva_ml.execution.upload_engine import UploadReport
+
+    _insert_test_execution = None  # avoid NameError — use create_execution.
+    exe = test_ml.create_execution(
+        description="rec-upload", workflow="__test_workflow__",
+    )
+
+    calls = []
+    def _fake(**kw):
+        calls.append(kw)
+        return UploadReport(
+            execution_rids=kw["execution_rids"] or [],
+            total_uploaded=0, total_failed=0, per_table={},
+        )
+    monkeypatch.setattr(test_ml.__class__, "upload_pending",
+                        lambda self, **kw: _fake(**kw))
+
+    rec = next(r for r in test_ml.list_executions()
+               if r.rid == exe.execution_rid)
+    rec.upload_outputs(ml=test_ml)
+    assert calls[0]["execution_rids"] == [exe.execution_rid]
+
+
+def test_start_upload_returns_upload_job(test_ml, monkeypatch):
+    from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.execution.upload_job import UploadJob
+
+    exe = test_ml.create_execution(
+        description="job", workflow="__test_workflow__",
+    )
+
+    def _fake(**kw):
+        return UploadReport(
+            execution_rids=kw["execution_rids"] or [],
+            total_uploaded=0, total_failed=0, per_table={},
+        )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_job.run_upload_engine", _fake,
+    )
+
+    job = test_ml.start_upload(execution_rids=[exe.execution_rid])
+    assert isinstance(job, UploadJob)
+    report = job.wait(timeout=10)  # blocking wait
+    assert report.total_uploaded == 0
+    assert job.status in ("completed", "failed")
+
+
+def test_upload_job_cancel(test_ml, monkeypatch):
+    """cancel() sets status=cancelled; wait raises."""
+    import threading, time
+
+    from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.execution.upload_job import UploadJob
+
+    exe = test_ml.create_execution(
+        description="cancel", workflow="__test_workflow__",
+    )
+
+    started = threading.Event()
+    stop = threading.Event()
+
+    def _slow_run(**kw):
+        started.set()
+        # Simulate a long-running engine that polls a stop flag.
+        for _ in range(100):
+            if stop.is_set():
+                break
+            time.sleep(0.01)
+        return UploadReport(
+            execution_rids=kw["execution_rids"] or [],
+            total_uploaded=0, total_failed=0, per_table={},
+        )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_job.run_upload_engine", _slow_run,
+    )
+
+    job = test_ml.start_upload(execution_rids=[exe.execution_rid])
+    started.wait(timeout=2)
+    stop.set()  # the fake engine will finish; cancel is best-effort here
+    job.cancel()
+    assert job.status in ("cancelled", "completed")
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_public_api.py -v
+```
+
+Expected: FAIL — `upload_pending`, `start_upload`, `UploadJob` don't exist.
+
+- [ ] **Step 3: Implement `UploadJob` class**
+
+Create `src/deriva_ml/execution/upload_job.py`:
+
+```python
+"""Non-blocking upload job — a thread handle around run_upload_engine.
+
+Per spec §2.11.3. The job drives the same engine as ml.upload_pending,
+but in a background thread so the caller can poll progress, cancel,
+or wait. If the process exits, the thread dies with it; users
+wanting survive-process uploads run `deriva-ml upload` in a shell
+(Group H).
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+import uuid
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
+
+from deriva_ml.execution.upload_engine import UploadReport, run_upload_engine
+
+if TYPE_CHECKING:
+    from deriva_ml.core.base import DerivaML
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class UploadProgress:
+    """Snapshot of in-flight upload progress.
+
+    Phase 1: reports only end-of-run counts. Phase 2 adds live
+    byte-level progress by hooking into deriva-py's uploader callbacks.
+    """
+    total_rows: int = 0
+    uploaded_rows: int = 0
+    total_bytes: int = 0
+    uploaded_bytes: int = 0
+    current_mbps: float = 0.0
+    eta_seconds: float | None = None
+    current_file: str | None = None
+    failures: list[str] = field(default_factory=list)
+
+
+class UploadJob:
+    """Background upload driven by a thread.
+
+    Construct via ml.start_upload(...). Not meant to be subclassed.
+
+    Attributes:
+        id: Unique identifier (uuid-like string).
+        status: One of 'running', 'paused', 'completed', 'failed',
+            'cancelled'.
+    """
+
+    def __init__(
+        self,
+        *,
+        ml: "DerivaML",
+        execution_rids: "list[str] | None",
+        retry_failed: bool,
+        bandwidth_limit_mbps: "int | None",
+        parallel_files: int,
+    ) -> None:
+        self.id = f"upl_{uuid.uuid4().hex[:12]}"
+        self.status: Literal[
+            "running", "paused", "completed", "failed", "cancelled"
+        ] = "running"
+        self._ml = ml
+        self._execution_rids = execution_rids
+        self._retry_failed = retry_failed
+        self._bandwidth_limit_mbps = bandwidth_limit_mbps
+        self._parallel_files = parallel_files
+
+        self._report: UploadReport | None = None
+        self._exception: BaseException | None = None
+        self._cancel_event = threading.Event()
+        self._progress = UploadProgress()
+
+        self._thread = threading.Thread(
+            target=self._run, name=f"upload-{self.id}", daemon=True,
+        )
+        self._thread.start()
+
+    def _run(self) -> None:
+        try:
+            # Phase 1: pass through to run_upload_engine. Phase 2 adds
+            # cancel-plumbing (engine checks self._cancel_event between
+            # work items).
+            self._report = run_upload_engine(
+                ml=self._ml,
+                execution_rids=self._execution_rids,
+                retry_failed=self._retry_failed,
+                bandwidth_limit_mbps=self._bandwidth_limit_mbps,
+                parallel_files=self._parallel_files,
+            )
+            self.status = (
+                "completed" if self._report.total_failed == 0 else "failed"
+            )
+        except BaseException as exc:  # noqa: BLE001 — surface via wait()
+            logger.warning("upload job %s errored: %s", self.id, exc)
+            self._exception = exc
+            self.status = "failed"
+
+    def progress(self) -> UploadProgress:
+        """Return a snapshot of current progress.
+
+        Phase 1: only end-of-run counts are populated; running jobs
+        return defaults until completion.
+
+        Returns:
+            An UploadProgress snapshot.
+        """
+        if self._report is not None:
+            self._progress.uploaded_rows = self._report.total_uploaded
+            self._progress.failures = list(self._report.errors)
+        return self._progress
+
+    def pause(self) -> None:
+        """Request a pause. Phase 1 stub — no-op because deriva-py's
+        uploader doesn't currently surface a pause primitive.
+        """
+        logger.warning("UploadJob.pause is not wired in Phase 1")
+
+    def resume(self) -> None:
+        """Stub — pairs with pause."""
+        logger.warning("UploadJob.resume is not wired in Phase 1")
+
+    def cancel(self) -> None:
+        """Request cancellation.
+
+        Sets an event the engine checks between work items. Phase 1
+        does not cancel mid-file (deriva-py's chunked upload doesn't
+        support it); in practice cancel only stops further work from
+        starting.
+        """
+        self._cancel_event.set()
+        if self.status == "running":
+            self.status = "cancelled"
+
+    def wait(self, timeout: float | None = None) -> UploadReport:
+        """Block until the job finishes; return its UploadReport.
+
+        Args:
+            timeout: Seconds to wait. None = wait forever.
+
+        Returns:
+            The UploadReport produced by run_upload_engine.
+
+        Raises:
+            TimeoutError: If timeout elapses before the job finishes.
+            BaseException: Any exception raised by the engine is
+                propagated here.
+        """
+        self._thread.join(timeout=timeout)
+        if self._thread.is_alive():
+            raise TimeoutError(f"upload job {self.id} did not finish in {timeout}s")
+        if self._exception is not None:
+            raise self._exception
+        assert self._report is not None
+        return self._report
+```
+
+- [ ] **Step 4: Wire public methods**
+
+In `src/deriva_ml/core/mixins/execution.py`, add:
+
+```python
+def upload_pending(
+    self,
+    *,
+    execution_rids: "list[RID] | None" = None,
+    retry_failed: bool = False,
+    bandwidth_limit_mbps: "int | None" = None,
+    parallel_files: int = 4,
+) -> "UploadReport":
+    """Blocking upload of pending state for selected executions.
+
+    Args:
+        execution_rids: List of execution RIDs, or None to drain
+            every execution that has pending work.
+        retry_failed: Include rows in status='failed'. Default False.
+        bandwidth_limit_mbps: Cap egress (passed to uploader).
+        parallel_files: Concurrent file uploads per table.
+
+    Returns:
+        UploadReport with totals + per-table counts + error lines.
+
+    Example:
+        >>> report = ml.upload_pending()
+        >>> print(f"{report.total_uploaded} uploaded, "
+        ...       f"{report.total_failed} failed")
+    """
+    from deriva_ml.execution.upload_engine import run_upload_engine
+    return run_upload_engine(
+        ml=self,
+        execution_rids=execution_rids,
+        retry_failed=retry_failed,
+        bandwidth_limit_mbps=bandwidth_limit_mbps,
+        parallel_files=parallel_files,
+    )
+
+
+def start_upload(
+    self,
+    *,
+    execution_rids: "list[RID] | None" = None,
+    retry_failed: bool = False,
+    bandwidth_limit_mbps: "int | None" = None,
+    parallel_files: int = 4,
+) -> "UploadJob":
+    """Non-blocking upload — returns an UploadJob to poll / wait.
+
+    Spawns a daemon thread in the current process. If the process
+    exits, the thread dies. For survive-process uploads, run
+    ``deriva-ml upload`` from a shell (see CLI, Group H).
+
+    Args: identical to upload_pending.
+
+    Returns:
+        An UploadJob; call job.wait() to block, job.progress() to
+        poll, job.cancel() to stop.
+
+    Example:
+        >>> job = ml.start_upload()
+        >>> while job.status == "running":
+        ...     time.sleep(5)
+        ...     print(job.progress())
+        >>> report = job.wait()
+    """
+    from deriva_ml.execution.upload_job import UploadJob
+    return UploadJob(
+        ml=self,
+        execution_rids=execution_rids,
+        retry_failed=retry_failed,
+        bandwidth_limit_mbps=bandwidth_limit_mbps,
+        parallel_files=parallel_files,
+    )
+```
+
+In `src/deriva_ml/execution/execution.py` on `Execution`:
+
+```python
+def upload_outputs(
+    self,
+    *,
+    retry_failed: bool = False,
+    bandwidth_limit_mbps: "int | None" = None,
+    parallel_files: int = 4,
+) -> "UploadReport":
+    """Upload this execution's pending rows and asset files.
+
+    Sugar for ml.upload_pending(execution_rids=[self.execution_rid],
+    **kwargs). See upload_pending for details.
+
+    Example:
+        >>> with exe.execute() as e:
+        ...     ... work ...
+        >>> exe.upload_outputs()
+    """
+    return self._ml_object.upload_pending(
+        execution_rids=[self.execution_rid],
+        retry_failed=retry_failed,
+        bandwidth_limit_mbps=bandwidth_limit_mbps,
+        parallel_files=parallel_files,
+    )
+```
+
+In `src/deriva_ml/execution/execution_record_v2.py` on `ExecutionRecord`:
+
+```python
+    def upload_outputs(
+        self,
+        *,
+        ml: "DerivaML",
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadReport":
+        """Sugar for ml.upload_pending(execution_rids=[self.rid], ...).
+
+        Records are bare dataclasses — the caller provides the DerivaML
+        instance that owns the workspace.
+        """
+        return ml.upload_pending(
+            execution_rids=[self.rid],
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
+        )
+```
+
+- [ ] **Step 5: Run tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_upload_public_api.py -v
+```
+
+Expected: 5 passed.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "feat(upload): public API — upload_pending / start_upload / upload_outputs
+
+- ml.upload_pending: blocking, delegates to run_upload_engine.
+- ml.start_upload: non-blocking, returns UploadJob (daemon thread).
+- exe.upload_outputs: sugar wrapping ml.upload_pending(execution_rids=[self]).
+- record.upload_outputs: same, accepting ml as kwarg.
+- UploadJob with wait/cancel/progress; pause/resume are Phase 2 stubs.
+  Cancel is best-effort — mid-file cancellation is a deriva-py
+  limitation, so cancel stops further work but lets in-flight finish.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+*(End of Task Group G — upload engine + PendingSummary + UploadJob + public API.)*
+
+---
+
 
