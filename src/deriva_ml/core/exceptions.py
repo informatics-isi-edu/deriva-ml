@@ -114,8 +114,11 @@ class DerivaMLAuthenticationError(DerivaMLConfigurationError):
 
 
 class DerivaMLOfflineError(DerivaMLConfigurationError):
-    """Raised when an operation that requires online mode is attempted
-    while the DerivaML instance is in offline mode.
+    """Exception raised when an online-only operation is attempted in offline mode.
+
+    The DerivaML instance was constructed with ``mode=ConnectionMode.offline``
+    but the caller invoked an operation that requires server contact — most
+    commonly ``create_execution``, which needs a server-assigned Execution RID.
 
     Example:
         Creating an execution requires an online mode because the
