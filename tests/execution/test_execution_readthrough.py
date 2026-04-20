@@ -128,3 +128,22 @@ def test_abort_transitions_to_aborted(test_ml):
     exe = _make_exe(test_ml, "E2 abort test")
     exe.abort()
     assert exe.status is ExecutionStatus.aborted
+
+
+def test_start_stop_time_readthrough(test_ml):
+    """E3: start_time / stop_time are SQLite read-through properties.
+
+    Parallels the `status` read-through semantics. Before __enter__,
+    both are None; after __enter__, start_time is set; after __exit__
+    (clean), stop_time is set and stop_time >= start_time.
+    """
+    exe = _make_exe(test_ml, "E3 times test")
+    assert exe.start_time is None
+    assert exe.stop_time is None
+
+    with exe.execute():
+        assert exe.start_time is not None
+        assert exe.stop_time is None
+
+    assert exe.stop_time is not None
+    assert exe.stop_time >= exe.start_time

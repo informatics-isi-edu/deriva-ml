@@ -214,11 +214,11 @@ class Execution:
         self._ml_object = ml_object
         self._model = ml_object.model
         self._logger = ml_object._logger
-        self.start_time = None
-        self.stop_time = None
-        # NOTE(E1): self._status intentionally removed — execution status
-        # now lives in SQLite (see `status` property below). Every read
-        # hits the workspace registry; no in-memory copy is kept.
+        # NOTE(E1/E3): self._status / self.start_time / self.stop_time
+        # intentionally removed — execution status and lifecycle
+        # timestamps now live in SQLite (see `status`, `start_time`,
+        # `stop_time` properties below). Every read hits the workspace
+        # registry; no in-memory copy is kept.
         self.uploaded_assets: dict[str, list[AssetFilePath]] | None = None
         self.configuration.argv = sys.argv
         self._execution_record: ExecutionRecord | None = None  # Lazily created after RID is assigned
@@ -394,10 +394,9 @@ class Execution:
         instance.configuration = None  # Group E loads from config_json
         instance._working_dir = ml_object.working_dir
         instance._cache_dir = ml_object.cache_dir
-        instance.start_time = None
-        instance.stop_time = None
-        # NOTE(E1): self._status intentionally not set — status lives in
-        # SQLite and is read through the `status` property.
+        # NOTE(E1/E3): self._status / self.start_time / self.stop_time
+        # intentionally not set — status and lifecycle timestamps live
+        # in SQLite and are read through the respective properties.
         instance.uploaded_assets = None
         instance._execution_record = None
         instance.workflow_rid = None
@@ -574,7 +573,11 @@ class Execution:
             # Now upload the files so we have the info in case the execution fails.
             self.uploaded_assets = self._upload_execution_dirs()
             self._set_asset_descriptions(self.uploaded_assets)
-        self.start_time = datetime.now()
+        # NOTE(E3): `start_time` is no longer an instance attribute —
+        # the authoritative value is written to SQLite by __enter__ via
+        # state_machine.transition. `_initialize_execution` predates the
+        # read-through design and is part of the legacy path retained
+        # for `execution_start`/`execution_stop` compatibility.
         self.update_status(Status.pending, "Initialize status finished.")
 
     @property
@@ -642,6 +645,80 @@ class Execution:
                 f"recreated. Use ml.list_executions() to see current state."
             )
         return row["error"]
+
+    @property
+    def start_time(self) -> "datetime | None":
+        """Start time from SQLite, or None if not yet started.
+
+        Parallels ``status`` / ``error`` — no caching, every read hits
+        the workspace registry. Populated by ``__enter__`` when the
+        execution transitions to ``running``. Returned values are
+        coerced to UTC-aware datetimes (SQLite may return naive values
+        even though we store tz-aware).
+
+        Returns:
+            Timezone-aware (UTC) datetime when the execution's
+            ``__enter__`` ran, or None before.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd or never created, e.g. dry-run).
+
+        Example:
+            >>> exe = ml.resume_execution("EXE-A")
+            >>> if exe.start_time is not None:
+            ...     print(f"started at {exe.start_time}")
+        """
+        from datetime import timezone
+
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        value = row["start_time"]
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+    @property
+    def stop_time(self) -> "datetime | None":
+        """Stop time from SQLite, or None if not yet stopped/failed.
+
+        Parallels ``status`` / ``error`` — no caching, every read hits
+        the workspace registry. Populated by ``__exit__`` on either
+        clean stop or exception (see spec §2.8 / §2.12). Returned
+        values are coerced to UTC-aware datetimes.
+
+        Returns:
+            Timezone-aware (UTC) datetime when the execution's
+            ``__exit__`` ran, or None if still running.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing.
+        """
+        from datetime import timezone
+
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        value = row["stop_time"]
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
 
     @property
     def execution_record(self) -> ExecutionRecord | None:
@@ -839,8 +916,9 @@ class Execution:
     def execution_start(self) -> None:
         """Marks the execution as started.
 
-        Records the start time and updates the execution's status to 'running'.
-        This should be called before beginning the main execution work.
+        Records the start time in SQLite and updates the execution's
+        status to 'initializing'. This should be called before beginning
+        the main execution work.
 
         Example:
             >>> execution.execution_start()
@@ -850,15 +928,26 @@ class Execution:
             ... except Exception:
             ...     execution.update_status(Status.failed, "Analysis error")
         """
-        self.start_time = datetime.now()
+        from datetime import timezone
+
+        # Persist start_time to SQLite (authoritative source for the
+        # `start_time` read-through property). Skip for dry-run — no
+        # SQLite row exists.
+        if not self._dry_run:
+            store = self._ml_object.workspace.execution_state_store()
+            store.update_execution(
+                self.execution_rid,
+                start_time=datetime.now(timezone.utc),
+            )
         self.uploaded_assets = None
         self.update_status(Status.initializing, "Start execution  ...")
 
     def execution_stop(self) -> None:
         """Marks the execution as completed.
 
-        Records the stop time and updates the execution's status to 'completed'.
-        This should be called after all execution work is finished.
+        Records the stop time in SQLite and updates the execution's
+        status to 'completed'. This should be called after all execution
+        work is finished.
 
         Example:
             >>> try:
@@ -867,16 +956,34 @@ class Execution:
             ... except Exception:
             ...     execution.update_status(Status.failed, "Analysis error")
         """
-        self.stop_time = datetime.now()
-        duration = self.stop_time - self.start_time
-        hours, remainder = divmod(duration.total_seconds(), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        duration = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
+        from datetime import timezone
+
+        now = datetime.now(timezone.utc)
+
+        # Persist stop_time to SQLite (authoritative source for the
+        # `stop_time` read-through property). Skip for dry-run.
+        if not self._dry_run:
+            store = self._ml_object.workspace.execution_state_store()
+            store.update_execution(self.execution_rid, stop_time=now)
+
+        # Compute duration against the start_time read-through property.
+        start = self.start_time
+        if start is not None:
+            # Coerce any naive datetime from SQLite to UTC so arithmetic
+            # with `now` (aware) doesn't raise.
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            duration = now - start
+            hours, remainder = divmod(duration.total_seconds(), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            duration_str = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
+        else:
+            duration_str = "0H 0min 0.0sec"
 
         self.update_status(Status.completed, "Algorithm execution ended.")
         if not self._dry_run:
             self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
-                [{"RID": self.execution_rid, "Duration": duration}]
+                [{"RID": self.execution_rid, "Duration": duration_str}]
             )
 
     def _build_upload_staging(self) -> Path:
@@ -1940,12 +2047,13 @@ class Execution:
         Routes through ``state_machine.transition()`` so the SQLite
         write, online-mode catalog sync, and allowed-transition
         validation all run in a single atomic step. Sets
-        ``start_time`` in the same transaction.
+        ``start_time`` in the same transaction (read back via the
+        ``start_time`` property).
 
         Dry-run executions skip the transition entirely — there is no
         SQLite registry row for a dry-run (sentinel RID), so there is
-        nothing to transition. The legacy ``start_time`` attribute is
-        still set for observability.
+        nothing to transition. ``start_time`` reads back as None for
+        dry-runs.
 
         Returns:
             This Execution instance.
@@ -1962,7 +2070,9 @@ class Execution:
         from datetime import datetime, timezone
 
         if self._dry_run:
-            self.start_time = datetime.now()
+            # No SQLite row for dry-run executions, so start_time read
+            # through the property returns None. That's acceptable —
+            # dry-runs are transient and not observed via start_time.
             return self
 
         current = self.status  # read-through from SQLite
@@ -1979,10 +2089,6 @@ class Execution:
             mode=self._ml_object._mode,
             extra_fields={"start_time": datetime.now(timezone.utc)},
         )
-        # Keep the legacy instance attribute in sync for any callers
-        # that still read ``exe.start_time`` directly (E3 converts this
-        # to a SQLite read-through property).
-        self.start_time = datetime.now()
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> bool:
@@ -2008,7 +2114,8 @@ class Execution:
         from datetime import datetime, timezone
 
         if self._dry_run:
-            self.stop_time = datetime.now()
+            # No SQLite row for dry-run executions; stop_time read-through
+            # returns None. Log any exception before returning.
             if exc_value is not None:
                 logging.error(
                     "Dry-run execution failed: %s: %s",
@@ -2039,11 +2146,6 @@ class Execution:
             mode=self._ml_object._mode,
             extra_fields=extra,
         )
-
-        # Keep the legacy instance attribute in sync for callers that
-        # still read ``exe.stop_time`` directly (E3 converts to SQLite
-        # read-through property).
-        self.stop_time = datetime.now()
 
         # Emit the pending-summary INFO log per §2.12 / R6.3. Full
         # PendingSummary object lands in Group G; this is a placeholder.
