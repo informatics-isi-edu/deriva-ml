@@ -51,7 +51,6 @@ from deriva_ml.core.constants import (
 # =============================================================================
 # From enums.py: Status codes, type identifiers, and vocabulary names
 from deriva_ml.core.enums import (
-    BaseStrEnum,
     BuiltinTypes,
     ExecAssetType,
     ExecMetadataType,
@@ -134,7 +133,6 @@ __all__ = [
     "is_system_schema",
     "get_domain_schemas",
     # Enums
-    "BaseStrEnum",
     "UploadState",
     "Status",
     "BuiltinType",
