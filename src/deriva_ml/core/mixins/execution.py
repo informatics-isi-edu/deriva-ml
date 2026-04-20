@@ -7,7 +7,7 @@ execution status.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
@@ -399,6 +399,76 @@ class ExecutionMixin:
         return Execution._from_registry(
             ml_object=self, execution_rid=execution_rid,
         )
+
+    def gc_executions(
+        self,
+        *,
+        older_than: "timedelta | None" = None,
+        status: "ExecutionStatus | list[ExecutionStatus] | None" = None,
+        delete_working_dir: bool = False,
+    ) -> int:
+        """Garbage-collect execution registry rows matching the filters.
+
+        By default only removes registry state (SQLite rows and their
+        pending_rows / directory_rules). Pass delete_working_dir=True to
+        also ``rm -rf`` the on-disk execution root under the workspace.
+
+        Does NOT touch the catalog. Executions uploaded to the catalog
+        remain there regardless of local gc.
+
+        Args:
+            older_than: If set, only gc executions whose last_activity is
+                older than this timedelta.
+            status: Filter by status (single or list); None = any status.
+                Typical: pass ExecutionStatus.uploaded to clean up after
+                successful uploads.
+            delete_working_dir: If True, remove the per-execution working
+                directory from disk. Defaults to False (registry-only).
+
+        Returns:
+            The number of executions removed.
+
+        Example:
+            >>> from datetime import timedelta
+            >>> from deriva_ml.execution.state_store import ExecutionStatus
+            >>> n = ml.gc_executions(
+            ...     status=ExecutionStatus.uploaded,
+            ...     older_than=timedelta(days=30),
+            ...     delete_working_dir=True,
+            ... )
+            >>> print(f"cleaned {n} old executions")
+        """
+        import shutil
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        store = self.workspace.execution_state_store()
+
+        # Pull the filtered row list from SQLite, then narrow by
+        # last_activity if older_than was provided.
+        rows = store.list_executions(status=status)
+        if older_than is not None:
+            cutoff = datetime.now(timezone.utc) - older_than
+            # SQLite's DateTime(timezone=True) stores as ISO text and
+            # returns naive datetimes; coerce both sides to naive UTC
+            # to avoid offset-aware/naive comparison errors.
+
+            def _is_older(last_activity: datetime) -> bool:
+                la = last_activity
+                if la.tzinfo is None:
+                    la = la.replace(tzinfo=timezone.utc)
+                return la < cutoff
+
+            rows = [r for r in rows if _is_older(r["last_activity"])]
+
+        for row in rows:
+            if delete_working_dir:
+                wd = Path(self.working_dir) / row["working_dir_rel"]
+                if wd.exists():
+                    shutil.rmtree(wd)
+            store.delete_execution(row["rid"])
+
+        return len(rows)
 
     def find_executions(
         self,

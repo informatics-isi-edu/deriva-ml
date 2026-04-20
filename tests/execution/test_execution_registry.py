@@ -170,3 +170,61 @@ def test_resume_execution_online_flushes_sync_pending(test_ml, monkeypatch):
     assert flushed_calls == ["EXE-A"]
     # Reconcile runs AFTER flush (so we compare catalog vs synced state).
     assert reconcile_calls == ["EXE-A"]
+
+
+def test_gc_executions_deletes_matching(test_ml):
+    from datetime import timedelta
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    # Three uploaded executions of different ages.
+    _insert_test_execution(test_ml.workspace, "OLD", ExecutionStatus.uploaded)
+    _insert_test_execution(test_ml.workspace, "NEW", ExecutionStatus.uploaded)
+    _insert_test_execution(test_ml.workspace, "RUN", ExecutionStatus.running)
+
+    # Backdate OLD so it matches older_than.
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.update_execution(
+        "OLD",
+        last_activity=now - timedelta(days=30),
+        created_at=now - timedelta(days=30),
+    )
+
+    n = test_ml.gc_executions(
+        status=ExecutionStatus.uploaded,
+        older_than=timedelta(days=7),
+    )
+    assert n == 1
+    rids = {r.rid for r in test_ml.list_executions()}
+    assert rids == {"NEW", "RUN"}
+
+
+def test_gc_executions_status_only(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.aborted)
+    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.running)
+
+    n = test_ml.gc_executions(status=ExecutionStatus.aborted)
+    assert n == 1
+    assert {r.rid for r in test_ml.list_executions()} == {"B"}
+
+
+def test_gc_executions_delete_working_dir(test_ml):
+    from deriva_ml.execution.state_store import ExecutionStatus
+    from pathlib import Path
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.uploaded)
+
+    # Create the working directory files.
+    work = Path(test_ml.working_dir) / "execution/EXE-A"
+    work.mkdir(parents=True, exist_ok=True)
+    (work / "scratch.txt").write_text("hi")
+    assert work.exists()
+
+    n = test_ml.gc_executions(
+        status=ExecutionStatus.uploaded,
+        delete_working_dir=True,
+    )
+    assert n == 1
+    assert not work.exists()

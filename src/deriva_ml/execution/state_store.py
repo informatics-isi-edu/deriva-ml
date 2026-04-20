@@ -34,6 +34,7 @@ from sqlalchemy import (
     Table,
     Text,
     case,
+    delete,
     func,
     insert,
     select,
@@ -695,3 +696,38 @@ class ExecutionStateStore:
         with self.engine.connect() as conn:
             rows = conn.execute(stmt).mappings().all()
         return [dict(r) for r in rows]
+
+    def delete_execution(self, execution_rid: str) -> None:
+        """Delete an execution row and all its pending_rows /
+        directory_rules.
+
+        Foreign keys cascade via ON DELETE, but SQLite only honors
+        that with PRAGMA foreign_keys=ON (which the workspace sets).
+        Belt-and-suspenders: we explicitly delete children first, so
+        the ORDER of deletions is predictable and so callers running
+        without FK-on get sensible behavior.
+
+        Args:
+            execution_rid: Which execution to remove.
+
+        Example:
+            >>> store.delete_execution("EXE-A")
+            >>> store.get_execution("EXE-A") is None
+            True
+        """
+        with self.engine.begin() as conn:
+            conn.execute(
+                delete(self.pending_rows).where(
+                    self.pending_rows.c.execution_rid == execution_rid
+                )
+            )
+            conn.execute(
+                delete(self.directory_rules).where(
+                    self.directory_rules.c.execution_rid == execution_rid
+                )
+            )
+            conn.execute(
+                delete(self.executions).where(
+                    self.executions.c.rid == execution_rid
+                )
+            )
