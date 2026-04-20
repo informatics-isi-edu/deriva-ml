@@ -606,6 +606,122 @@ class ExecutionStateStore:
             "failed_files": int(row["failed_files"]),
         }
 
+    # ─── lease two-phase protocol ───────────────────────────────────
+
+    def mark_pending_leasing(self, pending_id: int, *, lease_token: str) -> None:
+        """Phase 1 of RID leasing: write lease_token + status='leasing'.
+
+        Must be committed BEFORE the POST to ERMrest_RID_Lease so that
+        a crash between this write and the POST is recoverable via
+        revert_pending_leasing (token wasn't yet sent, so no server
+        state to reconcile).
+
+        Args:
+            pending_id: pending_rows.id to transition.
+            lease_token: UUID string. Same token goes in the POST body.
+
+        Example:
+            >>> token = generate_lease_token()
+            >>> store.mark_pending_leasing(pid, lease_token=token)
+            >>> # Now POST the token to ERMrest_RID_Lease.
+        """
+        self.update_pending_row(
+            pending_id,
+            status=PendingRowStatus.leasing,
+            lease_token=lease_token,
+        )
+
+    def finalize_pending_lease(
+        self,
+        *,
+        lease_token: str,
+        assigned_rid: str,
+    ) -> None:
+        """Phase 2: POST succeeded, assign the server RID and flip to
+        'leased'.
+
+        Identified by lease_token (not pending_id) so this works for
+        batched lease responses without requiring the caller to hold
+        pending_id↔token mappings.
+
+        Args:
+            lease_token: The token we POSTed and got a RID back for.
+            assigned_rid: The server-assigned RID from the response.
+
+        Example:
+            >>> store.finalize_pending_lease(
+            ...     lease_token="uuid...", assigned_rid="1-ABCD"
+            ... )
+        """
+        from datetime import datetime, timezone
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.pending_rows)
+                .where(self.pending_rows.c.lease_token == lease_token)
+                .values(
+                    rid=assigned_rid,
+                    status=str(PendingRowStatus.leased),
+                    leased_at=datetime.now(timezone.utc),
+                )
+            )
+
+    def revert_pending_leasing(self, *, lease_token: str) -> None:
+        """Rollback: clear lease_token and flip back to 'staged'.
+
+        Called either:
+          (a) right after a failed POST (token never landed on server), or
+          (b) during startup reconciliation when the token query to
+              ERMrest_RID_Lease returns nothing (POST failed silently
+              or was dropped before persisting).
+
+        Args:
+            lease_token: The token to clear.
+
+        Example:
+            >>> store.revert_pending_leasing(lease_token="uuid...")
+            >>> # Row is now back to status='staged', ready to re-issue.
+        """
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.pending_rows)
+                .where(self.pending_rows.c.lease_token == lease_token)
+                .values(
+                    lease_token=None,
+                    status=str(PendingRowStatus.staged),
+                )
+            )
+
+    def list_leasing_rows(
+        self,
+        *,
+        execution_rid: str | None = None,
+    ) -> list[dict]:
+        """Return rows currently in status='leasing' — candidates for
+        startup reconciliation.
+
+        Args:
+            execution_rid: If set, scope to one execution; if None,
+                return all leasing rows across all executions
+                (workspace-wide reconciliation).
+
+        Returns:
+            List of pending_rows dicts.
+
+        Example:
+            >>> # Workspace-wide sweep at startup:
+            >>> for r in store.list_leasing_rows():
+            ...     print(r["lease_token"], r["execution_rid"])
+        """
+        stmt = select(self.pending_rows).where(
+            self.pending_rows.c.status == str(PendingRowStatus.leasing)
+        )
+        if execution_rid is not None:
+            stmt = stmt.where(self.pending_rows.c.execution_rid == execution_rid)
+        with self.engine.connect() as conn:
+            rows = conn.execute(stmt).mappings().all()
+        return [dict(r) for r in rows]
+
     # ─── directory_rules CRUD ───────────────────────────────────────
 
     def insert_directory_rule(

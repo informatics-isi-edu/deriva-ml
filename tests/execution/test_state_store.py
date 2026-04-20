@@ -418,3 +418,94 @@ def test_count_pending_by_kind(tmp_path):
         "pending_files": 1,
         "failed_files": 0,
     }
+
+
+def test_mark_leasing_sets_token_and_status(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+
+    store.mark_pending_leasing(pid, lease_token="TOKEN-1")
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.leasing)
+    assert row["lease_token"] == "TOKEN-1"
+
+
+def test_finalize_lease_sets_rid_and_status(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T1")
+
+    store.finalize_pending_lease(lease_token="T1", assigned_rid="1-NEW")
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.leased)
+    assert row["rid"] == "1-NEW"
+
+
+def test_revert_leasing_to_staged(tmp_path):
+    """Crash recovery: leasing rows with no matching server lease
+    revert to staged so the next attempt reissues them."""
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T-LOST")
+
+    store.revert_pending_leasing(lease_token="T-LOST")
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.staged)
+    assert row["lease_token"] is None
