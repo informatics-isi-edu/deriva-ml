@@ -5651,4 +5651,1242 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task Group F — RID leasing
+
+Implements lazy, batched, crash-safe RID acquisition against
+`public:ERMrest_RID_Lease`. Six tasks at moderate density — the logic
+is mostly a faithful transcription of spec §2.6 + §4.4 + §4.5, so the
+plan spells out the test fixtures and the API shape but doesn't
+repeat spec narrative.
+
+### Task F1: `lease_module` — pure helpers for batched POST
+
+**Files:**
+- Create: `src/deriva_ml/execution/rid_lease.py`
+- Test: `tests/execution/test_rid_lease.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_rid_lease.py`:
+
+```python
+"""Tests for RID leasing against public:ERMrest_RID_Lease."""
+
+from __future__ import annotations
+
+import uuid
+
+import pytest
+
+
+class _MockLeaseCatalog:
+    """Mock that records POSTs to ERMrest_RID_Lease and returns
+    synthetic RIDs keyed by the lease tokens."""
+    def __init__(self, *, prefix: str = "RID-", fail: bool = False):
+        self.prefix = prefix
+        self.fail = fail
+        self.post_calls: list[list[dict]] = []
+
+    def post(self, path: str, json=None, **_kw):
+        if self.fail:
+            raise RuntimeError("simulated lease failure")
+        assert "ERMrest_RID_Lease" in path
+        assert isinstance(json, list)
+        self.post_calls.append(json)
+        class _R:
+            def __init__(self, bodies, prefix):
+                self._bodies = bodies
+                self._prefix = prefix
+            def json(self):
+                return [
+                    {"RID": f"{self._prefix}{i}", "ID": b["ID"]}
+                    for i, b in enumerate(self._bodies)
+                ]
+        return _R(json, self.prefix)
+
+
+def test_generate_lease_token_is_uuid_string():
+    from deriva_ml.execution.rid_lease import generate_lease_token
+
+    t = generate_lease_token()
+    # Must round-trip through UUID parser.
+    uuid.UUID(t)
+
+
+def test_post_lease_batch_sends_tokens_and_returns_rids():
+    from deriva_ml.execution.rid_lease import post_lease_batch
+
+    cat = _MockLeaseCatalog(prefix="RID-")
+    tokens = ["T1", "T2", "T3"]
+    rids_by_token = post_lease_batch(catalog=cat, tokens=tokens)
+
+    # Every input token received a RID back.
+    assert set(rids_by_token.keys()) == set(tokens)
+    assert all(v.startswith("RID-") for v in rids_by_token.values())
+    # Exactly one POST call with N entries.
+    assert len(cat.post_calls) == 1
+    assert len(cat.post_calls[0]) == 3
+
+
+def test_post_lease_batch_chunks(monkeypatch):
+    from deriva_ml.execution import rid_lease
+    from deriva_ml.execution.rid_lease import post_lease_batch
+
+    monkeypatch.setattr(rid_lease, "PENDING_ROWS_LEASE_CHUNK", 2)
+    cat = _MockLeaseCatalog(prefix="X-")
+    tokens = ["A", "B", "C", "D", "E"]
+    rids_by_token = post_lease_batch(catalog=cat, tokens=tokens)
+
+    # 5 tokens, chunk size 2 → 3 POSTs of 2, 2, 1.
+    assert len(cat.post_calls) == 3
+    assert len(cat.post_calls[0]) == 2
+    assert len(cat.post_calls[1]) == 2
+    assert len(cat.post_calls[2]) == 1
+    assert set(rids_by_token.keys()) == set(tokens)
+
+
+def test_post_lease_batch_empty_is_noop():
+    from deriva_ml.execution.rid_lease import post_lease_batch
+
+    cat = _MockLeaseCatalog()
+    result = post_lease_batch(catalog=cat, tokens=[])
+    assert result == {}
+    assert cat.post_calls == []
+
+
+def test_post_lease_batch_propagates_catalog_error():
+    from deriva_ml.execution.rid_lease import post_lease_batch
+
+    cat = _MockLeaseCatalog(fail=True)
+    with pytest.raises(RuntimeError):
+        post_lease_batch(catalog=cat, tokens=["T"])
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_rid_lease.py -v
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement `rid_lease.py`**
+
+Create `src/deriva_ml/execution/rid_lease.py`:
+
+```python
+"""RID leasing against public:ERMrest_RID_Lease.
+
+Per spec §2.6. Pure helpers — no SQLite awareness here. The
+acquire_leases_for_pending function in state_store composition (Task
+F2) wires these into the two-phase SQLite protocol.
+
+Why a dedicated module: the POST body format, chunking, and
+error-handling choices are specific to the lease table and worth
+isolating from the higher-level "take pending_rows with status=staged
+and assign them RIDs" orchestration.
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from deriva.core import ErmrestCatalog
+
+logger = logging.getLogger(__name__)
+
+# Chunk size for batched POSTs. 500 keeps us comfortably under
+# ERMrest URL and body-size limits while amortizing round-trip cost.
+# See spec §2.6 — may be tuned by tests via monkeypatch.
+PENDING_ROWS_LEASE_CHUNK = 500
+
+
+def generate_lease_token() -> str:
+    """Generate a fresh lease token.
+
+    Returns:
+        A UUID4 string. Used as the ERMrest_RID_Lease.ID column so
+        we can look up what we leased after a mid-flight crash.
+
+    Example:
+        >>> token = generate_lease_token()
+        >>> len(token) == 36
+        True
+    """
+    return str(uuid.uuid4())
+
+
+def post_lease_batch(
+    *,
+    catalog: "ErmrestCatalog",
+    tokens: list[str],
+) -> dict[str, str]:
+    """POST to ERMrest_RID_Lease in chunks; return token→RID map.
+
+    Args:
+        catalog: Live ErmrestCatalog to POST against.
+        tokens: Lease tokens (typically uuid4 strings from
+            generate_lease_token). Empty list is a no-op.
+
+    Returns:
+        Dict mapping each input token to its server-assigned RID.
+
+    Raises:
+        Exception: Whatever the catalog raises on POST failure.
+            Partial progress is NOT rolled back — the caller is
+            responsible for recording which tokens landed (via the
+            two-phase SQLite write in Task F2).
+
+    Example:
+        >>> tokens = [generate_lease_token() for _ in range(100)]
+        >>> assigned = post_lease_batch(catalog=cat, tokens=tokens)
+        >>> assigned[tokens[0]]
+        'EXE-ABC'
+    """
+    if not tokens:
+        return {}
+
+    result: dict[str, str] = {}
+    # Chunk to keep URL + body sizes bounded.
+    for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
+        chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
+        body = [{"ID": t} for t in chunk]
+        response = catalog.post("/entity/public:ERMrest_RID_Lease", json=body)
+        for row in response.json():
+            # ERMrest echoes both ID (our token) and RID (assigned).
+            result[row["ID"]] = row["RID"]
+    return result
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_rid_lease.py -v
+```
+
+Expected: 5 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/rid_lease.py tests/execution/test_rid_lease.py
+git commit -m "feat(execution): rid_lease — generate_lease_token + post_lease_batch
+
+Chunked POST to public:ERMrest_RID_Lease. Returns token→RID mapping.
+Empty input is a no-op. Errors propagate; caller owns idempotency
+(via the two-phase SQLite protocol in Task F2).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task F2: `acquire_leases_for_pending` — two-phase protocol
+
+**Files:**
+- Modify: `src/deriva_ml/execution/state_store.py` (add methods)
+- Test: `tests/execution/test_state_store.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_state_store.py`:
+
+```python
+def test_mark_leasing_sets_token_and_status(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+
+    store.mark_pending_leasing(pid, lease_token="TOKEN-1")
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.leasing)
+    assert row["lease_token"] == "TOKEN-1"
+
+
+def test_finalize_lease_sets_rid_and_status(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T1")
+
+    store.finalize_pending_lease(lease_token="T1", assigned_rid="1-NEW")
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.leased)
+    assert row["rid"] == "1-NEW"
+
+
+def test_revert_leasing_to_staged(tmp_path):
+    """Crash recovery: leasing rows with no matching server lease
+    revert to staged so the next attempt reissues them."""
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T-LOST")
+
+    store.revert_pending_leasing(lease_token="T-LOST")
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.staged)
+    assert row["lease_token"] is None
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_store.py -v -k "mark_leasing or finalize_lease or revert_leasing"
+```
+
+Expected: FAIL with `AttributeError`.
+
+- [ ] **Step 3: Add helpers to `ExecutionStateStore`**
+
+Append to `ExecutionStateStore` in `src/deriva_ml/execution/state_store.py`:
+
+```python
+    # ─── lease two-phase protocol ───────────────────────────────────
+
+    def mark_pending_leasing(self, pending_id: int, *, lease_token: str) -> None:
+        """Phase 1 of RID leasing: write lease_token + status='leasing'.
+
+        Must be committed BEFORE the POST to ERMrest_RID_Lease so that
+        a crash between this write and the POST is recoverable via
+        revert_pending_leasing (token wasn't yet sent, so no server
+        state to reconcile).
+
+        Args:
+            pending_id: pending_rows.id to transition.
+            lease_token: UUID string. Same token goes in the POST body.
+        """
+        self.update_pending_row(
+            pending_id,
+            status=PendingRowStatus.leasing,
+            lease_token=lease_token,
+        )
+
+    def finalize_pending_lease(
+        self,
+        *,
+        lease_token: str,
+        assigned_rid: str,
+    ) -> None:
+        """Phase 2: POST succeeded, assign the server RID and flip to
+        'leased'.
+
+        Identified by lease_token (not pending_id) so this works for
+        batched lease responses without requiring the caller to hold
+        pending_id↔token mappings.
+
+        Args:
+            lease_token: The token we POSTed and got a RID back for.
+            assigned_rid: The server-assigned RID from the response.
+
+        Raises:
+            Nothing specific — silently no-ops if no row matches the
+            token (e.g., another process already finalized). If
+            silent no-op is undesirable, the caller should verify
+            post-conditions via list_pending_rows.
+        """
+        from datetime import datetime, timezone
+        from sqlalchemy import update
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.pending_rows)
+                .where(self.pending_rows.c.lease_token == lease_token)
+                .values(
+                    rid=assigned_rid,
+                    status=str(PendingRowStatus.leased),
+                    leased_at=datetime.now(timezone.utc),
+                )
+            )
+
+    def revert_pending_leasing(self, *, lease_token: str) -> None:
+        """Rollback: clear lease_token and flip back to 'staged'.
+
+        Called either:
+        (a) right after a failed POST (token never landed on server), or
+        (b) during startup reconciliation when the token query to
+            ERMrest_RID_Lease returns nothing (POST failed silently
+            or was dropped before persisting).
+
+        Args:
+            lease_token: The token to clear.
+        """
+        from sqlalchemy import update
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                update(self.pending_rows)
+                .where(self.pending_rows.c.lease_token == lease_token)
+                .values(
+                    lease_token=None,
+                    status=str(PendingRowStatus.staged),
+                )
+            )
+
+    def list_leasing_rows(
+        self,
+        *,
+        execution_rid: str | None = None,
+    ) -> list[dict]:
+        """Return rows currently in status='leasing' — candidates for
+        startup reconciliation.
+
+        Args:
+            execution_rid: If set, scope to one execution; if None,
+                return all leasing rows across all executions
+                (workspace-wide reconciliation).
+
+        Returns:
+            List of pending_rows dicts.
+        """
+        from sqlalchemy import select
+
+        stmt = select(self.pending_rows).where(
+            self.pending_rows.c.status == str(PendingRowStatus.leasing)
+        )
+        if execution_rid is not None:
+            stmt = stmt.where(self.pending_rows.c.execution_rid == execution_rid)
+        with self.engine.connect() as conn:
+            rows = conn.execute(stmt).mappings().all()
+        return [dict(r) for r in rows]
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_store.py -v
+```
+
+Expected: 22 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/state_store.py tests/execution/test_state_store.py
+git commit -m "feat(state_store): lease two-phase protocol helpers
+
+mark_pending_leasing (phase 1), finalize_pending_lease (phase 2),
+revert_pending_leasing (rollback on POST failure or missing server
+state), list_leasing_rows (for startup reconciliation). Key helpers
+for the lease orchestrator in F3.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task F3: `acquire_leases_for_execution` orchestrator
+
+Composes the state_store helpers and `rid_lease` module into a single
+entry point: given a list of pending_ids in status='staged', transition
+them to 'leased' with assigned RIDs.
+
+**Files:**
+- Create: `src/deriva_ml/execution/lease_orchestrator.py`
+- Test: `tests/execution/test_lease_orchestrator.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/execution/test_lease_orchestrator.py`:
+
+```python
+"""Tests for the lease orchestrator — composes rid_lease + state_store."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+from sqlalchemy import create_engine
+
+
+class _MockLeaseCatalog:
+    def __init__(self, *, prefix="RID-", fail_after=None):
+        self.prefix = prefix
+        self.fail_after = fail_after  # After N successful posts, start failing
+        self.post_calls: list[list[dict]] = []
+
+    def post(self, path: str, json=None, **_kw):
+        self.post_calls.append(json)
+        if self.fail_after is not None and len(self.post_calls) > self.fail_after:
+            raise RuntimeError("simulated post failure")
+        class _R:
+            def __init__(self, bodies, prefix, offset):
+                self._bodies = bodies
+                self._prefix = prefix
+                self._offset = offset
+            def json(self):
+                return [
+                    {"RID": f"{self._prefix}{self._offset + i}", "ID": b["ID"]}
+                    for i, b in enumerate(self._bodies)
+                ]
+        offset = sum(len(p) for p in self.post_calls[:-1])
+        return _R(json, self.prefix, offset)
+
+
+def _setup_store(tmp_path):
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    return store
+
+
+def test_acquire_leases_happy_path(tmp_path):
+    from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    pending_ids = [
+        store.insert_pending_row(
+            execution_rid="EXE-A", key=f"k{i}",
+            target_schema="s", target_table="t",
+            metadata_json="{}", created_at=now,
+        )
+        for i in range(3)
+    ]
+
+    cat = _MockLeaseCatalog(prefix="R-")
+    acquire_leases_for_execution(
+        store=store, catalog=cat, execution_rid="EXE-A",
+        pending_ids=pending_ids,
+    )
+
+    rows = store.list_pending_rows(execution_rid="EXE-A")
+    assert len(rows) == 3
+    for r in rows:
+        assert r["status"] == "leased"
+        assert r["rid"] is not None
+        assert r["rid"].startswith("R-")
+        assert r["leased_at"] is not None
+
+
+def test_acquire_leases_skips_already_leased(tmp_path):
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    already_leased = store.insert_pending_row(
+        execution_rid="EXE-A", key="already",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+        rid="EXISTING-RID",
+        status=PendingRowStatus.leased,
+    )
+    to_lease = store.insert_pending_row(
+        execution_rid="EXE-A", key="new",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+
+    cat = _MockLeaseCatalog(prefix="R-")
+    acquire_leases_for_execution(
+        store=store, catalog=cat, execution_rid="EXE-A",
+        pending_ids=[already_leased, to_lease],
+    )
+
+    # Only ONE token was POSTed — the already-leased row was skipped.
+    assert len(cat.post_calls) == 1
+    assert len(cat.post_calls[0]) == 1
+
+
+def test_acquire_leases_reverts_on_post_failure(tmp_path):
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    ids = [
+        store.insert_pending_row(
+            execution_rid="EXE-A", key=f"k{i}",
+            target_schema="s", target_table="t",
+            metadata_json="{}", created_at=now,
+        )
+        for i in range(2)
+    ]
+
+    cat = _MockLeaseCatalog(fail_after=0)  # fail on first POST
+    with pytest.raises(RuntimeError):
+        acquire_leases_for_execution(
+            store=store, catalog=cat, execution_rid="EXE-A",
+            pending_ids=ids,
+        )
+
+    # Rows must be back in 'staged' — the leasing→staged revert ran.
+    rows = store.list_pending_rows(execution_rid="EXE-A")
+    for r in rows:
+        assert r["status"] == str(PendingRowStatus.staged), \
+            "orchestrator must revert on POST failure"
+        assert r["lease_token"] is None
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lease_orchestrator.py -v
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement the orchestrator**
+
+Create `src/deriva_ml/execution/lease_orchestrator.py`:
+
+```python
+"""Orchestrator for the two-phase RID lease protocol.
+
+Composes ExecutionStateStore's lease helpers with rid_lease's POST
+machinery. One entry point: acquire_leases_for_execution. Called by
+handle.rid property and by the upload-engine drain.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+from deriva_ml.execution.rid_lease import generate_lease_token, post_lease_batch
+from deriva_ml.execution.state_store import PendingRowStatus
+
+if TYPE_CHECKING:
+    from deriva.core import ErmrestCatalog
+
+    from deriva_ml.execution.state_store import ExecutionStateStore
+
+logger = logging.getLogger(__name__)
+
+
+def acquire_leases_for_execution(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    execution_rid: str,
+    pending_ids: list[int],
+) -> None:
+    """Transition the given pending rows from 'staged' to 'leased',
+    assigning server-issued RIDs.
+
+    Skips rows already in status='leased' (idempotent). Rows in
+    other intermediate states (leasing, uploading, uploaded, failed)
+    are also skipped — the orchestrator only promotes staged→leased.
+
+    Two-phase protocol:
+      1. Generate tokens, mark rows 'leasing' in SQLite (committed
+         before the POST).
+      2. POST batch to ERMrest_RID_Lease.
+      3. On success: finalize each row with its assigned RID
+         (status → 'leased').
+      4. On POST failure: revert all rows we marked in step 1
+         (status → 'staged'; token cleared).
+
+    Crash recovery is handled in Task F4 (reconcile at startup).
+
+    Args:
+        store: The ExecutionStateStore holding SQLite state.
+        catalog: Live ErmrestCatalog for POSTing to ERMrest_RID_Lease.
+        execution_rid: For logging + scoping; all pending_ids must
+            belong to this execution (not enforced here; caller's
+            concern).
+        pending_ids: pending_rows.id values to lease.
+
+    Raises:
+        Exception: Whatever the catalog POST raises. Before
+            propagating, the orchestrator reverts any rows it had
+            marked 'leasing' back to 'staged'.
+
+    Example:
+        >>> acquire_leases_for_execution(
+        ...     store=store, catalog=ml.catalog,
+        ...     execution_rid="EXE-A",
+        ...     pending_ids=[1, 2, 3],
+        ... )
+    """
+    if not pending_ids:
+        return
+
+    # Filter to rows actually in 'staged'. Build a (pending_id, token)
+    # list; the order maps to the POST body order, which maps to the
+    # response order in _MockLeaseCatalog and in real ERMrest.
+    rows_to_lease: list[tuple[int, str]] = []
+    all_rows = {r["id"]: r for r in store.list_pending_rows(execution_rid=execution_rid)}
+    for pid in pending_ids:
+        row = all_rows.get(pid)
+        if row is None:
+            logger.warning(
+                "acquire_leases: pending_id %d not in execution %s; skipping",
+                pid, execution_rid,
+            )
+            continue
+        if row["status"] != str(PendingRowStatus.staged):
+            # Already leased or past; skip silently.
+            continue
+        rows_to_lease.append((pid, generate_lease_token()))
+
+    if not rows_to_lease:
+        return
+
+    # Phase 1: write 'leasing' + token to SQLite, committed.
+    # This MUST happen before the POST so that if we crash, the token
+    # is in SQLite and we can look it up on the server at reconcile.
+    for pid, token in rows_to_lease:
+        store.mark_pending_leasing(pid, lease_token=token)
+
+    # Phase 2: POST the batch. On failure, revert all.
+    tokens = [t for _, t in rows_to_lease]
+    try:
+        assigned = post_lease_batch(catalog=catalog, tokens=tokens)
+    except Exception:
+        logger.warning(
+            "acquire_leases: POST failed for execution %s; reverting %d rows to staged",
+            execution_rid, len(rows_to_lease),
+        )
+        for _, token in rows_to_lease:
+            store.revert_pending_leasing(lease_token=token)
+        raise
+
+    # Phase 3: finalize each row with its assigned RID.
+    for _, token in rows_to_lease:
+        assigned_rid = assigned.get(token)
+        if assigned_rid is None:
+            # Server response missing this token. Revert just this
+            # row; leave the others (they did succeed).
+            logger.warning(
+                "acquire_leases: token %s missing from server response "
+                "for execution %s; reverting that row",
+                token, execution_rid,
+            )
+            store.revert_pending_leasing(lease_token=token)
+        else:
+            store.finalize_pending_lease(lease_token=token, assigned_rid=assigned_rid)
+
+    logger.debug(
+        "acquire_leases: %d rows leased for execution %s",
+        len(rows_to_lease), execution_rid,
+    )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lease_orchestrator.py -v
+```
+
+Expected: 3 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/lease_orchestrator.py tests/execution/test_lease_orchestrator.py
+git commit -m "feat(execution): acquire_leases_for_execution orchestrator
+
+Two-phase protocol: mark 'leasing' in SQLite, POST batch, finalize
+with assigned RIDs. On POST failure, revert all marked rows back to
+'staged'. Idempotent — already-leased rows are skipped.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task F4: Startup lease reconciliation
+
+**Files:**
+- Modify: `src/deriva_ml/execution/lease_orchestrator.py`
+- Test: `tests/execution/test_lease_orchestrator.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_lease_orchestrator.py`:
+
+```python
+class _MockCatalogWithGet:
+    """Mock exposing GET for querying ERMrest_RID_Lease by token."""
+    def __init__(self, *, rows_by_id: dict[str, str] | None = None):
+        self.rows_by_id = rows_by_id or {}  # token → RID
+        self.get_paths: list[str] = []
+
+    def get(self, path: str, **_kw):
+        self.get_paths.append(path)
+        # Parse out the ID filter from the URL (ID=T1;ID=T2...).
+        import re
+        ids_param = re.search(r"ID=([^&]+)", path)
+        tokens = ids_param.group(1).split(";") if ids_param else []
+        tokens = [re.sub(r"^ID=", "", t) for t in tokens if t]
+        rows = [
+            {"ID": t, "RID": self.rows_by_id[t]}
+            for t in tokens
+            if t in self.rows_by_id
+        ]
+        class _R:
+            def __init__(self, rows): self._rows = rows
+            def json(self): return self._rows
+        return _R(rows)
+
+
+def test_reconcile_pending_leases_adopts_server_assigned(tmp_path):
+    """Row status='leasing' whose token exists on the server →
+    promoted to 'leased' with the server's RID."""
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T-FOUND")
+
+    cat = _MockCatalogWithGet(rows_by_id={"T-FOUND": "R-LATE"})
+    reconcile_pending_leases(store=store, catalog=cat, execution_rid="EXE-A")
+
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.leased)
+    assert row["rid"] == "R-LATE"
+
+
+def test_reconcile_pending_leases_reverts_missing(tmp_path):
+    """Row status='leasing' whose token doesn't exist on the server →
+    reverted to 'staged'."""
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid, lease_token="T-ORPHAN")
+
+    cat = _MockCatalogWithGet(rows_by_id={})  # nothing on server
+    reconcile_pending_leases(store=store, catalog=cat, execution_rid="EXE-A")
+
+    row = store.list_pending_rows(execution_rid="EXE-A")[0]
+    assert row["status"] == str(PendingRowStatus.staged)
+    assert row["lease_token"] is None
+
+
+def test_reconcile_pending_leases_workspace_wide(tmp_path):
+    """execution_rid=None reconciles across all executions."""
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+    from deriva_ml.execution.state_store import PendingRowStatus, ExecutionStatus
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    store = _setup_store(tmp_path)  # creates EXE-A
+    now = datetime.now(timezone.utc)
+    # Add a second execution.
+    store.insert_execution(
+        rid="EXE-B", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-B",
+        created_at=now, last_activity=now,
+    )
+    pid_a = store.insert_pending_row(
+        execution_rid="EXE-A", key="ka",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    pid_b = store.insert_pending_row(
+        execution_rid="EXE-B", key="kb",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+    store.mark_pending_leasing(pid_a, lease_token="TA")
+    store.mark_pending_leasing(pid_b, lease_token="TB")
+
+    cat = _MockCatalogWithGet(rows_by_id={"TA": "R-A", "TB": "R-B"})
+    reconcile_pending_leases(store=store, catalog=cat, execution_rid=None)
+
+    for rid, expected_r in [("EXE-A", "R-A"), ("EXE-B", "R-B")]:
+        row = store.list_pending_rows(execution_rid=rid)[0]
+        assert row["status"] == str(PendingRowStatus.leased)
+        assert row["rid"] == expected_r
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lease_orchestrator.py -v -k reconcile
+```
+
+Expected: FAIL with `ImportError`.
+
+- [ ] **Step 3: Implement `reconcile_pending_leases`**
+
+Append to `src/deriva_ml/execution/lease_orchestrator.py`:
+
+```python
+def reconcile_pending_leases(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    execution_rid: str | None = None,
+) -> None:
+    """Recover from a crash during the two-phase lease protocol.
+
+    Finds pending_rows in status='leasing' (the intermediate state
+    between SQLite write and POST response) and asks ERMrest_RID_Lease
+    whether each token made it to the server.
+
+    Per-token outcomes:
+    - Token exists on server → adopt the server RID, status → 'leased'.
+    - Token doesn't exist → POST never landed, revert to 'staged' so
+      the next acquire_leases reissues.
+
+    Call sites:
+    - On workspace open (no execution_rid arg: sweep all executions).
+    - On resume_execution of a specific rid (pass execution_rid).
+
+    Args:
+        store: ExecutionStateStore.
+        catalog: Live ErmrestCatalog.
+        execution_rid: If None, reconcile across the whole workspace.
+            Otherwise scope to one execution (cheaper — typical for
+            resume_execution JIT reconciliation).
+
+    Example:
+        >>> # Workspace-wide startup reconciliation:
+        >>> reconcile_pending_leases(store=store, catalog=ml.catalog)
+        >>> # Per-execution on resume:
+        >>> reconcile_pending_leases(
+        ...     store=store, catalog=ml.catalog,
+        ...     execution_rid="EXE-A",
+        ... )
+    """
+    leasing_rows = store.list_leasing_rows(execution_rid=execution_rid)
+    if not leasing_rows:
+        return
+
+    tokens = [r["lease_token"] for r in leasing_rows if r["lease_token"]]
+    if not tokens:
+        # Shouldn't happen — leasing rows always carry tokens — but
+        # be defensive.
+        return
+
+    # Query ERMrest_RID_Lease for the tokens we expect to find there.
+    # Use a filter clause: ID=t1;ID=t2;... (ERMrest's in-list syntax).
+    # Chunked to stay under URL length limits.
+    from deriva_ml.execution.rid_lease import PENDING_ROWS_LEASE_CHUNK
+
+    found_by_token: dict[str, str] = {}
+    for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
+        chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
+        filter_clause = ";".join(f"ID={t}" for t in chunk)
+        path = f"/entity/public:ERMrest_RID_Lease/{filter_clause}"
+        response = catalog.get(path)
+        for row in response.json():
+            found_by_token[row["ID"]] = row["RID"]
+
+    # Apply outcomes.
+    for row in leasing_rows:
+        token = row["lease_token"]
+        if token in found_by_token:
+            store.finalize_pending_lease(
+                lease_token=token,
+                assigned_rid=found_by_token[token],
+            )
+        else:
+            store.revert_pending_leasing(lease_token=token)
+
+    logger.info(
+        "lease reconciliation: %d rows, %d adopted, %d reverted (execution_rid=%s)",
+        len(leasing_rows),
+        len(found_by_token),
+        len(leasing_rows) - len(found_by_token),
+        execution_rid or "all",
+    )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lease_orchestrator.py -v
+```
+
+Expected: 6 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/execution/lease_orchestrator.py tests/execution/test_lease_orchestrator.py
+git commit -m "feat(lease): reconcile_pending_leases crash-recovery
+
+Finds status='leasing' rows, queries ERMrest_RID_Lease by token.
+Found → adopt; missing → revert to 'staged'. Workspace-wide or
+scoped. Called on workspace open (Task F5) and on resume_execution
+(Group D already stubbed the call path).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task F5: Hook lease reconciliation into workspace startup
+
+**Files:**
+- Modify: `src/deriva_ml/core/base.py` (`DerivaML.__init__` or post-init)
+- Test: `tests/execution/test_lease_orchestrator.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_lease_orchestrator.py`:
+
+```python
+def test_workspace_open_reconciles_leases(test_ml, monkeypatch):
+    """On DerivaML construction (online), startup sweep runs."""
+    calls: list[str | None] = []
+
+    def _spy(*, store, catalog, execution_rid):
+        calls.append(execution_rid)
+
+    from deriva_ml.execution import lease_orchestrator
+    monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
+
+    # Creating a DerivaML instance should trigger the sweep.
+    # test_ml is already constructed; construct another one to observe.
+    from deriva_ml import DerivaML
+    DerivaML(
+        hostname=test_ml.host_name,
+        catalog_id=test_ml.catalog_id,
+        working_dir=test_ml.working_dir,
+    )
+    # Sweep scoped workspace-wide (execution_rid=None).
+    assert None in calls
+
+
+def test_offline_workspace_skips_lease_reconcile(monkeypatch, tmp_path):
+    """In offline mode there's no server to query — skip the sweep."""
+    from deriva_ml.execution import lease_orchestrator
+    calls: list[str | None] = []
+    def _spy(**_kw): calls.append(_kw.get("execution_rid"))
+    monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
+
+    from deriva_ml import ConnectionMode, DerivaML
+    DerivaML(
+        hostname="offline.example",
+        catalog_id="1",
+        working_dir=str(tmp_path),
+        mode=ConnectionMode.offline,
+    )
+    assert calls == []
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lease_orchestrator.py -v -k workspace_open
+```
+
+Expected: FAIL — the sweep isn't wired in yet.
+
+- [ ] **Step 3: Add the hook**
+
+In `src/deriva_ml/core/base.py`, locate the end of `DerivaML.__init__`
+(after the workspace is ready). Add:
+
+```python
+        # Reconcile any pending_rows stuck in 'leasing' from a prior
+        # crash. Workspace-wide sweep; per-execution reconciliation
+        # runs additionally on resume_execution (Group D).
+        if self._mode is ConnectionMode.online:
+            from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+
+            try:
+                reconcile_pending_leases(
+                    store=self.workspace.execution_state_store(),
+                    catalog=self.catalog,
+                )
+            except Exception as exc:
+                # Best-effort. If reconciliation itself fails, log and
+                # move on — the user's operation can still proceed;
+                # the next acquire_leases call will retry.
+                logging.getLogger("deriva_ml").warning(
+                    "startup lease reconciliation failed (%s); continuing", exc,
+                )
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_lease_orchestrator.py -v
+```
+
+Expected: all passing.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/core/base.py tests/execution/test_lease_orchestrator.py
+git commit -m "feat(core): startup lease reconciliation on DerivaML init
+
+Online-only workspace-wide sweep of status='leasing' pending rows.
+Best-effort — failures log and continue. Offline mode skips (no
+server to query).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task F6: Also reconcile per-execution on `resume_execution`
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/execution.py` (extend `resume_execution`)
+- Test: `tests/execution/test_execution_registry.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/execution/test_execution_registry.py`:
+
+```python
+def test_resume_execution_per_rid_lease_reconcile(test_ml, monkeypatch):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+
+    calls: list[str | None] = []
+
+    def _spy(*, store, catalog, execution_rid):
+        calls.append(execution_rid)
+
+    from deriva_ml.execution import lease_orchestrator
+    monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
+
+    test_ml.resume_execution("EXE-A")
+    assert "EXE-A" in calls  # scoped reconciliation for this execution
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v -k per_rid_lease
+```
+
+Expected: FAIL.
+
+- [ ] **Step 3: Wire the scoped reconcile call**
+
+In `src/deriva_ml/core/mixins/execution.py`, in `resume_execution` (from
+Task D4), add after the `flush_pending_sync` / `reconcile_with_catalog`
+calls but BEFORE returning the Execution:
+
+```python
+    if self._mode is ConnectionMode.online:
+        from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+        # Scoped reconciliation. Cheaper than the workspace-wide sweep
+        # we did at DerivaML init, and guarantees this specific
+        # execution's pending rows are consistent before we hand out
+        # the Execution object.
+        try:
+            reconcile_pending_leases(
+                store=store, catalog=self.catalog,
+                execution_rid=execution_rid,
+            )
+        except Exception as exc:
+            logging.getLogger("deriva_ml").warning(
+                "per-execution lease reconciliation failed for %s (%s); continuing",
+                execution_rid, exc,
+            )
+```
+
+- [ ] **Step 4: Run test**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_registry.py -v
+```
+
+Expected: passes.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/deriva_ml/core/mixins/execution.py tests/execution/test_execution_registry.py
+git commit -m "feat(execution): resume_execution reconciles its own lease state
+
+Per-execution lease reconcile runs on resume_execution. Belt-and-
+suspenders on top of the workspace-wide sweep at DerivaML init —
+guarantees this specific execution is consistent before the
+Execution is handed to the caller.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+*(End of Task Group F — RID leasing, two-phase protocol, crash recovery.)*
+
+---
+
 
