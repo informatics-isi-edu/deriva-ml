@@ -210,6 +210,52 @@ def test_reconcile_pending_leases_reverts_missing(tmp_path):
     assert row["lease_token"] is None
 
 
+def test_reconcile_pending_leases_chunks_large_batches(tmp_path, monkeypatch):
+    """With PENDING_ROWS_LEASE_CHUNK=2 and 5 leasing rows, the orchestrator
+    issues ceil(5/2)=3 GET requests and transitions all 5 rows out of
+    'leasing' (mix of adopt/revert)."""
+    from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    # Patch the binding in lease_orchestrator (the import was moved to
+    # module top-of-file, so this is where the reconcile loop reads it).
+    monkeypatch.setattr(
+        "deriva_ml.execution.lease_orchestrator.PENDING_ROWS_LEASE_CHUNK", 2
+    )
+
+    store = _setup_store(tmp_path)
+    now = datetime.now(timezone.utc)
+    tokens = [f"TK-{i}" for i in range(5)]
+    for i, tok in enumerate(tokens):
+        pid = store.insert_pending_row(
+            execution_rid="EXE-A", key=f"k{i}",
+            target_schema="s", target_table="t",
+            metadata_json="{}", created_at=now,
+        )
+        store.mark_pending_leasing(pid, lease_token=tok)
+
+    # Mix: tokens 0, 2, 4 found on server; 1, 3 missing.
+    rows_by_id = {"TK-0": "R-0", "TK-2": "R-2", "TK-4": "R-4"}
+    cat = _MockCatalogWithGet(rows_by_id=rows_by_id)
+
+    reconcile_pending_leases(store=store, catalog=cat, execution_rid="EXE-A")
+
+    # ceil(5/2) = 3 chunks → 3 GET calls.
+    assert len(cat.get_paths) == 3
+
+    # All 5 rows should be out of 'leasing'.
+    rows = store.list_pending_rows(execution_rid="EXE-A")
+    assert len(rows) == 5
+    statuses = {r["key"]: r["status"] for r in rows}
+    rids = {r["key"]: r["rid"] for r in rows}
+    for i in (0, 2, 4):
+        assert statuses[f"k{i}"] == str(PendingRowStatus.leased)
+        assert rids[f"k{i}"] == f"R-{i}"
+    for i in (1, 3):
+        assert statuses[f"k{i}"] == str(PendingRowStatus.staged)
+        assert rids[f"k{i}"] is None
+
+
 def test_reconcile_pending_leases_workspace_wide(tmp_path):
     """execution_rid=None reconciles across all executions."""
     from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases

@@ -9,8 +9,13 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
-from deriva_ml.execution.rid_lease import generate_lease_token, post_lease_batch
+from deriva_ml.execution.rid_lease import (
+    PENDING_ROWS_LEASE_CHUNK,
+    generate_lease_token,
+    post_lease_batch,
+)
 from deriva_ml.execution.state_store import PendingRowStatus
 
 if TYPE_CHECKING:
@@ -177,35 +182,55 @@ def reconcile_pending_leases(
         # be defensive.
         return
 
+    # Index leasing rows by token for per-chunk apply.
+    rows_by_token = {r["lease_token"]: r for r in leasing_rows if r["lease_token"]}
+
     # Query ERMrest_RID_Lease for the tokens we expect to find there.
     # Use a filter clause: ID=t1;ID=t2;... (ERMrest's in-list syntax).
     # Chunked to stay under URL length limits.
-    from deriva_ml.execution.rid_lease import PENDING_ROWS_LEASE_CHUNK
+    #
+    # Apply outcomes PER CHUNK so partial progress is durable: if the
+    # GET fails midway, the chunks already applied are committed in
+    # SQLite, and the next reconcile cycle retries the remainder from
+    # a clean state.
+    adopted = 0
+    reverted = 0
+    try:
+        for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
+            chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
+            filter_clause = ";".join(f"ID={quote(t, safe='')}" for t in chunk)
+            path = f"/entity/public:ERMrest_RID_Lease/{filter_clause}"
+            response = catalog.get(path)
+            found_by_token = {row["ID"]: row["RID"] for row in response.json()}
 
-    found_by_token: dict[str, str] = {}
-    for i in range(0, len(tokens), PENDING_ROWS_LEASE_CHUNK):
-        chunk = tokens[i : i + PENDING_ROWS_LEASE_CHUNK]
-        filter_clause = ";".join(f"ID={t}" for t in chunk)
-        path = f"/entity/public:ERMrest_RID_Lease/{filter_clause}"
-        response = catalog.get(path)
-        for row in response.json():
-            found_by_token[row["ID"]] = row["RID"]
-
-    # Apply outcomes.
-    for row in leasing_rows:
-        token = row["lease_token"]
-        if token in found_by_token:
-            store.finalize_pending_lease(
-                lease_token=token,
-                assigned_rid=found_by_token[token],
-            )
-        else:
-            store.revert_pending_leasing(lease_token=token)
+            # Apply outcomes for THIS chunk's tokens only.
+            for token in chunk:
+                if token not in rows_by_token:
+                    continue
+                if token in found_by_token:
+                    store.finalize_pending_lease(
+                        lease_token=token,
+                        assigned_rid=found_by_token[token],
+                    )
+                    adopted += 1
+                else:
+                    store.revert_pending_leasing(lease_token=token)
+                    reverted += 1
+    except Exception:  # noqa: BLE001 — catalog GET can raise anything; we swallow to preserve partial progress
+        logger.warning(
+            "reconcile_pending_leases aborted partway through "
+            "(adopted=%d, reverted=%d of %d rows); next reconcile will retry",
+            adopted,
+            reverted,
+            len(leasing_rows),
+            exc_info=True,
+        )
+        return
 
     logger.info(
         "lease reconciliation: %d rows, %d adopted, %d reverted (execution_rid=%s)",
         len(leasing_rows),
-        len(found_by_token),
-        len(leasing_rows) - len(found_by_token),
+        adopted,
+        reverted,
         execution_rid or "all",
     )
