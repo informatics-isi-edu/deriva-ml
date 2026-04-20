@@ -88,3 +88,85 @@ def test_list_executions_carries_pending_counts(test_ml):
     assert len(rows) == 1
     assert rows[0].pending_rows == 1
     assert rows[0].pending_files == 0
+
+
+def test_resume_execution_reads_from_sqlite(test_ml, monkeypatch):
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+
+    # Isolate SQLite-read behavior: test_ml is online, but the
+    # catalog does not have a matching Execution row. Stub reconcile
+    # to keep this test focused on the registry read.
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.reconcile_with_catalog",
+        lambda *, store, catalog, execution_rid: None,
+    )
+
+    exe = test_ml.resume_execution("EXE-A")
+    assert exe.execution_rid == "EXE-A"
+
+
+def test_resume_execution_missing_raises(test_ml):
+    from deriva_ml.core.exceptions import DerivaMLException
+
+    import pytest
+    with pytest.raises(DerivaMLException) as exc:
+        test_ml.resume_execution("EXE-NOPE")
+    assert "EXE-NOPE" in str(exc.value)
+
+
+def test_resume_execution_offline_skips_reconcile(catalog_manager, tmp_path):
+    """Offline resume must not contact the server."""
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    catalog_manager.reset()
+    ml = DerivaML(
+        catalog_manager.hostname,
+        catalog_manager.catalog_id,
+        default_schema=catalog_manager.domain_schema,
+        working_dir=tmp_path,
+        use_minid=False,
+        mode=ConnectionMode.offline,
+    )
+    _insert_test_execution(
+        ml.workspace, "EXE-A", ExecutionStatus.stopped, mode="offline",
+    )
+
+    # Just must not raise — offline reconcile is a no-op.
+    exe = ml.resume_execution("EXE-A")
+    assert exe.execution_rid == "EXE-A"
+
+
+def test_resume_execution_online_flushes_sync_pending(test_ml, monkeypatch):
+    """If sync_pending=True on resume (online), flush to catalog."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+    # Simulate prior offline transition.
+    test_ml.workspace.execution_state_store().update_execution(
+        "EXE-A", sync_pending=True,
+    )
+
+    flushed_calls = []
+    reconcile_calls = []
+
+    def _fake_flush(*, store, catalog, execution_rid):
+        flushed_calls.append(execution_rid)
+        store.update_execution(execution_rid, sync_pending=False)
+
+    def _fake_reconcile(*, store, catalog, execution_rid):
+        reconcile_calls.append(execution_rid)
+
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.flush_pending_sync", _fake_flush,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.reconcile_with_catalog", _fake_reconcile,
+    )
+
+    exe = test_ml.resume_execution("EXE-A")
+    assert flushed_calls == ["EXE-A"]
+    # Reconcile runs AFTER flush (so we compare catalog vs synced state).
+    assert reconcile_calls == ["EXE-A"]

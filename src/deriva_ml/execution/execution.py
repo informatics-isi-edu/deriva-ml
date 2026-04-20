@@ -305,6 +305,48 @@ class Execution:
 
         self._initialize_execution(reload)
 
+    @classmethod
+    def _from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
+        """Bind an Execution to an existing SQLite registry row.
+
+        Distinct from create_execution: does NOT contact the catalog and
+        does NOT POST a new row. Called by ml.resume_execution.
+
+        Temporary implementation for Group D — Group E replaces the body
+        to wire up read-through lifecycle properties.
+
+        Args:
+            ml_object: The DerivaML instance this Execution is bound to.
+            execution_rid: The pre-existing Execution RID.
+
+        Returns:
+            A minimally-initialized Execution with just enough state for
+            execution_rid lookup.
+        """
+        # Minimal construction: skip the existing __init__'s catalog
+        # interactions. Store the rid and ml_object so Group E has a
+        # starting point.
+        instance = cls.__new__(cls)
+        instance._ml_object = ml_object
+        instance._model = ml_object.model
+        instance._logger = getattr(ml_object, "_logger", None)
+        instance.execution_rid = execution_rid
+        instance._dry_run = False
+        # Fields the existing class expects to exist:
+        instance.datasets = []
+        instance.dataset_rids = []
+        instance.asset_paths = {}
+        instance.configuration = None  # Group E loads from config_json
+        instance._working_dir = ml_object.working_dir
+        instance._cache_dir = ml_object.cache_dir
+        instance.start_time = None
+        instance.stop_time = None
+        instance._status = Status.created
+        instance.uploaded_assets = None
+        instance._execution_record = None
+        instance.workflow_rid = None
+        return instance
+
     def _save_runtime_environment(self):
         runtime_env_path = self.asset_file_path(
             asset_name="Execution_Metadata",

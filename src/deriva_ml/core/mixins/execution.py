@@ -20,6 +20,10 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record_v2 import (
     ExecutionRecord as _ExecutionRecordV2,
 )
+from deriva_ml.execution.state_machine import (
+    flush_pending_sync,
+    reconcile_with_catalog,
+)
 from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
@@ -324,6 +328,76 @@ class ExecutionMixin:
                 ExecutionStatus.failed,
                 ExecutionStatus.pending_upload,
             ],
+        )
+
+    def resume_execution(self, execution_rid: RID) -> "Execution":
+        """Re-hydrate an Execution from the workspace SQLite registry.
+
+        Works in both online and offline modes. The execution's recorded
+        mode is independent of the current DerivaML instance's mode — a
+        user can create an execution online, run it offline, then upload
+        online, all via the same RID.
+
+        Before returning, runs just-in-time state reconciliation
+        (spec §2.2): if online and sync_pending=True, flushes SQLite to
+        the catalog; then checks for catalog/SQLite disagreement and
+        applies the disagreement rules.
+
+        Args:
+            execution_rid: Server-assigned Execution RID returned by a
+                prior create_execution call.
+
+        Returns:
+            An Execution object bound to this DerivaML instance, with
+            lifecycle fields as SQLite read-through properties (see
+            spec §2.3).
+
+        Raises:
+            DerivaMLException: If no matching executions row exists in
+                the workspace registry.
+            DerivaMLStateInconsistency: If just-in-time reconciliation
+                surfaces a disagreement outside the six documented cases
+                (see state_machine.reconcile_with_catalog).
+
+        Example:
+            >>> ml = DerivaML(hostname="example.org", catalog_id="42")
+            >>> exe = ml.resume_execution("5-ABC")
+            >>> exe.status
+            <ExecutionStatus.stopped>
+            >>> exe.upload_outputs()
+        """
+        from deriva_ml.execution.execution import Execution
+
+        store = self.workspace.execution_state_store()
+        row = store.get_execution(execution_rid)
+        if row is None:
+            raise DerivaMLException(
+                f"Execution {execution_rid} is not in the workspace registry. "
+                f"Either it was never created on this workspace, or it was "
+                f"garbage-collected. Use ml.list_executions() to see what's "
+                f"available locally."
+            )
+
+        # Just-in-time reconciliation. Online only — offline mode has no
+        # catalog to compare against.
+        if self._mode is ConnectionMode.online:
+            # Order matters: flush first (push our newer state) before
+            # reconcile (which would otherwise see stale catalog state
+            # as a disagreement). See spec §4.6 step 3.
+            if row["sync_pending"]:
+                flush_pending_sync(
+                    store=store, catalog=self.catalog,
+                    execution_rid=execution_rid,
+                )
+            reconcile_with_catalog(
+                store=store, catalog=self.catalog,
+                execution_rid=execution_rid,
+            )
+
+        # Construct Execution bound to this DerivaML — it reads lifecycle
+        # fields from SQLite via read-through properties (Group E).
+        return Execution._from_registry(
+            ml_object=self, execution_rid=execution_rid,
         )
 
     def find_executions(
