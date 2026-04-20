@@ -7,14 +7,20 @@ execution status.
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.enums import Status
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.upload import asset_file_path, execution_rids
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution.execution_record_v2 import (
+    ExecutionRecord as _ExecutionRecordV2,
+)
+from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
@@ -249,6 +255,76 @@ class ExecutionMixin:
 
         # Create and return an execution instance
         return Execution(configuration, self, reload=execution_rid)  # type: ignore[arg-type]
+
+    def list_executions(
+        self,
+        *,
+        status: "ExecutionStatus | list[ExecutionStatus] | None" = None,
+        workflow_rid: str | None = None,
+        mode: "ConnectionMode | None" = None,
+        since: datetime | None = None,
+    ) -> list[_ExecutionRecordV2]:
+        """Return known-local executions matching the filters.
+
+        Reads from the workspace SQLite registry — no server contact.
+        Works in both online and offline mode.
+
+        Args:
+            status: Single ExecutionStatus or list to filter; None = all.
+            workflow_rid: Match only executions tagged with this Workflow
+                RID; None = all.
+            mode: ConnectionMode the execution was last active under;
+                None = all.
+            since: Return only executions with last_activity >= this
+                timestamp (timezone-aware). None = no time filter.
+
+        Returns:
+            List of ExecutionRecord dataclasses — one per matching row.
+            Empty list if nothing matches. Pending-row counts are derived
+            in the same pass.
+
+        Example:
+            >>> from deriva_ml.execution.state_store import ExecutionStatus
+            >>> failed = ml.list_executions(status=ExecutionStatus.failed)
+            >>> for rec in failed:
+            ...     print(rec.rid, rec.error)
+        """
+        store = self.workspace.execution_state_store()
+        rows = store.list_executions(
+            status=status, workflow_rid=workflow_rid,
+            mode=mode, since=since,
+        )
+        return [
+            _ExecutionRecordV2.from_row(
+                row, **store.count_pending_by_kind(execution_rid=row["rid"])
+            )
+            for row in rows
+        ]
+
+    def find_incomplete_executions(self) -> list[_ExecutionRecordV2]:
+        """Sugar over list_executions for everything not terminally done.
+
+        Returns executions in status in (created, running, stopped,
+        failed, pending_upload) — the set of things a user would want to
+        either resume, retry, or clean up. Excludes uploaded (terminal
+        success) and aborted (terminal cleanup).
+
+        Returns:
+            List of ExecutionRecord for incomplete runs.
+
+        Example:
+            >>> for rec in ml.find_incomplete_executions():
+            ...     print(rec.rid, rec.status, rec.pending_rows)
+        """
+        return self.list_executions(
+            status=[
+                ExecutionStatus.created,
+                ExecutionStatus.running,
+                ExecutionStatus.stopped,
+                ExecutionStatus.failed,
+                ExecutionStatus.pending_upload,
+            ],
+        )
 
     def find_executions(
         self,
