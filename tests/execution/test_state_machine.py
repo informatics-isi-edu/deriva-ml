@@ -58,3 +58,74 @@ def test_validate_transition_rejects_disallowed():
 def test_invalid_transition_error_is_deriva_ml_exception():
     from deriva_ml.core.exceptions import DerivaMLException
     assert issubclass(InvalidTransitionError, DerivaMLException)
+
+
+def test_transition_writes_sqlite(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.created,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    # Offline mode: no catalog argument, no sync attempt.
+    transition(
+        store=store,
+        catalog=None,                # offline → skip catalog sync
+        execution_rid="EXE-A",
+        current=ExecutionStatus.created,
+        target=ExecutionStatus.running,
+        mode=ConnectionMode.offline,
+        extra_fields={"start_time": now},
+    )
+
+    row = store.get_execution("EXE-A")
+    assert row["status"] == "running"
+    assert row["start_time"] is not None
+    # Offline transitions always set sync_pending=True.
+    assert row["sync_pending"] is True
+
+
+def test_transition_rejects_invalid(tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import (
+        InvalidTransitionError, transition,
+    )
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.uploaded,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+
+    with pytest.raises(InvalidTransitionError):
+        transition(
+            store=store, catalog=None, execution_rid="EXE-A",
+            current=ExecutionStatus.uploaded,
+            target=ExecutionStatus.running,
+            mode=ConnectionMode.offline,
+        )
