@@ -9359,4 +9359,756 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task Group H — `deriva-ml upload` CLI + integration tests + CHANGELOG
+
+Five tasks at moderate density — CLI is mostly glue, integration
+tests are assertions against the live catalog, CHANGELOG is a
+mechanical summary of breaking changes.
+
+### Task H1: `deriva-ml upload` CLI entry point
+
+**Files:**
+- Create: `src/deriva_ml/cli/upload.py`
+- Modify: `pyproject.toml` (add `[project.scripts]` entry)
+- Test: `tests/cli/test_upload_cli.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/cli/test_upload_cli.py`:
+
+```python
+"""Tests for the deriva-ml upload CLI."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+
+import pytest
+
+
+def test_cli_help_lists_flags():
+    """Smoke test: help text mentions the main flags."""
+    result = subprocess.run(
+        [sys.executable, "-m", "deriva_ml.cli.upload", "--help"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0
+    out = result.stdout
+    for flag in ["--host", "--catalog", "--execution",
+                 "--bandwidth-mbps", "--parallel", "--retry-failed"]:
+        assert flag in out, f"flag {flag!r} missing from --help"
+
+
+def test_cli_argparse_translates_to_upload_pending_kwargs(test_ml, monkeypatch, tmp_path):
+    """End-to-end argparse: --bandwidth-mbps 50 --parallel 8 →
+    upload_pending(bandwidth_limit_mbps=50, parallel_files=8)."""
+    from deriva_ml.cli import upload as upload_cli
+    from deriva_ml.execution.upload_engine import UploadReport
+
+    calls = []
+    def _fake_upload_pending(self, **kw):
+        calls.append(kw)
+        return UploadReport(
+            execution_rids=kw.get("execution_rids") or [],
+            total_uploaded=0, total_failed=0, per_table={},
+        )
+    monkeypatch.setattr(
+        "deriva_ml.DerivaML.upload_pending", _fake_upload_pending,
+    )
+
+    # Stub DerivaML construction to return our test_ml.
+    monkeypatch.setattr(
+        upload_cli, "_construct_ml",
+        lambda host, catalog, mode: test_ml,
+    )
+
+    exit_code = upload_cli.main([
+        "--host", "example.org",
+        "--catalog", "42",
+        "--bandwidth-mbps", "50",
+        "--parallel", "8",
+        "--retry-failed",
+    ])
+    assert exit_code == 0
+    assert calls[0]["bandwidth_limit_mbps"] == 50
+    assert calls[0]["parallel_files"] == 8
+    assert calls[0]["retry_failed"] is True
+
+
+def test_cli_execution_arg_accepts_multiple(test_ml, monkeypatch):
+    from deriva_ml.cli import upload as upload_cli
+    from deriva_ml.execution.upload_engine import UploadReport
+
+    calls = []
+    def _fake(self, **kw):
+        calls.append(kw)
+        return UploadReport(
+            execution_rids=kw.get("execution_rids") or [],
+            total_uploaded=0, total_failed=0, per_table={},
+        )
+    monkeypatch.setattr("deriva_ml.DerivaML.upload_pending", _fake)
+    monkeypatch.setattr(
+        upload_cli, "_construct_ml",
+        lambda host, catalog, mode: test_ml,
+    )
+
+    upload_cli.main([
+        "--host", "h", "--catalog", "c",
+        "--execution", "EXE-A",
+        "--execution", "EXE-B",
+    ])
+    assert calls[0]["execution_rids"] == ["EXE-A", "EXE-B"]
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/cli/test_upload_cli.py -v
+```
+
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement the CLI**
+
+Create `src/deriva_ml/cli/upload.py`:
+
+```python
+"""Command-line interface for deriva-ml upload.
+
+Wraps DerivaML.upload_pending so operator-driven uploads can be
+scheduled, backgrounded, or run on a different host from the
+compute. Typical invocations:
+
+    deriva-ml upload --host example.org --catalog 42
+
+    deriva-ml upload --host example.org --catalog 42 \\
+        --execution EXE-A --execution EXE-B \\
+        --bandwidth-mbps 50 --parallel 4
+
+    nohup deriva-ml upload --host example.org --catalog 42 &
+
+Per spec §2.11.4. Drives the same engine as ml.upload_pending.
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from deriva_ml import DerivaML
+
+logger = logging.getLogger(__name__)
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """Construct the argparse parser. Factored so tests can import."""
+    p = argparse.ArgumentParser(
+        prog="deriva-ml upload",
+        description=(
+            "Upload pending execution outputs to the catalog. Drains "
+            "workspace SQLite-staged rows and asset files via deriva-py's "
+            "resumable uploader. Safe to re-run after crashes — idempotent."
+        ),
+    )
+    p.add_argument(
+        "--host", required=True,
+        help="Deriva catalog hostname (e.g., example.org).",
+    )
+    p.add_argument(
+        "--catalog", required=True,
+        help="Catalog ID (e.g., 42).",
+    )
+    p.add_argument(
+        "--execution", action="append", dest="execution_rids",
+        help=(
+            "Execution RID to upload. Can be given multiple times. "
+            "If omitted, drains every execution that has pending work."
+        ),
+    )
+    p.add_argument(
+        "--retry-failed", action="store_true",
+        help="Include rows currently in status='failed'.",
+    )
+    p.add_argument(
+        "--bandwidth-mbps", type=int, default=None,
+        dest="bandwidth_limit_mbps",
+        help="Cap upload egress in Mbps. Unlimited if omitted.",
+    )
+    p.add_argument(
+        "--parallel", type=int, default=4, dest="parallel_files",
+        help="Concurrent file uploads per table (default 4).",
+    )
+    p.add_argument(
+        "--working-dir", default=".",
+        help="Workspace root (default: current directory).",
+    )
+    p.add_argument(
+        "--mode", choices=["online", "offline"], default="online",
+        help="Connection mode (default online — upload requires online).",
+    )
+    return p
+
+
+def _construct_ml(host: str, catalog: str, mode: str) -> "DerivaML":
+    """Construct a DerivaML instance from CLI args.
+
+    Factored so tests can monkeypatch a prebuilt test_ml instead of
+    connecting to a real catalog.
+    """
+    from deriva_ml import ConnectionMode, DerivaML
+    return DerivaML(hostname=host, catalog_id=catalog, mode=ConnectionMode(mode))
+
+
+def main(argv: "list[str] | None" = None) -> int:
+    """CLI entry point.
+
+    Args:
+        argv: Command-line arguments (without program name). If None,
+            use sys.argv[1:]. Argparse prints help to stderr and
+            exits with code 2 on parse error.
+
+    Returns:
+        Exit code: 0 success (no failures), 1 if any failures reported.
+
+    Example:
+        Run programmatically::
+
+            >>> from deriva_ml.cli.upload import main
+            >>> main(["--host", "example.org", "--catalog", "42"])
+    """
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    # Simple stderr logging config; deriva-ml's logger inherits.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    ml = _construct_ml(args.host, args.catalog, args.mode)
+    try:
+        report = ml.upload_pending(
+            execution_rids=args.execution_rids,
+            retry_failed=args.retry_failed,
+            bandwidth_limit_mbps=args.bandwidth_limit_mbps,
+            parallel_files=args.parallel_files,
+        )
+    except Exception as exc:
+        logger.error("upload_pending failed: %s", exc)
+        return 2
+
+    # Human-readable summary to stderr.
+    print(
+        f"upload complete: {report.total_uploaded} items uploaded, "
+        f"{report.total_failed} failed.",
+        file=sys.stderr,
+    )
+    for fqn, counts in report.per_table.items():
+        print(f"  {fqn}: +{counts['uploaded']} / -{counts['failed']}",
+              file=sys.stderr)
+    if report.errors:
+        print("failures:", file=sys.stderr)
+        for err in report.errors[:10]:
+            print(f"  - {err}", file=sys.stderr)
+        if len(report.errors) > 10:
+            print(f"  ... and {len(report.errors) - 10} more", file=sys.stderr)
+
+    return 0 if report.total_failed == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+- [ ] **Step 4: Register the script**
+
+In `pyproject.toml` `[project.scripts]`:
+
+```toml
+deriva-ml-upload = "deriva_ml.cli.upload:main"
+```
+
+Note: per grounding, the existing CLI entries use `deriva-ml-*` naming. To preserve that convention, the script is registered as `deriva-ml-upload`. Shell usage:
+
+```bash
+deriva-ml-upload --host example.org --catalog 42
+```
+
+If a future umbrella CLI is added (`deriva-ml upload ...` subcommand form), this entry can alias.
+
+- [ ] **Step 5: Reinstall in the editable dev env so the script appears**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv sync
+```
+
+- [ ] **Step 6: Run tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/cli/test_upload_cli.py -v
+```
+
+Expected: 3 passed.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add -A
+git commit -m "feat(cli): deriva-ml-upload — operator-driven upload command
+
+Wraps DerivaML.upload_pending. Flags: --host, --catalog, --execution
+(repeatable), --retry-failed, --bandwidth-mbps, --parallel,
+--working-dir, --mode. Exit code 0 on clean, 1 on partial failure,
+2 on fatal. Compatible with shell backgrounding (nohup, &,
+systemd, launchd).
+
+Registered as deriva-ml-upload in pyproject.toml scripts section
+matching existing deriva-ml-* entry-point naming convention.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task H2: End-to-end integration test (live catalog)
+
+**Files:**
+- Create: `tests/integration/test_phase1_end_to_end.py`
+
+- [ ] **Step 1: Write the test**
+
+Create `tests/integration/test_phase1_end_to_end.py`:
+
+```python
+"""End-to-end Phase 1 integration test: online create, offline stage,
+online upload. Requires DERIVA_HOST to point at a test catalog.
+
+Mirrors the three-script walkthrough in spec §3.
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+
+@pytest.mark.integration
+def test_online_create_offline_stage_online_upload(
+    catalog_manager, tmp_path,
+):
+    """Three-phase workflow producing a durable catalog result.
+
+    Step 1 (online): create_execution writes catalog Execution row +
+    SQLite registry row.
+    Step 2 (offline): resume_execution + stage rows via
+    insert_pending_row.
+    Step 3 (online): upload_pending drains the staged rows into the
+    catalog and the execution ends in status='uploaded'.
+    """
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    catalog_manager.ensure_populated()
+    host = catalog_manager.host
+    cid = catalog_manager.catalog_id
+
+    # Step 1: online — create execution.
+    ml_online = DerivaML(
+        hostname=host, catalog_id=cid,
+        working_dir=str(tmp_path),
+        mode=ConnectionMode.online,
+    )
+    exe = ml_online.create_execution(
+        description="phase1 e2e",
+        workflow="__test_workflow__",  # or a fixture-specific workflow url
+    )
+    exe_rid = exe.execution_rid
+    # Registry row present, status=created.
+    recs = ml_online.list_executions()
+    assert any(r.rid == exe_rid and r.status is ExecutionStatus.created for r in recs)
+
+    # Transition to running/stopped via the context manager.
+    with exe.execute():
+        # No work yet — just exercise the transition.
+        pass
+    assert exe.status is ExecutionStatus.stopped
+
+    # Step 2: offline — stage rows via direct insert_pending_row
+    # (Phase 1 engine harness; TableHandle.insert is Phase 2).
+    ml_offline = DerivaML(
+        hostname=host, catalog_id=cid,
+        working_dir=str(tmp_path),
+        mode=ConnectionMode.offline,
+    )
+    exe_resumed = ml_offline.resume_execution(exe_rid)
+    store = ml_offline.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    # Stage a Subject row. Adjust target_schema/table to fixture data.
+    store.insert_pending_row(
+        execution_rid=exe_rid,
+        key="k1",
+        target_schema="deriva-ml",
+        target_table="Subject",
+        metadata_json='{"Name": "Alice"}',
+        created_at=now,
+    )
+    # pending_summary reports it.
+    summary = exe_resumed.pending_summary()
+    assert summary.has_pending
+    assert summary.total_pending_rows == 1
+
+    # Step 3: online — upload.
+    ml_upload = DerivaML(
+        hostname=host, catalog_id=cid,
+        working_dir=str(tmp_path),
+        mode=ConnectionMode.online,
+    )
+    report = ml_upload.upload_pending(execution_rids=[exe_rid])
+    assert report.total_uploaded == 1
+    assert report.total_failed == 0
+
+    # Execution is now uploaded.
+    exe_final = ml_upload.resume_execution(exe_rid)
+    assert exe_final.status is ExecutionStatus.uploaded
+    # Pending summary clean.
+    assert not exe_final.pending_summary().has_pending
+
+
+@pytest.mark.integration
+def test_crash_resume_after_interrupted_upload(
+    catalog_manager, tmp_path, monkeypatch,
+):
+    """Simulate process death during upload → re-run drains cleanly."""
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.execution.state_store import ExecutionStatus
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    catalog_manager.ensure_populated()
+    host = catalog_manager.host
+    cid = catalog_manager.catalog_id
+
+    ml = DerivaML(
+        hostname=host, catalog_id=cid,
+        working_dir=str(tmp_path),
+        mode=ConnectionMode.online,
+    )
+    exe = ml.create_execution(
+        description="crash-resume",
+        workflow="__test_workflow__",
+    )
+    with exe.execute():
+        pass
+
+    store = ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    for i in range(5):
+        store.insert_pending_row(
+            execution_rid=exe.execution_rid, key=f"k{i}",
+            target_schema="deriva-ml", target_table="Subject",
+            metadata_json=f'{{"Name": "Alice{i}"}}',
+            created_at=now,
+        )
+
+    # Simulate mid-drain crash: wrap run_upload_engine to raise after
+    # processing 2 rows.
+    original = run_upload_engine
+    call_count = {"n": 0}
+
+    def _interrupted(**kw):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            # Mark 2 rows uploaded manually, then raise.
+            from deriva_ml.execution.state_store import PendingRowStatus
+            rows = store.list_pending_rows(
+                execution_rid=kw["execution_rids"][0],
+            )[:2]
+            for r in rows:
+                store.update_pending_row(
+                    r["id"], status=PendingRowStatus.uploaded,
+                    uploaded_at=datetime.now(timezone.utc),
+                )
+            raise RuntimeError("simulated crash mid-upload")
+        return original(**kw)
+
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.run_upload_engine", _interrupted,
+    )
+
+    with pytest.raises(RuntimeError, match="simulated crash"):
+        ml.upload_pending(execution_rids=[exe.execution_rid])
+
+    # Unpatch. Re-run — should pick up the 3 remaining rows.
+    monkeypatch.setattr(
+        "deriva_ml.core.mixins.execution.run_upload_engine", original,
+    )
+    report = ml.upload_pending(execution_rids=[exe.execution_rid])
+    assert report.total_uploaded == 3
+    assert report.total_failed == 0
+
+    # Final state: all uploaded.
+    counts = store.count_pending_by_kind(execution_rid=exe.execution_rid)
+    assert counts["pending_rows"] == 0
+    assert counts["failed_rows"] == 0
+```
+
+- [ ] **Step 2: Run the integration test**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/integration/test_phase1_end_to_end.py -v --timeout=600
+```
+
+Expected: 2 passed (requires a running catalog).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add tests/integration/test_phase1_end_to_end.py
+git commit -m "test(integration): Phase 1 end-to-end — online/offline/online workflow
+
+Tests the full three-script walkthrough from spec §3 against a live
+catalog. Also tests crash-resume: upload_pending raises mid-drain,
+a second upload_pending completes the remaining rows. Fixtures
+rely on catalog_manager + DERIVA_HOST per tests/conftest.py
+conventions.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task H3: CHANGELOG — Phase 1 breaking changes
+
+**Files:**
+- Modify: `CHANGELOG.md` (create if missing)
+
+- [ ] **Step 1: Verify the CHANGELOG exists or create it**
+
+```bash
+ls /Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/CHANGELOG.md 2>/dev/null \
+  || echo "# Changelog\n\nAll notable changes to this project are documented here.\n" > \
+       /Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/CHANGELOG.md
+```
+
+- [ ] **Step 2: Add the release section**
+
+Insert at the top of `CHANGELOG.md`:
+
+```markdown
+## Unreleased — Phase 1: SQLite-backed execution state
+
+### Breaking changes
+
+Per spec §1.3 and R5.1 (aggressive deprecation), the following APIs
+have been removed without a shim. Update call sites before upgrading.
+
+| Removed | Replacement |
+|---|---|
+| `ml.restore_execution(rid)` | `ml.resume_execution(rid)` |
+| `exe.upload_execution_outputs(...)` | `exe.upload_outputs(...)` |
+| `exe.retry_failed()` | `exe.upload_outputs(retry_failed=True)` |
+| `Execution.list_nested_executions()` | `ExecutionRecord.list_execution_children(recurse=...)` |
+| `ExecutionRecord.list_nested_executions(recurse=...)` | `ExecutionRecord.list_execution_children(recurse=...)` |
+| `ExecutionRecord.list_parent_executions(recurse=...)` | `ExecutionRecord.list_execution_parents(recurse=...)` |
+| `Execution.datasets` as `list[DatasetBag]` | `Execution.datasets` as `DatasetCollection` (RID-keyed mapping + iterable) |
+
+### New — execution state
+
+- `ConnectionMode` enum (`online`, `offline`) with string coercion.
+- `DerivaML(..., mode=ConnectionMode.online | offline)` — default online.
+- `DerivaMLOfflineError` raised when a create-execution is attempted
+  in offline mode.
+- `DerivaMLNoExecutionContext` raised when writes are attempted on an
+  `ml.table()` handle (reserved for Phase 2 TableHandle surface).
+- `DerivaMLStateInconsistency` raised when workspace SQLite and
+  catalog disagree in ways outside the six reconciliation rules
+  (spec §2.2).
+- Three new SQLite tables in the workspace engine:
+  `execution_state__executions`, `execution_state__pending_rows`,
+  `execution_state__directory_rules`. See
+  `ExecutionStateStore` in `deriva_ml.execution.state_store`.
+- Execution lifecycle module: `deriva_ml.execution.state_machine`
+  with `transition()`, `flush_pending_sync()`,
+  `reconcile_with_catalog()`, `create_catalog_execution()`.
+
+### New — public APIs
+
+- `ml.list_executions(status=, workflow_rid=, mode=, since=)` —
+  SQLite-only registry query returning `ExecutionRecord` dataclasses.
+- `ml.find_incomplete_executions()` — sugar for the non-terminal
+  status set.
+- `ml.resume_execution(execution_rid)` — re-hydrate from registry;
+  runs just-in-time reconciliation when online.
+- `ml.gc_executions(status=, older_than=, delete_working_dir=)` —
+  cleanup registry state (and optionally on-disk files).
+- `ml.pending_summary()` — workspace-wide `WorkspacePendingSummary`.
+- `ml.upload_pending(execution_rids=, retry_failed=, ...)` — blocking
+  upload for selected executions; None = drain all pending.
+- `ml.start_upload(...)` — non-blocking; returns `UploadJob`.
+- `exe.upload_outputs(...)`, `ExecutionRecord.upload_outputs(ml=, ...)`
+  — sugar for `ml.upload_pending(execution_rids=[self.rid], ...)`.
+- `exe.pending_summary()`, `ExecutionRecord.pending_summary(ml=)` —
+  per-execution `PendingSummary`.
+- `exe.abort()` — transition an execution to `aborted`.
+- `create_execution` accepts both a pre-built `ExecutionConfiguration`
+  and kwargs (`datasets=[...]`, `workflow=...`, `description=...`);
+  mixing raises `TypeError`. Dataset shorthand `"RID@version"` is
+  coerced via `DatasetSpecConfig.from_shorthand`.
+
+### Behavior changes
+
+- `Execution.status`, `.start_time`, `.stop_time`, `.error` are now
+  read-through SQLite properties — no in-memory caching. Mutations
+  from other processes are visible on the next read.
+- `Execution.__enter__`/`__exit__`/`abort` route through the state
+  machine (validated transitions, SQLite write, catalog sync).
+- Context-manager exit emits an INFO log with pending counts if any
+  rows are staged. Upload does NOT auto-run on exit (per R6.3).
+- Workspace open triggers a best-effort lease reconciliation
+  (`reconcile_pending_leases`) to recover from mid-flight crashes.
+
+### New CLI
+
+- `deriva-ml-upload --host --catalog [--execution RID...]
+  [--retry-failed] [--bandwidth-mbps N] [--parallel N]` — operator-
+  driven upload wrapping `ml.upload_pending`. Exit codes: 0 clean,
+  1 partial failures, 2 fatal.
+
+### Phase 2 deferred
+
+Per spec §2.13, these sections remain provisional pending the
+feature-consistency follow-on:
+
+- Full `TableHandle` / `AssetTableHandle` surface
+  (`handle.insert(...)`, `asset_file(...)`, `asset_directory(...)`,
+  `handle.record_class()`, etc.). Phase 1 engine tests stage rows
+  directly via `ExecutionStateStore.insert_pending_row`.
+- `_drain_work_item` feature-aware pre-insert validation.
+- `Metric` / `Param` as first-class concepts parallel to features
+  (spec §8).
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add CHANGELOG.md
+git commit -m "docs(changelog): Phase 1 breaking changes + new APIs
+
+Enumerates every rename (R5.1 hard cutovers), every new public API,
+behavior changes (read-through properties, state machine routing,
+exit log), the new CLI, and the Phase 2 deferrals.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task H4: Run the full test suite
+
+**Files:** none (verification only)
+
+- [ ] **Step 1: Unit tests**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest \
+  tests/core/ tests/local_db/ tests/asset/ tests/model/ \
+  tests/execution/test_state_store.py \
+  tests/execution/test_state_machine.py \
+  tests/execution/test_execution_registry.py \
+  tests/execution/test_execution_record_v2.py \
+  tests/execution/test_execution_readthrough.py \
+  tests/execution/test_execution_hierarchy.py \
+  tests/execution/test_dataset_collection.py \
+  tests/execution/test_rid_lease.py \
+  tests/execution/test_lease_orchestrator.py \
+  tests/execution/test_pending_summary.py \
+  tests/execution/test_upload_engine.py \
+  tests/execution/test_upload_public_api.py \
+  tests/cli/ \
+  -q --timeout=300
+```
+
+Expected: all green. If any Phase 1 unit test fails, re-dispatch the implementer to fix the offending task before proceeding.
+
+- [ ] **Step 2: Integration tests (needs running catalog)**
+
+```bash
+DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost \
+  uv run pytest tests/integration/test_phase1_end_to_end.py \
+  -v --timeout=600
+```
+
+Expected: 2 passed. If the catalog isn't running, mark as a known failure and fix before merging.
+
+- [ ] **Step 3: Lint**
+
+```bash
+uv run ruff check src/
+uv run ruff format --check src/
+```
+
+Expected: clean. Fix whatever `ruff check` reports.
+
+- [ ] **Step 4: No commit — verification task**
+
+If all three steps pass, Phase 1 is ready for final review. If any fail, return to the failing group and fix.
+
+---
+
+### Task H5: Final code review + pre-merge smoke run
+
+**Files:** none (verification + dispatch)
+
+- [ ] **Step 1: Dispatch a `superpowers:code-reviewer` subagent**
+
+Per `superpowers:subagent-driven-development`, after the final task completes, run a fresh code-review pass on the entire Phase 1 diff:
+
+```
+Subagent: superpowers:code-reviewer
+Task: review the entire Phase 1 implementation (commits from the
+first Group A commit through Group H) against spec
+docs/superpowers/specs/2026-04-18-sqlite-execution-state-design.md
+(revisions 6 + follow-ups through §2.17).
+
+Check: spec coverage (every section has an implementation or is
+correctly marked Phase 2); §2.17 naming/ordering conformance;
+docstring tiers per §2.15 (Tier 1 on all public, Tier 2 on complex
+private, Tier 3 on non-obvious logic); CHANGELOG completeness.
+
+Report any gaps as blocker / important / nit. Implementer addresses
+blockers and important issues before merge.
+```
+
+- [ ] **Step 2: Address reviewer findings**
+
+Follow the subagent-driven-development pattern: re-dispatch the
+implementer to fix any blocker / important items, re-run the code
+reviewer until approved.
+
+- [ ] **Step 3: Squash-merge or direct push**
+
+Once approved, invoke `superpowers:finishing-a-development-branch`
+to finalize (PR → review → merge to main).
+
+---
+
+*(End of Task Group H — CLI, integration tests, CHANGELOG, final review.)*
+
+---
+
+## Post-Phase-1
+
+After Phase 1 merges to main:
+
+1. Begin the feature-consistency follow-on spec (`docs/superpowers/specs/YYYY-MM-DD-feature-metric-param-consistency.md`) per spec §8.
+2. The follow-on spec will determine whether `TableHandle` / `AssetTableHandle` need modification, whether `_drain_work_item` needs feature-aware pre-insert validation, and whether `Metric` / `Param` require new tables.
+3. Phase 2 implementation plan is written after the follow-on spec is approved; it finalizes §2.10 and §2.11.2 step 6 alongside the metric/param machinery.
+
+Phase 2 is **not** part of this plan.
 
