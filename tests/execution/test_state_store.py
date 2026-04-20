@@ -109,3 +109,24 @@ def test_indexes_created(tmp_path):
         f"missing (execution_rid, status) index; have: {pending_indexes}"
     assert any("execution_rid" in n and "target_table" in n for n in pending_indexes), \
         f"missing (execution_rid, target_table) index; have: {pending_indexes}"
+
+
+def test_workspace_exposes_execution_state_store(tmp_path):
+    from deriva_ml.local_db.workspace import Workspace
+
+    ws = Workspace(
+        working_dir=tmp_path,
+        hostname="test.example.org",
+        catalog_id="1",
+    )
+    try:
+        store = ws.execution_state_store()
+        assert isinstance(store, ExecutionStateStore)
+        # Tables must exist — ensure_schema ran.
+        from sqlalchemy import inspect
+        inspector = inspect(ws.engine)
+        assert EXECUTIONS_TABLE in inspector.get_table_names()
+        # Second call returns the same instance (cached).
+        assert ws.execution_state_store() is store
+    finally:
+        ws.close()
