@@ -625,18 +625,30 @@ def _invoke_deriva_py_uploader(
         # Resolve symlinks in the temp dir path so the scan-path ↔
         # input-path map lines up with what GenericUploader records
         # (which uses canonical absolute paths after Path.rglob/resolve).
-        scan_root = Path(scan_root_str).resolve()
+        tmp_root = Path(scan_root_str).resolve()
 
-        # Build the symlink farm:
-        # <scan_root>/<schema>/<table>/<md1>/.../<filename>
-        for f in files:
+        # deriva-py's asset_path_regex (src/deriva_ml/dataset/upload.py)
+        # requires the scan path to match:
+        #   .*/deriva-ml/execution/<exec_rid>/asset/<schema>/<table>/<metadata>/<file>
+        # We pass scan_root = <tmp_root>/deriva-ml to the uploader so
+        # the upload_root_regex (which ends in `/deriva-ml`) matches.
+        scan_root = tmp_root / "deriva-ml"
+        asset_root = scan_root / "execution" / execution_rid / "asset"
+
+        def _path_for(f: dict) -> Path:
+            """Compute the regex-expected path for one input file."""
             src = Path(f["path"]).resolve()
             metadata = f.get("metadata") or {}
-            target_dir = scan_root / schema_name / target_table
+            target_dir = asset_root / schema_name / target_table
             for col in metadata_cols:
                 target_dir = target_dir / str(metadata.get(col, "None"))
-            target_dir.mkdir(parents=True, exist_ok=True)
-            target = target_dir / src.name
+            return target_dir / src.name
+
+        # Build the symlink farm.
+        for f in files:
+            src = Path(f["path"]).resolve()
+            target = _path_for(f)
+            target.parent.mkdir(parents=True, exist_ok=True)
             if target.exists():
                 continue
             try:
@@ -668,13 +680,9 @@ def _invoke_deriva_py_uploader(
         # Map scan-root path (what uploader.file_status uses as keys)
         # back to original input path for SQLite attribution.
         scan_path_to_input: dict[str, str] = {}
-        for abs_input, row_dict in rows_by_path.items():
-            src = Path(abs_input)
-            metadata = row_dict.get("metadata") or {}
-            target_dir = scan_root / schema_name / target_table
-            for col in metadata_cols:
-                target_dir = target_dir / str(metadata.get(col, "None"))
-            scan_path_to_input[str(target_dir / src.name)] = abs_input
+        for f in files:
+            abs_input = str(Path(f["path"]).resolve())
+            scan_path_to_input[str(_path_for(f))] = abs_input
 
         def _apply_state_to_sqlite(scan_path: str, state_info: dict) -> None:
             """Idempotent: translate one uploader status dict to a SQLite write."""
@@ -720,10 +728,22 @@ def _invoke_deriva_py_uploader(
                 return -1  # hatrac abort signal
             return True
 
+        uploaded: list[str] = []
+        failed: list[dict] = []
         try:
             uploader.initialize(cleanup=False)
             uploader.getUpdatedConfig()
-            uploader.scanDirectory(scan_root, abort_on_invalid_input=True)
+            # abort_on_invalid_input=False so stray files under scan_root
+            # (deriva-py's transfer-state JSON, etc.) don't kill the whole
+            # batch. We attribute results by file_status dict afterward.
+            uploader.scanDirectory(scan_root, abort_on_invalid_input=False)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "upload: scan found %d groups; skipped %d files under %s",
+                    len(uploader.file_list),
+                    len(uploader.skipped_files),
+                    scan_root,
+                )
             uploader.uploadFiles(
                 status_callback=status_callback,
                 file_callback=file_callback,
@@ -732,25 +752,23 @@ def _invoke_deriva_py_uploader(
             # Reconciliation pass — catch anything the callback missed.
             for scan_path, info in uploader.file_status.items():
                 _apply_state_to_sqlite(scan_path, info)
+
+            # Build the return dict BEFORE cleanup() clears file_status.
+            for scan_path, info in uploader.file_status.items():
+                input_path = scan_path_to_input.get(scan_path)
+                if input_path is None:
+                    continue
+                state = info.get("State")
+                if state == UploadState.Success:
+                    uploaded.append(input_path)
+                elif state == UploadState.Failed:
+                    failed.append({
+                        "path": input_path,
+                        "error": info.get("Status") or "upload failed",
+                    })
         finally:
             try:
                 uploader.cleanup()
             except Exception:
                 pass
-
-        # Build return dict by walking final file_status one more time.
-        uploaded: list[str] = []
-        failed: list[dict] = []
-        for scan_path, info in uploader.file_status.items():
-            input_path = scan_path_to_input.get(scan_path)
-            if input_path is None:
-                continue
-            state = info.get("State")
-            if state == UploadState.Success:
-                uploaded.append(input_path)
-            elif state == UploadState.Failed:
-                failed.append({
-                    "path": input_path,
-                    "error": info.get("Status") or "upload failed",
-                })
         return {"uploaded": uploaded, "failed": failed}
