@@ -331,3 +331,31 @@ def test_load_from_code_simple_tabledef(tmp_path):
     assert len(t.foreign_keys) == 1
     assert t.foreign_keys[0].columns == ["Workflow"]
     assert t.foreign_keys[0].referenced_table == "Workflow"
+
+
+def test_load_from_code_vocabulary_with_terms(tmp_path):
+    """A VocabularyTableDef plus _ensure_terms yields a vocabulary TableModel."""
+    from deriva_ml.tools.validate_schema_doc import load_from_code
+
+    fixture = tmp_path / "fixture_vocab.py"
+    fixture.write_text(
+        'from deriva.core.typed import VocabularyTableDef\n'
+        'from deriva_ml.core.definitions import MLVocab\n'
+        '\n'
+        'def create():\n'
+        '    schema.create_table(\n'
+        '        VocabularyTableDef(name=MLVocab.workflow_type, curie_template="x:{RID}")\n'
+        '    )\n'
+        '\n'
+        'def seed():\n'
+        '    _ensure_terms(MLVocab.workflow_type, [\n'
+        '        {"Name": "Training", "Description": "Train a model"},\n'
+        '        {"Name": "Testing", "Description": "Evaluate a model"},\n'
+        '    ])\n'
+    )
+    model = load_from_code(fixture)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.name == "Workflow_Type"
+    assert t.kind == "vocabulary"
+    assert [term.name for term in t.terms] == ["Training", "Testing"]

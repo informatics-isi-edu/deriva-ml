@@ -351,28 +351,103 @@ def _callable_name(node: ast.Call) -> str:
     return ""
 
 
+def _extract_vocabulary(node: ast.Call) -> TableModel:
+    """Extract a VocabularyTableDef(name=..., curie_template=...) call."""
+    name: str = ""
+    for kw in node.keywords:
+        if kw.arg == "name":
+            name = _extract_ast_name_or_enum(kw.value)
+    return TableModel(name=name, kind="vocabulary")
+
+
+def _extract_ensure_terms(node: ast.Call) -> tuple[str, list[VocabularyTermModel]]:
+    """Extract (vocab_name, terms) from an _ensure_terms(vocab, [...]) call."""
+    if len(node.args) < 2:
+        raise SchemaCodeError(
+            f"_ensure_terms expects 2 positional args, got {len(node.args)}"
+        )
+    vocab_name = _extract_ast_name_or_enum(node.args[0])
+    terms_list = node.args[1]
+    if not isinstance(terms_list, ast.List):
+        raise SchemaCodeError(
+            f"_ensure_terms second arg must be a list literal, got "
+            f"{ast.dump(terms_list)}"
+        )
+    terms: list[VocabularyTermModel] = []
+    for elt in terms_list.elts:
+        if not isinstance(elt, ast.Dict):
+            raise SchemaCodeError(
+                f"_ensure_terms term must be a dict literal, got "
+                f"{ast.dump(elt)}"
+            )
+        name_val: str | None = None
+        for k, v in zip(elt.keys, elt.values, strict=True):
+            if (
+                isinstance(k, ast.Constant)
+                and k.value == "Name"
+                and isinstance(v, ast.Constant)
+                and isinstance(v.value, str)
+            ):
+                name_val = v.value
+        if name_val is None:
+            raise SchemaCodeError(
+                f"_ensure_terms term missing 'Name': {ast.dump(elt)}"
+            )
+        terms.append(VocabularyTermModel(name=name_val))
+    return vocab_name, terms
+
+
 def load_from_code(path: Path) -> SchemaModel:
     """Parse create_schema.py AST into a SchemaModel.
 
-    Walks the tree looking for TableDef, VocabularyTableDef,
-    Table.define_association, and _ensure_terms calls.
+    Walks the tree for:
+      - TableDef(...)              → plain table
+      - VocabularyTableDef(...)    → vocabulary table (terms populated below)
+      - Table.define_association(...) → association table (C4)
+      - _ensure_terms(vocab, [...]) → seed terms for a vocab table
+
+    After walking, vocab tables have their terms populated by matching
+    _ensure_terms vocab_name to TableModel.name.
 
     Args:
-        path: Path to create_schema.py or a fixture module.
+        path: Path to create_schema.py or a fixture.
 
     Returns:
-        SchemaModel with one TableModel per table definition found.
+        SchemaModel with all discovered TableModels, vocab terms filled in.
 
     Raises:
         SchemaCodeError: If a call pattern can't be statically extracted.
     """
     tree = ast.parse(path.read_text(), filename=str(path))
     tables: list[TableModel] = []
+    # Map from vocab table name → list of VocabularyTermModel to apply later.
+    terms_by_vocab: dict[str, list[VocabularyTermModel]] = {}
+
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         name = _callable_name(node)
         if name == "TableDef":
             tables.append(_extract_tabledef(node))
-        # Vocabulary / association / _ensure_terms handled in C3 / C4.
-    return SchemaModel(tables=tables)
+        elif name == "VocabularyTableDef":
+            tables.append(_extract_vocabulary(node))
+        elif name == "_ensure_terms":
+            vocab_name, terms = _extract_ensure_terms(node)
+            terms_by_vocab.setdefault(vocab_name, []).extend(terms)
+
+    # Apply accumulated terms to matching vocab tables.
+    tables_with_terms: list[TableModel] = []
+    for t in tables:
+        if t.kind == "vocabulary" and t.name in terms_by_vocab:
+            tables_with_terms.append(TableModel(
+                name=t.name,
+                kind=t.kind,
+                columns=t.columns,
+                foreign_keys=t.foreign_keys,
+                terms=terms_by_vocab[t.name],
+                associates=t.associates,
+                metadata=t.metadata,
+            ))
+        else:
+            tables_with_terms.append(t)
+    return SchemaModel(tables=tables_with_terms)
