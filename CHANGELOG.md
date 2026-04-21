@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Phase 2 Subsystem 0: Schema-doc source of truth
+
+### New
+
+- **`docs/reference/schema.md`** — authoritative description of the `deriva-ml` schema (tables, columns, FKs, vocabulary seeded terms). Edit this file **first** when changing the schema, then update `src/deriva_ml/schema/create_schema.py` to match.
+- **`deriva-ml-validate-schema`** CLI (`src/deriva_ml/tools/validate_schema_doc.py`) — asserts the doc and code agree on structure and seeded terms. Exit 0 on match, 1 on mismatch, 2 on parse error.
+- **CI workflow** `.github/workflows/validate-schema.yml` — runs the validator on every PR and push to main.
+- **`docs/reference/README.md`** — developer workflow instructions for doc-first schema changes.
+
+### Changed
+
+- Schema changes now **require editing two files together**: `docs/reference/schema.md` and `src/deriva_ml/schema/create_schema.py`. CI enforces they agree.
+
+### Known limitations
+
+- The validator's static AST walker cannot extract dynamically-named tables created via parameterized calls like `create_asset_table(asset_name=...)`. These tables (`Asset`, `File`, `Execution_Execution`, `Execution_Metadata`, `Execution_Asset`) exist at runtime but aren't cross-validated against the doc. The exemption is documented in `tests/tools/test_schema_doc_structure.py`.
+- `referenced_schema` in FKs is often written as a parameter (`sname`) or attribute (`schema.name`) in the code. The validator resolves these to a `<dynamic>` sentinel and treats them as matching any doc-side value.
+
+### Not yet supported (filed follow-ups)
+
+- Direction 2: `deriva-ml-validate-schema --against=catalog` for live-catalog drift detection.
+- Description validation (table/column prose on doc vs `comment=` on code).
+- Annotation validation (display configs, `curie_template`, indexes).
+- Ordering-convention test (warn-not-fail on section ordering violations in schema.md).
+
+---
+
 ## Unreleased — Phase 1: SQLite-backed execution state
 
 ### Breaking changes
