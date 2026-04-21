@@ -60,29 +60,9 @@ class ExecutionMixin:
     model: "DerivaModel"
     ml_schema: str
     working_dir: Path
-    status: str
     pathBuilder: Callable[[], Any]
     retrieve_rid: Callable[[RID], dict[str, Any]]
     _execution: "Execution"
-
-    def _update_status(self, new_status: Status, status_detail: str, execution_rid: RID) -> None:
-        """Update the status of an execution in the catalog.
-
-        Args:
-            new_status: New status.
-            status_detail: Details of the status.
-            execution_rid: Resource Identifier (RID) of the execution.
-        """
-        self.status = new_status.value
-        self.pathBuilder().schemas[self.ml_schema].Execution.update(
-            [
-                {
-                    "RID": execution_rid,
-                    "Status": self.status,
-                    "Status_Detail": status_detail,
-                }
-            ]
-        )
 
     def create_execution(
         self,

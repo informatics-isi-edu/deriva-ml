@@ -46,7 +46,7 @@ GlobusNativeLogin = _globus_auth_utils.GlobusNativeLogin
 
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.connection_mode import ConnectionMode
-from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition, VocabularyTableDef
+from deriva_ml.core.definitions import ML_SCHEMA, RID, TableDefinition, VocabularyTableDef
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
 from deriva_ml.core.mixins import (
@@ -350,7 +350,6 @@ class DerivaML(
         self.default_schema = self.model.default_schema
         self.project_name = project_name or self.default_schema or "deriva-ml"
         self.start_time = datetime.now()
-        self.status = Status.pending.value
         self.clean_execution_dir = clean_execution_dir
 
         # Reconcile any pending_rows stuck in 'leasing' from a prior
@@ -374,12 +373,23 @@ class DerivaML(
                 )
 
     def __del__(self) -> None:
-        """Cleanup method to handle incomplete executions."""
+        """Cleanup method to handle incomplete executions.
+
+        Best-effort abort on DerivaML shutdown. The previous implementation
+        used the legacy `Status` enum; the new `ExecutionStatus` lifecycle
+        separates Stopped/Uploaded/Aborted/Failed. Here we only attempt to
+        abort if the execution hasn't already reached a terminal state —
+        InvalidTransitionError from the state machine covers the rest.
+        """
+        # Inline import to avoid a circular (core.base ↔ execution.state_store) import.
         try:
-            # Mark execution as aborted if not completed
-            if self._execution and self._execution.status != Status.completed:
-                self._execution.update_status(Status.aborted, "Execution Aborted")
-        except (AttributeError, requests.HTTPError):
+            from deriva_ml.execution.state_store import ExecutionStatus
+
+            if self._execution and self._execution.status is not ExecutionStatus.Aborted:
+                self._execution.update_status(ExecutionStatus.Aborted, error="Execution Aborted")
+        except Exception:
+            # Any failure here (catalog unreachable, InvalidTransition, etc.)
+            # is swallowed — __del__ must not raise.
             pass
 
     @staticmethod
