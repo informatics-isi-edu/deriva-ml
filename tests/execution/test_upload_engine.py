@@ -40,7 +40,7 @@ def test_stage_plain_row_appends_pending(tmp_path):
         workflow_rid=None,
         description=None,
         config_json="{}",
-        status=ExecutionStatus.running,
+        status=ExecutionStatus.Running,
         mode=ConnectionMode.online,
         working_dir_rel="execution/EXE-A",
         created_at=now,
@@ -464,7 +464,7 @@ def test_run_upload_engine_partial_drain_failed_rows_mark_execution_failed(
     assert report.total_uploaded == 0
     # Execution is in 'failed' status because A actually failed.
     row = store.get_execution(exe.execution_rid)
-    assert row["status"] == str(ExecutionStatus.failed)
+    assert row["status"] == str(ExecutionStatus.Failed)
     # Crucially: B's pending row was NOT marked failed. It's still
     # in its prior non-terminal status (leased after _fake_acquire),
     # so a future upload_pending run without retry_failed will pick

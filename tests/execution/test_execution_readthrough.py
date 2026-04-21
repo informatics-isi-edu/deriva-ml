@@ -40,13 +40,13 @@ def test_status_reads_from_sqlite(test_ml):
 
     # Direct SQLite mutation (simulating state_machine.transition):
     store = test_ml.workspace.execution_state_store()
-    store.update_execution(exe.execution_rid, status=ExecutionStatus.running)
+    store.update_execution(exe.execution_rid, status=ExecutionStatus.Running)
 
     # exe.status must reflect the change on the very next read.
-    assert exe.status is ExecutionStatus.running
+    assert exe.status is ExecutionStatus.Running
 
-    store.update_execution(exe.execution_rid, status=ExecutionStatus.stopped)
-    assert exe.status is ExecutionStatus.stopped
+    store.update_execution(exe.execution_rid, status=ExecutionStatus.Stopped)
+    assert exe.status is ExecutionStatus.Stopped
 
 
 def test_status_reflects_second_process(test_ml, monkeypatch):
@@ -68,10 +68,10 @@ def test_status_reflects_second_process(test_ml, monkeypatch):
     exe_b = test_ml.resume_execution(exe_a.execution_rid)
 
     store = test_ml.workspace.execution_state_store()
-    store.update_execution(exe_a.execution_rid, status=ExecutionStatus.running)
+    store.update_execution(exe_a.execution_rid, status=ExecutionStatus.Running)
 
-    assert exe_a.status is ExecutionStatus.running
-    assert exe_b.status is ExecutionStatus.running
+    assert exe_a.status is ExecutionStatus.Running
+    assert exe_b.status is ExecutionStatus.Running
 
 
 def test_status_raises_if_registry_gone(test_ml):
@@ -95,12 +95,12 @@ def test_execute_enter_transitions_to_running(test_ml):
     from deriva_ml.execution.state_store import ExecutionStatus
 
     exe = _make_exe(test_ml, "E2 enter test")
-    assert exe.status is ExecutionStatus.created
+    assert exe.status is ExecutionStatus.Created
 
     with exe.execute() as _e:
-        assert exe.status is ExecutionStatus.running
+        assert exe.status is ExecutionStatus.Running
 
-    assert exe.status is ExecutionStatus.stopped
+    assert exe.status is ExecutionStatus.Stopped
 
 
 def test_execute_exit_with_exception_transitions_to_failed(test_ml):
@@ -116,7 +116,7 @@ def test_execute_exit_with_exception_transitions_to_failed(test_ml):
         with exe.execute():
             raise RuntimeError("boom")
 
-    assert exe.status is ExecutionStatus.failed
+    assert exe.status is ExecutionStatus.Failed
     # error message captured:
     assert "boom" in (exe.error or "")
 
@@ -127,7 +127,7 @@ def test_abort_transitions_to_aborted(test_ml):
 
     exe = _make_exe(test_ml, "E2 abort test")
     exe.abort()
-    assert exe.status is ExecutionStatus.aborted
+    assert exe.status is ExecutionStatus.Aborted
 
 
 def test_start_stop_time_readthrough(test_ml):
@@ -164,5 +164,5 @@ def test_repr_includes_status_and_pending(test_ml):
 
     r = repr(exe)
     assert exe.execution_rid in r
-    assert "created" in r   # status (SQLite is lowercase ExecutionStatus)
+    assert "Created" in r   # status (SQLite is title-case ExecutionStatus)
     assert "1" in r         # pending count

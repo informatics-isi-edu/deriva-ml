@@ -14,45 +14,45 @@ from deriva_ml.execution.state_store import ExecutionStatus
 
 def test_allowed_transitions_cover_all_happy_paths():
     # created → running → stopped → pending_upload → uploaded
-    assert (ExecutionStatus.created, ExecutionStatus.running) in ALLOWED_TRANSITIONS
-    assert (ExecutionStatus.running, ExecutionStatus.stopped) in ALLOWED_TRANSITIONS
-    assert (ExecutionStatus.stopped, ExecutionStatus.pending_upload) in ALLOWED_TRANSITIONS
-    assert (ExecutionStatus.pending_upload, ExecutionStatus.uploaded) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.Created, ExecutionStatus.Running) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.Running, ExecutionStatus.Stopped) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.Stopped, ExecutionStatus.Pending_Upload) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.Pending_Upload, ExecutionStatus.Uploaded) in ALLOWED_TRANSITIONS
 
 
 def test_allowed_transitions_cover_failure_paths():
-    assert (ExecutionStatus.running, ExecutionStatus.failed) in ALLOWED_TRANSITIONS
-    assert (ExecutionStatus.pending_upload, ExecutionStatus.failed) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.Running, ExecutionStatus.Failed) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.Pending_Upload, ExecutionStatus.Failed) in ALLOWED_TRANSITIONS
 
 
 def test_allowed_transitions_cover_abort():
     # Abort legal from created, running, stopped, failed
-    for start in [ExecutionStatus.created, ExecutionStatus.running,
-                  ExecutionStatus.stopped, ExecutionStatus.failed]:
-        assert (start, ExecutionStatus.aborted) in ALLOWED_TRANSITIONS
+    for start in [ExecutionStatus.Created, ExecutionStatus.Running,
+                  ExecutionStatus.Stopped, ExecutionStatus.Failed]:
+        assert (start, ExecutionStatus.Aborted) in ALLOWED_TRANSITIONS
 
 
 def test_retry_from_failed_back_to_pending_upload():
     # retry_failed → pending_upload is legal (upload retry path)
-    assert (ExecutionStatus.failed, ExecutionStatus.pending_upload) in ALLOWED_TRANSITIONS
+    assert (ExecutionStatus.Failed, ExecutionStatus.Pending_Upload) in ALLOWED_TRANSITIONS
 
 
 def test_validate_transition_accepts_allowed():
     validate_transition(
-        current=ExecutionStatus.running,
-        target=ExecutionStatus.stopped,
+        current=ExecutionStatus.Running,
+        target=ExecutionStatus.Stopped,
     )  # must not raise
 
 
 def test_validate_transition_rejects_disallowed():
     with pytest.raises(InvalidTransitionError) as exc:
         validate_transition(
-            current=ExecutionStatus.uploaded,
-            target=ExecutionStatus.running,  # can't go back to running
+            current=ExecutionStatus.Uploaded,
+            target=ExecutionStatus.Running,  # can't go back to running
         )
     msg = str(exc.value)
-    assert "uploaded" in msg
-    assert "running" in msg
+    assert "Uploaded" in msg
+    assert "Running" in msg
 
 
 def test_invalid_transition_error_is_deriva_ml_exception():
@@ -76,7 +76,7 @@ def test_transition_writes_sqlite(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.created,
+        config_json="{}", status=ExecutionStatus.Created,
         mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -86,14 +86,14 @@ def test_transition_writes_sqlite(tmp_path):
         store=store,
         catalog=None,                # offline → skip catalog sync
         execution_rid="EXE-A",
-        current=ExecutionStatus.created,
-        target=ExecutionStatus.running,
+        current=ExecutionStatus.Created,
+        target=ExecutionStatus.Running,
         mode=ConnectionMode.offline,
         extra_fields={"start_time": now},
     )
 
     row = store.get_execution("EXE-A")
-    assert row["status"] == "running"
+    assert row["status"] == "Running"
     assert row["start_time"] is not None
     # Offline transitions always set sync_pending=True.
     assert row["sync_pending"] is True
@@ -117,7 +117,7 @@ def test_transition_rejects_invalid(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.uploaded,
+        config_json="{}", status=ExecutionStatus.Uploaded,
         mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -125,8 +125,8 @@ def test_transition_rejects_invalid(tmp_path):
     with pytest.raises(InvalidTransitionError):
         transition(
             store=store, catalog=None, execution_rid="EXE-A",
-            current=ExecutionStatus.uploaded,
-            target=ExecutionStatus.running,
+            current=ExecutionStatus.Uploaded,
+            target=ExecutionStatus.Running,
             mode=ConnectionMode.offline,
         )
 
@@ -160,7 +160,7 @@ def test_online_transition_syncs_catalog(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.created,
+        config_json="{}", status=ExecutionStatus.Created,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -168,12 +168,12 @@ def test_online_transition_syncs_catalog(tmp_path):
     cat = _MockCatalog()
     transition(
         store=store, catalog=cat, execution_rid="EXE-A",
-        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        current=ExecutionStatus.Created, target=ExecutionStatus.Running,
         mode=ConnectionMode.online, extra_fields={"start_time": now},
     )
 
     row = store.get_execution("EXE-A")
-    assert row["status"] == "running"
+    assert row["status"] == "Running"
     # Online: sync succeeded, no pending flag.
     assert row["sync_pending"] is False
     # Catalog was put-updated.
@@ -181,7 +181,7 @@ def test_online_transition_syncs_catalog(tmp_path):
     body = cat.put_calls[0]["json"]
     assert isinstance(body, list) and len(body) == 1
     assert body[0]["RID"] == "EXE-A"
-    assert body[0]["Status"] == "running"
+    assert body[0]["Status"] == "Running"
 
 
 def test_online_transition_soft_fails_on_catalog_error(tmp_path):
@@ -200,7 +200,7 @@ def test_online_transition_soft_fails_on_catalog_error(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.created,
+        config_json="{}", status=ExecutionStatus.Created,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -210,12 +210,12 @@ def test_online_transition_soft_fails_on_catalog_error(tmp_path):
     # soft — user gets sync_pending=True for the next pass to flush.
     transition(
         store=store, catalog=cat, execution_rid="EXE-A",
-        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        current=ExecutionStatus.Created, target=ExecutionStatus.Running,
         mode=ConnectionMode.online,
     )
 
     row = store.get_execution("EXE-A")
-    assert row["status"] == "running"
+    assert row["status"] == "Running"
     assert row["sync_pending"] is True
 
 
@@ -235,14 +235,14 @@ def test_flush_pending_sync_pushes_catalog(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.created,
+        config_json="{}", status=ExecutionStatus.Created,
         mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
     # Do an offline transition: SQLite has sync_pending=True.
     transition(
         store=store, catalog=None, execution_rid="EXE-A",
-        current=ExecutionStatus.created, target=ExecutionStatus.running,
+        current=ExecutionStatus.Created, target=ExecutionStatus.Running,
         mode=ConnectionMode.offline,
     )
     assert store.get_execution("EXE-A")["sync_pending"] is True
@@ -271,7 +271,7 @@ def test_flush_pending_sync_noop_when_not_pending(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.stopped,
+        config_json="{}", status=ExecutionStatus.Stopped,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
         sync_pending=False,
@@ -317,15 +317,15 @@ def test_reconcile_no_disagreement(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.stopped,
+        config_json="{}", status=ExecutionStatus.Stopped,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now, sync_pending=False,
     )
 
-    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "stopped"})
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Stopped"})
     reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
     # Unchanged.
-    assert store.get_execution("EXE-A")["status"] == "stopped"
+    assert store.get_execution("EXE-A")["status"] == "Stopped"
 
 
 def test_reconcile_catalog_says_aborted(tmp_path):
@@ -345,14 +345,14 @@ def test_reconcile_catalog_says_aborted(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now, sync_pending=False,
     )
 
-    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "aborted"})
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Aborted"})
     reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
-    assert store.get_execution("EXE-A")["status"] == "aborted"
+    assert store.get_execution("EXE-A")["status"] == "Aborted"
 
 
 def test_reconcile_catalog_says_uploaded(tmp_path):
@@ -372,14 +372,14 @@ def test_reconcile_catalog_says_uploaded(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.pending_upload,
+        config_json="{}", status=ExecutionStatus.Pending_Upload,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now, sync_pending=False,
     )
 
-    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "uploaded"})
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Uploaded"})
     reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
-    assert store.get_execution("EXE-A")["status"] == "uploaded"
+    assert store.get_execution("EXE-A")["status"] == "Uploaded"
 
 
 def test_reconcile_sqlite_stopped_catalog_running(tmp_path):
@@ -399,15 +399,15 @@ def test_reconcile_sqlite_stopped_catalog_running(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.stopped,
+        config_json="{}", status=ExecutionStatus.Stopped,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now, sync_pending=False,
     )
 
-    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "running"})
+    cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Running"})
     reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
     # SQLite unchanged; sync_pending set so next flush pushes.
-    assert store.get_execution("EXE-A")["status"] == "stopped"
+    assert store.get_execution("EXE-A")["status"] == "Stopped"
     assert store.get_execution("EXE-A")["sync_pending"] is True
 
 
@@ -429,7 +429,7 @@ def test_reconcile_catalog_missing_raises(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.stopped,
+        config_json="{}", status=ExecutionStatus.Stopped,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -456,7 +456,7 @@ def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.stopped,
+        config_json="{}", status=ExecutionStatus.Stopped,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now, sync_pending=False,
     )
@@ -466,7 +466,7 @@ def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
     with caplog.at_level(logging.WARNING):
         reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
     # SQLite unchanged.
-    assert store.get_execution("EXE-A")["status"] == "stopped"
+    assert store.get_execution("EXE-A")["status"] == "Stopped"
     assert any("reconcile" in r.message.lower() for r in caplog.records)
 
 

@@ -134,13 +134,13 @@ def test_workspace_exposes_execution_state_store(tmp_path):
 
 def test_execution_status_values():
     from deriva_ml.execution.state_store import ExecutionStatus
-    assert ExecutionStatus.created.value == "created"
-    assert ExecutionStatus.running.value == "running"
-    assert ExecutionStatus.stopped.value == "stopped"
-    assert ExecutionStatus.failed.value == "failed"
-    assert ExecutionStatus.pending_upload.value == "pending_upload"
-    assert ExecutionStatus.uploaded.value == "uploaded"
-    assert ExecutionStatus.aborted.value == "aborted"
+    assert ExecutionStatus.Created.value == "Created"
+    assert ExecutionStatus.Running.value == "Running"
+    assert ExecutionStatus.Stopped.value == "Stopped"
+    assert ExecutionStatus.Failed.value == "Failed"
+    assert ExecutionStatus.Pending_Upload.value == "Pending_Upload"
+    assert ExecutionStatus.Uploaded.value == "Uploaded"
+    assert ExecutionStatus.Aborted.value == "Aborted"
 
 
 def test_pending_row_status_values():
@@ -173,7 +173,7 @@ def test_insert_execution_row(tmp_path):
         workflow_rid="WFL-1",
         description="test",
         config_json='{"foo": "bar"}',
-        status=ExecutionStatus.created,
+        status=ExecutionStatus.Created,
         mode=ConnectionMode.online,
         working_dir_rel="execution/EXE-A",
         created_at=now,
@@ -183,7 +183,7 @@ def test_insert_execution_row(tmp_path):
     row = store.get_execution("EXE-A")
     assert row is not None
     assert row["rid"] == "EXE-A"
-    assert row["status"] == "created"
+    assert row["status"] == "Created"
     assert row["mode"] == "online"
 
 
@@ -208,20 +208,20 @@ def test_update_execution_status(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.created,
+        config_json="{}", status=ExecutionStatus.Created,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
 
     store.update_execution(
         rid="EXE-A",
-        status=ExecutionStatus.running,
+        status=ExecutionStatus.Running,
         start_time=now,
         sync_pending=True,
     )
 
     row = store.get_execution("EXE-A")
-    assert row["status"] == "running"
+    assert row["status"] == "Running"
     assert row["sync_pending"] is True
     assert row["start_time"] is not None
 
@@ -239,9 +239,9 @@ def test_list_executions_filters_by_status(tmp_path):
 
     now = datetime.now(timezone.utc)
     for rid, status in [
-        ("A", ExecutionStatus.running),
-        ("B", ExecutionStatus.stopped),
-        ("C", ExecutionStatus.uploaded),
+        ("A", ExecutionStatus.Running),
+        ("B", ExecutionStatus.Stopped),
+        ("C", ExecutionStatus.Uploaded),
     ]:
         store.insert_execution(
             rid=rid, workflow_rid=None, description=None,
@@ -250,7 +250,7 @@ def test_list_executions_filters_by_status(tmp_path):
             created_at=now, last_activity=now,
         )
 
-    rows = store.list_executions(status=[ExecutionStatus.running, ExecutionStatus.stopped])
+    rows = store.list_executions(status=[ExecutionStatus.Running, ExecutionStatus.Stopped])
     rids = {r["rid"] for r in rows}
     assert rids == {"A", "B"}
 
@@ -269,7 +269,7 @@ def test_insert_pending_row(tmp_path):
 
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -304,7 +304,7 @@ def test_list_pending_rows_filter_by_status(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -340,7 +340,7 @@ def test_insert_directory_rule(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -376,7 +376,7 @@ def test_count_pending_by_kind(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -433,7 +433,7 @@ def test_mark_leasing_sets_token_and_status(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -462,7 +462,7 @@ def test_finalize_lease_sets_rid_and_status(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -494,7 +494,7 @@ def test_revert_leasing_to_staged(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
