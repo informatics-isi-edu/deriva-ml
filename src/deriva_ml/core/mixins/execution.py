@@ -25,6 +25,7 @@ from deriva_ml.execution.state_machine import (
     reconcile_with_catalog,
 )
 from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.execution.upload_engine import run_upload_engine
 
 if TYPE_CHECKING:
     from deriva_ml.asset.aux_classes import AssetSpec
@@ -32,6 +33,8 @@ if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.execution.pending_summary import WorkspacePendingSummary
+    from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.execution.upload_job import UploadJob
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
     from deriva_ml.model.catalog import DerivaModel
@@ -742,3 +745,72 @@ class ExecutionMixin:
         for exec_record in filtered_path.entities().fetch():
             if exec_record["RID"] in exec_rids_with_config:
                 yield Experiment(self, exec_record["RID"])  # type: ignore[arg-type]
+
+    def upload_pending(
+        self,
+        *,
+        execution_rids: "list[RID] | None" = None,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadReport":
+        """Blocking upload of pending state for selected executions.
+
+        Args:
+            execution_rids: List of RIDs, or None to drain every execution
+                that has pending work.
+            retry_failed: Include rows in status='failed'.
+            bandwidth_limit_mbps: Cap egress (passed to uploader).
+            parallel_files: Concurrent file uploads per table.
+
+        Returns:
+            UploadReport with totals + per-table counts + error lines.
+
+        Example:
+            >>> report = ml.upload_pending()
+            >>> print(f"{report.total_uploaded} uploaded, "
+            ...       f"{report.total_failed} failed")
+        """
+        return run_upload_engine(
+            ml=self,
+            execution_rids=execution_rids,
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
+        )
+
+    def start_upload(
+        self,
+        *,
+        execution_rids: "list[RID] | None" = None,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadJob":
+        """Non-blocking upload — returns an UploadJob to poll / wait.
+
+        Spawns a daemon thread in the current process. If the process
+        exits, the thread dies. For survive-process uploads, run
+        ``deriva-ml upload`` from a shell (see CLI, Group H).
+
+        Args: identical to upload_pending.
+
+        Returns:
+            An UploadJob; call job.wait() to block, job.progress() to
+            poll, job.cancel() to stop.
+
+        Example:
+            >>> job = ml.start_upload()
+            >>> while job.status == "running":
+            ...     time.sleep(5)
+            ...     print(job.progress())
+            >>> report = job.wait()
+        """
+        from deriva_ml.execution.upload_job import UploadJob
+        return UploadJob(
+            ml=self,
+            execution_rids=execution_rids,
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
+        )

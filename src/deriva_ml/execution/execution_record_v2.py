@@ -22,6 +22,7 @@ from deriva_ml.execution.state_store import ExecutionStatus
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML  # noqa: F401 (forward-looking)
     from deriva_ml.execution.pending_summary import PendingSummary
+    from deriva_ml.execution.upload_engine import UploadReport
 
 
 @dataclass(frozen=True)
@@ -153,4 +154,24 @@ class ExecutionRecord:
             rows=[PendingRowCount(**r) for r in data["rows"]],
             assets=[PendingAssetCount(**a) for a in data["assets"]],
             diagnostics=data["diagnostics"],
+        )
+
+    def upload_outputs(
+        self,
+        *,
+        ml: "DerivaML",
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadReport":
+        """Sugar for ml.upload_pending(execution_rids=[self.rid], ...).
+
+        Records are bare dataclasses — the caller provides the DerivaML
+        instance that owns the workspace.
+        """
+        return ml.upload_pending(
+            execution_rids=[self.rid],
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
         )

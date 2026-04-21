@@ -46,6 +46,7 @@ from deriva.core import format_exception
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.execution.pending_summary import PendingSummary
+    from deriva_ml.execution.upload_engine import UploadReport
 from deriva.core.hatrac_store import HatracStore
 from pydantic import ConfigDict, validate_call
 
@@ -2230,4 +2231,28 @@ class Execution:
             rows=[PendingRowCount(**r) for r in data["rows"]],
             assets=[PendingAssetCount(**a) for a in data["assets"]],
             diagnostics=data["diagnostics"],
+        )
+
+    def upload_outputs(
+        self,
+        *,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadReport":
+        """Upload this execution's pending rows and asset files.
+
+        Sugar for ml.upload_pending(execution_rids=[self.execution_rid],
+        **kwargs). See upload_pending for details.
+
+        Example:
+            >>> with exe.execute() as e:
+            ...     ... work ...
+            >>> exe.upload_outputs()
+        """
+        return self._ml_object.upload_pending(
+            execution_rids=[self.execution_rid],
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
         )
