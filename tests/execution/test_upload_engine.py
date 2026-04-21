@@ -254,7 +254,7 @@ def test_run_upload_engine_leases_and_marks_uploaded(test_ml, monkeypatch):
                 lease_token=f"T-{i}",
             )
 
-    def _fake_upload(*, store, catalog, work_item):
+    def _fake_upload(*, store, catalog, work_item, ml=None):
         for pid in work_item.pending_ids:
             store.update_pending_row(
                 pid, status=PendingRowStatus.uploaded,
@@ -328,7 +328,7 @@ def test_run_upload_engine_level_fail_fast_finishes_level(test_ml, monkeypatch):
                 lease_token=f"T-{i}",
             )
 
-    def _fake_upload(*, store, catalog, work_item):
+    def _fake_upload(*, store, catalog, work_item, ml=None):
         drained.append(work_item.target_table)
         if work_item.target_table == "TableA":
             # Simulate failure.
@@ -419,7 +419,7 @@ def test_run_upload_engine_partial_drain_failed_rows_mark_execution_failed(
                 lease_token=f"T-{i}",
             )
 
-    def _fake_upload(*, store, catalog, work_item):
+    def _fake_upload(*, store, catalog, work_item, ml=None):
         if work_item.target_table == "TableA":
             for pid in work_item.pending_ids:
                 store.update_pending_row(
@@ -480,3 +480,120 @@ def test_run_upload_engine_partial_drain_failed_rows_mark_execution_failed(
         if r["id"] == pid_a
     )
     assert a_row["status"] == str(PendingRowStatus.failed)
+
+
+# ─── G7: _drain_work_item real implementation ────────────────────────
+
+
+def test_drain_work_item_plain_row(test_ml, monkeypatch):
+    """Plain-row drain: build catalog-insert body via pathBuilder, mark
+    rows uploaded on success."""
+    import json
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import _drain_work_item, _WorkItem
+
+    wf = _make_workflow(test_ml, "G7 drain plain")
+    exe = test_ml.create_execution(description="drain-plain", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json=json.dumps({"Name": "Alice"}),
+        created_at=now, rid="R-1",
+        status=PendingRowStatus.leased,
+    )
+
+    inserted_bodies: list = []
+
+    class _MockInsertCallable:
+        def __call__(self, body, **_kw):
+            inserted_bodies.append(body)
+            return [{"RID": "R-1", **body[0]}]
+
+    class _FakeTablePath:
+        insert = _MockInsertCallable()
+
+    class _FakeTablesContainer:
+        def __getitem__(self, name):
+            return _FakeTablePath()
+
+    class _FakeSchema:
+        tables = _FakeTablesContainer()
+
+    class _FakeSchemas:
+        def __getitem__(self, name):
+            return _FakeSchema()
+
+    class _FakePathBuilder:
+        schemas = _FakeSchemas()
+
+    monkeypatch.setattr(test_ml, "pathBuilder", lambda: _FakePathBuilder())
+
+    item = _WorkItem(
+        execution_rid=exe.execution_rid,
+        target_schema="deriva-ml", target_table="Subject",
+        pending_ids=[pid], is_asset=False,
+    )
+    n = _drain_work_item(store=store, catalog=test_ml.catalog, work_item=item, ml=test_ml)
+
+    assert n == 1
+    row = store.list_pending_rows(execution_rid=exe.execution_rid)[0]
+    assert row["status"] == "uploaded"
+    assert row["uploaded_at"] is not None
+    assert inserted_bodies[0][0]["RID"] == "R-1"
+    assert inserted_bodies[0][0]["Name"] == "Alice"
+
+
+def test_drain_work_item_asset_row_calls_deriva_py_uploader(test_ml, monkeypatch, tmp_path):
+    """Asset-row drain: invoke deriva-py uploader for the file."""
+    import json
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import _drain_work_item, _WorkItem
+
+    f = tmp_path / "img.png"
+    f.write_bytes(b"fake-png")
+
+    wf = _make_workflow(test_ml, "G7 drain asset")
+    exe = test_ml.create_execution(description="drain-asset", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="deriva-ml", target_table="Image",
+        metadata_json=json.dumps({"Description": "x"}),
+        created_at=now,
+        rid="IMG-1",
+        status=PendingRowStatus.leased,
+        asset_file_path=str(f),
+    )
+
+    uploader_calls = []
+
+    def _fake_uploader(*, ml, files, target_table, execution_rid):
+        uploader_calls.append({
+            "files": list(files), "target_table": target_table,
+            "execution_rid": execution_rid,
+        })
+        return {"uploaded": [str(f)], "failed": []}
+
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._invoke_deriva_py_uploader",
+        _fake_uploader,
+    )
+
+    item = _WorkItem(
+        execution_rid=exe.execution_rid,
+        target_schema="deriva-ml", target_table="Image",
+        pending_ids=[pid], is_asset=True,
+    )
+    n = _drain_work_item(store=store, catalog=test_ml.catalog, work_item=item, ml=test_ml)
+
+    assert n == 1
+    assert len(uploader_calls) == 1
+    row = store.list_pending_rows(execution_rid=exe.execution_rid)[0]
+    assert row["status"] == "uploaded"

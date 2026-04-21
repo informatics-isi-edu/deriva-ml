@@ -327,7 +327,7 @@ def run_upload_engine(
                 )
 
             try:
-                n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item)
+                n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item, ml=ml)
                 total_uploaded += n
                 fqn = f"{item.target_schema}:{item.target_table}"
                 per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
@@ -444,10 +444,142 @@ def _drain_work_item(
     store: "ExecutionStateStore",
     catalog: "ErmrestCatalog",
     work_item: _WorkItem,
+    ml: "DerivaML | None" = None,
 ) -> int:
-    """Phase-1 stub — the concrete deriva-py-uploader invocation lives
-    in Task G7. Tests monkeypatch this in G6; G7 replaces the body.
+    """Drain one (exe, table) grouping: insert rows and/or upload files.
 
-    Returns the number of rows uploaded.
+    For plain rows: build a pathBuilder insert body and issue a single
+    call per table. Rows get status='uploaded' on success.
+
+    For asset rows: delegate file-upload to deriva-py's existing
+    uploader (chunk-resume + Hatrac hash dedup for idempotency).
+
+    Args:
+        store: ExecutionStateStore.
+        catalog: ErmrestCatalog.
+        work_item: Group of pending items to drain.
+        ml: DerivaML instance for pathBuilder + uploader config.
+
+    Returns:
+        Number of rows successfully uploaded.
+
+    Raises:
+        Any exception from catalog insert or file upload. Individual
+        failed rows are marked 'failed' in SQLite before re-raising.
     """
-    raise NotImplementedError("G7 implements the deriva-py invocation")
+    import json
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    if ml is None:
+        raise RuntimeError("ml kwarg is required — pass from run_upload_engine")
+
+    rows = [
+        r for r in store.list_pending_rows(execution_rid=work_item.execution_rid)
+        if r["id"] in set(work_item.pending_ids)
+    ]
+    if not rows:
+        return 0
+
+    now = datetime.now(timezone.utc)
+
+    if work_item.is_asset:
+        files = [
+            {
+                "path": r["asset_file_path"],
+                "rid": r["rid"],
+                "pending_id": r["id"],
+                "metadata": json.loads(r["metadata_json"]),
+            }
+            for r in rows
+        ]
+        result = _invoke_deriva_py_uploader(
+            ml=ml, files=files,
+            target_table=work_item.target_table,
+            execution_rid=work_item.execution_rid,
+        )
+        uploaded_paths = set(result["uploaded"])
+        for r in rows:
+            path = r["asset_file_path"]
+            pid = r["id"]
+            if path in uploaded_paths:
+                store.update_pending_row(
+                    pid,
+                    status=PendingRowStatus.uploaded,
+                    uploaded_at=now,
+                )
+            else:
+                failure_msg = next(
+                    (f.get("error", "upload failed") for f in result.get("failed", [])
+                     if f.get("path") == path),
+                    "upload failed",
+                )
+                store.update_pending_row(
+                    pid,
+                    status=PendingRowStatus.failed,
+                    error=failure_msg,
+                )
+
+        return sum(1 for r in rows if r["asset_file_path"] in uploaded_paths)
+
+    # Plain rows: build a single catalog insert body including pre-leased RIDs.
+    body = []
+    for r in rows:
+        metadata = json.loads(r["metadata_json"])
+        metadata["RID"] = r["rid"]
+        body.append(metadata)
+
+    try:
+        pb = ml.pathBuilder()
+        tpath = pb.schemas[work_item.target_schema].tables[work_item.target_table]
+        tpath.insert(body)
+    except Exception as exc:
+        for r in rows:
+            store.update_pending_row(
+                r["id"],
+                status=PendingRowStatus.failed,
+                error=str(exc),
+            )
+        raise
+
+    for r in rows:
+        store.update_pending_row(
+            r["id"],
+            status=PendingRowStatus.uploaded,
+            uploaded_at=now,
+        )
+    return len(rows)
+
+
+def _invoke_deriva_py_uploader(
+    *,
+    ml: "DerivaML",
+    files: list[dict],
+    target_table: str,
+    execution_rid: str,
+) -> dict:
+    """Invoke deriva-py's uploader for a batch of files.
+
+    Phase 1: raises NotImplementedError. The real asset-upload path
+    currently flows through src/deriva_ml/dataset/upload.py::upload_directory
+    which requires a directory layout matching the asset-upload spec
+    regex — incompatible with per-file invocations at this grain.
+
+    Phase 2 finalization: wire this to either (a) per-file Hatrac +
+    pathBuilder invocations, or (b) a restructured upload_directory
+    that works off a manifest rather than a regex-matched tree.
+
+    Tests monkeypatch this function. Real asset uploads in Phase 1
+    continue to flow through exe.upload_outputs (which calls the
+    existing _upload_execution_dirs flow, wired in G8).
+
+    Returns:
+        Dict with keys 'uploaded' (list of paths) and 'failed'
+        (list of {path, error}).
+    """
+    raise NotImplementedError(
+        "G7 Phase 1: _invoke_deriva_py_uploader not yet wired to a "
+        "real uploader. Tests monkeypatch this; production asset uploads "
+        "flow through exe.upload_outputs for now. Phase 2 finalizes."
+    )
