@@ -131,8 +131,52 @@ def test_transition_rejects_invalid(tmp_path):
         )
 
 
+class _MockTable:
+    """Records update() calls for assertion."""
+    def __init__(self, owner: "_MockCatalog"):
+        self._owner = owner
+
+    def update(self, body):
+        if self._owner.put_should_fail:
+            raise RuntimeError("simulated network failure")
+        # Record in the same shape the old put-based code used so existing
+        # assertions on body[0]["RID"] / body[0]["Status"] keep working.
+        self._owner.put_calls.append({"path": "Execution.update", "json": body})
+
+
+class _MockTablesContainer:
+    def __init__(self, owner: "_MockCatalog"):
+        self._owner = owner
+
+    def __getitem__(self, name):
+        return _MockTable(self._owner)
+
+
+class _MockSchema:
+    def __init__(self, owner: "_MockCatalog"):
+        self._owner = owner
+        self.tables = _MockTablesContainer(owner)
+
+
+class _MockSchemas:
+    def __init__(self, owner: "_MockCatalog"):
+        self._owner = owner
+
+    def __getitem__(self, name):
+        return _MockSchema(self._owner)
+
+
+class _MockPathBuilder:
+    def __init__(self, owner: "_MockCatalog"):
+        self.schemas = _MockSchemas(owner)
+
+
 class _MockCatalog:
-    """Minimal mock for ErmrestCatalog exposing just what transition() uses."""
+    """Minimal mock for ErmrestCatalog exposing what transition() uses.
+
+    Records both raw `put` calls and pathBuilder `update` calls in
+    `put_calls` for backward-compat with existing assertions.
+    """
     def __init__(self, *, put_should_fail: bool = False):
         self.put_should_fail = put_should_fail
         self.put_calls: list[dict] = []
@@ -142,6 +186,9 @@ class _MockCatalog:
             raise RuntimeError("simulated network failure")
         self.put_calls.append({"path": path, "json": json})
         return None
+
+    def getPathBuilder(self):
+        return _MockPathBuilder(self)
 
 
 def test_online_transition_syncs_catalog(tmp_path):
