@@ -447,6 +447,16 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         {"Name": "Multimodal", "Description": "Workflows combining multiple data modalities (e.g., imaging + clinical records)."},
     ])
 
+    _ensure_terms(MLVocab.execution_status, [
+        {"Name": "Created", "Description": "Execution row has been created; work has not started."},
+        {"Name": "Running", "Description": "Execution algorithm is actively running."},
+        {"Name": "Stopped", "Description": "Algorithm finished successfully; output assets not yet uploaded."},
+        {"Name": "Failed", "Description": "Execution encountered an unrecoverable error."},
+        {"Name": "Pending_Upload", "Description": "Algorithm succeeded; asset upload to the catalog is in progress."},
+        {"Name": "Uploaded", "Description": "Execution ran to success and all outputs are persisted to the catalog."},
+        {"Name": "Aborted", "Description": "Execution was canceled by the user before reaching a terminal state."},
+    ])
+
 
 def create_ml_catalog(
     hostname: str,
