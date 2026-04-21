@@ -511,7 +511,7 @@ class Execution:
         """
         # Materialize bdbag
         for dataset in self.configuration.datasets:
-            self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
+            self._logger.info(f"Materialize bag {dataset.rid}... ")
             self._datasets_list.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
 
@@ -523,7 +523,7 @@ class Execution:
             )
 
         # Download assets....
-        self.update_status(Status.running, "Downloading assets ...")
+        self._logger.info("Downloading assets ...")
         self.asset_paths = {}
         for asset_spec in self.configuration.assets:
             asset_rid = asset_spec.rid
@@ -580,7 +580,7 @@ class Execution:
         # state_machine.transition. `_initialize_execution` predates the
         # read-through design and is part of the legacy path retained
         # for `execution_start`/`execution_stop` compatibility.
-        self.update_status(Status.pending, "Initialize status finished.")
+        self._logger.info("Initialize status finished.")
 
     @property
     def status(self) -> "ExecutionStatus":
@@ -902,53 +902,66 @@ class Execution:
         """
         return self._ml_object.download_dataset_bag(dataset)
 
-    @validate_call
-    def update_status(self, status: Status, msg: str) -> None:
-        """Updates the execution's status in the catalog.
+    def update_status(
+        self,
+        target: "ExecutionStatus",
+        *,
+        error: str | None = None,
+    ) -> None:
+        """Transition this execution to a new status.
 
-        Records a new status and associated message in the catalog, allowing remote
-        tracking of execution progress.
+        Thin wrapper around state_machine.transition() that validates
+        against ALLOWED_TRANSITIONS, writes the SQLite registry, and syncs
+        to the catalog when online.
 
         Args:
-            status: New status value (e.g., running, completed, failed).
-            msg: Description of the status change or current state.
+            target: Target ExecutionStatus enum member.
+            error: For Failed/Aborted transitions, a human-readable error
+                message written to the `error` column. On a non-terminal
+                transition, error is ignored and a warning is logged.
 
         Raises:
-            DerivaMLException: If status update fails.
+            InvalidTransitionError: If the (current, target) pair is not in
+                ALLOWED_TRANSITIONS.
+            DerivaMLStateInconsistency: If state_machine's catalog sync
+                detects divergence.
 
         Example:
-            >>> execution.update_status(Status.running, "Processing sample 1 of 10")
-
-        Note:
-            Legacy compatibility shim. The authoritative lifecycle
-            status now lives in SQLite and is driven by
-            ``state_machine.transition()`` via ``__enter__`` /
-            ``__exit__`` / ``abort``. ``update_status`` still writes
-            the catalog-side Status vocabulary (title-case) for
-            callers that haven't been migrated (e.g., multirun runner
-            internals, dataset download progress reporting). It does
-            not touch the SQLite registry — the authoritative
-            lifecycle state is unchanged by this call.
+            >>> exe.update_status(ExecutionStatus.Running)
+            >>> exe.update_status(ExecutionStatus.Failed, error="Network timeout")
         """
-        self._logger.info(msg)
+        from deriva_ml.execution.state_machine import transition
+        from deriva_ml.execution.state_store import ExecutionStatus
 
-        if self._dry_run:
-            return
-
-        # Delegate to ExecutionRecord for catalog updates
-        if self._execution_record is not None:
-            self._execution_record.update_status(status, msg)
-        else:
-            # Fallback for cases where ExecutionRecord isn't available
-            self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
-                [
-                    {
-                        "RID": self.execution_rid,
-                        "Status": status.value,
-                        "Status_Detail": msg,
-                    }
-                ]
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLException(
+                f"Execution {self.execution_rid} not in workspace registry"
             )
+        current = ExecutionStatus(row["status"])
+
+        extra_fields: dict = {}
+        # Terminal = Failed, Aborted.
+        if target in (ExecutionStatus.Failed, ExecutionStatus.Aborted):
+            if error is not None:
+                extra_fields["error"] = error
+        elif error is not None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "error= ignored on non-terminal transition to %s: %s",
+                target.value, error,
+            )
+
+        transition(
+            store=store,
+            catalog=self._ml_object.catalog if self._ml_object._mode.value == "online" else None,
+            execution_rid=self.execution_rid,
+            current=current,
+            target=target,
+            mode=self._ml_object._mode,
+            extra_fields=extra_fields,
+        )
 
     def execution_start(self) -> None:
         """Marks the execution as started.
@@ -1119,7 +1132,7 @@ class Execution:
         upload_root = self._build_upload_staging()
 
         try:
-            self.update_status(Status.running, "Uploading execution files...")
+            self._logger.info("Uploading execution files...")
             results = upload_directory(
                 self._model,
                 upload_root,
@@ -1131,7 +1144,7 @@ class Execution:
             )
         except (RuntimeError, DerivaMLException) as e:
             error = format_exception(e)
-            self.update_status(Status.failed, error)
+            self._logger.error(error)
             raise DerivaMLException(f"Failed to upload execution_assets: {error}")
 
         # Update manifest with upload results
@@ -1163,7 +1176,7 @@ class Execution:
                 )
             )
         self._update_asset_execution_table(asset_map)
-        self.update_status(Status.running, "Updating features...")
+        self._logger.info("Updating features...")
 
         for p in self._feature_root.glob("**/*.jsonl"):
             m = is_feature_dir(p.parent)
@@ -1174,7 +1187,7 @@ class Execution:
                 uploaded_files=asset_map,
             )
 
-        self.update_status(Status.running, "Upload assets complete")
+        self._logger.info("Upload assets complete")
         return asset_map
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
