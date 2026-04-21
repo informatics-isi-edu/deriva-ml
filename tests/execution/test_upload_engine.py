@@ -289,3 +289,194 @@ def test_run_upload_engine_leases_and_marks_uploaded(test_ml, monkeypatch):
     assert report.total_failed == 0
     rows = store.list_pending_rows(execution_rid=exe.execution_rid)
     assert all(r["status"] == "uploaded" for r in rows)
+
+
+def test_run_upload_engine_level_fail_fast_finishes_level(test_ml, monkeypatch):
+    """At a given topological level, one item's failure must not
+    short-circuit its siblings — both independent items get attempted.
+    But subsequent levels (not present here) would be aborted."""
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    wf = _make_workflow(test_ml, "G6 level fail-fast")
+    exe = test_ml.create_execution(description="level", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    # Two tables at the same level (independence enforced by the
+    # _fk_edges_for_work monkeypatch below).
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="kA",
+        target_schema="deriva-ml", target_table="TableA",
+        metadata_json="{}", created_at=now,
+    )
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="kB",
+        target_schema="deriva-ml", target_table="TableB",
+        metadata_json="{}", created_at=now,
+    )
+
+    drained: list[str] = []
+
+    def _fake_acquire(*, store, catalog, execution_rid, pending_ids):
+        for i, pid in enumerate(pending_ids):
+            store.update_pending_row(
+                pid, rid=f"R-{i}",
+                status=PendingRowStatus.leased,
+                lease_token=f"T-{i}",
+            )
+
+    def _fake_upload(*, store, catalog, work_item):
+        drained.append(work_item.target_table)
+        if work_item.target_table == "TableA":
+            # Simulate failure.
+            for pid in work_item.pending_ids:
+                store.update_pending_row(
+                    pid, status=PendingRowStatus.failed, error="synthetic",
+                )
+            raise RuntimeError("synthetic drain failure")
+        # Success path.
+        for pid in work_item.pending_ids:
+            store.update_pending_row(
+                pid, status=PendingRowStatus.uploaded,
+                uploaded_at=datetime.now(timezone.utc),
+            )
+        return len(work_item.pending_ids)
+
+    def _fake_transition(*, store, catalog, execution_rid, current, target, mode, extra_fields=None):
+        store.update_execution(execution_rid, status=str(target))
+
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.acquire_leases_for_execution",
+        _fake_acquire,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._drain_work_item",
+        _fake_upload,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.transition",
+        _fake_transition,
+    )
+    # Force both tables into the same level (no FK between them).
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._fk_edges_for_work",
+        lambda *, ml, items: {
+            (i.target_schema, i.target_table): [] for i in items
+        },
+    )
+
+    report = run_upload_engine(
+        ml=test_ml,
+        execution_rids=[exe.execution_rid],
+        retry_failed=False,
+    )
+    # Both items got drained despite one failing — that's the fix
+    # for Issue 1 (per-level fail-fast, not per-item fail-fast).
+    assert set(drained) == {"TableA", "TableB"}
+    # One uploaded, one failed.
+    assert report.total_uploaded == 1
+    assert report.total_failed == 1
+
+
+def test_run_upload_engine_partial_drain_failed_rows_mark_execution_failed(
+    test_ml, monkeypatch,
+):
+    """When level 0 fails and level 1 never runs, the execution ends
+    up in 'failed' status because level 0 has failed rows. Level 1
+    rows stay in their prior non-terminal status — they are not
+    promoted to 'failed' (that's the point of Issue 2's fix). A later
+    upload_pending retry without retry_failed would pick them up."""
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import ExecutionStatus, PendingRowStatus
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    wf = _make_workflow(test_ml, "G6 partial drain")
+    exe = test_ml.create_execution(description="partial", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    # Two levels: A at level 0 (fails), B at level 1 (never drained).
+    pid_a = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="kA",
+        target_schema="deriva-ml", target_table="TableA",
+        metadata_json="{}", created_at=now,
+    )
+    pid_b = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="kB",
+        target_schema="deriva-ml", target_table="TableB",
+        metadata_json="{}", created_at=now,
+    )
+
+    def _fake_acquire(*, store, catalog, execution_rid, pending_ids):
+        for i, pid in enumerate(pending_ids):
+            store.update_pending_row(
+                pid, rid=f"R-{i}",
+                status=PendingRowStatus.leased,
+                lease_token=f"T-{i}",
+            )
+
+    def _fake_upload(*, store, catalog, work_item):
+        if work_item.target_table == "TableA":
+            for pid in work_item.pending_ids:
+                store.update_pending_row(
+                    pid, status=PendingRowStatus.failed, error="x",
+                )
+            raise RuntimeError("TableA failed")
+        # TableB should never get here because the drain aborts at
+        # level boundary. Fail loud if it does.
+        raise AssertionError("TableB should not have been drained")
+
+    def _fake_transition(*, store, catalog, execution_rid, current, target, mode, extra_fields=None):
+        store.update_execution(execution_rid, status=str(target))
+
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.acquire_leases_for_execution",
+        _fake_acquire,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._drain_work_item",
+        _fake_upload,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.transition",
+        _fake_transition,
+    )
+    # B depends on A — A must drain first.
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._fk_edges_for_work",
+        lambda *, ml, items: {
+            ("deriva-ml", "TableA"): [],
+            ("deriva-ml", "TableB"): [("deriva-ml", "TableA")],
+        },
+    )
+
+    report = run_upload_engine(
+        ml=test_ml,
+        execution_rids=[exe.execution_rid],
+        retry_failed=False,
+    )
+    # A failed; B never got drained.
+    assert report.total_failed == 1
+    assert report.total_uploaded == 0
+    # Execution is in 'failed' status because A actually failed.
+    row = store.get_execution(exe.execution_rid)
+    assert row["status"] == str(ExecutionStatus.failed)
+    # Crucially: B's pending row was NOT marked failed. It's still
+    # in its prior non-terminal status (leased after _fake_acquire),
+    # so a future upload_pending run without retry_failed will pick
+    # it up.
+    b_row = next(
+        r for r in store.list_pending_rows(execution_rid=exe.execution_rid)
+        if r["id"] == pid_b
+    )
+    assert b_row["status"] != str(PendingRowStatus.failed)
+    # And A's pending row is failed.
+    a_row = next(
+        r for r in store.list_pending_rows(execution_rid=exe.execution_rid)
+        if r["id"] == pid_a
+    )
+    assert a_row["status"] == str(PendingRowStatus.failed)

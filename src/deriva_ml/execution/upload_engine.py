@@ -108,7 +108,7 @@ def topo_sort_work_items(
     *,
     fk_edges: "dict[tuple[str, str], list[tuple[str, str]]]",
 ) -> list[_WorkItem]:
-    """Topologically sort work items by FK dependencies.
+    """Topologically sort work items by FK dependencies (flat order).
 
     Args:
         items: Work items to sort.
@@ -118,19 +118,54 @@ def topo_sort_work_items(
             to [].
 
     Returns:
-        Items in drain order: all parents before all children.
+        Items in a flat valid drain order: all parents before all
+        children. Still used by callers that only need a single valid
+        sequence. For per-level fail-fast semantics (spec §2.11.2
+        step 7), use `_group_by_topo_level` instead.
 
     Raises:
         DerivaMLCycleError: If fk_edges contains a cycle.
     """
-    from collections import deque
+    levels = _group_by_topo_level(items, fk_edges=fk_edges)
+    return [item for level in levels for item in level]
 
+
+def _group_by_topo_level(
+    items: list[_WorkItem],
+    *,
+    fk_edges: "dict[tuple[str, str], list[tuple[str, str]]]",
+) -> list[list[_WorkItem]]:
+    """Group work items into topological levels.
+
+    Items in the same inner list share the same dependency depth —
+    they have no FK dependency on each other and may be drained
+    concurrently (§2.11.2 step 6: "for each topological level, in
+    parallel"). All items in level N must complete before any item
+    in level N+1 is drained.
+
+    The per-level grouping is what makes per-level fail-fast possible:
+    the drain can record failures across an entire level before
+    aborting at the level boundary (spec §2.11.2 step 7).
+
+    Args:
+        items: Work items to group.
+        fk_edges: Adjacency map: (schema, table) → [(schema, parent_table), ...].
+            An entry means "this table has FKs to these parents"; parents
+            must drain first. Missing entries mean no FKs; equivalent
+            to [].
+
+    Returns:
+        List of levels. Each level is a list of `_WorkItem`. Levels
+        appear in drain order (level 0 first). Empty outer list if
+        `items` is empty.
+
+    Raises:
+        DerivaMLCycleError: If fk_edges contains a cycle.
+    """
     from deriva_ml.core.exceptions import DerivaMLCycleError
 
-    # Kahn's algorithm.
     by_key = {(i.target_schema, i.target_table): i for i in items}
     indeg: dict[tuple[str, str], int] = {k: 0 for k in by_key}
-    # We only care about edges between tables that have work to do.
     filtered_edges: dict[tuple[str, str], list[tuple[str, str]]] = {}
     for child, parents in fk_edges.items():
         if child not in by_key:
@@ -139,27 +174,32 @@ def topo_sort_work_items(
         filtered_edges[child] = real_parents
         indeg[child] = len(real_parents)
 
-    # Stable queue: keep input order for tables of equal in-degree.
-    queue: deque = deque(k for k in by_key if indeg[k] == 0)
-    output: list[_WorkItem] = []
-    while queue:
-        k = queue.popleft()
-        output.append(by_key[k])
-        for child, parents in filtered_edges.items():
-            if k in parents:
-                indeg[child] -= 1
-                if indeg[child] == 0:
-                    queue.append(child)
+    levels: list[list[_WorkItem]] = []
+    # Frontier: keys with in-degree 0. Level-by-level BFS (Kahn).
+    frontier = [k for k in by_key if indeg[k] == 0]
+    processed: set[tuple[str, str]] = set()
+    while frontier:
+        levels.append([by_key[k] for k in frontier])
+        next_frontier: list[tuple[str, str]] = []
+        for k in frontier:
+            processed.add(k)
+            for child, parents in filtered_edges.items():
+                if child in processed:
+                    continue
+                if k in parents:
+                    indeg[child] -= 1
+                    if indeg[child] == 0:
+                        next_frontier.append(child)
+        frontier = next_frontier
 
-    if len(output) != len(by_key):
-        seen = {(o.target_schema, o.target_table) for o in output}
-        remaining = [k for k in by_key if k not in seen]
+    if len(processed) != len(by_key):
+        remaining = [k for k in by_key if k not in processed]
         raise DerivaMLCycleError(
             f"FK cycle detected in pending tables: {remaining}. "
             "Split into multiple executions, or write rows that break "
             "the cycle in a prior run."
         )
-    return output
+    return levels
 
 
 @dataclass
@@ -199,11 +239,15 @@ def run_upload_engine(
     2. Re-validate metadata against catalog schema (Phase 2; skipped
        here — dependency on the provisional TableHandle surface).
     3. Acquire RID leases for any status='staged' rows.
-    4. Topologically sort work items by FK.
-    5. For each level in topo order, drain each item via
-       _drain_work_item (which wraps deriva-py's uploader).
-    6. On the first level with failures, abort the drain but leave
-       the rest of the work intact for a later re-run.
+    4. Group work items into topological levels by FK (items in the
+       same level have no FK dependency on each other).
+    5. For each level, drain every item via _drain_work_item (which
+       wraps deriva-py's uploader). One item's failure does NOT skip
+       its siblings in the same level — all independent items at a
+       level get drained.
+    6. After a level completes, if any item failed, abort the drain
+       at the level boundary and leave the rest of the work intact
+       for a later re-run (spec §2.11.2 step 7).
     7. Return an UploadReport.
 
     Args:
@@ -248,52 +292,62 @@ def run_upload_engine(
             execution_rid=exe_rid, pending_ids=pending_ids,
         )
 
-    # Step 4: topo sort.
+    # Step 4: topo sort into levels.
     fk_edges = _fk_edges_for_work(ml=ml, items=items)
-    sorted_items = topo_sort_work_items(items, fk_edges=fk_edges)
+    levels = _group_by_topo_level(items, fk_edges=fk_edges)
 
-    # Step 5: drain, aborting after the first level with failures.
+    # Step 5: drain level-by-level. Within a level, items are
+    # independent — one item's failure does NOT skip its siblings.
+    # Per spec §2.11.2 step 7, we record all failures in the level
+    # first, then abort at the level boundary.
     per_table: dict[str, dict] = {}
     errors: list[str] = []
     total_uploaded = 0
     total_failed = 0
 
-    for item in sorted_items:
-        try:
-            row = store.get_execution(item.execution_rid)
-            current_status = ExecutionStatus(row["status"])
-            if current_status != ExecutionStatus.pending_upload:
-                transition(
-                    store=store,
-                    catalog=ml.catalog if ml._mode.value == "online" else None,
-                    execution_rid=item.execution_rid,
-                    current=current_status,
-                    target=ExecutionStatus.pending_upload,
-                    mode=ml._mode,
+    for level in levels:
+        level_had_failure = False
+        for item in level:
+            try:
+                row = store.get_execution(item.execution_rid)
+                current_status = ExecutionStatus(row["status"])
+                if current_status != ExecutionStatus.pending_upload:
+                    transition(
+                        store=store,
+                        catalog=ml.catalog if ml._mode.value == "online" else None,
+                        execution_rid=item.execution_rid,
+                        current=current_status,
+                        target=ExecutionStatus.pending_upload,
+                        mode=ml._mode,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "upload: could not set pending_upload for %s: %s",
+                    item.execution_rid, exc,
                 )
-        except Exception as exc:
-            logger.warning(
-                "upload: could not set pending_upload for %s: %s",
-                item.execution_rid, exc,
-            )
 
-        try:
-            n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item)
-            total_uploaded += n
-            fqn = f"{item.target_schema}:{item.target_table}"
-            per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
-            per_table[fqn]["uploaded"] += n
-        except Exception as exc:
-            errors.append(f"{item.target_table}: {exc}")
-            failed_rows = store.list_pending_rows(
-                execution_rid=item.execution_rid,
-                status=PendingRowStatus.failed,
-                target_table=item.target_table,
-            )
-            total_failed += len(failed_rows)
-            fqn = f"{item.target_schema}:{item.target_table}"
-            per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
-            per_table[fqn]["failed"] += len(failed_rows)
+            try:
+                n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item)
+                total_uploaded += n
+                fqn = f"{item.target_schema}:{item.target_table}"
+                per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
+                per_table[fqn]["uploaded"] += n
+            except Exception as exc:
+                level_had_failure = True
+                errors.append(f"{item.target_table}: {exc}")
+                failed_rows = store.list_pending_rows(
+                    execution_rid=item.execution_rid,
+                    status=PendingRowStatus.failed,
+                    target_table=item.target_table,
+                )
+                total_failed += len(failed_rows)
+                fqn = f"{item.target_schema}:{item.target_table}"
+                per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
+                per_table[fqn]["failed"] += len(failed_rows)
+                # Continue draining siblings in this level.
+        if level_had_failure:
+            # Abort at the level boundary — don't descend into
+            # dependent levels whose parents couldn't drain.
             break
 
     # Final execution status transitions.
@@ -303,28 +357,37 @@ def run_upload_engine(
         if row is None:
             continue
         current_status = ExecutionStatus(row["status"])
-        if current_status == ExecutionStatus.pending_upload:
-            if counts["pending_rows"] == 0 and counts["pending_files"] == 0:
-                if counts["failed_rows"] == 0 and counts["failed_files"] == 0:
-                    target = ExecutionStatus.uploaded
-                else:
-                    target = ExecutionStatus.failed
-            else:
-                target = ExecutionStatus.failed
-            try:
-                transition(
-                    store=store,
-                    catalog=ml.catalog if ml._mode.value == "online" else None,
-                    execution_rid=exe_rid,
-                    current=current_status,
-                    target=target,
-                    mode=ml._mode,
-                    extra_fields={"error": errors[0]} if errors and target == ExecutionStatus.failed else {},
-                )
-            except Exception as exc:
-                logger.warning(
-                    "upload: final status transition failed for %s: %s", exe_rid, exc,
-                )
+        if current_status != ExecutionStatus.pending_upload:
+            continue
+
+        total_failed_counts = counts["failed_rows"] + counts["failed_files"]
+        total_pending_counts = counts["pending_rows"] + counts["pending_files"]
+
+        if total_failed_counts == 0 and total_pending_counts == 0:
+            target = ExecutionStatus.uploaded
+        elif total_failed_counts > 0:
+            target = ExecutionStatus.failed
+        else:
+            # No failures, but rows still pending (drain was aborted
+            # at a higher level or this run only partially drained).
+            # Leave status as pending_upload so a future upload_pending
+            # run picks up the rest without requiring retry_failed.
+            continue
+
+        try:
+            transition(
+                store=store,
+                catalog=ml.catalog if ml._mode.value == "online" else None,
+                execution_rid=exe_rid,
+                current=current_status,
+                target=target,
+                mode=ml._mode,
+                extra_fields={"error": errors[0]} if errors and target == ExecutionStatus.failed else {},
+            )
+        except Exception as exc:
+            logger.warning(
+                "upload: final status transition failed for %s: %s", exe_rid, exc,
+            )
 
     return UploadReport(
         execution_rids=rids,
