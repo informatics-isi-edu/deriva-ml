@@ -493,3 +493,56 @@ def test_diff_fk_target_mismatch():
     )])
     mismatches = diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)
+
+
+def test_diff_vocab_terms_differ():
+    from deriva_ml.tools.validate_schema_doc import (
+        MismatchKind, SchemaModel, TableModel, VocabularyTermModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="Asset_Type",
+        kind="vocabulary",
+        terms=[
+            VocabularyTermModel(name="Execution_Config"),
+            VocabularyTermModel(name="Extra_DocOnly_Term"),
+        ],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="Asset_Type",
+        kind="vocabulary",
+        terms=[
+            VocabularyTermModel(name="Execution_Config"),
+            VocabularyTermModel(name="Extra_CodeOnly_Term"),
+        ],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(
+        m.kind == MismatchKind.VOCAB_TERMS_MISMATCH
+        and "Extra_DocOnly_Term" in m.detail
+        and "Extra_CodeOnly_Term" in m.detail
+        for m in mismatches
+    )
+
+
+def test_diff_association_endpoints_differ():
+    from deriva_ml.tools.validate_schema_doc import (
+        AssociationEndpointModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="Dataset_Execution",
+        kind="association",
+        associates=[
+            AssociationEndpointModel(table="Dataset"),
+            AssociationEndpointModel(table="Execution"),
+        ],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="Dataset_Execution",
+        kind="association",
+        associates=[
+            AssociationEndpointModel(table="Dataset"),
+            AssociationEndpointModel(table="Workflow"),  # differs
+        ],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(m.kind == MismatchKind.ASSOCIATION_MISMATCH for m in mismatches)

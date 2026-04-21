@@ -539,7 +539,10 @@ def _compare_tables(
     """Compare two same-named TableModels; append any differences."""
     _compare_columns(mismatches, expected, actual)
     _compare_fks(mismatches, expected, actual)
-    # D4 adds _compare_terms / _compare_associates.
+    if expected.kind == "vocabulary" or actual.kind == "vocabulary":
+        _compare_terms(mismatches, expected, actual)
+    if expected.kind == "association" or actual.kind == "association":
+        _compare_associates(mismatches, expected, actual)
 
 
 def _compare_columns(
@@ -619,3 +622,37 @@ def _compare_fks(
                     f"code → {act_fk.referenced_schema}.{act_fk.referenced_table}{act_fk.referenced_columns}"
                 ),
             ))
+
+
+def _compare_terms(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -> None:
+    """Compare vocabulary seeded terms (by Name)."""
+    expected_terms = {t.name for t in expected.terms}
+    actual_terms = {t.name for t in actual.terms}
+    if expected_terms != actual_terms:
+        doc_only = sorted(expected_terms - actual_terms)
+        code_only = sorted(actual_terms - expected_terms)
+        mismatches.append(Mismatch(
+            kind=MismatchKind.VOCAB_TERMS_MISMATCH,
+            table=expected.name,
+            detail=f"doc-only: {doc_only}; code-only: {code_only}",
+        ))
+
+
+def _compare_associates(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -> None:
+    """Compare association-table endpoints (by table name)."""
+    expected_assoc = [a.table for a in expected.associates]
+    actual_assoc = [a.table for a in actual.associates]
+    if expected_assoc != actual_assoc:
+        mismatches.append(Mismatch(
+            kind=MismatchKind.ASSOCIATION_MISMATCH,
+            table=expected.name,
+            detail=f"associates doc {expected_assoc} vs code {actual_assoc}",
+        ))
