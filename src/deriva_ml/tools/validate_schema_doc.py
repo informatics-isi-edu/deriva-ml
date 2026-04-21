@@ -186,3 +186,41 @@ def load_from_doc(path: Path) -> SchemaModel:
             metadata=metadata,
         ))
     return SchemaModel(tables=tables)
+
+
+class SchemaCodeError(Exception):
+    """Raised when create_schema.py contains a pattern the validator can't extract."""
+
+
+# Enum lookup for resolving MLTable.xxx / MLVocab.xxx references.
+# Populated lazily via _resolve_enum_ref to avoid circular-import risk.
+_ENUM_LOOKUP: dict[str, dict[str, str]] = {}
+
+
+def _load_enum_lookup() -> dict[str, dict[str, str]]:
+    """Build {enum_name: {member_name: value}} for MLTable and MLVocab."""
+    global _ENUM_LOOKUP
+    if _ENUM_LOOKUP:
+        return _ENUM_LOOKUP
+    from deriva_ml.core.enums import MLTable, MLVocab
+
+    _ENUM_LOOKUP = {
+        "MLTable": {m.name: m.value for m in MLTable},
+        "MLVocab": {m.name: m.value for m in MLVocab},
+    }
+    return _ENUM_LOOKUP
+
+
+def _resolve_enum_ref(enum_name: str, member: str) -> str:
+    """Resolve an enum-member reference like MLTable.execution → 'Execution'."""
+    lookup = _load_enum_lookup()
+    if enum_name not in lookup:
+        raise SchemaCodeError(
+            f"unknown enum {enum_name!r}; expected one of {sorted(lookup)}"
+        )
+    members = lookup[enum_name]
+    if member not in members:
+        raise SchemaCodeError(
+            f"{enum_name} has no member {member!r}; known: {sorted(members)}"
+        )
+    return members[member]

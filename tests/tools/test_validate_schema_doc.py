@@ -261,3 +261,34 @@ def test_load_from_doc_accepts_descriptions(tmp_path):
     assert t.columns[0].name == "Name"
     # ColumnModel has no description field.
     assert not hasattr(t.columns[0], "description")
+
+
+def test_resolve_enum_ref_mltable():
+    """Resolver returns the enum value for MLTable.execution."""
+    from deriva_ml.tools.validate_schema_doc import _resolve_enum_ref
+
+    assert _resolve_enum_ref("MLTable", "execution") == "Execution"
+    assert _resolve_enum_ref("MLTable", "dataset") == "Dataset"
+
+
+def test_resolve_enum_ref_mlvocab():
+    from deriva_ml.tools.validate_schema_doc import _resolve_enum_ref
+
+    assert _resolve_enum_ref("MLVocab", "workflow_type") == "Workflow_Type"
+    assert _resolve_enum_ref("MLVocab", "asset_type") == "Asset_Type"
+
+
+def test_resolve_enum_ref_unknown_raises():
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaCodeError, _resolve_enum_ref
+
+    with pytest.raises(SchemaCodeError, match="unknown enum"):
+        _resolve_enum_ref("UnknownEnum", "whatever")
+
+
+def test_resolve_enum_ref_unknown_member_raises():
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaCodeError, _resolve_enum_ref
+
+    with pytest.raises(SchemaCodeError, match="has no member"):
+        _resolve_enum_ref("MLTable", "no_such_member")
