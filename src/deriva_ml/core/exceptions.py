@@ -103,6 +103,24 @@ class DerivaMLSchemaError(DerivaMLConfigurationError):
     pass
 
 
+class DerivaMLSchemaRefreshBlocked(DerivaMLConfigurationError):
+    """Raised when ``refresh_schema()`` is called with staged work in the workspace.
+
+    The caller should drain the workspace first (``ml.upload_pending()``)
+    or call ``refresh_schema(force=True)`` to discard local state.
+    Draining is the safer choice — a forced refresh may leave rows
+    whose metadata references columns or types no longer in the new
+    schema, causing catalog-insert failures on the next upload.
+
+    Example:
+        >>> raise DerivaMLSchemaRefreshBlocked(
+        ...     "refresh_schema requires a drained workspace; 3 pending rows"
+        ... )
+    """
+
+    pass
+
+
 class DerivaMLAuthenticationError(DerivaMLConfigurationError):
     """Exception raised for authentication failures.
 
