@@ -117,8 +117,10 @@ def test_invoke_uploader_happy_path(monkeypatch, tmp_path, asset_ml):
     monkeypatch.setattr(ue, "GenericUploader", FakeGenericUploader)
 
     # Stage two asset files on disk
-    f1 = tmp_path / "a.txt"; f1.write_text("a")
-    f2 = tmp_path / "b.txt"; f2.write_text("b")
+    f1 = tmp_path / "a.txt"
+    f1.write_text("a")
+    f2 = tmp_path / "b.txt"
+    f2.write_text("b")
 
     files = [
         {"path": str(f1), "rid": "R1", "pending_id": 1, "metadata": {}},
@@ -147,8 +149,10 @@ def test_invoke_uploader_mixed_outcomes(monkeypatch, tmp_path, asset_ml):
     from deriva_ml.execution import upload_engine as ue
     monkeypatch.setattr(ue, "GenericUploader", FakeGenericUploader)
 
-    f1 = tmp_path / "ok.txt"; f1.write_text("ok")
-    f2 = tmp_path / "bad.txt"; f2.write_text("bad")
+    f1 = tmp_path / "ok.txt"
+    f1.write_text("ok")
+    f2 = tmp_path / "bad.txt"
+    f2.write_text("bad")
 
     files = [
         {"path": str(f1), "rid": "R1", "pending_id": 1, "metadata": {}},
@@ -185,9 +189,12 @@ def test_invoke_uploader_cancel_mid_batch(monkeypatch, tmp_path, asset_ml):
 
     cancel_event = threading.Event()
 
-    f1 = tmp_path / "a.txt"; f1.write_text("a")
-    f2 = tmp_path / "b.txt"; f2.write_text("b")
-    f3 = tmp_path / "c.txt"; f3.write_text("c")
+    f1 = tmp_path / "a.txt"
+    f1.write_text("a")
+    f2 = tmp_path / "b.txt"
+    f2.write_text("b")
+    f3 = tmp_path / "c.txt"
+    f3.write_text("c")
 
     files = [
         {"path": str(f1), "rid": "R1", "pending_id": 1, "metadata": {}},
@@ -235,7 +242,8 @@ def test_invoke_uploader_reconciliation(monkeypatch, tmp_path, asset_ml):
     from deriva_ml.execution import upload_engine as ue
     monkeypatch.setattr(ue, "GenericUploader", FakeGenericUploader)
 
-    f1 = tmp_path / "only.txt"; f1.write_text("only")
+    f1 = tmp_path / "only.txt"
+    f1.write_text("only")
     files = [{"path": str(f1), "rid": "R1", "pending_id": 1, "metadata": {}}]
 
     # Make uploadFiles skip the status_callback entirely but still
@@ -264,7 +272,8 @@ def test_invoke_uploader_cleans_up_scan_root_on_exception(monkeypatch, tmp_path,
     from deriva_ml.execution import upload_engine as ue
     monkeypatch.setattr(ue, "GenericUploader", FakeGenericUploader)
 
-    f1 = tmp_path / "a.txt"; f1.write_text("a")
+    f1 = tmp_path / "a.txt"
+    f1.write_text("a")
     files = [{"path": str(f1), "rid": "R1", "pending_id": 1, "metadata": {}}]
 
     recorded_roots: list[Path] = []
