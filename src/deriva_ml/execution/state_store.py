@@ -667,6 +667,7 @@ class ExecutionStateStore:
 
         rows_out: list[dict] = []
         assets_out: list[dict] = []
+        missing_file_diagnostics: list[str] = []
         with self.engine.connect() as conn:
             for r in conn.execute(stmt).mappings().all():
                 table_fqn = f"{r['target_schema']}:{r['target_table']}"
@@ -686,7 +687,11 @@ class ExecutionStateStore:
                         try:
                             total_bytes += os.path.getsize(p)
                         except OSError:
-                            pass
+                            # File missing — surface as diagnostic,
+                            # don't crash the summary.
+                            missing_file_diagnostics.append(
+                                f"{table_fqn} asset file missing on disk: {p}"
+                            )
                     assets_out.append({
                         "table": table_fqn,
                         "pending_files": int(r["pending"]),
@@ -718,6 +723,12 @@ class ExecutionStateStore:
                 diagnostics.append(
                     f"{dr['target_table']} row {ident} failed: {dr['error']}"
                 )
+
+            # Missing files are added after the cap is applied to the
+            # failed-row diagnostics. In practice, missing files are rare
+            # and it's more useful to surface all of them than to silently
+            # drop some.
+            diagnostics.extend(missing_file_diagnostics)
 
         return {
             "rows": rows_out,

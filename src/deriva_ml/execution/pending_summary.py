@@ -163,9 +163,12 @@ class WorkspacePendingSummary:
     processes that want to know everything pending across runs.
 
     Attributes:
-        per_execution: PendingSummary per execution that has at least
-            one known-local row (pending or terminal). Empty
-            executions are excluded.
+        per_execution: PendingSummary per known-local execution
+            in the workspace. Empty executions (no pending/failed/
+            uploaded rows) are INCLUDED with empty rows/assets/
+            diagnostics lists — use per_execution[i].has_pending to
+            filter at the caller if only non-empty summaries are
+            wanted.
     """
     per_execution: list[PendingSummary]
 

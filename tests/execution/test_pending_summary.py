@@ -214,3 +214,31 @@ def test_ml_pending_summary_workspace_wide(test_ml):
     ws = test_ml.pending_summary()
     rids = {s.execution_rid for s in ws.per_execution}
     assert {exe_a.execution_rid, exe_b.execution_rid}.issubset(rids)
+
+
+def test_exe_pending_summary_asset_missing_file_diagnostic(test_ml, tmp_path):
+    """Missing asset file surfaces as diagnostic, not silent."""
+    from datetime import datetime, timezone
+
+    wf = _make_workflow(test_ml, "G2 missing file")
+    exe = test_ml.create_execution(description="miss", workflow=wf)
+
+    # Register a pending asset row whose file doesn't exist.
+    missing = tmp_path / "gone.png"
+    # deliberately don't write it
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="gone",
+        target_schema="deriva-ml", target_table="Image",
+        metadata_json="{}", created_at=now,
+        asset_file_path=str(missing),
+    )
+
+    s = exe.pending_summary()
+    assert any("gone.png" in d or "missing on disk" in d for d in s.diagnostics)
+    # pending_files still counts — we still know there's a pending row
+    [a] = s.assets
+    assert a.pending_files == 1
+    # bytes total is 0 because the file doesn't exist
+    assert a.total_bytes_pending == 0
