@@ -2,6 +2,40 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Phase 2 Subsystem 1a: Status-enum reconciliation
+
+### Breaking changes
+
+- **`ExecutionStatus` values are title-case.** `ExecutionStatus.Running` (was `.running`); `.value == "Running"` (was `"running"`). Identifiers and values both changed. Catalog reads via `ExecutionStatus(row["Status"])` now work without translation.
+- **Legacy `Status` enum deleted.** `deriva_ml.core.enums.Status` and `deriva_ml.core.definitions.Status` re-export are gone. Use `deriva_ml.execution.state_store.ExecutionStatus` instead.
+- **`Execution.update_status(...)` signature changed.** Was `update_status(status: Status, message: str)`. Now `update_status(target: ExecutionStatus, *, error: str | None = None)`. The positional `message` parameter is gone; use `logger.info(...)` for progress chatter. The keyword-only `error=` argument is meaningful only on `Failed` / `Aborted` transitions; on a non-terminal transition the kwarg is ignored with a warning log.
+- **`ExecutionRecord.update_status(...)` is new.** Same signature as `Execution.update_status` plus a required `ml: DerivaML` kwarg.
+- **`ExecutionMixin._update_status` deleted.** Was dead code (no callers in src/).
+- **`DerivaML.status` attribute deleted.** Was vestigial; no readers post-`_update_status` deletion.
+- **Legacy lifecycle states `Initializing` and `Pending` no longer exist.** Code that wrote `Status.initializing` is now `logger.info(...)`. `Status.pending` callsites now write `ExecutionStatus.Created`.
+- **`Status.completed` split.** Maps to `ExecutionStatus.Stopped` (algorithm finished, before upload) or `ExecutionStatus.Uploaded` (after upload finishes), depending on call-site context.
+
+### Fixed
+
+- **Catalog `Execution.Status` is now actually written.** `Execution.__init__` previously inserted only `Description` and `Workflow`, leaving `Status` NULL on every newly created Execution row. Now writes `Status: "Created"`.
+- **`state_machine.transition()` catalog sync now works.** Was using `catalog.put('/entity/...')` which ERMrest rejects with `409 Conflict: Entity PUT requires at least one client-managed key for input correlation.` Switched to `catalog.getPathBuilder().schemas['deriva-ml'].tables['Execution'].update(body)` — the same datapath pattern used elsewhere in the codebase.
+- **`_catalog_body_for_execution` no longer sends `Start_Time` / `End_Time`.** The catalog `Execution` table has no such columns; the body shape was off. Lifecycle timestamps live in SQLite only.
+- **Phase 1 H2 integration test workaround removed.** With `Execution.Status` now correctly synced, the H2 test no longer needs to read SQLite directly to bypass the reconciliation bug. Assertions tightened.
+
+### Migration notes
+
+- Existing catalogs with historical Execution rows containing `Status = "Initializing"` or `Status = "Pending"` will raise `DerivaMLStateInconsistency` on `resume_execution`. Users with such rows either clean them via `gc_executions` or update the `Status` field manually.
+- The catalog `Execution.Status_Detail` column is no longer written by `update_status` (no equivalent in the new signature). Columns persist in the schema; new rows have `NULL` here.
+- This subsystem (S1a) does NOT add `Execution_Status` as a controlled vocabulary table — the column remains free-text. Adding the vocabulary table is deferred to a future S1b subsystem that exercises the S0 doc-first workflow.
+
+### Tests
+
+- 11 new unit tests across `tests/execution/test_status_migration.py` and `tests/execution/test_update_status.py` verify the new enum + new method API.
+- `tests/test_migration_complete.py` is a grep gate that fails CI if any legacy `Status.xxx` references reappear in `src/deriva_ml/`.
+- 254/258 tests in `tests/execution/` pass. (3 pre-existing legacy lifecycle tests in `test_execution.py` that were stuck on the catalog-sync bug now pass after the fix.)
+
+---
+
 ## Unreleased — Phase 2 Subsystem 0: Schema-doc source of truth
 
 ### New
