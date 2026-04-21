@@ -205,6 +205,61 @@ class DerivaModel:
             # Multiple domain schemas, no explicit default
             self.default_schema = None
 
+    @classmethod
+    def from_cached(
+        cls,
+        schema_dict: dict,
+        *,
+        catalog,
+        ml_schema: str = ML_SCHEMA,
+        domain_schemas: "str | set[str] | None" = None,
+        default_schema: "str | None" = None,
+    ) -> "DerivaModel":
+        """Construct a DerivaModel from a cached ermrest /schema dict.
+
+        No network is touched. The ``catalog`` argument is passed to
+        deriva-py's ``Model(catalog, model_doc)`` constructor as the
+        first positional argument; in offline mode it will be a
+        :class:`~deriva_ml.core.catalog_stub.CatalogStub`, in online
+        mode it is a real ``ErmrestCatalog``. ``DerivaModel.__init__``
+        then reads the catalog back off ``model.catalog`` as usual.
+
+        This replicates what ``Model.fromcatalog(catalog)`` does
+        online — the online call fetches
+        ``catalog.get("/schema").json()`` and passes the result to
+        ``Model(catalog, dict)``. Here we pass in the already-cached
+        dict from :class:`~deriva_ml.core.schema_cache.SchemaCache`.
+
+        Args:
+            schema_dict: The JSON payload from a previous
+                ``catalog.get('/schema').json()`` call, as persisted
+                by ``SchemaCache``.
+            catalog: The catalog object to associate with the model.
+                Pass a real ``ErmrestCatalog`` online, or a
+                ``CatalogStub`` offline.
+            ml_schema: ML schema name (default ``"deriva-ml"``).
+            domain_schemas: Optional explicit set of domain schema
+                names. If None, auto-detects all non-system schemas
+                from the cached dict.
+            default_schema: Optional default schema name.
+
+        Returns:
+            A ``DerivaModel`` wrapping a deriva-py ``Model``
+            reconstructed from the dict.
+        """
+        from deriva.core.ermrest_model import Model
+
+        # Model.__init__(catalog, model_doc) stores catalog as
+        # self._catalog and exposes it via the .catalog property;
+        # DerivaModel.__init__ then reads self.model.catalog.
+        model = Model(catalog, schema_dict)
+        return cls(
+            model,
+            ml_schema=ml_schema,
+            domain_schemas=domain_schemas,
+            default_schema=default_schema,
+        )
+
     def is_system_schema(self, schema_name: str) -> bool:
         """Check if a schema is a system or ML schema.
 
