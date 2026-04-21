@@ -210,6 +210,7 @@ def test_load_from_doc_foreign_keys(tmp_path):
 def test_load_from_doc_invalid_kind_raises(tmp_path):
     """Unknown 'kind:' value raises SchemaDocError."""
     import pytest
+
     from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
 
     doc = tmp_path / "schema.md"
@@ -226,6 +227,7 @@ def test_load_from_doc_invalid_kind_raises(tmp_path):
 def test_load_from_doc_missing_required_key_raises(tmp_path):
     """Missing required key 'kind' raises SchemaDocError."""
     import pytest
+
     from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
 
     doc = tmp_path / "schema.md"
@@ -280,6 +282,7 @@ def test_resolve_enum_ref_mlvocab():
 
 def test_resolve_enum_ref_unknown_raises():
     import pytest
+
     from deriva_ml.tools.validate_schema_doc import SchemaCodeError, _resolve_enum_ref
 
     with pytest.raises(SchemaCodeError, match="unknown enum"):
@@ -288,6 +291,7 @@ def test_resolve_enum_ref_unknown_raises():
 
 def test_resolve_enum_ref_unknown_member_raises():
     import pytest
+
     from deriva_ml.tools.validate_schema_doc import SchemaCodeError, _resolve_enum_ref
 
     with pytest.raises(SchemaCodeError, match="has no member"):
@@ -431,7 +435,11 @@ def test_diff_identical_schemas_empty():
 
 def test_diff_column_missing_in_actual():
     from deriva_ml.tools.validate_schema_doc import (
-        ColumnModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+        ColumnModel,
+        MismatchKind,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Dataset", kind="table",
@@ -449,7 +457,11 @@ def test_diff_column_missing_in_actual():
 
 def test_diff_column_type_mismatch():
     from deriva_ml.tools.validate_schema_doc import (
-        ColumnModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+        ColumnModel,
+        MismatchKind,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Dataset", kind="table",
@@ -469,7 +481,12 @@ def test_diff_column_type_mismatch():
 
 def test_diff_fk_target_mismatch():
     from deriva_ml.tools.validate_schema_doc import (
-        ColumnModel, ForeignKeyModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+        ColumnModel,
+        ForeignKeyModel,
+        MismatchKind,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Execution", kind="table",
@@ -497,7 +514,11 @@ def test_diff_fk_target_mismatch():
 
 def test_diff_vocab_terms_differ():
     from deriva_ml.tools.validate_schema_doc import (
-        MismatchKind, SchemaModel, TableModel, VocabularyTermModel, diff_schemas,
+        MismatchKind,
+        SchemaModel,
+        TableModel,
+        VocabularyTermModel,
+        diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Asset_Type",
@@ -526,7 +547,11 @@ def test_diff_vocab_terms_differ():
 
 def test_diff_association_endpoints_differ():
     from deriva_ml.tools.validate_schema_doc import (
-        AssociationEndpointModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+        AssociationEndpointModel,
+        MismatchKind,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Dataset_Execution",
@@ -625,9 +650,13 @@ def test_cli_parse_error_returns_2(tmp_path, capsys):
 def test_to_doc_markdown_roundtrip(tmp_path):
     """A SchemaModel rendered to Markdown can be loaded back losslessly."""
     from deriva_ml.tools.validate_schema_doc import (
-        AssociationEndpointModel, ColumnModel, ForeignKeyModel,
-        SchemaModel, TableModel, VocabularyTermModel,
-        load_from_doc, to_doc_markdown,
+        AssociationEndpointModel,
+        ColumnModel,
+        SchemaModel,
+        TableModel,
+        VocabularyTermModel,
+        load_from_doc,
+        to_doc_markdown,
     )
     original = SchemaModel(tables=[
         TableModel(

@@ -250,6 +250,9 @@ def _extract_ast_str(node: ast.AST) -> str:
     )
 
 
+_KNOWN_TYPE_HOLDERS = frozenset({"BuiltinType"})
+
+
 def _extract_ast_str_tolerant(node: ast.AST) -> str:
     """Like _extract_ast_str, but returns DYNAMIC_VALUE for unknown patterns.
 
@@ -257,22 +260,26 @@ def _extract_ast_str_tolerant(node: ast.AST) -> str:
     attribute chain (e.g., FK referenced_schema = sname or schema.name).
     The diff comparator treats DYNAMIC_VALUE as matching any counterpart.
 
-    For attribute references like `MLVocab.dataset_type`, resolves via the
-    enum lookup first (→ "Dataset_Type"); falls back to `.attr` only if the
-    enum is unknown.
+    Resolution order for ast.Attribute nodes:
+      - MLTable / MLVocab enum reference → resolved via _resolve_enum_ref.
+      - BuiltinType.text → ".text" (type-like attribute).
+      - Anything else (schema.name, self.catalog) → DYNAMIC_VALUE.
     """
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.Attribute):
-        # Try enum resolution: MLVocab.dataset_type → "Dataset_Type".
         if isinstance(node.value, ast.Name):
+            # Enum-backed attr: MLVocab.dataset_type → "Dataset_Type".
             try:
                 return _resolve_enum_ref(node.value.id, node.attr)
             except SchemaCodeError:
-                # Not an enum we know about (e.g., BuiltinType.text); fall
-                # back to the attr name.
+                pass
+            # Known type holders: BuiltinType.text → "text".
+            if node.value.id in _KNOWN_TYPE_HOLDERS:
                 return node.attr
-        return node.attr
+        # Dotted access on a local value (schema.name, self.catalog, …)
+        # can't be resolved statically.
+        return DYNAMIC_VALUE
     # ast.Name (parameter reference), ast.Call, etc.: treat as dynamic.
     return DYNAMIC_VALUE
 

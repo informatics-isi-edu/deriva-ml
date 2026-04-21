@@ -16,7 +16,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 def test_validator_runs_clean_on_current_repo():
     """The authoritative doc and code agree. This IS the CI gate."""
     from deriva_ml.tools.validate_schema_doc import (
-        diff_schemas, load_from_code, load_from_doc,
+        diff_schemas,
+        load_from_code,
+        load_from_doc,
     )
 
     doc_path = REPO_ROOT / "docs" / "reference" / "schema.md"
