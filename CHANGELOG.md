@@ -12,12 +12,18 @@ have been removed without a shim. Update call sites before upgrading.
 | Removed | Replacement |
 |---|---|
 | `ml.restore_execution(rid)` | `ml.resume_execution(rid)` |
-| `exe.upload_execution_outputs(...)` | `exe.upload_outputs(...)` |
+| `exe.upload_execution_outputs(...)` *(still present; superseded)* | `exe.upload_outputs(...)` |
 | `exe.retry_failed()` | `exe.upload_outputs(retry_failed=True)` |
 | `Execution.list_nested_executions()` | `ExecutionRecord.list_execution_children(recurse=...)` |
 | `ExecutionRecord.list_nested_executions(recurse=...)` | `ExecutionRecord.list_execution_children(recurse=...)` |
 | `ExecutionRecord.list_parent_executions(recurse=...)` | `ExecutionRecord.list_execution_parents(recurse=...)` |
 | `Execution.datasets` as `list[DatasetBag]` | `Execution.datasets` as `DatasetCollection` (RID-keyed mapping + iterable) |
+
+Note: `exe.upload_execution_outputs(...)` is retained alongside the
+new `exe.upload_outputs(...)` Phase-1 entry point. Several internal
+call sites (`demo_catalog.py`, `run_notebook.py`, `dataset/split.py`,
+`base_config.py`, `runner.py`) still use the legacy method; migration
+is a Phase-2 cleanup.
 
 Additional behavior changes that may affect callers:
 
@@ -129,6 +135,10 @@ feature-consistency follow-on:
   `run_upload_engine` but not yet threaded through the uploader.
 - `get_upload_job(id)` / `list_upload_jobs()` — require a persisted
   `upload_jobs` SQLite table, not in Phase 1 scope.
+- `ml.list_pending_uploads()` (spec §2.7) — flat `list[UploadTarget]`
+  view of pending work across executions. Information is already
+  reachable via `ml.pending_summary().per_execution[i].rows/assets`;
+  a flat sugar method is Phase 2.
 - `ConnectionMode.offline` currently does not fully skip network I/O
   in `DerivaML.__init__` (credential/catalog-model fetch still runs).
   Per spec §2.1, offline should be a distinct code path; Phase 2
