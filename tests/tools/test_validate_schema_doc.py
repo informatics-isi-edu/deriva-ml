@@ -465,3 +465,31 @@ def test_diff_column_type_mismatch():
         and "text" in m.detail and "markdown" in m.detail
         for m in mismatches
     )
+
+
+def test_diff_fk_target_mismatch():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel, ForeignKeyModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="Execution", kind="table",
+        columns=[ColumnModel(name="Workflow", type="text")],
+        foreign_keys=[ForeignKeyModel(
+            columns=["Workflow"],
+            referenced_schema="deriva-ml",
+            referenced_table="Workflow",
+            referenced_columns=["RID"],
+        )],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="Execution", kind="table",
+        columns=[ColumnModel(name="Workflow", type="text")],
+        foreign_keys=[ForeignKeyModel(
+            columns=["Workflow"],
+            referenced_schema="deriva-ml",
+            referenced_table="SomeOtherTable",
+            referenced_columns=["RID"],
+        )],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)

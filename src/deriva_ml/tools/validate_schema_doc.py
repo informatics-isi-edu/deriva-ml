@@ -538,7 +538,8 @@ def _compare_tables(
 ) -> None:
     """Compare two same-named TableModels; append any differences."""
     _compare_columns(mismatches, expected, actual)
-    # D3 adds _compare_fks; D4 adds _compare_terms / _compare_associates.
+    _compare_fks(mismatches, expected, actual)
+    # D4 adds _compare_terms / _compare_associates.
 
 
 def _compare_columns(
@@ -571,5 +572,50 @@ def _compare_columns(
                 detail=(
                     f"column {col_name!r}: doc type {exp_c.type!r} "
                     f"vs code type {act_c.type!r}"
+                ),
+            ))
+
+
+def _compare_fks(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -> None:
+    """FK comparison — by tuple (columns, referenced_table, referenced_columns).
+
+    FKs are matched by their source columns tuple. If a doc FK and a code
+    FK share columns, their referenced_* must match.
+    """
+    def key(fk: ForeignKeyModel) -> tuple[str, ...]:
+        return tuple(fk.columns)
+
+    expected_fks = {key(fk): fk for fk in expected.foreign_keys}
+    actual_fks = {key(fk): fk for fk in actual.foreign_keys}
+
+    for k in sorted(expected_fks.keys() - actual_fks.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.FK_MISMATCH,
+            table=expected.name,
+            detail=f"FK on {list(k)} in doc but not in code",
+        ))
+    for k in sorted(actual_fks.keys() - expected_fks.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.FK_MISMATCH,
+            table=expected.name,
+            detail=f"FK on {list(k)} in code but not in doc",
+        ))
+    for k in sorted(expected_fks.keys() & actual_fks.keys()):
+        exp_fk = expected_fks[k]
+        act_fk = actual_fks[k]
+        if (exp_fk.referenced_schema, exp_fk.referenced_table, tuple(exp_fk.referenced_columns)) != (
+            act_fk.referenced_schema, act_fk.referenced_table, tuple(act_fk.referenced_columns)
+        ):
+            mismatches.append(Mismatch(
+                kind=MismatchKind.FK_MISMATCH,
+                table=expected.name,
+                detail=(
+                    f"FK on {list(k)} differs: "
+                    f"doc → {exp_fk.referenced_schema}.{exp_fk.referenced_table}{exp_fk.referenced_columns}; "
+                    f"code → {act_fk.referenced_schema}.{act_fk.referenced_table}{act_fk.referenced_columns}"
                 ),
             ))
