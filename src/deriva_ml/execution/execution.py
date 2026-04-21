@@ -142,7 +142,7 @@ class Execution:
         datasets (list[DatasetBag]): Materialized dataset objects.
         configuration (ExecutionConfiguration): Execution settings and parameters.
         workflow_rid (RID): RID of the associated workflow.
-        status (Status): Current execution status.
+        status (ExecutionStatus): Current execution status (read-through from SQLite).
         asset_paths (list[AssetFilePath]): Paths to execution assets.
         start_time (datetime | None): When execution started.
         stop_time (datetime | None): When execution completed.
@@ -949,7 +949,7 @@ class Execution:
 
         transition(
             store=store,
-            catalog=self._ml_object.catalog if self._ml_object._mode.value == "online" else None,
+            catalog=self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None,
             execution_rid=self.execution_rid,
             current=current,
             target=target,

@@ -340,11 +340,16 @@ def flush_pending_sync(
         return
 
     body = _catalog_body_for_execution(store=store, execution_rid=execution_rid)
+    # Use the datapath API (same fix pattern as transition()): raw
+    # catalog.put on /entity/... is rejected by ERMrest with 409
+    # "Entity PUT requires at least one client-managed key for input
+    # correlation."
     try:
-        catalog.put("/entity/deriva-ml:Execution", json=body)
+        pb = catalog.getPathBuilder()
+        pb.schemas["deriva-ml"].tables["Execution"].update(body)
     except Exception as exc:
         logger.warning(
-            "flush_pending_sync %s: catalog PUT failed (%s); will retry later",
+            "flush_pending_sync %s: catalog sync failed (%s); will retry later",
             execution_rid, exc,
         )
         return

@@ -103,7 +103,6 @@ class DerivaML(
         configuration (ExecutionConfiguration): Current execution configuration.
         project_name (str): Name of the current project.
         start_time (datetime): Timestamp when this instance was created.
-        status (str): Current status of operations.
 
     Example:
         >>> ml = DerivaML('deriva.example.org', 'my_catalog')

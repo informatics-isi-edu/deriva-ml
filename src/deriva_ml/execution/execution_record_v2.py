@@ -224,7 +224,7 @@ class ExecutionRecord:
 
         transition(
             store=store,
-            catalog=ml.catalog if ml._mode.value == "online" else None,
+            catalog=ml.catalog if ml._mode is ConnectionMode.online else None,
             execution_rid=self.rid,
             current=current,
             target=target,
