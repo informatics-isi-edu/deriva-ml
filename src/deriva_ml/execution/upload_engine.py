@@ -19,6 +19,7 @@ Key idempotency properties (spec §1.1 item 4):
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -227,8 +228,7 @@ def run_upload_engine(
     ml: "DerivaML",
     execution_rids: "list[str] | None",
     retry_failed: bool = False,
-    bandwidth_limit_mbps: "int | None" = None,
-    parallel_files: int = 4,
+    cancel_event: "threading.Event | None" = None,
 ) -> UploadReport:
     """Drain pending rows/files for the given executions.
 
@@ -254,9 +254,10 @@ def run_upload_engine(
         ml: DerivaML instance.
         execution_rids: Which executions to drain; None = all pending.
         retry_failed: Include status='failed' rows.
-        bandwidth_limit_mbps: Cap uploader egress. None = unlimited.
-            Passed to deriva-py's uploader config.
-        parallel_files: Concurrent file uploads per table. Bounded.
+        cancel_event: If provided and .is_set(), the engine stops
+            dispatching new batches before each batch and signals any
+            in-flight GenericUploader via its cancel() primitive. If
+            None, the engine runs to completion.
 
     Returns:
         UploadReport summarizing the run.
@@ -308,6 +309,9 @@ def run_upload_engine(
     for level in levels:
         level_had_failure = False
         for item in level:
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info("upload: cancel_event set — stopping drain before next batch")
+                break
             try:
                 row = store.get_execution(item.execution_rid)
                 current_status = ExecutionStatus(row["status"])
@@ -327,7 +331,11 @@ def run_upload_engine(
                 )
 
             try:
-                n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item, ml=ml)
+                n = _drain_work_item(
+                    store=store, catalog=ml.catalog,
+                    work_item=item, ml=ml,
+                    cancel_event=cancel_event,
+                )
                 total_uploaded += n
                 fqn = f"{item.target_schema}:{item.target_table}"
                 per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
@@ -345,9 +353,10 @@ def run_upload_engine(
                 per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
                 per_table[fqn]["failed"] += len(failed_rows)
                 # Continue draining siblings in this level.
-        if level_had_failure:
+        if level_had_failure or (cancel_event is not None and cancel_event.is_set()):
             # Abort at the level boundary — don't descend into
-            # dependent levels whose parents couldn't drain.
+            # dependent levels whose parents couldn't drain, and honor
+            # cancel requests at level boundaries.
             break
 
     # Final execution status transitions.
@@ -445,6 +454,7 @@ def _drain_work_item(
     catalog: "ErmrestCatalog",
     work_item: _WorkItem,
     ml: "DerivaML | None" = None,
+    cancel_event: "threading.Event | None" = None,
 ) -> int:
     """Drain one (exe, table) grouping: insert rows and/or upload files.
 
@@ -498,6 +508,7 @@ def _drain_work_item(
             ml=ml, files=files,
             target_table=work_item.target_table,
             execution_rid=work_item.execution_rid,
+            cancel_event=cancel_event,
         )
         uploaded_paths = set(result["uploaded"])
         for r in rows:
@@ -558,6 +569,7 @@ def _invoke_deriva_py_uploader(
     files: list[dict],
     target_table: str,
     execution_rid: str,
+    cancel_event: "threading.Event | None" = None,
 ) -> dict:
     """Invoke deriva-py's uploader for a batch of files.
 

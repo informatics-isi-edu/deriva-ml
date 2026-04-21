@@ -86,8 +86,7 @@ class UploadJob:
                 ml=self._ml,
                 execution_rids=self._execution_rids,
                 retry_failed=self._retry_failed,
-                bandwidth_limit_mbps=self._bandwidth_limit_mbps,
-                parallel_files=self._parallel_files,
+                cancel_event=self._cancel_event,
             )
             self.status = (
                 "completed" if self._report.total_failed == 0 else "failed"

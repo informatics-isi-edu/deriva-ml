@@ -750,12 +750,14 @@ class ExecutionMixin:
             >>> print(f"{report.total_uploaded} uploaded, "
             ...       f"{report.total_failed} failed")
         """
+        # Task 1: bandwidth_limit_mbps and parallel_files are kept on
+        # this method's signature for API stability but are no longer
+        # forwarded to the engine. Task 3 removes them from the API.
+        del bandwidth_limit_mbps, parallel_files
         return run_upload_engine(
             ml=self,
             execution_rids=execution_rids,
             retry_failed=retry_failed,
-            bandwidth_limit_mbps=bandwidth_limit_mbps,
-            parallel_files=parallel_files,
         )
 
     def start_upload(
