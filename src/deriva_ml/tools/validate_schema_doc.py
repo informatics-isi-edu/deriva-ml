@@ -9,6 +9,7 @@ Runs in CI via the deriva-ml-validate-schema entry point.
 
 from __future__ import annotations
 
+import ast
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -224,3 +225,154 @@ def _resolve_enum_ref(enum_name: str, member: str) -> str:
             f"{enum_name} has no member {member!r}; known: {sorted(members)}"
         )
     return members[member]
+
+
+def _extract_ast_str(node: ast.AST) -> str:
+    """Extract a string from an ast.Constant or return the ast.unparse repr."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    # Attribute access like BuiltinType.text → "text"
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    raise SchemaCodeError(
+        f"expected string constant or attribute, got {ast.dump(node)}"
+    )
+
+
+def _extract_ast_name_or_enum(node: ast.AST) -> str:
+    """Extract a table-name string from a literal, enum ref, or attr access."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Attribute):
+        # Expect: MLTable.execution or MLVocab.workflow_type
+        if isinstance(node.value, ast.Name):
+            return _resolve_enum_ref(node.value.id, node.attr)
+    raise SchemaCodeError(
+        f"expected string literal or enum reference, got {ast.dump(node)}"
+    )
+
+
+def _extract_ast_str_list(node: ast.AST) -> list[str]:
+    """Extract a list[str] from an ast.List node."""
+    if not isinstance(node, ast.List):
+        raise SchemaCodeError(
+            f"expected list literal, got {ast.dump(node)}"
+        )
+    return [_extract_ast_str(elt) for elt in node.elts]
+
+
+def _extract_column(node: ast.Call) -> ColumnModel:
+    """Extract a ColumnDef(...) call into a ColumnModel."""
+    # Positional or keyword args: ColumnDef("Name", BuiltinType.text)
+    name: str | None = None
+    type_: str | None = None
+    if node.args:
+        name = _extract_ast_str(node.args[0])
+        if len(node.args) > 1:
+            type_ = _extract_ast_str(node.args[1])
+    for kw in node.keywords:
+        if kw.arg == "name":
+            name = _extract_ast_str(kw.value)
+        elif kw.arg == "type":
+            type_ = _extract_ast_str(kw.value)
+    if name is None or type_ is None:
+        raise SchemaCodeError(
+            f"ColumnDef missing name or type: {ast.dump(node)}"
+        )
+    return ColumnModel(name=name, type=type_)
+
+
+def _extract_fk(node: ast.Call) -> ForeignKeyModel:
+    """Extract a ForeignKeyDef(...) call into a ForeignKeyModel."""
+    columns: list[str] = []
+    referenced_schema: str = ""
+    referenced_table: str = ""
+    referenced_columns: list[str] = []
+    for kw in node.keywords:
+        if kw.arg == "columns":
+            columns = _extract_ast_str_list(kw.value)
+        elif kw.arg == "referenced_schema":
+            referenced_schema = _extract_ast_str(kw.value)
+        elif kw.arg == "referenced_table":
+            referenced_table = _extract_ast_str(kw.value)
+        elif kw.arg == "referenced_columns":
+            referenced_columns = _extract_ast_str_list(kw.value)
+    return ForeignKeyModel(
+        columns=columns,
+        referenced_schema=referenced_schema,
+        referenced_table=referenced_table,
+        referenced_columns=referenced_columns,
+    )
+
+
+def _extract_tabledef(node: ast.Call) -> TableModel:
+    """Extract a TableDef(name=..., columns=[...], foreign_keys=[...]) call."""
+    name: str = ""
+    columns: list[ColumnModel] = []
+    foreign_keys: list[ForeignKeyModel] = []
+    for kw in node.keywords:
+        if kw.arg == "name":
+            name = _extract_ast_name_or_enum(kw.value)
+        elif kw.arg == "columns":
+            if isinstance(kw.value, ast.List):
+                columns = [
+                    _extract_column(elt)
+                    for elt in kw.value.elts
+                    if isinstance(elt, ast.Call) and _callable_name(elt) == "ColumnDef"
+                ]
+        elif kw.arg == "foreign_keys":
+            if isinstance(kw.value, ast.List):
+                foreign_keys = [
+                    _extract_fk(elt)
+                    for elt in kw.value.elts
+                    if isinstance(elt, ast.Call) and _callable_name(elt) == "ForeignKeyDef"
+                ]
+    return TableModel(
+        name=name,
+        kind="table",
+        columns=columns,
+        foreign_keys=foreign_keys,
+    )
+
+
+def _callable_name(node: ast.Call) -> str:
+    """Return the callable's name: 'TableDef', 'Foo.bar', etc."""
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        parts = []
+        cur: ast.AST = node.func
+        while isinstance(cur, ast.Attribute):
+            parts.insert(0, cur.attr)
+            cur = cur.value
+        if isinstance(cur, ast.Name):
+            parts.insert(0, cur.id)
+        return ".".join(parts)
+    return ""
+
+
+def load_from_code(path: Path) -> SchemaModel:
+    """Parse create_schema.py AST into a SchemaModel.
+
+    Walks the tree looking for TableDef, VocabularyTableDef,
+    Table.define_association, and _ensure_terms calls.
+
+    Args:
+        path: Path to create_schema.py or a fixture module.
+
+    Returns:
+        SchemaModel with one TableModel per table definition found.
+
+    Raises:
+        SchemaCodeError: If a call pattern can't be statically extracted.
+    """
+    tree = ast.parse(path.read_text(), filename=str(path))
+    tables: list[TableModel] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _callable_name(node)
+        if name == "TableDef":
+            tables.append(_extract_tabledef(node))
+        # Vocabulary / association / _ensure_terms handled in C3 / C4.
+    return SchemaModel(tables=tables)

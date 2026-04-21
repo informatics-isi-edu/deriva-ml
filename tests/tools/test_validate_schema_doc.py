@@ -292,3 +292,42 @@ def test_resolve_enum_ref_unknown_member_raises():
 
     with pytest.raises(SchemaCodeError, match="has no member"):
         _resolve_enum_ref("MLTable", "no_such_member")
+
+
+def test_load_from_code_simple_tabledef(tmp_path):
+    """A fixture module with one TableDef call produces a TableModel."""
+    from deriva_ml.tools.validate_schema_doc import load_from_code
+
+    fixture = tmp_path / "fixture_schema.py"
+    fixture.write_text(
+        'from deriva.core.typed import TableDef, ColumnDef, ForeignKeyDef, BuiltinType\n'
+        'from deriva_ml.core.definitions import MLTable\n'
+        '\n'
+        'def create_execution_table(schema):\n'
+        '    schema.create_table(TableDef(\n'
+        '        name=MLTable.execution,\n'
+        '        columns=[\n'
+        '            ColumnDef("Workflow", BuiltinType.text),\n'
+        '            ColumnDef("Description", BuiltinType.markdown),\n'
+        '            ColumnDef("Status", BuiltinType.text),\n'
+        '        ],\n'
+        '        foreign_keys=[\n'
+        '            ForeignKeyDef(\n'
+        '                columns=["Workflow"],\n'
+        '                referenced_schema="deriva-ml",\n'
+        '                referenced_table="Workflow",\n'
+        '                referenced_columns=["RID"],\n'
+        '            )\n'
+        '        ],\n'
+        '    ))\n'
+    )
+    model = load_from_code(fixture)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.name == "Execution"
+    assert t.kind == "table"
+    assert [c.name for c in t.columns] == ["Workflow", "Description", "Status"]
+    assert [c.type for c in t.columns] == ["text", "markdown", "text"]
+    assert len(t.foreign_keys) == 1
+    assert t.foreign_keys[0].columns == ["Workflow"]
+    assert t.foreign_keys[0].referenced_table == "Workflow"
