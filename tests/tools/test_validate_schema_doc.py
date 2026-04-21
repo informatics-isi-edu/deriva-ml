@@ -427,3 +427,41 @@ def test_diff_identical_schemas_empty():
         ),
     ])
     assert diff_schemas(expected=s1, actual=s2) == []
+
+
+def test_diff_column_missing_in_actual():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="Dataset", kind="table",
+        columns=[ColumnModel(name="Name", type="text"), ColumnModel(name="Extra", type="text")],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="Dataset", kind="table",
+        columns=[ColumnModel(name="Name", type="text")],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert len(mismatches) == 1
+    assert mismatches[0].kind == MismatchKind.COLUMN_MISMATCH
+    assert "Extra" in mismatches[0].detail
+
+
+def test_diff_column_type_mismatch():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="Dataset", kind="table",
+        columns=[ColumnModel(name="Name", type="text")],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="Dataset", kind="table",
+        columns=[ColumnModel(name="Name", type="markdown")],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(
+        m.kind == MismatchKind.COLUMN_MISMATCH
+        and "text" in m.detail and "markdown" in m.detail
+        for m in mismatches
+    )

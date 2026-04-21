@@ -537,5 +537,39 @@ def _compare_tables(
     actual: TableModel,
 ) -> None:
     """Compare two same-named TableModels; append any differences."""
-    # D2-D4 populate this. Skeleton only for D1.
-    pass
+    _compare_columns(mismatches, expected, actual)
+    # D3 adds _compare_fks; D4 adds _compare_terms / _compare_associates.
+
+
+def _compare_columns(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -> None:
+    """Column-by-column diff."""
+    expected_cols = {c.name: c for c in expected.columns}
+    actual_cols = {c.name: c for c in actual.columns}
+    for col_name in sorted(expected_cols.keys() - actual_cols.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.COLUMN_MISMATCH,
+            table=expected.name,
+            detail=f"column {col_name!r} in doc but not in code",
+        ))
+    for col_name in sorted(actual_cols.keys() - expected_cols.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.COLUMN_MISMATCH,
+            table=expected.name,
+            detail=f"column {col_name!r} in code but not in doc",
+        ))
+    for col_name in sorted(expected_cols.keys() & actual_cols.keys()):
+        exp_c = expected_cols[col_name]
+        act_c = actual_cols[col_name]
+        if exp_c.type != act_c.type:
+            mismatches.append(Mismatch(
+                kind=MismatchKind.COLUMN_MISMATCH,
+                table=expected.name,
+                detail=(
+                    f"column {col_name!r}: doc type {exp_c.type!r} "
+                    f"vs code type {act_c.type!r}"
+                ),
+            ))
