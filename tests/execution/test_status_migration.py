@@ -35,3 +35,27 @@ def test_execution_status_member_count():
     """Canonical set is exactly 7."""
     from deriva_ml.execution.state_store import ExecutionStatus
     assert len(list(ExecutionStatus)) == 7
+
+
+def test_sqlite_stores_title_case_status(tmp_path):
+    """insert_execution + get_execution round-trips title-case status."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import ExecutionStateStore, ExecutionStatus
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-T1", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.Running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-T1",
+        created_at=now, last_activity=now,
+    )
+    row = store.get_execution("EXE-T1")
+    assert row is not None
+    assert row["status"] == "Running"  # title-case stored verbatim
+    assert ExecutionStatus(row["status"]) is ExecutionStatus.Running
