@@ -546,3 +546,77 @@ def test_diff_association_endpoints_differ():
     )])
     mismatches = diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.ASSOCIATION_MISMATCH for m in mismatches)
+
+
+def test_cli_match_returns_0(tmp_path, capsys):
+    """Identical schemas: exit 0, success message."""
+    from deriva_ml.tools.validate_schema_doc import main
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: X\n"
+        "kind: table\n"
+        "columns: []\n"
+        "foreign_keys: []\n"
+        "```\n"
+    )
+    code = tmp_path / "code.py"
+    code.write_text(
+        'from deriva.core.typed import TableDef\n'
+        'schema.create_table(TableDef(name="X", columns=[], foreign_keys=[]))\n'
+    )
+
+    exit_code = main(["--doc", str(doc), "--code", str(code)])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "agree" in captured.out
+
+
+def test_cli_mismatch_returns_1(tmp_path, capsys):
+    """Divergent schemas: exit 1, mismatch lines."""
+    from deriva_ml.tools.validate_schema_doc import main
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: X\n"
+        "kind: table\n"
+        "columns:\n"
+        "  - name: A\n"
+        "    type: text\n"
+        "foreign_keys: []\n"
+        "```\n"
+    )
+    code = tmp_path / "code.py"
+    code.write_text(
+        'from deriva.core.typed import TableDef, ColumnDef, BuiltinType\n'
+        'schema.create_table(TableDef(\n'
+        '    name="X",\n'
+        '    columns=[ColumnDef("B", BuiltinType.text)],\n'
+        '    foreign_keys=[],\n'
+        '))\n'
+    )
+
+    exit_code = main(["--doc", str(doc), "--code", str(code)])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "COLUMN MISMATCH" in captured.out or "column" in captured.out.lower()
+
+
+def test_cli_parse_error_returns_2(tmp_path, capsys):
+    """Malformed doc: exit 2."""
+    from deriva_ml.tools.validate_schema_doc import main
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: X\n"
+        "kind: invalid-kind\n"
+        "```\n"
+    )
+    code = tmp_path / "code.py"
+    code.write_text("")
+
+    exit_code = main(["--doc", str(doc), "--code", str(code)])
+    assert exit_code == 2

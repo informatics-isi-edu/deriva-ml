@@ -9,8 +9,11 @@ Runs in CI via the deriva-ml-validate-schema entry point.
 
 from __future__ import annotations
 
+import argparse
 import ast
 import re
+import sys
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -656,3 +659,89 @@ def _compare_associates(
             table=expected.name,
             detail=f"associates doc {expected_assoc} vs code {actual_assoc}",
         ))
+
+
+def _format_mismatches(mismatches: list[Mismatch]) -> str:
+    """Render mismatches in the §5.5 format."""
+    if not mismatches:
+        return "deriva-ml-validate-schema: schema.md and create_schema.py agree.\n"
+
+    buckets: dict[MismatchKind, list[Mismatch]] = defaultdict(list)
+    for m in mismatches:
+        buckets[m.kind].append(m)
+
+    lines = [
+        "deriva-ml-validate-schema: schema.md and create_schema.py disagree.",
+        "",
+    ]
+
+    def add_section(title: str, kind: MismatchKind) -> None:
+        lines.append(f"{title}:")
+        if kind in buckets:
+            for m in buckets[kind]:
+                lines.append(f"  - {m.detail}")
+        else:
+            lines.append("  (none)")
+        lines.append("")
+
+    add_section("MISSING FROM CODE", MismatchKind.MISSING_TABLE)
+    add_section("EXTRA IN CODE", MismatchKind.EXTRA_TABLE)
+    add_section("COLUMN MISMATCH", MismatchKind.COLUMN_MISMATCH)
+    add_section("FOREIGN KEY MISMATCH", MismatchKind.FK_MISMATCH)
+    add_section("VOCABULARY TERMS MISMATCH", MismatchKind.VOCAB_TERMS_MISMATCH)
+    add_section("ASSOCIATION MISMATCH", MismatchKind.ASSOCIATION_MISMATCH)
+    return "\n".join(lines)
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="deriva-ml-validate-schema",
+        description=(
+            "Validate that docs/reference/schema.md and "
+            "src/deriva_ml/schema/create_schema.py agree on tables, "
+            "columns, foreign keys, and vocabulary seeded terms."
+        ),
+    )
+    p.add_argument(
+        "--doc",
+        default="docs/reference/schema.md",
+        help="Path to the schema doc (default: docs/reference/schema.md).",
+    )
+    p.add_argument(
+        "--code",
+        default="src/deriva_ml/schema/create_schema.py",
+        help="Path to create_schema.py (default: src/deriva_ml/schema/create_schema.py).",
+    )
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point: compare doc vs code.
+
+    Returns:
+        0 if schemas agree.
+        1 if they differ.
+        2 if parsing failed on either side.
+    """
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        expected = load_from_doc(Path(args.doc))
+    except (SchemaDocError, FileNotFoundError) as exc:
+        print(f"error loading doc: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        actual = load_from_code(Path(args.code))
+    except (SchemaCodeError, FileNotFoundError) as exc:
+        print(f"error loading code: {exc}", file=sys.stderr)
+        return 2
+
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    print(_format_mismatches(mismatches))
+    return 1 if mismatches else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
