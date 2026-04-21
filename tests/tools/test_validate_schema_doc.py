@@ -691,3 +691,117 @@ def test_to_doc_markdown_roundtrip(tmp_path):
     assert roundtripped.tables[0].columns[0].name == "Name"
     assert roundtripped.tables[1].terms[0].name == "Training"
     assert roundtripped.tables[2].associates[0].table == "Dataset"
+
+
+def test_dynamic_value_fk_schema_matches_any():
+    """DYNAMIC_VALUE on either side of referenced_schema matches anything.
+
+    When create_schema.py writes `referenced_schema=sname` (a parameter),
+    the AST extractor stores DYNAMIC_VALUE. The doc side writes the literal
+    schema name (e.g. "deriva-ml"). These must compare as equal.
+    """
+    from deriva_ml.tools.validate_schema_doc import (
+        DYNAMIC_VALUE,
+        ColumnModel,
+        ForeignKeyModel,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="Execution",
+        kind="table",
+        columns=[ColumnModel(name="Workflow", type="text")],
+        foreign_keys=[ForeignKeyModel(
+            columns=["Workflow"],
+            referenced_schema="deriva-ml",  # doc-side literal
+            referenced_table="Workflow",
+            referenced_columns=["RID"],
+        )],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="Execution",
+        kind="table",
+        columns=[ColumnModel(name="Workflow", type="text")],
+        foreign_keys=[ForeignKeyModel(
+            columns=["Workflow"],
+            referenced_schema=DYNAMIC_VALUE,  # code-side unresolvable
+            referenced_table="Workflow",
+            referenced_columns=["RID"],
+        )],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert mismatches == [], f"Expected no mismatches; got {mismatches}"
+
+
+def test_dynamic_value_does_not_mask_other_fk_differences():
+    """DYNAMIC_VALUE matches referenced_schema, but other FK fields still diff."""
+    from deriva_ml.tools.validate_schema_doc import (
+        DYNAMIC_VALUE,
+        ColumnModel,
+        ForeignKeyModel,
+        MismatchKind,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="Execution",
+        kind="table",
+        columns=[ColumnModel(name="Workflow", type="text")],
+        foreign_keys=[ForeignKeyModel(
+            columns=["Workflow"],
+            referenced_schema="deriva-ml",
+            referenced_table="Workflow",
+            referenced_columns=["RID"],
+        )],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="Execution",
+        kind="table",
+        columns=[ColumnModel(name="Workflow", type="text")],
+        foreign_keys=[ForeignKeyModel(
+            columns=["Workflow"],
+            referenced_schema=DYNAMIC_VALUE,
+            referenced_table="DifferentTable",  # differs
+            referenced_columns=["RID"],
+        )],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)
+
+
+def test_compare_associates_detects_metadata_mismatch():
+    """Association-table metadata columns diff when they differ."""
+    from deriva_ml.tools.validate_schema_doc import (
+        AssociationEndpointModel,
+        ColumnModel,
+        MismatchKind,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name="X_Y",
+        kind="association",
+        associates=[
+            AssociationEndpointModel(table="X"),
+            AssociationEndpointModel(table="Y"),
+        ],
+        metadata=[ColumnModel(name="Sequence", type="int4")],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name="X_Y",
+        kind="association",
+        associates=[
+            AssociationEndpointModel(table="X"),
+            AssociationEndpointModel(table="Y"),
+        ],
+        metadata=[],  # code is missing the metadata column
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(
+        m.kind == MismatchKind.ASSOCIATION_MISMATCH
+        and "metadata" in m.detail
+        for m in mismatches
+    ), f"Expected metadata mismatch; got {mismatches}"

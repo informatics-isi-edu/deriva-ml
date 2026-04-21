@@ -720,7 +720,7 @@ def _compare_associates(
     expected: TableModel,
     actual: TableModel,
 ) -> None:
-    """Compare association-table endpoints (by table name)."""
+    """Compare association-table endpoints (by table name) + metadata columns."""
     expected_assoc = [a.table for a in expected.associates]
     actual_assoc = [a.table for a in actual.associates]
     if expected_assoc != actual_assoc:
@@ -728,6 +728,18 @@ def _compare_associates(
             kind=MismatchKind.ASSOCIATION_MISMATCH,
             table=expected.name,
             detail=f"associates doc {expected_assoc} vs code {actual_assoc}",
+        ))
+    # Association tables may carry metadata columns (e.g. Execution_Nested_Execution.Sequence).
+    # Diff by (name, type) tuples — same semantics as the regular column diff.
+    expected_meta = {(m.name, m.type) for m in expected.metadata}
+    actual_meta = {(m.name, m.type) for m in actual.metadata}
+    if expected_meta != actual_meta:
+        doc_only = sorted(expected_meta - actual_meta)
+        code_only = sorted(actual_meta - expected_meta)
+        mismatches.append(Mismatch(
+            kind=MismatchKind.ASSOCIATION_MISMATCH,
+            table=expected.name,
+            detail=f"metadata doc-only {doc_only} vs code-only {code_only}",
         ))
 
 
