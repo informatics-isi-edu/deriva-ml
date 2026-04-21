@@ -236,3 +236,28 @@ def test_load_from_doc_missing_required_key_raises(tmp_path):
     )
     with pytest.raises(SchemaDocError, match="missing required key"):
         load_from_doc(doc)
+
+
+def test_load_from_doc_accepts_descriptions(tmp_path):
+    """Descriptions on tables and columns are tolerated (doc-side only)."""
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: Dataset\n"
+        "kind: table\n"
+        "description: A collection of records.\n"
+        "columns:\n"
+        "  - name: Name\n"
+        "    type: text\n"
+        "    description: Human-readable label.\n"
+        "```\n"
+    )
+    model = load_from_doc(doc)
+    # Description text is NOT preserved in the model (doc-side only).
+    t = model.tables[0]
+    assert t.name == "Dataset"
+    assert t.columns[0].name == "Name"
+    # ColumnModel has no description field.
+    assert not hasattr(t.columns[0], "description")
