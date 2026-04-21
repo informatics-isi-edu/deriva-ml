@@ -21,6 +21,7 @@ from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML  # noqa: F401 (forward-looking)
+    from deriva_ml.execution.pending_summary import PendingSummary
 
 
 @dataclass(frozen=True)
@@ -119,4 +120,37 @@ class ExecutionRecord:
             failed_rows=failed_rows,
             pending_files=pending_files,
             failed_files=failed_files,
+        )
+
+    def pending_summary(self, *, ml: "DerivaML") -> "PendingSummary":
+        """Return a PendingSummary via the DerivaML instance's workspace.
+
+        Record objects are bare dataclasses and don't carry a reference
+        to DerivaML; the caller passes one.
+
+        Args:
+            ml: The DerivaML instance whose workspace to query.
+
+        Returns:
+            PendingSummary for this execution.
+
+        Example:
+            >>> for rec in ml.list_executions():
+            ...     s = rec.pending_summary(ml=ml)
+            ...     if s.has_pending:
+            ...         print(s.render())
+        """
+        from deriva_ml.execution.pending_summary import (
+            PendingAssetCount,
+            PendingRowCount,
+            PendingSummary,
+        )
+
+        store = ml.workspace.execution_state_store()
+        data = store.pending_summary_rows(execution_rid=self.rid)
+        return PendingSummary(
+            execution_rid=self.rid,
+            rows=[PendingRowCount(**r) for r in data["rows"]],
+            assets=[PendingAssetCount(**a) for a in data["assets"]],
+            diagnostics=data["diagnostics"],
         )

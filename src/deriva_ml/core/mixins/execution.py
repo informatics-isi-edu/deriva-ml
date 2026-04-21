@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from deriva_ml.dataset.aux_classes import DatasetSpec
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord
+    from deriva_ml.execution.pending_summary import WorkspacePendingSummary
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
     from deriva_ml.model.catalog import DerivaModel
@@ -375,6 +376,28 @@ class ExecutionMixin:
             )
             for row in rows
         ]
+
+    def pending_summary(self) -> "WorkspacePendingSummary":
+        """Workspace-wide pending-upload summary.
+
+        Queries every known-local execution and returns a
+        WorkspacePendingSummary aggregating per-execution snapshots.
+        Useful for standalone uploader processes that want to know
+        what's pending across runs.
+
+        Returns:
+            WorkspacePendingSummary with one PendingSummary per execution
+            that has at least one registry row.
+
+        Example:
+            >>> print(ml.pending_summary().render())
+        """
+        from deriva_ml.execution.pending_summary import WorkspacePendingSummary
+
+        summaries = []
+        for rec in self.list_executions():
+            summaries.append(rec.pending_summary(ml=self))
+        return WorkspacePendingSummary(per_execution=summaries)
 
     def find_incomplete_executions(self) -> list[_ExecutionRecordV2]:
         """Sugar over list_executions for everything not terminally done.

@@ -45,6 +45,7 @@ from deriva.core import format_exception
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
+    from deriva_ml.execution.pending_summary import PendingSummary
 from deriva.core.hatrac_store import HatracStore
 from pydantic import ConfigDict, validate_call
 
@@ -2198,4 +2199,35 @@ class Execution:
             current=self.status,
             target=ExecutionStatus.aborted,
             mode=self._ml_object._mode,
+        )
+
+    def pending_summary(self) -> "PendingSummary":
+        """Return a snapshot of pending upload state for this execution.
+
+        Read-only; does not affect state. Safe to call from anywhere at
+        any time, including from a separate process holding the same
+        workspace.
+
+        Returns:
+            PendingSummary with per-table row and asset counts and
+            diagnostic messages from any failed rows.
+
+        Example:
+            >>> summary = exe.pending_summary()
+            >>> if summary.has_pending:
+            ...     print(summary.render())
+        """
+        from deriva_ml.execution.pending_summary import (
+            PendingAssetCount,
+            PendingRowCount,
+            PendingSummary,
+        )
+
+        store = self._ml_object.workspace.execution_state_store()
+        data = store.pending_summary_rows(execution_rid=self.execution_rid)
+        return PendingSummary(
+            execution_rid=self.execution_rid,
+            rows=[PendingRowCount(**r) for r in data["rows"]],
+            assets=[PendingAssetCount(**a) for a in data["assets"]],
+            diagnostics=data["diagnostics"],
         )

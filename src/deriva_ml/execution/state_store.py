@@ -606,6 +606,125 @@ class ExecutionStateStore:
             "failed_files": int(row["failed_files"]),
         }
 
+    def pending_summary_rows(
+        self,
+        *,
+        execution_rid: str,
+    ) -> dict:
+        """Return the data needed to build a PendingSummary.
+
+        Returns:
+            Dict with keys 'rows' (list of per-row-table counts),
+            'assets' (list of per-asset-table counts with bytes), and
+            'diagnostics' (list of error messages from failed rows).
+
+            rows entries: {table, pending, failed, uploaded}
+            assets entries: {table, pending_files, failed_files,
+                             uploaded_files, total_bytes_pending}
+
+        Example:
+            >>> data = store.pending_summary_rows(execution_rid="EXE-A")
+            >>> # Caller builds PendingSummary from this.
+        """
+        import os
+
+        from sqlalchemy import and_
+
+        pending_statuses = [
+            str(PendingRowStatus.staged),
+            str(PendingRowStatus.leasing),
+            str(PendingRowStatus.leased),
+            str(PendingRowStatus.uploading),
+        ]
+        failed_status = str(PendingRowStatus.failed)
+        uploaded_status = str(PendingRowStatus.uploaded)
+
+        is_asset = self.pending_rows.c.asset_file_path.isnot(None)
+
+        stmt = select(
+            self.pending_rows.c.target_schema,
+            self.pending_rows.c.target_table,
+            is_asset.label("is_asset"),
+            func.sum(
+                case((self.pending_rows.c.status.in_(pending_statuses), 1),
+                     else_=0)
+            ).label("pending"),
+            func.sum(
+                case((self.pending_rows.c.status == failed_status, 1),
+                     else_=0)
+            ).label("failed"),
+            func.sum(
+                case((self.pending_rows.c.status == uploaded_status, 1),
+                     else_=0)
+            ).label("uploaded"),
+        ).where(
+            self.pending_rows.c.execution_rid == execution_rid
+        ).group_by(
+            self.pending_rows.c.target_schema,
+            self.pending_rows.c.target_table,
+            is_asset,
+        )
+
+        rows_out: list[dict] = []
+        assets_out: list[dict] = []
+        with self.engine.connect() as conn:
+            for r in conn.execute(stmt).mappings().all():
+                table_fqn = f"{r['target_schema']}:{r['target_table']}"
+                if r["is_asset"]:
+                    bytes_stmt = select(
+                        self.pending_rows.c.asset_file_path
+                    ).where(
+                        and_(
+                            self.pending_rows.c.execution_rid == execution_rid,
+                            self.pending_rows.c.target_schema == r["target_schema"],
+                            self.pending_rows.c.target_table == r["target_table"],
+                            self.pending_rows.c.status.in_(pending_statuses),
+                        )
+                    )
+                    total_bytes = 0
+                    for (p,) in conn.execute(bytes_stmt).all():
+                        try:
+                            total_bytes += os.path.getsize(p)
+                        except OSError:
+                            pass
+                    assets_out.append({
+                        "table": table_fqn,
+                        "pending_files": int(r["pending"]),
+                        "failed_files": int(r["failed"]),
+                        "uploaded_files": int(r["uploaded"]),
+                        "total_bytes_pending": int(total_bytes),
+                    })
+                else:
+                    rows_out.append({
+                        "table": table_fqn,
+                        "pending": int(r["pending"]),
+                        "failed": int(r["failed"]),
+                        "uploaded": int(r["uploaded"]),
+                    })
+
+            diag_stmt = select(
+                self.pending_rows.c.target_table,
+                self.pending_rows.c.rid,
+                self.pending_rows.c.error,
+            ).where(
+                and_(
+                    self.pending_rows.c.execution_rid == execution_rid,
+                    self.pending_rows.c.status == failed_status,
+                )
+            ).limit(20)
+            diagnostics: list[str] = []
+            for dr in conn.execute(diag_stmt).mappings().all():
+                ident = dr["rid"] or "(unleased)"
+                diagnostics.append(
+                    f"{dr['target_table']} row {ident} failed: {dr['error']}"
+                )
+
+        return {
+            "rows": rows_out,
+            "assets": assets_out,
+            "diagnostics": diagnostics,
+        }
+
     # ─── lease two-phase protocol ───────────────────────────────────
 
     def mark_pending_leasing(self, pending_id: int, *, lease_token: str) -> None:

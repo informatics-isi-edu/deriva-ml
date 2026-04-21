@@ -112,3 +112,105 @@ def test_workspace_pending_summary():
     rendered = ws.render()
     assert "A" in rendered
     assert "B" in rendered
+
+
+# ─── G2: integration tests via real ExecutionStateStore + DerivaML ────
+
+
+def _make_workflow(test_ml, name: str):
+    """Shared helper: ensure Test Workflow term + create Workflow object."""
+    from deriva_ml import MLVocab as vc
+
+    test_ml.add_term(
+        vc.workflow_type,
+        "Test Workflow",
+        description="for G2 pending_summary tests",
+    )
+    return test_ml.create_workflow(
+        name=name,
+        workflow_type="Test Workflow",
+        description="for G2 pending_summary tests",
+    )
+
+
+def test_exe_pending_summary_no_pending(test_ml):
+    wf = _make_workflow(test_ml, "G2 empty workflow")
+    exe = test_ml.create_execution(description="empty", workflow=wf)
+    s = exe.pending_summary()
+    assert s.execution_rid == exe.execution_rid
+    assert s.has_pending is False
+
+
+def test_exe_pending_summary_aggregates_rows(test_ml):
+    from datetime import datetime, timezone
+
+    wf = _make_workflow(test_ml, "G2 aggregates workflow")
+    exe = test_ml.create_execution(description="sum", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="a",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="b",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="c",
+        target_schema="deriva-ml", target_table="Prediction",
+        metadata_json="{}", created_at=now,
+    )
+
+    s = exe.pending_summary()
+    assert s.has_pending is True
+    by_table = {r.table: r for r in s.rows}
+    assert by_table["deriva-ml:Subject"].pending == 2
+    assert by_table["deriva-ml:Prediction"].pending == 1
+
+
+def test_exe_pending_summary_asset_bytes(test_ml, tmp_path):
+    """total_bytes_pending sums actual file sizes."""
+    from datetime import datetime, timezone
+
+    wf = _make_workflow(test_ml, "G2 bytes workflow")
+    exe = test_ml.create_execution(description="bytes", workflow=wf)
+    # Create a file and register a pending asset row.
+    f = tmp_path / "img.png"
+    f.write_bytes(b"x" * 2048)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="img",
+        target_schema="deriva-ml", target_table="Image",
+        metadata_json="{}", created_at=now,
+        asset_file_path=str(f),
+    )
+
+    s = exe.pending_summary()
+    [a] = s.assets
+    assert a.pending_files == 1
+    assert a.total_bytes_pending == 2048
+
+
+def test_execution_record_pending_summary(test_ml):
+    wf = _make_workflow(test_ml, "G2 record workflow")
+    exe = test_ml.create_execution(description="rec", workflow=wf)
+    records = test_ml.list_executions()
+    assert len(records) >= 1
+    # Grab the new record matching our rid.
+    rec = next(r for r in records if r.rid == exe.execution_rid)
+    s = rec.pending_summary(ml=test_ml)
+    assert s.execution_rid == exe.execution_rid
+
+
+def test_ml_pending_summary_workspace_wide(test_ml):
+    wf = _make_workflow(test_ml, "G2 workspace workflow")
+    exe_a = test_ml.create_execution(description="a", workflow=wf)
+    exe_b = test_ml.create_execution(description="b", workflow=wf)
+
+    ws = test_ml.pending_summary()
+    rids = {s.execution_rid for s in ws.per_execution}
+    assert {exe_a.execution_rid, exe_b.execution_rid}.issubset(rids)
