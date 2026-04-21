@@ -96,3 +96,62 @@ def _enumerate_work(
                 is_asset=any(r["asset_file_path"] is not None for r in group),
             ))
     return items
+
+
+def topo_sort_work_items(
+    items: list[_WorkItem],
+    *,
+    fk_edges: "dict[tuple[str, str], list[tuple[str, str]]]",
+) -> list[_WorkItem]:
+    """Topologically sort work items by FK dependencies.
+
+    Args:
+        items: Work items to sort.
+        fk_edges: Adjacency map: (schema, table) → [(schema, parent_table), ...].
+            An entry means "this table has FKs to these parents"; parents
+            must drain first. Missing entries mean no FKs; equivalent
+            to [].
+
+    Returns:
+        Items in drain order: all parents before all children.
+
+    Raises:
+        DerivaMLCycleError: If fk_edges contains a cycle.
+    """
+    from collections import deque
+
+    from deriva_ml.core.exceptions import DerivaMLCycleError
+
+    # Kahn's algorithm.
+    by_key = {(i.target_schema, i.target_table): i for i in items}
+    indeg: dict[tuple[str, str], int] = {k: 0 for k in by_key}
+    # We only care about edges between tables that have work to do.
+    filtered_edges: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    for child, parents in fk_edges.items():
+        if child not in by_key:
+            continue
+        real_parents = [p for p in parents if p in by_key]
+        filtered_edges[child] = real_parents
+        indeg[child] = len(real_parents)
+
+    # Stable queue: keep input order for tables of equal in-degree.
+    queue: deque = deque(k for k in by_key if indeg[k] == 0)
+    output: list[_WorkItem] = []
+    while queue:
+        k = queue.popleft()
+        output.append(by_key[k])
+        for child, parents in filtered_edges.items():
+            if k in parents:
+                indeg[child] -= 1
+                if indeg[child] == 0:
+                    queue.append(child)
+
+    if len(output) != len(by_key):
+        seen = {(o.target_schema, o.target_table) for o in output}
+        remaining = [k for k in by_key if k not in seen]
+        raise DerivaMLCycleError(
+            f"FK cycle detected in pending tables: {remaining}. "
+            "Split into multiple executions, or write rows that break "
+            "the cycle in a prior run."
+        )
+    return output

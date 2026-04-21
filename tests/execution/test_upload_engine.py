@@ -152,3 +152,69 @@ def test_engine_none_execution_rids_means_all_pending(test_ml):
     rids = {w.execution_rid for w in work}
     assert exe_a.execution_rid in rids
     assert exe_b.execution_rid not in rids
+
+
+# ─── G5: topological sort ────────────────────────────────────────────
+
+
+def test_topo_sort_puts_parents_before_children():
+    """If table A has an FK to table B, B must drain before A."""
+    from deriva_ml.execution.upload_engine import (
+        _WorkItem,
+        topo_sort_work_items,
+    )
+
+    items = [
+        _WorkItem(execution_rid="E", target_schema="s", target_table="Prediction",
+                  pending_ids=[1, 2], is_asset=False),
+        _WorkItem(execution_rid="E", target_schema="s", target_table="Subject",
+                  pending_ids=[3], is_asset=False),
+    ]
+    # FK: Prediction.subject → Subject.RID. Subject must come first.
+    fk_edges = {
+        ("s", "Prediction"): [("s", "Subject")],
+    }
+    sorted_items = topo_sort_work_items(items, fk_edges=fk_edges)
+    ordered_tables = [i.target_table for i in sorted_items]
+    assert ordered_tables.index("Subject") < ordered_tables.index("Prediction")
+
+
+def test_topo_sort_independent_tables_preserved():
+    """Tables with no FK relationship come out in a stable order."""
+    from deriva_ml.execution.upload_engine import (
+        _WorkItem,
+        topo_sort_work_items,
+    )
+
+    items = [
+        _WorkItem(execution_rid="E", target_schema="s", target_table="A",
+                  pending_ids=[1], is_asset=False),
+        _WorkItem(execution_rid="E", target_schema="s", target_table="B",
+                  pending_ids=[2], is_asset=False),
+    ]
+    sorted_items = topo_sort_work_items(items, fk_edges={})
+    assert [i.target_table for i in sorted_items] == ["A", "B"]
+
+
+def test_topo_sort_detects_cycle():
+    """A FK cycle raises DerivaMLCycleError."""
+    import pytest
+
+    from deriva_ml.core.exceptions import DerivaMLCycleError
+    from deriva_ml.execution.upload_engine import (
+        _WorkItem,
+        topo_sort_work_items,
+    )
+
+    items = [
+        _WorkItem(execution_rid="E", target_schema="s", target_table="A",
+                  pending_ids=[1], is_asset=False),
+        _WorkItem(execution_rid="E", target_schema="s", target_table="B",
+                  pending_ids=[2], is_asset=False),
+    ]
+    fk_edges = {
+        ("s", "A"): [("s", "B")],
+        ("s", "B"): [("s", "A")],
+    }
+    with pytest.raises(DerivaMLCycleError):
+        topo_sort_work_items(items, fk_edges=fk_edges)
