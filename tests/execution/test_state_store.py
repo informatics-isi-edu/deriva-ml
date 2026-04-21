@@ -509,3 +509,80 @@ def test_revert_leasing_to_staged(tmp_path):
     row = store.list_pending_rows(execution_rid="EXE-A")[0]
     assert row["status"] == str(PendingRowStatus.staged)
     assert row["lease_token"] is None
+
+
+# ─── Workspace-wide count_pending_rows ────────────────────────────────
+
+
+def test_count_pending_rows_workspace_wide(tmp_path):
+    """count_pending_rows counts non-terminal rows across ALL executions."""
+    from datetime import datetime, timezone
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+
+    now = datetime.now(timezone.utc)
+
+    # Two executions; insert rows in various states.
+    for rid in ("EXE-A", "EXE-B"):
+        store.insert_execution(
+            rid=rid, workflow_rid=None, description=None,
+            config_json="{}", status=ExecutionStatus.Created,
+            mode=ConnectionMode.online, working_dir_rel=f"execution/{rid}",
+            created_at=now, last_activity=now,
+        )
+
+    # EXE-A: 2 non-terminal (staged, leased), 1 uploaded (terminal).
+    store.insert_pending_row(
+        execution_rid="EXE-A", key="a1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+        status=PendingRowStatus.staged,
+    )
+    store.insert_pending_row(
+        execution_rid="EXE-A", key="a2",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+        status=PendingRowStatus.leased,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="a3",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+        status=PendingRowStatus.staged,
+    )
+    store.update_pending_row(pid, status=PendingRowStatus.uploaded)
+
+    # EXE-B: 1 failed (non-terminal for upload_pending), 1 uploaded.
+    store.insert_pending_row(
+        execution_rid="EXE-B", key="b1",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+        status=PendingRowStatus.failed,
+    )
+    pid2 = store.insert_pending_row(
+        execution_rid="EXE-B", key="b2",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+        status=PendingRowStatus.staged,
+    )
+    store.update_pending_row(pid2, status=PendingRowStatus.uploaded)
+
+    # Total non-terminal: 2 (EXE-A staged+leased) + 1 (EXE-B failed) = 3.
+    assert store.count_pending_rows() == 3
+
+
+def test_count_pending_rows_empty_store(tmp_path):
+    from deriva_ml.execution.state_store import ExecutionStateStore
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+
+    assert store.count_pending_rows() == 0
