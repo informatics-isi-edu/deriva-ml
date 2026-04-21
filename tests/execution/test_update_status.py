@@ -81,3 +81,22 @@ def test_execution_update_status_error_kwarg_on_nonterminal_warns(test_ml, caplo
     assert row["status"] == "Running"
     # The error column is NOT populated for non-terminal transitions.
     assert row["error"] is None
+
+
+def test_record_update_status_transitions(test_ml):
+    """ExecutionRecord.update_status(target, *, ml, error=None) parallel."""
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    wf = _make_workflow(test_ml, "B2 record")
+    exe = test_ml.create_execution(description="rec", workflow=wf)
+    rec = next(r for r in test_ml.list_executions() if r.rid == exe.execution_rid)
+
+    rec.update_status(ExecutionStatus.Running, ml=test_ml)
+    store = test_ml.workspace.execution_state_store()
+    row = store.get_execution(exe.execution_rid)
+    assert row["status"] == "Running"
+
+    rec.update_status(ExecutionStatus.Failed, ml=test_ml, error="boom")
+    row = store.get_execution(exe.execution_rid)
+    assert row["status"] == "Failed"
+    assert row["error"] == "boom"
