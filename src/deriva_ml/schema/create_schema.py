@@ -155,7 +155,13 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
                     referenced_schema=schema.name,
                     referenced_table="Workflow",
                     referenced_columns=["RID"],
-                )
+                ),
+                ForeignKeyDef(
+                    columns=["Status"],
+                    referenced_schema=schema.name,
+                    referenced_table=MLVocab.execution_status,
+                    referenced_columns=["Name"],
+                ),
             ],
             annotations=annotation,
         )
