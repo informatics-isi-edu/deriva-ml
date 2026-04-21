@@ -620,3 +620,45 @@ def test_cli_parse_error_returns_2(tmp_path, capsys):
 
     exit_code = main(["--doc", str(doc), "--code", str(code)])
     assert exit_code == 2
+
+
+def test_to_doc_markdown_roundtrip(tmp_path):
+    """A SchemaModel rendered to Markdown can be loaded back losslessly."""
+    from deriva_ml.tools.validate_schema_doc import (
+        AssociationEndpointModel, ColumnModel, ForeignKeyModel,
+        SchemaModel, TableModel, VocabularyTermModel,
+        load_from_doc, to_doc_markdown,
+    )
+    original = SchemaModel(tables=[
+        TableModel(
+            name="Dataset",
+            kind="table",
+            columns=[ColumnModel(name="Name", type="text")],
+            foreign_keys=[],
+        ),
+        TableModel(
+            name="Workflow_Type",
+            kind="vocabulary",
+            terms=[VocabularyTermModel(name="Training")],
+        ),
+        TableModel(
+            name="Dataset_Dataset_Type",
+            kind="association",
+            associates=[
+                AssociationEndpointModel(table="Dataset"),
+                AssociationEndpointModel(table="Dataset_Type"),
+            ],
+        ),
+    ])
+    md = to_doc_markdown(original)
+    doc = tmp_path / "schema.md"
+    doc.write_text(md)
+    roundtripped = load_from_doc(doc)
+
+    assert len(roundtripped.tables) == 3
+    assert [t.name for t in roundtripped.tables] == [
+        "Dataset", "Workflow_Type", "Dataset_Dataset_Type",
+    ]
+    assert roundtripped.tables[0].columns[0].name == "Name"
+    assert roundtripped.tables[1].terms[0].name == "Training"
+    assert roundtripped.tables[2].associates[0].table == "Dataset"

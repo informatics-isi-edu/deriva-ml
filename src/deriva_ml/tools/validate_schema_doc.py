@@ -743,5 +743,59 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if mismatches else 0
 
 
+def to_doc_markdown(model: SchemaModel) -> str:
+    """Render a SchemaModel to the docs/reference/schema.md format.
+
+    Used for bootstrap (generate an initial doc from the code) and for
+    emergency regeneration. The output is round-trip identical with
+    load_from_doc.
+
+    Args:
+        model: SchemaModel instance.
+
+    Returns:
+        Multi-section Markdown string.
+    """
+    sections: list[str] = []
+    for t in model.tables:
+        header = f"## {t.name}\n"
+        yaml_body: dict = {
+            "table": t.name,
+            "kind": t.kind,
+        }
+        if t.columns:
+            yaml_body["columns"] = [
+                {"name": c.name, "type": c.type} for c in t.columns
+            ]
+        if t.foreign_keys:
+            yaml_body["foreign_keys"] = [
+                {
+                    "columns": list(fk.columns),
+                    "referenced_schema": fk.referenced_schema,
+                    "referenced_table": fk.referenced_table,
+                    "referenced_columns": list(fk.referenced_columns),
+                }
+                for fk in t.foreign_keys
+            ]
+        elif t.kind == "table":
+            yaml_body["foreign_keys"] = []
+        if t.terms:
+            yaml_body["terms"] = [{"name": term.name} for term in t.terms]
+        if t.associates:
+            yaml_body["associates"] = [
+                {"table": a.table} for a in t.associates
+            ]
+        if t.metadata:
+            yaml_body["metadata"] = [
+                {"name": m.name, "type": m.type} for m in t.metadata
+            ]
+        yaml_text = yaml.safe_dump(
+            yaml_body, sort_keys=False, default_flow_style=False,
+        )
+        block = "```yaml\n" + yaml_text + "```\n"
+        sections.append(header + "\n" + block)
+    return "\n".join(sections)
+
+
 if __name__ == "__main__":
     sys.exit(main())
