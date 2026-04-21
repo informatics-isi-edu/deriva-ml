@@ -84,7 +84,6 @@ from deriva_ml.core.constants import RID
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     MLVocab,
-    Status,
     VocabularyTerm,
 )
 from deriva_ml.core.exceptions import DerivaMLException
@@ -2646,30 +2645,14 @@ class Dataset:
             file to avoid re-downloading already-materialized bags.
         """
 
-        def update_status(status: Status, msg: str) -> None:
-            """Update the current status for this execution in the catalog"""
-            if self.execution_rid and self.execution_rid != DRY_RUN_RID:
-                self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].Execution.update(
-                    [
-                        {
-                            "RID": self.execution_rid,
-                            "Status": status.value,
-                            "Status_Detail": msg,
-                        }
-                    ]
-                )
-            self._logger.info(msg)
-
         def fetch_progress_callback(current, total):
             msg = f"Materializing bag: {current} of {total} file(s) downloaded."
-            if self.execution_rid:
-                update_status(Status.running, msg)
+            self._logger.info(msg)
             return True
 
         def validation_progress_callback(current, total):
             msg = f"Validating bag: {current} of {total} file(s) validated."
-            if self.execution_rid:
-                update_status(Status.running, msg)
+            self._logger.info(msg)
             return True
 
         # request metadata
