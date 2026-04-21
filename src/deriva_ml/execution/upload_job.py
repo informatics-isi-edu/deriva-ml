@@ -57,8 +57,6 @@ class UploadJob:
         ml: "DerivaML",
         execution_rids: "list[str] | None",
         retry_failed: bool,
-        bandwidth_limit_mbps: "int | None",
-        parallel_files: int,
     ) -> None:
         self.id = f"upl_{uuid.uuid4().hex[:12]}"
         self.status: Literal[
@@ -67,8 +65,6 @@ class UploadJob:
         self._ml = ml
         self._execution_rids = execution_rids
         self._retry_failed = retry_failed
-        self._bandwidth_limit_mbps = bandwidth_limit_mbps
-        self._parallel_files = parallel_files
 
         self._report: UploadReport | None = None
         self._exception: BaseException | None = None
@@ -86,8 +82,7 @@ class UploadJob:
                 ml=self._ml,
                 execution_rids=self._execution_rids,
                 retry_failed=self._retry_failed,
-                bandwidth_limit_mbps=self._bandwidth_limit_mbps,
-                parallel_files=self._parallel_files,
+                cancel_event=self._cancel_event,
             )
             self.status = (
                 "completed" if self._report.total_failed == 0 else "failed"

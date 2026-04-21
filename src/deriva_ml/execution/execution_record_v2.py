@@ -162,8 +162,6 @@ class ExecutionRecord:
         *,
         ml: "DerivaML",
         retry_failed: bool = False,
-        bandwidth_limit_mbps: "int | None" = None,
-        parallel_files: int = 4,
     ) -> "UploadReport":
         """Sugar for ml.upload_pending(execution_rids=[self.rid], ...).
 
@@ -173,8 +171,6 @@ class ExecutionRecord:
         return ml.upload_pending(
             execution_rids=[self.rid],
             retry_failed=retry_failed,
-            bandwidth_limit_mbps=bandwidth_limit_mbps,
-            parallel_files=parallel_files,
         )
 
     def update_status(

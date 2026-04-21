@@ -7,8 +7,7 @@ compute. Typical invocations:
     deriva-ml-upload --host example.org --catalog 42
 
     deriva-ml-upload --host example.org --catalog 42 \\
-        --execution EXE-A --execution EXE-B \\
-        --bandwidth-mbps 50 --parallel 4
+        --execution EXE-A --execution EXE-B
 
     nohup deriva-ml-upload --host example.org --catalog 42 &
 
@@ -58,15 +57,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Include rows currently in status='failed'.",
     )
     p.add_argument(
-        "--bandwidth-mbps", type=int, default=None,
-        dest="bandwidth_limit_mbps",
-        help="Cap upload egress in Mbps. Unlimited if omitted.",
-    )
-    p.add_argument(
-        "--parallel", type=int, default=4, dest="parallel_files",
-        help="Concurrent file uploads per table (default 4).",
-    )
-    p.add_argument(
         "--working-dir", default=".",
         help="Workspace root (default: current directory).",
     )
@@ -111,8 +101,6 @@ def main(argv: "list[str] | None" = None) -> int:
         report = ml.upload_pending(
             execution_rids=args.execution_rids,
             retry_failed=args.retry_failed,
-            bandwidth_limit_mbps=args.bandwidth_limit_mbps,
-            parallel_files=args.parallel_files,
         )
     except Exception as exc:
         logger.error("upload_pending failed: %s", exc)

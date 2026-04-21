@@ -254,7 +254,7 @@ def test_run_upload_engine_leases_and_marks_uploaded(test_ml, monkeypatch):
                 lease_token=f"T-{i}",
             )
 
-    def _fake_upload(*, store, catalog, work_item, ml=None):
+    def _fake_upload(*, store, catalog, work_item, ml=None, cancel_event=None):
         for pid in work_item.pending_ids:
             store.update_pending_row(
                 pid, status=PendingRowStatus.uploaded,
@@ -328,7 +328,7 @@ def test_run_upload_engine_level_fail_fast_finishes_level(test_ml, monkeypatch):
                 lease_token=f"T-{i}",
             )
 
-    def _fake_upload(*, store, catalog, work_item, ml=None):
+    def _fake_upload(*, store, catalog, work_item, ml=None, cancel_event=None):
         drained.append(work_item.target_table)
         if work_item.target_table == "TableA":
             # Simulate failure.
@@ -419,7 +419,7 @@ def test_run_upload_engine_partial_drain_failed_rows_mark_execution_failed(
                 lease_token=f"T-{i}",
             )
 
-    def _fake_upload(*, store, catalog, work_item, ml=None):
+    def _fake_upload(*, store, catalog, work_item, ml=None, cancel_event=None):
         if work_item.target_table == "TableA":
             for pid in work_item.pending_ids:
                 store.update_pending_row(
@@ -480,6 +480,76 @@ def test_run_upload_engine_partial_drain_failed_rows_mark_execution_failed(
         if r["id"] == pid_a
     )
     assert a_row["status"] == str(PendingRowStatus.failed)
+
+
+# ─── cancel_event plumbing ───────────────────────────────────────────
+
+
+def test_run_upload_engine_skips_batches_when_cancel_event_set(test_ml, monkeypatch):
+    """Cancel set before the run starts → no batches dispatched.
+
+    Proves run_upload_engine accepts cancel_event kwarg and honors it at
+    the between-batches check by refusing to call _drain_work_item.
+    """
+    import threading
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    wf = _make_workflow(test_ml, "cancel_event workflow")
+    exe = test_ml.create_execution(description="cancel", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k1",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json='{"Name": "A"}', created_at=now,
+    )
+
+    drain_calls: list = []
+
+    def _fake_acquire(*, store, catalog, execution_rid, pending_ids):
+        for i, pid in enumerate(pending_ids):
+            store.update_pending_row(
+                pid, rid=f"R-{i}",
+                status=PendingRowStatus.leased,
+                lease_token=f"T-{i}",
+            )
+
+    def _fake_upload(*, store, catalog, work_item, ml=None, cancel_event=None):
+        drain_calls.append(work_item.target_table)
+        return len(work_item.pending_ids)
+
+    def _fake_transition(*, store, catalog, execution_rid, current, target, mode, extra_fields=None):
+        store.update_execution(execution_rid, status=str(target))
+
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.acquire_leases_for_execution",
+        _fake_acquire,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._drain_work_item",
+        _fake_upload,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.transition",
+        _fake_transition,
+    )
+
+    cancel_event = threading.Event()
+    cancel_event.set()
+
+    report = run_upload_engine(
+        ml=test_ml,
+        execution_rids=[exe.execution_rid],
+        retry_failed=False,
+        cancel_event=cancel_event,
+    )
+    # With cancel pre-set, no uploads should have occurred and
+    # _drain_work_item should never have been invoked.
+    assert report.total_uploaded == 0
+    assert drain_calls == []
 
 
 # ─── G7: _drain_work_item real implementation ────────────────────────
@@ -574,11 +644,22 @@ def test_drain_work_item_asset_row_calls_deriva_py_uploader(test_ml, monkeypatch
 
     uploader_calls = []
 
-    def _fake_uploader(*, ml, files, target_table, execution_rid):
+    def _fake_uploader(*, ml, files, target_table, execution_rid, cancel_event=None):
         uploader_calls.append({
             "files": list(files), "target_table": target_table,
             "execution_rid": execution_rid,
         })
+        # Post-Task-2 contract: _invoke_deriva_py_uploader is responsible
+        # for writing per-row SQLite status (previously done by the drain
+        # wrapper). Mirror that here so _drain_work_item's aggregate
+        # count matches.
+        upload_store = ml.workspace.execution_state_store()
+        for file_info in files:
+            upload_store.update_pending_row(
+                file_info["pending_id"],
+                status=PendingRowStatus.uploaded,
+                uploaded_at=datetime.now(timezone.utc),
+            )
         return {"uploaded": [str(f)], "failed": []}
 
     monkeypatch.setattr(
@@ -597,3 +678,21 @@ def test_drain_work_item_asset_row_calls_deriva_py_uploader(test_ml, monkeypatch
     assert len(uploader_calls) == 1
     row = store.list_pending_rows(execution_rid=exe.execution_rid)[0]
     assert row["status"] == "uploaded"
+
+
+def test_run_upload_engine_rejects_dropped_kwargs(test_ml):
+    """Dropped kwargs raise TypeError — this is the breaking-change contract."""
+    import pytest
+
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    with pytest.raises(TypeError, match="bandwidth_limit_mbps"):
+        run_upload_engine(
+            ml=test_ml, execution_rids=[], retry_failed=False,
+            bandwidth_limit_mbps=100,
+        )
+    with pytest.raises(TypeError, match="parallel_files"):
+        run_upload_engine(
+            ml=test_ml, execution_rids=[], retry_failed=False,
+            parallel_files=8,
+        )

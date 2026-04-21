@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Phase 2 Subsystem 3: Upload-engine deriva-py integration
+
+### Breaking changes
+
+- **`bandwidth_limit_mbps` and `parallel_files` kwargs removed** from `ml.upload_pending`, `ml.start_upload`, `Execution.upload_outputs`, `ExecutionRecord.upload_outputs`, and `UploadJob`. The CLI flags `--bandwidth-mbps` and `--parallel` are likewise removed. `deriva-py`'s `GenericUploader` does not implement bandwidth throttling or parallel file uploads; these kwargs were plumbed through every surface in Phase 1 but never reached deriva-py — they were accepted and silently ignored. Callers passing them now get `TypeError`; CLI users passing the flags get `unrecognized arguments`.
+
+### New
+
+- **Real `_invoke_deriva_py_uploader` body.** Replaces the Phase 1 `NotImplementedError` stub with a production implementation that drives `deriva-py`'s `GenericUploader` per batch. Each invocation materializes a per-batch `TemporaryDirectory` scan root with a hardlink/symlink farm matching `asset_table_upload_spec`'s regex, constructs a fresh `GenericUploader` pointed at the root, and drives `scanDirectory + uploadFiles`. Retry, transfer-state persistence, and hatrac chunk resumability all stay inside deriva-py; deriva-ml does not re-implement any of it.
+- **Live per-file SQLite status writes.** The `status_callback` hook fires at each file boundary, walks `uploader.file_status`, and writes newly-terminal rows to the execution-state store (Uploaded / Failed). Writes are idempotent via a `written_paths` set. A post-run reconciliation pass catches any file the callback missed.
+- **`UploadJob` cancellation wired to `GenericUploader.cancel()`.** `UploadJob._cancel_event` now threads through `run_upload_engine` → `_drain_work_item` → `_invoke_deriva_py_uploader`. Two deriva-py callbacks observe the event:
+  - `status_callback()` checks at each file boundary and calls `uploader.cancel()`.
+  - `file_callback(**kw)` checks during in-flight byte transfers, calls `uploader.cancel()`, and returns `-1` as the hatrac abort signal.
+  - Plus a between-batches guard in `run_upload_engine` that stops dispatching new work items once cancel is set.
+
+### Tests
+
+- **`tests/execution/test_upload_engine_deriva_py.py`** — new file, 6 unit tests using a `FakeGenericUploader` test double: happy path, mixed outcomes, cancel mid-batch, callback-missed reconciliation, scan-root cleanup on exception, empty-files noop.
+- **`test_run_upload_engine_skips_batches_when_cancel_event_set`** verifies the between-batches cancel guard.
+- **`test_run_upload_engine_rejects_dropped_kwargs`** asserts `TypeError` for the removed kwargs.
+- **`test_cli_rejects_parallel_flag` / `test_cli_rejects_bandwidth_flag`** assert argparse rejects the removed flags.
+- Full suite: 265 passed, 1 skipped (`tests/execution/`) + 4 passed (`tests/cli/`).
+
+### Audit notes
+
+- Verified deriva-py's `UploadState` is a `tuple` subclass (not an `Enum`) with members `(Success, Failed, Pending, Running, Paused, Aborted, Cancelled, Timeout)`. There is no `Skipped` state — hatrac's server-side hash-dedup makes already-present files succeed as `Success`. The return shape is `{uploaded, failed}`; skip/dedup cases fall under `uploaded`.
+- Ruff E702 audit cleaned up 9 compound `x = ...; x.write_text(...)` statements in the new test file.
+
+---
+
 ## Unreleased — Phase 2 Subsystem 1b: Execution_Status vocabulary
 
 ### New
