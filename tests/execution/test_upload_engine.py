@@ -3,6 +3,22 @@
 from __future__ import annotations
 
 
+def _make_workflow(test_ml, name: str):
+    """Shared helper: ensure Test Workflow term + create Workflow object."""
+    from deriva_ml import MLVocab as vc
+
+    test_ml.add_term(
+        vc.workflow_type,
+        "Test Workflow",
+        description="for upload_engine tests",
+    )
+    return test_ml.create_workflow(
+        name=name,
+        workflow_type="Test Workflow",
+        description="for upload_engine tests",
+    )
+
+
 def test_stage_plain_row_appends_pending(tmp_path):
     from datetime import datetime, timezone
 
@@ -47,3 +63,92 @@ def test_stage_plain_row_appends_pending(tmp_path):
     )
     assert len(rows) == 1
     assert rows[0]["metadata_json"] == '{"Name": "Alice"}'
+
+
+# ─── G4: _enumerate_work ──────────────────────────────────────────
+
+
+def test_engine_enumerates_pending_for_executions(test_ml):
+    """_enumerate returns one entry per (execution, table) with
+    pending or failed-with-retry items."""
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.upload_engine import _enumerate_work
+
+    wf = _make_workflow(test_ml, "G4 enumerate workflow")
+    exe_a = test_ml.create_execution(description="a", workflow=wf)
+    exe_b = test_ml.create_execution(description="b", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe_a.execution_rid, key="ka",
+        target_schema="s", target_table="Subject",
+        metadata_json="{}", created_at=now,
+    )
+    store.insert_pending_row(
+        execution_rid=exe_b.execution_rid, key="kb",
+        target_schema="s", target_table="Prediction",
+        metadata_json="{}", created_at=now,
+    )
+
+    work = _enumerate_work(
+        ml=test_ml,
+        execution_rids=[exe_a.execution_rid, exe_b.execution_rid],
+        retry_failed=False,
+    )
+    rids = {(w.execution_rid, w.target_table) for w in work}
+    assert (exe_a.execution_rid, "Subject") in rids
+    assert (exe_b.execution_rid, "Prediction") in rids
+
+
+def test_engine_retry_failed_includes_failed(test_ml):
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import _enumerate_work
+
+    wf = _make_workflow(test_ml, "G4 retry workflow")
+    exe = test_ml.create_execution(description="retry", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    pid = store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k",
+        target_schema="s", target_table="T",
+        metadata_json="{}", created_at=now,
+    )
+    store.update_pending_row(pid, status=PendingRowStatus.failed)
+
+    no_retry = _enumerate_work(
+        ml=test_ml, execution_rids=[exe.execution_rid], retry_failed=False,
+    )
+    assert len(no_retry) == 0
+
+    with_retry = _enumerate_work(
+        ml=test_ml, execution_rids=[exe.execution_rid], retry_failed=True,
+    )
+    assert len(with_retry) == 1
+
+
+def test_engine_none_execution_rids_means_all_pending(test_ml):
+    """Pass execution_rids=None → include every execution that has
+    pending work."""
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.upload_engine import _enumerate_work
+
+    wf = _make_workflow(test_ml, "G4 all-pending workflow")
+    exe_a = test_ml.create_execution(description="a", workflow=wf)
+    exe_b = test_ml.create_execution(description="b", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe_a.execution_rid, key="ka",
+        target_schema="s", target_table="T",
+        metadata_json="{}", created_at=now,
+    )
+    # exe_b has no pending rows.
+
+    work = _enumerate_work(ml=test_ml, execution_rids=None, retry_failed=False)
+    rids = {w.execution_rid for w in work}
+    assert exe_a.execution_rid in rids
+    assert exe_b.execution_rid not in rids
