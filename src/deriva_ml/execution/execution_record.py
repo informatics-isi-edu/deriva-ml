@@ -400,7 +400,7 @@ class ExecutionRecord(BaseModel):
             child = ExecutionRecord(
                 execution_rid=record["RID"],
                 workflow=workflow,
-                status=ExecutionStatus(record.get("Status", "Created")),
+                status=ExecutionStatus(record.get("Status") or "Created"),
                 description=record.get("Description"),
                 _ml_instance=self._ml_instance,
                 _logger=self._logger,
@@ -480,7 +480,7 @@ class ExecutionRecord(BaseModel):
             parent = ExecutionRecord(
                 execution_rid=record["RID"],
                 workflow=workflow,
-                status=ExecutionStatus(record.get("Status", "Created")),
+                status=ExecutionStatus(record.get("Status") or "Created"),
                 description=record.get("Description"),
                 _ml_instance=self._ml_instance,
                 _logger=self._logger,
