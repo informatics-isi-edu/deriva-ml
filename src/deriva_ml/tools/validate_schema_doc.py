@@ -230,6 +230,14 @@ def _resolve_enum_ref(enum_name: str, member: str) -> str:
     return members[member]
 
 
+# Sentinel for AST values the validator can't resolve statically — parameter
+# names, attribute chains like `schema.name`, etc. When either side of a diff
+# has this sentinel, comparison treats it as "any match." Used chiefly for
+# referenced_schema in FKs where create_schema.py passes `sname` / `schema.name`
+# as a parameter rather than a literal.
+DYNAMIC_VALUE = "<dynamic>"
+
+
 def _extract_ast_str(node: ast.AST) -> str:
     """Extract a string from an ast.Constant or return the ast.unparse repr."""
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -240,6 +248,33 @@ def _extract_ast_str(node: ast.AST) -> str:
     raise SchemaCodeError(
         f"expected string constant or attribute, got {ast.dump(node)}"
     )
+
+
+def _extract_ast_str_tolerant(node: ast.AST) -> str:
+    """Like _extract_ast_str, but returns DYNAMIC_VALUE for unknown patterns.
+
+    Used for fields whose code-side value is commonly a parameter or
+    attribute chain (e.g., FK referenced_schema = sname or schema.name).
+    The diff comparator treats DYNAMIC_VALUE as matching any counterpart.
+
+    For attribute references like `MLVocab.dataset_type`, resolves via the
+    enum lookup first (→ "Dataset_Type"); falls back to `.attr` only if the
+    enum is unknown.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Attribute):
+        # Try enum resolution: MLVocab.dataset_type → "Dataset_Type".
+        if isinstance(node.value, ast.Name):
+            try:
+                return _resolve_enum_ref(node.value.id, node.attr)
+            except SchemaCodeError:
+                # Not an enum we know about (e.g., BuiltinType.text); fall
+                # back to the attr name.
+                return node.attr
+        return node.attr
+    # ast.Name (parameter reference), ast.Call, etc.: treat as dynamic.
+    return DYNAMIC_VALUE
 
 
 def _extract_ast_name_or_enum(node: ast.AST) -> str:
@@ -295,7 +330,7 @@ def _extract_fk(node: ast.Call) -> ForeignKeyModel:
         if kw.arg == "columns":
             columns = _extract_ast_str_list(kw.value)
         elif kw.arg == "referenced_schema":
-            referenced_schema = _extract_ast_str(kw.value)
+            referenced_schema = _extract_ast_str_tolerant(kw.value)
         elif kw.arg == "referenced_table":
             referenced_table = _extract_ast_str(kw.value)
         elif kw.arg == "referenced_columns":
@@ -400,31 +435,49 @@ def _extract_ensure_terms(node: ast.Call) -> tuple[str, list[VocabularyTermModel
     return vocab_name, terms
 
 
-def _extract_association(node: ast.Call) -> TableModel:
-    """Extract Table.define_association(associates=[...], metadata=[...])."""
+def _extract_association(node: ast.Call) -> TableModel | None:
+    """Extract Table.define_association(associates, metadata=[...]).
+
+    `associates` may be passed positionally (first positional arg) or as a
+    keyword. Endpoint-name references that are parameters (e.g., `asset_name`
+    in `create_asset_table`) are dynamic — if either endpoint can't be
+    resolved statically, the helper returns None and the caller skips it.
+    """
     associates: list[AssociationEndpointModel] = []
     metadata: list[ColumnModel] = []
+    assoc_list_node: ast.AST | None = None
+
+    # associates as positional (first arg).
+    if node.args:
+        assoc_list_node = node.args[0]
+
+    # Or associates= kwarg overrides.
     for kw in node.keywords:
         if kw.arg == "associates":
-            if not isinstance(kw.value, ast.List):
-                raise SchemaCodeError(
-                    f"define_association associates must be a list, got "
-                    f"{ast.dump(kw.value)}"
-                )
-            for elt in kw.value.elts:
-                if not isinstance(elt, ast.Tuple) or len(elt.elts) < 1:
-                    raise SchemaCodeError(
-                        f"associates entry must be a tuple (name, table), got "
-                        f"{ast.dump(elt)}"
-                    )
-                table_name = _extract_ast_name_or_enum(elt.elts[0])
-                associates.append(AssociationEndpointModel(table=table_name))
+            assoc_list_node = kw.value
         elif kw.arg == "metadata":
             if isinstance(kw.value, ast.List):
                 for m_elt in kw.value.elts:
                     if isinstance(m_elt, ast.Call) and _callable_name(m_elt) == "ColumnDef":
                         metadata.append(_extract_column(m_elt))
-    # Association name: derived from associates — '{first}_{second}'.
+
+    if not isinstance(assoc_list_node, ast.List):
+        # Can't resolve associates list → skip this table rather than fail.
+        return None
+
+    for elt in assoc_list_node.elts:
+        if not isinstance(elt, ast.Tuple) or len(elt.elts) < 1:
+            return None  # unexpected shape — skip silently
+        table_name = _extract_ast_str_tolerant(elt.elts[0])
+        if table_name == DYNAMIC_VALUE:
+            # Endpoint name is a parameter like `asset_name` — skip this
+            # association since we can't derive a table name.
+            return None
+        associates.append(AssociationEndpointModel(table=table_name))
+
+    if not associates:
+        return None
+
     derived_name = "_".join(a.table for a in associates)
     return TableModel(
         name=derived_name,
@@ -472,7 +525,9 @@ def load_from_code(path: Path) -> SchemaModel:
             vocab_name, terms = _extract_ensure_terms(node)
             terms_by_vocab.setdefault(vocab_name, []).extend(terms)
         elif name == "Table.define_association":
-            tables.append(_extract_association(node))
+            assoc = _extract_association(node)
+            if assoc is not None:
+                tables.append(assoc)
 
     # Apply accumulated terms to matching vocab tables.
     tables_with_terms: list[TableModel] = []
@@ -613,8 +668,16 @@ def _compare_fks(
     for k in sorted(expected_fks.keys() & actual_fks.keys()):
         exp_fk = expected_fks[k]
         act_fk = actual_fks[k]
-        if (exp_fk.referenced_schema, exp_fk.referenced_table, tuple(exp_fk.referenced_columns)) != (
-            act_fk.referenced_schema, act_fk.referenced_table, tuple(act_fk.referenced_columns)
+        # DYNAMIC_VALUE on either side of referenced_schema matches anything —
+        # create_schema.py frequently passes `sname` / `schema.name` which the
+        # AST extractor can't resolve statically.
+        schemas_match = (
+            exp_fk.referenced_schema == DYNAMIC_VALUE
+            or act_fk.referenced_schema == DYNAMIC_VALUE
+            or exp_fk.referenced_schema == act_fk.referenced_schema
+        )
+        if not schemas_match or (exp_fk.referenced_table, tuple(exp_fk.referenced_columns)) != (
+            act_fk.referenced_table, tuple(act_fk.referenced_columns)
         ):
             mismatches.append(Mismatch(
                 kind=MismatchKind.FK_MISMATCH,
