@@ -100,3 +100,38 @@ def test_record_update_status_transitions(test_ml):
     row = store.get_execution(exe.execution_rid)
     assert row["status"] == "Failed"
     assert row["error"] == "boom"
+
+
+def test_update_status_offline_writes_sqlite_sets_sync_pending(tmp_path, monkeypatch):
+    """In offline mode, update_status writes SQLite + sync_pending=True, no catalog call."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import ExecutionStateStore, ExecutionStatus
+
+    eng = create_engine(f"sqlite:///{tmp_path}/offline.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-OFF", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.Running,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-OFF",
+        created_at=now, last_activity=now,
+    )
+
+    # Run transition directly (we're testing state_machine behavior under offline mode).
+    transition(
+        store=store,
+        catalog=None,
+        execution_rid="EXE-OFF",
+        current=ExecutionStatus.Running,
+        target=ExecutionStatus.Stopped,
+        mode=ConnectionMode.offline,
+    )
+    row = store.get_execution("EXE-OFF")
+    assert row["status"] == "Stopped"
+    assert row["sync_pending"] is True
