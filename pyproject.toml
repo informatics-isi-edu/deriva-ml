@@ -44,6 +44,7 @@ deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
 deriva-ml-split-dataset = "deriva_ml.dataset.split:main"
 deriva-ml-storage = "deriva_ml.cache_tui:main"
 deriva-ml-upload = "deriva_ml.cli.upload:main"
+deriva-ml-validate-schema = "deriva_ml.tools.validate_schema_doc:main"
 
 [project.optional-dependencies]
 
