@@ -62,7 +62,6 @@ from deriva_ml.core.definitions import (
     FileUploadState,
     MLAsset,
     MLVocab,
-    Status,
     UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
@@ -304,7 +303,7 @@ class Execution:
             self._execution_record = ExecutionRecord(
                 execution_rid=self.execution_rid,
                 workflow=self.configuration.workflow,
-                status=Status.created,
+                status=ExecutionStatus.Created,
                 description=self.configuration.description,
                 _ml_instance=self._ml_object,
                 _logger=self._logger,
@@ -321,8 +320,6 @@ class Execution:
         # shouldn't blow away whatever status/history it already has).
         if not self._dry_run and reload is None:
             from datetime import datetime, timezone
-
-            from deriva_ml.execution.state_store import ExecutionStatus
 
             store = self._ml_object.workspace.execution_state_store()
             now = datetime.now(timezone.utc)
@@ -602,7 +599,6 @@ class Execution:
             <ExecutionStatus.Stopped>
         """
         from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-        from deriva_ml.execution.state_store import ExecutionStatus
 
         store = self._ml_object.workspace.execution_state_store()
         row = store.get_execution(self.execution_rid)
@@ -930,9 +926,6 @@ class Execution:
             >>> exe.update_status(ExecutionStatus.Running)
             >>> exe.update_status(ExecutionStatus.Failed, error="Network timeout")
         """
-        from deriva_ml.execution.state_machine import transition
-        from deriva_ml.execution.state_store import ExecutionStatus
-
         store = self._ml_object.workspace.execution_state_store()
         row = store.get_execution(self.execution_rid)
         if row is None:
@@ -967,7 +960,7 @@ class Execution:
         """Marks the execution as started.
 
         Records the start time in SQLite and updates the execution's
-        status to 'initializing'. This should be called before beginning
+        status to 'Running'. This should be called before beginning
         the main execution work.
 
         Example:
@@ -976,7 +969,7 @@ class Execution:
             ...     # Run analysis
             ...     execution.execution_stop()
             ... except Exception:
-            ...     execution.update_status(Status.failed, "Analysis error")
+            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")
         """
         from datetime import timezone
 
@@ -990,21 +983,22 @@ class Execution:
                 start_time=datetime.now(timezone.utc),
             )
         self.uploaded_assets = None
-        self.update_status(Status.initializing, "Start execution  ...")
+        self._logger.info("Start execution...")
 
     def execution_stop(self) -> None:
-        """Marks the execution as completed.
+        """Marks the execution as stopped (algorithm finished successfully).
 
         Records the stop time in SQLite and updates the execution's
-        status to 'completed'. This should be called after all execution
-        work is finished.
+        status to 'Stopped'. This should be called after all execution
+        work is finished; upload of outputs is a separate phase that
+        moves status from Stopped → Pending_Upload → Uploaded.
 
         Example:
             >>> try:
             ...     # Run analysis
             ...     execution.execution_stop()
             ... except Exception:
-            ...     execution.update_status(Status.failed, "Analysis error")
+            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")
         """
         from datetime import timezone
 
@@ -1030,7 +1024,7 @@ class Execution:
         else:
             duration_str = "0H 0min 0.0sec"
 
-        self.update_status(Status.completed, "Algorithm execution ended.")
+        self.update_status(ExecutionStatus.Stopped)
         if not self._dry_run:
             self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
                 [{"RID": self.execution_rid, "Duration": duration_str}]
@@ -1388,13 +1382,19 @@ class Execution:
                 chunk_size=chunk_size,
             )
             self._set_asset_descriptions(self.uploaded_assets)
-            self.update_status(Status.completed, "Successfully end the execution.")
+            # Successful end of upload: Stopped → Pending_Upload → Uploaded.
+            # Only transition if we're in Stopped (algorithm ended cleanly);
+            # otherwise leave state alone.
+            if self.status is ExecutionStatus.Stopped:
+                self.update_status(ExecutionStatus.Pending_Upload)
+            if self.status is ExecutionStatus.Pending_Upload:
+                self.update_status(ExecutionStatus.Uploaded)
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)
             return self.uploaded_assets
         except Exception as e:
             error = format_exception(e)
-            self.update_status(Status.failed, error)
+            self.update_status(ExecutionStatus.Failed, error=error)
             raise e
 
     def _clean_folder_contents(self, folder_path: Path, remove_folder: bool = True):
