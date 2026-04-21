@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
-from deriva_ml.core.enums import Status
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record_v2 import (
@@ -53,7 +52,7 @@ class ExecutionMixin:
     Methods:
         create_execution: Create a new execution environment
         resume_execution: Re-hydrate a previous execution from the registry
-        _update_status: Update execution status in catalog
+        list_executions / find_executions: Query the registry / catalog for executions
     """
 
     # Type hints for IDE support - actual attributes/methods from host class
@@ -260,7 +259,7 @@ class ExecutionMixin:
 
             Update mutable properties::
 
-                >>> record.status = Status.completed
+                >>> record.status = ExecutionStatus.Uploaded
                 >>> record.description = "Analysis finished"
 
             Query relationships::
@@ -568,7 +567,7 @@ class ExecutionMixin:
         self,
         workflow: "Workflow | RID | None" = None,
         workflow_type: str | None = None,
-        status: Status | None = None,
+        status: ExecutionStatus | None = None,
     ) -> Iterable["ExecutionRecord"]:
         """List all executions in the catalog.
 
@@ -579,7 +578,7 @@ class ExecutionMixin:
             workflow: Optional Workflow object or RID to filter by.
             workflow_type: Optional workflow type name to filter by (e.g., "python_script").
                 This filters by the Workflow_Type vocabulary term.
-            status: Optional status to filter by (e.g., Status.completed).
+            status: Optional status to filter by (e.g., ExecutionStatus.Uploaded).
 
         Returns:
             Iterable of ExecutionRecord objects.
@@ -592,7 +591,7 @@ class ExecutionMixin:
 
             Filter by status::
 
-                >>> completed = list(ml.find_executions(status=Status.completed))
+                >>> uploaded = list(ml.find_executions(status=ExecutionStatus.Uploaded))
 
             Filter by specific workflow::
 
@@ -666,7 +665,7 @@ class ExecutionMixin:
     def find_experiments(
         self,
         workflow_rid: RID | None = None,
-        status: Status | None = None,
+        status: ExecutionStatus | None = None,
     ) -> Iterable["Experiment"]:
         """List all experiments (executions with Hydra configuration) in the catalog.
 
@@ -676,13 +675,13 @@ class ExecutionMixin:
 
         Args:
             workflow_rid: Optional workflow RID to filter by.
-            status: Optional status to filter by (e.g., Status.Completed).
+            status: Optional status to filter by (e.g., ExecutionStatus.Uploaded).
 
         Returns:
             Iterable of Experiment objects for executions with Hydra config.
 
         Example:
-            >>> experiments = list(ml.find_experiments(status=Status.Completed))
+            >>> experiments = list(ml.find_experiments(status=ExecutionStatus.Uploaded))
             >>> for exp in experiments:
             ...     print(f"{exp.name}: {exp.config_choices}")
         """
