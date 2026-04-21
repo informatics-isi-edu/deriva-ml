@@ -155,7 +155,13 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
                     referenced_schema=schema.name,
                     referenced_table="Workflow",
                     referenced_columns=["RID"],
-                )
+                ),
+                ForeignKeyDef(
+                    columns=["Status"],
+                    referenced_schema=schema.name,
+                    referenced_table=MLVocab.execution_status,
+                    referenced_columns=["Name"],
+                ),
             ],
             annotations=annotation,
         )
@@ -320,6 +326,9 @@ def create_ml_schema(
     asset_role_table = schema.create_table(
         VocabularyTableDef(name=MLVocab.asset_role, curie_template=f"{project_name}:{{RID}}")
     )
+    execution_status_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.execution_status, curie_template=f"{project_name}:{{RID}}")
+    )
 
     create_workflow_table(schema, annotations["workflow_annotation"])
     execution_table = create_execution_table(schema, annotations["execution_annotation"])
@@ -436,6 +445,16 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         {"Name": "VGG19", "Description": "VGG19 convolutional neural network for image classification."},
         {"Name": "RETFound", "Description": "RETFound vision transformer (ViT-Large) foundation model for retinal images."},
         {"Name": "Multimodal", "Description": "Workflows combining multiple data modalities (e.g., imaging + clinical records)."},
+    ])
+
+    _ensure_terms(MLVocab.execution_status, [
+        {"Name": "Created", "Description": "Execution row has been created; work has not started."},
+        {"Name": "Running", "Description": "Execution algorithm is actively running."},
+        {"Name": "Stopped", "Description": "Algorithm finished successfully; output assets not yet uploaded."},
+        {"Name": "Failed", "Description": "Execution encountered an unrecoverable error."},
+        {"Name": "Pending_Upload", "Description": "Algorithm succeeded; asset upload to the catalog is in progress."},
+        {"Name": "Uploaded", "Description": "Execution ran to success and all outputs are persisted to the catalog."},
+        {"Name": "Aborted", "Description": "Execution was canceled by the user before reaching a terminal state."},
     ])
 
 

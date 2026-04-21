@@ -72,6 +72,7 @@ class MLVocab(StrEnum):
         workflow_type (str): Workflow classification vocabulary (e.g., "Python", "Notebook").
         asset_type (str): Asset/file type classification vocabulary (e.g., "Image", "CSV").
         asset_role (str): Asset role vocabulary for execution relationships (e.g., "Input", "Output").
+        execution_status (str): Execution status vocabulary for execution lifecycle states.
         feature_name (str): Feature name vocabulary for ML feature definitions.
     """
 
@@ -79,6 +80,7 @@ class MLVocab(StrEnum):
     workflow_type = "Workflow_Type"
     asset_type = "Asset_Type"
     asset_role = "Asset_Role"
+    execution_status = "Execution_Status"
     feature_name = "Feature_Name"
 
 

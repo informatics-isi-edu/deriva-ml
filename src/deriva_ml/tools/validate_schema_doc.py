@@ -339,7 +339,10 @@ def _extract_fk(node: ast.Call) -> ForeignKeyModel:
         elif kw.arg == "referenced_schema":
             referenced_schema = _extract_ast_str_tolerant(kw.value)
         elif kw.arg == "referenced_table":
-            referenced_table = _extract_ast_str(kw.value)
+            # Use the enum-aware resolver so MLTable.execution / MLVocab.execution_status
+            # references resolve to their canonical StrEnum values rather than the
+            # Python identifier name.
+            referenced_table = _extract_ast_name_or_enum(kw.value)
         elif kw.arg == "referenced_columns":
             referenced_columns = _extract_ast_str_list(kw.value)
     return ForeignKeyModel(
