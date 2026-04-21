@@ -339,7 +339,7 @@ class Execution:
                     workflow_rid=self.workflow_rid,
                     description=self.configuration.description,
                     config_json=config_json,
-                    status=ExecutionStatus.created,
+                    status=ExecutionStatus.Created,
                     mode=self._ml_object._mode,
                     working_dir_rel=f"execution/{self.execution_rid}",
                     created_at=now,
@@ -599,7 +599,7 @@ class Execution:
         Example:
             >>> exe = ml.resume_execution("5-ABC")
             >>> exe.status
-            <ExecutionStatus.stopped>
+            <ExecutionStatus.Stopped>
         """
         from deriva_ml.core.exceptions import DerivaMLStateInconsistency
         from deriva_ml.execution.state_store import ExecutionStatus
@@ -1719,9 +1719,9 @@ class Execution:
 
         Example:
             >>> with exe.execute() as e:
-            ...     # e.status is ExecutionStatus.running
+            ...     # e.status is ExecutionStatus.Running
             ...     pass
-            >>> # e.status is ExecutionStatus.stopped (or failed on exception)
+            >>> # e.status is ExecutionStatus.Stopped (or failed on exception)
         """
         return self
 
@@ -2057,12 +2057,12 @@ class Execution:
 
         Raises:
             InvalidTransitionError: If the execution is not currently
-                in ``ExecutionStatus.created``.
+                in ``ExecutionStatus.Created``.
 
         Example:
             >>> with exe.execute() as e:
             ...     e.status
-            <ExecutionStatus.running>
+            <ExecutionStatus.Running>
         """
         from datetime import datetime, timezone
 
@@ -2082,7 +2082,7 @@ class Execution:
             ),
             execution_rid=self.execution_rid,
             current=current,
-            target=ExecutionStatus.running,
+            target=ExecutionStatus.Running,
             mode=self._ml_object._mode,
             extra_fields={"start_time": datetime.now(timezone.utc)},
         )
@@ -2124,10 +2124,10 @@ class Execution:
         now = datetime.now(timezone.utc)
 
         if exc_value is None:
-            target = ExecutionStatus.stopped
+            target = ExecutionStatus.Stopped
             extra = {"stop_time": now}
         else:
-            target = ExecutionStatus.failed
+            target = ExecutionStatus.Failed
             extra = {"stop_time": now, "error": f"{exc_type.__name__}: {exc_value}"}
 
         transition(
@@ -2184,7 +2184,7 @@ class Execution:
             >>> exe = ml.resume_execution("EXE-A")
             >>> exe.abort()
             >>> exe.status
-            <ExecutionStatus.aborted>
+            <ExecutionStatus.Aborted>
         """
         if self._dry_run:
             return
@@ -2198,7 +2198,7 @@ class Execution:
             ),
             execution_rid=self.execution_rid,
             current=self.status,
-            target=ExecutionStatus.aborted,
+            target=ExecutionStatus.Aborted,
             mode=self._ml_object._mode,
         )
 

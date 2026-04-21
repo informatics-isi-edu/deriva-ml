@@ -311,13 +311,13 @@ def run_upload_engine(
             try:
                 row = store.get_execution(item.execution_rid)
                 current_status = ExecutionStatus(row["status"])
-                if current_status != ExecutionStatus.pending_upload:
+                if current_status != ExecutionStatus.Pending_Upload:
                     transition(
                         store=store,
                         catalog=ml.catalog if ml._mode.value == "online" else None,
                         execution_rid=item.execution_rid,
                         current=current_status,
-                        target=ExecutionStatus.pending_upload,
+                        target=ExecutionStatus.Pending_Upload,
                         mode=ml._mode,
                     )
             except Exception as exc:
@@ -357,16 +357,16 @@ def run_upload_engine(
         if row is None:
             continue
         current_status = ExecutionStatus(row["status"])
-        if current_status != ExecutionStatus.pending_upload:
+        if current_status != ExecutionStatus.Pending_Upload:
             continue
 
         total_failed_counts = counts["failed_rows"] + counts["failed_files"]
         total_pending_counts = counts["pending_rows"] + counts["pending_files"]
 
         if total_failed_counts == 0 and total_pending_counts == 0:
-            target = ExecutionStatus.uploaded
+            target = ExecutionStatus.Uploaded
         elif total_failed_counts > 0:
-            target = ExecutionStatus.failed
+            target = ExecutionStatus.Failed
         else:
             # No failures, but rows still pending (drain was aborted
             # at a higher level or this run only partially drained).
@@ -382,7 +382,7 @@ def run_upload_engine(
                 current=current_status,
                 target=target,
                 mode=ml._mode,
-                extra_fields={"error": errors[0]} if errors and target == ExecutionStatus.failed else {},
+                extra_fields={"error": errors[0]} if errors and target == ExecutionStatus.Failed else {},
             )
         except Exception as exc:
             logger.warning(

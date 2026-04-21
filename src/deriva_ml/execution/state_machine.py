@@ -74,24 +74,24 @@ class InvalidTransitionError(DerivaMLException):
 
 ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozenset({
     # Happy path
-    (ExecutionStatus.created, ExecutionStatus.running),
-    (ExecutionStatus.running, ExecutionStatus.stopped),
-    (ExecutionStatus.stopped, ExecutionStatus.pending_upload),
-    (ExecutionStatus.pending_upload, ExecutionStatus.uploaded),
+    (ExecutionStatus.Created, ExecutionStatus.Running),
+    (ExecutionStatus.Running, ExecutionStatus.Stopped),
+    (ExecutionStatus.Stopped, ExecutionStatus.Pending_Upload),
+    (ExecutionStatus.Pending_Upload, ExecutionStatus.Uploaded),
 
     # Failure paths
-    (ExecutionStatus.running, ExecutionStatus.failed),
-    (ExecutionStatus.pending_upload, ExecutionStatus.failed),
+    (ExecutionStatus.Running, ExecutionStatus.Failed),
+    (ExecutionStatus.Pending_Upload, ExecutionStatus.Failed),
 
     # Retry from upload failure back into upload
-    (ExecutionStatus.failed, ExecutionStatus.pending_upload),
+    (ExecutionStatus.Failed, ExecutionStatus.Pending_Upload),
 
     # Abort is legal from any pre-terminal state. 'uploaded' is
     # terminal — we don't allow abort after successful upload.
-    (ExecutionStatus.created, ExecutionStatus.aborted),
-    (ExecutionStatus.running, ExecutionStatus.aborted),
-    (ExecutionStatus.stopped, ExecutionStatus.aborted),
-    (ExecutionStatus.failed, ExecutionStatus.aborted),
+    (ExecutionStatus.Created, ExecutionStatus.Aborted),
+    (ExecutionStatus.Running, ExecutionStatus.Aborted),
+    (ExecutionStatus.Stopped, ExecutionStatus.Aborted),
+    (ExecutionStatus.Failed, ExecutionStatus.Aborted),
 })
 
 
@@ -112,8 +112,8 @@ def validate_transition(
 
     Example:
         >>> validate_transition(
-        ...     current=ExecutionStatus.running,
-        ...     target=ExecutionStatus.stopped,
+        ...     current=ExecutionStatus.Running,
+        ...     target=ExecutionStatus.Stopped,
         ... )  # returns None, no raise
     """
     if (current, target) not in ALLOWED_TRANSITIONS:
@@ -168,8 +168,8 @@ def transition(
         >>> transition(
         ...     store=store, catalog=ml.catalog,
         ...     execution_rid="EXE-A",
-        ...     current=ExecutionStatus.running,
-        ...     target=ExecutionStatus.stopped,
+        ...     current=ExecutionStatus.Running,
+        ...     target=ExecutionStatus.Stopped,
         ...     mode=ConnectionMode.online,
         ...     extra_fields={"stop_time": datetime.now(timezone.utc)},
         ... )
@@ -365,19 +365,19 @@ def flush_pending_sync(
 
 _DISAGREEMENT_RULES: dict[tuple[ExecutionStatus, ExecutionStatus], str] = {
     # Externally aborted while we thought we were running.
-    (ExecutionStatus.running, ExecutionStatus.aborted): "adopt",
+    (ExecutionStatus.Running, ExecutionStatus.Aborted): "adopt",
     # Another process completed the upload.
-    (ExecutionStatus.pending_upload, ExecutionStatus.uploaded): "adopt",
+    (ExecutionStatus.Pending_Upload, ExecutionStatus.Uploaded): "adopt",
     # External failure signal.
-    (ExecutionStatus.running, ExecutionStatus.failed): "adopt",
+    (ExecutionStatus.Running, ExecutionStatus.Failed): "adopt",
     # We stopped cleanly; catalog still says running (our earlier PUT
     # never landed).
-    (ExecutionStatus.stopped, ExecutionStatus.running): "push",
+    (ExecutionStatus.Stopped, ExecutionStatus.Running): "push",
     # Same story at other cleanly-terminal SQLite states.
-    (ExecutionStatus.failed, ExecutionStatus.running): "push",
-    (ExecutionStatus.uploaded, ExecutionStatus.pending_upload): "push",
-    (ExecutionStatus.uploaded, ExecutionStatus.running): "push",
-    (ExecutionStatus.aborted, ExecutionStatus.running): "push",
+    (ExecutionStatus.Failed, ExecutionStatus.Running): "push",
+    (ExecutionStatus.Uploaded, ExecutionStatus.Pending_Upload): "push",
+    (ExecutionStatus.Uploaded, ExecutionStatus.Running): "push",
+    (ExecutionStatus.Aborted, ExecutionStatus.Running): "push",
 }
 
 
@@ -552,7 +552,7 @@ def create_catalog_execution(
     body = [{
         "Workflow": workflow_rid,
         "Description": description,
-        "Status": str(ExecutionStatus.created),
+        "Status": str(ExecutionStatus.Created),
     }]
     response = catalog.post("/entity/deriva-ml:Execution", json=body)
     inserted = response.json()

@@ -273,7 +273,7 @@ class ExecutionStateStore:
             workflow_rid: Workflow FK, or None if not yet attached.
             description: Human-readable description from config.
             config_json: Serialized ExecutionConfiguration.
-            status: Initial status, typically ExecutionStatus.created.
+            status: Initial status, typically ExecutionStatus.Created.
             mode: ConnectionMode the execution is active under.
             working_dir_rel: Path relative to the workspace root.
             created_at: UTC timestamp when the row is written.
@@ -382,9 +382,9 @@ class ExecutionStateStore:
 
         Example:
             >>> # All incomplete executions:
-            >>> incomplete = [ExecutionStatus.created, ExecutionStatus.running,
-            ...               ExecutionStatus.stopped, ExecutionStatus.failed,
-            ...               ExecutionStatus.pending_upload]
+            >>> incomplete = [ExecutionStatus.Created, ExecutionStatus.Running,
+            ...               ExecutionStatus.Stopped, ExecutionStatus.Failed,
+            ...               ExecutionStatus.Pending_Upload]
             >>> rows = store.list_executions(status=incomplete)
         """
         stmt = select(self.executions)

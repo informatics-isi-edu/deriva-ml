@@ -364,7 +364,7 @@ class ExecutionMixin:
 
         Example:
             >>> from deriva_ml.execution.state_store import ExecutionStatus
-            >>> failed = ml.list_executions(status=ExecutionStatus.failed)
+            >>> failed = ml.list_executions(status=ExecutionStatus.Failed)
             >>> for rec in failed:
             ...     print(rec.rid, rec.error)
         """
@@ -419,11 +419,11 @@ class ExecutionMixin:
         """
         return self.list_executions(
             status=[
-                ExecutionStatus.created,
-                ExecutionStatus.running,
-                ExecutionStatus.stopped,
-                ExecutionStatus.failed,
-                ExecutionStatus.pending_upload,
+                ExecutionStatus.Created,
+                ExecutionStatus.Running,
+                ExecutionStatus.Stopped,
+                ExecutionStatus.Failed,
+                ExecutionStatus.Pending_Upload,
             ],
         )
 
@@ -460,7 +460,7 @@ class ExecutionMixin:
             >>> ml = DerivaML(hostname="example.org", catalog_id="42")
             >>> exe = ml.resume_execution("5-ABC")
             >>> exe.status
-            <ExecutionStatus.stopped>
+            <ExecutionStatus.Stopped>
             >>> exe.upload_outputs()
         """
         from deriva_ml.execution.execution import Execution
@@ -534,7 +534,7 @@ class ExecutionMixin:
             older_than: If set, only gc executions whose last_activity is
                 older than this timedelta.
             status: Filter by status (single or list); None = any status.
-                Typical: pass ExecutionStatus.uploaded to clean up after
+                Typical: pass ExecutionStatus.Uploaded to clean up after
                 successful uploads.
             delete_working_dir: If True, remove the per-execution working
                 directory from disk. Defaults to False (registry-only).
@@ -546,7 +546,7 @@ class ExecutionMixin:
             >>> from datetime import timedelta
             >>> from deriva_ml.execution.state_store import ExecutionStatus
             >>> n = ml.gc_executions(
-            ...     status=ExecutionStatus.uploaded,
+            ...     status=ExecutionStatus.Uploaded,
             ...     older_than=timedelta(days=30),
             ...     delete_working_dir=True,
             ... )
