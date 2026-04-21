@@ -320,6 +320,9 @@ def create_ml_schema(
     asset_role_table = schema.create_table(
         VocabularyTableDef(name=MLVocab.asset_role, curie_template=f"{project_name}:{{RID}}")
     )
+    execution_status_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.execution_status, curie_template=f"{project_name}:{{RID}}")
+    )
 
     create_workflow_table(schema, annotations["workflow_annotation"])
     execution_table = create_execution_table(schema, annotations["execution_annotation"])
