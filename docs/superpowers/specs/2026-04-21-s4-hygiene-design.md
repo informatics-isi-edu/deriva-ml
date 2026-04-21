@@ -1,24 +1,22 @@
-# S4 — Hygiene Bundle Design
+# S4 — Cache-Backed Offline Mode Design
 
 **Status:** Draft · **Date:** 2026-04-21 · **Subsystem:** Phase 2 S4
 
 ## 1. Goal
 
-Close two loose ends accumulated in earlier Phase 2 subsystems:
+Make `ConnectionMode.offline` actually work without network access. `DerivaML.__init__` currently does `get_authn_session()`, `connect_ermrest()`, and `getCatalogModel()` unconditionally, so offline mode silently requires a reachable catalog. This subsystem introduces a workspace-backed schema cache, a `CatalogStub` that raises `DerivaMLReadOnlyError` on any offline catalog access, and an explicit `refresh_schema()` method with a drift-detection policy.
 
-- **H1** — Make `ConnectionMode.offline` actually work without network access. `DerivaML.__init__` currently does `get_authn_session()`, `connect_ermrest()`, and `getCatalogModel()` unconditionally, so offline mode silently requires a reachable catalog.
-- **H2** — Finish the S1a `Status`-enum migration. The S1a CHANGELOG claimed the legacy enum was deleted, but references remain in `core/base.py`, `dataset/dataset.py`, and several docstrings. The grep-gate that was meant to enforce the migration was committed on a branch (`3f95dce`) but never merged.
+## 1.1 Scope history note
 
-Both fit together as a "finish what was started" PR: small, mechanical H2 first; real design work for H1 second.
+The initial brainstorming pass also scoped a second hygiene item — finishing the S1a `Status`-enum migration (formerly called "H2"). On starting execution we verified that H2 had already been completed on `main` in commit `8313953` (`refactor(core): migrate base.py + mixins to ExecutionStatus.Aborted`) and that the grep-gate test `tests/test_migration_complete.py` was landed separately. The stale context that suggested otherwise came from a sibling worktree stuck at a pre-migration commit. H2 is therefore dropped from the spec; S4 is scoped to H1 only.
 
 ## 2. Scope
 
 **In scope:**
-- Cache-backed offline mode (H1): `SchemaCache`, `CatalogStub`, `refresh_schema()`, mode-branched `__init__`.
-- Finish `Status` migration (H2): replace Group-1 real call sites (`base.py`, `dataset.py`), scrub Group-3 docstrings / dead imports, land the grep-gate `tests/test_migration_complete.py` with an exemption list.
+- Cache-backed offline mode: `SchemaCache`, `CatalogStub`, `refresh_schema()`, mode-branched `__init__`.
 
 **Out of scope (tracked in the project todo list):**
-- H3 — Legacy Pydantic `ExecutionRecord` class in `execution/execution_record.py` and its 7 importers. Documented exempt in the grep-gate. Scheduled for a later subsystem.
+- H3 — Legacy Pydantic `ExecutionRecord` class in `execution/execution_record.py` and its 7 importers. Scheduled for a later subsystem.
 - Schema-cache data-migration operations (`pin_schema`, `migrate_schema` with table/column maps). Built on top of this subsystem's `SchemaCache` foundation.
 - Bug C — asset metadata None-stringification.
 - Bug E.2 — deriva-py upserts by MD5+Filename, ignoring pre-leased RIDs.
@@ -26,12 +24,6 @@ Both fit together as a "finish what was started" PR: small, mechanical H2 first;
 
 ## 3. Architecture
 
-Two independent parts ship in one PR:
-
-**Part A (H2) — Status cleanup, ~10 mechanical edits + 1 grep-gate test.**
-No new abstractions. Each edit is documented in §4.
-
-**Part B (H1) — Cache-backed offline mode.**
 Three new units:
 
 1. `SchemaCache` (`src/deriva_ml/core/schema_cache.py`) — owns one file at `<workspace>/schema-cache.json`. Methods: `exists()`, `load()`, `write(...)`, `snapshot_id()`. Atomic writes (tmp + fsync + rename).
@@ -40,101 +32,11 @@ Three new units:
 
 `DerivaML.__init__` branches on `self._mode` into `_init_online` or `_init_offline` helpers.
 
-## 4. Part A — H2 implementation details
+## 4. Status-migration hygiene (scoped out; see §1.1)
 
-### 4.1 Real call sites (Group 1)
+Originally this section specified the H2 `Status`-enum migration cleanup. On starting execution we discovered the migration was already completed on `main` in commit `8313953`, and the grep-gate test `tests/test_migration_complete.py` was already landed. Nothing to do. Scope section §2 has been updated; the implementation plan will also be trimmed.
 
-| File | Line(s) | Current | After |
-|---|---|---|---|
-| `src/deriva_ml/core/base.py` | 353 | `self.status = Status.pending.value` | `self.status = ExecutionStatus.Created.value` |
-| `src/deriva_ml/core/base.py` | 380 | `if self._execution and self._execution.status != Status.completed:` | Terminal-state set check (see §4.1 "__del__" paragraph below) |
-| `src/deriva_ml/core/base.py` | 381 | `self._execution.update_status(Status.aborted, "Execution Aborted")` | `self._execution.update_status(ExecutionStatus.Aborted, error="Execution Aborted")` |
-| `src/deriva_ml/dataset/dataset.py` | 87 (import) | `Status,` | (remove from multi-name import) |
-| `src/deriva_ml/dataset/dataset.py` | 2649 | `def update_status(status: Status, msg: str) -> None:` | `def update_status(status: str, msg: str) -> None:` with comment |
-| `src/deriva_ml/dataset/dataset.py` | 2656 | `"Status": status.value,` | `"Status": status,` |
-| `src/deriva_ml/dataset/dataset.py` | 2666, 2672 | `update_status(Status.running, msg)` | `update_status("Running", msg)` |
-
-**`__del__` terminal-state set check (`base.py:380`):** the old code treated `Status.completed` as "don't abort." The closest ExecutionStatus equivalent is `Uploaded`, but an execution that ran successfully and hasn't yet uploaded (`.Stopped`) shouldn't be force-aborted on GC either. Use a set of terminal states:
-
-```python
-_TERMINAL_EXECUTION_STATES = (
-    ExecutionStatus.Uploaded,
-    ExecutionStatus.Stopped,
-    ExecutionStatus.Aborted,
-    ExecutionStatus.Failed,
-)
-
-if self._execution and self._execution.status not in _TERMINAL_EXECUTION_STATES:
-    self._execution.update_status(ExecutionStatus.Aborted, error="Execution Aborted")
-```
-
-**`dataset.py:2649` progress token:** the legacy `update_status(status: Status, msg: str)` is a local closure that writes `{"Status": status.value, "Status_Detail": msg}` to a **`Dataset.Status`** column — a freeform display string with no FK to `Execution_Status`. Not semantically an execution status. Replace the parameter with a plain `str` and add a comment:
-
-```python
-def update_status(status: str, msg: str) -> None:
-    # status is a display-only progress token ("Running", "Complete"),
-    # not FK-validated against Execution_Status. Writing ExecutionStatus
-    # values here would be misleading; keep as plain strings.
-    ...
-    row = {"Status": status, "Status_Detail": msg}
-```
-
-### 4.2 Docstrings and dead imports (Group 3)
-
-| File | Line | Change |
-|---|---|---|
-| `src/deriva_ml/core/mixins/execution.py` | 283 | `>>> record.status = Status.completed` → `>>> record.status = ExecutionStatus.Uploaded` |
-| `src/deriva_ml/core/mixins/execution.py` | 602 | `e.g., Status.completed` → `e.g., ExecutionStatus.Uploaded` |
-| `src/deriva_ml/core/mixins/execution.py` | 615 | `>>> completed = list(ml.find_executions(status=Status.completed))` → `...ExecutionStatus.Uploaded` |
-| `src/deriva_ml/interfaces.py` | 86 | Remove the `from deriva_ml.core.enums import Status` TYPE_CHECKING import |
-
-### 4.3 Grep-gate test
-
-Create `tests/test_migration_complete.py`:
-
-```python
-"""Fail CI if any new `Status` enum reference leaks into src/.
-
-S1a deleted the legacy `Status` enum in favor of `ExecutionStatus`.
-Non-exempt source files must use `ExecutionStatus`, string literals,
-or other context-appropriate values — never the legacy `Status` enum.
-"""
-from __future__ import annotations
-
-import re
-from pathlib import Path
-
-# Files deliberately exempted from the migration. Each exemption is
-# an island to be resolved in a future subsystem.
-EXEMPT_PATHS: set[str] = {
-    # Legacy Pydantic ExecutionRecord — scheduled for removal in a
-    # later subsystem that migrates 7 importers to ExecutionRecordV2.
-    "src/deriva_ml/execution/execution_record.py",
-}
-
-# Match `Status.name` or `Status(` but not ExecutionStatus /
-# PendingRowStatus / HTTPStatus / CacheStatus etc.
-STATUS_PATTERN = re.compile(r"(?<![A-Za-z_])Status\.[a-zA-Z_]|(?<![A-Za-z_])Status\(")
-
-
-def test_no_legacy_Status_references_in_src():
-    root = Path(__file__).parent.parent / "src" / "deriva_ml"
-    offenders: list[str] = []
-    for py in root.rglob("*.py"):
-        rel = py.relative_to(py.parents[2]).as_posix()
-        if rel in EXEMPT_PATHS:
-            continue
-        for lineno, line in enumerate(py.read_text().splitlines(), 1):
-            if STATUS_PATTERN.search(line):
-                offenders.append(f"{rel}:{lineno}: {line.strip()}")
-    assert not offenders, (
-        "Legacy `Status` enum references in src/. Use `ExecutionStatus`, "
-        "string literals, or context-appropriate enums instead. Offenders:\n"
-        + "\n".join(offenders)
-    )
-```
-
-## 5. Part B — H1 implementation details
+## 5. H1 implementation details — cache-backed offline mode
 
 ### 5.1 `SchemaCache` (`src/deriva_ml/core/schema_cache.py`)
 
@@ -452,7 +354,7 @@ ml.refresh_schema()
 
 ### 8.1 Unit tests (no catalog needed)
 
-- `tests/test_migration_complete.py` (Part A) — the grep-gate itself. Asserts the current post-H2 tree passes. Belt-and-suspenders: a second test plants a synthetic `Status.xxx` in a temp fake file and confirms the gate would catch it.
+- ~~`tests/test_migration_complete.py`~~ — already exists on main from a prior migration; see §4.
 - `tests/core/test_schema_cache.py` — `SchemaCache` unit tests: write+load round-trip, atomic-write recovery (tmp exists, original intact on crash), missing file returns `None` from `snapshot_id()`, corrupt JSON raises.
 - `tests/core/test_catalog_stub.py` — `CatalogStub`: any attribute access raises `DerivaMLReadOnlyError` with the attribute name in the message.
 
@@ -481,7 +383,7 @@ The existing test suite must pass end-to-end. The `self.catalog = CatalogStub()`
 
 ## 10. Rollout
 
-Single PR against `main`. CHANGELOG entry covers both parts under one "Unreleased — Phase 2 Subsystem 4" heading. No feature flag. No breaking change to existing API:
+Single PR against `main`. CHANGELOG entry documents the offline-mode work under one "Unreleased — Phase 2 Subsystem 4" heading. No feature flag. No breaking change to existing API:
 
 - `DerivaML()` default mode is still `online`; behavior unchanged for existing callers.
 - `ConnectionMode.offline` now actually works (previously silently network-dependent).
