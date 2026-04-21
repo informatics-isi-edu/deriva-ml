@@ -127,9 +127,10 @@ mode:
    `uploader.file_status` (a dict keyed by absolute path), diffs against
    paths-already-written, and writes any newly-terminal rows. This is the
    same pattern deriva-py's own UI clients use. Terminal states map as:
-   - `UploadState.Success` → `Uploaded`
+   - `UploadState.Success` → `Uploaded` (hatrac server-side hash-dedup
+     means files that were already present also land here — deriva-py
+     does not expose a distinct "skipped" state)
    - `UploadState.Failed` → `Failed` with the status string as the error
-   - `UploadState.Skipped` → `Skipped`
    - `UploadState.Cancelled` / `Aborted` → leave as `Pending` (so a later
      run resumes)
    - `UploadState.Paused` / `Timeout` → leave as `Pending`
@@ -149,14 +150,13 @@ def _invoke_deriva_py_uploader(
         {
             "uploaded": list[Path],   # absolute input paths, State=Success
             "failed":   list[dict],   # [{"path": Path, "error": str}]
-            "skipped":  list[Path],   # State=Skipped
         }
     """
 ```
 
-The existing stub's documented contract (`uploaded` / `failed`) is extended
-with `skipped`, which deriva-py reports distinctly and the SQLite store wants
-to record.
+Matches the existing stub's documented contract. Files that deriva-py
+internally recognized as already-present still come back as `Success` via
+hatrac hash-dedup and are listed under `uploaded`.
 
 ### 3.6 Hard-drop of `bandwidth_limit_mbps` and `parallel_files`
 
@@ -213,7 +213,7 @@ ml.start_upload() / ml.upload_pending() / cli/upload.py
          │    _status_cb / _file_cb: observe cancel_event → uploader.cancel()
          │    _status_cb: write newly-terminal rows to SQLite store
          │ 5. reconcile uploader.file_status → store
-         │ 6. return {uploaded, failed, skipped}
+         │ 6. return {uploaded, failed}
          │ (finally: rmtree scan_root)
          ▼
    UploadReport aggregation
@@ -222,13 +222,13 @@ ml.start_upload() / ml.upload_pending() / cli/upload.py
 ### 4.2 SQLite store interaction
 
 `_invoke_deriva_py_uploader` receives the `store` handle. Writes happen in
-two places (live callback + reconciliation). The store's existing
-`mark_uploaded` / `mark_failed` / `mark_skipped` APIs are used (creating them
-if they don't yet exist — currently the store has `mark_uploaded` /
-`mark_failed`; a `mark_skipped` is added).
+two places (live callback + reconciliation), both through the existing
+`ExecutionStateStore.update_pending_row` API with `status=PendingRowStatus.uploaded`
+or `PendingRowStatus.failed`. No new store methods are needed.
 
-All three are idempotent by design: they either transition `Pending` to a
-terminal state or leave an already-terminal row alone.
+Writes are idempotent by the `written_paths` set the callback maintains: a
+path that has been written once is not rewritten, whether via callback or
+reconciliation.
 
 ### 4.3 GenericUploader configuration
 
@@ -254,8 +254,8 @@ batch does not affect future batches).
   class with a fake that sets `file_status` to all-Success. Assert return
   value lists all inputs as uploaded. Assert SQLite rows marked Uploaded.
 - **`_invoke_deriva_py_uploader` mixed outcomes** — fake uploader produces
-  Success, Failed, Skipped. Assert return dict splits correctly and SQLite
-  rows reflect each state.
+  Success and Failed. Assert return dict splits correctly and SQLite rows
+  reflect each state.
 - **Callback-driven live updates** — fake uploader invokes
   `status_callback` between file transitions; assert each callback fires a
   SQLite write before the uploader returns.
