@@ -487,3 +487,55 @@ def load_from_code(path: Path) -> SchemaModel:
         else:
             tables_with_terms.append(t)
     return SchemaModel(tables=tables_with_terms)
+
+
+@dataclass(frozen=True)
+class Mismatch:
+    """One discrepancy between expected and actual schemas."""
+    kind: "MismatchKind"
+    table: str | None
+    detail: str
+
+
+def diff_schemas(*, expected: SchemaModel, actual: SchemaModel) -> list[Mismatch]:
+    """Compare two schemas; return list of Mismatches.
+
+    Args:
+        expected: The "expected" schema — typically the doc side.
+        actual: The "actual" schema — typically the code side.
+
+    Returns:
+        Empty list if schemas match. Otherwise one Mismatch per discrepancy.
+    """
+    mismatches: list[Mismatch] = []
+    expected_tables = {t.name: t for t in expected.tables}
+    actual_tables = {t.name: t for t in actual.tables}
+
+    # Missing from actual (in doc but not in code).
+    for name in sorted(expected_tables.keys() - actual_tables.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.MISSING_TABLE,
+            table=name,
+            detail=f"table {name!r} is in the doc but not in the code",
+        ))
+    # Extra in actual (in code but not in doc).
+    for name in sorted(actual_tables.keys() - expected_tables.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.EXTRA_TABLE,
+            table=name,
+            detail=f"table {name!r} is in the code but not in the doc",
+        ))
+    # Tables in both: D2-D4 extend this loop.
+    for name in sorted(expected_tables.keys() & actual_tables.keys()):
+        _compare_tables(mismatches, expected_tables[name], actual_tables[name])
+    return mismatches
+
+
+def _compare_tables(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -> None:
+    """Compare two same-named TableModels; append any differences."""
+    # D2-D4 populate this. Skeleton only for D1.
+    pass

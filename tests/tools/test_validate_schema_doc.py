@@ -392,3 +392,38 @@ def test_load_from_code_association_table(tmp_path):
     assert t.name == "Execution_Nested_Execution"
     assert [a.table for a in t.associates] == ["Execution", "Nested_Execution"]
     assert [m.name for m in t.metadata] == ["Sequence"]
+
+
+def test_mismatch_dataclass_fields():
+    from deriva_ml.tools.validate_schema_doc import Mismatch, MismatchKind
+    m = Mismatch(
+        kind=MismatchKind.MISSING_TABLE,
+        table="Execution_Status",
+        detail="declared in doc but not in code",
+    )
+    assert m.kind == MismatchKind.MISSING_TABLE
+    assert m.table == "Execution_Status"
+
+
+def test_diff_identical_schemas_empty():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
+    )
+    s1 = SchemaModel(tables=[
+        TableModel(
+            name="Dataset",
+            kind="table",
+            columns=[ColumnModel(name="Name", type="text")],
+        ),
+    ])
+    s2 = SchemaModel(tables=[
+        TableModel(
+            name="Dataset",
+            kind="table",
+            columns=[ColumnModel(name="Name", type="text")],
+        ),
+    ])
+    assert diff_schemas(expected=s1, actual=s2) == []
