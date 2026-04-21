@@ -56,3 +56,57 @@ def test_mismatch_kinds_defined():
     assert MismatchKind.COLUMN_MISMATCH.value == "column_mismatch"
     assert MismatchKind.FK_MISMATCH.value == "fk_mismatch"
     assert MismatchKind.VOCAB_TERMS_MISMATCH.value == "vocab_terms_mismatch"
+
+
+def test_extract_yaml_blocks_basic(tmp_path):
+    """Extracts YAML-fenced blocks and parses each into a dict."""
+    from deriva_ml.tools.validate_schema_doc import _extract_yaml_blocks
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "# Intro\n"
+        "\n"
+        "## Dataset\n"
+        "\n"
+        "```yaml\n"
+        "table: Dataset\n"
+        "kind: table\n"
+        "columns:\n"
+        "  - name: Name\n"
+        "    type: text\n"
+        "```\n"
+        "\n"
+        "More prose.\n"
+        "\n"
+        "```yaml\n"
+        "table: Workflow\n"
+        "kind: table\n"
+        "```\n"
+    )
+
+    blocks = _extract_yaml_blocks(doc)
+    assert len(blocks) == 2
+    assert blocks[0]["table"] == "Dataset"
+    assert blocks[0]["columns"][0]["name"] == "Name"
+    assert blocks[1]["table"] == "Workflow"
+
+
+def test_extract_yaml_blocks_ignores_non_yaml_fences(tmp_path):
+    """Code blocks fenced as other languages are not parsed as YAML."""
+    from deriva_ml.tools.validate_schema_doc import _extract_yaml_blocks
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```python\n"
+        "x = 1\n"
+        "```\n"
+        "\n"
+        "```yaml\n"
+        "table: Dataset\n"
+        "kind: table\n"
+        "```\n"
+    )
+
+    blocks = _extract_yaml_blocks(doc)
+    assert len(blocks) == 1
+    assert blocks[0]["table"] == "Dataset"

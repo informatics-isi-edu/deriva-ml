@@ -9,8 +9,12 @@ Runs in CI via the deriva-ml-validate-schema entry point.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
+
+import yaml
 
 
 @dataclass(frozen=True)
@@ -68,3 +72,46 @@ class MismatchKind(StrEnum):
     FK_MISMATCH = "fk_mismatch"
     VOCAB_TERMS_MISMATCH = "vocab_terms_mismatch"
     ASSOCIATION_MISMATCH = "association_mismatch"
+
+
+class SchemaDocError(Exception):
+    """Raised when the schema doc can't be parsed or is malformed."""
+
+
+_YAML_FENCE_RE = re.compile(
+    r"^```yaml\s*$(.*?)^```\s*$",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _extract_yaml_blocks(path: Path) -> list[dict]:
+    """Extract YAML-fenced code blocks from a Markdown file.
+
+    Args:
+        path: Path to the Markdown file.
+
+    Returns:
+        List of dicts, one per ```yaml block, in file order.
+
+    Raises:
+        SchemaDocError: If any block fails to parse as YAML.
+    """
+    text = path.read_text()
+    blocks: list[dict] = []
+    for match in _YAML_FENCE_RE.finditer(text):
+        body = match.group(1)
+        line_number = text[: match.start()].count("\n") + 1
+        try:
+            parsed = yaml.safe_load(body)
+        except yaml.YAMLError as exc:
+            raise SchemaDocError(
+                f"YAML parse error in {path}:{line_number}: {exc}"
+            ) from exc
+        if parsed is None:
+            continue
+        if not isinstance(parsed, dict):
+            raise SchemaDocError(
+                f"{path}:{line_number}: expected a mapping, got {type(parsed).__name__}"
+            )
+        blocks.append(parsed)
+    return blocks
