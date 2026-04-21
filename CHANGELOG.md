@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Phase 2 Subsystem 1b: Execution_Status vocabulary
+
+### New
+
+- **`Execution_Status` vocabulary table** in the `deriva-ml` schema. Seeded with 7 canonical terms (Created, Running, Stopped, Failed, Pending_Upload, Uploaded, Aborted) matching the `ExecutionStatus` StrEnum from S1a.
+- **FK on `Execution.Status` → `Execution_Status.Name`.** Catalog now rejects any `Execution` insert whose `Status` value isn't one of the seeded canonical terms.
+- **`MLVocab.execution_status`** enum member for canonical access to the new vocabulary-table name.
+- **`tests/schema/test_vocab_fk_convention.py`** — live-catalog audit test that asserts every FK targeting a vocabulary table in the `deriva-ml` schema references the `Name` column.
+- **Conventions section in `docs/reference/schema.md`** documenting the vocabulary-FK-on-Name rule, its rationale, and the enforcing test.
+
+### Changed
+
+- **S0 validator** (`src/deriva_ml/tools/validate_schema_doc.py`): `_extract_fk` now uses `_extract_ast_name_or_enum` on `referenced_table=` values so that `MLVocab.xxx` references in `ForeignKeyDef(...)` resolve to their StrEnum values (Title_Case) rather than the Python identifier (lowercase). Without this fix the validator reported spurious mismatches for FKs whose `referenced_table` was an enum reference.
+
+### Audit notes
+
+- Audit of the pre-S1b schema found **zero violations** of the Name-not-RID rule. Deriva-py's `Table.define_association` default `key_column_search_order = ['Name', 'name', 'ID', 'id']` already picks `Name` for vocabulary targets and falls back to `RID` only for entity targets. The new convention makes this implicit behavior explicit and test-enforced.
+
+### Migration notes
+
+- Existing deployed catalogs MAY need a one-time migration to add the `Execution_Status` vocabulary table + FK if they were created before S1b. A separate cleanup task (outside S1b scope) verifies compliance on any live deployments. New catalogs created via `create_ml_catalog` have everything set up.
+- Historical `Execution` rows whose `Status` value was `"Initializing"` or `"Pending"` (pre-S1a) will violate the new FK constraint if the catalog is migrated to include the FK. Users should clean those rows via `gc_executions` or manual updates.
+
+---
+
 ## Unreleased — Phase 2 Subsystem 1a: Status-enum reconciliation
 
 ### Breaking changes
