@@ -1,0 +1,287 @@
+# deriva-ml Schema Reference
+
+This document is the authoritative description of the `deriva-ml` schema. It is kept in sync with `src/deriva_ml/schema/create_schema.py` by the `deriva-ml-validate-schema` CI check.
+
+## Editing this doc
+
+Schema changes are **doc-first** per Phase-2-Subsystem-0. To change the schema:
+
+1. Edit the relevant `## <Table>` section below (or add a new one).
+2. Edit `src/deriva_ml/schema/create_schema.py` to match.
+3. Run `uv run deriva-ml-validate-schema` locally to verify agreement.
+4. Commit both files together. CI re-runs the validator.
+
+## What is and isn't validated
+
+The validator enforces: **table names, columns (name + type), foreign keys, vocabulary seeded terms, and association-table endpoints.**
+
+The validator does NOT enforce: descriptions (narrative on both sides), ERMrest annotations, `curie_template` values, indexes, or display configs. These may differ between doc and code without CI failure.
+
+The `referenced_schema` field in foreign keys is often written in the code as a parameter (`sname`) or attribute (`schema.name`). The validator's AST parser resolves these to a `<dynamic>` sentinel and treats them as matching any doc-side value. In this doc we write the literal schema name (`deriva-ml`) for clarity.
+
+See `docs/superpowers/specs/2026-04-21-schema-doc-source-of-truth-design.md` for the full rationale.
+
+## Table of contents
+
+Ordered as: **core entities**, then **vocabularies**, then **association tables**.
+
+**Core entities**: [Dataset](#dataset), [Dataset_Version](#dataset_version), [Execution](#execution), [Workflow](#workflow)
+**Vocabularies**: [Dataset_Type](#dataset_type), [Workflow_Type](#workflow_type), [Feature_Name](#feature_name), [Asset_Type](#asset_type), [Asset_Role](#asset_role)
+**Associations**: [Dataset_Dataset_Type](#dataset_dataset_type), [Dataset_Nested_Dataset](#dataset_nested_dataset), [Dataset_Execution](#dataset_execution), [Dataset_File](#dataset_file), [Execution_Nested_Execution](#execution_nested_execution), [Workflow_Workflow_Type](#workflow_workflow_type)
+
+---
+
+## Dataset
+
+A versioned collection of records identified for training, validation, testing, or other ML purposes. The primary grouping unit for ML data.
+
+```yaml
+table: Dataset
+kind: table
+columns:
+- name: Description
+  type: markdown
+- name: Deleted
+  type: boolean
+foreign_keys: []
+```
+
+## Dataset_Version
+
+Version history for a `Dataset`. Each row records one semantic version (MAJOR.MINOR.PATCH) of a dataset, pinned to a catalog snapshot and optionally a MINID for durable external reference.
+
+```yaml
+table: Dataset_Version
+kind: table
+columns:
+- name: Version
+  type: text
+- name: Description
+  type: markdown
+- name: Dataset
+  type: text
+- name: Execution
+  type: text
+- name: Minid
+  type: text
+- name: Minid_Spec_Hash
+  type: text
+- name: Snapshot
+  type: text
+foreign_keys:
+- columns:
+  - Dataset
+  referenced_schema: deriva-ml
+  referenced_table: Dataset
+  referenced_columns:
+  - RID
+- columns:
+  - Execution
+  referenced_schema: deriva-ml
+  referenced_table: Execution
+  referenced_columns:
+  - RID
+```
+
+## Execution
+
+Per-execution lifecycle row. Created once per workflow run; status transitions (Created → Running → Stopped → Pending_Upload → Uploaded or Failed) are managed by the Phase-1 state machine in `src/deriva_ml/execution/state_machine.py`. `Status` and `Status_Detail` are plain text fields today; Subsystem 1 will tighten `Status` to a controlled vocabulary.
+
+```yaml
+table: Execution
+kind: table
+columns:
+- name: Workflow
+  type: text
+- name: Description
+  type: markdown
+- name: Duration
+  type: text
+- name: Status
+  type: text
+- name: Status_Detail
+  type: text
+foreign_keys:
+- columns:
+  - Workflow
+  referenced_schema: deriva-ml
+  referenced_table: Workflow
+  referenced_columns:
+  - RID
+```
+
+## Workflow
+
+A computational pipeline or procedure definition — the "program" an `Execution` runs. Identified by `Checksum` (content hash of the code) for deduplication.
+
+```yaml
+table: Workflow
+kind: table
+columns:
+- name: Name
+  type: text
+- name: Description
+  type: markdown
+- name: URL
+  type: ermrest_uri
+- name: Checksum
+  type: text
+- name: Version
+  type: text
+foreign_keys: []
+```
+
+## Dataset_Type
+
+Controlled vocabulary classifying a `Dataset`'s purpose. Multiple types can apply (e.g., Training + Labeled). Terms are orthogonal tags.
+
+```yaml
+table: Dataset_Type
+kind: vocabulary
+terms:
+- name: Complete
+- name: File
+- name: Training
+- name: Testing
+- name: Validation
+- name: Split
+- name: Labeled
+- name: Unlabeled
+```
+
+## Workflow_Type
+
+Controlled vocabulary classifying a `Workflow` by its computational purpose.
+
+```yaml
+table: Workflow_Type
+kind: vocabulary
+terms:
+- name: Training
+- name: Testing
+- name: Prediction
+- name: Feature_Creation
+- name: Visualization
+- name: Analysis
+- name: Ingest
+- name: Data_Cleaning
+- name: Embedding
+- name: Dataset_Management
+- name: VGG19
+- name: RETFound
+- name: Multimodal
+```
+
+## Feature_Name
+
+Controlled vocabulary of feature identifiers. Each domain-specific Feature table references its name here. No starter terms — projects define their own.
+
+```yaml
+table: Feature_Name
+kind: vocabulary
+```
+
+## Asset_Type
+
+Controlled vocabulary classifying file assets by purpose. Drives which upload-spec regex applies and which `Execution_*` association table an asset flows into.
+
+```yaml
+table: Asset_Type
+kind: vocabulary
+terms:
+- name: Execution_Config
+- name: Runtime_Env
+- name: Hydra_Config
+- name: Deriva_Config
+- name: Execution_Metadata
+- name: Execution_Asset
+- name: File
+- name: Input_File
+- name: Output_File
+- name: Model_File
+- name: Notebook_Output
+```
+
+## Asset_Role
+
+Controlled vocabulary classifying an asset's role in an `Execution` — input data or output artifact.
+
+```yaml
+table: Asset_Role
+kind: vocabulary
+terms:
+- name: Input
+- name: Output
+```
+
+## Dataset_Dataset_Type
+
+Association linking a `Dataset` to its zero-or-more `Dataset_Type` classifications.
+
+```yaml
+table: Dataset_Dataset_Type
+kind: association
+associates:
+- table: Dataset
+- table: Dataset_Type
+```
+
+## Dataset_Nested_Dataset
+
+Self-association: one `Dataset` can contain nested `Dataset` children (e.g., a Split dataset has Training/Testing/Validation children).
+
+```yaml
+table: Dataset_Nested_Dataset
+kind: association
+associates:
+- table: Dataset
+- table: Nested_Dataset
+```
+
+## Dataset_Execution
+
+Association linking a `Dataset` to the `Execution`(s) that produced or consumed it. Drives provenance queries.
+
+```yaml
+table: Dataset_Execution
+kind: association
+associates:
+- table: Dataset
+- table: Execution
+```
+
+## Dataset_File
+
+Association linking a `Dataset` to raw `File` members (files that aren't tracked as catalog `Asset` rows).
+
+```yaml
+table: Dataset_File
+kind: association
+associates:
+- table: Dataset
+- table: File
+```
+
+## Execution_Nested_Execution
+
+Self-association for hierarchical runs: a sweep/multirun `Execution` is the parent; individual trials are children. The optional `Sequence` column records ordering (null for parallel).
+
+```yaml
+table: Execution_Nested_Execution
+kind: association
+associates:
+- table: Execution
+- table: Nested_Execution
+```
+
+## Workflow_Workflow_Type
+
+Association linking a `Workflow` to its zero-or-more `Workflow_Type` classifications.
+
+```yaml
+table: Workflow_Workflow_Type
+kind: association
+associates:
+- table: Workflow
+- table: Workflow_Type
+```
