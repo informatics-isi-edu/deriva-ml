@@ -359,3 +359,36 @@ def test_load_from_code_vocabulary_with_terms(tmp_path):
     assert t.name == "Workflow_Type"
     assert t.kind == "vocabulary"
     assert [term.name for term in t.terms] == ["Training", "Testing"]
+
+
+def test_load_from_code_association_table(tmp_path):
+    """Table.define_association produces a TableModel with kind='association'."""
+    from deriva_ml.tools.validate_schema_doc import load_from_code
+
+    fixture = tmp_path / "fixture_assoc.py"
+    fixture.write_text(
+        'from deriva.core.ermrest_model import Table\n'
+        'from deriva.core.typed import ColumnDef, BuiltinType\n'
+        '\n'
+        'def create():\n'
+        '    schema.create_table(\n'
+        '        Table.define_association(\n'
+        '            associates=[\n'
+        '                ("Execution", execution_table),\n'
+        '                ("Nested_Execution", execution_table),\n'
+        '            ],\n'
+        '            metadata=[\n'
+        '                ColumnDef(name="Sequence", type="int4", nullok=True),\n'
+        '            ],\n'
+        '        )\n'
+        '    )\n'
+    )
+    model = load_from_code(fixture)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.kind == "association"
+    # Name isn't given directly; derived from the associates pair.
+    # We expect "Execution_Nested_Execution" as the default-constructed name.
+    assert t.name == "Execution_Nested_Execution"
+    assert [a.table for a in t.associates] == ["Execution", "Nested_Execution"]
+    assert [m.name for m in t.metadata] == ["Sequence"]

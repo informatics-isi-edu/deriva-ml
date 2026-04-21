@@ -397,6 +397,40 @@ def _extract_ensure_terms(node: ast.Call) -> tuple[str, list[VocabularyTermModel
     return vocab_name, terms
 
 
+def _extract_association(node: ast.Call) -> TableModel:
+    """Extract Table.define_association(associates=[...], metadata=[...])."""
+    associates: list[AssociationEndpointModel] = []
+    metadata: list[ColumnModel] = []
+    for kw in node.keywords:
+        if kw.arg == "associates":
+            if not isinstance(kw.value, ast.List):
+                raise SchemaCodeError(
+                    f"define_association associates must be a list, got "
+                    f"{ast.dump(kw.value)}"
+                )
+            for elt in kw.value.elts:
+                if not isinstance(elt, ast.Tuple) or len(elt.elts) < 1:
+                    raise SchemaCodeError(
+                        f"associates entry must be a tuple (name, table), got "
+                        f"{ast.dump(elt)}"
+                    )
+                table_name = _extract_ast_name_or_enum(elt.elts[0])
+                associates.append(AssociationEndpointModel(table=table_name))
+        elif kw.arg == "metadata":
+            if isinstance(kw.value, ast.List):
+                for m_elt in kw.value.elts:
+                    if isinstance(m_elt, ast.Call) and _callable_name(m_elt) == "ColumnDef":
+                        metadata.append(_extract_column(m_elt))
+    # Association name: derived from associates — '{first}_{second}'.
+    derived_name = "_".join(a.table for a in associates)
+    return TableModel(
+        name=derived_name,
+        kind="association",
+        associates=associates,
+        metadata=metadata,
+    )
+
+
 def load_from_code(path: Path) -> SchemaModel:
     """Parse create_schema.py AST into a SchemaModel.
 
@@ -434,6 +468,8 @@ def load_from_code(path: Path) -> SchemaModel:
         elif name == "_ensure_terms":
             vocab_name, terms = _extract_ensure_terms(node)
             terms_by_vocab.setdefault(vocab_name, []).extend(terms)
+        elif name == "Table.define_association":
+            tables.append(_extract_association(node))
 
     # Apply accumulated terms to matching vocab tables.
     tables_with_terms: list[TableModel] = []
