@@ -233,11 +233,13 @@ def transition(
         store=store,
         execution_rid=execution_rid,
     )
+    # Use the datapath API for the update. Raw catalog.put on ERMrest
+    # requires specific URL forms that vary by server version; the
+    # pathBuilder abstracts this and is what the rest of the codebase
+    # uses for Execution.update.
     try:
-        catalog.put(
-            "/entity/deriva-ml:Execution",
-            json=body,
-        )
+        pb = catalog.getPathBuilder()
+        pb.schemas["deriva-ml"].tables["Execution"].update(body)
     except Exception as exc:  # network blip, 5xx, etc.
         logger.warning(
             "execution %s: catalog sync FAILED (%s); SQLite committed, "
@@ -287,15 +289,14 @@ def _catalog_body_for_execution(
         raise DerivaMLStateInconsistency(
             f"executions row {execution_rid} vanished between write and PUT"
         )
-    # Catalog Execution schema: RID (PK), Status, Start_Time, End_Time,
-    # Duration, ... — see src/deriva_ml/schema/create_schema.py for
-    # the canonical column list. We update only the columns we own
-    # here; the catalog is responsible for RCB/RMT etc.
+    # Catalog Execution schema has: Workflow, Description, Duration,
+    # Status, Status_Detail (see src/deriva_ml/schema/create_schema.py).
+    # Start/stop times are NOT catalog columns — they live in SQLite
+    # only. Duration is computed elsewhere (in execution_stop) and
+    # written directly; don't echo it here.
     return [{
         "RID": row["rid"],
         "Status": row["status"],
-        "Start_Time": row["start_time"],
-        "End_Time": row["stop_time"],
         # Status_Detail: prefer error if present, else description.
         "Status_Detail": row["error"] or row["description"],
     }]

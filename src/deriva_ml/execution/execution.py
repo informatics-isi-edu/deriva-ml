@@ -278,6 +278,7 @@ class Execution:
                     {
                         "Description": self.configuration.description,
                         "Workflow": self.workflow_rid,
+                        "Status": str(ExecutionStatus.Created),
                     }
                 ]
             )[0]["RID"]
