@@ -303,7 +303,7 @@ class ExecutionMixin:
         record = ExecutionRecord(
             execution_rid=execution_rid,
             workflow=workflow,
-            status=Status(execution_data.get("Status", "Created")),
+            status=ExecutionStatus(execution_data.get("Status") or "Created"),
             description=execution_data.get("Description"),
             start_time=start_time,
             stop_time=stop_time,

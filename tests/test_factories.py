@@ -154,9 +154,12 @@ class TestExecutionFactories:
 
         assert execution is not None
         # Use context manager to properly enter/exit
+        from deriva_ml.execution.state_store import ExecutionStatus
+
         with execution.execute() as exe:
-            # Status may be Initializing or Running depending on timing
-            assert exe.status.value in ("Initializing", "Running")
+            # Status may be Created or Running depending on timing
+            # (the Phase 2 lifecycle replaced legacy Initializing with Created).
+            assert exe.status in (ExecutionStatus.Created, ExecutionStatus.Running)
 
 
 class TestVocabularyFactories:
