@@ -110,3 +110,129 @@ def test_extract_yaml_blocks_ignores_non_yaml_fences(tmp_path):
     blocks = _extract_yaml_blocks(doc)
     assert len(blocks) == 1
     assert blocks[0]["table"] == "Dataset"
+
+
+def test_load_from_doc_plain_table(tmp_path):
+    """A plain table becomes a TableModel with kind='table'."""
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: Dataset\n"
+        "kind: table\n"
+        "description: A data collection.\n"
+        "columns:\n"
+        "  - name: Name\n"
+        "    type: text\n"
+        "  - name: Description\n"
+        "    type: markdown\n"
+        "foreign_keys: []\n"
+        "```\n"
+    )
+    model = load_from_doc(doc)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.name == "Dataset"
+    assert t.kind == "table"
+    assert len(t.columns) == 2
+    assert t.columns[0].name == "Name"
+    assert t.columns[0].type == "text"
+
+
+def test_load_from_doc_vocabulary(tmp_path):
+    """A vocabulary table gets terms populated."""
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: Asset_Type\n"
+        "kind: vocabulary\n"
+        "terms:\n"
+        "  - name: Execution_Config\n"
+        "  - name: Runtime_Env\n"
+        "```\n"
+    )
+    model = load_from_doc(doc)
+    t = model.tables[0]
+    assert t.kind == "vocabulary"
+    assert len(t.terms) == 2
+    assert [term.name for term in t.terms] == ["Execution_Config", "Runtime_Env"]
+
+
+def test_load_from_doc_association(tmp_path):
+    """An association table gets associates populated."""
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: Dataset_Execution\n"
+        "kind: association\n"
+        "associates:\n"
+        "  - table: Dataset\n"
+        "  - table: Execution\n"
+        "```\n"
+    )
+    model = load_from_doc(doc)
+    t = model.tables[0]
+    assert t.kind == "association"
+    assert [a.table for a in t.associates] == ["Dataset", "Execution"]
+
+
+def test_load_from_doc_foreign_keys(tmp_path):
+    """FKs parse correctly."""
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: Execution\n"
+        "kind: table\n"
+        "columns:\n"
+        "  - name: Workflow\n"
+        "    type: text\n"
+        "foreign_keys:\n"
+        "  - columns: [Workflow]\n"
+        "    referenced_schema: deriva-ml\n"
+        "    referenced_table: Workflow\n"
+        "    referenced_columns: [RID]\n"
+        "```\n"
+    )
+    model = load_from_doc(doc)
+    fk = model.tables[0].foreign_keys[0]
+    assert fk.columns == ["Workflow"]
+    assert fk.referenced_table == "Workflow"
+    assert fk.referenced_columns == ["RID"]
+
+
+def test_load_from_doc_invalid_kind_raises(tmp_path):
+    """Unknown 'kind:' value raises SchemaDocError."""
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: Bogus\n"
+        "kind: not-a-real-kind\n"
+        "```\n"
+    )
+    with pytest.raises(SchemaDocError, match="unknown kind"):
+        load_from_doc(doc)
+
+
+def test_load_from_doc_missing_required_key_raises(tmp_path):
+    """Missing required key 'kind' raises SchemaDocError."""
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
+
+    doc = tmp_path / "schema.md"
+    doc.write_text(
+        "```yaml\n"
+        "table: Bogus\n"
+        "```\n"
+    )
+    with pytest.raises(SchemaDocError, match="missing required key"):
+        load_from_doc(doc)
