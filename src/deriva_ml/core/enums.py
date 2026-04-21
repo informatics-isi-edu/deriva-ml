@@ -53,28 +53,11 @@ class UploadState(Enum):
     timeout = 7
 
 
-class Status(StrEnum):
-    """Execution status values.
-
-    Represents the various states an execution can be in throughout its lifecycle.
-
-    Attributes:
-        initializing (str): Initial setup is in progress.
-        created (str): Execution record has been created.
-        pending (str): Execution is queued.
-        running (str): Execution is in progress.
-        aborted (str): Execution was manually stopped.
-        completed (str): Execution finished successfully.
-        failed (str): Execution encountered an error.
-    """
-
-    initializing = "Initializing"
-    created = "Created"
-    pending = "Pending"
-    running = "Running"
-    aborted = "Aborted"
-    completed = "Completed"
-    failed = "Failed"
+# Note: the legacy `Status` StrEnum was deleted in Phase 2 Subsystem 1a.
+# Use `deriva_ml.execution.state_store.ExecutionStatus` instead — it carries
+# the canonical 7-state lifecycle (Created, Running, Stopped, Failed,
+# Pending_Upload, Uploaded, Aborted) with title-case values that match the
+# catalog Execution.Status column directly.
 
 
 class MLVocab(StrEnum):
