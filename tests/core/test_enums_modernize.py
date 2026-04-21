@@ -20,9 +20,12 @@ def test_base_str_enum_is_gone():
     )
 
 
-def test_status_is_str_enum():
-    from deriva_ml.core.enums import Status
-    assert issubclass(Status, StrEnum)
+def test_execution_status_is_str_enum():
+    """Phase 2 Subsystem 1a replaced legacy core.enums.Status with
+    deriva_ml.execution.state_store.ExecutionStatus (title-case values).
+    """
+    from deriva_ml.execution.state_store import ExecutionStatus
+    assert issubclass(ExecutionStatus, StrEnum)
 
 
 def test_mlvocab_is_str_enum():
@@ -52,8 +55,9 @@ def test_execassettype_is_str_enum():
 
 def test_str_returns_value_not_dotted_name():
     """StrEnum.__str__ returns the value, not 'ClassName.MEMBER'."""
-    from deriva_ml.core.enums import Status, MLVocab
-    s = next(iter(Status))
+    from deriva_ml.core.enums import MLVocab
+    from deriva_ml.execution.state_store import ExecutionStatus
+    s = next(iter(ExecutionStatus))
     v = next(iter(MLVocab))
     assert str(s) == s.value
     assert str(v) == v.value
@@ -61,6 +65,6 @@ def test_str_returns_value_not_dotted_name():
 
 def test_value_lookup_still_works():
     """Member-by-value lookup is unchanged."""
-    from deriva_ml.core.enums import Status
-    s = next(iter(Status))
-    assert Status(s.value) is s
+    from deriva_ml.execution.state_store import ExecutionStatus
+    s = next(iter(ExecutionStatus))
+    assert ExecutionStatus(s.value) is s

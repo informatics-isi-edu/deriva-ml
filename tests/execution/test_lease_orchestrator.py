@@ -44,7 +44,7 @@ def _setup_store(tmp_path):
     now = datetime.now(timezone.utc)
     store.insert_execution(
         rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
         created_at=now, last_activity=now,
     )
@@ -267,7 +267,7 @@ def test_reconcile_pending_leases_workspace_wide(tmp_path):
     # Add a second execution.
     store.insert_execution(
         rid="EXE-B", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.running,
+        config_json="{}", status=ExecutionStatus.Running,
         mode=ConnectionMode.online, working_dir_rel="execution/EXE-B",
         created_at=now, last_activity=now,
     )

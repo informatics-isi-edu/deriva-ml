@@ -39,7 +39,7 @@ def test_online_create_offline_stage_online_upload(catalog_manager, tmp_path):
     Creates an execution online, stages a Subject row via SQLite in an
     offline DerivaML instance sharing the same working_dir, then uploads
     via a fresh online instance. Verifies the catalog row lands and the
-    execution reaches ExecutionStatus.uploaded.
+    execution reaches ExecutionStatus.Uploaded.
     """
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.execution.state_store import ExecutionStatus
@@ -110,18 +110,15 @@ def test_online_create_offline_stage_online_upload(catalog_manager, tmp_path):
     assert report.total_failed == 0, f"Report: {report}"
     assert report.total_uploaded == 1, f"Report: {report}"
 
-    # Verify the execution reached `uploaded` in SQLite and pending work
-    # drained. We read the registry directly rather than via
-    # resume_execution(): the pre-existing legacy Status='Pending' that
-    # _initialize_execution writes to the catalog is not in
-    # ExecutionStatus, so the online-resume reconcile sweep trips on
-    # this catalog value. That's a separate pre-existing issue between
-    # the legacy Status vocabulary (enums.py) and the new ExecutionStatus
-    # (state_store.py); not scoped to H2.
+    # Verify the execution reached `Uploaded` in SQLite and pending work
+    # drained. Post-S1a the catalog Status vocabulary is unified with
+    # ExecutionStatus (title-case), so resume_execution's reconcile path
+    # no longer trips on the legacy 'Pending' value — we can read through
+    # the resumed Execution object directly.
     upload_store = ml_upload.workspace.execution_state_store()
     registry_row = upload_store.get_execution(exe_rid)
     assert registry_row is not None
-    assert registry_row["status"] == str(ExecutionStatus.uploaded)
+    assert registry_row["status"] == str(ExecutionStatus.Uploaded)
     counts = upload_store.count_pending_by_kind(execution_rid=exe_rid)
     assert counts["pending_rows"] == 0
     assert counts["failed_rows"] == 0

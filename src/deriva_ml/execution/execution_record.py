@@ -14,7 +14,7 @@ Example:
 
         >>> record = ml.lookup_execution("2-ABC1")
         >>> print(record.status)
-        Status.running
+        ExecutionStatus.Running
         >>> record.description = "Updated analysis description"
         >>> # The change is immediately written to the catalog
 
@@ -33,8 +33,9 @@ from typing import TYPE_CHECKING, Any, Iterable
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
-from deriva_ml.core.definitions import RID, Status
+from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.execution.state_store import ExecutionStatus
 
 logger = logging.getLogger("deriva_ml")
 
@@ -61,8 +62,9 @@ class ExecutionRecord(BaseModel):
     Attributes:
         execution_rid (RID): Resource Identifier of the execution record.
         workflow (Workflow | None): The associated workflow object, bound to catalog.
-        status (Status): Current execution status (Created, Running, Completed, Failed).
-            Setting this property updates the catalog.
+        status (ExecutionStatus): Current execution status (Created, Running,
+            Stopped, Failed, Pending_Upload, Uploaded, Aborted). Setting this
+            property updates the catalog.
         description (str | None): Description of the execution. Setting this
             property updates the catalog.
         start_time (datetime | None): When the execution started (read-only).
@@ -79,7 +81,7 @@ class ExecutionRecord(BaseModel):
 
         Update mutable properties::
 
-            >>> record.status = Status.completed
+            >>> record.status = ExecutionStatus.Uploaded
             >>> record.description = "Analysis completed successfully"
 
         Query relationships::
@@ -95,14 +97,14 @@ class ExecutionRecord(BaseModel):
 
             >>> snapshot = ml.catalog_snapshot("2023-01-15T10:30:00")
             >>> record = snapshot.lookup_execution("2-ABC1")
-            >>> record.status = Status.completed  # Raises DerivaMLException
+            >>> record.status = ExecutionStatus.Uploaded  # Raises DerivaMLException
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     execution_rid: RID
     _workflow: "Workflow | None" = PrivateAttr(default=None)
-    _status: Status = PrivateAttr(default=Status.created)
+    _status: ExecutionStatus = PrivateAttr(default=ExecutionStatus.Created)
     _description: str | None = PrivateAttr(default=None)
     start_time: datetime | None = None
     stop_time: datetime | None = None
@@ -115,7 +117,7 @@ class ExecutionRecord(BaseModel):
         self,
         execution_rid: RID,
         workflow: "Workflow | None" = None,
-        status: Status = Status.created,
+        status: ExecutionStatus = ExecutionStatus.Created,
         description: str | None = None,
         start_time: datetime | None = None,
         stop_time: datetime | None = None,
@@ -168,16 +170,17 @@ class ExecutionRecord(BaseModel):
         return self._workflow.rid if self._workflow else None
 
     @property
-    def status(self) -> Status:
+    def status(self) -> ExecutionStatus:
         """Get the current execution status.
 
         Returns:
-            Status: The current status (Created, Running, Completed, Failed, etc.).
+            ExecutionStatus: The current status (Created, Running, Stopped,
+                Failed, Pending_Upload, Uploaded, Aborted).
         """
         return self._status
 
     @status.setter
-    def status(self, value: Status) -> None:
+    def status(self, value: ExecutionStatus) -> None:
         """Set the execution status.
 
         When bound to a writable catalog, this updates the catalog record.
@@ -247,7 +250,7 @@ class ExecutionRecord(BaseModel):
                 "Use a writable catalog connection instead."
             )
 
-    def _update_status_in_catalog(self, new_status: Status, status_detail: str = "") -> None:
+    def _update_status_in_catalog(self, new_status: ExecutionStatus, status_detail: str = "") -> None:
         """Update the status field in the catalog.
 
         Args:
@@ -281,7 +284,7 @@ class ExecutionRecord(BaseModel):
         execution_path = pb.schemas[self._ml_instance.ml_schema].Execution
         execution_path.update([{"RID": self.execution_rid, "Description": new_description}])
 
-    def update_status(self, status: Status, status_detail: str = "") -> None:
+    def update_status(self, status: ExecutionStatus, status_detail: str = "") -> None:
         """Update execution status with an optional detail message.
 
         This method updates both the Status and Status_Detail columns in the
@@ -296,7 +299,7 @@ class ExecutionRecord(BaseModel):
             DerivaMLException: If the catalog is read-only or not connected.
 
         Example:
-            >>> record.update_status(Status.failed, "Network timeout during data transfer")
+            >>> record.update_status(ExecutionStatus.Failed, "Network timeout during data transfer")
         """
         if self._ml_instance is not None:
             self._update_status_in_catalog(status, status_detail)
@@ -397,7 +400,7 @@ class ExecutionRecord(BaseModel):
             child = ExecutionRecord(
                 execution_rid=record["RID"],
                 workflow=workflow,
-                status=Status(record.get("Status", "Created")),
+                status=ExecutionStatus(record.get("Status") or "Created"),
                 description=record.get("Description"),
                 _ml_instance=self._ml_instance,
                 _logger=self._logger,
@@ -477,7 +480,7 @@ class ExecutionRecord(BaseModel):
             parent = ExecutionRecord(
                 execution_rid=record["RID"],
                 workflow=workflow,
-                status=Status(record.get("Status", "Created")),
+                status=ExecutionStatus(record.get("Status") or "Created"),
                 description=record.get("Description"),
                 _ml_instance=self._ml_instance,
                 _logger=self._logger,

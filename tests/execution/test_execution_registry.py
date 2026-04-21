@@ -32,24 +32,24 @@ def test_list_executions_returns_dataclass(test_ml):
     from deriva_ml.execution.execution_record_v2 import ExecutionRecord
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
 
     rows = test_ml.list_executions()
     assert len(rows) == 1
     assert isinstance(rows[0], ExecutionRecord)
     assert rows[0].rid == "EXE-A"
-    assert rows[0].status is ExecutionStatus.stopped
+    assert rows[0].status is ExecutionStatus.Stopped
 
 
 def test_list_executions_status_filter(test_ml):
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.running)
-    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.uploaded)
-    _insert_test_execution(test_ml.workspace, "C", ExecutionStatus.failed)
+    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.Running)
+    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.Uploaded)
+    _insert_test_execution(test_ml.workspace, "C", ExecutionStatus.Failed)
 
     incomplete = test_ml.list_executions(
-        status=[ExecutionStatus.running, ExecutionStatus.failed],
+        status=[ExecutionStatus.Running, ExecutionStatus.Failed],
     )
     rids = {r.rid for r in incomplete}
     assert rids == {"A", "C"}
@@ -58,11 +58,11 @@ def test_list_executions_status_filter(test_ml):
 def test_find_incomplete_executions(test_ml):
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.running)
-    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.uploaded)
-    _insert_test_execution(test_ml.workspace, "C", ExecutionStatus.stopped)
-    _insert_test_execution(test_ml.workspace, "D", ExecutionStatus.aborted)
-    _insert_test_execution(test_ml.workspace, "E", ExecutionStatus.pending_upload)
+    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.Running)
+    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.Uploaded)
+    _insert_test_execution(test_ml.workspace, "C", ExecutionStatus.Stopped)
+    _insert_test_execution(test_ml.workspace, "D", ExecutionStatus.Aborted)
+    _insert_test_execution(test_ml.workspace, "E", ExecutionStatus.Pending_Upload)
 
     rows = test_ml.find_incomplete_executions()
     rids = {r.rid for r in rows}
@@ -75,7 +75,7 @@ def test_find_incomplete_executions(test_ml):
 def test_list_executions_carries_pending_counts(test_ml):
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
 
     store = test_ml.workspace.execution_state_store()
     now = datetime.now(timezone.utc)
@@ -93,7 +93,7 @@ def test_list_executions_carries_pending_counts(test_ml):
 def test_resume_execution_reads_from_sqlite(test_ml, monkeypatch):
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
 
     # Isolate SQLite-read behavior: test_ml is online, but the
     # catalog does not have a matching Execution row. Stub reconcile
@@ -131,7 +131,7 @@ def test_resume_execution_offline_skips_reconcile(catalog_manager, tmp_path):
         mode=ConnectionMode.offline,
     )
     _insert_test_execution(
-        ml.workspace, "EXE-A", ExecutionStatus.stopped, mode="offline",
+        ml.workspace, "EXE-A", ExecutionStatus.Stopped, mode="offline",
     )
 
     # Just must not raise — offline reconcile is a no-op.
@@ -143,7 +143,7 @@ def test_resume_execution_online_flushes_sync_pending(test_ml, monkeypatch):
     """If sync_pending=True on resume (online), flush to catalog."""
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
     # Simulate prior offline transition.
     test_ml.workspace.execution_state_store().update_execution(
         "EXE-A", sync_pending=True,
@@ -177,9 +177,9 @@ def test_gc_executions_deletes_matching(test_ml):
     from deriva_ml.execution.state_store import ExecutionStatus
 
     # Three uploaded executions of different ages.
-    _insert_test_execution(test_ml.workspace, "OLD", ExecutionStatus.uploaded)
-    _insert_test_execution(test_ml.workspace, "NEW", ExecutionStatus.uploaded)
-    _insert_test_execution(test_ml.workspace, "RUN", ExecutionStatus.running)
+    _insert_test_execution(test_ml.workspace, "OLD", ExecutionStatus.Uploaded)
+    _insert_test_execution(test_ml.workspace, "NEW", ExecutionStatus.Uploaded)
+    _insert_test_execution(test_ml.workspace, "RUN", ExecutionStatus.Running)
 
     # Backdate OLD so it matches older_than.
     store = test_ml.workspace.execution_state_store()
@@ -191,7 +191,7 @@ def test_gc_executions_deletes_matching(test_ml):
     )
 
     n = test_ml.gc_executions(
-        status=ExecutionStatus.uploaded,
+        status=ExecutionStatus.Uploaded,
         older_than=timedelta(days=7),
     )
     assert n == 1
@@ -202,10 +202,10 @@ def test_gc_executions_deletes_matching(test_ml):
 def test_gc_executions_status_only(test_ml):
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.aborted)
-    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.running)
+    _insert_test_execution(test_ml.workspace, "A", ExecutionStatus.Aborted)
+    _insert_test_execution(test_ml.workspace, "B", ExecutionStatus.Running)
 
-    n = test_ml.gc_executions(status=ExecutionStatus.aborted)
+    n = test_ml.gc_executions(status=ExecutionStatus.Aborted)
     assert n == 1
     assert {r.rid for r in test_ml.list_executions()} == {"B"}
 
@@ -214,7 +214,7 @@ def test_gc_executions_delete_working_dir(test_ml):
     from deriva_ml.execution.state_store import ExecutionStatus
     from pathlib import Path
 
-    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.uploaded)
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Uploaded)
 
     # Create the working directory files.
     work = Path(test_ml.working_dir) / "execution/EXE-A"
@@ -223,7 +223,7 @@ def test_gc_executions_delete_working_dir(test_ml):
     assert work.exists()
 
     n = test_ml.gc_executions(
-        status=ExecutionStatus.uploaded,
+        status=ExecutionStatus.Uploaded,
         delete_working_dir=True,
     )
     assert n == 1
@@ -388,7 +388,7 @@ def test_create_execution_writes_registry_row(test_ml):
     assert row is not None
     assert row["rid"] == exe.execution_rid
     # Initial status is 'created'.
-    assert row["status"] == ExecutionStatus.created
+    assert row["status"] == ExecutionStatus.Created
     assert row["mode"] == "online"
     assert row["config_json"]  # non-empty
     assert row["working_dir_rel"].startswith("execution/")
@@ -405,7 +405,7 @@ def test_restore_execution_symbol_removed(test_ml):
 def test_resume_execution_per_rid_lease_reconcile(test_ml, monkeypatch):
     from deriva_ml.execution.state_store import ExecutionStatus
 
-    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.stopped)
+    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
 
     # Stub the preceding reconcile step — our synthetic EXE-A is not
     # in the catalog, so the real reconcile_with_catalog would blow up

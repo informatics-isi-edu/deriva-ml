@@ -211,7 +211,9 @@ class TestExperimentBasic:
 
         experiment = ml.lookup_experiment(execution_rid)
 
-        assert experiment.status == "Completed"
+        # Phase 2 lifecycle: after upload_execution_outputs the status is "Uploaded"
+        # (legacy "Completed" no longer exists in ExecutionStatus).
+        assert experiment.status == "Uploaded"
 
     def test_experiment_get_chaise_url(self, completed_execution):
         """Test generating Chaise URL for the experiment."""
@@ -452,31 +454,31 @@ class TestExperimentFinder:
 
     def test_find_experiments_by_status(self, execution_with_hydra_config):
         """Test find_experiments with status filter."""
-        from deriva_ml.core.definitions import Status
+        from deriva_ml.execution.state_store import ExecutionStatus
 
         ml = execution_with_hydra_config._ml_object
 
-        # Find completed experiments
-        completed = list(ml.find_experiments(status=Status.completed))
+        # Find uploaded experiments (Phase 2 lifecycle: upload_execution_outputs → Uploaded)
+        uploaded = list(ml.find_experiments(status=ExecutionStatus.Uploaded))
 
-        # The execution_with_hydra_config should be completed and found
-        experiment_rids = [e.execution_rid for e in completed]
+        # The execution_with_hydra_config should be uploaded and found
+        experiment_rids = [e.execution_rid for e in uploaded]
         assert execution_with_hydra_config.execution_rid in experiment_rids
 
-        # Verify all returned experiments have Completed status
-        for exp in completed:
-            assert exp.status == "Completed"
+        # Verify all returned experiments have Uploaded status
+        for exp in uploaded:
+            assert exp.status == "Uploaded"
 
     def test_find_experiments_by_status_filters_correctly(self, execution_with_hydra_config):
         """Test that status filter excludes experiments with different status."""
-        from deriva_ml.core.definitions import Status
+        from deriva_ml.execution.state_store import ExecutionStatus
 
         ml = execution_with_hydra_config._ml_object
 
-        # Find running experiments (our test execution is Completed, not Running)
-        running = list(ml.find_experiments(status=Status.running))
+        # Find running experiments (our test execution is Uploaded, not Running)
+        running = list(ml.find_experiments(status=ExecutionStatus.Running))
 
-        # The completed execution should NOT appear in running experiments
+        # The uploaded execution should NOT appear in running experiments
         experiment_rids = [e.execution_rid for e in running]
         assert execution_with_hydra_config.execution_rid not in experiment_rids
 
@@ -517,15 +519,15 @@ class TestExperimentFinder:
 
     def test_find_experiments_combined_filters(self, execution_with_hydra_config, test_workflow):
         """Test find_experiments with both status and workflow_rid filters."""
-        from deriva_ml.core.definitions import Status
+        from deriva_ml.execution.state_store import ExecutionStatus
 
         ml = execution_with_hydra_config._ml_object
 
-        # Find completed experiments for the specific workflow
+        # Find uploaded experiments for the specific workflow
         experiments = list(
             ml.find_experiments(
                 workflow_rid=test_workflow.rid,
-                status=Status.completed,
+                status=ExecutionStatus.Uploaded,
             )
         )
 
@@ -544,16 +546,16 @@ class TestExperimentFinder:
 
     def test_find_executions_by_status(self, completed_execution):
         """Test find_executions with status filter."""
-        from deriva_ml.core.definitions import Status
+        from deriva_ml.execution.state_store import ExecutionStatus
 
         ml = completed_execution._ml_object
 
-        # Find completed executions
-        completed = list(ml.find_executions(status=Status.completed))
+        # Find uploaded executions (Phase 2 lifecycle)
+        uploaded = list(ml.find_executions(status=ExecutionStatus.Uploaded))
 
-        assert len(completed) >= 1
-        for exe in completed:
-            assert exe.status.value == "Completed"
+        assert len(uploaded) >= 1
+        for exe in uploaded:
+            assert exe.status.value == "Uploaded"
 
     def test_find_executions_by_workflow(self, completed_execution, test_workflow):
         """Test find_executions with workflow filter."""

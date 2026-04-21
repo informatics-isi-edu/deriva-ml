@@ -49,24 +49,26 @@ logger = logging.getLogger(__name__)
 
 
 class ExecutionStatus(StrEnum):
-    """Lifecycle status for an Execution (see spec §2.2).
+    """Lifecycle status for an Execution (see Phase 1 spec §2.2).
 
     Transitions are:
-        created → running → {stopped, failed} →
-            {pending_upload → {uploaded, failed}}
-        created → aborted
-        running → aborted
+        Created → Running → {Stopped, Failed} →
+            {Pending_Upload → {Uploaded, Failed}}
+        Created → Aborted
+        Running → Aborted
 
-    Values are lowercase strings for direct storage in SQLite and for
-    clean comparison against ERMrest's Status vocabulary terms.
+    Values are title-case to match the catalog Execution.Status field
+    directly — ExecutionStatus(row["Status"]) works without translation.
+    Python identifiers are title-case to match the values (precedent:
+    stdlib http.HTTPStatus uses uppercase identifiers).
     """
-    created = "created"
-    running = "running"
-    stopped = "stopped"
-    failed = "failed"
-    pending_upload = "pending_upload"
-    uploaded = "uploaded"
-    aborted = "aborted"
+    Created = "Created"
+    Running = "Running"
+    Stopped = "Stopped"
+    Failed = "Failed"
+    Pending_Upload = "Pending_Upload"
+    Uploaded = "Uploaded"
+    Aborted = "Aborted"
 
 
 class PendingRowStatus(StrEnum):
@@ -271,7 +273,7 @@ class ExecutionStateStore:
             workflow_rid: Workflow FK, or None if not yet attached.
             description: Human-readable description from config.
             config_json: Serialized ExecutionConfiguration.
-            status: Initial status, typically ExecutionStatus.created.
+            status: Initial status, typically ExecutionStatus.Created.
             mode: ConnectionMode the execution is active under.
             working_dir_rel: Path relative to the workspace root.
             created_at: UTC timestamp when the row is written.
@@ -380,9 +382,9 @@ class ExecutionStateStore:
 
         Example:
             >>> # All incomplete executions:
-            >>> incomplete = [ExecutionStatus.created, ExecutionStatus.running,
-            ...               ExecutionStatus.stopped, ExecutionStatus.failed,
-            ...               ExecutionStatus.pending_upload]
+            >>> incomplete = [ExecutionStatus.Created, ExecutionStatus.Running,
+            ...               ExecutionStatus.Stopped, ExecutionStatus.Failed,
+            ...               ExecutionStatus.Pending_Upload]
             >>> rows = store.list_executions(status=incomplete)
         """
         stmt = select(self.executions)

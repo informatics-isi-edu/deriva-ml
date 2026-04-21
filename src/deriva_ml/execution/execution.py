@@ -62,7 +62,6 @@ from deriva_ml.core.definitions import (
     FileUploadState,
     MLAsset,
     MLVocab,
-    Status,
     UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
@@ -143,7 +142,7 @@ class Execution:
         datasets (list[DatasetBag]): Materialized dataset objects.
         configuration (ExecutionConfiguration): Execution settings and parameters.
         workflow_rid (RID): RID of the associated workflow.
-        status (Status): Current execution status.
+        status (ExecutionStatus): Current execution status (read-through from SQLite).
         asset_paths (list[AssetFilePath]): Paths to execution assets.
         start_time (datetime | None): When execution started.
         stop_time (datetime | None): When execution completed.
@@ -279,6 +278,7 @@ class Execution:
                     {
                         "Description": self.configuration.description,
                         "Workflow": self.workflow_rid,
+                        "Status": str(ExecutionStatus.Created),
                     }
                 ]
             )[0]["RID"]
@@ -304,7 +304,7 @@ class Execution:
             self._execution_record = ExecutionRecord(
                 execution_rid=self.execution_rid,
                 workflow=self.configuration.workflow,
-                status=Status.created,
+                status=ExecutionStatus.Created,
                 description=self.configuration.description,
                 _ml_instance=self._ml_object,
                 _logger=self._logger,
@@ -322,8 +322,6 @@ class Execution:
         if not self._dry_run and reload is None:
             from datetime import datetime, timezone
 
-            from deriva_ml.execution.state_store import ExecutionStatus
-
             store = self._ml_object.workspace.execution_state_store()
             now = datetime.now(timezone.utc)
 
@@ -339,7 +337,7 @@ class Execution:
                     workflow_rid=self.workflow_rid,
                     description=self.configuration.description,
                     config_json=config_json,
-                    status=ExecutionStatus.created,
+                    status=ExecutionStatus.Created,
                     mode=self._ml_object._mode,
                     working_dir_rel=f"execution/{self.execution_rid}",
                     created_at=now,
@@ -511,7 +509,7 @@ class Execution:
         """
         # Materialize bdbag
         for dataset in self.configuration.datasets:
-            self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
+            self._logger.info(f"Materialize bag {dataset.rid}... ")
             self._datasets_list.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
 
@@ -523,7 +521,7 @@ class Execution:
             )
 
         # Download assets....
-        self.update_status(Status.running, "Downloading assets ...")
+        self._logger.info("Downloading assets ...")
         self.asset_paths = {}
         for asset_spec in self.configuration.assets:
             asset_rid = asset_spec.rid
@@ -580,7 +578,7 @@ class Execution:
         # state_machine.transition. `_initialize_execution` predates the
         # read-through design and is part of the legacy path retained
         # for `execution_start`/`execution_stop` compatibility.
-        self.update_status(Status.pending, "Initialize status finished.")
+        self._logger.info("Initialize status finished.")
 
     @property
     def status(self) -> "ExecutionStatus":
@@ -599,10 +597,9 @@ class Execution:
         Example:
             >>> exe = ml.resume_execution("5-ABC")
             >>> exe.status
-            <ExecutionStatus.stopped>
+            <ExecutionStatus.Stopped>
         """
         from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-        from deriva_ml.execution.state_store import ExecutionStatus
 
         store = self._ml_object.workspace.execution_state_store()
         row = store.get_execution(self.execution_rid)
@@ -902,59 +899,69 @@ class Execution:
         """
         return self._ml_object.download_dataset_bag(dataset)
 
-    @validate_call
-    def update_status(self, status: Status, msg: str) -> None:
-        """Updates the execution's status in the catalog.
+    def update_status(
+        self,
+        target: "ExecutionStatus",
+        *,
+        error: str | None = None,
+    ) -> None:
+        """Transition this execution to a new status.
 
-        Records a new status and associated message in the catalog, allowing remote
-        tracking of execution progress.
+        Thin wrapper around state_machine.transition() that validates
+        against ALLOWED_TRANSITIONS, writes the SQLite registry, and syncs
+        to the catalog when online.
 
         Args:
-            status: New status value (e.g., running, completed, failed).
-            msg: Description of the status change or current state.
+            target: Target ExecutionStatus enum member.
+            error: For Failed/Aborted transitions, a human-readable error
+                message written to the `error` column. On a non-terminal
+                transition, error is ignored and a warning is logged.
 
         Raises:
-            DerivaMLException: If status update fails.
+            InvalidTransitionError: If the (current, target) pair is not in
+                ALLOWED_TRANSITIONS.
+            DerivaMLStateInconsistency: If state_machine's catalog sync
+                detects divergence.
 
         Example:
-            >>> execution.update_status(Status.running, "Processing sample 1 of 10")
-
-        Note:
-            Legacy compatibility shim. The authoritative lifecycle
-            status now lives in SQLite and is driven by
-            ``state_machine.transition()`` via ``__enter__`` /
-            ``__exit__`` / ``abort``. ``update_status`` still writes
-            the catalog-side Status vocabulary (title-case) for
-            callers that haven't been migrated (e.g., multirun runner
-            internals, dataset download progress reporting). It does
-            not touch the SQLite registry — the authoritative
-            lifecycle state is unchanged by this call.
+            >>> exe.update_status(ExecutionStatus.Running)
+            >>> exe.update_status(ExecutionStatus.Failed, error="Network timeout")
         """
-        self._logger.info(msg)
-
-        if self._dry_run:
-            return
-
-        # Delegate to ExecutionRecord for catalog updates
-        if self._execution_record is not None:
-            self._execution_record.update_status(status, msg)
-        else:
-            # Fallback for cases where ExecutionRecord isn't available
-            self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
-                [
-                    {
-                        "RID": self.execution_rid,
-                        "Status": status.value,
-                        "Status_Detail": msg,
-                    }
-                ]
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLException(
+                f"Execution {self.execution_rid} not in workspace registry"
             )
+        current = ExecutionStatus(row["status"])
+
+        extra_fields: dict = {}
+        # Terminal = Failed, Aborted.
+        if target in (ExecutionStatus.Failed, ExecutionStatus.Aborted):
+            if error is not None:
+                extra_fields["error"] = error
+        elif error is not None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "error= ignored on non-terminal transition to %s: %s",
+                target.value, error,
+            )
+
+        transition(
+            store=store,
+            catalog=self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None,
+            execution_rid=self.execution_rid,
+            current=current,
+            target=target,
+            mode=self._ml_object._mode,
+            extra_fields=extra_fields,
+        )
 
     def execution_start(self) -> None:
         """Marks the execution as started.
 
         Records the start time in SQLite and updates the execution's
-        status to 'initializing'. This should be called before beginning
+        status to 'Running'. This should be called before beginning
         the main execution work.
 
         Example:
@@ -963,7 +970,7 @@ class Execution:
             ...     # Run analysis
             ...     execution.execution_stop()
             ... except Exception:
-            ...     execution.update_status(Status.failed, "Analysis error")
+            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")
         """
         from datetime import timezone
 
@@ -977,21 +984,22 @@ class Execution:
                 start_time=datetime.now(timezone.utc),
             )
         self.uploaded_assets = None
-        self.update_status(Status.initializing, "Start execution  ...")
+        self._logger.info("Start execution...")
 
     def execution_stop(self) -> None:
-        """Marks the execution as completed.
+        """Marks the execution as stopped (algorithm finished successfully).
 
         Records the stop time in SQLite and updates the execution's
-        status to 'completed'. This should be called after all execution
-        work is finished.
+        status to 'Stopped'. This should be called after all execution
+        work is finished; upload of outputs is a separate phase that
+        moves status from Stopped → Pending_Upload → Uploaded.
 
         Example:
             >>> try:
             ...     # Run analysis
             ...     execution.execution_stop()
             ... except Exception:
-            ...     execution.update_status(Status.failed, "Analysis error")
+            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")
         """
         from datetime import timezone
 
@@ -1017,7 +1025,7 @@ class Execution:
         else:
             duration_str = "0H 0min 0.0sec"
 
-        self.update_status(Status.completed, "Algorithm execution ended.")
+        self.update_status(ExecutionStatus.Stopped)
         if not self._dry_run:
             self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
                 [{"RID": self.execution_rid, "Duration": duration_str}]
@@ -1119,7 +1127,7 @@ class Execution:
         upload_root = self._build_upload_staging()
 
         try:
-            self.update_status(Status.running, "Uploading execution files...")
+            self._logger.info("Uploading execution files...")
             results = upload_directory(
                 self._model,
                 upload_root,
@@ -1131,7 +1139,7 @@ class Execution:
             )
         except (RuntimeError, DerivaMLException) as e:
             error = format_exception(e)
-            self.update_status(Status.failed, error)
+            self._logger.error(error)
             raise DerivaMLException(f"Failed to upload execution_assets: {error}")
 
         # Update manifest with upload results
@@ -1163,7 +1171,7 @@ class Execution:
                 )
             )
         self._update_asset_execution_table(asset_map)
-        self.update_status(Status.running, "Updating features...")
+        self._logger.info("Updating features...")
 
         for p in self._feature_root.glob("**/*.jsonl"):
             m = is_feature_dir(p.parent)
@@ -1174,7 +1182,7 @@ class Execution:
                 uploaded_files=asset_map,
             )
 
-        self.update_status(Status.running, "Upload assets complete")
+        self._logger.info("Upload assets complete")
         return asset_map
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -1375,13 +1383,19 @@ class Execution:
                 chunk_size=chunk_size,
             )
             self._set_asset_descriptions(self.uploaded_assets)
-            self.update_status(Status.completed, "Successfully end the execution.")
+            # Successful end of upload: Stopped → Pending_Upload → Uploaded.
+            # Only transition if we're in Stopped (algorithm ended cleanly);
+            # otherwise leave state alone.
+            if self.status is ExecutionStatus.Stopped:
+                self.update_status(ExecutionStatus.Pending_Upload)
+            if self.status is ExecutionStatus.Pending_Upload:
+                self.update_status(ExecutionStatus.Uploaded)
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)
             return self.uploaded_assets
         except Exception as e:
             error = format_exception(e)
-            self.update_status(Status.failed, error)
+            self.update_status(ExecutionStatus.Failed, error=error)
             raise e
 
     def _clean_folder_contents(self, folder_path: Path, remove_folder: bool = True):
@@ -1719,9 +1733,9 @@ class Execution:
 
         Example:
             >>> with exe.execute() as e:
-            ...     # e.status is ExecutionStatus.running
+            ...     # e.status is ExecutionStatus.Running
             ...     pass
-            >>> # e.status is ExecutionStatus.stopped (or failed on exception)
+            >>> # e.status is ExecutionStatus.Stopped (or failed on exception)
         """
         return self
 
@@ -2057,12 +2071,12 @@ class Execution:
 
         Raises:
             InvalidTransitionError: If the execution is not currently
-                in ``ExecutionStatus.created``.
+                in ``ExecutionStatus.Created``.
 
         Example:
             >>> with exe.execute() as e:
             ...     e.status
-            <ExecutionStatus.running>
+            <ExecutionStatus.Running>
         """
         from datetime import datetime, timezone
 
@@ -2082,7 +2096,7 @@ class Execution:
             ),
             execution_rid=self.execution_rid,
             current=current,
-            target=ExecutionStatus.running,
+            target=ExecutionStatus.Running,
             mode=self._ml_object._mode,
             extra_fields={"start_time": datetime.now(timezone.utc)},
         )
@@ -2124,10 +2138,10 @@ class Execution:
         now = datetime.now(timezone.utc)
 
         if exc_value is None:
-            target = ExecutionStatus.stopped
+            target = ExecutionStatus.Stopped
             extra = {"stop_time": now}
         else:
-            target = ExecutionStatus.failed
+            target = ExecutionStatus.Failed
             extra = {"stop_time": now, "error": f"{exc_type.__name__}: {exc_value}"}
 
         transition(
@@ -2184,7 +2198,7 @@ class Execution:
             >>> exe = ml.resume_execution("EXE-A")
             >>> exe.abort()
             >>> exe.status
-            <ExecutionStatus.aborted>
+            <ExecutionStatus.Aborted>
         """
         if self._dry_run:
             return
@@ -2198,7 +2212,7 @@ class Execution:
             ),
             execution_rid=self.execution_rid,
             current=self.status,
-            target=ExecutionStatus.aborted,
+            target=ExecutionStatus.Aborted,
             mode=self._ml_object._mode,
         )
 

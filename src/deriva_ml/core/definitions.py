@@ -19,7 +19,7 @@ This is the recommended import location for most DerivaML type definitions:
 
 For more specialized imports, you can import directly from submodules:
     >>> from deriva_ml.core.constants import ML_SCHEMA
-    >>> from deriva_ml.core.enums import Status
+    >>> from deriva_ml.execution.state_store import ExecutionStatus
     >>> from deriva.core.typed import ColumnDef
 """
 
@@ -57,7 +57,6 @@ from deriva_ml.core.enums import (
     MLAsset,
     MLTable,
     MLVocab,
-    Status,
     UploadState,
 )
 
@@ -134,7 +133,6 @@ __all__ = [
     "get_domain_schemas",
     # Enums
     "UploadState",
-    "Status",
     "BuiltinType",
     "BuiltinTypes",
     "MLVocab",

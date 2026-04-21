@@ -24,7 +24,7 @@ import pytest
 
 from deriva_ml import DerivaML, ExecAssetType, MLAsset
 from deriva_ml import MLVocab as vc  # noqa: N812
-from deriva_ml.core.definitions import BuiltinTypes, ColumnDefinition, Status
+from deriva_ml.core.definitions import BuiltinTypes, ColumnDefinition
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution import Execution, ExecutionConfiguration
@@ -380,12 +380,13 @@ class TestExecutionLifecycle:
     def test_execution_context_manager(self, basic_execution):
         """Test execution as a context manager.
 
-        Post-E2: `execute()` is a no-op returning self; __enter__ transitions
-        the SQLite status created → running via state_machine.transition().
-        __exit__ transitions running → stopped on clean exit. The legacy
-        catalog-side Status vocab (title-case Initializing/Running/Completed)
-        still participates via update_status() for back-compat, but the
-        authoritative lifecycle status lives in SQLite (ExecutionStatus).
+        Post-S1a: `execute()` is a no-op returning self; __enter__ transitions
+        the SQLite status Created → Running via state_machine.transition().
+        __exit__ transitions Running → Stopped on clean exit. After S1a the
+        catalog Status column and ExecutionStatus share a single title-case
+        vocabulary (Created, Running, Stopped, Pending_Upload, Uploaded,
+        Failed, Aborted) — SQLite remains authoritative; the catalog is a
+        synced mirror.
         """
         from deriva_ml.execution.state_store import ExecutionStatus
 
@@ -393,11 +394,11 @@ class TestExecutionLifecycle:
 
         with execution.execute() as exe:
             assert exe.execution_rid is not None
-            # New lifecycle: __enter__ transitions SQLite status to running.
-            assert exe.status is ExecutionStatus.running
+            # New lifecycle: __enter__ transitions SQLite status to Running.
+            assert exe.status is ExecutionStatus.Running
 
-        # After context exit, the authoritative SQLite status is stopped.
-        assert execution.status is ExecutionStatus.stopped
+        # After context exit, the authoritative SQLite status is Stopped.
+        assert execution.status is ExecutionStatus.Stopped
 
         # Upload finalizes the catalog-visible lifecycle; after upload we
         # expect the SQLite status to have advanced (pending_upload or
@@ -408,35 +409,50 @@ class TestExecutionLifecycle:
 
     def test_execution_manual_start_stop(self, basic_execution):
         """Test manual execution start and stop."""
+        from deriva_ml.execution.state_store import ExecutionStatus
+
         execution = basic_execution
         ml = execution._ml_object
 
         execution.execution_start()
-        # execution_start sets status to Initializing
-        assert get_execution_status(ml, execution.execution_rid) == "Initializing"
+        # In the Phase 2 lifecycle execution_start records start_time but
+        # leaves status at Created (the prior 'Initializing' state is gone).
+        assert get_execution_status(ml, execution.execution_rid) == "Created"
 
-        # Update to Running
-        execution.update_status(Status.running, "Running")
+        # Transition Created → Running via update_status.
+        execution.update_status(ExecutionStatus.Running)
         assert get_execution_status(ml, execution.execution_rid) == "Running"
 
         execution.execution_stop()
+        # execution_stop transitions Running → Stopped.
+        assert get_execution_status(ml, execution.execution_rid) == "Stopped"
+
         execution.upload_execution_outputs()
-        assert get_execution_status(ml, execution.execution_rid) == "Completed"
+        # upload_execution_outputs advances Stopped → Pending_Upload → Uploaded.
+        assert get_execution_status(ml, execution.execution_rid) == "Uploaded"
 
     def test_execution_status_updates(self, basic_execution):
-        """Test updating execution status."""
+        """Test updating execution status through the Phase 2 lifecycle.
+
+        The legacy Status_Detail free-text column is no longer part of the
+        update_status contract. The new update_status(target, *, error=None)
+        validates against ALLOWED_TRANSITIONS; tests verifying an error
+        string are covered by test_update_status.py (terminal states only).
+        """
+        from deriva_ml.execution.state_store import ExecutionStatus
+
         execution = basic_execution
         ml = execution._ml_object
 
         with execution.execute():
-            execution.update_status(Status.running, "Processing step 1")
+            # Inside execute() the status is Running — validated by the
+            # state machine, no way to re-transition to Running here.
             record = ml.retrieve_rid(execution.execution_rid)
             assert record["Status"] == "Running"
-            assert record["Status_Detail"] == "Processing step 1"
 
-            execution.update_status(Status.running, "Processing step 2")
-            record = ml.retrieve_rid(execution.execution_rid)
-            assert record["Status_Detail"] == "Processing step 2"
+        # After __exit__, status is Stopped.
+        record = ml.retrieve_rid(execution.execution_rid)
+        assert record["Status"] == "Stopped"
 
     def test_execution_metadata_files_uploaded(self, basic_execution):
         """Test that execution metadata files are uploaded."""
@@ -1113,9 +1129,10 @@ class TestExecutionFeatures:
 
         execution.upload_execution_outputs()
 
-        # Verify features were uploaded
+        # Verify features were uploaded. Phase 2 lifecycle:
+        # upload_execution_outputs advances Stopped → Pending_Upload → Uploaded.
         status = get_execution_status(ml, execution.execution_rid)
-        assert status == "Completed"
+        assert status == "Uploaded"
 
 
 # =============================================================================
@@ -1251,8 +1268,9 @@ class TestExecutionIntegration:
         uploaded = execution.upload_execution_outputs()
         assert "deriva-ml/Execution_Asset" in uploaded
 
+        # Phase 2 lifecycle: upload_execution_outputs → Uploaded (legacy Completed).
         status = get_execution_status(ml, execution.execution_rid)
-        assert status == "Completed"
+        assert status == "Uploaded"
 
 
 # =============================================================================

@@ -17,7 +17,7 @@ def test_execution_record_has_registry_fields():
         rid="EXE-A",
         workflow_rid="WFL-1",
         description="test",
-        status=ExecutionStatus.stopped,
+        status=ExecutionStatus.Stopped,
         mode=ConnectionMode.online,
         working_dir_rel="execution/EXE-A",
         start_time=now,
@@ -32,7 +32,7 @@ def test_execution_record_has_registry_fields():
         failed_files=0,
     )
     assert rec.rid == "EXE-A"
-    assert rec.status is ExecutionStatus.stopped
+    assert rec.status is ExecutionStatus.Stopped
     assert rec.mode is ConnectionMode.online
     assert rec.pending_rows == 0
 
@@ -45,7 +45,7 @@ def test_execution_record_is_frozen():
     now = datetime.now(timezone.utc)
     rec = ExecutionRecord(
         rid="X", workflow_rid=None, description=None,
-        status=ExecutionStatus.created, mode=ConnectionMode.online,
+        status=ExecutionStatus.Created, mode=ConnectionMode.online,
         working_dir_rel="execution/X",
         start_time=None, stop_time=None, last_activity=now,
         error=None, sync_pending=False, created_at=now,
@@ -65,7 +65,7 @@ def test_from_row_constructs_from_sqlite_dict():
         "rid": "EXE-A",
         "workflow_rid": "WFL-1",
         "description": "test",
-        "status": "stopped",
+        "status": "Stopped",
         "mode": "online",
         "working_dir_rel": "execution/EXE-A",
         "start_time": now,
@@ -82,7 +82,7 @@ def test_from_row_constructs_from_sqlite_dict():
         pending_files=1, failed_files=0,
     )
     assert rec.rid == "EXE-A"
-    assert rec.status is ExecutionStatus.stopped
+    assert rec.status is ExecutionStatus.Stopped
     assert rec.mode is ConnectionMode.online
     assert rec.pending_rows == 3
     assert rec.pending_files == 1

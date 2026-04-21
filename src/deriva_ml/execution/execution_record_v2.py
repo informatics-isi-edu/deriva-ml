@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from deriva_ml.core.connection_mode import ConnectionMode
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
@@ -174,4 +175,59 @@ class ExecutionRecord:
             retry_failed=retry_failed,
             bandwidth_limit_mbps=bandwidth_limit_mbps,
             parallel_files=parallel_files,
+        )
+
+    def update_status(
+        self,
+        target: ExecutionStatus,
+        *,
+        ml: "DerivaML",
+        error: str | None = None,
+    ) -> None:
+        """Transition this execution's status via the workspace state machine.
+
+        Parallel to Execution.update_status. ExecutionRecord is a bare
+        dataclass and doesn't carry an ml reference — caller passes one.
+
+        Args:
+            target: Target ExecutionStatus enum member.
+            ml: The DerivaML instance whose workspace owns the registry.
+            error: For Failed/Aborted, a human-readable message.
+
+        Raises:
+            InvalidTransitionError: If the transition is not allowed.
+            DerivaMLStateInconsistency: If catalog sync detects divergence.
+
+        Example:
+            >>> rec.update_status(ExecutionStatus.Aborted, ml=ml, error="user cancel")
+        """
+        from deriva_ml.execution.state_machine import transition
+
+        store = ml.workspace.execution_state_store()
+        row = store.get_execution(self.rid)
+        if row is None:
+            raise DerivaMLException(
+                f"Execution {self.rid} not in workspace registry"
+            )
+        current = ExecutionStatus(row["status"])
+
+        extra_fields: dict = {}
+        if target in (ExecutionStatus.Failed, ExecutionStatus.Aborted):
+            if error is not None:
+                extra_fields["error"] = error
+        elif error is not None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "error= ignored on non-terminal transition to %s: %s",
+                target.value, error,
+            )
+
+        transition(
+            store=store,
+            catalog=ml.catalog if ml._mode is ConnectionMode.online else None,
+            execution_rid=self.rid,
+            current=current,
+            target=target,
+            mode=ml._mode,
+            extra_fields=extra_fields,
         )

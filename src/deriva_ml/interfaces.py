@@ -83,10 +83,10 @@ from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.model.catalog import DerivaModel
 
 if TYPE_CHECKING:
-    from deriva_ml.core.enums import Status
     from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion, VersionPart
     from deriva_ml.dataset.dataset import Dataset
     from deriva_ml.execution.execution_record import ExecutionRecord
+    from deriva_ml.execution.state_store import ExecutionStatus
     from deriva_ml.execution.workflow import Workflow
 
 
@@ -788,7 +788,7 @@ class DerivaMLCatalogReader(Protocol):
         self,
         workflow: "Workflow | RID | None" = None,
         workflow_type: str | None = None,
-        status: "Status | None" = None,
+        status: "ExecutionStatus | None" = None,
     ) -> Iterable["ExecutionRecord"]:
         """List all executions in the catalog.
 
