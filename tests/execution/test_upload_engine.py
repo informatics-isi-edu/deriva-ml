@@ -649,6 +649,17 @@ def test_drain_work_item_asset_row_calls_deriva_py_uploader(test_ml, monkeypatch
             "files": list(files), "target_table": target_table,
             "execution_rid": execution_rid,
         })
+        # Post-Task-2 contract: _invoke_deriva_py_uploader is responsible
+        # for writing per-row SQLite status (previously done by the drain
+        # wrapper). Mirror that here so _drain_work_item's aggregate
+        # count matches.
+        upload_store = ml.workspace.execution_state_store()
+        for file_info in files:
+            upload_store.update_pending_row(
+                file_info["pending_id"],
+                status=PendingRowStatus.uploaded,
+                uploaded_at=datetime.now(timezone.utc),
+            )
         return {"uploaded": [str(f)], "failed": []}
 
     monkeypatch.setattr(

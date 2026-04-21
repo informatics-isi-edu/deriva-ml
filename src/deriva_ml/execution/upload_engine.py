@@ -18,11 +18,21 @@ Key idempotency properties (spec §1.1 item 4):
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import shutil
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
+from deriva.core import DEFAULT_SESSION_CONFIG
+from deriva.transfer.upload.deriva_upload import GenericUploader, UploadState
+
+from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.dataset.upload import DEFAULT_UPLOAD_TIMEOUT, bulk_upload_configuration
 from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
 from deriva_ml.execution.state_machine import transition
 from deriva_ml.execution.state_store import ExecutionStatus, PendingRowStatus
@@ -510,29 +520,15 @@ def _drain_work_item(
             execution_rid=work_item.execution_rid,
             cancel_event=cancel_event,
         )
+        # NOTE: _invoke_deriva_py_uploader has already written per-row
+        # SQLite status via its callbacks. We only need the aggregate
+        # count here. Rows whose status is still Pending at this point
+        # fall through and will be retried on the next run.
         uploaded_paths = set(result["uploaded"])
-        for r in rows:
-            path = r["asset_file_path"]
-            pid = r["id"]
-            if path in uploaded_paths:
-                store.update_pending_row(
-                    pid,
-                    status=PendingRowStatus.uploaded,
-                    uploaded_at=now,
-                )
-            else:
-                failure_msg = next(
-                    (f.get("error", "upload failed") for f in result.get("failed", [])
-                     if f.get("path") == path),
-                    "upload failed",
-                )
-                store.update_pending_row(
-                    pid,
-                    status=PendingRowStatus.failed,
-                    error=failure_msg,
-                )
-
-        return sum(1 for r in rows if r["asset_file_path"] in uploaded_paths)
+        return sum(
+            1 for r in rows
+            if r["asset_file_path"] in uploaded_paths
+        )
 
     # Plain rows: build a single catalog insert body including pre-leased RIDs.
     body = []
@@ -573,25 +569,188 @@ def _invoke_deriva_py_uploader(
 ) -> dict:
     """Invoke deriva-py's uploader for a batch of files.
 
-    Phase 1: raises NotImplementedError. The real asset-upload path
-    currently flows through src/deriva_ml/dataset/upload.py::upload_directory
-    which requires a directory layout matching the asset-upload spec
-    regex — incompatible with per-file invocations at this grain.
+    Builds a per-batch symlink-farm scan root whose layout matches
+    ``asset_table_upload_spec``'s regex, constructs a fresh
+    ``GenericUploader``, and drives ``scanDirectory + uploadFiles``.
 
-    Phase 2 finalization: wire this to either (a) per-file Hatrac +
-    pathBuilder invocations, or (b) a restructured upload_directory
-    that works off a manifest rather than a regex-matched tree.
+    Two callbacks are wired:
 
-    Tests monkeypatch this function. Real asset uploads in Phase 1
-    continue to flow through exe.upload_outputs (which calls the
-    existing _upload_execution_dirs flow, wired in G8).
+    - ``status_callback()``: fires at each file boundary with no args.
+      Walks ``uploader.file_status``, writes newly-terminal rows to the
+      SQLite store, observes ``cancel_event`` and calls
+      ``uploader.cancel()``.
+    - ``file_callback(**kw)``: fires during in-flight uploads with
+      byte progress. Observes ``cancel_event``; returns ``-1`` to
+      signal hatrac to abort the current transfer when cancelled.
+
+    After ``uploadFiles`` returns, a reconciliation pass over
+    ``uploader.file_status`` catches any file the callback missed and
+    writes its terminal state.
+
+    Args:
+        ml: DerivaML instance (for model, host, catalog_id, workspace).
+        files: List of dicts with keys 'path', 'rid', 'pending_id',
+            'metadata'. All entries share target_table and execution_rid.
+        target_table: Name of the target asset table (no schema).
+        execution_rid: Execution RID these files belong to.
+        cancel_event: Optional cancellation signal.
 
     Returns:
-        Dict with keys 'uploaded' (list of paths) and 'failed'
-        (list of {path, error}).
+        ``{"uploaded": list[str], "failed": list[dict]}`` where
+        ``uploaded`` lists absolute input paths that succeeded and
+        ``failed`` lists ``{"path": str, "error": str}`` for failures.
     """
-    raise NotImplementedError(
-        "G7 Phase 1: _invoke_deriva_py_uploader not yet wired to a "
-        "real uploader. Tests monkeypatch this; production asset uploads "
-        "flow through exe.upload_outputs for now. Phase 2 finalizes."
-    )
+    if not files:
+        return {"uploaded": [], "failed": []}
+
+    from datetime import datetime, timezone
+
+    store = ml.workspace.execution_state_store()
+
+    # Resolve schema for the target table (scan root layout needs it).
+    try:
+        table_obj = ml.model.name_to_table(target_table)
+        schema_name = table_obj.schema.name
+        metadata_cols = sorted(ml.model.asset_metadata(target_table))
+    except Exception as exc:
+        raise DerivaMLException(
+            f"Unable to resolve asset table {target_table!r}: {exc}"
+        ) from exc
+
+    # Map absolute input path → the file dict (for callback writes).
+    rows_by_path: dict[str, dict] = {str(Path(f["path"]).resolve()): f for f in files}
+    written_paths: set[str] = set()
+
+    with TemporaryDirectory(prefix="deriva-ml-upload-") as scan_root_str:
+        # Resolve symlinks in the temp dir path so the scan-path ↔
+        # input-path map lines up with what GenericUploader records
+        # (which uses canonical absolute paths after Path.rglob/resolve).
+        scan_root = Path(scan_root_str).resolve()
+
+        # Build the symlink farm:
+        # <scan_root>/<schema>/<table>/<md1>/.../<filename>
+        for f in files:
+            src = Path(f["path"]).resolve()
+            metadata = f.get("metadata") or {}
+            target_dir = scan_root / schema_name / target_table
+            for col in metadata_cols:
+                target_dir = target_dir / str(metadata.get(col, "None"))
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / src.name
+            if target.exists():
+                continue
+            try:
+                os.link(src, target)  # hardlink where possible
+            except (OSError, NotImplementedError):
+                try:
+                    target.symlink_to(src)
+                except OSError:
+                    shutil.copy2(src, target)
+
+        # Build config file (same shape upload_directory uses).
+        spec_file = scan_root / "config.json"
+        spec_file.write_text(json.dumps(bulk_upload_configuration(ml.model)))
+
+        session_config = DEFAULT_SESSION_CONFIG.copy()
+        session_config["timeout"] = DEFAULT_UPLOAD_TIMEOUT
+
+        uploader = GenericUploader(
+            server={
+                "host": ml.model.hostname,
+                "protocol": "https",
+                "catalog_id": ml.model.catalog.catalog_id,
+                "session": session_config,
+            },
+            config_file=spec_file,
+            dcctx_cid="deriva-ml/upload_engine",
+        )
+
+        # Map scan-root path (what uploader.file_status uses as keys)
+        # back to original input path for SQLite attribution.
+        scan_path_to_input: dict[str, str] = {}
+        for abs_input, row_dict in rows_by_path.items():
+            src = Path(abs_input)
+            metadata = row_dict.get("metadata") or {}
+            target_dir = scan_root / schema_name / target_table
+            for col in metadata_cols:
+                target_dir = target_dir / str(metadata.get(col, "None"))
+            scan_path_to_input[str(target_dir / src.name)] = abs_input
+
+        def _apply_state_to_sqlite(scan_path: str, state_info: dict) -> None:
+            """Idempotent: translate one uploader status dict to a SQLite write."""
+            if scan_path in written_paths:
+                return
+            input_path = scan_path_to_input.get(scan_path)
+            if input_path is None:
+                return
+            row = rows_by_path.get(input_path)
+            if row is None:
+                return
+            state = state_info.get("State")
+            status = state_info.get("Status", "")
+            now = datetime.now(timezone.utc)
+            # Map deriva-py UploadState codes → SQLite status.
+            if state == UploadState.Success:
+                store.update_pending_row(
+                    row["pending_id"],
+                    status=PendingRowStatus.uploaded,
+                    uploaded_at=now,
+                )
+                written_paths.add(scan_path)
+            elif state == UploadState.Failed:
+                store.update_pending_row(
+                    row["pending_id"],
+                    status=PendingRowStatus.failed,
+                    error=status or "upload failed",
+                )
+                written_paths.add(scan_path)
+            # UploadState.Cancelled/Aborted/Paused/Timeout: leave Pending.
+
+        def status_callback() -> None:
+            # Observe cancel first.
+            if cancel_event is not None and cancel_event.is_set():
+                uploader.cancel()
+            # Walk file_status, write any newly-terminal rows.
+            for scan_path, info in list(uploader.file_status.items()):
+                _apply_state_to_sqlite(scan_path, info)
+
+        def file_callback(**kwargs) -> bool | int:
+            if cancel_event is not None and cancel_event.is_set():
+                uploader.cancel()
+                return -1  # hatrac abort signal
+            return True
+
+        try:
+            uploader.initialize(cleanup=False)
+            uploader.getUpdatedConfig()
+            uploader.scanDirectory(scan_root, abort_on_invalid_input=True)
+            uploader.uploadFiles(
+                status_callback=status_callback,
+                file_callback=file_callback,
+            )
+
+            # Reconciliation pass — catch anything the callback missed.
+            for scan_path, info in uploader.file_status.items():
+                _apply_state_to_sqlite(scan_path, info)
+        finally:
+            try:
+                uploader.cleanup()
+            except Exception:
+                pass
+
+        # Build return dict by walking final file_status one more time.
+        uploaded: list[str] = []
+        failed: list[dict] = []
+        for scan_path, info in uploader.file_status.items():
+            input_path = scan_path_to_input.get(scan_path)
+            if input_path is None:
+                continue
+            state = info.get("State")
+            if state == UploadState.Success:
+                uploaded.append(input_path)
+            elif state == UploadState.Failed:
+                failed.append({
+                    "path": input_path,
+                    "error": info.get("Status") or "upload failed",
+                })
+        return {"uploaded": uploaded, "failed": failed}
