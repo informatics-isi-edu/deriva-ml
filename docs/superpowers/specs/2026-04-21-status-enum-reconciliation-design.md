@@ -152,24 +152,16 @@ Identified by grep (non-exhaustive — implementation will do a full sweep):
 
 ## 6. Schema seeding
 
-`src/deriva_ml/schema/create_schema.py` (or wherever `Execution_Status` vocabulary terms are seeded during `create_ml_schema`):
+**Correction from earlier draft:** `Execution.Status` is a plain `text` column (`src/deriva_ml/schema/create_schema.py:149`), NOT a foreign key to an `Execution_Status` vocabulary table. There is no vocab table to seed. The column holds whatever string the library writes.
 
-**Seed the full canonical set for new catalogs:**
-- `Created`
-- `Running`
-- `Stopped`         ← new (additive)
-- `Failed`
-- `Pending_Upload`  ← new (additive)
-- `Uploaded`        ← new (additive)
-- `Aborted`
+This simplifies §6 to nothing:
+- No vocabulary table exists.
+- No schema-init routine seeds `Execution_Status` terms.
+- No term-migration helper needed.
 
-**Remove from the seed list** (if currently present):
-- `Initializing`
-- `Pending`
+**The only discipline:** post-migration, `Execution.Status` values written to the catalog are constrained by the library to the 7 canonical title-case strings (the `ExecutionStatus` enum values). Historical rows with `"Initializing"` / `"Pending"` remain as free-text until the user manually updates them or they age out via `gc_executions`.
 
-Existing catalogs (if any) retain whatever terms they currently have in the `Execution_Status` vocabulary — we don't attempt to purge legacy terms from existing catalogs because that would orphan historical rows. New catalogs start clean with only the canonical 7.
-
-Dev catalogs get re-created from scratch during normal test runs, so no migration helper is needed.
+`Execution.Status_Detail` (a sibling text column on the catalog Execution table) stays unused by the library — it was a pre-existing column that legacy `update_status` would populate with the human-readable message. With M2 (drop status_message), this column is simply not written to. It may be removed from the schema in a future migration; not in scope here.
 
 ## 7. Error handling
 
@@ -222,18 +214,16 @@ The existing 627-test Phase-1 suite must pass post-migration. Any test that hard
 Rough task sequence; the implementation plan will refine into bite-sized steps:
 
 1. Update `ExecutionStatus` enum values (the 7-character strings).
-2. Update SQLite schema seeding (no column change — the seed string changes).
-3. Sweep `src/deriva_ml/` for lowercase status literals; rewrite.
-4. Update `create_ml_schema` vocabulary seeding to include new terms.
-5. Implement `Execution.update_status(target, *, error=None)`.
-6. Implement `ExecutionRecord.update_status(target, *, ml, error=None)`.
-7. Migrate every call site per §5's table.
-8. Delete `Status` enum + `DerivaML.status` attribute + `_initialize_execution`.
-9. Add test files (§8.1).
-10. Update existing tests (§8.2).
-11. Run the grep gate; address any remaining hits.
-12. Full regression: 627 unit + 2 integration must pass.
-13. CHANGELOG: add a "Phase 2 Subsystem 1" entry noting the breaking change and the dropped legacy terms.
+2. Sweep SQLite-written status string literals (if any hardcoded) — ensure they use the enum.
+3. Implement `Execution.update_status(target, *, error=None)`.
+4. Implement `ExecutionRecord.update_status(target, *, ml, error=None)`.
+5. Migrate every call site per §5's table.
+6. Delete `Status` enum + `DerivaML.status` attribute + `_initialize_execution` (verify no readers first).
+7. Add test files (§8.1).
+8. Update existing tests (§8.2).
+9. Run the grep gate; address any remaining hits.
+10. Full regression: 627 unit + 2 integration must pass.
+11. CHANGELOG: add a "Phase 2 Subsystem 1" entry noting the breaking change.
 
 ## 10. Non-goals
 
@@ -252,4 +242,4 @@ Explicitly out of scope; separate subsystems handle them:
 None at design freeze. Decisions made during brainstorming that might surface as follow-ups:
 
 - If an unexpected external consumer of the legacy `Status` enum surfaces post-merge, revert to Option C (shim). Unlikely given the current architecture, but noted.
-- The `Stopped` / `Pending_Upload` / `Uploaded` vocab terms need to be in the catalog's `Execution_Status` vocabulary before any execution can transition to them. New catalogs get them automatically via §6; existing catalogs (if any — none confirmed in production) need one-time `add_term` calls. A small `migrate_execution_status_vocabulary.py` helper may be worth shipping; flag for implementation triage.
+- (The earlier-drafted bullet about seeding an `Execution_Status` vocabulary is removed — §6 documents the correction: `Execution.Status` is a free-text column, not a vocab FK.)
