@@ -19,13 +19,18 @@ Key idempotency properties (spec §1.1 item 4):
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from deriva_ml.execution.state_store import PendingRowStatus
+from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
+from deriva_ml.execution.state_machine import transition
+from deriva_ml.execution.state_store import ExecutionStatus, PendingRowStatus
 
 if TYPE_CHECKING:
+    from deriva.core.ermrest_catalog import ErmrestCatalog
+
     from deriva_ml.core.base import DerivaML
+    from deriva_ml.execution.state_store import ExecutionStateStore
 
 logger = logging.getLogger(__name__)
 
@@ -155,3 +160,231 @@ def topo_sort_work_items(
             "the cycle in a prior run."
         )
     return output
+
+
+@dataclass
+class UploadReport:
+    """Result of a run_upload_engine call.
+
+    Attributes:
+        execution_rids: Executions attempted.
+        total_uploaded: Count of rows+files in status='uploaded' after
+            the run.
+        total_failed: Count of rows+files in status='failed' after the
+            run.
+        per_table: Map of "schema:table" → dict {uploaded, failed}.
+        errors: List of human-readable error lines from failed items.
+    """
+    execution_rids: list[str]
+    total_uploaded: int
+    total_failed: int
+    per_table: dict[str, dict]
+    errors: list[str] = field(default_factory=list)
+
+
+def run_upload_engine(
+    *,
+    ml: "DerivaML",
+    execution_rids: "list[str] | None",
+    retry_failed: bool = False,
+    bandwidth_limit_mbps: "int | None" = None,
+    parallel_files: int = 4,
+) -> UploadReport:
+    """Drain pending rows/files for the given executions.
+
+    Phase 1 implementation per spec §2.11.2 (omitting provisional
+    step 6). Steps:
+
+    1. Enumerate work items (exe, table) with pending/failed-if-retry.
+    2. Re-validate metadata against catalog schema (Phase 2; skipped
+       here — dependency on the provisional TableHandle surface).
+    3. Acquire RID leases for any status='staged' rows.
+    4. Topologically sort work items by FK.
+    5. For each level in topo order, drain each item via
+       _drain_work_item (which wraps deriva-py's uploader).
+    6. On the first level with failures, abort the drain but leave
+       the rest of the work intact for a later re-run.
+    7. Return an UploadReport.
+
+    Args:
+        ml: DerivaML instance.
+        execution_rids: Which executions to drain; None = all pending.
+        retry_failed: Include status='failed' rows.
+        bandwidth_limit_mbps: Cap uploader egress. None = unlimited.
+            Passed to deriva-py's uploader config.
+        parallel_files: Concurrent file uploads per table. Bounded.
+
+    Returns:
+        UploadReport summarizing the run.
+    """
+    store = ml.workspace.execution_state_store()
+
+    rids = execution_rids or [row["rid"] for row in store.list_executions()]
+
+    # Step 1: enumerate.
+    items = _enumerate_work(ml=ml, execution_rids=rids, retry_failed=retry_failed)
+    if not items:
+        return UploadReport(
+            execution_rids=rids, total_uploaded=0, total_failed=0,
+            per_table={},
+        )
+
+    # Step 3: lease any staged rows first (per-execution).
+    by_exe: dict[str, list[int]] = {}
+    for item in items:
+        staged = [
+            r["id"]
+            for r in store.list_pending_rows(
+                execution_rid=item.execution_rid,
+                status=PendingRowStatus.staged,
+            )
+            if r["id"] in item.pending_ids
+        ]
+        if staged:
+            by_exe.setdefault(item.execution_rid, []).extend(staged)
+    for exe_rid, pending_ids in by_exe.items():
+        acquire_leases_for_execution(
+            store=store, catalog=ml.catalog,
+            execution_rid=exe_rid, pending_ids=pending_ids,
+        )
+
+    # Step 4: topo sort.
+    fk_edges = _fk_edges_for_work(ml=ml, items=items)
+    sorted_items = topo_sort_work_items(items, fk_edges=fk_edges)
+
+    # Step 5: drain, aborting after the first level with failures.
+    per_table: dict[str, dict] = {}
+    errors: list[str] = []
+    total_uploaded = 0
+    total_failed = 0
+
+    for item in sorted_items:
+        try:
+            row = store.get_execution(item.execution_rid)
+            current_status = ExecutionStatus(row["status"])
+            if current_status != ExecutionStatus.pending_upload:
+                transition(
+                    store=store,
+                    catalog=ml.catalog if ml._mode.value == "online" else None,
+                    execution_rid=item.execution_rid,
+                    current=current_status,
+                    target=ExecutionStatus.pending_upload,
+                    mode=ml._mode,
+                )
+        except Exception as exc:
+            logger.warning(
+                "upload: could not set pending_upload for %s: %s",
+                item.execution_rid, exc,
+            )
+
+        try:
+            n = _drain_work_item(store=store, catalog=ml.catalog, work_item=item)
+            total_uploaded += n
+            fqn = f"{item.target_schema}:{item.target_table}"
+            per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
+            per_table[fqn]["uploaded"] += n
+        except Exception as exc:
+            errors.append(f"{item.target_table}: {exc}")
+            failed_rows = store.list_pending_rows(
+                execution_rid=item.execution_rid,
+                status=PendingRowStatus.failed,
+                target_table=item.target_table,
+            )
+            total_failed += len(failed_rows)
+            fqn = f"{item.target_schema}:{item.target_table}"
+            per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
+            per_table[fqn]["failed"] += len(failed_rows)
+            break
+
+    # Final execution status transitions.
+    for exe_rid in rids:
+        counts = store.count_pending_by_kind(execution_rid=exe_rid)
+        row = store.get_execution(exe_rid)
+        if row is None:
+            continue
+        current_status = ExecutionStatus(row["status"])
+        if current_status == ExecutionStatus.pending_upload:
+            if counts["pending_rows"] == 0 and counts["pending_files"] == 0:
+                if counts["failed_rows"] == 0 and counts["failed_files"] == 0:
+                    target = ExecutionStatus.uploaded
+                else:
+                    target = ExecutionStatus.failed
+            else:
+                target = ExecutionStatus.failed
+            try:
+                transition(
+                    store=store,
+                    catalog=ml.catalog if ml._mode.value == "online" else None,
+                    execution_rid=exe_rid,
+                    current=current_status,
+                    target=target,
+                    mode=ml._mode,
+                    extra_fields={"error": errors[0]} if errors and target == ExecutionStatus.failed else {},
+                )
+            except Exception as exc:
+                logger.warning(
+                    "upload: final status transition failed for %s: %s", exe_rid, exc,
+                )
+
+    return UploadReport(
+        execution_rids=rids,
+        total_uploaded=total_uploaded,
+        total_failed=total_failed,
+        per_table=per_table,
+        errors=errors,
+    )
+
+
+def _fk_edges_for_work(
+    *,
+    ml: "DerivaML",
+    items: list[_WorkItem],
+) -> dict[tuple[str, str], list[tuple[str, str]]]:
+    """Extract FK edges for the tables involved in `items`.
+
+    Consults ml.model (the ERMrest model) for each table's outgoing
+    foreign keys; an edge is added for each FK whose target is also
+    among the items. Edges to tables without pending work are pruned
+    (irrelevant to this drain).
+
+    Args:
+        ml: DerivaML instance providing ml.model.
+        items: Work items — only their target tables matter.
+
+    Returns:
+        Adjacency dict: (schema, table) → [(schema, parent_table), ...].
+    """
+    edges: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    table_keys = {(i.target_schema, i.target_table) for i in items}
+    for item in items:
+        try:
+            schema = ml.model.schemas[item.target_schema]
+            table = schema.tables[item.target_table]
+        except (KeyError, AttributeError):
+            # Schema/table not in the model (test fixtures sometimes
+            # register pending rows for tables that don't exist in the
+            # deployed catalog). Treat as no outgoing FKs.
+            edges[(item.target_schema, item.target_table)] = []
+            continue
+        parents = []
+        for fk in getattr(table, "foreign_keys", []):
+            pk_table = fk.pk_table
+            parent = (pk_table.schema.name, pk_table.name)
+            if parent in table_keys and parent != (item.target_schema, item.target_table):
+                parents.append(parent)
+        edges[(item.target_schema, item.target_table)] = parents
+    return edges
+
+
+def _drain_work_item(
+    *,
+    store: "ExecutionStateStore",
+    catalog: "ErmrestCatalog",
+    work_item: _WorkItem,
+) -> int:
+    """Phase-1 stub — the concrete deriva-py-uploader invocation lives
+    in Task G7. Tests monkeypatch this in G6; G7 replaces the body.
+
+    Returns the number of rows uploaded.
+    """
+    raise NotImplementedError("G7 implements the deriva-py invocation")

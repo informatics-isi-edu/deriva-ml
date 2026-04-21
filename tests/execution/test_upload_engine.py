@@ -218,3 +218,74 @@ def test_topo_sort_detects_cycle():
     }
     with pytest.raises(DerivaMLCycleError):
         topo_sort_work_items(items, fk_edges=fk_edges)
+
+
+# ─── G6: run_upload_engine outer loop ─────────────────────────────────
+
+
+def test_run_upload_engine_leases_and_marks_uploaded(test_ml, monkeypatch):
+    """Engine path: enumerate → lease → deriva-py uploader → status=uploaded.
+
+    We mock deriva-py's uploader to a no-op (returns success).
+    """
+    from datetime import datetime, timezone
+
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    wf = _make_workflow(test_ml, "G6 engine workflow")
+    exe = test_ml.create_execution(description="engine", workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid, key="k1",
+        target_schema="deriva-ml", target_table="Subject",
+        metadata_json='{"Name": "A"}', created_at=now,
+    )
+
+    lease_calls: list[list[int]] = []
+
+    def _fake_acquire(*, store, catalog, execution_rid, pending_ids):
+        lease_calls.append(pending_ids)
+        for i, pid in enumerate(pending_ids):
+            store.update_pending_row(
+                pid, rid=f"R-{i}",
+                status=PendingRowStatus.leased,
+                lease_token=f"T-{i}",
+            )
+
+    def _fake_upload(*, store, catalog, work_item):
+        for pid in work_item.pending_ids:
+            store.update_pending_row(
+                pid, status=PendingRowStatus.uploaded,
+                uploaded_at=datetime.now(timezone.utc),
+            )
+        return len(work_item.pending_ids)
+
+    # Stub state-machine transitions so test doesn't require traversing
+    # a multi-step status path (running → stopped → pending_upload → ...).
+    def _fake_transition(*, store, catalog, execution_rid, current, target, mode, extra_fields=None):
+        store.update_execution(execution_rid, status=str(target))
+
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.acquire_leases_for_execution",
+        _fake_acquire,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine._drain_work_item",
+        _fake_upload,
+    )
+    monkeypatch.setattr(
+        "deriva_ml.execution.upload_engine.transition",
+        _fake_transition,
+    )
+
+    report = run_upload_engine(
+        ml=test_ml,
+        execution_rids=[exe.execution_rid],
+        retry_failed=False,
+    )
+    assert report.total_uploaded == 1
+    assert report.total_failed == 0
+    rows = store.list_pending_rows(execution_rid=exe.execution_rid)
+    assert all(r["status"] == "uploaded" for r in rows)
