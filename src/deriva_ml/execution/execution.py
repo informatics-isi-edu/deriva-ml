@@ -45,12 +45,15 @@ from deriva.core import format_exception
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
+    from deriva_ml.execution.pending_summary import PendingSummary
+    from deriva_ml.execution.upload_engine import UploadReport
 from deriva.core.hatrac_store import HatracStore
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.asset.manifest import AssetEntry, AssetManifest
 from deriva_ml.core.base import DerivaML
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     RID,
@@ -81,6 +84,8 @@ from deriva_ml.dataset.upload import (
 from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record import ExecutionRecord
+from deriva_ml.execution.state_machine import transition
+from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
@@ -211,15 +216,17 @@ class Execution:
         self._ml_object = ml_object
         self._model = ml_object.model
         self._logger = ml_object._logger
-        self.start_time = None
-        self.stop_time = None
-        self._status = Status.created
+        # NOTE(E1/E3): self._status / self.start_time / self.stop_time
+        # intentionally removed — execution status and lifecycle
+        # timestamps now live in SQLite (see `status`, `start_time`,
+        # `stop_time` properties below). Every read hits the workspace
+        # registry; no in-memory copy is kept.
         self.uploaded_assets: dict[str, list[AssetFilePath]] | None = None
         self.configuration.argv = sys.argv
         self._execution_record: ExecutionRecord | None = None  # Lazily created after RID is assigned
 
         self.dataset_rids: List[RID] = []
-        self.datasets: list[DatasetBag] = []
+        self._datasets_list: list[DatasetBag] = []
 
         self._working_dir = self._ml_object.working_dir
         self._cache_dir = self._ml_object.cache_dir
@@ -304,6 +311,98 @@ class Execution:
             )
 
         self._initialize_execution(reload)
+
+        # Register the execution in the workspace SQLite registry.
+        # Per spec §2.4, SQLite is authoritative for local state; the
+        # file-tree exists but we do NOT rely on listing the filesystem
+        # to enumerate executions anymore.
+        # Skip when: dry_run (sentinel RID not valid) or reload
+        # (resume_execution path — the row may already exist, and we
+        # shouldn't blow away whatever status/history it already has).
+        if not self._dry_run and reload is None:
+            from datetime import datetime, timezone
+
+            from deriva_ml.execution.state_store import ExecutionStatus
+
+            store = self._ml_object.workspace.execution_state_store()
+            now = datetime.now(timezone.utc)
+
+            # Serialize the ExecutionConfiguration. Pydantic v2 dumps to
+            # a plain dict; model_dump_json then serializes. Includes
+            # the RID + version info so a reconstructed configuration
+            # from a resume_execution call is faithful.
+            config_json = self.configuration.model_dump_json()
+
+            try:
+                store.insert_execution(
+                    rid=self.execution_rid,
+                    workflow_rid=self.workflow_rid,
+                    description=self.configuration.description,
+                    config_json=config_json,
+                    status=ExecutionStatus.created,
+                    mode=self._ml_object._mode,
+                    working_dir_rel=f"execution/{self.execution_rid}",
+                    created_at=now,
+                    last_activity=now,
+                )
+            except Exception as exc:
+                # The catalog row is already created at this point —
+                # don't leave a catalog Execution with no SQLite sibling.
+                # Log and re-raise; the user can recover via
+                # lookup_execution, but workspace-based resume is
+                # impaired until the row is re-registered manually.
+                import logging
+                logger = logging.getLogger("deriva_ml.execution")
+                logger.error(
+                    "create_execution %s: catalog POST succeeded but "
+                    "SQLite registry write FAILED (%s). Execution can "
+                    "be recovered via ml.lookup_execution(rid) + manual "
+                    "adoption.",
+                    self.execution_rid, exc,
+                )
+                raise
+
+    @classmethod
+    def _from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
+        """Bind an Execution to an existing SQLite registry row.
+
+        Distinct from create_execution: does NOT contact the catalog and
+        does NOT POST a new row. Called by ml.resume_execution.
+
+        Temporary implementation for Group D — Group E replaces the body
+        to wire up read-through lifecycle properties.
+
+        Args:
+            ml_object: The DerivaML instance this Execution is bound to.
+            execution_rid: The pre-existing Execution RID.
+
+        Returns:
+            A minimally-initialized Execution with just enough state for
+            execution_rid lookup.
+        """
+        # Minimal construction: skip the existing __init__'s catalog
+        # interactions. Store the rid and ml_object so Group E has a
+        # starting point.
+        instance = cls.__new__(cls)
+        instance._ml_object = ml_object
+        instance._model = ml_object.model
+        instance._logger = getattr(ml_object, "_logger", None)
+        instance.execution_rid = execution_rid
+        instance._dry_run = False
+        # Fields the existing class expects to exist:
+        instance._datasets_list = []
+        instance.dataset_rids = []
+        instance.asset_paths = {}
+        instance.configuration = None  # Group E loads from config_json
+        instance._working_dir = ml_object.working_dir
+        instance._cache_dir = ml_object.cache_dir
+        # NOTE(E1/E3): self._status / self.start_time / self.stop_time
+        # intentionally not set — status and lifecycle timestamps live
+        # in SQLite and are read through the respective properties.
+        instance.uploaded_assets = None
+        instance._execution_record = None
+        instance.workflow_rid = None
+        return instance
 
     def _save_runtime_environment(self):
         runtime_env_path = self.asset_file_path(
@@ -413,7 +512,7 @@ class Execution:
         # Materialize bdbag
         for dataset in self.configuration.datasets:
             self.update_status(Status.initializing, f"Materialize bag {dataset.rid}... ")
-            self.datasets.append(self.download_dataset_bag(dataset))
+            self._datasets_list.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
 
         # Update execution info
@@ -476,30 +575,187 @@ class Execution:
             # Now upload the files so we have the info in case the execution fails.
             self.uploaded_assets = self._upload_execution_dirs()
             self._set_asset_descriptions(self.uploaded_assets)
-        self.start_time = datetime.now()
+        # NOTE(E3): `start_time` is no longer an instance attribute —
+        # the authoritative value is written to SQLite by __enter__ via
+        # state_machine.transition. `_initialize_execution` predates the
+        # read-through design and is part of the legacy path retained
+        # for `execution_start`/`execution_stop` compatibility.
         self.update_status(Status.pending, "Initialize status finished.")
 
     @property
-    def status(self) -> Status:
-        """Get the current execution status.
+    def status(self) -> "ExecutionStatus":
+        """Current execution status, read from SQLite on every access.
+
+        No caching — a mutation from another process (e.g., ``deriva-ml
+        upload`` running in a shell) is visible on the next read.
 
         Returns:
-            Status: The current status (Created, Running, Completed, Failed, etc.).
-        """
-        if self._execution_record is not None:
-            return self._execution_record.status
-        return self._status
+            The ExecutionStatus value from the workspace registry.
 
-    @status.setter
-    def status(self, value: Status) -> None:
-        """Set the execution status.
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd or never created).
 
-        Args:
-            value: The new status value.
+        Example:
+            >>> exe = ml.resume_execution("5-ABC")
+            >>> exe.status
+            <ExecutionStatus.stopped>
         """
-        self._status = value
-        if self._execution_record is not None:
-            self._execution_record._status = value
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+        from deriva_ml.execution.state_store import ExecutionStatus
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        return ExecutionStatus(row["status"])
+
+    @property
+    def error(self) -> str | None:
+        """Last error message for this execution, read from SQLite.
+
+        Parallels ``status`` — no caching, every read hits the workspace
+        registry. Populated by ``__exit__`` when an exception occurs
+        (see spec §2.8 / §2.12).
+
+        Returns:
+            The error message string, or None if no error has been
+            recorded for this execution.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd or never created).
+
+        Example:
+            >>> with exe.execute():
+            ...     raise RuntimeError("boom")
+            >>> exe.error
+            'RuntimeError: boom'
+        """
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        return row["error"]
+
+    @property
+    def start_time(self) -> "datetime | None":
+        """Start time from SQLite, or None if not yet started.
+
+        Parallels ``status`` / ``error`` — no caching, every read hits
+        the workspace registry. Populated by ``__enter__`` when the
+        execution transitions to ``running``. Returned values are
+        coerced to UTC-aware datetimes (SQLite may return naive values
+        even though we store tz-aware).
+
+        Returns:
+            Timezone-aware (UTC) datetime when the execution's
+            ``__enter__`` ran, or None before.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd or never created, e.g. dry-run).
+
+        Example:
+            >>> exe = ml.resume_execution("EXE-A")
+            >>> if exe.start_time is not None:
+            ...     print(f"started at {exe.start_time}")
+        """
+        from datetime import timezone
+
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        value = row["start_time"]
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+    @property
+    def stop_time(self) -> "datetime | None":
+        """Stop time from SQLite, or None if not yet stopped/failed.
+
+        Parallels ``status`` / ``error`` — no caching, every read hits
+        the workspace registry. Populated by ``__exit__`` on either
+        clean stop or exception (see spec §2.8 / §2.12). Returned
+        values are coerced to UTC-aware datetimes.
+
+        Returns:
+            Timezone-aware (UTC) datetime when the execution's
+            ``__exit__`` ran, or None if still running.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing.
+        """
+        from datetime import timezone
+
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        value = row["stop_time"]
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+    @property
+    def datasets(self) -> "DatasetCollection":
+        """Input datasets as a RID-keyed mapping + iterable.
+
+        Replaces the previous ``list[DatasetBag]`` exposure (hard
+        cutover per spec R5.1). The returned collection behaves like a
+        ``Mapping[str, DatasetBag]`` (keyed by ``dataset_rid``) and is
+        also iterable, yielding ``DatasetBag`` values in insertion
+        order.
+
+        Returns:
+            A ``DatasetCollection`` wrapping the materialized
+            ``DatasetBag`` objects that were downloaded during
+            execution initialization.
+
+        Example:
+            >>> # RID lookup (primary access pattern)
+            >>> bag = exe.datasets["1-XYZ"]
+            >>> # Iterate bags in insertion order
+            >>> for bag in exe.datasets:
+            ...     print(bag.dataset_rid)
+            >>> # Introspect which RIDs are present
+            >>> rids = list(exe.datasets.keys())
+            >>> # Count
+            >>> n = len(exe.datasets)
+
+        Migration note:
+            Callers that previously indexed by position
+            (``exe.datasets[0]``) must switch to either
+            ``list(exe.datasets)[0]`` or the RID-keyed lookup
+            ``exe.datasets[rid]``.
+        """
+        from deriva_ml.execution.dataset_collection import DatasetCollection
+        return DatasetCollection(self._datasets_list)
 
     @property
     def execution_record(self) -> ExecutionRecord | None:
@@ -568,10 +824,10 @@ class Execution:
             ...         # No datasets downloaded, use live catalog
             ...         pass
         """
-        if not self.datasets:
+        if not self._datasets_list:
             return None
         # Use the first dataset's model as the primary
-        return DerivaMLDatabase(self.datasets[0].model)
+        return DerivaMLDatabase(self._datasets_list[0].model)
 
     @property
     def catalog(self) -> "DerivaML":
@@ -662,8 +918,18 @@ class Execution:
 
         Example:
             >>> execution.update_status(Status.running, "Processing sample 1 of 10")
+
+        Note:
+            Legacy compatibility shim. The authoritative lifecycle
+            status now lives in SQLite and is driven by
+            ``state_machine.transition()`` via ``__enter__`` /
+            ``__exit__`` / ``abort``. ``update_status`` still writes
+            the catalog-side Status vocabulary (title-case) for
+            callers that haven't been migrated (e.g., multirun runner
+            internals, dataset download progress reporting). It does
+            not touch the SQLite registry — the authoritative
+            lifecycle state is unchanged by this call.
         """
-        self._status = status
         self._logger.info(msg)
 
         if self._dry_run:
@@ -687,8 +953,9 @@ class Execution:
     def execution_start(self) -> None:
         """Marks the execution as started.
 
-        Records the start time and updates the execution's status to 'running'.
-        This should be called before beginning the main execution work.
+        Records the start time in SQLite and updates the execution's
+        status to 'initializing'. This should be called before beginning
+        the main execution work.
 
         Example:
             >>> execution.execution_start()
@@ -698,15 +965,26 @@ class Execution:
             ... except Exception:
             ...     execution.update_status(Status.failed, "Analysis error")
         """
-        self.start_time = datetime.now()
+        from datetime import timezone
+
+        # Persist start_time to SQLite (authoritative source for the
+        # `start_time` read-through property). Skip for dry-run — no
+        # SQLite row exists.
+        if not self._dry_run:
+            store = self._ml_object.workspace.execution_state_store()
+            store.update_execution(
+                self.execution_rid,
+                start_time=datetime.now(timezone.utc),
+            )
         self.uploaded_assets = None
         self.update_status(Status.initializing, "Start execution  ...")
 
     def execution_stop(self) -> None:
         """Marks the execution as completed.
 
-        Records the stop time and updates the execution's status to 'completed'.
-        This should be called after all execution work is finished.
+        Records the stop time in SQLite and updates the execution's
+        status to 'completed'. This should be called after all execution
+        work is finished.
 
         Example:
             >>> try:
@@ -715,16 +993,34 @@ class Execution:
             ... except Exception:
             ...     execution.update_status(Status.failed, "Analysis error")
         """
-        self.stop_time = datetime.now()
-        duration = self.stop_time - self.start_time
-        hours, remainder = divmod(duration.total_seconds(), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        duration = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
+        from datetime import timezone
+
+        now = datetime.now(timezone.utc)
+
+        # Persist stop_time to SQLite (authoritative source for the
+        # `stop_time` read-through property). Skip for dry-run.
+        if not self._dry_run:
+            store = self._ml_object.workspace.execution_state_store()
+            store.update_execution(self.execution_rid, stop_time=now)
+
+        # Compute duration against the start_time read-through property.
+        start = self.start_time
+        if start is not None:
+            # Coerce any naive datetime from SQLite to UTC so arithmetic
+            # with `now` (aware) doesn't raise.
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            duration = now - start
+            hours, remainder = divmod(duration.total_seconds(), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            duration_str = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
+        else:
+            duration_str = "0H 0min 0.0sec"
 
         self.update_status(Status.completed, "Algorithm execution ended.")
         if not self._dry_run:
             self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
-                [{"RID": self.execution_rid, "Duration": duration}]
+                [{"RID": self.execution_rid, "Duration": duration_str}]
             )
 
     def _build_upload_staging(self) -> Path:
@@ -1411,8 +1707,22 @@ class Execution:
         return table_path(self._working_dir, schema=table_schema, table=table)
 
     def execute(self) -> Execution:
-        """Initiate an execution with the provided configuration. Can be used in a context manager."""
-        self.execution_start()
+        """Return self so this Execution can be used as a context manager.
+
+        Per spec §2.8, the lifecycle transitions (created → running →
+        stopped/failed) live on ``__enter__`` / ``__exit__``. ``execute()``
+        itself is a no-op that simply returns ``self`` so usage reads
+        naturally as ``with exe.execute() as e: ...``.
+
+        Returns:
+            This Execution instance, which is itself a context manager.
+
+        Example:
+            >>> with exe.execute() as e:
+            ...     # e.status is ExecutionStatus.running
+            ...     pass
+            >>> # e.status is ExecutionStatus.stopped (or failed on exception)
+        """
         return self
 
     @validate_call
@@ -1641,121 +1951,47 @@ class Execution:
 
             execution_execution.insert([record])
 
-    def list_nested_executions(
-        self,
-        recurse: bool = False,
-        _visited: set[RID] | None = None,
-    ) -> list["ExecutionRecord"]:
-        """List all nested (child) executions of this execution.
-
-        Args:
-            recurse: If True, recursively return all descendant executions.
-            _visited: Internal parameter to track visited executions and prevent infinite recursion.
-
-        Returns:
-            List of nested ExecutionRecord objects, ordered by sequence if available.
-            To get full Execution objects with lifecycle management, use restore_execution().
-
-        Example:
-            >>> children = parent_exec.list_nested_executions()
-            >>> all_descendants = parent_exec.list_nested_executions(recurse=True)
-        """
-        if self._execution_record is not None:
-            return list(self._execution_record.list_nested_executions(recurse=recurse, _visited=_visited))
-
-        # Fallback for dry_run mode
-        if _visited is None:
-            _visited = set()
-
-        if self.execution_rid in _visited:
-            return []
-        _visited.add(self.execution_rid)
-
-        pb = self._ml_object.pathBuilder()
-        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
-
-        # Query for nested executions, ordered by sequence
-        nested = list(
-            execution_execution.filter(execution_execution.Execution == self.execution_rid).entities().fetch()
-        )
-
-        # Sort by sequence (None values at the end)
-        nested.sort(key=lambda x: (x.get("Sequence") is None, x.get("Sequence")))
-
-        children = []
-        for record in nested:
-            child = self._ml_object.lookup_execution(record["Nested_Execution"])
-            children.append(child)
-            if recurse:
-                children.extend(child.list_nested_executions(recurse=True, _visited=_visited))
-
-        return children
-
-    def list_parent_executions(
-        self,
-        recurse: bool = False,
-        _visited: set[RID] | None = None,
-    ) -> list["ExecutionRecord"]:
-        """List all parent executions that contain this execution as a nested child.
-
-        Args:
-            recurse: If True, recursively return all ancestor executions.
-            _visited: Internal parameter to track visited executions and prevent infinite recursion.
-
-        Returns:
-            List of parent ExecutionRecord objects.
-            To get full Execution objects with lifecycle management, use restore_execution().
-
-        Example:
-            >>> parents = child_exec.list_parent_executions()
-            >>> all_ancestors = child_exec.list_parent_executions(recurse=True)
-        """
-        if self._execution_record is not None:
-            return list(self._execution_record.list_parent_executions(recurse=recurse, _visited=_visited))
-
-        # Fallback for dry_run mode
-        if _visited is None:
-            _visited = set()
-
-        if self.execution_rid in _visited:
-            return []
-        _visited.add(self.execution_rid)
-
-        pb = self._ml_object.pathBuilder()
-        execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
-
-        parent_records = list(
-            execution_execution.filter(execution_execution.Nested_Execution == self.execution_rid).entities().fetch()
-        )
-
-        parents = []
-        for record in parent_records:
-            parent = self._ml_object.lookup_execution(record["Execution"])
-            parents.append(parent)
-            if recurse:
-                parents.extend(parent.list_parent_executions(recurse=True, _visited=_visited))
-
-        return parents
-
     def is_nested(self) -> bool:
         """Check if this execution is nested within another execution.
 
+        Hierarchy queries live on :class:`ExecutionRecord` only (per spec
+        R2.1). This shortcut delegates to
+        ``self._execution_record.is_nested()`` when available.
+
         Returns:
             True if this execution has at least one parent execution.
+
+        Raises:
+            DerivaMLException: If this Execution has no bound
+                ExecutionRecord (e.g. a dry-run execution).
         """
-        if self._execution_record is not None:
-            return self._execution_record.is_nested()
-        return len(self.list_parent_executions()) > 0
+        if self._execution_record is None:
+            raise DerivaMLException(
+                "is_nested requires a bound ExecutionRecord. "
+                "Hierarchy queries are not available in dry-run mode."
+            )
+        return self._execution_record.is_nested()
 
     def is_parent(self) -> bool:
         """Check if this execution has nested child executions.
 
+        Hierarchy queries live on :class:`ExecutionRecord` only (per spec
+        R2.1). This shortcut delegates to
+        ``self._execution_record.is_parent()`` when available.
+
         Returns:
             True if this execution has at least one nested execution.
+
+        Raises:
+            DerivaMLException: If this Execution has no bound
+                ExecutionRecord (e.g. a dry-run execution).
         """
-        if self._execution_record is not None:
-            return self._execution_record.is_parent()
-        return len(self.list_nested_executions()) > 0
+        if self._execution_record is None:
+            raise DerivaMLException(
+                "is_parent requires a bound ExecutionRecord. "
+                "Hierarchy queries are not available in dry-run mode."
+            )
+        return self._execution_record.is_parent()
 
     def __str__(self):
         items = [
@@ -1768,37 +2004,255 @@ class Execution:
         ]
         return "\n".join(items)
 
-    def __enter__(self):
-        """
-        Method invoked when entering the context.
+    def __repr__(self) -> str:
+        """One-line summary including status and pending counts.
+
+        Pending counts read SQLite — no caching. Example output::
+
+            <Execution EXE-A status=stopped pending=15rows/2files>
+
+        Omits the pending suffix when there are no pending rows or
+        files. Always guards against exceptions — ``repr`` MUST NOT
+        raise, so reads that would raise (e.g., the registry row is
+        missing) degrade to ``<Execution EXE-A>``.
 
         Returns:
-        - self: The instance itself.
-
+            Compact repr string suitable for logs and interactive use.
         """
-        self.execution_start()
+        try:
+            store = self._ml_object.workspace.execution_state_store()
+            row = store.get_execution(self.execution_rid)
+            if row is None:
+                return f"<Execution {self.execution_rid} status=? (not in registry)>"
+            counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
+            pending_part = ""
+            if counts["pending_rows"] or counts["pending_files"]:
+                pending_part = (
+                    f" pending={counts['pending_rows']}rows/"
+                    f"{counts['pending_files']}files"
+                )
+            return (
+                f"<Execution {self.execution_rid} "
+                f"status={row['status']}{pending_part}>"
+            )
+        except Exception:  # repr must not raise
+            return f"<Execution {self.execution_rid}>"
+
+    def __enter__(self) -> "Execution":
+        """Begin the execution: status created → running.
+
+        Routes through ``state_machine.transition()`` so the SQLite
+        write, online-mode catalog sync, and allowed-transition
+        validation all run in a single atomic step. Sets
+        ``start_time`` in the same transaction (read back via the
+        ``start_time`` property).
+
+        Dry-run executions skip the transition entirely — there is no
+        SQLite registry row for a dry-run (sentinel RID), so there is
+        nothing to transition. ``start_time`` reads back as None for
+        dry-runs.
+
+        Returns:
+            This Execution instance.
+
+        Raises:
+            InvalidTransitionError: If the execution is not currently
+                in ``ExecutionStatus.created``.
+
+        Example:
+            >>> with exe.execute() as e:
+            ...     e.status
+            <ExecutionStatus.running>
+        """
+        from datetime import datetime, timezone
+
+        if self._dry_run:
+            # No SQLite row for dry-run executions, so start_time read
+            # through the property returns None. That's acceptable —
+            # dry-runs are transient and not observed via start_time.
+            return self
+
+        current = self.status  # read-through from SQLite
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(
+                self._ml_object.catalog
+                if self._ml_object._mode is ConnectionMode.online
+                else None
+            ),
+            execution_rid=self.execution_rid,
+            current=current,
+            target=ExecutionStatus.running,
+            mode=self._ml_object._mode,
+            extra_fields={"start_time": datetime.now(timezone.utc)},
+        )
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> bool:
-        """
-        Method invoked when exiting the context.
+        """End the execution: status running → stopped (clean) or failed.
+
+        On clean exit, transitions to ``stopped``. On exception, transitions
+        to ``failed`` and stores the exception message in the ``error``
+        column. Per spec §2.12 / R6.3, returns False to propagate any
+        exception (unlike the legacy ``__exit__`` which returned True to
+        suppress). After the transition, emits an INFO log summarizing
+        pending rows/files if any are still staged (the full
+        ``PendingSummary`` render lands in Group G; this is the
+        placeholder.)
 
         Args:
-           exc_type: Exception type.
-           exc_value: Exception value.
-           exc_tb: Exception traceback.
+           exc_type: Exception type (or None on clean exit).
+           exc_value: Exception value (or None on clean exit).
+           exc_tb: Exception traceback (or None on clean exit).
 
         Returns:
-           bool: True if execution completed successfully, False otherwise.
+           False — always. Any exception propagates to the caller.
         """
-        if not exc_type:
-            self.update_status(Status.running, "Successfully run Ml.")
-            self.execution_stop()
-            return True
-        else:
-            self.update_status(
-                Status.failed,
-                f"Exception type: {exc_type}, Exception value: {exc_value}",
-            )
-            logging.error(f"Exception type: {exc_type}, Exception value: {exc_value}, Exception traceback: {exc_tb}")
+        from datetime import datetime, timezone
+
+        if self._dry_run:
+            # No SQLite row for dry-run executions; stop_time read-through
+            # returns None. Log any exception before returning.
+            if exc_value is not None:
+                logging.error(
+                    "Dry-run execution failed: %s: %s",
+                    exc_type.__name__, exc_value,
+                )
             return False
+
+        current = self.status
+        now = datetime.now(timezone.utc)
+
+        if exc_value is None:
+            target = ExecutionStatus.stopped
+            extra = {"stop_time": now}
+        else:
+            target = ExecutionStatus.failed
+            extra = {"stop_time": now, "error": f"{exc_type.__name__}: {exc_value}"}
+
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(
+                self._ml_object.catalog
+                if self._ml_object._mode is ConnectionMode.online
+                else None
+            ),
+            execution_rid=self.execution_rid,
+            current=current,
+            target=target,
+            mode=self._ml_object._mode,
+            extra_fields=extra,
+        )
+
+        # Emit the pending-summary INFO log per §2.12 / R6.3. Full
+        # PendingSummary object lands in Group G; this is a placeholder.
+        store = self._ml_object.workspace.execution_state_store()
+        counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
+        if counts["pending_rows"] or counts["pending_files"]:
+            logging.getLogger("deriva_ml.execution").info(
+                "[Execution %s] exited with pending: "
+                "%d rows, %d files. Call exe.upload_outputs() to flush.",
+                self.execution_rid,
+                counts["pending_rows"], counts["pending_files"],
+            )
+
+        if exc_value is not None:
+            logging.error(
+                "Execution %s failed: %s: %s",
+                self.execution_rid, exc_type.__name__, exc_value,
+            )
+
+        # Propagate any exception.
+        return False
+
+    def abort(self) -> None:
+        """Mark this execution as aborted.
+
+        Legal from any non-terminal status (``created``, ``running``,
+        ``stopped``, ``failed``). Pending rows are NOT discarded —
+        the user can inspect them and decide whether to recover via
+        ``resume_execution`` or discard via ``gc_executions``.
+
+        Dry-run executions have no SQLite registry row, so abort() is
+        a no-op for them.
+
+        Raises:
+            InvalidTransitionError: If the current status doesn't allow
+                abort (e.g., status='uploaded' — terminal).
+
+        Example:
+            >>> exe = ml.resume_execution("EXE-A")
+            >>> exe.abort()
+            >>> exe.status
+            <ExecutionStatus.aborted>
+        """
+        if self._dry_run:
+            return
+
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(
+                self._ml_object.catalog
+                if self._ml_object._mode is ConnectionMode.online
+                else None
+            ),
+            execution_rid=self.execution_rid,
+            current=self.status,
+            target=ExecutionStatus.aborted,
+            mode=self._ml_object._mode,
+        )
+
+    def pending_summary(self) -> "PendingSummary":
+        """Return a snapshot of pending upload state for this execution.
+
+        Read-only; does not affect state. Safe to call from anywhere at
+        any time, including from a separate process holding the same
+        workspace.
+
+        Returns:
+            PendingSummary with per-table row and asset counts and
+            diagnostic messages from any failed rows.
+
+        Example:
+            >>> summary = exe.pending_summary()
+            >>> if summary.has_pending:
+            ...     print(summary.render())
+        """
+        from deriva_ml.execution.pending_summary import (
+            PendingAssetCount,
+            PendingRowCount,
+            PendingSummary,
+        )
+
+        store = self._ml_object.workspace.execution_state_store()
+        data = store.pending_summary_rows(execution_rid=self.execution_rid)
+        return PendingSummary(
+            execution_rid=self.execution_rid,
+            rows=[PendingRowCount(**r) for r in data["rows"]],
+            assets=[PendingAssetCount(**a) for a in data["assets"]],
+            diagnostics=data["diagnostics"],
+        )
+
+    def upload_outputs(
+        self,
+        *,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadReport":
+        """Upload this execution's pending rows and asset files.
+
+        Sugar for ml.upload_pending(execution_rids=[self.execution_rid],
+        **kwargs). See upload_pending for details.
+
+        Example:
+            >>> with exe.execute() as e:
+            ...     ... work ...
+            >>> exe.upload_outputs()
+        """
+        return self._ml_object.upload_pending(
+            execution_rids=[self.execution_rid],
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
+        )

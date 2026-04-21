@@ -62,6 +62,7 @@ from hydra_zen import store
 from omegaconf import OmegaConf
 from pydantic import BaseModel, model_validator
 
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import ML_SCHEMA
 
 
@@ -98,6 +99,9 @@ class DerivaMLConfig(BaseModel):
         clean_execution_dir: Whether to automatically clean execution working directories
             after successful upload. Defaults to True. Set to False to retain local copies
             of execution outputs for debugging or manual inspection.
+        mode: Connection mode. ``ConnectionMode.online`` (default) talks to the catalog
+            eagerly; ``ConnectionMode.offline`` stages all writes in a workspace SQLite
+            database. Accepts either an enum value or its string literal ("online"/"offline").
 
     Example:
         >>> config = DerivaMLConfig(
@@ -124,6 +128,7 @@ class DerivaMLConfig(BaseModel):
     use_minid: bool | None = None  # None means "auto" - True if s3_bucket is set
     check_auth: bool = True
     clean_execution_dir: bool = True
+    mode: ConnectionMode | str = ConnectionMode.online
 
     @model_validator(mode="after")
     def init_working_dir(self) -> "DerivaMLConfig":

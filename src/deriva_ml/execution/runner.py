@@ -116,8 +116,8 @@ This creates:
 - Child 2: learning_rate=0.1 (sequence=2)
 
 Query nested executions via the catalog or MCP tools:
-- list_nested_executions(parent_rid)
-- list_parent_executions(child_rid)
+- list_execution_children(parent_rid)
+- list_execution_parents(child_rid)
 
 Configuration Groups
 --------------------

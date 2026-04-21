@@ -4,7 +4,6 @@ This module provides enumeration classes used throughout DerivaML for representi
 types, and vocabularies. Each enum class represents a specific set of constants used in the system.
 
 Classes:
-    BaseStrEnum: Base class for string-based enums.
     UploadState: States for file upload operations.
     Status: Execution status values.
     BuiltinTypes: Alias for BuiltinType from deriva.core.typed.
@@ -14,7 +13,7 @@ Classes:
     ExecAssetType: Execution asset type identifiers.
 """
 
-from enum import Enum
+from enum import Enum, StrEnum
 
 # Import BuiltinType from deriva.core.typed
 from deriva.core.typed import BuiltinType
@@ -26,22 +25,6 @@ BuiltinTypes = BuiltinType
 This maintains backwards compatibility with existing DerivaML code that uses
 the plural form 'BuiltinTypes'. New code should use BuiltinType directly.
 """
-
-
-class BaseStrEnum(str, Enum):
-    """Base class for string-based enumerations.
-
-    Extends both str and Enum to create string enums that are both string-like and enumerated.
-    This provides type safety while maintaining string compatibility.
-
-    Example:
-        >>> class MyEnum(BaseStrEnum):
-        ...     VALUE = "value"
-        >>> isinstance(MyEnum.VALUE, str)  # True
-        >>> isinstance(MyEnum.VALUE, Enum)  # True
-    """
-
-    pass
 
 
 class UploadState(Enum):
@@ -70,7 +53,7 @@ class UploadState(Enum):
     timeout = 7
 
 
-class Status(BaseStrEnum):
+class Status(StrEnum):
     """Execution status values.
 
     Represents the various states an execution can be in throughout its lifecycle.
@@ -94,7 +77,7 @@ class Status(BaseStrEnum):
     failed = "Failed"
 
 
-class MLVocab(BaseStrEnum):
+class MLVocab(StrEnum):
     """Controlled vocabulary table identifiers.
 
     Defines the names of controlled vocabulary tables used in DerivaML. These tables
@@ -116,7 +99,7 @@ class MLVocab(BaseStrEnum):
     feature_name = "Feature_Name"
 
 
-class MLAsset(BaseStrEnum):
+class MLAsset(StrEnum):
     """Asset type identifiers.
 
     Defines the types of assets that can be associated with executions.
@@ -130,7 +113,7 @@ class MLAsset(BaseStrEnum):
     execution_asset = "Execution_Asset"
 
 
-class MLTable(BaseStrEnum):
+class MLTable(StrEnum):
     """Core ML schema table identifiers.
 
     Defines the names of the core tables in the deriva-ml schema. These tables
@@ -159,7 +142,7 @@ class MLTable(BaseStrEnum):
     execution_asset = "Execution_Asset"
 
 
-class ExecMetadataType(BaseStrEnum):
+class ExecMetadataType(StrEnum):
     """Execution metadata type identifiers.
 
     Defines the types of metadata that can be associated with an execution.
@@ -177,7 +160,7 @@ class ExecMetadataType(BaseStrEnum):
     deriva_config = "Deriva_Config"
 
 
-class ExecAssetType(BaseStrEnum):
+class ExecAssetType(StrEnum):
     """Execution asset type identifiers.
 
     Defines the types of assets that can be produced or consumed during an execution.

@@ -24,6 +24,7 @@ except ImportError:
 
 from deriva_ml import DerivaML
 from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
+from deriva_ml.dataset.aux_classes import VersionPart
 from deriva_ml.execution.execution import ExecutionConfiguration
 
 
@@ -1544,4 +1545,121 @@ class TestNewFKPatterns:
         assert len(df) == image_count, (
             f"Row count ({len(df)}) should match Image member count ({image_count}). "
             "Each Image should have exactly one quality feature value."
+        )
+
+
+class TestVersionPinnedDenormalize:
+    """Verify denormalize resolves ``version=`` to a catalog snapshot.
+
+    The contract (per Rule 10 refinement, originally deferred in the
+    spec and now implemented):
+
+    * With no ``version=`` kwarg, denormalize runs against whatever
+      catalog the ``DerivaML`` / ``Dataset`` instance is bound to —
+      the live catalog in normal use, or a pre-pinned snapshot if the
+      instance was constructed via :meth:`DerivaML.catalog_snapshot`.
+    * With an explicit ``version="X.Y.Z"``, denormalize resolves X.Y.Z
+      to its catalog snapshot via :meth:`Dataset._version_snapshot_catalog`
+      and runs ``list_dataset_members`` + the paged row fetch against
+      that snapshot — so the result reflects the catalog state at the
+      time version X.Y.Z was recorded.
+    * A ``DatasetBag`` is already materialized at a fixed version; the
+      ``version=`` kwarg is not accepted on bag sugar methods because
+      the bag's own SQLite IS the version pin.
+
+    The tests below exercise these three shapes against a live catalog.
+    """
+
+    def test_live_catalog_denormalize_no_version_uses_current(self, dataset_test, tmp_path):
+        """No ``version=`` ⇒ denormalize uses the live (current) catalog.
+
+        Baseline check: a bare call returns rows for the current state.
+        """
+        dataset = dataset_test.dataset_description.dataset
+
+        df = dataset.get_denormalized_as_dataframe(
+            include_tables=["Subject"],
+            ignore_unrelated_anchors=True,
+        )
+
+        assert len(df) > 0, "Expected rows from live-catalog denormalize"
+        assert any(c.startswith("Subject.") for c in df.columns)
+
+    def test_explicit_version_uses_snapshot(self, dataset_test, tmp_path):
+        """``version="X.Y.Z"`` ⇒ results match the snapshot recorded at X.Y.Z.
+
+        Procedure:
+        1. Capture current version v0 and denormalize at that version.
+        2. Increment to v1 (creating a new snapshot) — but do NOT add
+           any new dataset members, so v0 and v1 reference the same
+           set of member RIDs on the server side.
+        3. Denormalize at v0 and at v1. Both should succeed and return
+           the same set of Subject RIDs (since no membership changed).
+        4. The key property: denormalize at v0 runs against the v0
+           snapshot catalog (not the current catalog) — if snapshot
+           resolution were broken, the call would either fail (snapshot
+           not found) or silently fall through to current catalog. We
+           verify the call succeeds and returns stable RID sets.
+        """
+        dataset = dataset_test.dataset_description.dataset
+
+        v0 = str(dataset.current_version)
+        df_v0 = dataset.get_denormalized_as_dataframe(
+            include_tables=["Subject"],
+            ignore_unrelated_anchors=True,
+            version=v0,
+        )
+        assert len(df_v0) > 0, "Expected rows from v0 snapshot denormalize"
+        v0_rids = set(df_v0["Subject.RID"].dropna())
+
+        # Bump to v1 (creates a new snapshot) without changing members.
+        v1 = str(dataset.increment_dataset_version(component=VersionPart.patch))
+        assert v0 != v1, "Version increment should produce a distinct version string"
+
+        df_v1 = dataset.get_denormalized_as_dataframe(
+            include_tables=["Subject"],
+            ignore_unrelated_anchors=True,
+            version=v1,
+        )
+        assert len(df_v1) > 0, "Expected rows from v1 snapshot denormalize"
+        v1_rids = set(df_v1["Subject.RID"].dropna())
+
+        # Membership unchanged → RID sets must match.
+        assert v0_rids == v1_rids, (
+            f"v0 and v1 snapshots should have identical Subject RIDs; "
+            f"diff: v0-only={v0_rids - v1_rids}, v1-only={v1_rids - v0_rids}"
+        )
+
+        # And also match the live (no-version) call — since nothing
+        # changed between v1 and live.
+        df_live = dataset.get_denormalized_as_dataframe(
+            include_tables=["Subject"],
+            ignore_unrelated_anchors=True,
+        )
+        assert set(df_live["Subject.RID"].dropna()) == v0_rids
+
+    def test_bag_is_pinned_to_download_version(self, dataset_test, tmp_path):
+        """A ``DatasetBag`` is already at a fixed version; no ``version=`` arg accepted.
+
+        Download at v0, then bump the live catalog. The bag should still
+        reflect v0's state regardless of what the live catalog does next
+        — the bag's SQLite IS the version pin.
+        """
+        dataset = dataset_test.dataset_description.dataset
+
+        v0 = str(dataset.current_version)
+        bag_v0 = dataset.download_dataset_bag(v0, use_minid=False)
+        bag_v0_rids = {
+            m["RID"] for m in bag_v0.list_dataset_members(recurse=True).get("Subject", [])
+        }
+
+        # Bump the live catalog to v1.
+        dataset.increment_dataset_version(component=VersionPart.patch)
+
+        # The bag remains at v0 — bag's own SQLite is unchanged.
+        df = bag_v0.get_denormalized_as_dataframe(include_tables=["Subject"])
+        bag_denorm_rids = set(df["Subject.RID"].dropna())
+        assert bag_denorm_rids == bag_v0_rids, (
+            "Bag denormalize should return exactly the Subjects in the bag "
+            "regardless of later live-catalog changes."
         )

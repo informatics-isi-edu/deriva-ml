@@ -45,6 +45,7 @@ deriva_tags = _core_utils.tag
 GlobusNativeLogin = _globus_auth_utils.GlobusNativeLogin
 
 from deriva_ml.core.config import DerivaMLConfig
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import ML_SCHEMA, RID, Status, TableDefinition, VocabularyTableDef
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
@@ -228,6 +229,7 @@ class DerivaML(
         use_minid: bool | None = None,
         check_auth: bool = True,
         clean_execution_dir: bool = True,
+        mode: ConnectionMode | str = ConnectionMode.online,
     ) -> None:
         """Initializes a DerivaML instance.
 
@@ -259,7 +261,19 @@ class DerivaML(
             check_auth: Check if the user has access to the catalog.
             clean_execution_dir: Whether to automatically clean up execution working directories
                 after successful upload. Defaults to True. Set to False to retain local copies.
+            mode: Connection mode for this instance. ``ConnectionMode.online`` (default)
+                sends writes to the catalog eagerly; ``ConnectionMode.offline`` stages
+                writes into local SQLite for later upload. Accepts the string
+                literals ``"online"`` or ``"offline"``; any other value raises
+                ``ValueError``. See spec §2.1.
         """
+        # Store connection mode (see spec §2.1).
+        # Done before catalog connection so subclasses/mixins can read
+        # ``self._mode`` during their own setup if needed.
+        # ``ConnectionMode(x)`` is idempotent on enum members and coerces
+        # strings ("online"/"offline") uniformly; unknown strings raise ValueError.
+        self._mode = ConnectionMode(mode)
+
         # Get or use provided credentials for server access
         self.credential = credential or get_credential(hostname)
 
@@ -339,6 +353,26 @@ class DerivaML(
         self.status = Status.pending.value
         self.clean_execution_dir = clean_execution_dir
 
+        # Reconcile any pending_rows stuck in 'leasing' from a prior
+        # crash. Workspace-wide sweep; per-execution reconciliation
+        # runs additionally on resume_execution (Group D).
+        if self._mode is ConnectionMode.online:
+            from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+
+            try:
+                reconcile_pending_leases(
+                    store=self.workspace.execution_state_store(),
+                    catalog=self.catalog,
+                    execution_rid=None,
+                )
+            except Exception as exc:
+                # Best-effort. If reconciliation itself fails, log and
+                # move on — the user's operation can still proceed;
+                # the next acquire_leases call will retry.
+                logging.getLogger("deriva_ml").warning(
+                    "startup lease reconciliation failed (%s); continuing", exc,
+                )
+
     def __del__(self) -> None:
         """Cleanup method to handle incomplete executions."""
         try:
@@ -408,6 +442,21 @@ class DerivaML(
             logging_level=self._logging_level,
             deriva_logging_level=self._deriva_logging_level,
         )
+
+    @property
+    def mode(self) -> ConnectionMode:
+        """Current connection mode.
+
+        Returns:
+            The ConnectionMode this DerivaML instance was constructed
+            with. Drives whether writes go live to the catalog (online)
+            or stage in SQLite for later upload (offline). See spec §2.1.
+
+        Example:
+            >>> ml.mode is ConnectionMode.online
+            True
+        """
+        return self._mode
 
     @property
     def _dataset_table(self) -> Table:
@@ -1586,7 +1635,7 @@ class DerivaML(
     # - create_feature, feature_record_class, delete_feature, lookup_feature, list_feature_values -> FeatureMixin
     # - find_datasets, create_dataset, lookup_dataset, delete_dataset, list_dataset_element_types,
     #   add_dataset_element_type, download_dataset_bag -> DatasetMixin
-    # - _update_status, create_execution, restore_execution -> ExecutionMixin
+    # - _update_status, create_execution, resume_execution -> ExecutionMixin
     # - add_files, list_files, _bootstrap_versions, _synchronize_dataset_versions, _set_version_snapshot -> FileMixin
 
 

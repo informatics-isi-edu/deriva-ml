@@ -1,24 +1,40 @@
 """Execution management mixin for DerivaML.
 
 This module provides the ExecutionMixin class which handles
-execution operations including creating, restoring, and updating
+execution operations including creating, resuming, and updating
 execution status.
 """
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.enums import Status
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.upload import asset_file_path, execution_rids
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+from deriva_ml.execution.execution_record_v2 import (
+    ExecutionRecord as _ExecutionRecordV2,
+)
+from deriva_ml.execution.state_machine import (
+    flush_pending_sync,
+    reconcile_with_catalog,
+)
+from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.execution.upload_engine import run_upload_engine
 
 if TYPE_CHECKING:
+    from deriva_ml.asset.aux_classes import AssetSpec
+    from deriva_ml.dataset.aux_classes import DatasetSpec
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord
+    from deriva_ml.execution.pending_summary import WorkspacePendingSummary
+    from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.execution.upload_job import UploadJob
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
     from deriva_ml.model.catalog import DerivaModel
@@ -36,7 +52,7 @@ class ExecutionMixin:
 
     Methods:
         create_execution: Create a new execution environment
-        restore_execution: Restore a previous execution
+        resume_execution: Re-hydrate a previous execution from the registry
         _update_status: Update execution status in catalog
     """
 
@@ -69,42 +85,170 @@ class ExecutionMixin:
         )
 
     def create_execution(
-        self, configuration: ExecutionConfiguration, workflow: "Workflow | RID | None" = None, dry_run: bool = False
+        self,
+        configuration: "ExecutionConfiguration | None" = None,
+        *,
+        datasets: "list[DatasetSpec | str] | None" = None,
+        assets: "list[AssetSpec | str] | None" = None,
+        workflow: "Workflow | RID | str | None" = None,
+        description: "str | None" = None,
+        dry_run: bool = False,
     ) -> "Execution":
         """Create an execution environment.
 
-        Initializes a local compute environment for executing an ML or analytic routine.
-        This has several side effects:
+        Initializes a local compute environment for executing an ML or
+        analytic routine. Accepts either a pre-built
+        :class:`ExecutionConfiguration` (the config-object form) or
+        individual keyword arguments that the method assembles into an
+        ``ExecutionConfiguration`` (the kwargs form). Mixing the two
+        forms is rejected with ``TypeError`` — pick one.
 
-        1. Downloads datasets specified in the configuration to the cache directory.
-           If no version is specified, creates a new minor version for the dataset.
+        Creating executions requires online mode because the Execution
+        RID is server-assigned.
+
+        Side effects:
+
+        1. Downloads datasets specified in the configuration to the
+           cache directory. If no version is specified, creates a new
+           minor version for the dataset.
         2. Downloads any execution assets to the working directory.
-        3. Creates an execution record in the catalog (unless dry_run=True).
+        3. Creates an execution record in the catalog (unless
+           ``dry_run=True``).
 
         Args:
-            configuration: ExecutionConfiguration specifying execution parameters.
-            workflow: Optional Workflow object or RID if not present in configuration.
-            dry_run: If True, skip creating catalog records and uploading results.
+            configuration: A pre-built ExecutionConfiguration. If this
+                is provided, all of the kwargs below (except
+                ``dry_run``) must be None.
+            datasets: Kwargs form only. List of :class:`DatasetSpec`
+                or ``"RID@version"`` shorthand strings; strings are
+                coerced via :meth:`DatasetSpec.from_shorthand`.
+            assets: Kwargs form only. List of :class:`AssetSpec` or
+                bare RID strings; strings are coerced to
+                ``AssetSpec(rid=...)``.
+            workflow: A :class:`Workflow` object, a Workflow RID, or a
+                workflow URL string. Strings that look like URLs are
+                resolved via :meth:`lookup_workflow_by_url`. Accepted
+                in both forms — in the config-object form it
+                supplements / overrides ``configuration.workflow``; in
+                the kwargs form it is the workflow for the execution.
+            description: Kwargs form only. Human-readable description
+                of the execution.
+            dry_run: If True, skip creating catalog records and
+                uploading results.
 
         Returns:
-            Execution: An execution object for managing the execution lifecycle.
+            An :class:`Execution` object for managing the execution
+            lifecycle.
+
+        Raises:
+            TypeError: If ``configuration`` is given alongside
+                ``datasets``, ``assets``, or ``description`` kwargs.
+            DerivaMLOfflineError: If the current connection mode is
+                :attr:`ConnectionMode.offline`.
 
         Example:
-            >>> config = ExecutionConfiguration(
-            ...     workflow=workflow,
-            ...     description="Process samples",
-            ...     datasets=[DatasetSpec(rid="4HM")],
-            ... )
-            >>> with ml.create_execution(config) as execution:
-            ...     # Run analysis
-            ...     pass
-            >>> execution.upload_execution_outputs()
+            Config-object form::
+
+                >>> config = ExecutionConfiguration(
+                ...     workflow=workflow,
+                ...     description="Process samples",
+                ...     datasets=[DatasetSpec(rid="4HM", version="1.0.0")],
+                ... )
+                >>> with ml.create_execution(config) as execution:
+                ...     # Run analysis
+                ...     pass
+                >>> execution.upload_execution_outputs()
+
+            Kwargs form (equivalent)::
+
+                >>> with ml.create_execution(
+                ...     datasets=["4HM@1.0.0"],
+                ...     workflow=workflow,
+                ...     description="Process samples",
+                ... ) as execution:
+                ...     # Run analysis
+                ...     pass
         """
         # Import here to avoid circular dependency
+        from deriva_ml.asset.aux_classes import AssetSpec
+        from deriva_ml.core.exceptions import DerivaMLOfflineError
+        from deriva_ml.dataset.aux_classes import DatasetSpec
         from deriva_ml.execution.execution import Execution
+        from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+        from deriva_ml.execution.workflow import Workflow as WorkflowClass
+
+        # Offline guard first — the error should be about the mode,
+        # not a downstream validation issue.
+        if self._mode is ConnectionMode.offline:
+            raise DerivaMLOfflineError(
+                "create_execution requires online mode — the Execution "
+                "RID is server-assigned. Switch to "
+                "ConnectionMode.online to create, then you can run "
+                "offline scripts via resume_execution."
+            )
+
+        # Reject mixed forms. Note: ``workflow`` and ``dry_run`` are
+        # accepted in both forms (workflow had legacy config-form
+        # support; dry_run is universal). Only the kwargs-only fields
+        # gate the mixing check.
+        kwargs_form_only = any(
+            x is not None for x in (datasets, assets, description)
+        )
+        if configuration is not None and kwargs_form_only:
+            raise TypeError(
+                "create_execution: cannot mix configuration= with "
+                "datasets/assets/description kwargs; pass exactly one "
+                "form."
+            )
+
+        # Resolve a string workflow to a Workflow object (used by both forms).
+        resolved_workflow = workflow
+        if isinstance(resolved_workflow, str):
+            resolved_workflow = self.lookup_workflow_by_url(resolved_workflow)
+
+        if configuration is None:
+            # Kwargs form: assemble an ExecutionConfiguration.
+            ds_specs: list[DatasetSpec] = []
+            for d in datasets or []:
+                if isinstance(d, str):
+                    ds_specs.append(DatasetSpec.from_shorthand(d))
+                else:
+                    ds_specs.append(d)
+            as_specs: list[AssetSpec] = []
+            for a in assets or []:
+                if isinstance(a, str):
+                    as_specs.append(AssetSpec(rid=a))
+                else:
+                    as_specs.append(a)
+
+            configuration = ExecutionConfiguration(
+                datasets=ds_specs,
+                assets=as_specs,
+                workflow=resolved_workflow
+                if isinstance(resolved_workflow, WorkflowClass)
+                else None,
+                description=description or "",
+            )
+            # If workflow is a RID (not a Workflow or string URL),
+            # pass it through the legacy workflow= parameter so
+            # Execution.__init__ can raise its own clear error
+            # (our job is just assembly, not re-validation).
+            workflow_for_execution = (
+                resolved_workflow
+                if not isinstance(resolved_workflow, WorkflowClass)
+                else None
+            )
+        else:
+            # Config-object form: preserve legacy behaviour.
+            workflow_for_execution = resolved_workflow
 
         # Create and store an execution instance
-        self._execution = Execution(configuration, self, workflow=workflow, dry_run=dry_run)  # type: ignore[arg-type]
+        self._execution = Execution(
+            configuration,
+            self,
+            workflow=workflow_for_execution,
+            dry_run=dry_run,
+        )  # type: ignore[arg-type]
         return self._execution
 
     def lookup_execution(self, execution_rid: RID) -> "ExecutionRecord":
@@ -114,7 +258,7 @@ class ExecutionMixin:
         metadata. The ExecutionRecord provides access to the catalog record
         state and allows updating mutable properties like status and description.
 
-        For running computations with datasets and assets, use ``restore_execution()``
+        For running computations with datasets and assets, use ``resume_execution()``
         or ``create_execution()`` which return full Execution objects.
 
         Args:
@@ -141,8 +285,8 @@ class ExecutionMixin:
 
             Query relationships::
 
-                >>> children = list(record.list_nested_executions())
-                >>> parents = list(record.list_parent_executions())
+                >>> children = list(record.list_execution_children())
+                >>> parents = list(record.list_execution_parents())
         """
         # Import here to avoid circular dependency
         from deriva_ml.execution.execution_record import ExecutionRecord
@@ -191,64 +335,254 @@ class ExecutionMixin:
 
         return record
 
-    def restore_execution(self, execution_rid: RID | None = None) -> "Execution":
-        """Restores a previous execution.
+    def list_executions(
+        self,
+        *,
+        status: "ExecutionStatus | list[ExecutionStatus] | None" = None,
+        workflow_rid: str | None = None,
+        mode: "ConnectionMode | None" = None,
+        since: datetime | None = None,
+    ) -> list[_ExecutionRecordV2]:
+        """Return known-local executions matching the filters.
 
-        Given an execution RID, retrieves the execution configuration and restores the local compute environment.
-        This routine has a number of side effects.
-
-        1. The datasets specified in the configuration are downloaded and placed in the cache-dir. If a version is
-        not specified in the configuration, then a new minor version number is created for the dataset and downloaded.
-
-        2. If any execution assets are provided in the configuration, they are downloaded and placed
-        in the working directory.
+        Reads from the workspace SQLite registry — no server contact.
+        Works in both online and offline mode.
 
         Args:
-            execution_rid: Resource Identifier (RID) of the execution to restore.
+            status: Single ExecutionStatus or list to filter; None = all.
+            workflow_rid: Match only executions tagged with this Workflow
+                RID; None = all.
+            mode: ConnectionMode the execution was last active under;
+                None = all.
+            since: Return only executions with last_activity >= this
+                timestamp (timezone-aware). None = no time filter.
 
         Returns:
-            Execution: An execution object representing the restored execution environment.
-
-        Raises:
-            DerivaMLException: If execution_rid is not valid or execution cannot be restored.
+            List of ExecutionRecord dataclasses — one per matching row.
+            Empty list if nothing matches. Pending-row counts are derived
+            in the same pass.
 
         Example:
-            >>> execution = ml.restore_execution("1-abc123")
+            >>> from deriva_ml.execution.state_store import ExecutionStatus
+            >>> failed = ml.list_executions(status=ExecutionStatus.failed)
+            >>> for rec in failed:
+            ...     print(rec.rid, rec.error)
         """
-        # Import here to avoid circular dependency
-        from deriva_ml.execution.execution import Execution
+        store = self.workspace.execution_state_store()
+        rows = store.list_executions(
+            status=status, workflow_rid=workflow_rid,
+            mode=mode, since=since,
+        )
+        return [
+            _ExecutionRecordV2.from_row(
+                row, **store.count_pending_by_kind(execution_rid=row["rid"])
+            )
+            for row in rows
+        ]
 
-        # If no RID provided, try to find single execution in working directory
-        if not execution_rid:
-            e_rids = execution_rids(self.working_dir)
-            if len(e_rids) != 1:
-                raise DerivaMLException(f"Multiple execution RIDs were found {e_rids}.")
-            execution_rid = e_rids[0]
+    def pending_summary(self) -> "WorkspacePendingSummary":
+        """Workspace-wide pending-upload summary.
 
-        # Try to load configuration from a file
-        cfile = asset_file_path(
-            prefix=self.working_dir,
-            exec_rid=execution_rid,
-            file_name="configuration.json",
-            asset_table=self.model.name_to_table("Execution_Metadata"),
-            metadata={},
+        Queries every known-local execution and returns a
+        WorkspacePendingSummary aggregating per-execution snapshots.
+        Useful for standalone uploader processes that want to know
+        what's pending across runs.
+
+        Returns:
+            WorkspacePendingSummary with one PendingSummary per execution
+            that has at least one registry row.
+
+        Example:
+            >>> print(ml.pending_summary().render())
+        """
+        from deriva_ml.execution.pending_summary import WorkspacePendingSummary
+
+        summaries = []
+        for rec in self.list_executions():
+            summaries.append(rec.pending_summary(ml=self))
+        return WorkspacePendingSummary(per_execution=summaries)
+
+    def find_incomplete_executions(self) -> list[_ExecutionRecordV2]:
+        """Sugar over list_executions for everything not terminally done.
+
+        Returns executions in status in (created, running, stopped,
+        failed, pending_upload) — the set of things a user would want to
+        either resume, retry, or clean up. Excludes uploaded (terminal
+        success) and aborted (terminal cleanup).
+
+        Returns:
+            List of ExecutionRecord for incomplete runs.
+
+        Example:
+            >>> for rec in ml.find_incomplete_executions():
+            ...     print(rec.rid, rec.status, rec.pending_rows)
+        """
+        return self.list_executions(
+            status=[
+                ExecutionStatus.created,
+                ExecutionStatus.running,
+                ExecutionStatus.stopped,
+                ExecutionStatus.failed,
+                ExecutionStatus.pending_upload,
+            ],
         )
 
-        # Load configuration from a file or create from an execution record
-        if cfile.exists():
-            configuration = ExecutionConfiguration.load_configuration(cfile)
-        else:
-            execution = self.retrieve_rid(execution_rid)
-            # Look up the workflow object from the RID
-            workflow_rid = execution.get("Workflow")
-            workflow = self.lookup_workflow(workflow_rid) if workflow_rid else None
-            configuration = ExecutionConfiguration(
-                workflow=workflow,
-                description=execution["Description"],
+    def resume_execution(self, execution_rid: RID) -> "Execution":
+        """Re-hydrate an Execution from the workspace SQLite registry.
+
+        Works in both online and offline modes. The execution's recorded
+        mode is independent of the current DerivaML instance's mode — a
+        user can create an execution online, run it offline, then upload
+        online, all via the same RID.
+
+        Before returning, runs just-in-time state reconciliation
+        (spec §2.2): if online and sync_pending=True, flushes SQLite to
+        the catalog; then checks for catalog/SQLite disagreement and
+        applies the disagreement rules.
+
+        Args:
+            execution_rid: Server-assigned Execution RID returned by a
+                prior create_execution call.
+
+        Returns:
+            An Execution object bound to this DerivaML instance, with
+            lifecycle fields as SQLite read-through properties (see
+            spec §2.3).
+
+        Raises:
+            DerivaMLException: If no matching executions row exists in
+                the workspace registry.
+            DerivaMLStateInconsistency: If just-in-time reconciliation
+                surfaces a disagreement outside the six documented cases
+                (see state_machine.reconcile_with_catalog).
+
+        Example:
+            >>> ml = DerivaML(hostname="example.org", catalog_id="42")
+            >>> exe = ml.resume_execution("5-ABC")
+            >>> exe.status
+            <ExecutionStatus.stopped>
+            >>> exe.upload_outputs()
+        """
+        from deriva_ml.execution.execution import Execution
+
+        store = self.workspace.execution_state_store()
+        row = store.get_execution(execution_rid)
+        if row is None:
+            raise DerivaMLException(
+                f"Execution {execution_rid} is not in the workspace registry. "
+                f"Either it was never created on this workspace, or it was "
+                f"garbage-collected. Use ml.list_executions() to see what's "
+                f"available locally."
             )
 
-        # Create and return an execution instance
-        return Execution(configuration, self, reload=execution_rid)  # type: ignore[arg-type]
+        # Just-in-time reconciliation. Online only — offline mode has no
+        # catalog to compare against.
+        if self._mode is ConnectionMode.online:
+            # Order matters: flush first (push our newer state) before
+            # reconcile (which would otherwise see stale catalog state
+            # as a disagreement). See spec §4.6 step 3.
+            if row["sync_pending"]:
+                flush_pending_sync(
+                    store=store, catalog=self.catalog,
+                    execution_rid=execution_rid,
+                )
+            reconcile_with_catalog(
+                store=store, catalog=self.catalog,
+                execution_rid=execution_rid,
+            )
+
+            # Scoped reconciliation. Cheaper than the workspace-wide sweep
+            # we did at DerivaML init, and guarantees this specific
+            # execution's pending rows are consistent before we hand out
+            # the Execution object.
+            from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
+
+            try:
+                reconcile_pending_leases(
+                    store=store, catalog=self.catalog,
+                    execution_rid=execution_rid,
+                )
+            except Exception as exc:
+                logging.getLogger("deriva_ml").warning(
+                    "per-execution lease reconciliation failed for %s (%s); continuing",
+                    execution_rid, exc,
+                )
+
+        # Construct Execution bound to this DerivaML — it reads lifecycle
+        # fields from SQLite via read-through properties (Group E).
+        return Execution._from_registry(
+            ml_object=self, execution_rid=execution_rid,
+        )
+
+    def gc_executions(
+        self,
+        *,
+        older_than: "timedelta | None" = None,
+        status: "ExecutionStatus | list[ExecutionStatus] | None" = None,
+        delete_working_dir: bool = False,
+    ) -> int:
+        """Garbage-collect execution registry rows matching the filters.
+
+        By default only removes registry state (SQLite rows and their
+        pending_rows / directory_rules). Pass delete_working_dir=True to
+        also ``rm -rf`` the on-disk execution root under the workspace.
+
+        Does NOT touch the catalog. Executions uploaded to the catalog
+        remain there regardless of local gc.
+
+        Args:
+            older_than: If set, only gc executions whose last_activity is
+                older than this timedelta.
+            status: Filter by status (single or list); None = any status.
+                Typical: pass ExecutionStatus.uploaded to clean up after
+                successful uploads.
+            delete_working_dir: If True, remove the per-execution working
+                directory from disk. Defaults to False (registry-only).
+
+        Returns:
+            The number of executions removed.
+
+        Example:
+            >>> from datetime import timedelta
+            >>> from deriva_ml.execution.state_store import ExecutionStatus
+            >>> n = ml.gc_executions(
+            ...     status=ExecutionStatus.uploaded,
+            ...     older_than=timedelta(days=30),
+            ...     delete_working_dir=True,
+            ... )
+            >>> print(f"cleaned {n} old executions")
+        """
+        import shutil
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        store = self.workspace.execution_state_store()
+
+        # Pull the filtered row list from SQLite, then narrow by
+        # last_activity if older_than was provided.
+        rows = store.list_executions(status=status)
+        if older_than is not None:
+            cutoff = datetime.now(timezone.utc) - older_than
+            # SQLite's DateTime(timezone=True) stores as ISO text and
+            # returns naive datetimes; coerce both sides to naive UTC
+            # to avoid offset-aware/naive comparison errors.
+
+            def _is_older(last_activity: datetime) -> bool:
+                la = last_activity
+                if la.tzinfo is None:
+                    la = la.replace(tzinfo=timezone.utc)
+                return la < cutoff
+
+            rows = [r for r in rows if _is_older(r["last_activity"])]
+
+        for row in rows:
+            if delete_working_dir:
+                wd = Path(self.working_dir) / row["working_dir_rel"]
+                if wd.exists():
+                    shutil.rmtree(wd)
+            store.delete_execution(row["rid"])
+
+        return len(rows)
 
     def find_executions(
         self,
@@ -411,3 +745,72 @@ class ExecutionMixin:
         for exec_record in filtered_path.entities().fetch():
             if exec_record["RID"] in exec_rids_with_config:
                 yield Experiment(self, exec_record["RID"])  # type: ignore[arg-type]
+
+    def upload_pending(
+        self,
+        *,
+        execution_rids: "list[RID] | None" = None,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadReport":
+        """Blocking upload of pending state for selected executions.
+
+        Args:
+            execution_rids: List of RIDs, or None to drain every execution
+                that has pending work.
+            retry_failed: Include rows in status='failed'.
+            bandwidth_limit_mbps: Cap egress (passed to uploader).
+            parallel_files: Concurrent file uploads per table.
+
+        Returns:
+            UploadReport with totals + per-table counts + error lines.
+
+        Example:
+            >>> report = ml.upload_pending()
+            >>> print(f"{report.total_uploaded} uploaded, "
+            ...       f"{report.total_failed} failed")
+        """
+        return run_upload_engine(
+            ml=self,
+            execution_rids=execution_rids,
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
+        )
+
+    def start_upload(
+        self,
+        *,
+        execution_rids: "list[RID] | None" = None,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: "int | None" = None,
+        parallel_files: int = 4,
+    ) -> "UploadJob":
+        """Non-blocking upload — returns an UploadJob to poll / wait.
+
+        Spawns a daemon thread in the current process. If the process
+        exits, the thread dies. For survive-process uploads, run
+        ``deriva-ml upload`` from a shell (see CLI, Group H).
+
+        Args: identical to upload_pending.
+
+        Returns:
+            An UploadJob; call job.wait() to block, job.progress() to
+            poll, job.cancel() to stop.
+
+        Example:
+            >>> job = ml.start_upload()
+            >>> while job.status == "running":
+            ...     time.sleep(5)
+            ...     print(job.progress())
+            >>> report = job.wait()
+        """
+        from deriva_ml.execution.upload_job import UploadJob
+        return UploadJob(
+            ml=self,
+            execution_rids=execution_rids,
+            retry_failed=retry_failed,
+            bandwidth_limit_mbps=bandwidth_limit_mbps,
+            parallel_files=parallel_files,
+        )

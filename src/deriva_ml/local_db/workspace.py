@@ -27,6 +27,7 @@ from deriva_ml.local_db import sqlite_helpers as sh
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from deriva_ml.execution.state_store import ExecutionStateStore
     from deriva_ml.local_db.manifest_store import ManifestStore
     from deriva_ml.local_db.result_cache import CachedResult, CachedResultMeta, ResultCache
     from deriva_ml.local_db.schema import LocalSchema
@@ -90,6 +91,7 @@ class Workspace:
         self._manifest_store: "ManifestStore | None" = None
         self._local_schema: "LocalSchema | None" = None
         self._result_cache: "ResultCache | None" = None
+        self._execution_state_store: "ExecutionStateStore | None" = None
         self._closed = False
 
     # ---- paths ----
@@ -299,6 +301,34 @@ class Workspace:
             s.ensure_schema()
             self._manifest_store = s
         return self._manifest_store
+
+    def execution_state_store(self) -> "ExecutionStateStore":
+        """Return the ExecutionStateStore for this workspace, creating schema on first access.
+
+        Cached — subsequent calls return the same instance. The store lives
+        on this Workspace's shared engine; the three ``execution_state__*``
+        tables coexist with ManifestStore and ResultCache tables in a single
+        main.db, so cross-table transactions are atomic.
+
+        Returns:
+            The ExecutionStateStore bound to ``self.engine`` with schema
+            ensured.
+
+        Example:
+            >>> ws = Workspace(working_dir=".", hostname="h", catalog_id="1")
+            >>> store = ws.execution_state_store()
+            >>> store.executions   # the sqlalchemy.Table
+        """
+        if self._execution_state_store is None:
+            # Lazy import to avoid import cycle between workspace.py and
+            # execution/state_store.py (state_store may later reference
+            # workspace types).
+            from deriva_ml.execution.state_store import ExecutionStateStore
+
+            store = ExecutionStateStore(engine=self.engine)
+            store.ensure_schema()
+            self._execution_state_store = store
+        return self._execution_state_store
 
     def import_legacy_manifests(self) -> int:
         """Import any pre-existing ``asset-manifest.json`` files into the DB.

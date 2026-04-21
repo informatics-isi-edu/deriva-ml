@@ -10,6 +10,7 @@ import deriva.core  # noqa: F401
 
 # Safe imports - no circular dependencies
 from deriva_ml.core.config import DerivaMLConfig
+from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import (
     RID,
     BuiltinTypes,
@@ -106,6 +107,7 @@ def __getattr__(name: str) -> type:
 __all__ = [
     "DerivaML",  # Lazy-loaded
     "DerivaMLConfig",
+    "ConnectionMode",
     # Asset classes (lazy-loaded)
     "Asset",
     "AssetFilePath",
