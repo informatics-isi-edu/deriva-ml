@@ -2251,13 +2251,11 @@ class Execution:
         self,
         *,
         retry_failed: bool = False,
-        bandwidth_limit_mbps: "int | None" = None,
-        parallel_files: int = 4,
     ) -> "UploadReport":
         """Upload this execution's pending rows and asset files.
 
-        Sugar for ml.upload_pending(execution_rids=[self.execution_rid],
-        **kwargs). See upload_pending for details.
+        Sugar for ml.upload_pending(execution_rids=[self.execution_rid], **kwargs).
+        See upload_pending for details.
 
         Example:
             >>> with exe.execute() as e:
@@ -2267,6 +2265,4 @@ class Execution:
         return self._ml_object.upload_pending(
             execution_rids=[self.execution_rid],
             retry_failed=retry_failed,
-            bandwidth_limit_mbps=bandwidth_limit_mbps,
-            parallel_files=parallel_files,
         )

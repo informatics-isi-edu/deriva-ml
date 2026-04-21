@@ -730,8 +730,6 @@ class ExecutionMixin:
         *,
         execution_rids: "list[RID] | None" = None,
         retry_failed: bool = False,
-        bandwidth_limit_mbps: "int | None" = None,
-        parallel_files: int = 4,
     ) -> "UploadReport":
         """Blocking upload of pending state for selected executions.
 
@@ -739,8 +737,6 @@ class ExecutionMixin:
             execution_rids: List of RIDs, or None to drain every execution
                 that has pending work.
             retry_failed: Include rows in status='failed'.
-            bandwidth_limit_mbps: Cap egress (passed to uploader).
-            parallel_files: Concurrent file uploads per table.
 
         Returns:
             UploadReport with totals + per-table counts + error lines.
@@ -750,10 +746,6 @@ class ExecutionMixin:
             >>> print(f"{report.total_uploaded} uploaded, "
             ...       f"{report.total_failed} failed")
         """
-        # Task 1: bandwidth_limit_mbps and parallel_files are kept on
-        # this method's signature for API stability but are no longer
-        # forwarded to the engine. Task 3 removes them from the API.
-        del bandwidth_limit_mbps, parallel_files
         return run_upload_engine(
             ml=self,
             execution_rids=execution_rids,
@@ -765,8 +757,6 @@ class ExecutionMixin:
         *,
         execution_rids: "list[RID] | None" = None,
         retry_failed: bool = False,
-        bandwidth_limit_mbps: "int | None" = None,
-        parallel_files: int = 4,
     ) -> "UploadJob":
         """Non-blocking upload — returns an UploadJob to poll / wait.
 
@@ -792,6 +782,4 @@ class ExecutionMixin:
             ml=self,
             execution_rids=execution_rids,
             retry_failed=retry_failed,
-            bandwidth_limit_mbps=bandwidth_limit_mbps,
-            parallel_files=parallel_files,
         )

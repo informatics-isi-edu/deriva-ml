@@ -678,3 +678,21 @@ def test_drain_work_item_asset_row_calls_deriva_py_uploader(test_ml, monkeypatch
     assert len(uploader_calls) == 1
     row = store.list_pending_rows(execution_rid=exe.execution_rid)[0]
     assert row["status"] == "uploaded"
+
+
+def test_run_upload_engine_rejects_dropped_kwargs(test_ml):
+    """Dropped kwargs raise TypeError — this is the breaking-change contract."""
+    import pytest
+
+    from deriva_ml.execution.upload_engine import run_upload_engine
+
+    with pytest.raises(TypeError, match="bandwidth_limit_mbps"):
+        run_upload_engine(
+            ml=test_ml, execution_rids=[], retry_failed=False,
+            bandwidth_limit_mbps=100,
+        )
+    with pytest.raises(TypeError, match="parallel_files"):
+        run_upload_engine(
+            ml=test_ml, execution_rids=[], retry_failed=False,
+            parallel_files=8,
+        )
