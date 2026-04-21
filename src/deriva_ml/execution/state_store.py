@@ -626,7 +626,7 @@ class ExecutionStateStore:
             >>> data = store.pending_summary_rows(execution_rid="EXE-A")
             >>> # Caller builds PendingSummary from this.
         """
-        import os
+        from pathlib import Path
 
         from sqlalchemy import and_
 
@@ -685,7 +685,7 @@ class ExecutionStateStore:
                     total_bytes = 0
                     for (p,) in conn.execute(bytes_stmt).all():
                         try:
-                            total_bytes += os.path.getsize(p)
+                            total_bytes += Path(p).stat().st_size
                         except OSError:
                             # File missing — surface as diagnostic,
                             # don't crash the summary.
