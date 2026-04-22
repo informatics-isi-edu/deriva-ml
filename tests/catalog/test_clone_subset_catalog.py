@@ -9,6 +9,8 @@ Tests cover:
 
 from __future__ import annotations
 
+import os
+
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -516,7 +518,10 @@ class TestParseExportAnnotationTables:
 class TestCreateMlWorkspaceIntegration:
     """Integration tests for create_ml_workspace (requires running catalog)."""
 
-    @pytest.mark.skip(reason="Requires running catalog")
+    @pytest.mark.skipif(
+        not os.environ.get("DERIVA_HOST"),
+        reason="requires a live catalog at DERIVA_HOST",
+    )
     def test_create_workspace_basic(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test basic workspace creation from a dataset RID."""
         ml = catalog_manager.ensure_populated(tmp_path / "source")
@@ -567,7 +572,10 @@ class TestCreateMlWorkspaceIntegration:
         finally:
             self._delete_catalog(hostname, result.catalog_id)
 
-    @pytest.mark.skip(reason="Requires running catalog")
+    @pytest.mark.skipif(
+        not os.environ.get("DERIVA_HOST"),
+        reason="requires a live catalog at DERIVA_HOST",
+    )
     def test_create_workspace_with_associations(self, catalog_manager: CatalogManager, tmp_path: Path):
         """Test that association tables are automatically included."""
         ml = catalog_manager.ensure_populated(tmp_path / "source")
