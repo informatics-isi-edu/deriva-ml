@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from deriva_ml.local_db.manifest_store import ManifestStore
+    from deriva_ml.model.catalog import DerivaModel
 
 
 def _json_default(obj: Any) -> Any:
@@ -144,3 +145,56 @@ class AssetManifest:
             "assets": {k: v.to_dict() for k, v in self.assets.items()},
             "features": {k: v.to_dict() for k, v in self.features.items()},
         }
+
+
+def _validate_pending_asset_metadata(
+    model: "DerivaModel",
+    manifest: "AssetManifest",
+) -> None:
+    """Raise DerivaMLValidationError if any pending asset entry is
+    missing a NOT-NULL metadata column value.
+
+    Iterates manifest entries where status == pending and the asset
+    table has metadata columns. For each NOT-NULL column absent from
+    the entry's metadata dict, records (manifest_key, schema, table,
+    column). If any errors collected, raises a single
+    :class:`DerivaMLValidationError` whose message lists every
+    failure in sorted order.
+
+    Nullable columns may be absent without error; downstream staging
+    substitutes ``NULL_SENTINEL`` which the upload pre-processor
+    translates to SQL NULL.
+    """
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    # Map manifest_key -> sorted list of missing NOT-NULL column names
+    missing_by_key: dict[str, list[str]] = {}
+
+    for key, entry in sorted(manifest.pending_assets().items()):
+        cols = model.asset_metadata_columns(entry.asset_table)
+        if not cols:
+            continue
+        provided = set(entry.metadata.keys())
+        missing: list[str] = []
+        for col in cols:
+            if not col.nullok and col.name not in provided:
+                missing.append(col.name)
+        if missing:
+            missing_by_key[key] = sorted(missing)
+
+    if not missing_by_key:
+        return
+
+    lines = [
+        f"Missing required metadata for {len(missing_by_key)} pending asset(s):"
+    ]
+    for key in sorted(missing_by_key.keys()):
+        cols = missing_by_key[key]
+        noun = "column" if len(cols) == 1 else "columns"
+        lines.append(f"  - {key}: missing {noun} {', '.join(cols)}")
+    lines.append(
+        "Supply these values before calling upload_outputs(), either via "
+        "the ``metadata=`` arg to asset_file_path(...) or by assigning "
+        "to the returned AssetFilePath's ``metadata`` property."
+    )
+    raise DerivaMLValidationError("\n".join(lines))
