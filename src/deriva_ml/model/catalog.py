@@ -638,6 +638,31 @@ class DerivaModel:
             raise DerivaMLTableTypeError("asset table", table.name)
         return {c.name for c in table.columns} - DerivaAssetColumns
 
+    def asset_metadata_columns(self, table: str | Table) -> list[Column]:
+        """Return Column objects for the asset-metadata columns of ``table``.
+
+        Like :meth:`asset_metadata` but returns the :class:`Column`
+        instances (not just names) so callers can inspect attributes
+        such as ``nullok``. Results are sorted by column name for
+        deterministic iteration.
+
+        Args:
+            table: Asset table name or Table object.
+
+        Returns:
+            Sorted list of Column objects.
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not an asset table.
+        """
+        table = self.name_to_table(table)
+        if not self.is_asset(table):
+            raise DerivaMLTableTypeError("asset table", table.name)
+        return sorted(
+            (c for c in table.columns if c.name not in DerivaAssetColumns),
+            key=lambda c: c.name,
+        )
+
     def apply(self) -> None:
         """Call ERMRestModel.apply"""
         if self.catalog == "file-system":

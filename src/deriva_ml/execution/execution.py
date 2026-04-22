@@ -69,6 +69,7 @@ from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import (
+    NULL_SENTINEL,
     asset_root,
     asset_type_path,
     execution_root,
@@ -1068,10 +1069,13 @@ class Execution:
             # from the asset table (not just those in the manifest entry).
             # This must match the regex group order in asset_table_upload_spec()
             # which uses sorted(model.asset_metadata(asset_table)).
-            # Missing metadata values get "None" (matching legacy asset_file_path).
+            # Missing metadata values get NULL_SENTINEL which
+            # NullSentinelProcessor translates to SQL NULL at insert time.
+            # Only nullable columns reach here — the validator (Task 6)
+            # guards NOT-NULL columns upstream.
             all_metadata_cols = sorted(self._model.asset_metadata(asset_table_name))
             metadata_parts = (
-                [str(entry.metadata.get(k, "None")) for k in all_metadata_cols] if all_metadata_cols else []
+                [str(entry.metadata.get(k, NULL_SENTINEL)) for k in all_metadata_cols] if all_metadata_cols else []
             )
             target_dir = staging_root / entry.schema / asset_table_name
             for part in metadata_parts:
@@ -1123,6 +1127,12 @@ class Execution:
         Raises:
             DerivaMLException: If upload fails.
         """
+        # Bug C: refuse to upload if any pending asset is missing a
+        # required (NOT-NULL) metadata column. This raises a single
+        # DerivaMLValidationError that lists all failures at once.
+        from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+        _validate_pending_asset_metadata(self._model, self._get_manifest())
+
         # Build staging symlinks from manifest into the regex-expected tree
         upload_root = self._build_upload_staging()
 

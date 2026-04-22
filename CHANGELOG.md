@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Bug C: asset metadata None-stringification
+
+### Fixed
+
+- **Missing asset metadata no longer inserts the literal string `"None"`.** The three staging path-builders (`Execution._build_upload_staging`, `_invoke_deriva_py_uploader`, `asset_file_path` helper in `dataset/upload.py`) previously substituted `"None"` for any metadata value absent from the manifest entry. That string flowed through deriva-py's regex + `column_map` expansion into catalog inserts, causing 400 errors on non-string columns (e.g., `invalid input syntax for type timestamp: "None"`). Replaced with a two-branch approach:
+  - **NOT-NULL columns missing → `DerivaMLValidationError` at upload time.** New `_validate_pending_asset_metadata` runs at the top of `Execution._upload_execution_dirs` and `run_upload_engine`, listing every missing required column across every pending asset in a single aggregated message. Treats both absent keys and explicit `None` values as missing.
+  - **Nullable columns missing → SQL `NULL` in the catalog.** Staging writes the sentinel `"__NULL__"` as the directory segment; the new `NullSentinelProcessor` (a deriva-py `BaseProcessor` subclass wired into `asset_table_upload_spec`) translates the sentinel to Python `None` before deriva-py's `interpolateDict` drops the key from the insert row.
+
+### Added
+
+- **`DerivaModel.asset_metadata_columns(table) -> list[Column]`** — companion to the existing `asset_metadata(table) -> set[str]`, returning `Column` objects so callers can inspect `nullok`.
+- **`deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor`** — `BaseProcessor` subclass for sentinel→None translation. Wired automatically into `asset_table_upload_spec`'s `pre_processors` when the asset table has metadata columns.
+- **`NULL_SENTINEL = "__NULL__"`** — module-level constant in `deriva_ml.dataset.upload`.
+
+### External-caller impact
+
+No action required for callers who supply complete metadata. Callers who previously relied on the broken `"None"` substitution now get a `DerivaMLValidationError` (with an actionable message) at upload time instead of an opaque 400 from the catalog. Net outcome unchanged — the upload still can't succeed — but failure mode is clearer and cheaper (no network round-trip).
+
+A known constraint: if a legitimate metadata value is the string `"__NULL__"`, it will be corrupted to SQL `NULL` by the pre-processor. Highly unlikely in practice; documented in `NullSentinelProcessor`'s docstring.
+
 ## Unreleased — Schema pin + diff
 
 ### Added
