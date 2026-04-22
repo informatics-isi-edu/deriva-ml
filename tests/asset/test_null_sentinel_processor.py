@@ -69,7 +69,7 @@ def test_asset_table_upload_spec_omits_pre_processors_when_no_metadata(test_ml):
     """Asset tables with zero metadata columns don't need the processor."""
     from deriva_ml.dataset.upload import asset_table_upload_spec
 
-    # Create an asset table with no metadata columns — no processor expected.
-    test_ml.create_asset("NullSentinelNoMetaAsset")
-    spec = asset_table_upload_spec(test_ml.model, "NullSentinelNoMetaAsset")
+    # Execution_Asset is a built-in ML asset table with zero user metadata
+    # columns — a clean canonical example.
+    spec = asset_table_upload_spec(test_ml.model, "Execution_Asset")
     assert "pre_processors" not in spec or not spec["pre_processors"]
