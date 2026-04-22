@@ -596,7 +596,7 @@ class DerivaML(
                 Run an online ``DerivaML.__init__`` or
                 :meth:`refresh_schema` first.
         """
-        from deriva_ml.core.schema_diff import compute_diff, SchemaDiff
+        from deriva_ml.core.schema_diff import compute_diff
 
         cache = SchemaCache(self.working_dir)
         drift: SchemaDiff | None = None
