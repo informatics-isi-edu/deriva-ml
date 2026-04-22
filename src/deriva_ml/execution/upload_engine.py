@@ -32,7 +32,7 @@ from deriva.core import DEFAULT_SESSION_CONFIG
 from deriva.transfer.upload.deriva_upload import GenericUploader, UploadState
 
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.upload import DEFAULT_UPLOAD_TIMEOUT, bulk_upload_configuration
+from deriva_ml.dataset.upload import DEFAULT_UPLOAD_TIMEOUT, NULL_SENTINEL, bulk_upload_configuration
 from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
 from deriva_ml.execution.state_machine import transition
 from deriva_ml.execution.state_store import ExecutionStatus, PendingRowStatus
@@ -641,7 +641,7 @@ def _invoke_deriva_py_uploader(
             metadata = f.get("metadata") or {}
             target_dir = asset_root / schema_name / target_table
             for col in metadata_cols:
-                target_dir = target_dir / str(metadata.get(col, "None"))
+                target_dir = target_dir / str(metadata.get(col, NULL_SENTINEL))
             return target_dir / src.name
 
         # Build the symlink farm.

@@ -709,7 +709,7 @@ def asset_file_path(
         raise DerivaMLException(f"Metadata {metadata} does not match asset metadata {asset_metadata}")
 
     for m in asset_metadata:
-        path = path / str(metadata.get(m, "None"))
+        path = path / str(metadata.get(m, NULL_SENTINEL))
     path.mkdir(parents=True, exist_ok=True)
     return path / file_name
 

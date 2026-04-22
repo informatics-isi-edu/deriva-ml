@@ -368,7 +368,7 @@ class TestUploadStaging:
         matching the regex groups in asset_table_upload_spec.
         """
         import re
-        from deriva_ml.dataset.upload import asset_table_upload_spec
+        from deriva_ml.dataset.upload import NULL_SENTINEL, asset_table_upload_spec
 
         ml = workflow_terms
 
@@ -402,5 +402,6 @@ class TestUploadStaging:
         assert match.group("Acquisition_Date") == "2026-01-01"
         assert match.group("Acquisition_Time") == "12:00:00"
         # Observation is a metadata column on Image but was not provided,
-        # so it should appear as "None" in the staging path.
-        assert match.group("Observation") == "None"
+        # so it should appear as NULL_SENTINEL in the staging path.
+        # NullSentinelProcessor translates this back to SQL NULL at insert time.
+        assert match.group("Observation") == NULL_SENTINEL
