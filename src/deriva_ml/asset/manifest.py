@@ -13,7 +13,7 @@ import logging
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterable
 
 if TYPE_CHECKING:
     from deriva_ml.local_db.manifest_store import ManifestStore
@@ -147,38 +147,29 @@ class AssetManifest:
         }
 
 
-def _validate_pending_asset_metadata(
+def _validate_pending_asset_metadata_iter(
     model: "DerivaModel",
-    manifest: "AssetManifest",
+    entries: "Iterable[tuple[str, str, str, dict]]",
 ) -> None:
-    """Raise DerivaMLValidationError if any pending asset entry is
-    missing a NOT-NULL metadata column value.
+    """Lower-level validator accepting (key, schema, asset_table, metadata_dict)
+    tuples. Used by both the manifest-based wrapper and the upload
+    engine (which reads pending rows from SQLite rather than a manifest).
 
-    Iterates manifest entries where status == pending and the asset
-    table has metadata columns. For each NOT-NULL column absent from
-    the entry's metadata dict, records (manifest_key, schema, table,
-    column). If any errors collected, raises a single
-    :class:`DerivaMLValidationError` whose message lists every
-    failure in sorted order.
-
-    Nullable columns may be absent without error; downstream staging
-    substitutes ``NULL_SENTINEL`` which the upload pre-processor
-    translates to SQL NULL.
+    See :func:`_validate_pending_asset_metadata` for semantics.
     """
     from deriva_ml.core.exceptions import DerivaMLValidationError
 
-    # Map manifest_key -> sorted list of missing NOT-NULL column names
     missing_by_key: dict[str, list[str]] = {}
 
-    for key, entry in sorted(manifest.pending_assets().items()):
-        cols = model.asset_metadata_columns(entry.asset_table)
+    for key, _schema, asset_table, metadata in sorted(entries):
+        cols = model.asset_metadata_columns(asset_table)
         if not cols:
             continue
         missing: list[str] = []
         for col in cols:
             if col.nullok:
                 continue
-            value = entry.metadata.get(col.name)
+            value = metadata.get(col.name)
             if value is None:
                 missing.append(col.name)
         if missing:
@@ -200,3 +191,31 @@ def _validate_pending_asset_metadata(
         "to the returned AssetFilePath's ``metadata`` property."
     )
     raise DerivaMLValidationError("\n".join(lines))
+
+
+def _validate_pending_asset_metadata(
+    model: "DerivaModel",
+    manifest: "AssetManifest",
+) -> None:
+    """Raise DerivaMLValidationError if any pending manifest entry is
+    missing a NOT-NULL metadata column value.
+
+    Thin wrapper over :func:`_validate_pending_asset_metadata_iter`
+    that projects ``AssetManifest.pending_assets()`` into the iterable
+    shape the lower-level function expects.
+
+    Iterates entries returned by ``pending_assets()``. For each
+    NOT-NULL column absent from the entry's metadata dict (including
+    the key-present-but-None case), records the failure. If any
+    errors collected, raises a single :class:`DerivaMLValidationError`
+    whose message lists every failure in sorted order.
+
+    Nullable columns may be absent without error; downstream staging
+    substitutes ``NULL_SENTINEL`` which the upload pre-processor
+    translates to SQL NULL.
+    """
+    entries = (
+        (key, entry.schema, entry.asset_table, dict(entry.metadata))
+        for key, entry in manifest.pending_assets().items()
+    )
+    _validate_pending_asset_metadata_iter(model, entries)

@@ -192,3 +192,29 @@ def test_error_message_is_deterministic():
     assert msgs[0] == msgs[1]
     # Sorted: Alpha before Zeta, a.png before z.png
     assert msgs[0].index("Image/a.png") < msgs[0].index("Image/z.png")
+
+
+def test_iter_validator_accepts_tuples():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    model = _fake_model({
+        "Image": [_col("Acquisition_Time", nullok=False)],
+    })
+    entries = [
+        ("Image/x.png", "test-schema", "Image", {}),
+    ]
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_metadata_iter(model, entries)
+    assert "Image/x.png" in str(ei.value)
+    assert "Acquisition_Time" in str(ei.value)
+
+
+def test_iter_validator_happy_path():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+    model = _fake_model({
+        "Image": [_col("Acquisition_Time", nullok=False)],
+    })
+    entries = [
+        ("Image/x.png", "test-schema", "Image", {"Acquisition_Time": "now"}),
+    ]
+    assert _validate_pending_asset_metadata_iter(model, entries) is None

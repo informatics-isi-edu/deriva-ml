@@ -272,7 +272,34 @@ def run_upload_engine(
     Returns:
         UploadReport summarizing the run.
     """
+    # Bug C: refuse to drain if any pending asset row is missing a
+    # required (NOT-NULL) metadata column. Iterate pending rows
+    # across requested executions, filter to asset rows (those with
+    # an asset_file_path), project into the validator's iterable
+    # shape, and run the check. Raises DerivaMLValidationError with
+    # an aggregated message.
+    import json as _json
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+
     store = ml.workspace.execution_state_store()
+    if execution_rids is None:
+        rids_for_validation = [row["rid"] for row in store.list_executions()]
+    else:
+        rids_for_validation = list(execution_rids)
+    validator_entries: list[tuple[str, str, str, dict]] = []
+    for rid in rids_for_validation:
+        for row in store.list_pending_rows(execution_rid=rid):
+            if not row.get("asset_file_path"):
+                continue  # non-asset rows have no metadata-column dependency
+            md = _json.loads(row["metadata_json"]) if row["metadata_json"] else {}
+            validator_entries.append((
+                f"{row['execution_rid']}/{row['target_table']}/{row['key']}",
+                row["target_schema"],
+                row["target_table"],
+                md,
+            ))
+    if validator_entries:
+        _validate_pending_asset_metadata_iter(ml.model, validator_entries)
 
     rids = execution_rids or [row["rid"] for row in store.list_executions()]
 
