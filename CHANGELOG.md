@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Schema pin + diff
+
+### Added
+
+- **`DerivaML.pin_schema(reason: str | None = None) -> SchemaDiff | None`** — freeze the local schema cache at its current snapshot. While pinned, `refresh_schema()` refuses to update the cache (even with `force=True`). Online-mode pin additionally returns a `SchemaDiff` when the live catalog's schema has drifted structurally from the cached one (and logs a WARNING).
+- **`DerivaML.unpin_schema() -> None`** — clear the pin. No-op if not pinned.
+- **`DerivaML.pin_status() -> PinStatus`** — return a frozen `PinStatus` snapshot (pinned flag, UTC pinned_at, pin_reason, pinned_snapshot_id).
+- **`DerivaML.diff_schema() -> SchemaDiff`** — pure inspection (online only). Returns the structural diff between the cached and live schemas; `SchemaDiff` is a Pydantic model with `.render()` for human-readable output and `.model_dump()` for JSON.
+- **`deriva_ml.core.schema_cache.PinStatus`** — Pydantic `BaseModel(frozen=True)`.
+- **`deriva_ml.core.schema_diff`** — new module: `SchemaDiff` + 7 fine-grained record types (`AddedTable`, `RemovedTable`, `AddedColumn`, `RemovedColumn`, `ColumnTypeChange`, `AddedForeignKey`, `RemovedForeignKey`) + `compute_diff(cached, live)` walker.
+- **`DerivaMLSchemaPinned`** — new `DerivaMLConfigurationError` subclass raised by `refresh_schema()` on a pinned cache.
+
+### Changed
+
+- **Cache file format.** `schema-cache.json` gains an optional top-level `"pin"` object (`{"at": "...", "reason": "..."}`). Presence means pinned. Backward-compatible: unpinned caches written by prior versions remain valid without change.
+- **`DerivaML.refresh_schema()`** now raises `DerivaMLSchemaPinned` before its pending-rows check when the cache is pinned. `force=True` does NOT bypass a pin — it only bypasses the pending-rows guard.
+- **`SchemaCache.write()`** internals: the tmp + fsync + rename dance was extracted into a private `_write_atomic(payload)` helper so `pin()`/`unpin()` reuse identical on-disk discipline. Public signature and behavior unchanged.
+
+### Migration
+
+No caller changes required. This is strictly additive; existing cache files remain valid.
+
 ## Unreleased — H3: ExecutionRecord disambiguation
 
 ### Renamed
