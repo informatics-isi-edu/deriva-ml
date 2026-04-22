@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 if TYPE_CHECKING:
     from deriva.core import ErmrestCatalog
@@ -82,3 +82,69 @@ def post_lease_batch(
             # ERMrest echoes both ID (our token) and RID (assigned).
             result[row["ID"]] = row["RID"]
     return result
+
+
+def _validate_pending_asset_leases(
+    catalog: "ErmrestCatalog",
+    entries: "Iterable[tuple[str, str]]",
+) -> None:
+    """Confirm each (key, rid) pair's RID is still live in ERMrest_RID_Lease.
+
+    Queries the lease table in batches of ``PENDING_ROWS_LEASE_CHUNK``.
+    Aggregates missing RIDs and raises a single
+    :class:`DerivaMLValidationError` listing every failure in sorted
+    order. Returns ``None`` silently when every RID is present.
+
+    Args:
+        catalog: Live ErmrestCatalog for querying the lease table.
+        entries: Iterable of (key, rid) tuples. Key is a
+            human-readable identifier used in the error message.
+
+    Raises:
+        DerivaMLValidationError: If one or more RIDs are not found
+            in ``ERMrest_RID_Lease``.
+    """
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    entries_list = list(entries)
+    if not entries_list:
+        return
+
+    # Build a reverse map so we can attribute a missing RID back to
+    # its caller-supplied key. If the same RID appears under two keys
+    # (shouldn't happen in practice), the forward list below produces
+    # one missing-entry per occurrence.
+    rid_to_keys: dict[str, list[str]] = {}
+    for key, rid in entries_list:
+        rid_to_keys.setdefault(rid, []).append(key)
+
+    all_rids = list(rid_to_keys.keys())
+    found_rids: set[str] = set()
+
+    for i in range(0, len(all_rids), PENDING_ROWS_LEASE_CHUNK):
+        chunk = all_rids[i : i + PENDING_ROWS_LEASE_CHUNK]
+        filter_clause = ";".join(f"RID={rid}" for rid in chunk)
+        path = f"/entity/public:ERMrest_RID_Lease/{filter_clause}"
+        response = catalog.get(path)
+        for row in response.json():
+            found_rids.add(row["RID"])
+
+    missing: list[tuple[str, str]] = []
+    for key, rid in entries_list:
+        if rid not in found_rids:
+            missing.append((key, rid))
+    if not missing:
+        return
+
+    lines = [
+        f"Missing or invalid pre-allocated RIDs for "
+        f"{len(missing)} pending asset(s):"
+    ]
+    for key, rid in sorted(missing):
+        lines.append(f"  - {key}: RID {rid} not found in ERMrest_RID_Lease")
+    lines.append(
+        "A pre-leased RID has become invalid (e.g., cleared from the "
+        "lease table or never successfully POSTed). Restart the "
+        "execution to re-lease, or investigate lease-table state."
+    )
+    raise DerivaMLValidationError("\n".join(lines))
