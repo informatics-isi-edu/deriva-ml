@@ -49,6 +49,18 @@ if TYPE_CHECKING:
 class ExecutionRecord(BaseModel):
     """Represents a catalog record for an execution.
 
+    A live, catalog-bound record. Property setters (``record.status = ...``,
+    ``record.description = ...``) write through to the catalog on
+    assignment; requires online mode for mutations. Returned by
+    :meth:`~deriva_ml.DerivaML.lookup_execution` and
+    :meth:`~deriva_ml.DerivaML.find_executions`.
+
+    For a frozen snapshot value object that reads from the local
+    SQLite registry and works offline, see
+    :class:`~deriva_ml.execution.execution_snapshot.ExecutionSnapshot`
+    returned by :meth:`~deriva_ml.DerivaML.list_executions` and
+    :meth:`~deriva_ml.DerivaML.find_incomplete_executions`.
+
     An ExecutionRecord provides access to the persistent state of an execution
     stored in the Deriva catalog. When bound to a writable catalog, its mutable
     properties (status, description) can be set and changes are automatically
