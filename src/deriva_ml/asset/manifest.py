@@ -126,6 +126,23 @@ class AssetManifest:
     def mark_uploaded(self, key: str, rid: str) -> None:
         self._store.mark_asset_uploaded(self._execution_rid, key, rid)
 
+    def set_asset_rid(self, key: str, rid: str) -> None:
+        """Assign a pre-leased RID to an asset entry without changing status.
+
+        Used when the RID is known in advance (from ``ERMrest_RID_Lease``)
+        so the catalog insert at upload time can use the caller-supplied
+        RID. Unlike :meth:`mark_uploaded`, this leaves ``status`` and
+        ``uploaded_at`` unchanged.
+
+        Args:
+            key: Manifest key (``"{AssetTable}/{filename}"``).
+            rid: Pre-allocated RID to assign to the entry.
+
+        Raises:
+            KeyError: If ``key`` is not present in the manifest.
+        """
+        self._store.set_asset_rid(self._execution_rid, key, rid)
+
     def mark_failed(self, key: str, error: str) -> None:
         self._store.mark_asset_failed(self._execution_rid, key, error)
 

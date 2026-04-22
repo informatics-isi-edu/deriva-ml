@@ -295,6 +295,30 @@ class ManifestStore:
                 )
             )
 
+    def set_asset_rid(self, execution_rid: str, key: str, rid: str) -> None:
+        """Assign a pre-leased RID to an asset entry without changing status.
+
+        Used when the RID is known in advance (from ``ERMrest_RID_Lease``)
+        so the catalog insert at upload time can use the caller-supplied
+        RID. Unlike :meth:`mark_asset_uploaded`, this leaves ``status``
+        and ``uploaded_at`` unchanged.
+
+        Args:
+            execution_rid: Owning execution RID.
+            key: Asset key.
+            rid: Pre-allocated RID to assign to the entry.
+
+        Raises:
+            KeyError: If the entry does not exist.
+        """
+        self._require_asset(execution_rid, key)
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(self._assets_t)
+                .where((self._assets_t.c.execution_rid == execution_rid) & (self._assets_t.c.key == key))
+                .values(rid=rid, updated_at=_now_iso())
+            )
+
     def mark_asset_failed(self, execution_rid: str, key: str, error: str) -> None:
         """Transition an asset entry to ``status="failed"`` and record the error message.
 
