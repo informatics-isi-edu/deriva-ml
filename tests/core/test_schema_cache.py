@@ -118,6 +118,7 @@ def _populate(cache, schema_payload=None):
 
 def test_pin_on_unpinned_cache_sets_fields(tmp_path):
     from datetime import datetime, timezone
+
     from deriva_ml.core.schema_cache import SchemaCache
     cache = SchemaCache(tmp_path)
     _populate(cache)
@@ -144,6 +145,7 @@ def test_pin_without_reason(tmp_path):
 
 def test_pin_idempotent_updates_metadata(tmp_path):
     import time
+
     from deriva_ml.core.schema_cache import SchemaCache
     cache = SchemaCache(tmp_path)
     _populate(cache)
@@ -201,6 +203,7 @@ def test_pin_persists_across_instances(tmp_path):
 def test_cache_file_format_has_nested_pin_object(tmp_path):
     """After pin, the JSON has a top-level ``pin`` object; unpin removes it."""
     import json
+
     from deriva_ml.core.schema_cache import SchemaCache
     cache = SchemaCache(tmp_path)
     _populate(cache)

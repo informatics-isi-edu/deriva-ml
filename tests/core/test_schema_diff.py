@@ -1,8 +1,6 @@
 """Unit tests for compute_diff + SchemaDiff rendering."""
 from __future__ import annotations
 
-import pytest
-
 
 def _schema(tables: dict | None = None, schema_name: str = "deriva-ml") -> dict:
     """Minimal ERMrest /schema payload for tests."""
