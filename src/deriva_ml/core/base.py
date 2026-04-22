@@ -508,28 +508,45 @@ class DerivaML(
     def refresh_schema(self, *, force: bool = False) -> None:
         """Fetch the current catalog schema and overwrite the workspace cache.
 
-        Online mode only. Refuses when the workspace has pending
-        rows unless ``force=True`` is passed; a forced refresh may
-        leave staged rows whose metadata references columns or types
-        no longer in the new schema, causing catalog-insert failures
-        on the next upload.
+        Online mode only. Refuses in two cases:
+
+        1. The cache is pinned (via :meth:`pin_schema`). Raises
+           :class:`DerivaMLSchemaPinned`. ``force=True`` does NOT
+           bypass a pin — call :meth:`unpin_schema` first.
+        2. The workspace has pending rows (staged/leasing/leased/
+           uploading/failed). Raises
+           :class:`DerivaMLSchemaRefreshBlocked` unless
+           ``force=True`` is passed; a forced refresh may leave
+           staged rows whose metadata references columns or types
+           no longer in the new schema, causing catalog-insert
+           failures on the next upload.
 
         Args:
             force: If True, refresh even when the workspace has
-                pending rows (status staged/leasing/leased/uploading/
-                failed). Default False refuses in that case with
-                :class:`DerivaMLSchemaRefreshBlocked`.
+                pending rows. Does NOT bypass a pin.
 
         Raises:
             DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLSchemaPinned: If the cache is pinned (any
+                ``force`` value).
             DerivaMLSchemaRefreshBlocked: If ``force=False`` and the
-                workspace has pending rows.
+                workspace has pending rows (and the cache is not
+                pinned).
         """
         from deriva_ml.model.catalog import DerivaModel
 
         if self._mode is not ConnectionMode.online:
             raise DerivaMLReadOnlyError(
                 "refresh_schema requires online mode"
+            )
+        cache = SchemaCache(self.working_dir)
+        if cache.exists() and cache.pin_status().pinned:
+            pin_info = cache.pin_status()
+            raise DerivaMLSchemaPinned(
+                f"refresh_schema refused: cache is pinned at snapshot "
+                f"{pin_info.pinned_snapshot_id}"
+                + (f" (reason: {pin_info.pin_reason})" if pin_info.pin_reason else "")
+                + ". Call ml.unpin_schema() first."
             )
         store = self.workspace.execution_state_store()
         count = store.count_pending_rows()
@@ -543,7 +560,6 @@ class DerivaML(
             )
         live_snapshot_id = self.catalog.get("/").json()["snaptime"]
         live_schema = self.catalog.get("/schema").json()
-        cache = SchemaCache(self.working_dir)
         old_snapshot_id = cache.snapshot_id()
         cache.write(
             snapshot_id=live_snapshot_id,
