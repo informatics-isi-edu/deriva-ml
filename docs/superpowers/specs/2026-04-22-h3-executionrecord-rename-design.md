@@ -16,16 +16,17 @@ These classes were introduced during Phase 2 S1a as the "v2" replacement was bui
 **In scope:**
 - Rename the V2 class `ExecutionRecord` → `ExecutionSnapshot`.
 - Rename the V2 module `execution_record_v2.py` → `execution_snapshot.py` (keeps file-name ↔ class-name symmetry).
+- Convert `ExecutionSnapshot` from `@dataclass(frozen=True)` to Pydantic `BaseModel` with `ConfigDict(frozen=True)`. See §3.1 for rationale.
 - Update every internal importer of V2 (currently all aliased as `_ExecutionRecordV2`) to import `ExecutionSnapshot` directly.
 - Update return-type annotations on `list_executions` and `find_incomplete_executions` from `list[_ExecutionRecordV2]` to `list[ExecutionSnapshot]`.
-- Rename tests file `tests/execution/test_execution_record_v2.py` → `tests/execution/test_execution_snapshot.py` and update its imports.
+- Rename tests file `tests/execution/test_execution_record_v2.py` → `tests/execution/test_execution_snapshot.py` and update its imports. Confirm tests still pass after the Pydantic conversion; update any that rely on dataclass-specific behavior (e.g., `dataclasses.asdict(x)` → `x.model_dump()`).
 - Update `tests/execution/test_execution_registry.py` import.
 - Rewrite docstrings on the four execution-query methods (`lookup_execution`, `find_executions`, `list_executions`, `find_incomplete_executions`) so each makes the live-vs-snapshot distinction explicit and cross-references the sibling methods.
 - Rewrite the class docstrings on both `ExecutionRecord` (live) and `ExecutionSnapshot` (local) to explicitly state which they are and when to use each.
 - CHANGELOG entry.
 
 **Explicitly out of scope:**
-- No functional/behavior change. Method signatures, return shapes, and semantics are unchanged.
+- No functional/behavior change. Method signatures, return shapes, and field semantics are unchanged. The idiom conversion on `ExecutionSnapshot` is pure mechanics — field types and names stay the same.
 - No method renames. The audit of the codebase's naming convention (mixins/*, Execution class) showed `list_` / `find_` / `lookup_` / `get_` are not cleanly split by data source — `list_vocabulary_terms` hits the catalog, `list_files` reads the filesystem, `find_incomplete_executions` reads SQLite. Changing method names to encode data source would be a bigger change than the real confusion warrants.
 - No merger of the two classes. Their concepts differ (live mutable vs. frozen snapshot) in ways that would make a merged class either lose functionality or grow mode branches everywhere.
 - No legacy class rename. `ExecutionRecord` (live) keeps its name — it's the primary concept in the catalog-record mental model and the one most user-facing code will interact with.
@@ -33,7 +34,7 @@ These classes were introduced during Phase 2 S1a as the "v2" replacement was bui
 
 ## 3. Architecture
 
-No architectural change. This is a rename + docstring cleanup that makes existing behavior legible.
+No architectural change to behavior or control flow. This is a rename + idiom-consistency cleanup that makes the current design legible and aligns both classes with the project's convention for user-facing types.
 
 **Before (current `main`):**
 
@@ -46,9 +47,23 @@ deriva_ml.execution.execution_record_v2.ExecutionRecord    # snapshot, dataclass
 **After:**
 
 ```
-deriva_ml.execution.execution_record.ExecutionRecord       # unchanged
+deriva_ml.execution.execution_record.ExecutionRecord       # unchanged (pydantic, live)
 deriva_ml.execution.execution_snapshot.ExecutionSnapshot   # renamed class + renamed module
+                                                           # converted to pydantic BaseModel(frozen=True)
 ```
+
+### 3.1 On idiom choice — Pydantic for both
+
+The project's rule (captured in `CLAUDE.md` → User Preferences → Class idiom choice): **Pydantic for any of — user-constructed types, types with user-assigned mutable fields, public method parameters needing validation, types that may be serialized or cross a boundary**. `@dataclass` is reserved for purely internal value objects with no user-facing surface.
+
+Applying that rule to both classes here:
+
+- `ExecutionRecord` (live) — stays Pydantic. **Criterion: users assign to mutable properties** (`record.status = ExecutionStatus.Uploaded` writes through to the catalog) — those assignments want validation at the call site.
+- `ExecutionSnapshot` (local) — **converts from `@dataclass(frozen=True)` to Pydantic `BaseModel` with `ConfigDict(frozen=True)`**. The class is user-facing (returned by public methods), it has behavior methods (`pending_summary(ml=...)`, `upload_outputs(ml=...)`) whose parameters benefit from `@validate_call`, and it's a plausible serialization target (logs, reports, dashboards). Without Pydantic, users serializing these snapshots have to know to reach for `dataclasses.asdict()` instead of `.model_dump()` — an extra interface to learn. With Pydantic, the serialization story is uniform across every return type in the library.
+
+The field list and semantics don't change; only the idiom does. `frozen=True` preserves the value-object character (no mutation after construction). The `from_row` classmethod is kept — Pydantic supports classmethods cleanly.
+
+The existing split in this codebase already follows the rule (`DerivaMLConfig`, `DatasetSpec`, `AssetSpec`, `VocabularyTerm`, `FeatureRecord`, `AssetRecord`, etc. are all Pydantic; `@dataclass` is used for internal tooling like `catalog/clone.py`, `tools/validate_schema_doc.py`, and internal value objects in `asset/manifest.py`). Converting `ExecutionSnapshot` brings it in line with its peers rather than making it the one user-facing return type that breaks the rule.
 
 ## 4. Class and module renames
 

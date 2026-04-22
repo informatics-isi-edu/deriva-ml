@@ -262,6 +262,19 @@ This applies to spec/plan reviews during the brainstorming → spec → plan cyc
 
 When Claude needs user input to proceed, prefix the question with `⏸ NEED INPUT:` on its own line so it stands out in long sessions. One question at a time is preferred over batched lists.
 
+### Class idiom choice — Pydantic vs `@dataclass`
+
+Use **Pydantic `BaseModel`** when ANY of these apply — the goal is a single serialization/validation story for anything user-facing:
+
+1. **Users construct instances directly** (config, specs). They expect field validation.
+2. **Users assign to mutable fields** (`record.status = ...`). Validation should fire at the assignment site, not at next sync.
+3. **Public method parameters**. Use `@validate_call` (or `@pydantic.validate_call`) so bad args fail with a clear message at the call boundary.
+4. **The class may be serialized or cross a boundary** (JSON I/O, logs, cache, API, bag metadata). Users should reach for one API (`.model_dump()`) rather than juggling `dataclasses.asdict()` depending on type.
+
+Use **`@dataclass`** only when NONE of those apply — purely internal value objects with no user-facing surface. Examples in this codebase: `catalog/clone.py` internal orchestration records, `tools/validate_schema_doc.py` parse results.
+
+When in doubt, pick Pydantic — "too many interfaces" is the failure mode to avoid. A user-facing return type that's `@dataclass` forces every serialization caller to know its exact type.
+
 ## Best Practices & Patterns
 
 ### Version Bumping
