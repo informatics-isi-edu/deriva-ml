@@ -646,26 +646,6 @@ class TestDuplicateAssociationTables:
         )
 
 
-class TestDenormalizeSqlGeneration:
-    """Test the SQL generation aspects of _denormalize."""
-
-    @pytest.mark.skip(
-        reason="bag._denormalize() was removed in Phase 2; behavior is now covered "
-        "by the public denormalize_as_dataframe tests which exercise the unified "
-        "denormalize() engine end-to-end."
-    )
-    def test_sql_select_structure(self, dataset_test, tmp_path):
-        """Legacy: tested the deleted _denormalize() private method on DatasetBag."""
-
-    @pytest.mark.skip(
-        reason="bag._denormalize() was removed in Phase 2; UNION behavior for "
-        "multi-path joins is now handled inside the unified denormalize() engine "
-        "and covered by TestDenormalize.test_simple_denormalize etc."
-    )
-    def test_union_for_multiple_paths(self, dataset_test, tmp_path):
-        """Legacy: tested the deleted _denormalize() private method on DatasetBag."""
-
-
 class TestCatalogDenormalize:
     """Test suite for catalog-based denormalization (Dataset class).
 

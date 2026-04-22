@@ -117,11 +117,27 @@ def test_resume_execution_missing_raises(test_ml):
 
 
 def test_resume_execution_offline_skips_reconcile(catalog_manager, tmp_path):
-    """Offline resume must not contact the server."""
+    """Offline resume must not contact the server.
+
+    S4 made offline mode require a pre-populated schema cache; this
+    test now does a two-step setup — online run first to populate
+    <working_dir>/schema-cache.json, then offline run reads it.
+    """
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.execution.state_store import ExecutionStatus
 
     catalog_manager.reset()
+    # Step 1: online run populates the schema cache.
+    DerivaML(
+        catalog_manager.hostname,
+        catalog_manager.catalog_id,
+        default_schema=catalog_manager.domain_schema,
+        working_dir=tmp_path,
+        use_minid=False,
+        mode=ConnectionMode.online,
+    )
+    # Step 2: offline run reads the cache; resume_execution must not
+    # contact the server.
     ml = DerivaML(
         catalog_manager.hostname,
         catalog_manager.catalog_id,
@@ -341,12 +357,28 @@ def test_create_execution_rejects_mixed_forms(test_ml):
 
 
 def test_create_execution_offline_raises(catalog_manager, tmp_path):
+    """Offline create_execution must raise DerivaMLOfflineError.
+
+    S4 made offline mode require a pre-populated schema cache; this
+    test now does a two-step setup — online run first to populate
+    <working_dir>/schema-cache.json, then offline run reads it.
+    """
     import pytest
 
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.core.exceptions import DerivaMLOfflineError
 
     catalog_manager.reset()
+    # Step 1: online run populates the schema cache.
+    DerivaML(
+        catalog_manager.hostname,
+        catalog_manager.catalog_id,
+        default_schema=catalog_manager.domain_schema,
+        working_dir=tmp_path,
+        use_minid=False,
+        mode=ConnectionMode.online,
+    )
+    # Step 2: offline run reads the cache; create_execution must raise.
     ml_offline = DerivaML(
         catalog_manager.hostname,
         catalog_manager.catalog_id,
