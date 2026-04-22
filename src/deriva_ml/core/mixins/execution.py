@@ -16,9 +16,7 @@ from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
-from deriva_ml.execution.execution_record_v2 import (
-    ExecutionRecord as _ExecutionRecordV2,
-)
+from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
 from deriva_ml.execution.state_machine import (
     flush_pending_sync,
     reconcile_with_catalog,
@@ -321,7 +319,7 @@ class ExecutionMixin:
         workflow_rid: str | None = None,
         mode: "ConnectionMode | None" = None,
         since: datetime | None = None,
-    ) -> list[_ExecutionRecordV2]:
+    ) -> list[ExecutionSnapshot]:
         """Return known-local executions matching the filters.
 
         Reads from the workspace SQLite registry — no server contact.
@@ -353,7 +351,7 @@ class ExecutionMixin:
             mode=mode, since=since,
         )
         return [
-            _ExecutionRecordV2.from_row(
+            ExecutionSnapshot.from_row(
                 row, **store.count_pending_by_kind(execution_rid=row["rid"])
             )
             for row in rows
@@ -381,7 +379,7 @@ class ExecutionMixin:
             summaries.append(rec.pending_summary(ml=self))
         return WorkspacePendingSummary(per_execution=summaries)
 
-    def find_incomplete_executions(self) -> list[_ExecutionRecordV2]:
+    def find_incomplete_executions(self) -> list[ExecutionSnapshot]:
         """Sugar over list_executions for everything not terminally done.
 
         Returns executions in status in (created, running, stopped,
