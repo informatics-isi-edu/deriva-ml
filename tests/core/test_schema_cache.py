@@ -103,3 +103,112 @@ def test_write_atomic_helper_exists_and_writes_payload(tmp_path):
     assert cache.exists()
     import json
     assert json.loads(cache._path.read_text()) == payload
+
+
+def _populate(cache, schema_payload=None):
+    """Helper: write a minimal valid cache for pin tests."""
+    cache.write(
+        snapshot_id="s0",
+        hostname="h",
+        catalog_id="c",
+        ml_schema="ml",
+        schema=schema_payload or {"schemas": {}},
+    )
+
+
+def test_pin_on_unpinned_cache_sets_fields(tmp_path):
+    from datetime import datetime, timezone
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    _populate(cache)
+    before = datetime.now(timezone.utc)
+    cache.pin(reason="paper repro")
+    after = datetime.now(timezone.utc)
+    status = cache.pin_status()
+    assert status.pinned is True
+    assert status.pin_reason == "paper repro"
+    assert status.pinned_snapshot_id == "s0"
+    assert status.pinned_at is not None
+    assert before <= status.pinned_at <= after
+
+
+def test_pin_without_reason(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    _populate(cache)
+    cache.pin()
+    status = cache.pin_status()
+    assert status.pinned is True
+    assert status.pin_reason is None
+
+
+def test_pin_idempotent_updates_metadata(tmp_path):
+    import time
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    _populate(cache)
+    cache.pin(reason="first")
+    first = cache.pin_status()
+    time.sleep(0.01)
+    cache.pin(reason="second")
+    second = cache.pin_status()
+    assert second.pinned is True
+    assert second.pin_reason == "second"
+    assert second.pinned_at >= first.pinned_at
+
+
+def test_unpin_clears_fields(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    _populate(cache)
+    cache.pin(reason="r")
+    cache.unpin()
+    status = cache.pin_status()
+    assert status.pinned is False
+    assert status.pinned_at is None
+    assert status.pin_reason is None
+    assert status.pinned_snapshot_id == "s0"
+
+
+def test_unpin_on_unpinned_is_no_op(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    _populate(cache)
+    cache.unpin()  # should not raise
+    status = cache.pin_status()
+    assert status.pinned is False
+
+
+def test_pin_status_on_missing_cache_raises(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    import pytest
+    with pytest.raises(FileNotFoundError):
+        cache.pin_status()
+
+
+def test_pin_persists_across_instances(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    a = SchemaCache(tmp_path)
+    _populate(a)
+    a.pin(reason="persist me")
+    b = SchemaCache(tmp_path)
+    status = b.pin_status()
+    assert status.pinned is True
+    assert status.pin_reason == "persist me"
+
+
+def test_cache_file_format_has_nested_pin_object(tmp_path):
+    """After pin, the JSON has a top-level ``pin`` object; unpin removes it."""
+    import json
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    _populate(cache)
+    cache.pin(reason="x")
+    raw = json.loads(cache._path.read_text())
+    assert "pin" in raw
+    assert raw["pin"]["reason"] == "x"
+    assert "at" in raw["pin"]
+    cache.unpin()
+    raw2 = json.loads(cache._path.read_text())
+    assert "pin" not in raw2
