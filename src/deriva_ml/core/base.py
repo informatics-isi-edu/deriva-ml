@@ -44,10 +44,16 @@ DEFAULT_LOGGER_OVERRIDES = _core_utils.DEFAULT_LOGGER_OVERRIDES
 deriva_tags = _core_utils.tag
 GlobusNativeLogin = _globus_auth_utils.GlobusNativeLogin
 
+from deriva_ml.core.catalog_stub import CatalogStub
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import ML_SCHEMA, RID, TableDefinition, VocabularyTableDef
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import (
+    DerivaMLConfigurationError,
+    DerivaMLException,
+    DerivaMLReadOnlyError,
+    DerivaMLSchemaRefreshBlocked,
+)
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
 from deriva_ml.core.mixins import (
     AnnotationMixin,
@@ -61,6 +67,7 @@ from deriva_ml.core.mixins import (
     VocabularyMixin,
     WorkflowMixin,
 )
+from deriva_ml.core.schema_cache import SchemaCache
 from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 
@@ -273,47 +280,13 @@ class DerivaML(
         # strings ("online"/"offline") uniformly; unknown strings raise ValueError.
         self._mode = ConnectionMode(mode)
 
-        # Get or use provided credentials for server access
+        # Get or use provided credentials for server access.
+        # get_credential() reads ~/.deriva/credential.json; no network.
         self.credential = credential or get_credential(hostname)
 
-        # Initialize server connection and catalog access
-        server = DerivaServer(
-            "https",
-            hostname,
-            credentials=self.credential,
-            session_config=self._get_session_config(),
-        )
-        try:
-            if check_auth and server.get_authn_session():
-                pass
-        except Exception:
-            raise DerivaMLException(
-                "You are not authorized to access this catalog. "
-                "Please check your credentials and make sure you have logged in."
-            )
-        self.catalog = server.connect_ermrest(catalog_id)
-        # Import here to avoid circular imports
-        from deriva_ml.model.catalog import DerivaModel
-
-        self.model = DerivaModel(
-            self.catalog.getCatalogModel(),
-            ml_schema=ml_schema,
-            domain_schemas=domain_schemas,
-            default_schema=default_schema,
-        )
-
-        # Store S3 bucket configuration and resolve use_minid
-        self.s3_bucket = s3_bucket
-        if use_minid is None:
-            # Auto mode: enable MINID if s3_bucket is configured
-            self.use_minid = s3_bucket is not None
-        elif use_minid and s3_bucket is None:
-            # User requested MINID but no S3 bucket configured - disable MINID
-            self.use_minid = False
-        else:
-            self.use_minid = use_minid
-
-        # Set up working and cache directories
+        # Set up working and cache directories. Done BEFORE catalog/
+        # schema setup so SchemaCache can be constructed for either
+        # mode branch below.
         # If working_dir is already provided (e.g. from DerivaMLConfig.instantiate()),
         # use it directly; otherwise compute the default path.
         if working_dir is not None:
@@ -325,6 +298,41 @@ class DerivaML(
 
         self.cache_dir = Path(cache_dir) if cache_dir else self.working_dir / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Mode-branched init: online connects to the catalog and
+        # verifies (or populates) the schema cache; offline reads
+        # the cache and skips all network calls.
+        cache = SchemaCache(self.working_dir)
+        if self._mode is ConnectionMode.online:
+            self._init_online(
+                hostname=hostname,
+                catalog_id=catalog_id,
+                check_auth=check_auth,
+                cache=cache,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+        else:
+            self._init_offline(
+                hostname=hostname,
+                catalog_id=catalog_id,
+                cache=cache,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+
+        # Store S3 bucket configuration and resolve use_minid
+        self.s3_bucket = s3_bucket
+        if use_minid is None:
+            # Auto mode: enable MINID if s3_bucket is configured
+            self.use_minid = s3_bucket is not None
+        elif use_minid and s3_bucket is None:
+            # User requested MINID but no S3 bucket configured - disable MINID
+            self.use_minid = False
+        else:
+            self.use_minid = use_minid
 
         # Set up logging using centralized configuration
         # This configures deriva_ml, Hydra, and deriva-py loggers without
@@ -390,6 +398,170 @@ class DerivaML(
             # Any failure here (catalog unreachable, InvalidTransition, etc.)
             # is swallowed — __del__ must not raise.
             pass
+
+    def _init_online(
+        self,
+        *,
+        hostname: str,
+        catalog_id: str | int,
+        check_auth: bool,
+        cache: "SchemaCache",
+        ml_schema: str,
+        domain_schemas: "str | set[str] | None",
+        default_schema: "str | None",
+    ) -> None:
+        """Online init: connect to server, resolve schema via cache
+        or fresh fetch with a drift warning."""
+        from deriva_ml.model.catalog import DerivaModel
+
+        server = DerivaServer(
+            "https",
+            hostname,
+            credentials=self.credential,
+            session_config=self._get_session_config(),
+        )
+        try:
+            if check_auth and server.get_authn_session():
+                pass
+        except Exception:
+            raise DerivaMLException(
+                "You are not authorized to access this catalog. "
+                "Please check your credentials and make sure you have logged in."
+            )
+        self.catalog = server.connect_ermrest(catalog_id)
+
+        # GET / returns {snaptime: ..., ...} — cheap way to learn
+        # the catalog's current snapshot id.
+        live_snapshot_id = self.catalog.get("/").json()["snaptime"]
+
+        if cache.exists():
+            cached = cache.load()
+            if cached["snapshot_id"] != live_snapshot_id:
+                logging.getLogger("deriva_ml").warning(
+                    "schema cache is at snapshot %s; live catalog is at %s. "
+                    "Using cached schema. Call ml.refresh_schema() to update.",
+                    cached["snapshot_id"], live_snapshot_id,
+                )
+            self.model = DerivaModel.from_cached(
+                cached["schema"],
+                catalog=self.catalog,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+        else:
+            # First-time online init — fetch live schema and populate cache.
+            live_schema = self.catalog.get("/schema").json()
+            cache.write(
+                snapshot_id=live_snapshot_id,
+                hostname=hostname,
+                catalog_id=str(catalog_id),
+                ml_schema=ml_schema,
+                schema=live_schema,
+            )
+            self.model = DerivaModel.from_cached(
+                live_schema,
+                catalog=self.catalog,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+
+    def _init_offline(
+        self,
+        *,
+        hostname: str,
+        catalog_id: str | int,
+        cache: "SchemaCache",
+        ml_schema: str,
+        domain_schemas: "str | set[str] | None",
+        default_schema: "str | None",
+    ) -> None:
+        """Offline init: read cache, skip all network. Raises if the
+        cache is missing or belongs to a different (host, catalog)."""
+        from deriva_ml.model.catalog import DerivaModel
+
+        if not cache.exists():
+            raise DerivaMLConfigurationError(
+                f"offline mode requires a cached schema at {cache._path}; "
+                f"run online once first (with the same working_dir) to populate the cache."
+            )
+        cached = cache.load()
+        if cached["hostname"] != hostname or cached["catalog_id"] != str(catalog_id):
+            raise DerivaMLConfigurationError(
+                f"cached schema at {cache._path} is for "
+                f"{cached['hostname']}/{cached['catalog_id']}, "
+                f"but __init__ was called with {hostname}/{catalog_id}. "
+                f"Use the matching working_dir or run online to refresh."
+            )
+        self.catalog = CatalogStub()
+        self.model = DerivaModel.from_cached(
+            cached["schema"],
+            catalog=self.catalog,
+            ml_schema=ml_schema,
+            domain_schemas=domain_schemas,
+            default_schema=default_schema,
+        )
+
+    def refresh_schema(self, *, force: bool = False) -> None:
+        """Fetch the current catalog schema and overwrite the workspace cache.
+
+        Online mode only. Refuses when the workspace has pending
+        rows unless ``force=True`` is passed; a forced refresh may
+        leave staged rows whose metadata references columns or types
+        no longer in the new schema, causing catalog-insert failures
+        on the next upload.
+
+        Args:
+            force: If True, refresh even when the workspace has
+                pending rows (status staged/leasing/leased/uploading/
+                failed). Default False refuses in that case with
+                :class:`DerivaMLSchemaRefreshBlocked`.
+
+        Raises:
+            DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLSchemaRefreshBlocked: If ``force=False`` and the
+                workspace has pending rows.
+        """
+        from deriva_ml.model.catalog import DerivaModel
+
+        if self._mode is not ConnectionMode.online:
+            raise DerivaMLReadOnlyError(
+                "refresh_schema requires online mode"
+            )
+        store = self.workspace.execution_state_store()
+        count = store.count_pending_rows()
+        if count > 0 and not force:
+            raise DerivaMLSchemaRefreshBlocked(
+                f"refresh_schema requires a drained workspace; "
+                f"{count} pending rows. Run ml.upload_pending() first, "
+                f"or call refresh_schema(force=True) to discard local "
+                f"state (staged rows may become inconsistent with the "
+                f"new schema)."
+            )
+        live_snapshot_id = self.catalog.get("/").json()["snaptime"]
+        live_schema = self.catalog.get("/schema").json()
+        cache = SchemaCache(self.working_dir)
+        old_snapshot_id = cache.snapshot_id()
+        cache.write(
+            snapshot_id=live_snapshot_id,
+            hostname=self.host_name,
+            catalog_id=str(self.catalog_id),
+            ml_schema=self.model.ml_schema,
+            schema=live_schema,
+        )
+        # Reload the in-memory model so this session sees the new schema.
+        self.model = DerivaModel.from_cached(
+            live_schema,
+            catalog=self.catalog,
+            ml_schema=self.model.ml_schema,
+            domain_schemas=self.model.domain_schemas,
+            default_schema=self.model.default_schema,
+        )
+        logging.getLogger("deriva_ml").info(
+            "schema cache refreshed from %s to %s",
+            old_snapshot_id, live_snapshot_id,
+        )
 
     @staticmethod
     def _get_session_config() -> dict:

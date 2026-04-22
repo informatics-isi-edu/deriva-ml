@@ -608,6 +608,34 @@ class ExecutionStateStore:
             "failed_files": int(row["failed_files"]),
         }
 
+    def count_pending_rows(self) -> int:
+        """Count non-terminal pending rows across ALL executions.
+
+        Non-terminal means status is one of staged/leasing/leased/
+        uploading/failed. Rows in status='uploaded' are excluded.
+
+        Used by ``DerivaML.refresh_schema()`` to decide whether to
+        refuse a schema refresh: a non-zero count means staged work
+        may reference columns/types that would disappear from the
+        refreshed schema, so the refresh is blocked unless
+        ``force=True``.
+
+        Returns:
+            Integer count; 0 if the pending_rows table is empty.
+        """
+        non_terminal = [
+            str(PendingRowStatus.staged),
+            str(PendingRowStatus.leasing),
+            str(PendingRowStatus.leased),
+            str(PendingRowStatus.uploading),
+            str(PendingRowStatus.failed),
+        ]
+        stmt = select(func.count()).select_from(self.pending_rows).where(
+            self.pending_rows.c.status.in_(non_terminal)
+        )
+        with self.engine.begin() as conn:
+            return int(conn.scalar(stmt) or 0)
+
     def pending_summary_rows(
         self,
         *,

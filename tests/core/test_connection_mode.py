@@ -38,9 +38,24 @@ def test_derivaml_default_mode_is_online(test_ml):
 
 
 def test_derivaml_accepts_mode_enum(catalog_manager, tmp_path):
-    """Constructing DerivaML with mode=ConnectionMode.offline works."""
+    """Constructing DerivaML with mode=ConnectionMode.offline works
+    when a schema cache has been populated by a prior online run.
+
+    S4 (offline-mode init) made offline mode require a pre-populated
+    <working_dir>/schema-cache.json; before S4 offline mode silently
+    did network work anyway. This test now verifies the two-step
+    online-populate-then-offline-load contract.
+    """
     from deriva_ml import ConnectionMode, DerivaML
     catalog_manager.reset()
+    # Step 1: online run populates the schema cache in tmp_path.
+    DerivaML(
+        hostname=catalog_manager.hostname,
+        catalog_id=catalog_manager.catalog_id,
+        working_dir=tmp_path,
+        mode=ConnectionMode.online,
+    )
+    # Step 2: offline run reads the cache, skips all network.
     ml = DerivaML(
         hostname=catalog_manager.hostname,
         catalog_id=catalog_manager.catalog_id,
@@ -51,9 +66,19 @@ def test_derivaml_accepts_mode_enum(catalog_manager, tmp_path):
 
 
 def test_derivaml_accepts_mode_string(catalog_manager, tmp_path):
-    """String 'offline' is coerced to ConnectionMode.offline."""
+    """String 'offline' is coerced to ConnectionMode.offline.
+
+    Same two-step pattern as the enum test above — online run
+    populates the cache, then offline run loads it.
+    """
     from deriva_ml import ConnectionMode, DerivaML
     catalog_manager.reset()
+    DerivaML(
+        hostname=catalog_manager.hostname,
+        catalog_id=catalog_manager.catalog_id,
+        working_dir=tmp_path,
+        mode="online",
+    )
     ml = DerivaML(
         hostname=catalog_manager.hostname,
         catalog_id=catalog_manager.catalog_id,
@@ -66,6 +91,7 @@ def test_derivaml_accepts_mode_string(catalog_manager, tmp_path):
 def test_derivaml_rejects_invalid_mode(catalog_manager, tmp_path):
     """Unknown mode string raises ValueError (or ValidationError)."""
     from pydantic import ValidationError
+
     from deriva_ml import DerivaML
     catalog_manager.reset()
     with pytest.raises((ValidationError, ValueError)):

@@ -2,6 +2,41 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Phase 2 Subsystem 4: Cache-backed offline mode
+
+### New
+
+- **`ConnectionMode.offline` now actually works without network.** `DerivaML.__init__` reads the cached schema from `<working_dir>/schema-cache.json` and sets `self.catalog = CatalogStub()`. Any code that tries to reach `self.catalog.<method>` in offline mode raises `DerivaMLReadOnlyError` with a clear message. Offline mode requires a pre-populated cache — run online once in the same `working_dir` first.
+- **`DerivaML.refresh_schema(force=False)`** — explicit schema-cache refresh. Online mode only. Refuses when the workspace has pending rows unless `force=True`, with clear error text about the risk of stale metadata against a new schema. Updates `self.model` in place so the calling session sees the new schema without re-constructing `DerivaML`.
+- **`SchemaCache`** (`deriva_ml.core.schema_cache`) — workspace-backed cache of the catalog schema at `<workspace>/schema-cache.json`. Atomic writes (tmp + fsync + rename) for crash safety.
+- **`CatalogStub`** (`deriva_ml.core.catalog_stub`) — drop-in replacement for `ErmrestCatalog` in offline mode. Any non-dunder attribute access raises `DerivaMLReadOnlyError` with the attribute name in the message; dunders pass through normally so `repr()`, `print()`, copy protocol, etc. still work.
+- **`DerivaMLSchemaRefreshBlocked`** (`deriva_ml.core.exceptions`) — subclass of `DerivaMLConfigurationError`. Raised when `refresh_schema()` is called with pending workspace rows and `force=False`.
+- **`ExecutionStateStore.count_pending_rows()`** — workspace-wide non-terminal row count (the existing `count_pending_by_kind` is per-execution).
+- **`DerivaModel.from_cached(schema_dict, *, catalog, ...)`** — classmethod for offline model construction from a cached `/schema` dict; no network.
+
+### Drift behavior (online mode)
+
+On online `__init__`, the library fetches the live catalog's snapshot id via `GET /` and compares it to the cached id. If they differ, a warning is logged and the **cached schema continues to be used** — the live schema is discarded. Users who want the new schema must call `ml.refresh_schema()` explicitly. Rationale: auto-refresh is unsafe when the workspace has staged data that references the old schema. A future subsystem will add map operations for schema-aware data migration that can safely reconcile staged data against a refreshed schema.
+
+### Tests
+
+- **`tests/core/test_catalog_stub.py`** (new) — 4 unit tests: attribute access raises, method call raises, repr format, dunder passthrough.
+- **`tests/core/test_schema_cache.py`** (new) — 6 unit tests: missing-cache states, write+load round-trip, load-missing raises `FileNotFoundError`, corrupt-file raises `DerivaMLConfigurationError`, atomic-write crash recovery preserves the old cache.
+- **`tests/core/test_offline_init.py`** (new) — 7 integration tests: offline-without-cache error, hostname/catalog_id mismatch error, online populates cache, offline-after-online succeeds, `refresh_schema()` refuses with pending rows, `refresh_schema(force=True)` succeeds, drift warning on stale cache.
+- **`tests/model/test_derivamodel_from_cached.py`** (new) — 1 unit test: `from_cached` constructs without network via `CatalogStub`.
+- **`tests/execution/test_state_store.py`** — 2 new tests for `count_pending_rows()` (multi-execution happy path, empty store).
+- **`tests/core/test_connection_mode.py`** — 2 existing tests (`test_derivaml_accepts_mode_enum`, `test_derivaml_accepts_mode_string`) updated to the new offline contract. Before S4 these tests silently succeeded because offline mode did network work despite its name; they now pre-populate the cache via an online run first.
+
+### Scope-out note
+
+The initial S4 brainstorming also scoped a second hygiene item — finishing the S1a `Status`-enum migration. On starting execution we discovered the migration had already been completed on `main` in commit `8313953` and the grep-gate test `tests/test_migration_complete.py` was already landed. The stale context came from a sibling worktree stuck at a pre-migration commit. That hygiene item was removed from S4's scope; the subsystem shipped as offline-mode init only. Spec and plan were corrected in commits `54c3e4e` and `d9449fa`.
+
+### API note (not a breaking change, but worth noting)
+
+Code that relied on `ml.catalog is None` to detect offline mode sees a `CatalogStub` instance instead. The instance is truthy and its methods all raise `DerivaMLReadOnlyError`. Replace `ml.catalog is None` with `ml.mode is ConnectionMode.offline` or `isinstance(ml.catalog, CatalogStub)`. Audit of `src/` and `tests/` on the pre-merge tree found zero such callers, so this is forward-looking guidance.
+
+---
+
 ## Unreleased — Phase 2 Subsystem 3: Upload-engine deriva-py integration
 
 ### Breaking changes
