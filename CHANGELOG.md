@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — H3: ExecutionRecord disambiguation
+
+### Renamed
+
+- **`deriva_ml.execution.execution_record_v2.ExecutionRecord`** → **`deriva_ml.execution.execution_snapshot.ExecutionSnapshot`**. The V2 class-name collided with the live catalog-backed `ExecutionRecord` and was aliased internally as `_ExecutionRecordV2` to compensate. The rename makes the two distinct concepts — live catalog record (mutable, ERMrest-backed) vs. frozen snapshot (value object, SQLite-backed) — clear at the import site. Also converted from `@dataclass(frozen=True)` to Pydantic `BaseModel(frozen=True)` so users get `.model_dump()` for free and the class matches the project convention for user-facing return types.
+- The following methods now return `ExecutionSnapshot` (was: aliased `_ExecutionRecordV2`):
+  - `DerivaML.list_executions(...)`
+  - `DerivaML.find_incomplete_executions()`
+- Test module **`tests/execution/test_execution_record_v2.py`** → **`tests/execution/test_execution_snapshot.py`**.
+
+### External-caller impact
+
+If you were importing the V2 class directly by its module path:
+
+```python
+# Before
+from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+
+# After
+from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+```
+
+Callers using only the public method API (`ml.list_executions(...)`, `ml.find_incomplete_executions()`) see no change beyond the class name in the return type — attribute access (`snap.rid`, `snap.status`, `snap.pending_rows`, etc.) and the behavior methods (`snap.upload_outputs(ml=...)`, `snap.update_status(..., ml=...)`, `snap.pending_summary(ml=...)`) are unchanged.
+
+### Docstrings
+
+The four execution-query methods (`lookup_execution`, `find_executions`, `list_executions`, `find_incomplete_executions`) and both `ExecutionRecord` (live) and `ExecutionSnapshot` (local) class docstrings now explicitly state whether they use the live catalog or the local SQLite registry, and cross-reference the sibling methods/classes.
+
+---
+
 ## Unreleased — Phase 2 Subsystem 4: Cache-backed offline mode
 
 ### New
