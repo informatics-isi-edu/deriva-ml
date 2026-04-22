@@ -88,7 +88,7 @@ def test_added_table():
     })
     diff = compute_diff(cached, live)
     assert [t.table for t in diff.added_tables] == ["T2"]
-    assert all(t.schema == "deriva-ml" for t in diff.added_tables)
+    assert all(t.schema_name == "deriva-ml" for t in diff.added_tables)
 
 
 def test_removed_table():
@@ -109,7 +109,7 @@ def test_added_column():
     diff = compute_diff(cached, live)
     assert len(diff.added_columns) == 1
     add = diff.added_columns[0]
-    assert add.schema == "deriva-ml"
+    assert add.schema_name == "deriva-ml"
     assert add.table == "T"
     assert add.column == "b"
     assert add.type == "int4"
