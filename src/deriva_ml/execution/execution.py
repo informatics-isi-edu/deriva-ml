@@ -1127,6 +1127,12 @@ class Execution:
         Raises:
             DerivaMLException: If upload fails.
         """
+        # Bug C: refuse to upload if any pending asset is missing a
+        # required (NOT-NULL) metadata column. This raises a single
+        # DerivaMLValidationError that lists all failures at once.
+        from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+        _validate_pending_asset_metadata(self._model, self._get_manifest())
+
         # Build staging symlinks from manifest into the regex-expected tree
         upload_root = self._build_upload_staging()
 
