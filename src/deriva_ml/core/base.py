@@ -55,7 +55,6 @@ from deriva_ml.core.exceptions import (
     DerivaMLSchemaRefreshBlocked,
 )
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
-from deriva_ml.core.schema_cache import SchemaCache
 from deriva_ml.core.mixins import (
     AnnotationMixin,
     AssetMixin,
@@ -68,6 +67,7 @@ from deriva_ml.core.mixins import (
     VocabularyMixin,
     WorkflowMixin,
 )
+from deriva_ml.core.schema_cache import SchemaCache
 from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 
