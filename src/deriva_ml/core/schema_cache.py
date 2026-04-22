@@ -89,6 +89,17 @@ class SchemaCache:
             "ml_schema": ml_schema,
             "schema": schema,
         }
+        self._write_atomic(payload)
+
+    def _write_atomic(self, payload: dict) -> None:
+        """Atomically write ``payload`` as JSON to the cache file.
+
+        Writes to a sibling ``.tmp``, ``fsync``'s, then ``os.replace``'s
+        over the target. On failure the original file is unchanged.
+        Used by both ``write()`` (full cache refresh) and ``pin()``/
+        ``unpin()`` (which rewrite an existing cache's payload with
+        a tweaked ``"pin"`` key).
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".json.tmp")
         with open(tmp, "w") as fp:

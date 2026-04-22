@@ -86,3 +86,20 @@ def test_write_is_atomic_no_partial_file_on_crash(tmp_path, monkeypatch):
     monkeypatch.setattr(os_mod, "replace", original_replace)
     assert cache.snapshot_id() == "v1"
     assert cache.load()["schema"] == {"a": 1}
+
+
+def test_write_atomic_helper_exists_and_writes_payload(tmp_path):
+    """_write_atomic is the private helper pin/unpin will reuse."""
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    payload = {
+        "snapshot_id": "s1",
+        "hostname": "h",
+        "catalog_id": "c",
+        "ml_schema": "ml",
+        "schema": {"k": "v"},
+    }
+    cache._write_atomic(payload)
+    assert cache.exists()
+    import json
+    assert json.loads(cache._path.read_text()) == payload
