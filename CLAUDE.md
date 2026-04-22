@@ -248,6 +248,20 @@ Use `zen_partial=True` for model functions that receive execution context at run
 
 See `docs/configuration/overview.md` for complete documentation.
 
+## User Preferences
+
+### Opening markdown files for review
+
+When the user asks to open a spec, plan, or other markdown file for review, use MarkEdit:
+```bash
+open -a MarkEdit /absolute/path/to/file.md
+```
+This applies to spec/plan reviews during the brainstorming → spec → plan cycle as well as ad-hoc markdown review requests.
+
+### Input-required notifications
+
+When Claude needs user input to proceed, prefix the question with `⏸ NEED INPUT:` on its own line so it stands out in long sessions. One question at a time is preferred over batched lists.
+
 ## Best Practices & Patterns
 
 ### Version Bumping
