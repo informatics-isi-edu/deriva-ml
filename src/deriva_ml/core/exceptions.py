@@ -121,6 +121,23 @@ class DerivaMLSchemaRefreshBlocked(DerivaMLConfigurationError):
     pass
 
 
+class DerivaMLSchemaPinned(DerivaMLConfigurationError):
+    """Raised when ``refresh_schema()`` is called on a pinned cache.
+
+    The cache has been explicitly pinned via ``pin_schema()``. Call
+    ``unpin_schema()`` first if you really want to refresh. Note:
+    ``force=True`` does NOT bypass a pin — it only bypasses the
+    pending-rows guard.
+
+    Example:
+        >>> raise DerivaMLSchemaPinned(
+        ...     "refresh_schema refused: cache is pinned at snapshot s0"
+        ... )
+    """
+
+    pass
+
+
 class DerivaMLAuthenticationError(DerivaMLConfigurationError):
     """Exception raised for authentication failures.
 

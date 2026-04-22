@@ -52,6 +52,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLConfigurationError,
     DerivaMLException,
     DerivaMLReadOnlyError,
+    DerivaMLSchemaPinned,
     DerivaMLSchemaRefreshBlocked,
 )
 from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
@@ -67,12 +68,13 @@ from deriva_ml.core.mixins import (
     VocabularyMixin,
     WorkflowMixin,
 )
-from deriva_ml.core.schema_cache import SchemaCache
+from deriva_ml.core.schema_cache import PinStatus, SchemaCache
 from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 
 if TYPE_CHECKING:
     from deriva_ml.catalog.clone import CatalogProvenance
+    from deriva_ml.core.schema_diff import SchemaDiff
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
     from deriva_ml.schema.validation import SchemaValidationReport
@@ -506,28 +508,45 @@ class DerivaML(
     def refresh_schema(self, *, force: bool = False) -> None:
         """Fetch the current catalog schema and overwrite the workspace cache.
 
-        Online mode only. Refuses when the workspace has pending
-        rows unless ``force=True`` is passed; a forced refresh may
-        leave staged rows whose metadata references columns or types
-        no longer in the new schema, causing catalog-insert failures
-        on the next upload.
+        Online mode only. Refuses in two cases:
+
+        1. The cache is pinned (via :meth:`pin_schema`). Raises
+           :class:`DerivaMLSchemaPinned`. ``force=True`` does NOT
+           bypass a pin — call :meth:`unpin_schema` first.
+        2. The workspace has pending rows (staged/leasing/leased/
+           uploading/failed). Raises
+           :class:`DerivaMLSchemaRefreshBlocked` unless
+           ``force=True`` is passed; a forced refresh may leave
+           staged rows whose metadata references columns or types
+           no longer in the new schema, causing catalog-insert
+           failures on the next upload.
 
         Args:
             force: If True, refresh even when the workspace has
-                pending rows (status staged/leasing/leased/uploading/
-                failed). Default False refuses in that case with
-                :class:`DerivaMLSchemaRefreshBlocked`.
+                pending rows. Does NOT bypass a pin.
 
         Raises:
             DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLSchemaPinned: If the cache is pinned (any
+                ``force`` value).
             DerivaMLSchemaRefreshBlocked: If ``force=False`` and the
-                workspace has pending rows.
+                workspace has pending rows (and the cache is not
+                pinned).
         """
         from deriva_ml.model.catalog import DerivaModel
 
         if self._mode is not ConnectionMode.online:
             raise DerivaMLReadOnlyError(
                 "refresh_schema requires online mode"
+            )
+        cache = SchemaCache(self.working_dir)
+        if cache.exists() and cache.pin_status().pinned:
+            pin_info = cache.pin_status()
+            raise DerivaMLSchemaPinned(
+                f"refresh_schema refused: cache is pinned at snapshot "
+                f"{pin_info.pinned_snapshot_id}"
+                + (f" (reason: {pin_info.pin_reason})" if pin_info.pin_reason else "")
+                + ". Call ml.unpin_schema() first."
             )
         store = self.workspace.execution_state_store()
         count = store.count_pending_rows()
@@ -541,7 +560,6 @@ class DerivaML(
             )
         live_snapshot_id = self.catalog.get("/").json()["snaptime"]
         live_schema = self.catalog.get("/schema").json()
-        cache = SchemaCache(self.working_dir)
         old_snapshot_id = cache.snapshot_id()
         cache.write(
             snapshot_id=live_snapshot_id,
@@ -562,6 +580,114 @@ class DerivaML(
             "schema cache refreshed from %s to %s",
             old_snapshot_id, live_snapshot_id,
         )
+
+    def pin_schema(self, reason: str | None = None) -> "SchemaDiff | None":
+        """Freeze the local schema cache at its current snapshot.
+
+        While pinned, :meth:`refresh_schema` refuses to update the
+        cache (even with ``force=True``). Call :meth:`unpin_schema`
+        to clear the pin.
+
+        Online mode additionally checks for structural drift: if the
+        live catalog has moved on and its ``/schema`` payload differs
+        from the cached one (columns, tables, foreign keys, etc.),
+        a :class:`SchemaDiff` describing the drift is returned, and
+        a WARNING is logged. The pin is still persisted.
+
+        Offline mode always returns ``None`` — the cache is pinned,
+        but no live comparison is possible.
+
+        Args:
+            reason: Free-text explanation stored alongside the pin.
+                Useful for reporting (``pin_status().pin_reason``).
+
+        Returns:
+            A :class:`SchemaDiff` when the pin is applied online and
+            the live catalog's schema differs structurally from the
+            cache. ``None`` otherwise (offline, no drift, or snapshot
+            bumped without schema change).
+
+        Raises:
+            FileNotFoundError: If the workspace has no cache yet.
+                Run an online ``DerivaML.__init__`` or
+                :meth:`refresh_schema` first.
+        """
+        from deriva_ml.core.schema_diff import compute_diff
+
+        cache = SchemaCache(self.working_dir)
+        drift: SchemaDiff | None = None
+        if self._mode is ConnectionMode.online:
+            live_snapshot_id = self.catalog.get("/").json()["snaptime"]
+            cached_payload = cache.load()
+            if cached_payload["snapshot_id"] != live_snapshot_id:
+                live_schema = self.catalog.get("/schema").json()
+                diff = compute_diff(cached_payload["schema"], live_schema)
+                if not diff.is_empty():
+                    logging.getLogger("deriva_ml").warning(
+                        "pin_schema: cache at %s, live at %s; "
+                        "structural drift detected (see returned SchemaDiff)",
+                        cached_payload["snapshot_id"], live_snapshot_id,
+                    )
+                    drift = diff
+        cache.pin(reason=reason)
+        return drift
+
+    def unpin_schema(self) -> None:
+        """Clear the schema-cache pin. No-op if not pinned.
+
+        Works in any mode. After unpinning, :meth:`refresh_schema`
+        is allowed again (subject to the pending-rows guard).
+
+        Raises:
+            FileNotFoundError: If the workspace has no cache file.
+        """
+        SchemaCache(self.working_dir).unpin()
+
+    def pin_status(self) -> "PinStatus":
+        """Return the current pin state of the local schema cache.
+
+        Works in any mode.
+
+        Returns:
+            A :class:`PinStatus` snapshot: ``pinned`` flag, UTC
+            ``pinned_at`` timestamp (or None), caller-supplied
+            ``pin_reason`` (or None), and the cache's current
+            ``pinned_snapshot_id``.
+
+        Raises:
+            FileNotFoundError: If the workspace has no cache file.
+        """
+        return SchemaCache(self.working_dir).pin_status()
+
+    def diff_schema(self) -> "SchemaDiff":
+        """Return the structural diff between the cached and live schemas.
+
+        Online mode only. Fetches the live catalog's ``/schema``
+        payload, compares it against the cached copy with
+        :func:`~deriva_ml.core.schema_diff.compute_diff`, and returns
+        the result. The returned :class:`SchemaDiff` may be empty
+        (no drift) — callers should check ``diff.is_empty()`` rather
+        than truthiness.
+
+        Unlike :meth:`pin_schema`, this method never modifies the
+        cache and never logs a warning; it is a pure inspection
+        operation.
+
+        Returns:
+            A :class:`SchemaDiff`, possibly empty.
+
+        Raises:
+            DerivaMLReadOnlyError: If called in offline mode.
+            FileNotFoundError: If the workspace has no cache file.
+        """
+        from deriva_ml.core.schema_diff import compute_diff
+
+        if self._mode is not ConnectionMode.online:
+            raise DerivaMLReadOnlyError("diff_schema requires online mode")
+        cache = SchemaCache(self.working_dir)
+        cached_payload = cache.load()
+        live_schema = self.catalog.get("/schema").json()
+        return compute_diff(cached_payload["schema"], live_schema)
 
     @staticmethod
     def _get_session_config() -> dict:
