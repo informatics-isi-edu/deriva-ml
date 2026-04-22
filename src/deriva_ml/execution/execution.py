@@ -1080,6 +1080,10 @@ class Execution:
             target_dir = staging_root / entry.schema / asset_table_name
             for part in metadata_parts:
                 target_dir = target_dir / part
+            # Bug E.2: append pre-leased RID as the final path segment.
+            # asset_table_upload_spec's file_pattern expects to capture
+            # this as (?P<RID>[-A-Z0-9]+).
+            target_dir = target_dir / entry.rid
             target_dir.mkdir(parents=True, exist_ok=True)
 
             target = target_dir / filename
