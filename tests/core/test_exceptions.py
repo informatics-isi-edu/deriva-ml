@@ -31,3 +31,13 @@ def test_state_inconsistency_error_is_data_error():
         "SQLite says running, catalog says aborted for EXE-A"
     )
     assert isinstance(err, DerivaMLDataError)
+
+
+def test_derivaml_schema_pinned_inherits_configuration_error():
+    from deriva_ml.core.exceptions import (
+        DerivaMLConfigurationError,
+        DerivaMLSchemaPinned,
+    )
+    err = DerivaMLSchemaPinned("refresh_schema refused: cache is pinned")
+    assert isinstance(err, DerivaMLConfigurationError)
+    assert "pinned" in str(err)
