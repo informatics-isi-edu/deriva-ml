@@ -75,6 +75,14 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
+NULL_SENTINEL = "__NULL__"
+"""Directory-segment marker for nullable asset-metadata columns with
+no value. Written into the staging tree by the three path-builders
+(``Execution._build_upload_staging``, ``_invoke_deriva_py_uploader``,
+``asset_file_path``) and translated back to Python ``None`` by
+:class:`deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor`
+before deriva-py builds the catalog insert. See Bug C design doc."""
+
 # Use os.path.sep for OS-agnostic paths in regex patterns
 SEP = re.escape(os.path.sep)
 upload_root_regex = f"(?i)^.*{SEP}deriva-ml"
@@ -322,6 +330,19 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
         },
         "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
     }
+    # Wire the NullSentinelProcessor only when the table has metadata
+    # columns — otherwise no sentinel values can appear and the
+    # processor would be a no-op. See Bug C design doc.
+    if metadata_columns:
+        spec["pre_processors"] = [
+            {
+                "processor": "NullSentinelProcessor",
+                "processor_type": (
+                    "deriva_ml.asset.null_sentinel_processor."
+                    "NullSentinelProcessor"
+                ),
+            }
+        ]
     return spec
 
 

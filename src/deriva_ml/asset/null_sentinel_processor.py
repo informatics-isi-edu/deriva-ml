@@ -35,6 +35,7 @@ class NullSentinelProcessor(BaseProcessor):
         self.metadata = kwargs.get("metadata", {})
 
     def process(self):
+        from deriva_ml.dataset.upload import NULL_SENTINEL
         for k, v in list(self.metadata.items()):
-            if v == "__NULL__":
+            if v == NULL_SENTINEL:
                 self.metadata[k] = None
