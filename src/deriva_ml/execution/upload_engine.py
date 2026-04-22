@@ -282,13 +282,23 @@ def run_upload_engine(
     from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
 
     store = ml.workspace.execution_state_store()
+    _statuses_to_validate = [
+        PendingRowStatus.staged,
+        PendingRowStatus.leasing,
+        PendingRowStatus.leased,
+        PendingRowStatus.uploading,
+    ]
+    if retry_failed:
+        _statuses_to_validate.append(PendingRowStatus.failed)
     if execution_rids is None:
         rids_for_validation = [row["rid"] for row in store.list_executions()]
     else:
         rids_for_validation = list(execution_rids)
     validator_entries: list[tuple[str, str, str, dict]] = []
     for rid in rids_for_validation:
-        for row in store.list_pending_rows(execution_rid=rid):
+        for row in store.list_pending_rows(
+            execution_rid=rid, status=_statuses_to_validate,
+        ):
             if not row.get("asset_file_path"):
                 continue  # non-asset rows have no metadata-column dependency
             md = _json.loads(row["metadata_json"]) if row["metadata_json"] else {}
