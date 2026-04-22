@@ -300,7 +300,14 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
     # Be careful here as a metadata value might be a string with can contain special characters.
     # metadata_columns is sorted to ensure deterministic directory order matching the regex.
     metadata_path = "/".join([rf"(?P<{c}>[-:._ \w]+)" for c in metadata_columns])
-    asset_path = f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
+    # Bug E.2: capture pre-allocated RID as an additional path segment
+    # after metadata columns and before the filename.
+    rid_path = r"(?P<RID>[-A-Z0-9]+)"
+    parts = [metadata_path, rid_path] if metadata_path else [rid_path]
+    asset_path = (
+        f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/"
+        f"{'/'.join(parts)}/{asset_file_regex}"
+    )
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
 
@@ -317,6 +324,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
             "URL": "{URI}",
             "Length": "{file_size}",
             "Filename": "{file_name}",
+            "RID": "{RID}",  # Bug E.2: pre-allocated RID
         }
         | {c: f"{{{c}}}" for c in metadata_columns},
         "file_pattern": asset_path,  # Sets schema, asset_table, file
@@ -329,6 +337,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
             "content-disposition": "filename*=UTF-8''{file_name}",
         },
         "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+        "use_pre_allocated_rid": True,  # Bug E.2: use caller-supplied RID
     }
     # Wire the NullSentinelProcessor only when the table has metadata
     # columns — otherwise no sentinel values can appear and the

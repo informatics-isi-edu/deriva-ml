@@ -73,3 +73,41 @@ def test_asset_table_upload_spec_omits_pre_processors_when_no_metadata(test_ml):
     # columns — a clean canonical example.
     spec = asset_table_upload_spec(test_ml.model, "Execution_Asset")
     assert "pre_processors" not in spec or not spec["pre_processors"]
+
+
+def test_asset_table_upload_spec_has_use_pre_allocated_rid_flag(test_ml):
+    from deriva_ml import BuiltinTypes, ColumnDefinition
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    test_ml.create_asset(
+        "UsePreAllocatedFlagTest",
+        column_defs=[ColumnDefinition(name="foo", type=BuiltinTypes.int4)],
+    )
+    spec = asset_table_upload_spec(test_ml.model, "UsePreAllocatedFlagTest")
+    assert spec.get("use_pre_allocated_rid") is True
+
+
+def test_asset_table_upload_spec_file_pattern_captures_rid(test_ml):
+    from deriva_ml import BuiltinTypes, ColumnDefinition
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    test_ml.create_asset(
+        "UsePreAllocatedRegexTest",
+        column_defs=[ColumnDefinition(name="foo", type=BuiltinTypes.int4)],
+    )
+    spec = asset_table_upload_spec(test_ml.model, "UsePreAllocatedRegexTest")
+    pattern = spec["file_pattern"]
+    # Regex must contain a (?P<RID>...) named group.
+    assert "(?P<RID>" in pattern, f"file_pattern missing RID capture: {pattern}"
+
+
+def test_asset_table_upload_spec_column_map_includes_rid(test_ml):
+    from deriva_ml import BuiltinTypes, ColumnDefinition
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    test_ml.create_asset(
+        "UsePreAllocatedColumnMapTest",
+        column_defs=[ColumnDefinition(name="foo", type=BuiltinTypes.int4)],
+    )
+    spec = asset_table_upload_spec(test_ml.model, "UsePreAllocatedColumnMapTest")
+    assert spec["column_map"].get("RID") == "{RID}"
