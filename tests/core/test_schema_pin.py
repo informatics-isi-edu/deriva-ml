@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 
 import pytest
-
 
 requires_catalog = pytest.mark.skipif(
     not os.environ.get("DERIVA_HOST"),
@@ -107,9 +105,11 @@ def test_diff_schema_offline_raises(tmp_path):
 def test_pin_schema_online_no_drift_returns_none(test_ml):
     """Freshly-initialized online ml: cache is at live snapshot → no drift."""
     result = test_ml.pin_schema(reason="no-drift test")
-    assert result is None
-    assert test_ml.pin_status().pinned is True
-    test_ml.unpin_schema()  # cleanup
+    try:
+        assert result is None
+        assert test_ml.pin_status().pinned is True
+    finally:
+        test_ml.unpin_schema()
 
 
 @requires_catalog
@@ -142,15 +142,16 @@ def test_pin_schema_online_with_drift_returns_diff_and_logs_warning(
 
     caplog.set_level(logging.WARNING, logger="deriva_ml")
     diff = test_ml.pin_schema(reason="drift test")
-    assert diff is not None
-    assert not diff.is_empty()
-    assert len(diff.added_tables) > 0  # live has tables our forge didn't
-    assert any(
-        "drift" in r.message.lower() or "pin_schema" in r.message.lower()
-        for r in caplog.records
-    )
-    # cleanup
-    test_ml.unpin_schema()
+    try:
+        assert diff is not None
+        assert not diff.is_empty()
+        assert len(diff.added_tables) > 0  # live has tables our forge didn't
+        assert any(
+            "drift" in r.getMessage().lower() or "pin_schema" in r.getMessage().lower()
+            for r in caplog.records
+        )
+    finally:
+        test_ml.unpin_schema()
 
 
 @requires_catalog
