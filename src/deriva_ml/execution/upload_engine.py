@@ -679,6 +679,8 @@ def _invoke_deriva_py_uploader(
             target_dir = asset_root / schema_name / target_table
             for col in metadata_cols:
                 target_dir = target_dir / str(metadata.get(col, NULL_SENTINEL))
+            # Bug E.2: pre-leased RID as the final segment before filename.
+            target_dir = target_dir / f["rid"]
             return target_dir / src.name
 
         # Build the symlink farm.
