@@ -132,30 +132,30 @@ def pin_status(self) -> PinStatus:
 ```python
 class AddedTable(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
 
 class RemovedTable(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
 
 class AddedColumn(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     column: str
     type: str
 
 class RemovedColumn(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     column: str
 
 class ColumnTypeChange(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     column: str
     cached_type: str
@@ -163,7 +163,7 @@ class ColumnTypeChange(BaseModel):
 
 class AddedForeignKey(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     columns: list[str]
     referenced_schema: str
@@ -172,7 +172,7 @@ class AddedForeignKey(BaseModel):
 
 class RemovedForeignKey(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     columns: list[str]
     referenced_schema: str

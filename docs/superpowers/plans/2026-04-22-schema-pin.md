@@ -534,7 +534,7 @@ def test_added_table():
     })
     diff = compute_diff(cached, live)
     assert [t.table for t in diff.added_tables] == ["T2"]
-    assert all(t.schema == "deriva-ml" for t in diff.added_tables)
+    assert all(t.schema_name == "deriva-ml" for t in diff.added_tables)
 
 
 def test_removed_table():
@@ -555,7 +555,7 @@ def test_added_column():
     diff = compute_diff(cached, live)
     assert len(diff.added_columns) == 1
     add = diff.added_columns[0]
-    assert add.schema == "deriva-ml"
+    assert add.schema_name == "deriva-ml"
     assert add.table == "T"
     assert add.column == "b"
     assert add.type == "int4"
@@ -667,19 +667,19 @@ from pydantic import BaseModel, ConfigDict
 
 class AddedTable(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
 
 
 class RemovedTable(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
 
 
 class AddedColumn(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     column: str
     type: str
@@ -687,14 +687,14 @@ class AddedColumn(BaseModel):
 
 class RemovedColumn(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     column: str
 
 
 class ColumnTypeChange(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     column: str
     cached_type: str
@@ -703,7 +703,7 @@ class ColumnTypeChange(BaseModel):
 
 class AddedForeignKey(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     columns: list[str]
     referenced_schema: str
@@ -713,7 +713,7 @@ class AddedForeignKey(BaseModel):
 
 class RemovedForeignKey(BaseModel):
     model_config = ConfigDict(frozen=True)
-    schema: str
+    schema_name: str
     table: str
     columns: list[str]
     referenced_schema: str
@@ -769,27 +769,27 @@ class SchemaDiff(BaseModel):
         for s in self.removed_schemas:
             lines.append(f"- schema {s}")
         for t in self.added_tables:
-            lines.append(f"+ table {t.schema}.{t.table}")
+            lines.append(f"+ table {t.schema_name}.{t.table}")
         for t in self.removed_tables:
-            lines.append(f"- table {t.schema}.{t.table}")
+            lines.append(f"- table {t.schema_name}.{t.table}")
         for c in self.added_columns:
-            lines.append(f"+ column {c.schema}.{c.table}.{c.column} ({c.type})")
+            lines.append(f"+ column {c.schema_name}.{c.table}.{c.column} ({c.type})")
         for c in self.removed_columns:
-            lines.append(f"- column {c.schema}.{c.table}.{c.column}")
+            lines.append(f"- column {c.schema_name}.{c.table}.{c.column}")
         for c in self.column_type_changes:
             lines.append(
-                f"~ column {c.schema}.{c.table}.{c.column}: "
+                f"~ column {c.schema_name}.{c.table}.{c.column}: "
                 f"{c.cached_type} → {c.live_type}"
             )
         for fk in self.added_fkeys:
             lines.append(
-                f"+ fkey {fk.schema}.{fk.table}({','.join(fk.columns)}) "
+                f"+ fkey {fk.schema_name}.{fk.table}({','.join(fk.columns)}) "
                 f"→ {fk.referenced_schema}.{fk.referenced_table}"
                 f"({','.join(fk.referenced_columns)})"
             )
         for fk in self.removed_fkeys:
             lines.append(
-                f"- fkey {fk.schema}.{fk.table}({','.join(fk.columns)}) "
+                f"- fkey {fk.schema_name}.{fk.table}({','.join(fk.columns)}) "
                 f"→ {fk.referenced_schema}.{fk.referenced_table}"
                 f"({','.join(fk.referenced_columns)})"
             )
@@ -872,9 +872,9 @@ def compute_diff(cached: dict, live: dict) -> SchemaDiff:
         live_tables = _tables(live_schemas[schema_name])
 
         for t_name in sorted(set(live_tables) - set(cached_tables)):
-            added_tables.append(AddedTable(schema=schema_name, table=t_name))
+            added_tables.append(AddedTable(schema_name=schema_name, table=t_name))
         for t_name in sorted(set(cached_tables) - set(live_tables)):
-            removed_tables.append(RemovedTable(schema=schema_name, table=t_name))
+            removed_tables.append(RemovedTable(schema_name=schema_name, table=t_name))
 
         for t_name in sorted(set(cached_tables) & set(live_tables)):
             cached_cols = _col_map(cached_tables[t_name])
@@ -882,19 +882,19 @@ def compute_diff(cached: dict, live: dict) -> SchemaDiff:
             for col in sorted(set(live_cols) - set(cached_cols)):
                 added_columns.append(
                     AddedColumn(
-                        schema=schema_name, table=t_name,
+                        schema_name=schema_name, table=t_name,
                         column=col, type=live_cols[col],
                     )
                 )
             for col in sorted(set(cached_cols) - set(live_cols)):
                 removed_columns.append(
-                    RemovedColumn(schema=schema_name, table=t_name, column=col)
+                    RemovedColumn(schema_name=schema_name, table=t_name, column=col)
                 )
             for col in sorted(set(cached_cols) & set(live_cols)):
                 if cached_cols[col] != live_cols[col]:
                     column_type_changes.append(
                         ColumnTypeChange(
-                            schema=schema_name, table=t_name, column=col,
+                            schema_name=schema_name, table=t_name, column=col,
                             cached_type=cached_cols[col],
                             live_type=live_cols[col],
                         )
@@ -908,14 +908,14 @@ def compute_diff(cached: dict, live: dict) -> SchemaDiff:
             for k in sorted(set(live_keyed) - set(cached_keyed)):
                 cols, rs, rt, rcs = _fkey_detail(live_keyed[k])
                 added_fkeys.append(AddedForeignKey(
-                    schema=schema_name, table=t_name,
+                    schema_name=schema_name, table=t_name,
                     columns=cols, referenced_schema=rs,
                     referenced_table=rt, referenced_columns=rcs,
                 ))
             for k in sorted(set(cached_keyed) - set(live_keyed)):
                 cols, rs, rt, rcs = _fkey_detail(cached_keyed[k])
                 removed_fkeys.append(RemovedForeignKey(
-                    schema=schema_name, table=t_name,
+                    schema_name=schema_name, table=t_name,
                     columns=cols, referenced_schema=rs,
                     referenced_table=rt, referenced_columns=rcs,
                 ))
