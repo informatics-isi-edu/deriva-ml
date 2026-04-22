@@ -136,6 +136,39 @@ def test_nullable_missing_is_not_an_error():
     assert _validate_pending_asset_metadata(model, manifest) is None
 
 
+def test_explicit_none_value_for_not_null_column_raises():
+    """Explicit None for a NOT-NULL column is treated same as absent — raises.
+
+    This is the Bug C root cause: {"col": None} would previously flow
+    through downstream staging as the string "None" and fail the catalog
+    insert. The validator must reject it at upload time instead.
+    """
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    model = _fake_model({
+        "Image": [_col("Acquisition_Time", nullok=False)],
+    })
+    manifest = _fake_manifest({
+        "Image/a.png": _entry("Image", metadata={"Acquisition_Time": None}),
+    })
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_metadata(model, manifest)
+    assert "Acquisition_Time" in str(ei.value)
+    assert "Image/a.png" in str(ei.value)
+
+
+def test_explicit_none_value_for_nullable_column_passes():
+    """Explicit None for a NULLABLE column is fine — sentinel path handles it."""
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    model = _fake_model({
+        "Image": [_col("Description_Note", nullok=True)],
+    })
+    manifest = _fake_manifest({
+        "Image/a.png": _entry("Image", metadata={"Description_Note": None}),
+    })
+    assert _validate_pending_asset_metadata(model, manifest) is None
+
+
 def test_error_message_is_deterministic():
     """Same manifest twice → byte-identical error messages (sorted)."""
     from deriva_ml.asset.manifest import _validate_pending_asset_metadata

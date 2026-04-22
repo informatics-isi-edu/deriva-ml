@@ -174,10 +174,12 @@ def _validate_pending_asset_metadata(
         cols = model.asset_metadata_columns(entry.asset_table)
         if not cols:
             continue
-        provided = set(entry.metadata.keys())
         missing: list[str] = []
         for col in cols:
-            if not col.nullok and col.name not in provided:
+            if col.nullok:
+                continue
+            value = entry.metadata.get(col.name)
+            if value is None:
                 missing.append(col.name)
         if missing:
             missing_by_key[key] = sorted(missing)
