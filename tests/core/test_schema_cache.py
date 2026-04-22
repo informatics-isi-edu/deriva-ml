@@ -45,8 +45,8 @@ def test_load_missing_raises(tmp_path):
 
 
 def test_corrupt_cache_raises_configuration_error(tmp_path):
-    from deriva_ml.core.schema_cache import SchemaCache
     from deriva_ml.core.exceptions import DerivaMLConfigurationError
+    from deriva_ml.core.schema_cache import SchemaCache
     cache = SchemaCache(tmp_path)
     # Write garbage where the cache file should live
     cache._path.write_text("{ this is not valid json")

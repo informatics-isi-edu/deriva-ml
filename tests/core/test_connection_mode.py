@@ -91,6 +91,7 @@ def test_derivaml_accepts_mode_string(catalog_manager, tmp_path):
 def test_derivaml_rejects_invalid_mode(catalog_manager, tmp_path):
     """Unknown mode string raises ValueError (or ValidationError)."""
     from pydantic import ValidationError
+
     from deriva_ml import DerivaML
     catalog_manager.reset()
     with pytest.raises((ValidationError, ValueError)):

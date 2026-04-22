@@ -129,10 +129,12 @@ def test_offline_after_online_succeeds(catalog_manager, tmp_path):
 def test_refresh_schema_refuses_with_pending_rows(test_ml):
     """Stage a pending row, call refresh_schema() → DerivaMLSchemaRefreshBlocked."""
     from datetime import datetime, timezone
+
     from deriva_ml import ConnectionMode
     from deriva_ml.core.exceptions import DerivaMLSchemaRefreshBlocked
     from deriva_ml.execution.state_store import (
-        ExecutionStatus, PendingRowStatus,
+        ExecutionStatus,
+        PendingRowStatus,
     )
 
     store = test_ml.workspace.execution_state_store()
@@ -171,9 +173,11 @@ def test_refresh_schema_force_succeeds(test_ml, caplog):
     """refresh_schema(force=True) succeeds even with pending rows and logs."""
     import logging
     from datetime import datetime, timezone
+
     from deriva_ml import ConnectionMode
     from deriva_ml.execution.state_store import (
-        ExecutionStatus, PendingRowStatus,
+        ExecutionStatus,
+        PendingRowStatus,
     )
 
     store = test_ml.workspace.execution_state_store()
@@ -218,6 +222,7 @@ def test_online_drift_warning(catalog_manager, tmp_path, caplog):
     """Cache at stale snapshot id → re-init online → warning logged; cache unchanged."""
     import json as _json
     import logging
+
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.core.schema_cache import SchemaCache
 
