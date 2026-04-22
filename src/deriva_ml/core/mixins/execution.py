@@ -16,9 +16,7 @@ from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
-from deriva_ml.execution.execution_record_v2 import (
-    ExecutionRecord as _ExecutionRecordV2,
-)
+from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
 from deriva_ml.execution.state_machine import (
     flush_pending_sync,
     reconcile_with_catalog,
@@ -231,41 +229,31 @@ class ExecutionMixin:
         return self._execution
 
     def lookup_execution(self, execution_rid: RID) -> "ExecutionRecord":
-        """Look up an execution by RID and return an ExecutionRecord.
+        """Look up a single execution by RID in the live catalog.
 
-        Creates an ExecutionRecord object for querying and modifying execution
-        metadata. The ExecutionRecord provides access to the catalog record
-        state and allows updating mutable properties like status and description.
+        Queries the ERMrest catalog for the Execution row with the given
+        RID and returns an ``ExecutionRecord`` — a live, catalog-bound
+        value whose mutable properties (``status``, ``description``)
+        write through to the catalog on assignment. Online mode only.
 
-        For running computations with datasets and assets, use ``resume_execution()``
-        or ``create_execution()`` which return full Execution objects.
+        For enumerating executions from the local SQLite registry without
+        touching the catalog, see ``list_executions()``. For catalog-side
+        filter queries returning live records, see ``find_executions()``.
 
         Args:
             execution_rid: Resource Identifier (RID) of the execution.
 
         Returns:
-            ExecutionRecord: An execution record object bound to the catalog.
+            A live ``ExecutionRecord`` bound to the catalog. Property
+            setters (``record.status = ...``) write through.
 
         Raises:
-            DerivaMLException: If execution_rid is not valid or doesn't refer
-                to an Execution record.
+            DerivaMLException: If execution_rid is not valid or doesn't
+                refer to an Execution record.
 
         Example:
-            Look up an execution and query its state::
-
-                >>> record = ml.lookup_execution("1-abc123")
-                >>> print(f"Status: {record.status}")
-                >>> print(f"Description: {record.description}")
-
-            Update mutable properties::
-
-                >>> record.status = ExecutionStatus.Uploaded
-                >>> record.description = "Analysis finished"
-
-            Query relationships::
-
-                >>> children = list(record.list_execution_children())
-                >>> parents = list(record.list_execution_parents())
+            >>> record = ml.lookup_execution("1-abc123")
+            >>> record.status = ExecutionStatus.Uploaded   # writes to catalog
         """
         # Import here to avoid circular dependency
         from deriva_ml.execution.execution_record import ExecutionRecord
@@ -321,11 +309,19 @@ class ExecutionMixin:
         workflow_rid: str | None = None,
         mode: "ConnectionMode | None" = None,
         since: datetime | None = None,
-    ) -> list[_ExecutionRecordV2]:
-        """Return known-local executions matching the filters.
+    ) -> list[ExecutionSnapshot]:
+        """Enumerate locally-known executions from the SQLite registry.
 
-        Reads from the workspace SQLite registry — no server contact.
-        Works in both online and offline mode.
+        Reads from the workspace SQLite registry — **no server contact**.
+        Works in both online and offline mode. Each returned
+        ``ExecutionSnapshot`` is a frozen Pydantic value object captured
+        at query time; it cannot mutate the catalog. Pending-row counts
+        are included in the same pass.
+
+        For live catalog queries that return mutable
+        :class:`~deriva_ml.execution.execution_record.ExecutionRecord`
+        objects bound to the catalog, see ``find_executions()`` and
+        ``lookup_execution()``.
 
         Args:
             status: Single ExecutionStatus or list to filter; None = all.
@@ -337,15 +333,14 @@ class ExecutionMixin:
                 timestamp (timezone-aware). None = no time filter.
 
         Returns:
-            List of ExecutionRecord dataclasses — one per matching row.
-            Empty list if nothing matches. Pending-row counts are derived
-            in the same pass.
+            List of ``ExecutionSnapshot`` Pydantic models — one per matching
+            row in the registry. Empty list if nothing matches.
 
         Example:
             >>> from deriva_ml.execution.state_store import ExecutionStatus
             >>> failed = ml.list_executions(status=ExecutionStatus.Failed)
-            >>> for rec in failed:
-            ...     print(rec.rid, rec.error)
+            >>> for snap in failed:
+            ...     print(snap.rid, snap.error)
         """
         store = self.workspace.execution_state_store()
         rows = store.list_executions(
@@ -353,7 +348,7 @@ class ExecutionMixin:
             mode=mode, since=since,
         )
         return [
-            _ExecutionRecordV2.from_row(
+            ExecutionSnapshot.from_row(
                 row, **store.count_pending_by_kind(execution_rid=row["rid"])
             )
             for row in rows
@@ -381,20 +376,26 @@ class ExecutionMixin:
             summaries.append(rec.pending_summary(ml=self))
         return WorkspacePendingSummary(per_execution=summaries)
 
-    def find_incomplete_executions(self) -> list[_ExecutionRecordV2]:
-        """Sugar over list_executions for everything not terminally done.
+    def find_incomplete_executions(self) -> list[ExecutionSnapshot]:
+        """Sugar over :meth:`list_executions` for everything not terminally done.
 
-        Returns executions in status in (created, running, stopped,
-        failed, pending_upload) — the set of things a user would want to
-        either resume, retry, or clean up. Excludes uploaded (terminal
-        success) and aborted (terminal cleanup).
+        Reads from the workspace SQLite registry — no server contact.
+        Returns executions in status in (Created, Running, Stopped, Failed,
+        Pending_Upload) — the set of things a user would want to either
+        resume, retry, or clean up. Excludes Uploaded (terminal success)
+        and Aborted (terminal cleanup).
+
+        For live catalog queries returning mutable
+        :class:`~deriva_ml.execution.execution_record.ExecutionRecord`
+        objects, see ``find_executions(status=...)``.
 
         Returns:
-            List of ExecutionRecord for incomplete runs.
+            List of ``ExecutionSnapshot`` Pydantic models for each incomplete
+            execution known to the local registry.
 
         Example:
-            >>> for rec in ml.find_incomplete_executions():
-            ...     print(rec.rid, rec.status, rec.pending_rows)
+            >>> for snap in ml.find_incomplete_executions():
+            ...     print(snap.rid, snap.status, snap.pending_rows)
         """
         return self.list_executions(
             status=[
@@ -569,39 +570,28 @@ class ExecutionMixin:
         workflow_type: str | None = None,
         status: ExecutionStatus | None = None,
     ) -> Iterable["ExecutionRecord"]:
-        """List all executions in the catalog.
+        """Search the live catalog for executions matching the given filters.
 
-        Returns ExecutionRecord objects for each execution. These provide access
-        to execution metadata and allow updating mutable properties.
+        Queries the ERMrest catalog (online only) and yields live,
+        catalog-bound ``ExecutionRecord`` objects for each match. Each
+        returned record's mutable properties (``status``, ``description``)
+        write through to the catalog on assignment.
+
+        For enumerating locally-known executions from the SQLite registry
+        without touching the catalog (works in offline mode), see
+        ``list_executions()`` and ``find_incomplete_executions()``.
 
         Args:
-            workflow: Optional Workflow object or RID to filter by.
-            workflow_type: Optional workflow type name to filter by (e.g., "python_script").
-                This filters by the Workflow_Type vocabulary term.
-            status: Optional status to filter by (e.g., ExecutionStatus.Uploaded).
+            workflow: Optional Workflow or RID to filter by.
+            workflow_type: Optional workflow type name (e.g., "python_script").
+            status: Optional ExecutionStatus to filter by.
 
         Returns:
-            Iterable of ExecutionRecord objects.
+            Iterable of live ``ExecutionRecord`` objects.
 
         Example:
-            List all executions::
-
-                >>> for record in ml.find_executions():
-                ...     print(f"{record.execution_rid}: {record.status}")
-
-            Filter by status::
-
-                >>> uploaded = list(ml.find_executions(status=ExecutionStatus.Uploaded))
-
-            Filter by specific workflow::
-
-                >>> workflow = ml.lookup_workflow("2-ABC1")
-                >>> for record in ml.find_executions(workflow=workflow):
-                ...     print(f"{record.execution_rid}: {record.description}")
-
-            Filter by workflow type (all notebooks)::
-
-                >>> notebooks = list(ml.find_executions(workflow_type="python_notebook"))
+            >>> for record in ml.find_executions(status=ExecutionStatus.Uploaded):
+            ...     print(record.execution_rid, record.status)
         """
         # Import for type checking
         from deriva_ml.execution.workflow import Workflow as WorkflowClass

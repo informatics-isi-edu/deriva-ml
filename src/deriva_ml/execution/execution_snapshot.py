@@ -1,38 +1,53 @@
-"""SQLite-backed ExecutionRecord — a registry row with derived counts.
+"""SQLite-backed ExecutionSnapshot — a registry row with derived counts.
 
-Per spec §2.9. A frozen dataclass projection of one execution_state__
-row plus convenience counts from pending_rows. Returned by
-DerivaML.list_executions, ml.find_incomplete_executions, and as the
-handle for resume_execution's just-in-time reconciliation input.
+Per spec §2.9 (originally drafted as execution_record_v2). A frozen
+Pydantic snapshot of one ``execution_state__executions`` row plus
+convenience counts from ``execution_state__pending_rows``. Returned
+by ``DerivaML.list_executions`` and ``DerivaML.find_incomplete_executions``.
 
-This class will eventually replace the catalog-backed ExecutionRecord
-in execution_record.py (Task D8 merges). Built alongside to keep this
-refactor reviewable.
+This is a VALUE OBJECT, not a live catalog record:
+
+- Constructed from a SQLite registry row (``from_row``) or directly.
+- Immutable (``ConfigDict(frozen=True)``) — the snapshot captures a
+  moment in time; mutating it would be meaningless.
+- Reads do not contact the catalog; works in offline mode.
+- Behavior methods (``pending_summary``, ``upload_outputs``,
+  ``update_status``) take ``ml: DerivaML`` as a kwarg because the
+  snapshot itself doesn't carry a server connection.
+
+For a live, catalog-bound record whose property setters write
+through to the catalog, see
+:class:`~deriva_ml.execution.execution_record.ExecutionRecord`,
+returned by :meth:`~deriva_ml.DerivaML.lookup_execution` and
+:meth:`~deriva_ml.DerivaML.find_executions`.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
+
+from pydantic import BaseModel, ConfigDict
 
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
-    from deriva_ml.core.base import DerivaML  # noqa: F401 (forward-looking)
+    from deriva_ml.core.base import DerivaML  # noqa: F401
     from deriva_ml.execution.pending_summary import PendingSummary
     from deriva_ml.execution.upload_engine import UploadReport
 
 
-@dataclass(frozen=True)
-class ExecutionRecord:
+class ExecutionSnapshot(BaseModel):
     """Frozen snapshot of an execution's registry row plus pending counts.
 
-    A value object — no mutation, no server reads on property access.
-    If you need lifecycle fields that change over time (live status,
-    etc.), use the Execution object returned by resume_execution.
+    A Pydantic value object — no mutation, no server reads on property
+    access. If you need lifecycle fields that change over time (live
+    status, etc.), use the Execution object returned by
+    ``resume_execution`` or the
+    :class:`~deriva_ml.execution.execution_record.ExecutionRecord`
+    returned by ``lookup_execution``/``find_executions``.
 
     Attributes:
         rid: Server-assigned Execution RID.
@@ -44,7 +59,7 @@ class ExecutionRecord:
         start_time: Lifecycle start timestamp; None if not yet started.
         stop_time: Lifecycle stop timestamp; None if still running.
         last_activity: Last pending-row mutation time.
-        error: Last error message if status in (failed,).
+        error: Last error message if status == Failed.
         sync_pending: True if SQLite is ahead of the catalog.
         created_at: When the local registry first knew about this row.
         pending_rows: Count of non-asset pending rows not yet uploaded.
@@ -53,10 +68,12 @@ class ExecutionRecord:
         failed_files: Count of asset-file rows in status='failed'.
 
     Example:
-        >>> records = ml.find_incomplete_executions()
-        >>> for r in records:
-        ...     print(r.rid, r.status, r.pending_rows)
+        >>> snapshots = ml.find_incomplete_executions()
+        >>> for snap in snapshots:
+        ...     print(snap.rid, snap.status, snap.pending_rows)
     """
+
+    model_config = ConfigDict(frozen=True)
 
     rid: str
     workflow_rid: str | None
@@ -84,26 +101,26 @@ class ExecutionRecord:
         failed_rows: int = 0,
         pending_files: int = 0,
         failed_files: int = 0,
-    ) -> "ExecutionRecord":
+    ) -> "ExecutionSnapshot":
         """Construct from a SQLite executions row + pending counts.
 
         Args:
-            row: Dict returned by ExecutionStateStore.get_execution or
-                list_executions. Must contain all the executions
-                columns.
-            pending_rows: Count of non-asset pending rows, defaults to 0
-                if the caller hasn't queried pending_rows.
-            failed_rows: Count of non-asset rows in status='failed'.
+            row: Dict returned by ``ExecutionStateStore.get_execution``
+                or ``list_executions``. Must contain all the
+                ``execution_state__executions`` columns.
+            pending_rows: Count of non-asset pending rows. Defaults to
+                0 when the caller hasn't queried pending_rows.
+            failed_rows: Count of non-asset rows in ``status='failed'``.
             pending_files: Count of asset-file rows not yet uploaded.
-            failed_files: Count of asset-file rows in status='failed'.
+            failed_files: Count of asset-file rows in ``status='failed'``.
 
         Returns:
-            A frozen ExecutionRecord instance.
+            A frozen ``ExecutionSnapshot`` instance.
 
         Example:
             >>> row = store.get_execution("EXE-A")
             >>> counts = store.count_pending_by_kind(execution_rid="EXE-A")
-            >>> rec = ExecutionRecord.from_row(row, **counts)
+            >>> snap = ExecutionSnapshot.from_row(row, **counts)
         """
         return cls(
             rid=row["rid"],
@@ -127,8 +144,8 @@ class ExecutionRecord:
     def pending_summary(self, *, ml: "DerivaML") -> "PendingSummary":
         """Return a PendingSummary via the DerivaML instance's workspace.
 
-        Record objects are bare dataclasses and don't carry a reference
-        to DerivaML; the caller passes one.
+        Snapshot objects are frozen Pydantic models and don't carry a
+        reference to DerivaML; the caller passes one.
 
         Args:
             ml: The DerivaML instance whose workspace to query.
@@ -137,8 +154,8 @@ class ExecutionRecord:
             PendingSummary for this execution.
 
         Example:
-            >>> for rec in ml.list_executions():
-            ...     s = rec.pending_summary(ml=ml)
+            >>> for snap in ml.list_executions():
+            ...     s = snap.pending_summary(ml=ml)
             ...     if s.has_pending:
             ...         print(s.render())
         """
@@ -163,10 +180,10 @@ class ExecutionRecord:
         ml: "DerivaML",
         retry_failed: bool = False,
     ) -> "UploadReport":
-        """Sugar for ml.upload_pending(execution_rids=[self.rid], ...).
+        """Sugar for ``ml.upload_pending(execution_rids=[self.rid], ...)``.
 
-        Records are bare dataclasses — the caller provides the DerivaML
-        instance that owns the workspace.
+        Snapshots are frozen Pydantic models — the caller provides the
+        DerivaML instance that owns the workspace.
         """
         return ml.upload_pending(
             execution_rids=[self.rid],
@@ -182,8 +199,9 @@ class ExecutionRecord:
     ) -> None:
         """Transition this execution's status via the workspace state machine.
 
-        Parallel to Execution.update_status. ExecutionRecord is a bare
-        dataclass and doesn't carry an ml reference — caller passes one.
+        Parallel to ``Execution.update_status``. The snapshot is a
+        frozen Pydantic model and doesn't carry an ml reference —
+        caller passes one.
 
         Args:
             target: Target ExecutionStatus enum member.
@@ -195,7 +213,7 @@ class ExecutionRecord:
             DerivaMLStateInconsistency: If catalog sync detects divergence.
 
         Example:
-            >>> rec.update_status(ExecutionStatus.Aborted, ml=ml, error="user cancel")
+            >>> snap.update_status(ExecutionStatus.Aborted, ml=ml, error="user cancel")
         """
         from deriva_ml.execution.state_machine import transition
 

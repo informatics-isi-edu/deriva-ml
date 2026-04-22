@@ -28,15 +28,15 @@ def test_list_executions_empty(test_ml):
     assert test_ml.list_executions() == []
 
 
-def test_list_executions_returns_dataclass(test_ml):
-    from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+def test_list_executions_returns_snapshot(test_ml):
+    from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
     from deriva_ml.execution.state_store import ExecutionStatus
 
     _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
 
     rows = test_ml.list_executions()
     assert len(rows) == 1
-    assert isinstance(rows[0], ExecutionRecord)
+    assert isinstance(rows[0], ExecutionSnapshot)
     assert rows[0].rid == "EXE-A"
     assert rows[0].status is ExecutionStatus.Stopped
 
