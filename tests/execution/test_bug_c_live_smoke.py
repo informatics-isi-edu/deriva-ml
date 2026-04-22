@@ -97,19 +97,85 @@ def _find_asset_table_with_required_metadata(test_ml) -> tuple[str, str, list[st
     return None
 
 
-def _find_asset_table_with_all_nullable_metadata(test_ml) -> tuple[str, str, str] | None:
-    """Return (schema, table, first_nullable_col_name) for the first asset table with
-    nullable metadata and NO required metadata columns. Returns None if none found."""
-    for schema_name, schema in test_ml.model.model.schemas.items():
+def _find_asset_table_with_nullable_metadata(test_ml) -> tuple[str, str, dict, str] | None:
+    """Return (schema, table, required_metadata, first_nullable_col_name) for the first
+    asset table with at least one nullable metadata column. Required columns (if any)
+    are returned as a dict {col_name: value} the caller must merge into the pending-row
+    metadata to satisfy the validator and catalog FK constraints. For FK required cols,
+    an existing row from the referenced table is used (or a new one inserted). Returns
+    None if no suitable table or the caller can't satisfy FK constraints."""
+    from datetime import date, datetime, timezone
+    model = test_ml.model.model
+    pb = test_ml.pathBuilder()
+    for schema_name, schema in model.schemas.items():
         for table_name in schema.tables:
             try:
                 cols = test_ml.model.asset_metadata_columns(table_name)
             except Exception:
                 continue
-            required = [c for c in cols if not c.nullok]
             nullable = [c for c in cols if c.nullok]
-            if nullable and not required:
-                return (schema_name, table_name, nullable[0].name)
+            if not nullable:
+                continue
+            # Build a lookup of FK columns for this table so we can resolve
+            # FK-typed required cols to a real referenced-table value.
+            table = schema.tables[table_name]
+            fk_by_col: dict[str, tuple[str, str, str]] = {}
+            try:
+                for fk in table.foreign_keys:
+                    # Single-column FKs only (enough for common asset tables).
+                    if len(fk.column_map) == 1:
+                        from_col, to_col = next(iter(fk.column_map.items()))
+                        ref_table = to_col.table
+                        fk_by_col[from_col.name] = (
+                            ref_table.schema.name, ref_table.name, to_col.name
+                        )
+            except Exception:
+                pass
+
+            required_md: dict = {}
+            ok = True
+            for c in cols:
+                if c.nullok:
+                    continue
+                # FK column — look up an existing row or insert one.
+                if c.name in fk_by_col:
+                    ref_schema, ref_table_name, ref_col = fk_by_col[c.name]
+                    try:
+                        ref_path = pb.schemas[ref_schema].tables[ref_table_name]
+                        existing = list(ref_path.entities().fetch(limit=1))
+                        if existing:
+                            required_md[c.name] = existing[0][ref_col]
+                            continue
+                        # Try to insert a minimal parent row (tables typically
+                        # have enough defaults — RID, RCT, etc. are system cols).
+                        inserted = ref_path.insert([{}])
+                        if inserted:
+                            required_md[c.name] = inserted[0][ref_col]
+                            continue
+                    except Exception:
+                        pass
+                    ok = False
+                    break
+                # Non-FK required col — build a dummy value by typename.
+                tn = c.type.typename if hasattr(c, "type") else "text"
+                if tn in ("text", "longtext", "markdown"):
+                    required_md[c.name] = "bug-c-test-value"
+                elif tn in ("int2", "int4", "int8"):
+                    required_md[c.name] = 1
+                elif tn in ("float4", "float8"):
+                    required_md[c.name] = 1.0
+                elif tn in ("timestamp", "timestamptz"):
+                    required_md[c.name] = datetime.now(timezone.utc).isoformat()
+                elif tn == "date":
+                    required_md[c.name] = date.today().isoformat()
+                elif tn == "boolean":
+                    required_md[c.name] = True
+                else:
+                    ok = False
+                    break
+            if not ok:
+                continue
+            return (schema_name, table_name, required_md, nullable[0].name)
     return None
 
 
@@ -164,16 +230,18 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
 @requires_catalog
 def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_path):
     """The sentinel path. Staging an asset with a nullable metadata col
-    absent must upload successfully and write SQL NULL to the catalog."""
+    absent must upload successfully and write SQL NULL to the catalog.
+    Required columns (if any) are supplied so the validator doesn't
+    block the upload."""
     from deriva_ml.execution.state_store import PendingRowStatus
 
-    found = _find_asset_table_with_all_nullable_metadata(test_ml)
+    found = _find_asset_table_with_nullable_metadata(test_ml)
     if not found:
         pytest.skip(
-            "No asset table with all-nullable metadata found in test fixture; "
+            "No asset table with nullable metadata found in test fixture; "
             "Bug C sentinel path cannot be exercised."
         )
-    schema_name, table_name, nullable_col_name = found
+    schema_name, table_name, required_md, nullable_col_name = found
 
     f = tmp_path / "bug-c-null.bin"
     f.write_bytes(b"bug-c nullable-missing" * 32)
@@ -186,13 +254,13 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
     with exe.execute():
         pass
 
-    # Supply metadata for no columns — all are nullable.
+    # Supply ONLY the required metadata — nullable cols remain absent.
     store.insert_pending_row(
         execution_rid=exe.execution_rid,
         key="k3",
         target_schema=schema_name,
         target_table=table_name,
-        metadata_json=json.dumps({}),
+        metadata_json=json.dumps(required_md),
         created_at=now,
         rid="NULL-BUGC-1",
         status=PendingRowStatus.leased,
@@ -205,8 +273,7 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
     assert report.total_uploaded == 1
 
     # The catalog row's nullable column must be actual SQL NULL
-    # (Python None after fetch), not the string "__NULL__" and not
-    # "None".
+    # (Python None after fetch), not the string "__NULL__" and not "None".
     expected_md5 = hashlib.md5(f.read_bytes()).hexdigest()
     pb = test_ml.pathBuilder()
     asset_path = pb.schemas[schema_name].tables[table_name]
