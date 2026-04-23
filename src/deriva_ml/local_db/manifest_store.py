@@ -65,7 +65,7 @@ class StagedFeatureRow:
             Stored so flush doesn't have to re-resolve it from the model.
         record_json: JSON encoding of ``FeatureRecord.model_dump_json()``.
         created_at: ISO timestamp of staging.
-        status: "Pending" | "Uploaded" | "Failed".
+        status: "pending" | "uploaded" | "failed".
         uploaded_at: ISO timestamp of successful flush, or None.
         error: Error message on Failed status, or None.
     """
@@ -140,7 +140,7 @@ class ManifestStore:
             Column("target_table", String, nullable=False),    # target table name — avoids re-lookup at flush
             Column("record_json", Text, nullable=False),
             Column("created_at", String, nullable=False),
-            Column("status", String, nullable=False),          # Pending | Uploaded | Failed
+            Column("status", String, nullable=False),          # pending | uploaded | failed
             Column("uploaded_at", String),
             Column("error", Text),
         )
@@ -411,7 +411,7 @@ class ManifestStore:
         target_table: str,
         record_json: str,
     ) -> int:
-        """Insert one staged feature record row with status ``"Pending"``.
+        """Insert one staged feature record row with status ``"pending"``.
 
         Args:
             execution_rid: RID of the owning execution.
@@ -431,13 +431,28 @@ class ManifestStore:
             "target_table": target_table,
             "record_json": record_json,
             "created_at": now,
-            "status": "Pending",
+            "status": "pending",
             "uploaded_at": None,
             "error": None,
         }
         with self._engine.begin() as conn:
             result = conn.execute(insert(self._feature_records_t), row)
             return result.inserted_primary_key[0]
+
+    def _row_to_staged_feature_record(self, r: Any) -> StagedFeatureRow:
+        """Convert a DB row mapping to a :class:`StagedFeatureRow`."""
+        return StagedFeatureRow(
+            stage_id=r["stage_id"],
+            execution_rid=r["execution_rid"],
+            feature_table=r["feature_table"],
+            feature_name=r["feature_name"],
+            target_table=r["target_table"],
+            record_json=r["record_json"],
+            created_at=r["created_at"],
+            status=r["status"],
+            uploaded_at=r["uploaded_at"],
+            error=r["error"],
+        )
 
     def list_feature_records(self, execution_rid: str) -> list[StagedFeatureRow]:
         """Return all staged feature rows for *execution_rid*, ordered by stage_id.
@@ -458,30 +473,16 @@ class ManifestStore:
                 .mappings()
                 .all()
             )
-        return [
-            StagedFeatureRow(
-                stage_id=r["stage_id"],
-                execution_rid=r["execution_rid"],
-                feature_table=r["feature_table"],
-                feature_name=r["feature_name"],
-                target_table=r["target_table"],
-                record_json=r["record_json"],
-                created_at=r["created_at"],
-                status=r["status"],
-                uploaded_at=r["uploaded_at"],
-                error=r["error"],
-            )
-            for r in rows
-        ]
+        return [self._row_to_staged_feature_record(r) for r in rows]
 
     def list_pending_feature_records(self, execution_rid: str) -> list[StagedFeatureRow]:
-        """Return only rows with ``status == "Pending"`` for *execution_rid*.
+        """Return only rows with ``status == "pending"`` for *execution_rid*.
 
         Args:
             execution_rid: Owning execution RID.
 
         Returns:
-            Subset of :meth:`list_feature_records` filtered to Pending rows.
+            Subset of :meth:`list_feature_records` filtered to pending rows.
         """
         with self._engine.connect() as conn:
             rows = (
@@ -489,53 +490,57 @@ class ManifestStore:
                     select(self._feature_records_t)
                     .where(
                         (self._feature_records_t.c.execution_rid == execution_rid)
-                        & (self._feature_records_t.c.status == "Pending")
+                        & (self._feature_records_t.c.status == "pending")
                     )
                     .order_by(self._feature_records_t.c.stage_id)
                 )
                 .mappings()
                 .all()
             )
-        return [
-            StagedFeatureRow(
-                stage_id=r["stage_id"],
-                execution_rid=r["execution_rid"],
-                feature_table=r["feature_table"],
-                feature_name=r["feature_name"],
-                target_table=r["target_table"],
-                record_json=r["record_json"],
-                created_at=r["created_at"],
-                status=r["status"],
-                uploaded_at=r["uploaded_at"],
-                error=r["error"],
-            )
-            for r in rows
-        ]
+        return [self._row_to_staged_feature_record(r) for r in rows]
+
+    def _require_feature_record(self, stage_id: int) -> None:
+        with self._engine.connect() as conn:
+            exists = conn.execute(
+                select(self._feature_records_t.c.stage_id).where(
+                    self._feature_records_t.c.stage_id == stage_id
+                )
+            ).first()
+        if exists is None:
+            raise KeyError(f"Staged feature record with stage_id={stage_id!r} not found")
 
     def mark_feature_record_uploaded(self, stage_id: int) -> None:
-        """Transition a staged feature record to ``status="Uploaded"``.
+        """Transition a staged feature record to ``status="uploaded"``.
 
         Args:
             stage_id: Primary key of the row to update.
+
+        Raises:
+            KeyError: If no row with *stage_id* exists.
         """
+        self._require_feature_record(stage_id)
         now = _now_iso()
         with self._engine.begin() as conn:
             conn.execute(
                 update(self._feature_records_t)
                 .where(self._feature_records_t.c.stage_id == stage_id)
-                .values(status="Uploaded", uploaded_at=now, error=None)
+                .values(status="uploaded", uploaded_at=now, error=None)
             )
 
     def mark_feature_record_failed(self, stage_id: int, error: str) -> None:
-        """Transition a staged feature record to ``status="Failed"`` and record the error.
+        """Transition a staged feature record to ``status="failed"`` and record the error.
 
         Args:
             stage_id: Primary key of the row to update.
             error: Human-readable error description.
+
+        Raises:
+            KeyError: If no row with *stage_id* exists.
         """
+        self._require_feature_record(stage_id)
         with self._engine.begin() as conn:
             conn.execute(
                 update(self._feature_records_t)
                 .where(self._feature_records_t.c.stage_id == stage_id)
-                .values(status="Failed", error=error)
+                .values(status="failed", error=error)
             )

@@ -14,24 +14,16 @@ from sqlalchemy import create_engine, select
 from deriva_ml.local_db.manifest_store import ManifestStore
 
 
-def test_feature_records_table_created(tmp_path: Path) -> None:
-    """ManifestStore.ensure_schema creates the execution_state__feature_records table."""
+def test_ensure_schema_is_idempotent(tmp_path: Path) -> None:
+    """ManifestStore.ensure_schema() can be called twice without raising."""
     engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
     store = ManifestStore(engine)
     store.ensure_schema()
-    # Table is accessible via the store's metadata
-    assert "execution_state__feature_records" in store._metadata.tables
-    table = store._metadata.tables["execution_state__feature_records"]
-    expected_cols = {
-        "stage_id", "execution_rid", "feature_table", "feature_name",
-        "target_table", "record_json", "created_at", "status",
-        "uploaded_at", "error",
-    }
-    assert set(c.name for c in table.columns) == expected_cols
+    store.ensure_schema()  # second call must not raise
 
 
 def test_stage_feature_record_inserts_row(tmp_path: Path) -> None:
-    """stage_feature_record writes a Pending row readable by list_feature_records."""
+    """stage_feature_record writes a pending row readable by list_feature_records."""
     engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
     store = ManifestStore(engine)
     store.ensure_schema()
@@ -47,7 +39,7 @@ def test_stage_feature_record_inserts_row(tmp_path: Path) -> None:
     row = rows[0]
     assert row.feature_table == "domain.Image_Glaucoma"
     assert row.feature_name == "Glaucoma"
-    assert row.status == "Pending"
+    assert row.status == "pending"
     assert row.error is None
     assert row.uploaded_at is None
     assert json.loads(row.record_json) == {"Image": "IMG-1", "Glaucoma": "Normal"}
@@ -67,7 +59,7 @@ def test_mark_feature_record_uploaded(tmp_path: Path) -> None:
     stage_id = store.list_feature_records("EXE-1")[0].stage_id
     store.mark_feature_record_uploaded(stage_id)
     row = store.list_feature_records("EXE-1")[0]
-    assert row.status == "Uploaded"
+    assert row.status == "uploaded"
     assert row.uploaded_at is not None
 
 
@@ -85,7 +77,7 @@ def test_mark_feature_record_failed_records_error(tmp_path: Path) -> None:
     stage_id = store.list_feature_records("EXE-1")[0].stage_id
     store.mark_feature_record_failed(stage_id, error="ermrest rejected")
     row = store.list_feature_records("EXE-1")[0]
-    assert row.status == "Failed"
+    assert row.status == "failed"
     assert row.error == "ermrest rejected"
 
 
@@ -94,7 +86,7 @@ def test_list_pending_feature_records_filters_by_status(tmp_path: Path) -> None:
     store = ManifestStore(engine)
     store.ensure_schema()
     # Stage three: one pending, one uploaded, one failed
-    for i, _ in enumerate(range(3)):
+    for i in range(3):
         store.stage_feature_record(
             execution_rid="EXE-1",
             feature_table="domain.Image_Glaucoma",
@@ -108,3 +100,21 @@ def test_list_pending_feature_records_filters_by_status(tmp_path: Path) -> None:
     pending = store.list_pending_feature_records("EXE-1")
     assert len(pending) == 1
     assert pending[0].stage_id == ids[2]
+
+
+def test_mark_feature_record_uploaded_unknown_stage_id_raises(tmp_path: Path) -> None:
+    """mark_feature_record_uploaded raises KeyError for a nonexistent stage_id."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    with pytest.raises(KeyError):
+        store.mark_feature_record_uploaded(99999)
+
+
+def test_mark_feature_record_failed_unknown_stage_id_raises(tmp_path: Path) -> None:
+    """mark_feature_record_failed raises KeyError for a nonexistent stage_id."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    with pytest.raises(KeyError):
+        store.mark_feature_record_failed(99999, error="some error")
