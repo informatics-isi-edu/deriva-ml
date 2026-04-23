@@ -544,7 +544,7 @@ class Dataset:
                 grouped[target_rid].append(rec)
 
         for group in grouped.values():
-            chosen = selector(group) if len(group) > 1 else group[0]
+            chosen = selector(group)
             if chosen is not None:
                 yield chosen
 
