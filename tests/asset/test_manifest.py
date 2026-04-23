@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from deriva_ml.asset.aux_classes import AssetFilePath
-from deriva_ml.asset.manifest import AssetEntry, AssetManifest, FeatureEntry
+from deriva_ml.asset.manifest import AssetEntry, AssetManifest
 from deriva_ml.local_db.manifest_store import ManifestStore
 
 # =============================================================================
@@ -44,7 +44,6 @@ class TestAssetManifest:
         """Test creating a new empty manifest."""
         assert manifest.execution_rid == "4SP"
         assert manifest.assets == {}
-        assert manifest.features == {}
 
     def test_add_asset(self, manifest):
         """Test adding an asset entry."""
@@ -165,21 +164,6 @@ class TestAssetManifest:
 
         with pytest.raises(KeyError):
             manifest.update_asset_metadata("nonexistent", {})
-
-    def test_add_feature(self, manifest):
-        """Test adding a feature entry."""
-        manifest.add_feature(
-            "Diagnosis",
-            FeatureEntry(
-                feature_name="Diagnosis",
-                target_table="Image",
-                schema="test-schema",
-                values_path="features/Image/Diagnosis/Diagnosis.jsonl",
-            ),
-        )
-
-        assert "Diagnosis" in manifest.features
-        assert manifest.features["Diagnosis"].target_table == "Image"
 
     def test_to_json_format(self, manifest):
         """Test that to_json returns a well-formed dict."""

@@ -344,7 +344,7 @@ class Workspace:
         """
         import json as _json
 
-        from deriva_ml.asset.manifest import AssetEntry, FeatureEntry
+        from deriva_ml.asset.manifest import AssetEntry
 
         store = self.manifest_store()
         migrated = 0
@@ -359,9 +359,9 @@ class Workspace:
             for key, entry_dict in data.get("assets", {}).items():
                 entry = AssetEntry.from_dict(entry_dict)
                 store.add_asset(execution_rid, key, entry)
-            for name, entry_dict in data.get("features", {}).items():
-                entry = FeatureEntry.from_dict(entry_dict)
-                store.add_feature(execution_rid, name, entry)
+            # Note: legacy "features" entries in the manifest are no longer migrated —
+            # the file-based FeatureEntry path has been retired in favour of the
+            # row-per-record execution_state__feature_records table.
 
             sidecar = manifest_path.with_suffix(manifest_path.suffix + ".migrated.json")
             manifest_path.rename(sidecar)
