@@ -381,6 +381,13 @@ class TestUploadStaging:
             )
             path.write_text("staging test content")
 
+        # Bug E.2: lease pre-allocated RIDs for the manifest entries
+        # so _build_upload_staging can append them as path segments.
+        # (Normally this happens inside _upload_execution_dirs.)
+        from deriva_ml.execution.manifest_lease import lease_manifest_pending_assets
+        manifest = basic_execution._get_manifest()
+        lease_manifest_pending_assets(ml.catalog, manifest)
+
         # Build staging and get the regex from upload spec
         staging_root = basic_execution._build_upload_staging()
         spec = asset_table_upload_spec(basic_execution._model, "Image")
