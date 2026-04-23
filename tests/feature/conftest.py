@@ -145,12 +145,17 @@ def feature_symmetry_fixture(catalog_manager, tmp_path_factory):
     all_workflows = ml.find_workflows()
     assert all_workflows, "At least one workflow must exist after ensure_datasets"
 
-    # Select by name to avoid picking an arbitrary workflow when multiple exist
-    # (e.g. the symmetry fixture creates a "Symmetry dataset creator" workflow).
-    # The "Feature Creation" workflow is created by CatalogManager.ensure_features.
-    feature_workflows = [w for w in all_workflows if w.name == "Feature Creation"]
-    assert feature_workflows, "Expected 'Feature Creation' workflow from ensure_features"
-    feature_workflow_rid = feature_workflows[0].rid
+    # DerivaML deduplicates workflows by script checksum — all create_workflow calls
+    # from catalog_manager (ensure_populated, ensure_features, ensure_datasets) run
+    # from the same module and collapse into a SINGLE Workflow row. The surviving name
+    # is whichever registered first ("Test Population"), not "Feature Creation".
+    # The correct invariant is: exactly one workflow survives after test catalog setup.
+    # This assertion encodes that dedup invariant and will fail loudly if it changes.
+    assert len(all_workflows) == 1, (
+        f"Expected exactly one workflow after test catalog setup (workflow dedup by "
+        f"checksum), but found {len(all_workflows)}: {[w.name for w in all_workflows]}"
+    )
+    feature_workflow_rid = all_workflows[0].rid
     assert feature_workflow_rid, "Workflow must have a RID"
 
     # Create a new dataset that contains ALL image RIDs so that the dataset-scoped
