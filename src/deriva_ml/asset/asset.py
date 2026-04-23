@@ -224,42 +224,25 @@ class Asset:
         """
         return self._ml_instance.find_features(self.asset_table)
 
-    def list_feature_values(self, feature_name: str) -> list["FeatureRecord"]:
-        """Get all feature values for this specific asset.
+    def list_feature_values(self, *args, **kwargs) -> list["FeatureRecord"]:
+        """Retired — use ``ml.feature_values(asset_table, feature_name)`` instead.
 
-        Returns all values for the named feature across the entire asset table
-        (not filtered to this asset). To get values for just this asset,
-        filter by the target column::
+        ``Asset.list_feature_values`` has been removed. Use ``feature_values``
+        on the DerivaML instance directly::
 
-            values = [v for v in asset.list_feature_values("Quality")
-                      if v.Image == asset.asset_rid]
+            for rec in ml.feature_values(asset.asset_table, "Quality"):
+                if rec.Image == asset.asset_rid:
+                    ...
 
-        Each returned FeatureRecord is a dynamically-generated Pydantic model
-        with typed fields matching the feature's definition, including
-        ``Execution`` (provenance), ``RCT`` (creation timestamp), and all
-        feature-specific columns (vocabulary terms, asset references, or
-        value columns).
-
-        Args:
-            feature_name: Name of the feature to query (e.g.,
-                ``"Classification"``, ``"Quality"``).
-
-        Returns:
-            List of FeatureRecord instances. Each record has:
-
-            - ``Execution``: RID of the execution that created this value
-            - ``Feature_Name``: Name of the feature
-            - ``RCT``: Row Creation Time (ISO 8601 timestamp)
-            - Feature-specific columns as typed attributes
-            - ``model_dump()``: Convert to a dictionary
-
-        Example:
-            >>> values = asset.list_feature_values("Quality")
-            >>> for v in values:
-            ...     print(f"Image: {v.Image}, Score: {v.Score}, "
-            ...           f"Execution: {v.Execution}")
+        Raises:
+            DerivaMLException: Always. Points at the replacement API.
         """
-        return list(self._ml_instance.list_feature_values(self.asset_table, feature_name))
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        raise DerivaMLException(
+            "Asset.list_feature_values() has been retired. "
+            "Use ml.feature_values(asset_table, feature_name) instead."
+        )
 
     def add_asset_type(self, type_name: str) -> None:
         """Add an asset type to this asset.

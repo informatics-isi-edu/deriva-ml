@@ -631,178 +631,46 @@ class DatasetBag:
             ).all()
             return [r[0] for r in rows]
 
-    def fetch_table_features(
-        self,
-        table: Table | str,
-        feature_name: str | None = None,
-        selector: Callable[[list[FeatureRecord]], FeatureRecord] | None = None,
-    ) -> dict[str, list[FeatureRecord]]:
-        """Fetch all feature values for a table, grouped by feature name.
+    def fetch_table_features(self, *args, **kwargs):
+        """Retired — use ``feature_values(table, name)`` or ``Denormalizer``.
 
-        Queries the local SQLite database within this dataset bag and returns
-        a dictionary mapping feature names to lists of FeatureRecord instances.
-        This is useful for retrieving all annotations on a table in a single
-        call — for example, getting all classification labels, quality scores,
-        and bounding boxes for a set of images at once.
+        ``DatasetBag.fetch_table_features`` has been removed. Use the new
+        ``feature_values`` method to read a single feature::
 
-        **Selector for resolving multiple values:**
+            for rec in bag.feature_values("Image", "Quality"):
+                ...
 
-        An asset may have multiple values for the same feature — for example,
-        labels from different annotators or model runs. When a ``selector`` is
-        provided, records are grouped by target RID and the selector is called
-        once per group to pick a single value. Groups with only one record
-        are passed through unchanged.
-
-        A selector is any callable with signature
-        ``(list[FeatureRecord]) -> FeatureRecord``. Built-in selectors:
-
-        - ``FeatureRecord.select_newest`` — picks the record with the most
-          recent ``RCT`` (Row Creation Time).
-
-        Custom selector example::
-
-            def select_highest_confidence(records):
-                return max(records, key=lambda r: getattr(r, "Confidence", 0))
-
-        Args:
-            table: The table to fetch features for (name or Table object).
-            feature_name: If provided, only fetch values for this specific
-                feature. If ``None``, fetch all features on the table.
-            selector: Optional function to select among multiple feature values
-                for the same target object. Receives a list of FeatureRecord
-                instances (all for the same target RID) and returns the selected
-                one.
-
-        Returns:
-            dict[str, list[FeatureRecord]]: Keys are feature names, values are
-            lists of FeatureRecord instances. When a selector is provided, each
-            target object appears at most once per feature.
+        For wide-table denormalization across all features use the
+        ``Denormalizer`` subsystem.
 
         Raises:
-            DerivaMLException: If a specified ``feature_name`` doesn't exist
-                on the table.
-
-        Examples:
-            Fetch all features for a table::
-
-                >>> features = bag.fetch_table_features("Image")
-                >>> for name, records in features.items():
-                ...     print(f"{name}: {len(records)} values")
-
-            Fetch a single feature with newest-value selection::
-
-                >>> features = bag.fetch_table_features(
-                ...     "Image",
-                ...     feature_name="Classification",
-                ...     selector=FeatureRecord.select_newest,
-                ... )
-
-            Convert results to a DataFrame::
-
-                >>> features = bag.fetch_table_features("Image", feature_name="Quality")
-                >>> import pandas as pd
-                >>> df = pd.DataFrame([r.model_dump() for r in features["Quality"]])
+            DerivaMLException: Always. Points at the replacement API.
         """
-        features = list(self.find_features(table))
-        if feature_name is not None:
-            features = [f for f in features if f.feature_name == feature_name]
-            if not features:
-                table_name = table if isinstance(table, str) else table.name
-                raise DerivaMLException(f"Feature '{feature_name}' not found on table '{table_name}'.")
+        raise DerivaMLException(
+            "DatasetBag.fetch_table_features() has been retired. "
+            "Use feature_values(table, feature_name) to read a single feature, "
+            "or Denormalizer for multi-feature wide tables."
+        )
 
-        result: dict[str, list[FeatureRecord]] = {}
+    def list_feature_values(self, *args, **kwargs) -> Iterable[FeatureRecord]:
+        """Retired — renamed to ``feature_values``.
 
-        for feat in features:
-            record_class = feat.feature_record_class()
-            field_names = set(record_class.model_fields.keys())
-            target_col = feat.target_table.name
+        ``DatasetBag.list_feature_values`` has been removed. Use the new
+        ``feature_values`` method instead::
 
-            # Query raw values from SQLite
-            feature_table = self.model.find_table(feat.feature_table.name)
-            with Session(self.engine) as session:
-                sql_cmd = select(feature_table)
-                sql_result = session.execute(sql_cmd)
-                rows = [dict(row._mapping) for row in sql_result]
+            for rec in bag.feature_values("Image", "Quality"):
+                ...
 
-            records: list[FeatureRecord] = []
-            for raw_value in rows:
-                filtered_data = {k: v for k, v in raw_value.items() if k in field_names}
-                records.append(record_class(**filtered_data))
-
-            if selector and records:
-                # Group by target RID and apply selector
-                grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
-                for rec in records:
-                    target_rid = getattr(rec, target_col, None)
-                    if target_rid is not None:
-                        grouped[target_rid].append(rec)
-                records = [selector(group) if len(group) > 1 else group[0] for group in grouped.values()]
-
-            result[feat.feature_name] = records
-
-        return result
-
-    def list_feature_values(
-        self,
-        table: Table | str,
-        feature_name: str,
-        selector: Callable[[list[FeatureRecord]], FeatureRecord] | None = None,
-    ) -> Iterable[FeatureRecord]:
-        """Retrieve all values for a single feature as typed FeatureRecord instances.
-
-        Convenience wrapper around ``fetch_table_features()`` for the common
-        case of querying a single feature by name. Returns a flat list of
-        FeatureRecord objects — one per feature value (or one per target object
-        when a ``selector`` is provided).
-
-        Each returned record is a dynamically-generated Pydantic model with
-        typed fields matching the feature's definition. For example, an
-        ``Image_Classification`` feature might produce records with fields
-        ``Image`` (str), ``Image_Class`` (str), ``Execution`` (str),
-        ``RCT`` (str), and ``Feature_Name`` (str).
-
-        Args:
-            table: The table the feature is defined on (name or Table object).
-            feature_name: Name of the feature to retrieve values for.
-            selector: Optional function to resolve multiple values per target.
-                See ``fetch_table_features`` for details on how selectors work.
-                Use ``FeatureRecord.select_newest`` to pick the most recently
-                created value.
-
-        Returns:
-            Iterable[FeatureRecord]: FeatureRecord instances with:
-
-            - ``Execution``: RID of the execution that created this value
-            - ``Feature_Name``: Name of the feature
-            - ``RCT``: Row Creation Time (ISO 8601 timestamp)
-            - Feature-specific columns as typed attributes (vocabulary terms,
-              asset references, or value columns depending on the feature)
-            - ``model_dump()``: Convert to a dictionary
+        The signature is identical (``table``, ``feature_name``, optional
+        ``selector``).
 
         Raises:
-            DerivaMLException: If the feature doesn't exist on the table.
-
-        Examples:
-            Get typed feature records::
-
-                >>> for record in bag.list_feature_values("Image", "Quality"):
-                ...     print(f"Image {record.Image}: {record.ImageQuality}")
-                ...     print(f"Created by execution: {record.Execution}")
-
-            Select newest when multiple values exist::
-
-                >>> records = list(bag.list_feature_values(
-                ...     "Image", "Quality",
-                ...     selector=FeatureRecord.select_newest,
-                ... ))
-
-            Convert to a list of dicts::
-
-                >>> dicts = [r.model_dump() for r in
-                ...          bag.list_feature_values("Image", "Classification")]
+            DerivaMLException: Always. Points at the replacement API.
         """
-        result = self.fetch_table_features(table, feature_name=feature_name, selector=selector)
-        return result.get(feature_name, [])
+        raise DerivaMLException(
+            "DatasetBag.list_feature_values() has been retired and renamed. "
+            "Use feature_values(table, feature_name, selector=...) instead."
+        )
 
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of elements that can be contained in datasets.
@@ -1308,7 +1176,7 @@ class DatasetBag:
             # Track the column used for this group_key
             column_for_group[group_key] = use_column
             records_cache[group_key] = defaultdict(list)
-            feature_values = self.list_feature_values(table_name, feat.feature_name)
+            feature_values = self.feature_values(table_name, feat.feature_name)
 
             for fv in feature_values:
                 target_rid = getattr(fv, table_name, None)

@@ -222,6 +222,57 @@ class DatasetLike(Protocol):
         """
         ...
 
+    def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
+        """Look up a feature definition by table and name.
+
+        Args:
+            table: The table the feature is defined on (name or Table object).
+            feature_name: Name of the feature to look up.
+
+        Returns:
+            A Feature schema descriptor.
+
+        Raises:
+            DerivaMLException: If the feature doesn't exist on the specified table.
+        """
+        ...
+
+    def feature_values(
+        self,
+        table: Table | str,
+        feature_name: str,
+        selector: Any = None,
+    ) -> Iterable[FeatureRecord]:
+        """Yield feature values for a single feature, one record per target RID.
+
+        Args:
+            table: Target table the feature is defined on (name or Table).
+            feature_name: Name of the feature to read.
+            selector: Optional callable ``(list[FeatureRecord]) -> FeatureRecord | None``
+                used to reduce multi-value groups.
+
+        Returns:
+            Iterator of ``FeatureRecord`` instances.
+
+        Raises:
+            DerivaMLException: If ``feature_name`` is not a feature on ``table``.
+        """
+        ...
+
+    def list_workflow_executions(self, workflow: str) -> list[str]:
+        """Return execution RIDs that ran the given workflow.
+
+        Args:
+            workflow: Workflow RID or Workflow_Type name.
+
+        Returns:
+            List of execution RIDs. May be empty.
+
+        Raises:
+            DerivaMLException: If ``workflow`` does not resolve.
+        """
+        ...
+
     def get_denormalized_as_dataframe(
         self,
         include_tables: list[str],
@@ -537,21 +588,6 @@ class AssetLike(Protocol):
 
         Returns:
             Iterable of Feature objects.
-        """
-        ...
-
-    def list_feature_values(self, feature_name: str) -> list[FeatureRecord]:
-        """Get feature values for this specific asset.
-
-        Args:
-            feature_name: Name of the feature to query.
-
-        Returns:
-            List of FeatureRecord instances. Each record has:
-                - Execution: RID of the execution that created this feature value
-                - Feature_Name: Name of the feature
-                - All feature-specific columns as typed attributes
-                - model_dump() method to convert back to a dictionary
         """
         ...
 

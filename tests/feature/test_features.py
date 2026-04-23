@@ -213,7 +213,13 @@ class TestFeatures:
             exe.add_features([SubjectHealthFeature(Subject=subject_rids[0], SubjectHealth="Sick", Scale=23)])
 
         feature_execution.upload_execution_outputs()
-        features = list(ml_instance.list_feature_values("Subject", "Health"))
+        # Filter to records from THIS execution — the demo catalog populates
+        # Health feature values for every Subject during ensure_features, so the
+        # unfiltered count will be (# demo subjects) + 1.
+        features = [
+            f for f in ml_instance.feature_values("Subject", "Health")
+            if f.Execution == feature_execution.execution_rid
+        ]
         assert len(features) == 1
 
         _ImageBoundingboxFeature = ml_instance.feature_record_class("Image", "BoundingBox")
@@ -269,8 +275,13 @@ class TestFeatures:
         # Upload outputs (assets + feature values)
         asset_execution.upload_execution_outputs()
 
-        # Verify the feature values were created
-        features = list(ml_instance.list_feature_values("Image", "BoundingBox"))
+        # Verify the feature values were created — filter to THIS execution,
+        # since the demo catalog also populates BoundingBox feature values
+        # during ensure_features.
+        features = [
+            f for f in ml_instance.feature_values("Image", "BoundingBox")
+            if f.Execution == asset_execution.execution_rid
+        ]
         assert len(features) == 3
 
         # Verify each feature value has a valid asset RID (not a file path)
@@ -305,27 +316,30 @@ class TestFeatures:
         s_features_bag = [f"{f.target_table.name}:{f.feature_name}" for f in bag.find_features("Image")]
         assert s_features == s_features_bag
 
-        # list_feature_values now returns FeatureRecord instances - use model_dump() for dict access
+        # feature_values returns FeatureRecord instances. The feature-row's own
+        # RID is not exposed on FeatureRecord (stripped by Feature's skip_columns),
+        # so we compare by the identifying tuple (Subject, Execution) instead —
+        # which uniquely identifies a feature value per (target, execution) pair.
         catalog_feature_values = {
-            f.model_dump()["RID"]
-            for f in ml_instance.list_feature_values("Subject", "Health")
-            if f.model_dump()["Subject"] in subject_rids
+            (f.Subject, f.Execution)
+            for f in ml_instance.feature_values("Subject", "Health")
+            if f.Subject in subject_rids
         }
 
-        bag_feature_values = {f.model_dump()["RID"] for f in bag.list_feature_values("Subject", "Health")}
+        bag_feature_values = {(f.Subject, f.Execution) for f in bag.feature_values("Subject", "Health")}
         assert catalog_feature_values == bag_feature_values
 
         for t in ["Subject", "Image"]:
             for f in ml_instance.model.find_features(t):
                 catalog_features = [
                     {"Execution": e.model_dump()["Execution"], "Feature_Name": e.Feature_Name, t: e.model_dump()[t]}
-                    for e in ml_instance.list_feature_values(t, f.feature_name)
+                    for e in ml_instance.feature_values(t, f.feature_name)
                     if e.model_dump()[t] in (subject_rids | image_rids)
                 ]
                 catalog_features.sort(key=lambda x: x[t])
                 bag_features = [
                     {"Execution": e.model_dump()["Execution"], "Feature_Name": e.Feature_Name, t: e.model_dump()[t]}
-                    for e in bag.list_feature_values(t, f.feature_name)
+                    for e in bag.feature_values(t, f.feature_name)
                 ]
                 bag_features.sort(key=lambda x: x[t])
                 assert catalog_features == bag_features
