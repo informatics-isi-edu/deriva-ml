@@ -101,6 +101,13 @@ def test_returns_none_when_no_match():
     assert result is None
 
 
+def test_select_by_workflow_returns_none_on_empty_records() -> None:
+    """selector([]) returns None — no record group can satisfy a workflow filter."""
+    container = _StubContainer()
+    selector = FeatureRecord.select_by_workflow("wf-alpha", container=container)
+    assert selector([]) is None
+
+
 def test_resolves_executions_once():
     """Container.list_workflow_executions is called exactly once at factory construction."""
     container = _StubContainer()

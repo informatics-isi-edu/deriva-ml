@@ -121,10 +121,10 @@ class FeatureRecord(BaseModel):
         useful when multiple executions have produced values for the same
         feature and you want results from a specific run.
 
-        Unlike ``select_by_workflow`` (which requires catalog access and lives
-        on the DerivaML class), this selector works purely on the
-        ``Execution`` field of each record and can be passed directly as the
-        ``selector`` argument to ``fetch_table_features`` or
+        Unlike ``select_by_workflow`` (a factory that resolves the workflow's
+        execution set from a container), this selector filters on a known
+        ``Execution`` RID with no container dependency and can be passed
+        directly as the ``selector`` argument to ``fetch_table_features`` or
         ``list_feature_values``::
 
             features = ml.fetch_table_features(
