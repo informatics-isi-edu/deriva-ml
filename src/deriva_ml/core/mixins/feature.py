@@ -405,6 +405,10 @@ class FeatureMixin:
         per-feature denormalization cache populated on first access; subsequent
         calls are cheap.
 
+        All rows for the feature are fetched from the catalog before the first
+        record is yielded — this method is iterator-shaped for composability,
+        not for streaming of very large feature tables.
+
         Args:
             table: Target table the feature is defined on (name or Table).
             feature_name: Name of the feature to read.
