@@ -15,6 +15,47 @@ from deriva_ml.dataset.aux_classes import VersionPart
 from deriva_ml.execution import ExecutionConfiguration
 
 
+# ---------------------------------------------------------------------------
+# Bag fixture for retired-API tests
+# ---------------------------------------------------------------------------
+
+
+@dataclasses.dataclass
+class MaterializedBagFixture:
+    """Container for a downloaded + materialized bag with feature data."""
+
+    ml: object
+    bag: object
+    feature_name: str
+    target_table: str = "Image"
+
+
+@pytest.fixture
+def materialized_bag_with_feature(catalog_manager, tmp_path):
+    """Download a materialized bag that includes Image/Quality feature values.
+
+    Mirrors tests/dataset/conftest.py::materialized_bag_with_feature so that
+    tests/feature/ tests can also use this fixture.
+
+    Yields:
+        MaterializedBagFixture with .ml, .bag, .feature_name, .target_table.
+    """
+    catalog_manager.reset()
+    ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path)
+
+    dataset = dataset_desc.dataset
+    version = dataset.current_version
+
+    bag = dataset.download_dataset_bag(version=version, use_minid=False)
+
+    yield MaterializedBagFixture(
+        ml=ml,
+        bag=bag,
+        feature_name="Quality",
+        target_table="Image",
+    )
+
+
 @dataclasses.dataclass
 class BagFeatureSymmetryFixture:
     """Container for both an online ml and a matching offline bag with feature data."""

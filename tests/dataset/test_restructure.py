@@ -960,7 +960,7 @@ class TestListFeatureValuesReturnType:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # Get feature values from the bag
-        feature_values = list(bag.list_feature_values("Image", "Quality"))
+        feature_values = list(bag.feature_values("Image", "Quality"))
 
         if feature_values:
             # Each item should be a FeatureRecord subclass
@@ -986,7 +986,7 @@ class TestListFeatureValuesReturnType:
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        feature_values = list(bag.list_feature_values("Image", "Quality"))
+        feature_values = list(bag.feature_values("Image", "Quality"))
 
         if feature_values:
             for fv in feature_values:
