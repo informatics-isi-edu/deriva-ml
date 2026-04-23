@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import inspect
 
-from deriva_ml.asset.manifest import AssetEntry, FeatureEntry
+from deriva_ml.asset.manifest import AssetEntry
 from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva_ml.local_db.workspace import Workspace
 
@@ -25,7 +25,7 @@ class TestEnsureSchema:
     def test_creates_tables(self, store: ManifestStore) -> None:
         tables = inspect(store._engine).get_table_names()
         assert "execution_state__assets" in tables
-        assert "execution_state__features" in tables
+        assert "execution_state__feature_records" in tables
 
     def test_idempotent(self, store: ManifestStore) -> None:
         store.ensure_schema()
@@ -123,34 +123,6 @@ class TestAssetCrud:
     def test_update_types_missing_raises(self, store: ManifestStore) -> None:
         with pytest.raises(KeyError):
             store.update_asset_types("4SP", "nonexistent", ["A"])
-
-
-class TestFeatureCrud:
-    def test_add_and_list(self, store: ManifestStore) -> None:
-        f = FeatureEntry(
-            feature_name="Diagnosis",
-            target_table="Image",
-            schema="isa",
-            values_path="/some/path.csv",
-            asset_columns={},
-            status="pending",
-        )
-        store.add_feature("4SP", "Diagnosis", f)
-        got = store.list_features("4SP")
-        assert "Diagnosis" in got
-        assert got["Diagnosis"].target_table == "Image"
-
-    def test_list_features_empty(self, store: ManifestStore) -> None:
-        got = store.list_features("nonexistent")
-        assert got == {}
-
-    def test_add_feature_replaces_existing(self, store: ManifestStore) -> None:
-        f1 = FeatureEntry(feature_name="D", target_table="Image", schema="isa", values_path="/v1.csv", status="pending")
-        store.add_feature("4SP", "D", f1)
-        f2 = FeatureEntry(feature_name="D", target_table="Image", schema="isa", values_path="/v2.csv", status="pending")
-        store.add_feature("4SP", "D", f2)
-        got = store.list_features("4SP")
-        assert got["D"].values_path == "/v2.csv"
 
 
 class TestStatusFilters:

@@ -152,8 +152,8 @@ class TestManifestImport:
         finally:
             ws.close()
 
-    def test_feature_entries_imported(self, tmp_path: Path) -> None:
-        """Features in the legacy manifest are also imported."""
+    def test_feature_entries_in_legacy_manifest_are_silently_skipped(self, tmp_path: Path) -> None:
+        """Features in the legacy manifest are silently skipped (file-based path retired)."""
         d = tmp_path / "execution" / "F-1"
         d.mkdir(parents=True)
         (d / "asset-manifest.json").write_text(
@@ -178,10 +178,12 @@ class TestManifestImport:
 
         ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
         try:
+            # The manifest is still migrated (sidecar is created) even though
+            # the legacy "features" entries are ignored — the migration counts assets.
             count = ws.import_legacy_manifests()
             assert count == 1
-            features = ws.manifest_store().list_features("F-1")
-            assert "Diagnosis" in features
-            assert features["Diagnosis"].target_table == "Image"
+            # No feature_records should have been created
+            records = ws.manifest_store().list_feature_records("F-1")
+            assert records == []
         finally:
             ws.close()

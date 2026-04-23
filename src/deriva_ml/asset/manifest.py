@@ -60,25 +60,6 @@ class AssetEntry:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
-@dataclass
-class FeatureEntry:
-    """A feature entry in the manifest."""
-
-    feature_name: str
-    target_table: str
-    schema: str
-    values_path: str
-    asset_columns: dict[str, str] = field(default_factory=dict)
-    status: str = "pending"
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FeatureEntry:
-        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
-
-
 class AssetManifest:
     """Per-execution asset+feature manifest, backed by :class:`ManifestStore`.
 
@@ -103,10 +84,6 @@ class AssetManifest:
     @property
     def assets(self) -> dict[str, AssetEntry]:
         return self._store.list_assets(self._execution_rid)
-
-    @property
-    def features(self) -> dict[str, FeatureEntry]:
-        return self._store.list_features(self._execution_rid)
 
     def pending_assets(self) -> dict[str, AssetEntry]:
         return self._store.pending_assets(self._execution_rid)
@@ -146,9 +123,6 @@ class AssetManifest:
     def mark_failed(self, key: str, error: str) -> None:
         self._store.mark_asset_failed(self._execution_rid, key, error)
 
-    def add_feature(self, name: str, entry: FeatureEntry) -> None:
-        self._store.add_feature(self._execution_rid, name, entry)
-
     def to_json(self) -> dict[str, Any]:
         """Return a dict mirroring the legacy JSON file format.
 
@@ -160,7 +134,6 @@ class AssetManifest:
             "version": self.MANIFEST_VERSION,
             "execution_rid": self._execution_rid,
             "assets": {k: v.to_dict() for k, v in self.assets.items()},
-            "features": {k: v.to_dict() for k, v in self.features.items()},
         }
 
 
