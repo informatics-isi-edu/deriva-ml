@@ -41,7 +41,7 @@ from pathlib import Path
 # Local imports
 from pprint import pformat
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Self
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Self
 from urllib.parse import urlparse
 
 # Deriva imports
@@ -51,6 +51,7 @@ from deriva.core.asyncio.async_catalog import AsyncErmrestSnapshot
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
+    from deriva_ml.feature import FeatureRecord
 
 # Third-party imports
 import pandas as pd
@@ -462,6 +463,135 @@ class Dataset:
             Iterable of Feature objects.
         """
         return self._ml_instance.find_features(table)
+
+    def list_members(self, table: str | Table) -> list[str]:
+        """Return the RIDs of dataset members belonging to the given table.
+
+        Convenience wrapper around :meth:`list_dataset_members` that returns
+        a flat list of RID strings for a single table rather than the full
+        ``dict[table_name, list[record]]`` mapping.
+
+        Args:
+            table: Table name (str) or Table object whose member RIDs to return.
+
+        Returns:
+            List of RID strings for members of this dataset that belong to
+            ``table``. Returns an empty list if no members of that type exist.
+
+        Example:
+            >>> image_rids = dataset.list_members("Image")
+            >>> print(f"{len(image_rids)} images in dataset")
+        """
+        table_name = table if isinstance(table, str) else table.name
+        members = self.list_dataset_members()
+        return [r["RID"] for r in members.get(table_name, [])]
+
+    def feature_values(
+        self,
+        table: str | Table,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+    ) -> Iterable[FeatureRecord]:
+        """Dataset-scoped feature values — identical signature to DerivaML.feature_values.
+
+        Yields only records whose target RID is a member of this dataset.
+        Filtering is applied to the raw feature table query before selector
+        reduction — a target RID outside the dataset's member set is never
+        presented to the selector.
+
+        See :meth:`deriva_ml.core.mixins.feature.FeatureMixin.feature_values`
+        for the full contract (return type, selector semantics, exceptions).
+
+        Args:
+            table: Target table the feature is defined on (name or Table).
+            feature_name: Name of the feature to read.
+            selector: Optional callable ``(list[FeatureRecord]) -> FeatureRecord | None``
+                used to reduce multi-value groups. See ``FeatureRecord`` for built-ins.
+                Return ``None`` from a selector to omit that target RID.
+
+        Returns:
+            Iterator of ``FeatureRecord`` — filtered to dataset members, then
+            reduced by selector if provided.
+
+        Raises:
+            DerivaMLTableNotFound: ``table`` does not exist.
+            DerivaMLException: ``feature_name`` is not a feature on ``table``.
+
+        Example:
+            >>> from deriva_ml.feature import FeatureRecord
+            >>> records = list(dataset.feature_values(
+            ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
+            ... ))
+        """
+        members = set(self.list_members(table))
+        target_col = table if isinstance(table, str) else table.name
+
+        # Filter upstream raw records to dataset members
+        raw_in_scope = [
+            rec
+            for rec in self._ml_instance.feature_values(table, feature_name, selector=None)
+            if getattr(rec, target_col, None) in members
+        ]
+
+        if selector is None:
+            yield from raw_in_scope
+            return
+
+        grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+        for rec in raw_in_scope:
+            target_rid = getattr(rec, target_col, None)
+            if target_rid is not None:
+                grouped[target_rid].append(rec)
+
+        for group in grouped.values():
+            chosen = selector(group) if len(group) > 1 else group[0]
+            if chosen is not None:
+                yield chosen
+
+    def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
+        """Look up a Feature definition — delegates to the owning DerivaML.
+
+        Identical signature and return to ``DerivaML.lookup_feature``. Provided
+        for API symmetry so dataset-scoped code does not need to reach back
+        through ``self._ml_instance``.
+
+        Args:
+            table: The table the feature is defined on (name or Table object).
+            feature_name: Name of the feature to look up.
+
+        Returns:
+            A Feature schema descriptor.
+
+        Raises:
+            DerivaMLException: If the feature doesn't exist on the specified table.
+
+        Example:
+            >>> feat = dataset.lookup_feature("Image", "Glaucoma")
+            >>> RecordClass = feat.feature_record_class()
+        """
+        return self._ml_instance.lookup_feature(table, feature_name)
+
+    def list_workflow_executions(self, workflow: str) -> list[str]:
+        """Dataset-scoped list_workflow_executions — see DerivaML.list_workflow_executions.
+
+        Current implementation returns the full workflow execution list from the
+        catalog. Target-RID filtering at selection time (via ``feature_values``)
+        ensures that records from executions outside the dataset's member set
+        are excluded. A stricter scope (executions whose outputs touch dataset
+        members) is a performance optimization deferred to a later change.
+
+        Args:
+            workflow: Workflow RID or Workflow_Type name. See
+                ``DerivaML.list_workflow_executions`` for the resolution rules.
+
+        Returns:
+            List of execution RIDs. May be empty.
+
+        Example:
+            >>> rids = dataset.list_workflow_executions("Glaucoma_Training_v2")
+            >>> print(f"{len(rids)} training runs in catalog")
+        """
+        return self._ml_instance.list_workflow_executions(workflow)
 
     def dataset_history(self) -> list[DatasetHistory]:
         """Retrieves the version history of a dataset.
