@@ -1458,6 +1458,13 @@ class Execution:
         if clean_folder is None:
             clean_folder = getattr(self._ml_object, "clean_execution_dir", True)
 
+        # Transition to Pending_Upload BEFORE starting the upload work. This
+        # ensures that an exception during _upload_execution_dirs can legally
+        # transition to Failed (Stopped → Failed is not a legal transition,
+        # but Pending_Upload → Failed is; see state_machine.ALLOWED_TRANSITIONS).
+        if self.status is ExecutionStatus.Stopped:
+            self.update_status(ExecutionStatus.Pending_Upload)
+
         try:
             self.uploaded_assets = self._upload_execution_dirs(
                 progress_callback=progress_callback,
@@ -1467,11 +1474,7 @@ class Execution:
                 chunk_size=chunk_size,
             )
             self._set_asset_descriptions(self.uploaded_assets)
-            # Successful end of upload: Stopped → Pending_Upload → Uploaded.
-            # Only transition if we're in Stopped (algorithm ended cleanly);
-            # otherwise leave state alone.
-            if self.status is ExecutionStatus.Stopped:
-                self.update_status(ExecutionStatus.Pending_Upload)
+            # Successful end of upload: Pending_Upload → Uploaded.
             if self.status is ExecutionStatus.Pending_Upload:
                 self.update_status(ExecutionStatus.Uploaded)
             if clean_folder:
