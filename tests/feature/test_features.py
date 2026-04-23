@@ -400,12 +400,15 @@ def test_list_workflow_executions_by_workflow_type_name(test_ml) -> None:
     from deriva_ml.execution import ExecutionConfiguration
     from deriva_ml.execution.workflow import Workflow
 
-    test_ml.add_term(vc.workflow_type, "Test Workflow", description="Workflow type for testing")
+    # Use a test-unique Workflow_Type name to avoid cross-test pollution from
+    # any other test that also creates workflows tagged "Test Workflow".
+    wf_type_name = "S2_ListWF_TypeNameTest"
+    test_ml.add_term(vc.workflow_type, wf_type_name, description="Workflow type for type-name test")
     wf_rid = test_ml.add_workflow(
         Workflow(
             name="S2_type_wf",
             url="https://example.com/s2_type",
-            workflow_type="Test Workflow",
+            workflow_type=wf_type_name,
             description="S2 workflow type name coverage",
             checksum="b" * 64,
         )
@@ -414,8 +417,10 @@ def test_list_workflow_executions_by_workflow_type_name(test_ml) -> None:
     cfg = ExecutionConfiguration(description="exec", workflow=wf)
     with test_ml.create_execution(cfg) as exe:
         pass
-    rids = test_ml.list_workflow_executions("Test Workflow")
+    rids = test_ml.list_workflow_executions(wf_type_name)
     assert exe.execution_rid in rids
+    # Exact set — this test owns all executions of this unique type
+    assert set(rids) == {exe.execution_rid}
 
 
 def test_list_workflow_executions_unknown_raises(test_ml) -> None:
