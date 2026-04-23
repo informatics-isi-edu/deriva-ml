@@ -169,6 +169,8 @@ class DatasetFeatureFixture:
     feature_name: str
     target_table: str
     workflow: str
+    member_rids: set  # Image RIDs that ARE dataset members
+    non_member_rids: set  # Image RIDs that have feature values but are NOT members
 
 
 @pytest.fixture
@@ -226,23 +228,42 @@ def catalog_with_feature_and_dataset(populated_catalog):
         dataset.add_dataset_members(members={"Image": member_rids})
     dataset.increment_dataset_version(component=VersionPart.minor, description="v1")
 
+    member_set = set(member_rids)
+    non_member_set = set(all_image_rids) - member_set
     yield DatasetFeatureFixture(
         ml=ml,
         dataset=dataset,
         feature_name=feature_name,
         target_table="Image",
         workflow=workflow_rid,
+        member_rids=member_set,
+        non_member_rids=non_member_set,
     )
 
 
 def test_dataset_feature_values_filters_to_members(catalog_with_feature_and_dataset) -> None:
-    """Dataset.feature_values yields only records whose target RID is in dataset members."""
+    """Dataset.feature_values yields only records whose target RID is in dataset members.
+
+    The fixture seeds feature values for ALL images but adds only a subset as dataset
+    members, so non_member_rids is guaranteed non-empty — the filter must actively
+    exclude them.
+    """
     fx = catalog_with_feature_and_dataset
-    dataset = fx.dataset
-    feature_name = fx.feature_name
-    member_rids = set(dataset.list_members(fx.target_table))
-    records = list(dataset.feature_values(fx.target_table, feature_name))
-    assert all(getattr(r, fx.target_table) in member_rids for r in records)
+    assert fx.non_member_rids, (
+        "fixture must have at least one image with a feature value that is NOT a dataset member"
+    )
+
+    records = list(fx.dataset.feature_values(fx.target_table, fx.feature_name))
+    yielded_rids = {getattr(r, fx.target_table) for r in records}
+
+    # Every yielded RID is a member
+    assert yielded_rids.issubset(fx.member_rids), (
+        f"non-member RIDs leaked through: {yielded_rids - fx.member_rids}"
+    )
+    # No non-member RID was yielded — filter actually applied
+    assert not (yielded_rids & fx.non_member_rids), (
+        f"non-member RIDs should have been excluded: {yielded_rids & fx.non_member_rids}"
+    )
 
 
 def test_dataset_lookup_feature_delegates_to_ml(catalog_with_feature_and_dataset) -> None:
@@ -257,8 +278,14 @@ def test_dataset_lookup_feature_delegates_to_ml(catalog_with_feature_and_dataset
 def test_dataset_list_workflow_executions_scopes_to_dataset(
     catalog_with_feature_and_dataset,
 ) -> None:
-    """Dataset.list_workflow_executions returns a subset of ml.list_workflow_executions."""
+    """Dataset.list_workflow_executions is a pass-through to the catalog-wide list.
+
+    The current implementation returns the full catalog-wide list of executions for
+    the workflow.  The two sets are therefore equal (not merely a subset).  If strict
+    dataset scoping is added later this test will fail and signal that the contract
+    needs to be re-evaluated.
+    """
     fx = catalog_with_feature_and_dataset
     ml_rids = set(fx.ml.list_workflow_executions(fx.workflow))
     ds_rids = set(fx.dataset.list_workflow_executions(fx.workflow))
-    assert ds_rids.issubset(ml_rids)
+    assert ds_rids == ml_rids
