@@ -909,7 +909,7 @@ class DerivaML(
             table_name: Table the feature is attached to (e.g., "Image").
             feature_name: Name of the feature (e.g., "Classification").
             force: If True, re-fetch even if already cached.
-            **kwargs: Additional arguments passed to ``fetch_table_features``
+            **kwargs: Additional arguments passed to ``feature_values``
                 (e.g., ``selector``, ``workflow``, ``execution``).
 
         Returns:
@@ -934,8 +934,7 @@ class DerivaML(
             if cached is not None:
                 return cached.to_dataframe()
 
-        features = self.fetch_table_features(table_name, feature_name=feature_name, **kwargs)
-        records = [r.model_dump(mode="json") for r in features.get(feature_name, [])]
+        records = [r.model_dump(mode="json") for r in self.feature_values(table_name, feature_name=feature_name, **kwargs)]
         df = pd.DataFrame(records)
         if not df.empty:
             columns = list(df.columns)
@@ -1946,7 +1945,7 @@ class DerivaML(
 
     # Methods moved to mixins:
     # - create_asset, list_assets -> AssetMixin
-    # - create_feature, feature_record_class, delete_feature, lookup_feature, list_feature_values -> FeatureMixin
+    # - create_feature, feature_record_class, delete_feature, lookup_feature, feature_values -> FeatureMixin
     # - find_datasets, create_dataset, lookup_dataset, delete_dataset, list_dataset_element_types,
     #   add_dataset_element_type, download_dataset_bag -> DatasetMixin
     # - _update_status, create_execution, resume_execution -> ExecutionMixin

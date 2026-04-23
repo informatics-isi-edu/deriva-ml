@@ -37,29 +37,28 @@ class FeatureRecord(BaseModel):
     ``Feature.feature_record_class()`` with fields corresponding to the
     feature's vocabulary terms, asset references, and metadata columns.
 
-    Feature records are returned by ``list_feature_values()`` and
-    ``fetch_table_features()``. They can also be constructed manually and
-    passed to ``Execution.add_features()`` to insert new values into the
-    catalog.
+    Feature records are returned by ``feature_values()``. They can also be
+    constructed manually and passed to ``Execution.add_features()`` to insert
+    new values into the catalog.
 
     **Handling multiple values per target:**
 
     When the same target object (e.g., an Image) has multiple feature values
     — for example, labels from different annotators or model runs — use
-    a ``selector`` function to choose one. Pass it to ``fetch_table_features``
-    or ``list_feature_values``. A selector receives a list of FeatureRecord
-    instances for the same target and returns the selected one::
+    a ``selector`` function to choose one. Pass it to ``feature_values``.
+    A selector receives a list of FeatureRecord instances for the same target
+    and returns the selected one::
 
         # Built-in: pick the most recently created record
-        features = ml.fetch_table_features(
-            "Image", selector=FeatureRecord.select_newest
-        )
+        for rec in ml.feature_values("Image", selector=FeatureRecord.select_newest):
+            ...
 
         # Custom: pick the record with highest confidence
         def select_best(records):
             return max(records, key=lambda r: getattr(r, "Confidence", 0))
 
-        features = ml.fetch_table_features("Image", selector=select_best)
+        for rec in ml.feature_values("Image", selector=select_best):
+            ...
 
     Attributes:
         Execution (Optional[str]): RID of the execution that created this
@@ -97,11 +96,10 @@ class FeatureRecord(BaseModel):
         treated as older than any timestamped record.
 
         This method is designed to be passed directly as the ``selector``
-        argument to ``fetch_table_features`` or ``list_feature_values``::
+        argument to ``feature_values``::
 
-            features = ml.fetch_table_features(
-                "Image", selector=FeatureRecord.select_newest
-            )
+            for rec in ml.feature_values("Image", selector=FeatureRecord.select_newest):
+                ...
 
         Args:
             records: List of FeatureRecord instances for the same target
@@ -124,22 +122,21 @@ class FeatureRecord(BaseModel):
         Unlike ``select_by_workflow`` (a factory that resolves the workflow's
         execution set from a container), this selector filters on a known
         ``Execution`` RID with no container dependency and can be passed
-        directly as the ``selector`` argument to ``fetch_table_features`` or
-        ``list_feature_values``::
+        directly as the ``selector`` argument to ``feature_values``::
 
-            features = ml.fetch_table_features(
+            for rec in ml.feature_values(
                 "Image",
                 feature_name="FooBar",
                 selector=FeatureRecord.select_by_execution("3WY2"),
-            )
+            ):
+                ...
 
         Args:
             execution_rid: RID of the execution to filter by.
 
         Returns:
             A selector function ``(list[FeatureRecord]) -> FeatureRecord``
-            suitable for use with ``fetch_table_features`` or
-            ``list_feature_values``.
+            suitable for use as the ``selector=`` argument to ``feature_values``.
 
         Raises:
             DerivaMLException: If no records in the group match the
@@ -148,18 +145,12 @@ class FeatureRecord(BaseModel):
         Examples:
             Select values from a specific execution::
 
-                >>> features = ml.fetch_table_features(
+                >>> for rec in ml.feature_values(
                 ...     "Image",
                 ...     feature_name="Classification",
                 ...     selector=FeatureRecord.select_by_execution("3WY2"),
-                ... )
-
-            Use with list_feature_values::
-
-                >>> values = ml.list_feature_values(
-                ...     "Image", "Classification",
-                ...     selector=FeatureRecord.select_by_execution("3WY2"),
-                ... )
+                ... ):
+                ...     print(rec)
         """
 
         def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
@@ -215,7 +206,7 @@ class FeatureRecord(BaseModel):
         Returns:
             A selector callable ``(list[FeatureRecord]) -> FeatureRecord | None``
             suitable for use as the ``selector=`` argument to
-            ``feature_values`` or ``fetch_table_features``. Returns ``None``
+            ``feature_values``. Returns ``None``
             when no record in the group matches the workflow; returns the
             newest matching record (by RCT) otherwise.
 
@@ -269,11 +260,10 @@ class FeatureRecord(BaseModel):
         later revisions.
 
         This method is designed to be passed directly as the ``selector``
-        argument to ``fetch_table_features`` or ``list_feature_values``::
+        argument to ``feature_values``::
 
-            features = ml.fetch_table_features(
-                "Image", selector=FeatureRecord.select_first
-            )
+            for rec in ml.feature_values("Image", selector=FeatureRecord.select_first):
+                ...
 
         Args:
             records: List of FeatureRecord instances for the same target
@@ -316,11 +306,12 @@ class FeatureRecord(BaseModel):
         have labeled the same record and you want the majority opinion::
 
             selector = RecordClass.select_majority_vote()
-            features = ml.fetch_table_features(
+            for rec in ml.feature_values(
                 "Image",
                 feature_name="Diagnosis",
                 selector=selector,
-            )
+            ):
+                ...
 
         Args:
             column: Name of the column to count values for. If None,
