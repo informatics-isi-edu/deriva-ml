@@ -36,7 +36,6 @@ import os
 import shutil
 import sys
 import time
-from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, List
@@ -47,6 +46,7 @@ if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.execution.pending_summary import PendingSummary
     from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva.core.hatrac_store import HatracStore
 from pydantic import ConfigDict, validate_call
 
@@ -74,7 +74,6 @@ from deriva_ml.dataset.upload import (
     asset_type_path,
     execution_root,
     feature_root,
-    feature_value_path,
     flat_asset_dir,
     is_feature_dir,
     normalize_asset_dir,
@@ -1641,11 +1640,6 @@ class Execution:
         for row in pending:
             groups[row.feature_table].append(row)
 
-        # Refresh the model so dynamically-created feature tables are visible.
-        # Feature tables may have been created after this Execution's DerivaML
-        # instance was initialised (e.g., by a different fixture or sub-process).
-        self._ml_object.model.refresh_model()
-
         failures: list[str] = []
         for qualified, rows in groups.items():
             schema_name, table_name = qualified.split(".", 1)
@@ -1660,32 +1654,39 @@ class Execution:
 
                 # Asset-column rewriting: replace local filenames with uploaded RIDs.
                 # Requires looking up the feature to find which columns are assets.
-                # Only attempt if the feature exists in the (refreshed) model.
+                # If lookup_feature raises DerivaMLException (unknown feature / stale
+                # schema), we fail the entire group rather than silently inserting
+                # raw local file paths into asset-RID columns — that would produce
+                # corrupt catalog data with no visible error.
                 try:
                     feat = self._ml_object.lookup_feature(target_table, feature_name)
-                    asset_col_names = [c.name for c in feat.asset_columns]
-                    if asset_col_names:
-                        for p in payloads:
-                            for col in asset_col_names:
-                                val = p.get(col)
-                                if val is None:
-                                    continue
-                                # Try the structured-path lookup first (schema/table/file)
-                                key = normalize_asset_dir(val)
-                                if key is not None and key in asset_map:
-                                    p[col] = asset_map[key]
-                                else:
-                                    # Fall back to flat-path lookup: (table_name, filename)
-                                    pv = Path(val)
-                                    flat_key = (pv.parent.name, pv.name)
-                                    if flat_key in asset_map_by_table:
-                                        p[col] = asset_map_by_table[flat_key]
-                                    # If neither map has it, leave the value unchanged —
-                                    # it may already be a catalog RID.
-                except Exception:  # noqa: BLE001
-                    # If lookup_feature fails (schema out of date), skip asset rewriting.
-                    # The insert may still succeed if no asset columns need remapping.
-                    pass
+                except DerivaMLException as e:
+                    error_msg = f"lookup_feature failed for {qualified}: {e}"
+                    self._logger.error(error_msg)
+                    for r in rows:
+                        self._manifest_store.mark_feature_record_failed(r.stage_id, error=error_msg)
+                    failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
+                    continue  # skip to next group — do not attempt insert
+
+                asset_col_names = [c.name for c in feat.asset_columns]
+                if asset_col_names:
+                    for p in payloads:
+                        for col in asset_col_names:
+                            val = p.get(col)
+                            if val is None:
+                                continue
+                            # Try the structured-path lookup first (schema/table/file)
+                            key = normalize_asset_dir(val)
+                            if key is not None and key in asset_map:
+                                p[col] = asset_map[key]
+                            else:
+                                # Fall back to flat-path lookup: (table_name, filename)
+                                pv = Path(val)
+                                flat_key = (pv.parent.name, pv.name)
+                                if flat_key in asset_map_by_table:
+                                    p[col] = asset_map_by_table[flat_key]
+                                # If neither map has it, leave the value unchanged —
+                                # it may already be a catalog RID.
 
                 pb = self._ml_object.pathBuilder()
                 pb.schemas[schema_name].tables[table_name].insert(payloads)
@@ -1892,7 +1893,7 @@ class Execution:
         return self._manifest
 
     @property
-    def _manifest_store(self):
+    def _manifest_store(self) -> "ManifestStore":
         """Return the ManifestStore for this workspace.
 
         Used by ``add_features`` to stage feature records to SQLite and by
