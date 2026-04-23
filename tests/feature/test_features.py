@@ -362,3 +362,65 @@ class TestFeatures:
         )
         ml_instance.create_feature("Image", "BoundingBox", assets=[box_asset])
         ml_instance.create_feature("Image", "Quality", terms=["ImageQuality"])
+
+
+def test_list_workflow_executions_returns_matching_rids(test_ml) -> None:
+    """list_workflow_executions returns all execution RIDs that ran a given workflow."""
+    from deriva_ml import MLVocab as vc
+    from deriva_ml.execution import ExecutionConfiguration
+    from deriva_ml.execution.workflow import Workflow
+
+    test_ml.add_term(vc.workflow_type, "Test Workflow", description="Workflow type for testing")
+    wf_rid = test_ml.add_workflow(
+        Workflow(
+            name="S2_test_wf",
+            url="https://example.com/s2_test",
+            workflow_type="Test Workflow",
+            description="S2 list_workflow_executions coverage",
+            checksum="a" * 64,
+        )
+    )
+    # Two executions against the same workflow
+    wf = test_ml.lookup_workflow(wf_rid)
+    cfg = ExecutionConfiguration(description="exec 1", workflow=wf)
+    with test_ml.create_execution(cfg) as exe1:
+        pass
+    with test_ml.create_execution(cfg) as exe2:
+        pass
+    rids = test_ml.list_workflow_executions(wf_rid)
+    assert exe1.execution_rid in rids
+    assert exe2.execution_rid in rids
+    # Unique entries
+    assert len(rids) == len(set(rids))
+
+
+def test_list_workflow_executions_by_workflow_type_name(test_ml) -> None:
+    """list_workflow_executions accepts a Workflow_Type name (not just an RID)."""
+    from deriva_ml import MLVocab as vc
+    from deriva_ml.execution import ExecutionConfiguration
+    from deriva_ml.execution.workflow import Workflow
+
+    test_ml.add_term(vc.workflow_type, "Test Workflow", description="Workflow type for testing")
+    wf_rid = test_ml.add_workflow(
+        Workflow(
+            name="S2_type_wf",
+            url="https://example.com/s2_type",
+            workflow_type="Test Workflow",
+            description="S2 workflow type name coverage",
+            checksum="b" * 64,
+        )
+    )
+    wf = test_ml.lookup_workflow(wf_rid)
+    cfg = ExecutionConfiguration(description="exec", workflow=wf)
+    with test_ml.create_execution(cfg) as exe:
+        pass
+    rids = test_ml.list_workflow_executions("Test Workflow")
+    assert exe.execution_rid in rids
+
+
+def test_list_workflow_executions_unknown_raises(test_ml) -> None:
+    """Unknown workflow → DerivaMLException."""
+    from deriva_ml.core.exceptions import DerivaMLException
+
+    with pytest.raises(DerivaMLException):
+        test_ml.list_workflow_executions("nonexistent-workflow-xyz")
