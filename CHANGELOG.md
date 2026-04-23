@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Bug E.2: asset uploads honor pre-leased RIDs
+
+### Fixed
+
+- **Asset-table catalog inserts now use the caller-supplied pre-leased RID** instead of silently accepting a server-generated one. Previously, the plain-row drain path honored `pending_rows.rid` but the asset-row path (via deriva-py's `GenericUploader`) looked up or created rows by MD5+Filename, discarding the pre-leased RID. Any client code that captured the pre-leased RID (e.g., for FK references within the same upload batch) ended up with a dangling pointer.
+
+The fix spans two repos:
+
+- **deriva-py** (PRs #206, #207, #208, #209 merged to `2.0-dev`): new opt-in `use_pre_allocated_rid: true` flag on asset mappings, new `_createFileRecordWithRid` method, `nondefaults=RID` support in `_catalogRecordCreate`, and a new ERMrest tag `tag:isrd.isi.edu,2026:strict-preallocated-rid` in the tag enum. Default behavior is **soft**: on MD5+Filename match with a different existing RID, the existing row's RID is adopted (legacy semantics preserved). Tables annotated with `{"strict": true}` opt into **strict** mode where mismatch raises `DerivaUploadCatalogCreateError`.
+- **deriva-ml**: `asset_table_upload_spec` emits `use_pre_allocated_rid=True` and adds `(?P<RID>[-A-Z0-9]+)` to the `file_pattern`; staging path-builders append the pre-leased RID as the final directory segment; `lease_manifest_pending_assets` ensures every pending manifest entry has a RID before staging begins; `_validate_pending_asset_leases` catches stale SQLite state at pre-flight.
+
+### Added
+
+- **`DerivaML.set_strict_preallocated_rid(table, strict=True)`** — opt an asset table into strict-RID mode. Raises `DerivaMLTableTypeError` for non-asset tables. Call `apply_annotations()` to commit.
+- **`DerivaML.is_strict_preallocated_rid(table) -> bool`** — query whether a table has the strict annotation.
+- **`STRICT_PREALLOCATED_RID_TAG = "tag:isrd.isi.edu,2026:strict-preallocated-rid"`** — constant in `deriva_ml.core.mixins.annotation`.
+- **`_validate_pending_asset_leases(catalog, entries)`** — pre-flight validator in `deriva_ml.execution.rid_lease`. Batch-queries `public:ERMrest_RID_Lease` and raises an aggregated `DerivaMLValidationError` listing missing RIDs.
+- **`lease_manifest_pending_assets(catalog, manifest)`** — helper in `deriva_ml.execution.manifest_lease` that leases RIDs for any manifest entries with `rid is None`.
+- **`AssetManifest.set_asset_rid(key, rid)`** — new method for assigning a pre-leased RID without flipping status.
+
+### External-caller impact
+
+**No action required for existing callers.** Soft mode is the default, which preserves legacy `_getFileRecord` semantics: uploading the same file twice yields the same catalog RID (driven by MD5+Filename dedup + `URL UNIQUE` constraints).
+
+**New capability for FK-critical batches.** Callers who upload a batch of assets referenced by FK columns in the same batch can annotate the target table with `{"strict": true}` to get hard failures on unexpected RID reassignments. Without this annotation, soft fallback continues to apply.
+
+**Edge case:** if a pre-leased RID has been cleared from `ERMrest_RID_Lease` (e.g., by manual cleanup), the upload is refused at pre-flight by `_validate_pending_asset_leases` with a clear error message. Restart the execution to re-lease.
+
 ## Unreleased — Bug C: asset metadata None-stringification
 
 ### Fixed
