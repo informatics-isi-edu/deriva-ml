@@ -289,3 +289,56 @@ def test_dataset_list_workflow_executions_scopes_to_dataset(
     ml_rids = set(fx.ml.list_workflow_executions(fx.workflow))
     ds_rids = set(fx.dataset.list_workflow_executions(fx.workflow))
     assert ds_rids == ml_rids
+
+
+# ---------------------------------------------------------------------------
+# Task 6: DatasetBag.feature_values / lookup_feature (offline)
+# ---------------------------------------------------------------------------
+
+
+def test_bag_feature_values_matches_online(
+    catalog_with_feature_and_materialized_bag,
+) -> None:
+    """bag.feature_values yields records whose content matches ml.feature_values.
+
+    Compares sorted-by-target-RID model_dump() dicts, excluding RCT/RMT
+    which may differ slightly between catalog and bag representations.
+
+    The bag may include feature records for images reachable through any FK
+    path in the dataset (e.g., via Subject→Image), so it can contain MORE
+    records than just the direct Image members.  We therefore filter both
+    sides to ``member_rids`` (the set of Image RIDs explicitly listed as
+    dataset members) so the comparison is symmetric.
+    """
+    fx = catalog_with_feature_and_materialized_bag
+    online = sorted(
+        [
+            r.model_dump(exclude={"RCT", "RMT"})
+            for r in fx.ml.feature_values(fx.target_table, fx.feature_name)
+            if getattr(r, fx.target_table) in fx.member_rids
+        ],
+        key=lambda d: d[fx.target_table],
+    )
+    offline = sorted(
+        [
+            r.model_dump(exclude={"RCT", "RMT"})
+            for r in fx.bag.feature_values(fx.target_table, fx.feature_name)
+            if getattr(r, fx.target_table) in fx.member_rids
+        ],
+        key=lambda d: d[fx.target_table],
+    )
+    assert len(offline) > 0, "Bag should have at least one feature record for a dataset member"
+    assert online == offline
+
+
+def test_bag_lookup_feature_works_offline(
+    catalog_with_feature_and_materialized_bag,
+) -> None:
+    """bag.lookup_feature works without a live catalog connection."""
+    fx = catalog_with_feature_and_materialized_bag
+    feat = fx.bag.lookup_feature(fx.target_table, fx.feature_name)
+    assert feat.feature_name == fx.feature_name
+    # feature_record_class() must be usable offline
+    RecordClass = feat.feature_record_class()
+    instance = RecordClass(Image="IMG-1", Feature_Name=fx.feature_name)
+    assert instance.Image == "IMG-1"

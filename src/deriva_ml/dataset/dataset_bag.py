@@ -461,6 +461,176 @@ class DatasetBag:
         """
         return self.model.find_features(table)
 
+    def feature_values(
+        self,
+        table: str | Table,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+    ) -> Iterable[FeatureRecord]:
+        """Yield offline feature values — same signature as ``DerivaML.feature_values``.
+
+        Reads feature records from the bag's per-feature denormalization cache
+        (populated lazily on first access). Because bags are immutable snapshots,
+        the cache is stable for the bag's lifetime.
+
+        When *selector* is ``None``, every stored record is yielded in source order.
+        When a *selector* is provided, records are grouped by target RID, the
+        selector is called once per group (always, even single-element groups),
+        and only groups for which the selector returns a non-``None`` value appear
+        in the output.
+
+        Args:
+            table: Target table name or ``Table`` object (e.g. ``"Image"``).
+            feature_name: Name of the feature to read (e.g. ``"Glaucoma"``).
+            selector: Optional callable ``(list[FeatureRecord]) -> FeatureRecord | None``
+                that resolves multiple values per target to a single record (or
+                drops the target when it returns ``None``). Use
+                ``FeatureRecord.select_newest`` to pick the most-recently created
+                value.
+
+        Yields:
+            FeatureRecord instances with typed fields matching the feature
+            definition. Selector-filtered records (``None`` return) are omitted.
+
+        Raises:
+            DerivaMLException: If *feature_name* does not exist on *table*.
+            DerivaMLDataError: If the bag is corrupt (source table missing).
+
+        Example:
+            >>> from deriva_ml.feature import FeatureRecord
+            >>> for rec in bag.feature_values("Image", "Glaucoma"):
+            ...     print(rec.Image, rec.Glaucoma)
+            >>> # With selector — one record per image, most recent wins:
+            >>> records = list(bag.feature_values(
+            ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
+            ... ))
+        """
+        from collections import defaultdict
+
+        from deriva_ml.dataset.bag_feature_cache import BagFeatureCache
+
+        if not hasattr(self, "_feature_cache"):
+            self._feature_cache = BagFeatureCache(self)
+
+        target_col = table if isinstance(table, str) else table.name
+        records = list(self._feature_cache.fetch_feature_records(target_col, feature_name))
+
+        if selector is None:
+            yield from records
+            return
+
+        # Group by target RID, then apply selector to every group (always call
+        # selector — never short-circuit for single-element groups).
+        grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+        for rec in records:
+            target_rid = getattr(rec, target_col, None)
+            if target_rid is not None:
+                grouped[target_rid].append(rec)
+
+        for group in grouped.values():
+            chosen = selector(group)
+            if chosen is not None:
+                yield chosen
+
+    def lookup_feature(self, table: str | Table, feature_name: str) -> "Feature":
+        """Look up a feature definition from bag metadata — works fully offline.
+
+        Returns a ``Feature`` object with the same shape as the one returned by
+        ``DerivaML.lookup_feature``.  The ``feature_record_class()`` method on the
+        returned object also works offline, enabling callers to construct
+        ``FeatureRecord`` instances from bag data for later staging via
+        ``exe.add_features`` when back online.
+
+        Args:
+            table: Target table name or ``Table`` object (e.g. ``"Image"``).
+            feature_name: Name of the feature (e.g. ``"Glaucoma"``).
+
+        Returns:
+            Feature object for *feature_name* on *table*.
+
+        Raises:
+            DerivaMLException: If the feature does not exist on *table* in the bag.
+
+        Example:
+            >>> feat = bag.lookup_feature("Image", "Glaucoma")
+            >>> RecordClass = feat.feature_record_class()
+            >>> record = RecordClass(Image="1-ABC", Glaucoma="Normal")
+            >>> print(record.Glaucoma)
+            Normal
+        """
+        return self.model.lookup_feature(table, feature_name)
+
+    def list_workflow_executions(self, workflow: str) -> list[str]:
+        """Return execution RIDs from the bag that match the given workflow.
+
+        Reads the bag's local SQLite ``Execution`` table.  The *workflow* argument
+        is resolved in order:
+
+        1. **Workflow RID** — if a row in the ``Workflow`` table has ``RID ==
+           workflow``, return all ``Execution.RID`` values whose ``Workflow``
+           column matches.
+        2. **Workflow_Type name** — if no RID match, look up workflows via the
+           ``Workflow_Workflow_Type`` association table and return executions for
+           all matching workflows.
+
+        This mirrors the contract of ``DerivaML.list_workflow_executions`` but
+        operates entirely against the bag's offline SQLite data.
+
+        Args:
+            workflow: Workflow RID **or** ``Workflow_Type`` name to resolve.
+
+        Returns:
+            List of execution RIDs (possibly empty) that are associated with the
+            resolved workflow(s).
+
+        Raises:
+            DerivaMLException: If *workflow* cannot be resolved as either a
+                Workflow RID or a Workflow_Type name in this bag.
+
+        Example:
+            >>> rids = bag.list_workflow_executions("Glaucoma_Training_v2")
+            >>> print(len(rids))
+            3
+        """
+        from sqlalchemy import select as sa_select
+
+        workflow_table = self.model.find_table("Workflow")
+        execution_table = self.model.find_table("Execution")
+
+        with Session(self.engine) as session:
+            # Phase 1: try as a Workflow RID.
+            wf_rows = session.execute(
+                sa_select(workflow_table).where(workflow_table.c.RID == workflow)
+            ).mappings().all()
+
+            if wf_rows:
+                rows = session.execute(
+                    sa_select(execution_table.c.RID).where(
+                        execution_table.c.Workflow == workflow
+                    )
+                ).all()
+                return [r[0] for r in rows]
+
+            # Phase 2: fall back to Workflow_Type name via association table.
+            wwt = self.model.find_table("Workflow_Workflow_Type")
+            wf_of_type = [
+                r[0]
+                for r in session.execute(
+                    sa_select(wwt.c.Workflow).where(wwt.c.Workflow_Type == workflow)
+                ).all()
+            ]
+            if not wf_of_type:
+                raise DerivaMLException(
+                    f"No workflow resolved for '{workflow}' in bag — tried as "
+                    "Workflow RID and Workflow_Type name."
+                )
+            rows = session.execute(
+                sa_select(execution_table.c.RID).where(
+                    execution_table.c.Workflow.in_(wf_of_type)
+                )
+            ).all()
+            return [r[0] for r in rows]
+
     def fetch_table_features(
         self,
         table: Table | str,
