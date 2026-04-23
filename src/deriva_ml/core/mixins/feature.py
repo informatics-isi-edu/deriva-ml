@@ -562,6 +562,78 @@ class FeatureMixin:
         result = self.fetch_table_features(table, feature_name=feature_name, selector=selector)
         return result.get(feature_name, [])
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def list_workflow_executions(self, workflow: str) -> list[str]:
+        """Return execution RIDs that ran the given workflow.
+
+        The ``workflow`` argument resolves in two steps: first as a Workflow
+        RID, and if that fails, as a Workflow_Type name. The returned list
+        contains every execution RID for every workflow that matches.
+
+        This method is the catalog-backed building block for
+        ``FeatureRecord.select_by_workflow(workflow, container=ml)`` — it
+        resolves the workflow's execution set once, and the selector closes
+        over the result for cheap per-group membership testing.
+
+        Entries are unique by construction (each execution runs one workflow).
+        Consumers that need O(1) membership testing convert to ``set`` at the
+        call site.
+
+        Args:
+            workflow: Workflow RID (e.g., ``"2-ABC1"``) or Workflow_Type name
+                (e.g., ``"Training"``).
+
+        Returns:
+            List of execution RIDs, in insertion order. May be empty if the
+            workflow exists but has no executions yet.
+
+        Raises:
+            DerivaMLException: If ``workflow`` does not resolve as a Workflow
+                RID nor as a Workflow_Type name.
+
+        Example:
+            List all executions of a workflow and count them::
+
+                >>> rids = ml.list_workflow_executions("Glaucoma_Training_v2")
+                >>> print(f"{len(rids)} executions of this workflow")
+
+            Use as the catalog-backed resolver for the selector factory::
+
+                >>> from deriva_ml.feature import FeatureRecord
+                >>> sel = FeatureRecord.select_by_workflow(
+                ...     "Glaucoma_Training_v2", container=ml,
+                ... )
+        """
+        # Try RID first
+        try:
+            wf = self.lookup_workflow(workflow)
+            return [
+                exec_record.execution_rid
+                for exec_record in self.find_executions(workflow=wf)
+            ]
+        except DerivaMLException:
+            pass
+
+        # Fall back to Workflow_Type name
+        pb = self.pathBuilder()
+        wt_assoc = pb.schemas[self.ml_schema].Workflow_Workflow_Type
+        matching_workflows = {
+            row["Workflow"]
+            for row in wt_assoc.filter(
+                wt_assoc.Workflow_Type == workflow
+            ).entities().fetch()
+        }
+        if not matching_workflows:
+            raise DerivaMLException(
+                f"No workflow resolved for '{workflow}' — tried as Workflow RID "
+                f"and Workflow_Type name."
+            )
+        return [
+            exec_record.execution_rid
+            for exec_record in self.find_executions()
+            if exec_record.workflow_rid in matching_workflows
+        ]
+
     def select_by_workflow(
         self,
         records: list[FeatureRecord],
