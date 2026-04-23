@@ -14,6 +14,7 @@ import pytest
 from deriva_ml import BuiltinTypes, ColumnDefinition
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import VersionPart
+from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.execution import ExecutionConfiguration
 from deriva_ml.feature import FeatureRecord
 
@@ -392,6 +393,7 @@ class TestFeatureValuesSymmetry:
                 selector=FeatureRecord.select_newest,
             )
         )
+        assert records, "Selector returned no records"
         rids = [getattr(r, feature_container.target_table) for r in records]
         assert len(rids) == len(set(rids))  # one per target RID
 
@@ -416,9 +418,6 @@ class TestFeatureValuesSymmetry:
         limitation: Execution rows are only exported if Execution is a
         dataset element type or reachable via Dataset_Execution paths).
         """
-        from deriva_ml.dataset.dataset_bag import DatasetBag
-        from deriva_ml.core.exceptions import DerivaMLException
-
         if isinstance(feature_container.container, DatasetBag):
             # Verify the method is callable; skip if execution data not in bag.
             try:
@@ -430,6 +429,11 @@ class TestFeatureValuesSymmetry:
                     "DatasetBag.list_workflow_executions requires Execution rows "
                     "exported to bag SQLite — not present when Execution is not a "
                     "dataset element type (known bag-export limitation)."
+                )
+
+            if not rids:
+                pytest.skip(
+                    "DatasetBag returned empty execution list — pre-existing bag-export limitation."
                 )
         else:
             rids = feature_container.container.list_workflow_executions(

@@ -97,7 +97,10 @@ class FeatureSymmetryFixture:
         Returns:
             SymmetryContainer with the selected container and shared expectations.
         """
-        container = {"ml": self.ml, "dataset": self.dataset, "bag": self.bag}[kind]
+        containers = {"ml": self.ml, "dataset": self.dataset, "bag": self.bag}
+        if kind not in containers:
+            raise ValueError(f"Unknown container kind {kind!r}; expected one of {sorted(containers)}")
+        container = containers[kind]
         return SymmetryContainer(
             container=container,
             target_table=self.target_table,
@@ -108,8 +111,8 @@ class FeatureSymmetryFixture:
         )
 
 
-@pytest.fixture(scope="function")
-def feature_symmetry_fixture(catalog_manager, tmp_path):
+@pytest.fixture(scope="session")
+def feature_symmetry_fixture(catalog_manager, tmp_path_factory):
     """Build a catalog + all-image dataset + materialized bag with Image/Quality feature.
 
     Uses the demo catalog ``WITH_DATASETS`` state which already seeds the
@@ -122,6 +125,7 @@ def feature_symmetry_fixture(catalog_manager, tmp_path):
         ``.target_table``, ``.feature_name``, ``.workflow``,
         ``.expected_records_sorted``, ``.expected_workflow_executions``.
     """
+    tmp_path = tmp_path_factory.mktemp("symmetry")
     catalog_manager.reset()
     ml, _dataset_desc = catalog_manager.ensure_datasets(tmp_path)
 
@@ -141,9 +145,12 @@ def feature_symmetry_fixture(catalog_manager, tmp_path):
     all_workflows = ml.find_workflows()
     assert all_workflows, "At least one workflow must exist after ensure_datasets"
 
-    # Use the first workflow found — in practice there is only one due to checksum
-    # deduplication when running from the same script.
-    feature_workflow_rid = all_workflows[0].rid
+    # Select by name to avoid picking an arbitrary workflow when multiple exist
+    # (e.g. the symmetry fixture creates a "Symmetry dataset creator" workflow).
+    # The "Feature Creation" workflow is created by CatalogManager.ensure_features.
+    feature_workflows = [w for w in all_workflows if w.name == "Feature Creation"]
+    assert feature_workflows, "Expected 'Feature Creation' workflow from ensure_features"
+    feature_workflow_rid = feature_workflows[0].rid
     assert feature_workflow_rid, "Workflow must have a RID"
 
     # Create a new dataset that contains ALL image RIDs so that the dataset-scoped
