@@ -176,26 +176,46 @@ No deprecation shims. Messages are specific about the substitution.
   - Remove: `fetch_table_features`, `list_feature_values`
 - `execution/execution.py`
   - Change: `add_features(records)` stages to SQLite instead of write-through
-  - Add: `_flush_staged_features()` called during completion flush (after assets)
+  - Add: `_flush_staged_features()` called during completion flush (after assets), incorporating the asset-column-rewrite logic migrated from `_update_feature_table`
   - Add: resume detection for `Pending` staged features (piggybacks on §8 staged-asset resume)
+  - Remove: `_update_feature_table` (logic migrated) and the `.jsonl` glob-and-parse loop
+- `local_db/manifest_store.py`
+  - Add: `execution_state__feature_records` table, `stage_feature_record`, `list_feature_records`, `list_pending_feature_records`, `mark_feature_record_uploaded`, `mark_feature_record_failed`, `StagedFeatureRow` dataclass
+  - Remove: `FEATURES_TABLE` constant, `_features_t` definition and its index, `add_feature`, `list_features` (all file-based, replaced)
+- `asset/manifest.py`
+  - Remove: `FeatureEntry` dataclass, `AssetManifest.features`, `AssetManifest.add_feature` (file-based, no longer needed)
+- `asset/__init__.py`
+  - Remove: `FeatureEntry` export
+- `local_db/workspace.py`
+  - Remove: legacy `FeatureEntry` migration path (no migration target)
+- `dataset/upload.py`
+  - Remove: `.jsonl` per-feature file helpers (lines 22-35, 265, 713 — feature-specific; asset-side upload helpers stay)
 - `interfaces.py`
   - Update `DatasetLike` and related protocols to the three-method surface plus `lookup_feature` and `list_workflow_executions`
 
-### SQLite schema addition (§8 integration)
+### SQLite schema change (§8 integration — replaces file-based feature upload)
+
+The pre-existing file-based feature upload (`FeatureEntry` + `FEATURES_TABLE` tracking `values_path` files) is **removed** as part of S2 — goal is DRY. The old path wrote each feature's values to a `.jsonl` file, then re-parsed those files at upload; the new row-per-record staging collapses both steps into SQLite JSON rows.
 
 ```sql
-CREATE TABLE staged_features (
-    stage_id         INTEGER PRIMARY KEY,
+-- REPLACES execution_state__features (file-based FEATURES_TABLE)
+CREATE TABLE execution_state__feature_records (
+    stage_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    execution_rid    TEXT NOT NULL,
     feature_table    TEXT NOT NULL,        -- schema.table
     feature_name     TEXT NOT NULL,
+    target_table     TEXT NOT NULL,        -- table the feature is on
     record_json      TEXT NOT NULL,        -- FeatureRecord.model_dump_json()
     created_at       TEXT NOT NULL,
     status           TEXT NOT NULL,        -- Pending | Uploaded | Failed
     uploaded_at      TEXT,
     error            TEXT
 );
-CREATE INDEX idx_staged_features_feature ON staged_features(feature_table, status);
+CREATE INDEX ix_feature_records_exec_status
+    ON execution_state__feature_records(execution_rid, status);
 ```
+
+The asset-column rewriting logic (remap local asset filenames to uploaded asset RIDs at flush time) that lived in `_update_feature_table` moves into the new flush path — same contract, different storage.
 
 ## Data flow
 
@@ -483,11 +503,12 @@ When the test suite runs with coverage enabled, every public method added or mod
 
 ## Migration
 
-- No data migration — this is an API consistency change, not a schema change.
+- No catalog schema migration — this is an API consistency change plus a local storage replacement.
 - Retired APIs raise at first call with a clear pointer to the replacement; there is no silent period.
 - Client code using `ml.add_features` must move to `exe.add_features` within an execution context.
 - Client code using `fetch_table_features` or `list_feature_values` must move to `feature_values` (renamed, same signature).
 - Client code using `ml.select_by_workflow(records, workflow)` must move to the selector-factory form.
+- **Local storage:** the `execution_state__features` SQLite table is replaced by `execution_state__feature_records`. Any workspace SQLite still carrying `execution_state__features` rows predates S2 — those rows correspond to half-uploaded executions from before the cutover. The clean path is to finish flushing them on the pre-S2 code, then upgrade. No data-migration script is provided; pending pre-S2 feature uploads that have not been flushed must be flushed by the pre-S2 binary.
 
 ## Out of scope
 
