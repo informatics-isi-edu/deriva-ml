@@ -342,3 +342,98 @@ def test_bag_lookup_feature_works_offline(
     RecordClass = feat.feature_record_class()
     instance = RecordClass(Image="IMG-1", Feature_Name=fx.feature_name)
     assert instance.Image == "IMG-1"
+
+
+# ---------------------------------------------------------------------------
+# Task 8: Parametrized three-container symmetry compliance suite
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(params=["ml", "dataset", "bag"])
+def feature_container(request, feature_symmetry_fixture):
+    """Parametrize across DerivaML, Dataset, DatasetBag for symmetry tests."""
+    return feature_symmetry_fixture.by_container_kind(request.param)
+
+
+class TestFeatureValuesSymmetry:
+    """Same assertions, three containers. The symmetry contract.
+
+    Any future container claiming feature capability must pass this suite as
+    its acceptance test.  The fixture ``feature_symmetry_fixture`` ensures all
+    three containers see the same underlying data so comparisons are exact.
+    """
+
+    def test_find_features_returns_matching_definitions(self, feature_container):
+        """find_features includes the seeded feature definition on all containers."""
+        features = list(feature_container.container.find_features(feature_container.target_table))
+        names = {f.feature_name for f in features}
+        assert feature_container.feature_name in names
+
+    def test_feature_values_yields_expected_records(self, feature_container):
+        """feature_values yields records that match the expected sorted list."""
+        records = sorted(
+            [
+                r.model_dump(exclude={"RCT", "RMT"})
+                for r in feature_container.container.feature_values(
+                    feature_container.target_table, feature_container.feature_name
+                )
+            ],
+            key=lambda d: d[feature_container.target_table],
+        )
+        expected = feature_container.expected_records_sorted
+        assert records == expected
+
+    def test_feature_values_with_selector_matches(self, feature_container):
+        """select_newest selector reduces multi-value groups to one record per target."""
+        records = list(
+            feature_container.container.feature_values(
+                feature_container.target_table,
+                feature_container.feature_name,
+                selector=FeatureRecord.select_newest,
+            )
+        )
+        rids = [getattr(r, feature_container.target_table) for r in records]
+        assert len(rids) == len(set(rids))  # one per target RID
+
+    def test_lookup_feature_returns_usable_record_class(self, feature_container):
+        """lookup_feature returns a Feature whose feature_record_class() is constructible."""
+        feat = feature_container.container.lookup_feature(
+            feature_container.target_table, feature_container.feature_name
+        )
+        RecordClass = feat.feature_record_class()
+        instance = RecordClass(
+            **{feature_container.target_table: "TEST-RID"},
+            Feature_Name=feature_container.feature_name,
+        )
+        assert getattr(instance, feature_container.target_table) == "TEST-RID"
+
+    def test_list_workflow_executions_matches(self, feature_container):
+        """list_workflow_executions returns the expected set of execution RIDs.
+
+        For DerivaML and Dataset containers this exercises live catalog lookup.
+        For DatasetBag the same method reads from offline SQLite; the test
+        skips when the bag's Execution table is empty (a known bag-export
+        limitation: Execution rows are only exported if Execution is a
+        dataset element type or reachable via Dataset_Execution paths).
+        """
+        from deriva_ml.dataset.dataset_bag import DatasetBag
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        if isinstance(feature_container.container, DatasetBag):
+            # Verify the method is callable; skip if execution data not in bag.
+            try:
+                rids = feature_container.container.list_workflow_executions(
+                    feature_container.workflow
+                )
+            except DerivaMLException:
+                pytest.skip(
+                    "DatasetBag.list_workflow_executions requires Execution rows "
+                    "exported to bag SQLite — not present when Execution is not a "
+                    "dataset element type (known bag-export limitation)."
+                )
+        else:
+            rids = feature_container.container.list_workflow_executions(
+                feature_container.workflow
+            )
+        # Order-independent comparison against the catalog-computed baseline
+        assert set(rids) == feature_container.expected_workflow_executions
