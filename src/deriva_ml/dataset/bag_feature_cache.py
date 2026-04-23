@@ -165,7 +165,7 @@ class BagFeatureCache:
             cache_columns.append(Column(name, Text))
 
         cache_table = Table(cache_table_name, self._metadata, *cache_columns)
-        cache_table.create(self._engine)
+        cache_table.create(self._engine, checkfirst=True)
 
         # Read source rows and insert into cache.
         field_names = set(record_class.model_fields.keys())

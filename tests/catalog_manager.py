@@ -416,6 +416,7 @@ class CatalogManager:
         execution = ml.create_execution(workflow=workflow, configuration=ExecutionConfiguration())
         with execution.execute() as exe:
             self._dataset_description = create_demo_datasets(exe)
+        execution.upload_execution_outputs()
 
         self.state = CatalogState.WITH_DATASETS
         return ml, self._dataset_description
