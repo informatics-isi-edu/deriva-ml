@@ -451,19 +451,27 @@ class DerivaModel:
     def is_vocabulary(self, table_name: TableInput) -> bool:
         """Check if a given table is a controlled vocabulary table.
 
+        Delegates to ``Table.is_vocabulary()`` in deriva-py, which enforces both
+        the required column names AND their types (ermrest_curie, ermrest_uri,
+        text, markdown). The type check is stricter than a column-name-only
+        check — a table with an ``ID`` column of the wrong type correctly
+        returns False here where the legacy name-only implementation would
+        have returned True.
+
+        Mirrors :meth:`is_asset`, which already delegates to ``Table.is_asset()``.
+
         Args:
-          table_name: A ERMRest table object or the name of the table.
+            table_name: An ERMrest Table object or the name of the table.
 
         Returns:
-          Table object if the table is a controlled vocabulary, False otherwise.
+            True if the table has the structure of a controlled vocabulary,
+            False otherwise.
 
         Raises:
-          DerivaMLException: if the table doesn't exist.
-
+            DerivaMLException: if the table doesn't exist.
         """
-        vocab_columns = {"NAME", "URI", "SYNONYMS", "DESCRIPTION", "ID"}
         table = self.name_to_table(table_name)
-        return vocab_columns.issubset({c.name.upper() for c in table.columns})
+        return table.is_vocabulary()
 
     def vocab_columns(self, table_name: TableInput) -> dict[str, str]:
         """Return mapping from canonical vocab column name to actual column name.

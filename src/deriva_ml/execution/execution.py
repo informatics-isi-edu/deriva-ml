@@ -73,9 +73,7 @@ from deriva_ml.dataset.upload import (
     asset_root,
     asset_type_path,
     execution_root,
-    feature_root,
     flat_asset_dir,
-    is_feature_dir,
     normalize_asset_dir,
     table_path,
     upload_directory,
@@ -778,15 +776,6 @@ class Execution:
         return execution_root(self._working_dir, self.execution_rid)
 
     @property
-    def _feature_root(self) -> Path:
-        """Get the root directory for feature files.
-
-        Returns:
-            Path to the feature directory within the execution.
-        """
-        return feature_root(self._working_dir, self.execution_rid)
-
-    @property
     def _asset_root(self) -> Path:
         """Get the root directory for asset files.
 
@@ -1251,19 +1240,12 @@ class Execution:
                 )
             )
         self._update_asset_execution_table(asset_map)
-        self._logger.info("Updating features...")
-
-        for p in self._feature_root.glob("**/*.jsonl"):
-            m = is_feature_dir(p.parent)
-            self._update_feature_table(
-                target_table=m["target_table"],
-                feature_name=m["feature_name"],
-                feature_file=p,
-                uploaded_files=asset_map,
-            )
 
         # Flush SQLite-staged feature records (Task 7 staged-feature path).
-        # Must run AFTER asset upload so asset-column remapping has RIDs.
+        # Must run AFTER asset upload so asset-column remapping has uploaded-asset RIDs
+        # available in asset_map. This is the only feature-write path since S2 — the
+        # older file-based .jsonl path was retired in Task 10 alongside ml.add_features.
+        self._logger.info("Flushing staged feature records...")
         self._flush_staged_features(uploaded_files=asset_map)
 
         self._logger.info("Upload assets complete")
@@ -1529,74 +1511,6 @@ class Execution:
 
         except OSError as e:
             logging.warning(f"Failed to clean folder {folder_path}: {e}")
-
-    def _update_feature_table(
-        self,
-        target_table: str,
-        feature_name: str,
-        feature_file: str | Path,
-        uploaded_files: dict[str, list[AssetFilePath]],
-    ) -> None:
-        """Update the feature table with values from a JSONL file.
-
-        Reads feature values from a file and inserts them into the catalog,
-        replacing file paths with the RIDs of uploaded assets.
-
-        Args:
-            target_table: Name of the table the feature is defined on.
-            feature_name: Name of the feature to update.
-            feature_file: Path to JSONL file containing feature values.
-            uploaded_files: Map from asset table names to their uploaded AssetFilePath objects.
-        """
-
-        # Get the column names of all the Feature columns that should be the RID of an asset
-        asset_columns = [
-            c.name for c in self._ml_object.feature_record_class(target_table, feature_name).feature.asset_columns
-        ]
-
-        # Get the names of the columns in the feature that are assets.
-        asset_columns = [
-            c.name for c in self._ml_object.feature_record_class(target_table, feature_name).feature.asset_columns
-        ]
-
-        feature_table = self._ml_object.feature_record_class(target_table, feature_name).feature.feature_table.name
-        asset_map = {
-            (asset_table, asset.file_name): asset.asset_rid
-            for asset_table, assets in uploaded_files.items()
-            for asset in assets
-        }
-
-        # Build a secondary lookup by (table_name, filename) to handle flat
-        # asset paths (assets/{table}/file) written by the manifest-first
-        # storage layout.  normalize_asset_dir only recognises the staging
-        # path format (asset/{schema}/{table}/...), so flat paths return None.
-        asset_map_by_table = {
-            (asset_table.split("/")[1] if "/" in asset_table else asset_table, asset.file_name): asset.asset_rid
-            for asset_table, assets in uploaded_files.items()
-            for asset in assets
-        }
-
-        def map_path(e):
-            """Go through the asset columns and replace the file name with the RID for the uploaded file."""
-            for c in asset_columns:
-                key = normalize_asset_dir(e[c])
-                if key is not None:
-                    e[c] = asset_map[key]
-                else:
-                    # Fall back to flat-path lookup: extract the table name
-                    # and filename from the path.  Flat paths look like
-                    # .../assets/{table}/{filename}
-                    p = Path(e[c])
-                    e[c] = asset_map_by_table[(p.parent.name, p.name)]
-            return e
-
-        # Load the JSON file that has the set of records that contain the feature values.
-        with Path(feature_file).open("r") as feature_values:
-            entities = [json.loads(line.strip()) for line in feature_values]
-        # Update the asset columns in the feature and add to the catalog.
-        self._ml_object.domain_path().tables[feature_table].insert(
-            [map_path(e) for e in entities], on_conflict_skip=True
-        )
 
     def _flush_staged_features(self, uploaded_files: dict[str, list[AssetFilePath]] | None = None) -> None:
         """Flush all Pending staged-feature rows to ermrest.

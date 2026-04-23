@@ -89,32 +89,11 @@ upload_root_regex = f"(?i)^.*{SEP}deriva-ml"
 
 exec_dir_regex = upload_root_regex + f"{SEP}execution{SEP}(?P<execution_rid>[-\\w]+)"
 
-feature_dir_regex = exec_dir_regex + f"{SEP}feature"
-feature_table_dir_regex = (
-    feature_dir_regex + f"{SEP}(?P<schema>[-\\w]+){SEP}(?P<target_table>[-\\w]+){SEP}(?P<feature_name>[-\\w]+)"
-)
-feature_value_regex = feature_table_dir_regex + f"{SEP}(?P=feature_name)[.](?P<ext>[(csv|json)]*)$"
-feature_asset_dir_regex = feature_table_dir_regex + f"{SEP}asset{SEP}(?P<asset_table>[-\\w]+)"
-feature_asset_regex = feature_asset_dir_regex + f"{SEP}(?P<file>[A-Za-z0-9_-]+)[.](?P<ext>[a-z0-9]*)$"
-
 asset_path_regex = exec_dir_regex + rf"{SEP}asset{SEP}(?P<schema>[-\w]+){SEP}(?P<asset_table>[-\w]*)"
 
 asset_file_regex = r"(?P<file>[-\w]+)[.](?P<ext>[a-z0-9]*)$"
 
 table_regex = exec_dir_regex + rf"{SEP}table{SEP}(?P<schema>[-\w]+){SEP}(?P<table>[-\w]+){SEP}(?P=table)[.](csv|json)$"
-
-
-def is_feature_dir(path: Path) -> Optional[re.Match]:
-    """Check whether a path matches the expected directory layout for a feature table.
-
-    Args:
-        path: Filesystem path to check against the feature table directory pattern.
-
-    Returns:
-        A regex Match object with named groups (``schema``, ``target_table``,
-        ``feature_name``) if the path matches, or ``None`` otherwise.
-    """
-    return re.match(feature_table_dir_regex + "$", path.as_posix())
 
 
 def normalize_asset_dir(path: str | Path) -> Optional[tuple[str, str]]:
@@ -172,23 +151,6 @@ def execution_root(prefix: Path | str, exec_rid) -> Path:
     return path
 
 
-def feature_root(prefix: Path | str, exec_rid: str) -> Path:
-    """Return the directory for staging feature uploads for a specific execution.
-
-    The directory is created if it does not already exist.
-
-    Args:
-        prefix: Location of the upload root directory.
-        exec_rid: RID of the execution whose feature files are being staged.
-
-    Returns:
-        Path to the feature upload directory for the given execution.
-    """
-    path = execution_root(prefix, exec_rid) / "feature"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def asset_root(prefix: Path | str, exec_rid: str) -> Path:
     """Return the directory for staging asset uploads for a specific execution.
 
@@ -240,29 +202,6 @@ def upload_staging_root(prefix: Path | str, exec_rid: str) -> Path:
 def manifest_path(prefix: Path | str, exec_rid: str) -> Path:
     """Return the path to the asset-manifest.json file for an execution."""
     return execution_root(prefix, exec_rid) / "asset-manifest.json"
-
-
-def feature_dir(prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str) -> Path:
-    """Return the path to the directory in which a named feature for an execution should be placed."""
-    path = feature_root(prefix, exec_rid) / schema / target_table / feature_name
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def feature_value_path(prefix: Path | str, exec_rid: str, schema: str, target_table: str, feature_name: str) -> Path:
-    """Return the path to a CSV file in which to place feature values that are to be uploaded.
-
-    Args:
-        prefix: Location of upload root directory
-        exec_rid: RID of the execution to be associated with this feature.
-        schema: Domain schema name
-        target_table: Target table name for the feature.
-        feature_name: Name of the feature.
-
-    Returns:
-        Path to CSV file in which to place feature values
-    """
-    return feature_dir(prefix, exec_rid, schema, target_table, feature_name) / f"{feature_name}.jsonl"
 
 
 def table_path(prefix: Path | str, schema: str, table: str) -> Path:
