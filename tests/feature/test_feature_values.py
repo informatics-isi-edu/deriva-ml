@@ -441,3 +441,77 @@ class TestFeatureValuesSymmetry:
             )
         # Order-independent comparison against the catalog-computed baseline
         assert set(rids) == feature_container.expected_workflow_executions
+
+
+# ---------------------------------------------------------------------------
+# Task 9: Offline-to-online write cycle round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_offline_construct_records_online_stage(
+    catalog_with_feature_and_materialized_bag,
+) -> None:
+    """Construct FeatureRecord from bag offline; stage + flush via live execution.
+
+    This closes the offline-to-online loop: a user working with a downloaded
+    bag on a laptop can build new feature records (e.g., model predictions)
+    and commit them back to the live catalog via exe.add_features when
+    reconnected.
+
+    The test intentionally avoids touching fx.ml in the OFFLINE section to
+    prove that record construction works without a catalog connection.
+    """
+    fx = catalog_with_feature_and_materialized_bag
+
+    # ------------------------------------------------------------------ #
+    # OFFLINE: construct records using bag metadata only — no catalog call #
+    # ------------------------------------------------------------------ #
+    feat = fx.bag.lookup_feature(fx.target_table, fx.feature_name)
+    RecordClass = feat.feature_record_class()
+
+    # Pick a few target RIDs from the bag (up to 3)
+    target_rids = sorted(
+        {getattr(r, fx.target_table) for r in fx.bag.feature_values(fx.target_table, fx.feature_name)}
+    )[:3]
+    assert target_rids, "Bag should have at least one feature target RID"
+
+    # Build records entirely offline — ImageQuality is the vocab column name (from
+    # create_feature("Image", "Quality", terms=["ImageQuality"])).
+    # "Good" is a valid ImageQuality term per demo_catalog.py.
+    records = [
+        RecordClass(**{fx.target_table: rid, "ImageQuality": "Good"})
+        for rid in target_rids
+    ]
+    # Confirm Execution is not set — exe.add_features must auto-fill it
+    assert all(r.Execution is None for r in records), "Execution should be None before staging"
+
+    # ------------------------------------------------------------------ #
+    # ONLINE: stage + flush via a fresh execution                          #
+    # ------------------------------------------------------------------ #
+    workflow = fx.ml.find_workflows()[0]
+    cfg = ExecutionConfiguration(
+        description="offline-to-online test (S2 Task 9)",
+        workflow=workflow,
+    )
+    execution = fx.ml.create_execution(cfg)
+    with execution.execute() as exe:
+        count = exe.add_features(records)
+        assert count == len(target_rids), (
+            f"add_features should return the number of staged records; "
+            f"got {count}, expected {len(target_rids)}"
+        )
+    # __exit__ does NOT auto-upload (Task 7 review) — explicit call required
+    execution.upload_execution_outputs()
+
+    # ------------------------------------------------------------------ #
+    # VERIFY: records from this execution appear in the live catalog       #
+    # ------------------------------------------------------------------ #
+    written = list(fx.ml.feature_values(fx.target_table, fx.feature_name))
+    ours = [r for r in written if r.Execution == execution.execution_rid]
+    assert len(ours) == len(target_rids), (
+        f"Expected {len(target_rids)} new records from execution "
+        f"{execution.execution_rid}; found {len(ours)}"
+    )
+    assert all(r.ImageQuality == "Good" for r in ours), (
+        "All written records should have ImageQuality='Good'"
+    )
