@@ -604,35 +604,26 @@ class FeatureMixin:
                 ...     "Glaucoma_Training_v2", container=ml,
                 ... )
         """
-        # Try RID first
+        # Try RID first — narrow scope so catalog errors inside find_executions propagate.
         try:
             wf = self.lookup_workflow(workflow)
-            return [
-                exec_record.execution_rid
-                for exec_record in self.find_executions(workflow=wf)
-            ]
         except DerivaMLException:
-            pass
+            wf = None
 
-        # Fall back to Workflow_Type name
-        pb = self.pathBuilder()
-        wt_assoc = pb.schemas[self.ml_schema].Workflow_Workflow_Type
-        matching_workflows = {
-            row["Workflow"]
-            for row in wt_assoc.filter(
-                wt_assoc.Workflow_Type == workflow
-            ).entities().fetch()
-        }
-        if not matching_workflows:
+        if wf is not None:
+            return [r.execution_rid for r in self.find_executions(workflow=wf)]
+
+        # Fallback: treat `workflow` as a Workflow_Type name.
+        # find_executions(workflow_type=...) returns an empty generator (not raise)
+        # for unknown type names, so we check whether the result is empty and raise
+        # only when neither the RID path nor the type-name path matched anything.
+        rids = [r.execution_rid for r in self.find_executions(workflow_type=workflow)]
+        if not rids:
             raise DerivaMLException(
                 f"No workflow resolved for '{workflow}' — tried as Workflow RID "
                 f"and Workflow_Type name."
             )
-        return [
-            exec_record.execution_rid
-            for exec_record in self.find_executions()
-            if exec_record.workflow_rid in matching_workflows
-        ]
+        return rids
 
     def select_by_workflow(
         self,
