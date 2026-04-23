@@ -63,15 +63,15 @@ df = d.as_dataframe(["Image", "Image_Glaucoma"])
 
 S2 adds no feature-specific code to `Denormalizer`. Selector-style multi-value reduction stays on `feature_values`, where it is feature-aware.
 
-### Container helper: `resolve_workflow_executions`
+### Container helper: `list_workflow_executions`
 
 Each container exposes:
 
 ```python
-container.resolve_workflow_executions(workflow) -> set[str]
+container.list_workflow_executions(workflow) -> list[RID]
 ```
 
-Returns the set of execution RIDs in the container's scope that ran the given workflow.
+Returns the list of execution RIDs in the container's scope that ran the given workflow. Entries are unique (a given execution runs one workflow). Consumers that need O(1) membership testing (such as `FeatureRecord.select_by_workflow`) convert to `set` at the call site.
 
 - `DerivaML`: all executions in the catalog for this workflow.
 - `Dataset`: executions in scope of the dataset.
@@ -89,7 +89,7 @@ selector = FeatureRecord.select_by_workflow(workflow, *, container)
 
 - Classmethod factory on `FeatureRecord`.
 - `container` is a **required kwarg** (no ambient state, no guessing).
-- At construction, resolves the execution set once via `container.resolve_workflow_executions(workflow)`.
+- At construction, resolves the execution list once via `container.list_workflow_executions(workflow)` and converts to a `set` internally for O(1) membership tests.
 - Returns a closure `(list[FeatureRecord]) -> FeatureRecord | None` matching the existing selector signature.
 - When no record in the group matches the workflow, returns `None`; `feature_values` treats `None` as "absent for this target RID" and omits the target from its iterator.
 
@@ -162,24 +162,24 @@ No deprecation shims. Messages are specific about the substitution.
 ### Modified
 
 - `core/mixins/feature.py`
-  - Add: `feature_values(table, feature_name, selector=...)`, `resolve_workflow_executions(workflow)`
+  - Add: `feature_values(table, feature_name, selector=...)`, `list_workflow_executions(workflow)`
   - Remove: `add_features`, `fetch_table_features`, `list_feature_values`, `select_by_workflow`
   - Keep: `create_feature`, `lookup_feature`, `delete_feature`, `find_features`
 - `feature.py`
   - Add: `FeatureRecord.select_by_workflow(workflow, *, container)` classmethod factory
   - Keep existing selectors unchanged
 - `dataset/dataset.py`
-  - Add: `feature_values`, `lookup_feature`, `resolve_workflow_executions` (delegates to `ml`)
+  - Add: `feature_values`, `lookup_feature`, `list_workflow_executions` (delegates to `ml`)
 - `dataset/dataset_bag.py`
   - Rewrite feature read path through the bag cache
-  - Add: `lookup_feature`, `resolve_workflow_executions`
+  - Add: `lookup_feature`, `list_workflow_executions`
   - Remove: `fetch_table_features`, `list_feature_values`
 - `execution/execution.py`
   - Change: `add_features(records)` stages to SQLite instead of write-through
   - Add: `_flush_staged_features()` called during completion flush (after assets)
   - Add: resume detection for `Pending` staged features (piggybacks on §8 staged-asset resume)
 - `interfaces.py`
-  - Update `DatasetLike` and related protocols to the three-method surface plus `lookup_feature` and `resolve_workflow_executions`
+  - Update `DatasetLike` and related protocols to the three-method surface plus `lookup_feature` and `list_workflow_executions`
 
 ### SQLite schema addition (§8 integration)
 
@@ -277,7 +277,7 @@ On execution completion:
 - `find_features(table)` returns matching metadata.
 - `feature_values(table, name)` yields matching records (modulo timestamp tolerance).
 - `lookup_feature(table, name).feature_record_class()` returns a class with matching field shape.
-- `resolve_workflow_executions(workflow)` returns the same set.
+- `list_workflow_executions(workflow)` returns the same list (order-independent comparison).
 
 This suite is the contract: any future container claiming feature capability must pass it.
 
@@ -318,7 +318,7 @@ Every public method touched by S2 must ship with complete docstrings including r
 
 ### Per-method docstring contract
 
-Every public method in the new surface (`find_features`, `feature_values`, `lookup_feature`, `resolve_workflow_executions`, `add_features`, `FeatureRecord.select_by_workflow`, and the retired-API shims with their error-path pointers) must include:
+Every public method in the new surface (`find_features`, `feature_values`, `lookup_feature`, `list_workflow_executions`, `add_features`, `FeatureRecord.select_by_workflow`, and the retired-API shims with their error-path pointers) must include:
 
 1. **One-line summary.**
 2. **Extended description** — what it does, when to use it, how it relates to sibling methods.
@@ -458,7 +458,7 @@ class TestFeatureValuesSymmetry:
     def test_feature_values_yields_expected_records(self, feature_container): ...
     def test_feature_values_with_selector(self, feature_container): ...
     def test_lookup_feature_returns_usable_record_class(self, feature_container): ...
-    def test_resolve_workflow_executions_matches(self, feature_container): ...
+    def test_list_workflow_executions_matches(self, feature_container): ...
 ```
 
 Any future container claiming feature capability must pass this suite as its acceptance test.
