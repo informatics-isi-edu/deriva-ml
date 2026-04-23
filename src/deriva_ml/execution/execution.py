@@ -1080,6 +1080,10 @@ class Execution:
             target_dir = staging_root / entry.schema / asset_table_name
             for part in metadata_parts:
                 target_dir = target_dir / part
+            # Bug E.2: append pre-leased RID as the final path segment.
+            # asset_table_upload_spec's file_pattern expects to capture
+            # this as (?P<RID>[-A-Z0-9]+).
+            target_dir = target_dir / entry.rid
             target_dir.mkdir(parents=True, exist_ok=True)
 
             target = target_dir / filename
@@ -1127,11 +1131,21 @@ class Execution:
         Raises:
             DerivaMLException: If upload fails.
         """
+        # Bug E.2: lease pre-allocated RIDs for any pending manifest
+        # entries that don't have one yet. Required because
+        # asset_table_upload_spec emits use_pre_allocated_rid=True and
+        # _build_upload_staging appends entry.rid as a path segment.
+        # The engine-driven path leases RIDs in SQLite separately;
+        # this covers the manifest-driven init-time path.
+        from deriva_ml.execution.manifest_lease import lease_manifest_pending_assets
+        manifest = self._get_manifest()
+        lease_manifest_pending_assets(self._ml_object.catalog, manifest)
+
         # Bug C: refuse to upload if any pending asset is missing a
         # required (NOT-NULL) metadata column. This raises a single
         # DerivaMLValidationError that lists all failures at once.
         from deriva_ml.asset.manifest import _validate_pending_asset_metadata
-        _validate_pending_asset_metadata(self._model, self._get_manifest())
+        _validate_pending_asset_metadata(self._model, manifest)
 
         # Build staging symlinks from manifest into the regex-expected tree
         upload_root = self._build_upload_staging()

@@ -52,6 +52,15 @@ def test_upload_asset_with_full_metadata_end_to_end(test_ml, tmp_path):
     with exe.execute():
         pass
 
+    # Bug E.2: ERMrest validates pre-allocated RIDs against
+    # ERMrest_RID_Lease and decodes them as URL-base32; use a real
+    # leased RID instead of a hand-crafted fake one.
+    from deriva_ml.execution.rid_lease import (
+        generate_lease_token, post_lease_batch,
+    )
+    _token = generate_lease_token()
+    _leased = post_lease_batch(catalog=test_ml.catalog, tokens=[_token])[_token]
+
     store.insert_pending_row(
         execution_rid=exe.execution_rid,
         key="k1",
@@ -59,9 +68,9 @@ def test_upload_asset_with_full_metadata_end_to_end(test_ml, tmp_path):
         target_table="Execution_Asset",
         metadata_json=json.dumps({}),
         created_at=now,
-        rid="EA-BUGC-HAPPY-1",
+        rid=_leased,
         status=PendingRowStatus.leased,
-        lease_token="happy-lease",
+        lease_token=_token,
         asset_file_path=str(f),
     )
 
@@ -206,6 +215,13 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
     with exe.execute():
         pass
 
+    # Bug E.2: use a real leased RID (ERMrest validates it at insert time).
+    from deriva_ml.execution.rid_lease import (
+        generate_lease_token, post_lease_batch,
+    )
+    _token = generate_lease_token()
+    _leased = post_lease_batch(catalog=test_ml.catalog, tokens=[_token])[_token]
+
     # Pending row with EMPTY metadata — missing required columns.
     store.insert_pending_row(
         execution_rid=exe.execution_rid,
@@ -214,9 +230,9 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
         target_table=table_name,
         metadata_json=json.dumps({}),
         created_at=now,
-        rid="IMG-BUGC-REQ-1",
+        rid=_leased,
         status=PendingRowStatus.leased,
-        lease_token="req-lease",
+        lease_token=_token,
         asset_file_path=str(f),
     )
 
@@ -254,6 +270,13 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
     with exe.execute():
         pass
 
+    # Bug E.2: use a real leased RID (ERMrest validates it at insert time).
+    from deriva_ml.execution.rid_lease import (
+        generate_lease_token, post_lease_batch,
+    )
+    _token = generate_lease_token()
+    _leased = post_lease_batch(catalog=test_ml.catalog, tokens=[_token])[_token]
+
     # Supply ONLY the required metadata — nullable cols remain absent.
     store.insert_pending_row(
         execution_rid=exe.execution_rid,
@@ -262,9 +285,9 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
         target_table=table_name,
         metadata_json=json.dumps(required_md),
         created_at=now,
-        rid="NULL-BUGC-1",
+        rid=_leased,
         status=PendingRowStatus.leased,
-        lease_token="null-lease",
+        lease_token=_token,
         asset_file_path=str(f),
     )
 

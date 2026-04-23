@@ -300,7 +300,14 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
     # Be careful here as a metadata value might be a string with can contain special characters.
     # metadata_columns is sorted to ensure deterministic directory order matching the regex.
     metadata_path = "/".join([rf"(?P<{c}>[-:._ \w]+)" for c in metadata_columns])
-    asset_path = f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}"
+    # Bug E.2: capture pre-allocated RID as an additional path segment
+    # after metadata columns and before the filename.
+    rid_path = r"(?P<RID>[-A-Z0-9]+)"
+    parts = [metadata_path, rid_path] if metadata_path else [rid_path]
+    asset_path = (
+        f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/"
+        f"{'/'.join(parts)}/{asset_file_regex}"
+    )
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
 
@@ -317,6 +324,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
             "URL": "{URI}",
             "Length": "{file_size}",
             "Filename": "{file_name}",
+            "RID": "{RID}",  # Bug E.2: pre-allocated RID
         }
         | {c: f"{{{c}}}" for c in metadata_columns},
         "file_pattern": asset_path,  # Sets schema, asset_table, file
@@ -329,6 +337,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
             "content-disposition": "filename*=UTF-8''{file_name}",
         },
         "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
+        "use_pre_allocated_rid": True,  # Bug E.2: use caller-supplied RID
     }
     # Wire the NullSentinelProcessor only when the table has metadata
     # columns — otherwise no sentinel values can appear and the
@@ -354,47 +363,21 @@ def bulk_upload_configuration(model: DerivaModel, chunk_size: int | None = None)
         chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
             large files will be uploaded in chunks of this size.
     """
-    asset_tables_with_metadata = [
+    # Bug E.2: Use asset_table_upload_spec for ALL asset tables, not
+    # just those with metadata columns. The spec handles zero-metadata
+    # tables correctly (RID is the only capturing segment). This
+    # unifies the regex + use_pre_allocated_rid semantics across all
+    # asset tables, fixing the mismatch where Execution_Metadata (and
+    # other zero-metadata tables) went through a fallback mapping that
+    # did not include the RID segment.
+    all_asset_mappings = [
         asset_table_upload_spec(model=model, asset_table=t, chunk_size=chunk_size)
         for t in model.find_assets()
-        if model.asset_metadata(t)
     ]
 
-    # Build hatrac_options with optional chunk_size for non-metadata assets
-    hatrac_options = {"versioned_urls": True}
-    if chunk_size is not None:
-        hatrac_options["chunk_size"] = chunk_size
-
     return {
-        "asset_mappings": asset_tables_with_metadata
+        "asset_mappings": all_asset_mappings
         + [
-            {
-                # Upload assets into an asset table of an asset table without any metadata
-                "column_map": {
-                    "MD5": "{md5}",
-                    "URL": "{URI}",
-                    "Length": "{file_size}",
-                    "Filename": "{file_name}",
-                },
-                "asset_type": "file",
-                "target_table": ["{schema}", "{asset_table}"],
-                "file_pattern": asset_path_regex + "/" + asset_file_regex,  # Sets schema, asset_table, name, ext
-                "checksum_types": ["sha256", "md5"],
-                "hatrac_options": hatrac_options,
-                "hatrac_templates": {
-                    "hatrac_uri": "/hatrac/{asset_table}/{md5}.{file_name}",
-                    "content-disposition": "filename*=UTF-8''{file_name}",
-                },
-                "record_query_template": "/entity/{target_table}/MD5={md5}&Filename={file_name}",
-            },
-            # {
-            #  Upload the records into a  table
-            #   "asset_type": "skip",
-            ##   "default_columns": ["RID", "RCB", "RMB", "RCT", "RMT"],
-            #  "file_pattern": feature_value_regex,  # Sets schema, table,
-            #  "ext_pattern": "^.*[.](?P<file_ext>json|csv)$",
-            #  "target_table": ["{schema}", "{table}"],
-            # },
             {
                 #  Upload the records into a  table
                 "asset_type": "table",
