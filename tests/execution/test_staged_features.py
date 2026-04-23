@@ -2,15 +2,22 @@
 
 Stages individual FeatureRecord instances as JSON rows for later batch flush
 to ermrest. Replaces the older file-based FEATURES_TABLE / .jsonl path.
+
+This file contains two test classes:
+- SQLite-unit tests (no catalog needed) — original Task 1 tests
+- Live-catalog integration tests — added in Task 7
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, select
 
+from deriva_ml import BuiltinTypes, ColumnDefinition
+from deriva_ml.execution import ExecutionConfiguration
 from deriva_ml.local_db.manifest_store import ManifestStore
 
 
@@ -118,3 +125,175 @@ def test_mark_feature_record_failed_unknown_stage_id_raises(tmp_path: Path) -> N
     store.ensure_schema()
     with pytest.raises(KeyError):
         store.mark_feature_record_failed(99999, error="some error")
+
+
+# =============================================================================
+# Task 7 — live-catalog integration tests
+# =============================================================================
+
+
+@dataclasses.dataclass
+class FeatureIntegrationFixture:
+    """Container for a seeded feature on the test catalog."""
+
+    workflow: object          # Workflow object for ExecutionConfiguration
+    record_class: type        # FeatureRecord subclass
+    schema: str               # domain schema name (e.g. "test-schema")
+    feature_table_name: str   # bare table name (e.g. "Image_Image_Label")
+    image_rids: list[str]     # target Image RIDs available for test records
+
+
+@pytest.fixture
+def image_feature(populated_catalog):
+    """A test catalog with an Image/Image_Label feature pre-created.
+
+    Yields a FeatureIntegrationFixture with workflow, record_class, schema,
+    feature_table_name, and image_rids.
+    """
+    ml = populated_catalog
+    feature_name = "Image_Label"
+
+    RecordClass = ml.create_feature(
+        target_table="Image",
+        feature_name=feature_name,
+        metadata=[ColumnDefinition(name="Image_Label", type=BuiltinTypes.text)],
+    )
+    image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    assert len(image_rids) >= 2, "Need at least 2 Image rows"
+
+    # Derive schema/table from the feature definition
+    feat = RecordClass.feature
+    schema_name = feat.feature_table.schema.name
+    table_name = feat.feature_table.name
+
+    workflow = ml.create_workflow(
+        name="image-label-seeder-t7",
+        workflow_type="Test Workflow",
+    )
+    yield FeatureIntegrationFixture(
+        workflow=workflow,
+        record_class=RecordClass,
+        schema=schema_name,
+        feature_table_name=table_name,
+        image_rids=image_rids,
+    )
+
+
+@pytest.fixture
+def other_feature(populated_catalog):
+    """A second feature (Image/Quality_Score) for the mixed-feature-def test.
+
+    Must be used alongside ``image_feature`` — both share the same catalog
+    but reference different feature tables.
+    """
+    ml = populated_catalog
+    feature_name = "Quality_Score"
+
+    RecordClass = ml.create_feature(
+        target_table="Image",
+        feature_name=feature_name,
+        metadata=[ColumnDefinition(name="Quality", type=BuiltinTypes.int4)],
+    )
+    image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    assert image_rids, "No Image rows in test catalog"
+
+    feat = RecordClass.feature
+    schema_name = feat.feature_table.schema.name
+    table_name = feat.feature_table.name
+
+    workflow = ml.create_workflow(
+        name="quality-score-seeder-t7",
+        workflow_type="Test Workflow",
+    )
+    yield FeatureIntegrationFixture(
+        workflow=workflow,
+        record_class=RecordClass,
+        schema=schema_name,
+        feature_table_name=table_name,
+        image_rids=image_rids,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_exe_add_features_stages_to_sqlite(test_ml, image_feature) -> None:
+    """exe.add_features writes Pending rows to execution_state__feature_records, nothing to ermrest yet."""
+    cfg = ExecutionConfiguration(description="stage test", workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        RecordClass = image_feature.record_class
+        exe.add_features([
+            RecordClass(Image=image_feature.image_rids[0], Image_Label="A"),
+            RecordClass(Image=image_feature.image_rids[1], Image_Label="B"),
+        ])
+        # Pending in SQLite
+        store = exe._manifest_store
+        pending = store.list_pending_feature_records(exe.execution_rid)
+        assert len(pending) == 2
+        # Not in ermrest yet (query the feature table directly)
+        pb = test_ml.pathBuilder()
+        rows = list(pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch())
+        # Should have NO rows from this execution yet
+        assert all(r.get("Execution") != exe.execution_rid for r in rows)
+    # After __exit__ + upload: rows Uploaded and in ermrest
+    exe.upload_execution_outputs()
+    pb = test_ml.pathBuilder()
+    rows = list(pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch())
+    ours = [r for r in rows if r.get("Execution") == exe.execution_rid]
+    assert len(ours) == 2
+
+
+def test_exe_add_features_auto_fills_execution_rid(test_ml, image_feature) -> None:
+    """Records without Execution set get it auto-filled from the execution context."""
+    cfg = ExecutionConfiguration(description="auto-fill test", workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        RecordClass = image_feature.record_class
+        # No Execution set — auto-fill should apply
+        exe.add_features([RecordClass(Image=image_feature.image_rids[0], Image_Label="A")])
+        pending = exe._manifest_store.list_pending_feature_records(exe.execution_rid)
+        payload = json.loads(pending[0].record_json)
+        assert payload["Execution"] == exe.execution_rid
+
+
+def test_exe_add_features_mixed_feature_defs_raises(test_ml, image_feature, other_feature) -> None:
+    """Records from different features raise DerivaMLValidationError before staging."""
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    cfg = ExecutionConfiguration(description="mixed test", workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        mixed = [
+            image_feature.record_class(Image=image_feature.image_rids[0], Image_Label="A"),
+            other_feature.record_class(Image=other_feature.image_rids[0], Quality=5),
+        ]
+        with pytest.raises(DerivaMLValidationError):
+            exe.add_features(mixed)
+        # Nothing staged
+        assert exe._manifest_store.list_feature_records(exe.execution_rid) == []
+
+
+def test_exe_add_features_empty_raises(test_ml, image_feature) -> None:
+    """An empty features list raises ValueError."""
+    cfg = ExecutionConfiguration(description="empty test", workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        with pytest.raises(ValueError):
+            exe.add_features([])
+
+
+def test_flush_happens_after_assets(test_ml, image_feature) -> None:
+    """Feature flush order: assets first, then features.
+
+    A feature whose asset column points at a staged asset must see the asset's
+    uploaded RID in ermrest when the feature row is inserted. Verify by
+    checking that asset upload completes before any feature INSERT attempts
+    occur.
+    """
+    pytest.skip("Requires instrumenting upload_execution_outputs — see test plan")
+
+
+def test_flush_failure_marks_group_failed_but_continues(
+    test_ml, image_feature
+) -> None:
+    """If one feature group's insert fails, others still flush; DerivaMLUploadError summarizes."""
+    pytest.skip("Requires injecting ermrest failure for one group — see test plan")
