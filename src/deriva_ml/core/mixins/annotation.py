@@ -24,7 +24,7 @@ Table = _ermrest_model.Table
 
 from pydantic import ConfigDict, validate_call
 
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
@@ -36,6 +36,12 @@ VISIBLE_COLUMNS_TAG = "tag:isrd.isi.edu,2016:visible-columns"
 VISIBLE_FOREIGN_KEYS_TAG = "tag:isrd.isi.edu,2016:visible-foreign-keys"
 TABLE_DISPLAY_TAG = "tag:isrd.isi.edu,2016:table-display"
 COLUMN_DISPLAY_TAG = "tag:isrd.isi.edu,2016:column-display"
+# Bug E.2: opt-in strict mode for pre-allocated RID inserts. When set
+# to {"strict": true} on an asset table, deriva-py's uploader raises
+# DerivaUploadCatalogCreateError on RID mismatch instead of silently
+# adopting the existing row's RID. Use for tables whose rows are
+# referenced by FK columns in the same upload batch.
+STRICT_PREALLOCATED_RID_TAG = "tag:isrd.isi.edu,2026:strict-preallocated-rid"
 
 
 class AnnotationMixin:
@@ -312,12 +318,77 @@ class AnnotationMixin:
 
         return f"{table_obj.name}.{column_name}"
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def set_strict_preallocated_rid(
+        self,
+        table: str | Table,
+        strict: bool = True,
+    ) -> str:
+        """Mark or unmark an asset table as strict-preallocated-RID.
+
+        When ``strict=True``, deriva-py's uploader raises
+        ``DerivaUploadCatalogCreateError`` if an upload's caller-supplied
+        pre-allocated RID differs from an existing catalog row's RID for
+        the same MD5+Filename. When ``False`` (or the annotation is
+        absent), the uploader silently adopts the existing row's RID
+        (legacy behavior preserved for shared artifacts like
+        ``Execution_Metadata`` configs).
+
+        Use strict mode for tables whose rows are referenced by FK
+        columns in the same upload batch — any unexpected RID
+        reassignment would corrupt those references.
+
+        Args:
+            table: Asset table name or Table object.
+            strict: If True, set the annotation to ``{"strict": true}``.
+                If False, remove the annotation (equivalent to soft mode).
+
+        Returns:
+            The table's name.
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not an asset table.
+
+        Example:
+            >>> ml.set_strict_preallocated_rid("ScanResult", strict=True)
+            >>> ml.apply_annotations()  # Commit to the catalog.
+        """
+        if not self.model.is_asset(table):
+            raise DerivaMLTableTypeError("asset table", str(table))
+        table_obj = self.model.name_to_table(table)
+        if strict:
+            table_obj.annotations[STRICT_PREALLOCATED_RID_TAG] = {"strict": True}
+        else:
+            table_obj.annotations.pop(STRICT_PREALLOCATED_RID_TAG, None)
+        return table_obj.name
+
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def is_strict_preallocated_rid(self, table: str | Table) -> bool:
+        """Return True if the asset table has the strict-preallocated-RID annotation set.
+
+        Checks for the ``tag:isrd.isi.edu,2026:strict-preallocated-rid``
+        annotation. Returns True iff the annotation is present with
+        ``{"strict": true}``.
+
+        Args:
+            table: Asset table name or Table object.
+
+        Returns:
+            True if strict mode is set on this table, False otherwise.
+        """
+        table_obj = self.model.name_to_table(table)
+        anno = table_obj.annotations.get(STRICT_PREALLOCATED_RID_TAG, {})
+        if not isinstance(anno, dict):
+            return False
+        return bool(anno.get("strict", False))
+
     def apply_annotations(self) -> None:
         """Apply all staged annotation changes to the catalog.
 
         Commits any annotation changes made via set_display_annotation,
         set_visible_columns, set_visible_foreign_keys, set_table_display,
-        or set_column_display to the remote catalog.
+        set_column_display, or set_strict_preallocated_rid to the remote
+        catalog.
 
         Example:
             >>> ml.set_display_annotation("Image", {"name": "Images"})
