@@ -16,7 +16,7 @@ Typical usage example:
 import importlib
 from pathlib import Path
 from types import UnionType
-from typing import TYPE_CHECKING, ClassVar, Optional, Type
+from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Type
 
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Column = _ermrest_model.Column
@@ -171,6 +171,89 @@ class FeatureRecord(BaseModel):
                     f"No feature records match execution '{execution_rid}'."
                 )
             return FeatureRecord.select_newest(filtered)
+
+        return _selector
+
+    @classmethod
+    def select_by_workflow(
+        cls, workflow: str, *, container
+    ) -> "Callable[[list[FeatureRecord]], FeatureRecord | None]":
+        """Return a selector that picks the newest record from a specific workflow.
+
+        Creates a selector function that filters records to those produced by
+        executions of the given workflow, then returns the newest match by RCT.
+        This is the recommended replacement for the retired
+        ``DerivaML.select_by_workflow(records, workflow)`` method.
+
+        Unlike ``select_by_execution``, which requires knowing a specific
+        execution RID, this selector works at the workflow level — it accepts
+        any record produced by any execution of the named workflow.
+
+        **Eager resolution:** the workflow's execution list is resolved once
+        at factory-construction time by calling
+        ``container.list_workflow_executions(workflow)``. Unknown-workflow
+        errors therefore surface immediately (at factory-call time), not
+        lazily during iteration.
+
+        **None return semantics:** when no record in a group matches the
+        workflow, the selector returns ``None``. ``feature_values`` treats
+        ``None`` as "feature absent for this target RID" and omits the target
+        from the iterator. This is distinct from ``select_by_execution``, which
+        raises on no-match.
+
+        Args:
+            workflow: Name (or RID) of the workflow to filter by. Must be a
+                workflow known to ``container``; an unknown name raises
+                ``DerivaMLException`` immediately.
+            container: Required keyword-only argument. An object that
+                implements ``list_workflow_executions(workflow) -> list[str]``.
+                Typically a ``DerivaML``, ``Dataset``, or ``DatasetBag``
+                instance. The container determines which executions are in
+                scope (all catalog executions for ``DerivaML``; dataset-scoped
+                executions for ``Dataset`` / ``DatasetBag``).
+
+        Returns:
+            A selector callable ``(list[FeatureRecord]) -> FeatureRecord | None``
+            suitable for use as the ``selector=`` argument to
+            ``feature_values`` or ``fetch_table_features``. Returns ``None``
+            when no record in the group matches the workflow; returns the
+            newest matching record (by RCT) otherwise.
+
+        Raises:
+            DerivaMLException: If ``workflow`` is not known to ``container``.
+                Raised at factory-construction time (eager resolution).
+            TypeError: If ``container`` is passed positionally (it is
+                keyword-only).
+
+        Example:
+            Select Glaucoma labels produced by a specific training workflow::
+
+                >>> selector = FeatureRecord.select_by_workflow(
+                ...     "Glaucoma_Training_v2", container=ml
+                ... )
+                >>> for rec in ml.feature_values(
+                ...     "Image", "Glaucoma", selector=selector
+                ... ):
+                ...     print(f"{rec.Image}: {rec.Glaucoma}")
+
+            Works identically on a downloaded bag (offline)::
+
+                >>> selector = FeatureRecord.select_by_workflow(
+                ...     "Glaucoma_Training_v2", container=bag
+                ... )
+                >>> labels = list(bag.feature_values("Image", "Glaucoma", selector=selector))
+        """
+        # Eager resolution: fail fast on unknown workflow at construction time,
+        # not lazily during iteration. Convert to a set for O(1) membership
+        # testing inside the closure.
+        execution_rids: set[str] = set(container.list_workflow_executions(workflow))
+
+        def _selector(records: list["FeatureRecord"]) -> "FeatureRecord | None":
+            matched = [r for r in records if r.Execution in execution_rids]
+            if not matched:
+                # Return None so feature_values omits this target RID silently.
+                return None
+            return FeatureRecord.select_newest(matched)
 
         return _selector
 
