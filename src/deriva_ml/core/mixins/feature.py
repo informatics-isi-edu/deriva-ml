@@ -380,6 +380,113 @@ class FeatureMixin:
         entries = feature_path.insert([f.model_dump() for f in features])
         return len(list(entries))
 
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def feature_values(
+        self,
+        table: Table | str,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+    ) -> Iterable[FeatureRecord]:
+        """Yield feature values for a single feature, one record per target RID.
+
+        Returns an iterator of typed ``FeatureRecord`` instances. Each record is
+        wide in shape — target RID, all value columns (vocab terms, asset
+        references, metadata columns), and provenance columns (``Execution``,
+        ``RCT``) — exposed as typed attributes.
+
+        When a ``selector`` is provided, records are grouped by target RID and
+        the selector collapses each group to a single survivor. Target RIDs
+        whose group's selector returns ``None`` are omitted. When no selector
+        is provided, every raw record is yielded — multiple records per target
+        RID are possible.
+
+        This method has identical signatures and semantics across ``DerivaML``,
+        ``Dataset``, and ``DatasetBag``. The bag implementation reads from a
+        per-feature denormalization cache populated on first access; subsequent
+        calls are cheap.
+
+        Args:
+            table: Target table the feature is defined on (name or Table).
+            feature_name: Name of the feature to read.
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-value groups. Built-ins include
+                ``FeatureRecord.select_newest``,
+                ``FeatureRecord.select_first``, and the factory
+                ``FeatureRecord.select_by_workflow(workflow, container=...)``.
+                Return ``None`` from a selector to omit that target RID.
+
+        Returns:
+            Iterator of ``FeatureRecord`` — one record per target RID after
+            selector reduction, or all raw records if no selector.
+
+        Raises:
+            DerivaMLTableNotFound: ``table`` does not exist.
+            DerivaMLException: ``feature_name`` is not a feature on ``table``.
+
+        Example:
+            Get the newest Glaucoma label per image::
+
+                >>> from deriva_ml.feature import FeatureRecord
+                >>> for rec in ml.feature_values(
+                ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
+                ... ):
+                ...     print(f"{rec.Image}: {rec.Glaucoma} (by {rec.Execution})")
+
+            Filter by a specific workflow — works identically on a downloaded bag::
+
+                >>> workflow = ml.lookup_workflow("Glaucoma_Training_v2")
+                >>> sel = FeatureRecord.select_by_workflow(workflow, container=ml)
+                >>> labels = [r.Glaucoma for r in ml.feature_values(
+                ...     "Image", "Glaucoma", selector=sel,
+                ... )]
+
+            Convert to a pandas DataFrame when needed::
+
+                >>> import pandas as pd
+                >>> df = pd.DataFrame(
+                ...     r.model_dump()
+                ...     for r in ml.feature_values("Image", "Glaucoma")
+                ... )
+        """
+        table_obj = self.model.name_to_table(table)
+        feat = self.lookup_feature(table_obj, feature_name)
+        record_class = feat.feature_record_class()
+        field_names = set(record_class.model_fields.keys())
+        target_col = feat.target_table.name
+
+        # Fetch raw rows via datapath
+        pb = self.pathBuilder()
+        raw_values = (
+            pb.schemas[feat.feature_table.schema.name]
+            .tables[feat.feature_table.name]
+            .entities()
+            .fetch()
+        )
+
+        # Materialize to FeatureRecord instances
+        records: list[FeatureRecord] = [
+            record_class(**{k: v for k, v in raw.items() if k in field_names})
+            for raw in raw_values
+        ]
+
+        if selector is None:
+            # No reduction — yield everything.
+            yield from records
+            return
+
+        # Group by target RID, apply selector, skip None results.
+        grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+        for rec in records:
+            target_rid = getattr(rec, target_col, None)
+            if target_rid is not None:
+                grouped[target_rid].append(rec)
+
+        for group in grouped.values():
+            chosen = selector(group)
+            if chosen is not None:
+                yield chosen
+
     def fetch_table_features(
         self,
         table: Table | str,
