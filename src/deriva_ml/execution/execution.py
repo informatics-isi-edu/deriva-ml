@@ -845,33 +845,90 @@ class Execution:
         return self._ml_object
 
     def add_features(self, features: list[FeatureRecord]) -> int:
-        """Add feature values to the catalog in batch.
+        """Stage feature records for batch insertion on execution completion.
 
-        Convenience method that delegates to ``catalog.add_features()``.
-        Automatically sets the ``Execution`` field on each record to this
-        execution's RID if not already set.
+        Writes the records to the execution's SQLite ``execution_state__feature_records`` table
+        with status ``Pending``. The records are not sent to ermrest immediately
+        — they are flushed in a single batch, **after asset upload**, when the
+        execution completes successfully. This integrates with the SQLite
+        execution-state design so crash-resume works for feature writes without
+        extra plumbing.
+
+        Records with ``Execution`` unset are auto-filled with this execution's
+        RID. All records in a single call must share one feature definition;
+        mixing features raises ``DerivaMLValidationError`` and nothing is staged.
+
+        **Provenance requirement.** This is the only way to write feature values
+        — ``DerivaML.add_features`` is retired (see the retired-API error shims).
+        For "admin fixup" cases, create a short-lived execution with an
+        appropriate ``Workflow_Type`` (e.g. ``Manual_Correction``) and call
+        ``exe.add_features`` inside it. The three-extra-lines give you a real
+        audit trail, which is the point.
 
         Args:
-            features: List of FeatureRecord instances to insert. All must share
-                the same feature definition. Create records using the class
-                returned by ``Feature.feature_record_class()``.
+            features: List of FeatureRecord instances to stage. All must share
+                the same feature definition. Create instances via
+                ``Feature.feature_record_class()``.
 
         Returns:
-            Number of feature records inserted.
+            Number of records staged.
+
+        Raises:
+            ValueError: features list is empty.
+            DerivaMLValidationError: Records do not share a single feature
+                definition.
+            DerivaMLDataError: SQLite staging write failed.
 
         Example:
-            >>> feature = exe.catalog.lookup_feature("Image", "Classification")
+            >>> feature = ml.lookup_feature("Image", "Glaucoma")
             >>> RecordClass = feature.feature_record_class()
             >>> records = [
-            ...     RecordClass(Image="1-ABC", Image_Class="Normal"),
-            ...     RecordClass(Image="1-DEF", Image_Class="Abnormal"),
+            ...     RecordClass(Image="IMG-1", Glaucoma="Normal"),
+            ...     RecordClass(Image="IMG-2", Glaucoma="Severe"),
             ... ]
-            >>> exe.add_features(records)  # Execution RID set automatically
+            >>> with ml.create_execution(cfg) as exe:
+            ...     exe.add_features(records)     # staged, not yet in ermrest
+            ...     # ... more work ...
+            >>> # on __exit__: staged records flushed to ermrest after assets
         """
+        from deriva_ml.core.exceptions import DerivaMLValidationError
+
+        if not features:
+            raise ValueError("features list must not be empty")
+
+        # All records must share one feature definition
+        feature_defs = {type(f).feature for f in features if type(f).feature is not None}
+        if len(feature_defs) > 1:
+            raise DerivaMLValidationError(
+                f"add_features called with records from {len(feature_defs)} different "
+                f"feature definitions; all records must share one feature."
+            )
+
+        # Auto-fill Execution RID on records that don't have it
         for f in features:
             if f.Execution is None:
                 f.Execution = self.execution_rid
-        return self._ml_object.add_features(features)
+
+        # Stage to SQLite — durability boundary is the write-through here.
+        feat_class = type(features[0])
+        feat = feat_class.feature
+        schema_name = feat.feature_table.schema.name
+        table_name = feat.feature_table.name
+        qualified = f"{schema_name}.{table_name}"
+        feature_name = feat.feature_name
+        target_table_name = feat.target_table.name
+
+        count = 0
+        for f in features:
+            self._manifest_store.stage_feature_record(
+                execution_rid=self.execution_rid,
+                feature_table=qualified,
+                feature_name=feature_name,
+                target_table=target_table_name,
+                record_json=f.model_dump_json(),
+            )
+            count += 1
+        return count
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
@@ -1206,6 +1263,10 @@ class Execution:
                 uploaded_files=asset_map,
             )
 
+        # Flush SQLite-staged feature records (Task 7 staged-feature path).
+        # Must run AFTER asset upload so asset-column remapping has RIDs.
+        self._flush_staged_features(uploaded_files=asset_map)
+
         self._logger.info("Upload assets complete")
         return asset_map
 
@@ -1535,6 +1596,114 @@ class Execution:
             [map_path(e) for e in entities], on_conflict_skip=True
         )
 
+    def _flush_staged_features(self, uploaded_files: dict[str, list[AssetFilePath]] | None = None) -> None:
+        """Flush all Pending staged-feature rows to ermrest.
+
+        Called from ``_upload_execution_dirs()`` **after** staged-asset
+        upload so feature rows referencing assets see their uploaded RIDs
+        in ermrest. Groups rows by ``feature_table`` and batch-inserts each
+        group via the datapath. Per-group failures mark those rows ``Failed``
+        without aborting the other groups; an overall ``DerivaMLUploadError``
+        is raised at the end if any failure occurred.
+
+        Args:
+            uploaded_files: Map of "{schema}/{table}" → list[AssetFilePath] returned
+                by the asset-upload step. Used to rewrite asset-column values
+                (local filenames → uploaded asset RIDs). May be None when no
+                assets were uploaded.
+
+        See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md
+        §Data flow — flush order.
+        """
+        from collections import defaultdict as _defaultdict
+
+        from deriva_ml.core.exceptions import DerivaMLUploadError
+
+        pending = self._manifest_store.list_pending_feature_records(self.execution_rid)
+        if not pending:
+            return
+
+        # Build asset lookup maps from the uploaded_files (same logic as _update_feature_table)
+        uploaded_files = uploaded_files or {}
+        asset_map = {
+            (asset_table, asset.file_name): asset.asset_rid
+            for asset_table, assets in uploaded_files.items()
+            for asset in assets
+        }
+        asset_map_by_table = {
+            (asset_table.split("/")[1] if "/" in asset_table else asset_table, asset.file_name): asset.asset_rid
+            for asset_table, assets in uploaded_files.items()
+            for asset in assets
+        }
+
+        # Group pending rows by feature_table for batch insertion
+        groups: dict[str, list] = _defaultdict(list)
+        for row in pending:
+            groups[row.feature_table].append(row)
+
+        # Refresh the model so dynamically-created feature tables are visible.
+        # Feature tables may have been created after this Execution's DerivaML
+        # instance was initialised (e.g., by a different fixture or sub-process).
+        self._ml_object.model.refresh_model()
+
+        failures: list[str] = []
+        for qualified, rows in groups.items():
+            schema_name, table_name = qualified.split(".", 1)
+            feature_name = rows[0].feature_name
+            target_table = rows[0].target_table
+            try:
+                # Build payload dicts directly from staged JSON.
+                payloads = [json.loads(r.record_json) for r in rows]
+                # Remove RCT — server-assigned, causes insert failure if present.
+                for p in payloads:
+                    p.pop("RCT", None)
+
+                # Asset-column rewriting: replace local filenames with uploaded RIDs.
+                # Requires looking up the feature to find which columns are assets.
+                # Only attempt if the feature exists in the (refreshed) model.
+                try:
+                    feat = self._ml_object.lookup_feature(target_table, feature_name)
+                    asset_col_names = [c.name for c in feat.asset_columns]
+                    if asset_col_names:
+                        for p in payloads:
+                            for col in asset_col_names:
+                                val = p.get(col)
+                                if val is None:
+                                    continue
+                                # Try the structured-path lookup first (schema/table/file)
+                                key = normalize_asset_dir(val)
+                                if key is not None and key in asset_map:
+                                    p[col] = asset_map[key]
+                                else:
+                                    # Fall back to flat-path lookup: (table_name, filename)
+                                    pv = Path(val)
+                                    flat_key = (pv.parent.name, pv.name)
+                                    if flat_key in asset_map_by_table:
+                                        p[col] = asset_map_by_table[flat_key]
+                                    # If neither map has it, leave the value unchanged —
+                                    # it may already be a catalog RID.
+                except Exception:  # noqa: BLE001
+                    # If lookup_feature fails (schema out of date), skip asset rewriting.
+                    # The insert may still succeed if no asset columns need remapping.
+                    pass
+
+                pb = self._ml_object.pathBuilder()
+                pb.schemas[schema_name].tables[table_name].insert(payloads)
+                # Success — mark all rows uploaded
+                for r in rows:
+                    self._manifest_store.mark_feature_record_uploaded(r.stage_id)
+            except Exception as e:  # noqa: BLE001 — capture broad, propagate summary
+                error_msg = f"{type(e).__name__}: {e}"
+                for r in rows:
+                    self._manifest_store.mark_feature_record_failed(r.stage_id, error=error_msg)
+                failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
+
+        if failures:
+            raise DerivaMLUploadError(
+                f"Feature flush failed for {len(failures)} feature table(s): "
+                + "; ".join(failures)
+            )
+
     def _update_asset_execution_table(
         self,
         uploaded_assets: dict[str, list[AssetFilePath]],
@@ -1722,6 +1891,15 @@ class Execution:
             self._manifest = AssetManifest(ws.manifest_store(), self.execution_rid)
         return self._manifest
 
+    @property
+    def _manifest_store(self):
+        """Return the ManifestStore for this workspace.
+
+        Used by ``add_features`` to stage feature records to SQLite and by
+        ``_flush_staged_features`` to read them back for batch ermrest insert.
+        """
+        return self._ml_object.workspace.manifest_store()
+
     def table_path(self, table: str) -> Path:
         """Return a local file path to a CSV to add values to a table on upload.
 
@@ -1762,51 +1940,6 @@ class Execution:
             >>> # e.status is ExecutionStatus.Stopped (or failed on exception)
         """
         return self
-
-    @validate_call
-    def add_features(self, features: Iterable[FeatureRecord]) -> None:
-        """Adds feature records to the catalog.
-
-        Associates feature records with this execution and uploads them to the catalog.
-        Features represent measurable properties or characteristics of records.
-
-        NOTE: The catalog is not updated until upload_execution_outputs() is called.
-
-        Args:
-            features: Feature records to add, each containing a value and metadata.
-
-        Raises:
-            DerivaMLException: If feature addition fails or features are invalid.
-
-        Example:
-            >>> feature = FeatureRecord(value="high", confidence=0.95)
-            >>> execution.add_features([feature])
-        """
-
-        # Make sure feature list is homogeneous:
-        sorted_features = defaultdict(list)
-        for f in features:
-            sorted_features[type(f)].append(f)
-        for fs in sorted_features.values():
-            self._add_features(fs)
-
-    def _add_features(self, features: list[FeatureRecord]) -> None:
-        # Update feature records to include current execution_rid
-        first_row = features[0]
-        feature = first_row.feature
-        # Use the schema from the feature table
-        feature_schema = feature.feature_table.schema.name
-        json_path = feature_value_path(
-            self._working_dir,
-            schema=feature_schema,
-            target_table=feature.target_table.name,
-            feature_name=feature.feature_name,
-            exec_rid=self.execution_rid,
-        )
-        with Path(json_path).open("a", encoding="utf-8") as file:
-            for feature in features:
-                feature.Execution = self.execution_rid
-                file.write(json.dumps(feature.model_dump(mode="json", exclude={"RCT"})) + "\n")
 
     def list_input_datasets(self) -> list[Dataset]:
         """List all datasets that were inputs to this execution.
