@@ -45,7 +45,7 @@ class FeatureMixin:
         delete_feature: Remove a feature definition
         lookup_feature: Retrieve a Feature object
         find_features: Find all features in the catalog, optionally filtered by table
-        list_feature_values: Get all values for a feature
+        feature_values: Get all values for a feature
     """
 
     # Type hints for IDE support - actual attributes/methods from host class
@@ -289,8 +289,8 @@ class FeatureMixin:
         returns a dynamically generated Pydantic model for constructing
         validated feature records to insert into the catalog.
 
-        To retrieve actual feature **values**, use ``fetch_table_features``
-        or ``list_feature_values`` instead.
+        To retrieve actual feature **values**, use ``feature_values``
+        instead.
 
         Args:
             table: The table the feature is defined on (name or Table object).
@@ -320,8 +320,7 @@ class FeatureMixin:
         describing each feature's structure (target table, term/asset/value columns),
         not the feature values themselves.
 
-        Use ``fetch_table_features`` or ``list_feature_values`` to retrieve actual
-        feature values.
+        Use ``feature_values`` to retrieve actual feature values.
 
         Args:
             table: Optional table to find features for. If None, returns all feature

@@ -945,11 +945,11 @@ class TestValueSelectorWithNestedDatasets:
             assert isinstance(cached_rids, set)
 
 
-class TestListFeatureValuesReturnType:
-    """Tests for list_feature_values return type correctness."""
+class TestFeatureValuesReturnType:
+    """Tests for feature_values return type correctness."""
 
-    def test_list_feature_values_returns_feature_records(self, dataset_test, tmp_path):
-        """Test that list_feature_values returns FeatureRecord instances.
+    def test_feature_values_returns_feature_records(self, dataset_test, tmp_path):
+        """Test that feature_values returns FeatureRecord instances.
 
         This test verifies that feature values are returned as typed FeatureRecord
         Pydantic models with proper attribute access and model_dump() support.
@@ -981,7 +981,7 @@ class TestListFeatureValuesReturnType:
             assert hasattr(first_value, "Feature_Name"), "FeatureRecord should have Feature_Name attribute"
             assert hasattr(first_value, "Execution"), "FeatureRecord should have Execution attribute for provenance"
 
-    def test_list_feature_values_columns_accessible_by_attribute(self, dataset_test, tmp_path):
+    def test_feature_values_columns_accessible_by_attribute(self, dataset_test, tmp_path):
         """Test that feature value columns can be accessed as attributes."""
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
