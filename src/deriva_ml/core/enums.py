@@ -137,12 +137,19 @@ class ExecMetadataType(StrEnum):
         runtime_env (str): Runtime environment information.
         hydra_config (str): Hydra YAML configuration files (config.yaml, overrides.yaml).
         deriva_config (str): DerivaML execution configuration (configuration.json).
+        metrics_file (str): Training-metric log file (typically JSONL, one
+            record per evaluation point — per epoch, per eval step, etc.).
+            Written during execution via ``Execution.metrics_file()`` and
+            uploaded as an ``Execution_Metadata`` asset on
+            ``upload_execution_outputs()``. Readback: parse the file from
+            the downloaded bag.
     """
 
     execution_config = "Execution_Config"
     runtime_env = "Runtime_Env"
     hydra_config = "Hydra_Config"
     deriva_config = "Deriva_Config"
+    metrics_file = "Metrics_File"
 
 
 class ExecAssetType(StrEnum):
