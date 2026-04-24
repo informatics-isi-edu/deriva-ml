@@ -56,20 +56,24 @@ the worst failure mode of other ML data libraries — train/test label
 encoders silently diverging — and respects deriva-ml's broader
 convention of not opining on user numeric shapes.
 
-**Anchor 3: PyTorch is an optional dependency.** The adapter lives
-behind a runtime `import torch` guard. The base library never imports
-torch at module-load time. A user who installs deriva-ml without torch
-can call every non-adapter API normally; calls to `as_torch_dataset`
-raise a clean `ImportError` with install hints. A `deriva-ml[torch]`
-package extra exists as a convenience.
+**Anchor 3: PyTorch and TensorFlow are optional dependencies.** Each
+adapter lives behind a runtime framework-import guard (`import torch`
+for `as_torch_dataset`, `import tensorflow` for `as_tf_dataset`). The
+base library never imports either at module-load time. A user who
+installs deriva-ml without one or both frameworks can call every
+non-adapter API normally; calls to the corresponding adapter method
+raise a clean `ImportError` with install hints. Package extras
+`deriva-ml[torch]` and `deriva-ml[tf]` exist as conveniences.
 
-**Anchor 4: Bag-only in v1.** `Dataset.as_torch_dataset` (live-catalog
-variant) is intentionally out of scope. Live-catalog datasets require
+**Anchor 4: Bag-only in v1.** Live-catalog adapter variants
+(`Dataset.as_torch_dataset`, `Dataset.as_tf_dataset`) are
+intentionally out of scope. Live-catalog datasets require
 download-during-`__getitem__`, which introduces network IO on hot
 paths, credential lifetime concerns, retry policy, cache eviction —
 all of which deserve their own spec. The bag case covers the primary
 training workflow (download the bag, then train locally) without any
-of that complexity. Live-catalog support is a named follow-up.
+of that complexity. Live-catalog support is a named follow-up for
+both framework adapters.
 
 **Anchor 5: Feature-parallel consistency.** The adapter's signature,
 error behavior, and selector handling mirror
@@ -117,7 +121,10 @@ in the same PR as the adapter — see §8 for the alignment scope.
 
 ## 3. Public API
 
-### 3.1 Signature
+### 3.1 Signatures
+
+Two adapter methods, with identical shapes for their six shared
+keyword arguments:
 
 ```python
 class DatasetBag:
@@ -129,17 +136,38 @@ class DatasetBag:
         transform: Callable[[Any], Any] | None = None,
         targets: list[str] | dict[str, FeatureSelector] | None = None,
         target_transform: Callable[
-            [FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord]],
+            [FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord] | None],
             Any,
         ] | None = None,
-        missing: Literal["error", "skip", "none"] = "error",
+        missing: Literal["error", "skip", "unknown"] = "error",
     ) -> "torch.utils.data.Dataset":
+        """..."""
+
+    def as_tf_dataset(
+        self,
+        element_type: str,
+        *,
+        sample_loader: Callable[[Path, dict[str, Any]], Any] | None = None,
+        transform: Callable[[Any], Any] | None = None,
+        targets: list[str] | dict[str, FeatureSelector] | None = None,
+        target_transform: Callable[
+            [FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord] | None],
+            Any,
+        ] | None = None,
+        missing: Literal["error", "skip", "unknown"] = "error",
+        output_signature: "tf.TensorSpec | tuple[tf.TensorSpec, ...] | None" = None,
+    ) -> "tf.data.Dataset":
         """..."""
 ```
 
-All arguments after `element_type` are keyword-only by intent: they
-are semantically independent and the positional-order constraint would
-make future additions (e.g., `sampler=`, `num_workers_hint=`) awkward.
+Both adapters share six keyword-only parameters with matching names,
+types, and semantics (`element_type`, `sample_loader`, `transform`,
+`targets`, `target_transform`, `missing`). `as_tf_dataset` adds one
+TF-specific parameter (`output_signature`) that has no counterpart in
+the torch shape; see §3.2 for its semantics. All arguments after
+`element_type` are keyword-only by intent: they are semantically
+independent and positional order would make future additions
+(e.g., `sampler=` on torch, `prefetch=` on tf) awkward.
 
 ### 3.2 Argument semantics
 
@@ -210,9 +238,45 @@ default returns the feature record(s) as-is.
 - `"skip"` — drop unlabeled elements from the dataset entirely. The
   resulting dataset's `__len__` reflects only labeled elements. Index
   mapping is stable across the dataset's lifetime.
-- `"none"` — keep all elements; yield `target=None` for unlabeled
-  ones. The user's `target_transform` must handle `None`. Useful for
+- `"unknown"` — keep all elements; pass `None` to the user's
+  `target_transform` for unlabeled ones. The user's
+  `target_transform` must handle `None` (typically returning a
+  sentinel class index or an ignore-mask value). Useful for
   semi-supervised / self-training work.
+
+  Note the naming: `"unknown"` is the **policy name** (shared across
+  `as_torch_dataset`, `as_tf_dataset`, and `restructure_assets` —
+  see §3.7), while the runtime value the adapter hands to
+  `target_transform` is Python `None`. The same literal policy value
+  drives restructure's `unknown/` directory and the adapter's
+  `None` target — one name, two honest realizations of the same
+  "keep it, flag it" intent.
+
+**`output_signature`** (`as_tf_dataset` only) — the `tf.TensorSpec`
+structure describing the `(sample, target)` tuple shape and dtype.
+TensorFlow's `tf.data.Dataset.from_generator` path requires this
+signature to do graph-mode tracing over the dataset.
+
+- `None` (default) — the adapter **infers** the signature from the
+  first `(sample, target)` tuple produced at construction time. The
+  adapter pulls one sample eagerly, builds the appropriate
+  `tf.TensorSpec` via `tf.type_spec_from_value`, and re-wraps the
+  generator so that eagerly-consumed first sample is not lost on
+  iteration. Cost: one extra iteration at adapter-construction. This
+  mirrors the behavior of `keras.utils.timeseries_dataset_from_array`
+  and other Keras data-loading helpers that auto-infer when they
+  can.
+- `tf.TensorSpec(...)` or nested tuple of same — the user provides
+  the signature explicitly. Recommended for production pipelines that
+  want deterministic startup (no eager first-sample read) or where
+  the first sample's shape isn't representative (e.g., ragged
+  tensors, variable-length sequences).
+
+Inference limitations: the inferred signature uses `tf.TensorSpec`
+with the first sample's exact shape. If later samples have different
+shapes (variable-height images, variable-length sequences), the user
+must pass `output_signature` explicitly with `shape=[None, ...]`
+markers where ragged. The docstring example covers this case.
 
 ### 3.3 Target arity
 
@@ -271,10 +335,11 @@ access. No library-level retry or fallback.
 
 ### 3.7 Shared target-specification vocabulary
 
-Per anchor 7, `as_torch_dataset` and `restructure_assets` share the
-vocabulary for describing how to resolve feature values into labels.
-The same three parameters appear on both methods with identical names,
-types, and semantics:
+Per anchor 7, the two adapter methods (`as_torch_dataset`,
+`as_tf_dataset`) and `restructure_assets` share the vocabulary for
+describing how to resolve feature values into labels. The same three
+parameters appear on all three methods with identical names, types,
+and semantics:
 
 **`targets: list[str] | dict[str, FeatureSelector] | None`**
 
@@ -302,8 +367,9 @@ Single-key vs multi-key behavior matches each method's output shape
 User-supplied callable that maps the resolved feature record(s) into
 the final label value.
 
-- For the adapter: return value goes to the training loop unchanged.
-  Any type (int, tensor, list, etc.).
+- For the adapters (both torch and tf): return value goes to the
+  training loop unchanged. Any type (int, `torch.Tensor`, `tf.Tensor`,
+  dict of tensors, etc.). The library does not inspect it.
 - For restructure: return value MUST be a string (used as a
   filesystem directory name). A non-string return raises
   `DerivaMLValidationError` at construction with a message explaining
@@ -323,33 +389,53 @@ for adapter becomes `return rec.Grade` for restructure).
 Policy for elements whose feature value is absent:
 
 - `"error"` — raise `DerivaMLException` at construction listing
-  unlabeled RIDs. Default for **adapter**.
+  unlabeled RIDs. Default for **both adapters** (torch and tf).
 - `"skip"` — drop unlabeled elements entirely. For restructure, the
-  asset file is not placed in the output tree. For the adapter, the
-  element is absent from `__len__`.
+  asset file is not placed in the output tree. For the adapters, the
+  element is absent from `__len__` / iteration.
 - `"unknown"` — keep unlabeled elements. For restructure, the asset
   goes into an `unknown/` directory (matches today's behavior).
-  For the adapter, the target is `None` (user's `target_transform`
+  For the adapters, the target is `None` (user's `target_transform`
   must handle it). Default for **restructure**.
 
 The default differs by method because the failure modes differ:
 silent mislabeling during training is a correctness hazard (adapter
-default is `"error"`); silently placing an asset in `unknown/` during
-a filesystem lay-out is recoverable by inspection (restructure default
-is `"unknown"`, which preserves today's behavior and avoids breakage).
+defaults are `"error"`); silently placing an asset in `unknown/`
+during a filesystem lay-out is recoverable by inspection (restructure
+default is `"unknown"`, which preserves pre-alignment behavior and
+avoids breakage for unparameterized calls).
 
-Users who want the adapter's strictness in restructure just pass
-`missing="error"`; users who want restructure's leniency in the adapter
-pass `missing="unknown"`.
+Users who want the adapter strictness in restructure pass
+`missing="error"`; users who want restructure's leniency in an
+adapter pass `missing="unknown"` and handle `None` in their
+`target_transform`.
+
+**Per-method unique arguments.** The required positional argument
+differs: both adapter methods take `element_type` (a table name);
+`restructure_assets` takes `output_dir` (a path). These can't unify
+without hiding what each method's input actually is. Additionally:
+`sample_loader` and `transform` apply only to the adapters
+(restructure doesn't load in-memory samples; its on-disk rewrite
+hook is `file_transformer`, which operates on paths).
+`output_signature` applies only to `as_tf_dataset`
+(TF-specific, no counterpart on torch or restructure).
 
 ## 4. Package structure
 
-New module: `src/deriva_ml/dataset/torch_adapter.py`.
+Three new modules: two framework adapters and a shared helper:
 
-Public entry point: `DatasetBag.as_torch_dataset(...)` as a method,
-delegating to a module-level builder function. The method is defined
-in `dataset_bag.py` (same class body as existing `as_` helpers);
-the builder imports torch lazily inside its body.
+- `src/deriva_ml/dataset/torch_adapter.py` — builds
+  `torch.utils.data.Dataset`. Imports torch lazily inside the builder
+  function body.
+- `src/deriva_ml/dataset/tf_adapter.py` — builds `tf.data.Dataset`.
+  Imports tensorflow lazily inside the builder function body. Handles
+  the `from_generator` + `output_signature` inference plumbing.
+- `src/deriva_ml/dataset/target_resolution.py` — private helper
+  `_resolve_targets(...)` consumed by both adapter modules AND by
+  `restructure_assets`. See §8.5.
+
+Public entry points are methods on `DatasetBag` that delegate to the
+module-level builders:
 
 ```python
 # dataset_bag.py (class body):
@@ -357,11 +443,19 @@ def as_torch_dataset(self, element_type, **kwargs):
     """..."""
     from deriva_ml.dataset.torch_adapter import build_torch_dataset
     return build_torch_dataset(self, element_type, **kwargs)
+
+def as_tf_dataset(self, element_type, **kwargs):
+    """..."""
+    from deriva_ml.dataset.tf_adapter import build_tf_dataset
+    return build_tf_dataset(self, element_type, **kwargs)
 ```
 
-This keeps the public signature discoverable from the class docstring
-and IDE autocomplete, while isolating the torch coupling to one
-module.
+This keeps the public signatures discoverable from the class
+docstring and IDE autocomplete, while isolating each framework's
+coupling to one module. Users who install deriva-ml without torch
+or without tensorflow can still import `DatasetBag` and call every
+other method; only the adapter method corresponding to the missing
+framework raises on first call, with an install-hint message.
 
 ## 5. Package extras
 
@@ -370,51 +464,104 @@ module.
 ```toml
 [project.optional-dependencies]
 torch = ["torch>=2.0"]
+tf    = ["tensorflow>=2.15"]
 ```
 
-Installation: `pip install 'deriva-ml[torch]'`. The existing
-`dependency-groups` table for dev / lint stays where it is — the new
-`optional-dependencies` section documents runtime extras users can
-opt into, which is distinct from dev tooling.
+Installation:
+- `pip install 'deriva-ml[torch]'` — for PyTorch users.
+- `pip install 'deriva-ml[tf]'` — for TensorFlow / Keras-on-TF users.
+- `pip install 'deriva-ml[torch,tf]'` — both (uncommon but valid).
 
-Version floor `>=2.0` chosen to match modern PyTorch while leaving
-room for PyTorch 2.x + torchvision users. Specific-version pinning is
-the user's concern.
+The existing `dependency-groups` table for dev / lint stays where
+it is — the new `optional-dependencies` section documents runtime
+extras users can opt into, which is distinct from dev tooling.
+
+**Version-floor rationale:**
+
+- **PyTorch `>=2.0`** — modern torch; torchvision users typically
+  already have this. Specific-version pinning is the user's concern.
+- **TensorFlow `>=2.15`** — recent-enough to cover Keras 3 migration
+  (Keras 3 requires TF 2.15+), and cleanly supports the modern
+  `tf.data.Dataset.from_generator(output_signature=...)` path this
+  adapter uses. Older TF versions had bugs in the generator
+  output-signature inference that we'd have to work around.
+
+**Platform note (tensorflow wheel selection):**
+
+On macOS (Apple Silicon) the conventional install is
+`tensorflow-macos` rather than vanilla `tensorflow`. On CUDA-enabled
+Linux it's `tensorflow[and-cuda]`. Our extra pins `tensorflow>=2.15`
+as the package name; users on special platforms should install their
+preferred tf wheel separately and install `deriva-ml` without the
+`[tf]` extra (the import guard inside `as_tf_dataset` just checks
+that `tensorflow` is importable — it doesn't care which wheel). The
+UG section documents this.
 
 ## 6. Testing strategy
 
-Three test tiers:
+Three test tiers per adapter (torch and TF), plus shared-helper tests
+and the existing catalog fixture.
 
-### 6.1 Module-import test (no torch installed)
+### 6.1 Module-import tests (framework not installed)
 
-Verify the library still imports when torch is absent. Mocks or
-manipulates `sys.modules` to remove torch; confirms `DatasetBag` is
-importable and every method except `as_torch_dataset` works normally.
-Confirms `as_torch_dataset` raises `ImportError` with the expected
-install-hint message.
+Verify the library still imports when a given framework is absent.
+Two parallel tests:
 
-Lives in: `tests/dataset/test_torch_adapter_no_torch.py`.
+- `tests/dataset/test_torch_adapter_no_torch.py` — removes torch via
+  `sys.modules` manipulation, confirms `DatasetBag` is importable and
+  every method except `as_torch_dataset` works, confirms
+  `as_torch_dataset` raises `ImportError` with install-hint message.
+- `tests/dataset/test_tf_adapter_no_tf.py` — same shape for
+  tensorflow. The two tests are independent (removing torch does not
+  touch the TF import path and vice versa).
 
-### 6.2 Pure-Python logic (torch stubbed)
+### 6.2 Pure-Python logic (framework stubbed)
 
 Exercises the join logic, selector pass-through, `missing=` branches,
-target arity, and error paths without a real torch install. Uses a
-minimal `torch.utils.data.Dataset` stub. No GPU/CPU tensor ops
-involved; just the library's data-plumbing logic.
+target arity, and error paths without a real framework install. Two
+parallel tests:
 
-Lives in: `tests/dataset/test_torch_adapter_logic.py`.
+- `tests/dataset/test_torch_adapter_logic.py` — stubs
+  `torch.utils.data.Dataset`.
+- `tests/dataset/test_tf_adapter_logic.py` — stubs `tf.data.Dataset`
+  plus `tf.TensorSpec` (the `output_signature` inference is tested
+  against the stub).
 
-### 6.3 End-to-end with real torch
+Both tiers share the same test matrix:
+- `missing="error"` raises at construction with RID list.
+- `missing="skip"` drops unlabeled elements.
+- `missing="unknown"` passes `None` to `target_transform`.
+- Selector dict form vs list form yield equivalent results when no
+  selector is provided.
+- `target_transform` is called on the right shape (FeatureRecord /
+  dict / list per target arity).
+- Asset-table element with no `sample_loader` raises at construction.
 
-Runs only when torch is importable. Builds a dataset from a test-catalog
-bag fixture, iterates it under a real `DataLoader`, verifies the output
-tuple shape, label encoding round-trip, and `missing="skip"` filters
-correctly.
+### 6.3 End-to-end with real frameworks
 
-Lives in: `tests/dataset/test_torch_adapter_e2e.py`. Skipped with
-`pytest.importorskip("torch")` when torch is not installed.
+Runs only when the framework is importable. Two parallel tests:
 
-### 6.4 Test catalog fixture
+- `tests/dataset/test_torch_adapter_e2e.py` — gated by
+  `pytest.importorskip("torch")`. Builds a dataset from the
+  `catalog_with_datasets` fixture, iterates under a real
+  `DataLoader`, verifies tuple shape, label-encoding round-trip,
+  `missing="skip"` filtering, and (where applicable) multi-worker
+  behavior.
+- `tests/dataset/test_tf_adapter_e2e.py` — gated by
+  `pytest.importorskip("tensorflow")`. Same flow using
+  `tf.data.Dataset.batch(...)` / `.prefetch(...)`. Additionally
+  verifies `output_signature=None` inference works (caller passes
+  no signature; first `.take(1)` produces the expected shape).
+
+### 6.4 Shared-helper tests
+
+`tests/dataset/test_target_resolution.py` tests the
+`_resolve_targets` helper in isolation from any framework. Covers
+the contract enumerated in §8.5 (returns-dict-keyed-by-RID semantics,
+three `missing=` branches, selector dict behavior). Independent of
+torch and tf — pure-Python.
+
+### 6.5 Test catalog fixture
 
 Leverages the existing `catalog_with_datasets` fixture. The test
 doesn't need new catalog setup — the demo catalog already has
@@ -447,29 +594,93 @@ enum-value check or import-guard behavior) runs at doctest collection.
 ### 7.2 User guide section
 
 New section in `docs/user-guide/offline.md` (Chapter 5, which already
-covers `DatasetBag` and `restructure_assets`) titled **"How to train a
-PyTorch model from a bag"**. Structure follows the UG contract:
+covers `DatasetBag` and `restructure_assets`) titled **"How to feed a
+bag to a training framework"**. Structure follows the UG contract,
+with sub-subsections for each supported framework plus Keras routing:
 
-1. **Motivation.** Two sentences explaining why the adapter exists and
-   when a user would reach for it instead of `restructure_assets`.
-2. **Simple example.** Image classification with one feature as label,
-   `PIL.Image.open` as loader, a torchvision transform pipeline. ~15
-   lines of code end-to-end.
-3. **Explanation.** How labels come from features, how the selector
-   pattern handles multi-annotator cases, how `missing=` resolves
-   sparse-label choices.
-4. **Worked variations:**
-   - Tabular regression (non-asset element_type, no `sample_loader`
-     default override, continuous-valued feature)
-   - Multi-target (two features → dict target)
-   - Multi-annotator resolution (selector-dict form)
-5. **Notes:** pointer to the `deriva-ml[torch]` extra; pointer to
-   `restructure_assets` for the narrow image-classification case
-   that predates the adapter; explicit note that
-   `Dataset.as_torch_dataset` (live-catalog variant) is not yet
-   shipped.
-6. **See also:** Chapter 3 (features API for selector pattern); the
-   `DatasetBag.feature_values` docstring for the selector shape.
+1. **Motivation.** Two sentences explaining why these adapters exist
+   and when a user would reach for them instead of
+   `restructure_assets`.
+2. **Choosing your path.** Short decision paragraph:
+   - `as_torch_dataset` — if you're using PyTorch (native) or Keras
+     on the PyTorch backend.
+   - `as_tf_dataset` — if you're using TensorFlow (native) or Keras
+     on the TensorFlow backend.
+   - `restructure_assets` — if you're using a third-party trainer
+     that expects `ImageFolder` class-folder layout (e.g., RetFound
+     fine-tuning scripts, `torchvision.datasets.ImageFolder`,
+     `tf.keras.utils.image_dataset_from_directory`).
+
+#### 7.2.1 Using with PyTorch
+
+Structure:
+- **Simple example.** Image classification with one feature as
+  label, `PIL.Image.open` as loader, torchvision transform
+  pipeline. ~15 lines end-to-end.
+- **Explanation.** How labels come from features, how the selector
+  pattern handles multi-annotator cases, how `missing=` resolves
+  sparse-label choices.
+- **Worked variations:**
+  - Tabular regression (non-asset element_type, no `sample_loader`
+    override needed, continuous-valued feature).
+  - Multi-target (two features → dict target).
+  - Multi-annotator resolution (selector-dict form).
+- **Notes:** pointer to `deriva-ml[torch]` extra; explicit note that
+  `Dataset.as_torch_dataset` (live-catalog variant) is not yet
+  shipped.
+
+#### 7.2.2 Using with TensorFlow
+
+Structure:
+- **Simple example.** Same image-classification task but returning
+  `tf.data.Dataset`, showing `.batch().prefetch()` pipeline. ~15
+  lines end-to-end.
+- **`output_signature` guidance.** When to let inference happen
+  (default; one-shot research code), when to pass it explicitly
+  (production pipelines with deterministic startup; ragged tensors).
+- **Worked variations:** the same three from the PyTorch section,
+  translated to TF shape.
+- **Notes:** pointer to `deriva-ml[tf]` extra and to the platform
+  note (§5) about `tensorflow-macos` / `tensorflow[and-cuda]` for
+  users who want a specific wheel.
+
+#### 7.2.3 Using with Keras
+
+Keras 3 accepts data from either backend's native format. Users
+don't need a separate adapter; they pick the method matching their
+Keras backend:
+
+- **Keras on PyTorch backend:** wrap `as_torch_dataset(...)` in a
+  `DataLoader` and pass to `model.fit(...)`. Keras consumes
+  `torch.utils.data.DataLoader` natively.
+- **Keras on TensorFlow backend:** pass `as_tf_dataset(...)` directly
+  to `model.fit(...)`. Keras consumes `tf.data.Dataset` natively.
+- **Keras on JAX backend:** use either adapter; Keras 3 accepts
+  Python iterables of `(x, y)` tuples regardless of origin.
+
+A ~20-line worked example shows the backend choice via
+`os.environ["KERAS_BACKEND"] = "torch"` or `"tensorflow"` and then
+the appropriate adapter call. Explicit note: no `as_keras_dataset`
+method exists because Keras is a consumer of both adapters, not a
+third parallel one.
+
+#### 7.2.4 Using with `ImageFolder` / third-party tools
+
+Pointer to §7.4.2: `restructure_assets` is the tool when your
+downstream consumer wants the class-folder directory layout
+(including RetFound fine-tuning scripts,
+`torchvision.datasets.ImageFolder`,
+`tf.keras.utils.image_dataset_from_directory`, and similar).
+Aligned vocabulary (§3.7) means the `targets` / `target_transform`
+/ `missing` kwargs you'd use with `as_torch_dataset` work
+identically with `restructure_assets`.
+
+#### 7.2.5 See also
+
+Chapter 3 (features API for selector pattern); the
+`DatasetBag.feature_values` docstring for the selector shape;
+the `split_dataset` docstring for the stratified-split flow that
+composes upstream of all three framework paths (see §7.4.1).
 
 ### 7.3 Cross-references
 
@@ -766,25 +977,23 @@ shared parameter names.
 The following are intentionally **out of scope** to keep the v1
 surface focused:
 
-- **TensorFlow adapter.** Parallel `as_tf_dataset` has the same shape
-  but is a separate deliverable. If this PR lands cleanly, a follow-up
-  adds TF with minimal new design (the join logic, path resolution,
-  and feature-value plumbing are directly reusable).
-- **`Dataset.as_torch_dataset` (live-catalog variant).** Covered in
-  anchor 4 above. Named follow-up; not v1.
-- **DataLoader construction.** The library returns a `Dataset`; the
-  user wraps it in `torch.utils.data.DataLoader` with their own
-  `batch_size`, `shuffle`, `num_workers`, etc. The library does not
-  opine on batching.
+- **Live-catalog adapter variants** (`Dataset.as_torch_dataset`,
+  `Dataset.as_tf_dataset`). Covered in anchor 4 above. Named
+  follow-up; not v1.
+- **DataLoader / `.batch()` construction.** Both adapters return a
+  raw `Dataset` (torch) or `tf.data.Dataset` (tf). The user wraps in
+  `torch.utils.data.DataLoader` with their own `batch_size`,
+  `shuffle`, `num_workers`, or chains `.batch().prefetch()` on the
+  TF side. The library does not opine on batching.
 - **Train/val/test splits.** Already covered by
-  `split_dataset` / `stratify_by_column`. The adapter takes whatever
-  bag you hand it; splitting happens upstream.
-- **In-memory caching across epochs.** Torch's own DataLoader +
-  dataset-level caching is the standard pattern. The library doesn't
-  layer on top.
-- **Inference-result writeback.** That's feature-record territory (D1
-  + existing `add_features` path), orthogonal to the data-loading
-  adapter.
+  `split_dataset` / `stratify_by_column`. The adapters take whatever
+  bag you hand them; splitting happens upstream.
+- **In-memory caching across epochs.** Both frameworks have standard
+  idioms (`torch.utils.data.DataLoader` persistent workers,
+  `tf.data.Dataset.cache()`). The library doesn't layer on top.
+- **Inference-result writeback.** That's feature-record territory
+  (D1 + existing `add_features` path), orthogonal to the data-loading
+  adapters.
 - **Label encoding helpers.** Explicit non-goal per anchor 2.
   Users own their encoder; the library surfaces typed records.
 
@@ -795,26 +1004,42 @@ Implementation plan (separate document at
 will enumerate specific tasks; this spec's checklist names the
 deliverables the plan must cover.
 
-**Adapter deliverables:**
+**Adapter deliverables (PyTorch):**
 
 - [ ] `src/deriva_ml/dataset/torch_adapter.py` — new module
 - [ ] `src/deriva_ml/dataset/dataset_bag.py` — `as_torch_dataset`
   method added with full docstring
-- [ ] `pyproject.toml` — `[project.optional-dependencies]` table with
-  `torch = [...]`
 - [ ] `tests/dataset/test_torch_adapter_no_torch.py`
 - [ ] `tests/dataset/test_torch_adapter_logic.py`
 - [ ] `tests/dataset/test_torch_adapter_e2e.py` (pytest.importorskip)
-- [ ] `docs/user-guide/offline.md` — new "How to train a PyTorch model
-  from a bag" section per §7.2
+
+**Adapter deliverables (TensorFlow):**
+
+- [ ] `src/deriva_ml/dataset/tf_adapter.py` — new module
+- [ ] `src/deriva_ml/dataset/dataset_bag.py` — `as_tf_dataset`
+  method added with full docstring (incl. `output_signature`
+  inference behavior)
+- [ ] `tests/dataset/test_tf_adapter_no_tf.py`
+- [ ] `tests/dataset/test_tf_adapter_logic.py`
+- [ ] `tests/dataset/test_tf_adapter_e2e.py` (pytest.importorskip;
+  verifies `output_signature=None` inference)
 
 **Shared infrastructure (per §8.5):**
 
-- [ ] `src/deriva_ml/dataset/target_resolution.py` (or equivalent) —
-  private helper `_resolve_targets(bag, element_type, targets, missing)`
-  shared between `as_torch_dataset` and `restructure_assets`
-- [ ] Tests for the shared helper covering the three `missing=`
-  branches and selector-dict vs list forms
+- [ ] `src/deriva_ml/dataset/target_resolution.py` — private helper
+  `_resolve_targets(bag, element_type, targets, missing)` shared
+  among `as_torch_dataset`, `as_tf_dataset`, and `restructure_assets`
+- [ ] `tests/dataset/test_target_resolution.py` — tests for the
+  shared helper covering the three `missing=` branches and
+  selector-dict vs list forms
+- [ ] `pyproject.toml` — `[project.optional-dependencies]` table
+  with `torch = [...]` and `tf = [...]` extras
+
+**User guide:**
+
+- [ ] `docs/user-guide/offline.md` — new "How to feed a bag to a
+  training framework" section per §7.2 covering PyTorch, TensorFlow,
+  Keras (both backends), and `ImageFolder`-style layout
 
 **Restructure alignment deliverables (per §8):**
 
@@ -879,7 +1104,35 @@ anything; it reads.
 **Risk: Torch dependency bloat for users who install
 `deriva-ml[torch]` accidentally.** Mitigation: named extra; pip install
 without `[torch]` leaves torch out entirely. The default install
-remains lean.
+remains lean. Same reasoning applies to `deriva-ml[tf]`.
+
+**Risk: TensorFlow wheel selection is platform-dependent and confuses
+users.** On macOS (Apple Silicon) the canonical install is
+`tensorflow-macos`, not vanilla `tensorflow`. On CUDA-enabled Linux
+it's `tensorflow[and-cuda]`. Mitigation: document the wheel choice in
+both the package-extras section of pyproject.toml's PyPI description
+and in the UG TensorFlow sub-section. The import guard inside
+`as_tf_dataset` just checks that `tensorflow` is importable, so any
+properly-installed tf wheel satisfies it regardless of which variant
+the user chose.
+
+**Risk: `tf.data.Dataset.from_generator` is slower than
+`from_tensor_slices`.** `from_generator` can't be traced into a
+tf.graph, so tf.data optimizations (autograph, XLA) don't apply
+inside our iteration. Mitigation: anchor 4 (no eager materialization)
+is a deliberate choice — the cost is acceptable for research-scale
+datasets, and the alternative (eager materialization) would violate
+our lazy-loading contract for any bag larger than RAM. Users with
+performance-critical pipelines and smaller datasets can use
+`.cache()` on the returned `tf.data.Dataset` as a standard TF
+escape hatch.
+
+**Risk: `output_signature=None` inference consumes one sample eagerly
+at adapter construction.** For pipelines where even the first sample
+is expensive (e.g., huge 4D medical volumes), this adds measurable
+startup cost. Mitigation: documented in §3.2 and in the docstring;
+users with this concern pass `output_signature` explicitly to skip
+the eager-infer path.
 
 **Risk: `restructure_assets` parameter rename is a hard break for any
 downstream caller using `group_by=`, `value_selector=`, or the
@@ -910,13 +1163,13 @@ can be inlined back per-method with a single commit.
 
 ## 12. Future work (named for future-spec continuity)
 
-- **TF adapter** (separate future spec): `bag.as_tf_dataset(...)` with
-  the same target/selector/missing semantics but a `tf.data.Dataset`
-  return type. Reuses the join logic, path resolution, and
-  feature-value plumbing; only the framework wrapper is new.
-- **`Dataset.as_torch_dataset` (live-catalog variant)** (separate
-  future spec): live-download semantics, credential lifetime, retry
-  policy, cache eviction.
+- **Live-catalog adapter variants** (separate future spec):
+  `Dataset.as_torch_dataset` and `Dataset.as_tf_dataset` with
+  live-download-during-iteration semantics. Requires design work on
+  credential lifetime, retry policy, cache eviction, and
+  download-during-`__getitem__` performance. The bag-only v1 covers
+  the primary training workflow (download once, train many times)
+  without any of that complexity.
 - **Numpy/Arrow adapters** (lower priority): for users who want
   framework-agnostic iteration over (sample, target) tuples.
 - **Streaming / iterable datasets** (lower priority): `IterableDataset`
