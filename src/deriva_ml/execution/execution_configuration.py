@@ -11,7 +11,7 @@ It includes:
 The module supports both direct parameter specification and JSON-based configuration files.
 
 Typical usage example:
-    >>> workflow = ml.lookup_workflow_by_url("https://github.com/my-org/my-repo")
+    >>> workflow = ml.lookup_workflow_by_url("https://github.com/my-org/my-repo")  # doctest: +SKIP
     >>> config = ExecutionConfiguration(
     ...     workflow=workflow,
     ...     datasets=[DatasetSpec(rid="1-abc123", version="1.0.0")],
@@ -135,7 +135,7 @@ class ExecutionConfiguration(BaseModel):
             FileNotFoundError: If configuration file doesn't exist.
 
         Example:
-            >>> config = ExecutionConfiguration.load_configuration(Path("config.json"))
+            >>> config = ExecutionConfiguration.load_configuration(Path("config.json"))  # doctest: +SKIP
             >>> print(f"Workflow: {config.workflow}")
             >>> print(f"Datasets: {len(config.datasets)}")
         """

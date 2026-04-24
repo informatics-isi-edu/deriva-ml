@@ -646,19 +646,19 @@ def create_model_config(
     --------
     Basic usage with DerivaML:
 
-        >>> from deriva_ml.execution.runner import create_model_config
+        >>> from deriva_ml.execution.runner import create_model_config  # doctest: +SKIP
         >>> model_config = create_model_config()
         >>> store(model_config, name="deriva_model")
 
     With a custom subclass:
 
-        >>> from eye_ai import EyeAI
+        >>> from eye_ai import EyeAI  # doctest: +SKIP
         >>> model_config = create_model_config(EyeAI, description="EyeAI analysis")
         >>> store(model_config, name="eyeai_model")
 
     With custom hydra defaults:
 
-        >>> model_config = create_model_config(
+        >>> model_config = create_model_config(  # doctest: +SKIP
         ...     hydra_defaults=[
         ...         "_self_",
         ...         {"deriva_ml": "production"},
