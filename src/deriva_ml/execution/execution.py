@@ -1797,6 +1797,83 @@ class Execution:
         result._bind_manifest(manifest, manifest_key)
         return result
 
+    def metrics_file(self, filename: str = "metrics.jsonl") -> AssetFilePath:
+        """Return a path for writing training-metric records.
+
+        Thin sugar over ``asset_file_path(MLAsset.execution_metadata, ...)``
+        that stamps the file with ``asset_types=Metrics_File`` so the
+        catalog's ``Execution_Metadata.Type`` column honestly describes
+        the file's purpose. The file registers with the execution's asset
+        manifest on first call and uploads as part of
+        ``upload_execution_outputs()``.
+
+        The file itself is plain text; callers decide the format. The
+        default filename ``metrics.jsonl`` suggests one JSON record per
+        line — the simplest shape that lets a downstream reader page
+        through the file without loading the whole thing into memory —
+        but CSV, YAML, or a single JSON object also work as long as the
+        readback code knows the format.
+
+        Repeated calls inside the same execution return the **same**
+        AssetFilePath (registered once in the manifest), so append-style
+        writes across an epoch loop are safe::
+
+            with ml.create_execution(cfg) as exe:
+                for epoch in range(num_epochs):
+                    train_loss = train_one_epoch(...)
+                    val_loss = evaluate(...)
+                    with exe.metrics_file().open("a") as f:
+                        json.dump(
+                            {"epoch": epoch, "train_loss": train_loss,
+                             "val_loss": val_loss},
+                            f,
+                        )
+                        f.write("\\n")
+            exe.upload_execution_outputs()
+
+        Args:
+            filename: Name of the metrics file inside the execution's
+                Execution_Metadata staging area. Defaults to
+                ``"metrics.jsonl"``. Override to distinguish multiple
+                metric streams (e.g. ``"train_metrics.jsonl"`` +
+                ``"eval_metrics.jsonl"``) — each distinct filename
+                becomes a separate Execution_Metadata asset on upload.
+
+        Returns:
+            AssetFilePath for the metrics file. Use its ``.open(...)``
+            method to read, write, or append; the manifest tracks the
+            file for upload regardless of how you write to it.
+
+        Raises:
+            DerivaMLException: If the Execution_Metadata table is not
+                present in the catalog schema (should never happen in a
+                correctly-initialized catalog).
+            DerivaMLValidationError: If the ``Metrics_File`` term is
+                missing from the Asset_Type vocabulary (i.e. an old
+                catalog predating this feature; run ``create_ml_schema``
+                or ``initialize_ml_schema`` once to seed the term).
+
+        Example:
+            >>> from deriva_ml.core.enums import MLAsset, ExecMetadataType
+            >>> MLAsset.execution_metadata.value
+            'Execution_Metadata'
+            >>> ExecMetadataType.metrics_file.value
+            'Metrics_File'
+
+            >>> # Catalog-dependent end-to-end flow:
+            >>> import json
+            >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+            ...     with exe.metrics_file().open("a") as f:  # doctest: +SKIP
+            ...         json.dump({"epoch": 0, "val_loss": 0.23}, f)  # doctest: +SKIP
+            ...         f.write("\\n")  # doctest: +SKIP
+            >>> exe.upload_execution_outputs()  # doctest: +SKIP
+        """
+        return self.asset_file_path(
+            MLAsset.execution_metadata,
+            filename,
+            asset_types=ExecMetadataType.metrics_file.value,
+        )
+
     def _get_manifest(self) -> AssetManifest:
         """Get or create the asset manifest for this execution."""
         if not hasattr(self, "_manifest") or self._manifest is None:

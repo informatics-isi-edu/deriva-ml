@@ -305,6 +305,7 @@ EXPECTED_VOCABULARY_TERMS: dict[str, list[str]] = {
         "Runtime_Env",
         "Hydra_Config",
         "Deriva_Config",
+        "Metrics_File",
         "Execution_Metadata",
         "Execution_Asset",
         "File",
