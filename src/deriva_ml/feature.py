@@ -1,15 +1,35 @@
 """Feature implementation for deriva-ml.
 
-This module provides classes for defining and managing features in deriva-ml. Features represent measurable
-properties or characteristics that can be associated with records in a table. The module includes:
+This module provides classes for defining and managing features in deriva-ml.
+Features represent measurable properties or characteristics associated with
+records in a target table (e.g., a diagnostic label on an Image row).
 
-- Feature: Main class for defining and managing features
-- FeatureRecord: Base class for feature records using pydantic models
+Exported classes:
+    Feature: Encapsulates a feature's schema — target table, vocabulary columns,
+        asset columns, and value columns. Obtained via ``DerivaML.create_feature``
+        or ``DerivaML.lookup_feature``. Not constructed directly.
+    FeatureRecord: Pydantic base class for dynamically generated feature record
+        models. Subclasses are created by ``Feature.feature_record_class()``.
 
-Typical usage example:
-    >>> feature = Feature(association_result, model)
-    >>> FeatureClass = feature.feature_record_class()
-    >>> record = FeatureClass(value="high", confidence=0.95)
+Selector classmethod suite (``FeatureRecord`` class methods):
+    ``FeatureRecord.select_newest(records)`` — Returns the record with the most
+        recent ``RCT`` (Row Creation Time). Useful when multiple annotators have
+        labelled the same object.
+    ``FeatureRecord.select_first(records)`` — Returns the record with the
+        earliest ``RCT``. Useful to preserve the original annotation.
+    ``FeatureRecord.select_latest(records)`` — Alias for ``select_newest``.
+    ``FeatureRecord.select_by_execution(execution_rid)`` — Returns a selector
+        that picks the newest record from a specific execution run.
+    ``FeatureRecord.select_by_workflow(workflow, *, container)`` — Returns a
+        selector that picks the newest record from any execution of the named
+        workflow. Resolves the execution list eagerly at construction time.
+    ``FeatureRecord.select_majority_vote(column)`` — Returns a selector that
+        picks the most common value for a column (consensus labeling).
+
+Typical usage:
+    >>> feature = ml.lookup_feature("Image", "Diagnosis")  # doctest: +SKIP
+    >>> DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
+    >>> record = DiagnosisRecord(Diagnosis="benign", Confidence=0.97)  # doctest: +SKIP
 """
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
@@ -145,7 +165,7 @@ class FeatureRecord(BaseModel):
         Examples:
             Select values from a specific execution::
 
-                >>> for rec in ml.feature_values(
+                >>> for rec in ml.feature_values(  # doctest: +SKIP
                 ...     "Image",
                 ...     feature_name="Classification",
                 ...     selector=FeatureRecord.select_by_execution("3WY2"),
@@ -219,20 +239,20 @@ class FeatureRecord(BaseModel):
         Example:
             Select Glaucoma labels produced by a specific training workflow::
 
-                >>> selector = FeatureRecord.select_by_workflow(
+                >>> selector = FeatureRecord.select_by_workflow(  # doctest: +SKIP
                 ...     "Glaucoma_Training_v2", container=ml
                 ... )
-                >>> for rec in ml.feature_values(
+                >>> for rec in ml.feature_values(  # doctest: +SKIP
                 ...     "Image", "Glaucoma", selector=selector
                 ... ):
                 ...     print(f"{rec.Image}: {rec.Glaucoma}")
 
             Works identically on a downloaded bag (offline)::
 
-                >>> selector = FeatureRecord.select_by_workflow(
+                >>> selector = FeatureRecord.select_by_workflow(  # doctest: +SKIP
                 ...     "Glaucoma_Training_v2", container=bag
                 ... )
-                >>> labels = list(bag.feature_values("Image", "Glaucoma", selector=selector))
+                >>> labels = list(bag.feature_values("Image", "Glaucoma", selector=selector))  # doctest: +SKIP
         """
         # Eager resolution: fail fast on unknown workflow at construction time,
         # not lazily during iteration. Convert to a set for O(1) membership
@@ -371,37 +391,81 @@ class FeatureRecord(BaseModel):
 
     @classmethod
     def feature_columns(cls) -> set[Column]:
-        """Returns all columns specific to this feature.
+        """Return all columns specific to this feature.
+
+        Returns the full set of feature-specific columns — the union of
+        ``asset_columns``, ``term_columns``, and ``value_columns``. System
+        columns (``RID``, ``RCT``, ``RMT``, ``RCB``, ``RMB``) and structural
+        association columns (``Feature_Name``, the target-table FK, and
+        ``Execution``) are excluded.
 
         Returns:
-            set[Column]: Set of feature-specific columns, excluding system and relationship columns.
+            set[Column]: Feature-specific ERMrest ``Column`` objects. Equivalent
+            to ``cls.feature.feature_columns``.
+
+        Note:
+            Only available on a class returned by ``Feature.feature_record_class()``.
+            Calling this on the ``FeatureRecord`` base class (where ``feature``
+            is ``None``) raises ``AttributeError``.
         """
         return cls.feature.feature_columns
 
     @classmethod
     def asset_columns(cls) -> set[Column]:
-        """Returns columns that reference asset tables.
+        """Return columns that reference asset tables.
+
+        Asset columns are FK columns whose referent table is classified as an
+        asset table (e.g., ``Image``, ``Scan``). In a generated
+        ``FeatureRecord`` subclass these fields accept ``str | Path`` values.
 
         Returns:
-            set[Column]: Set of columns that contain references to asset tables.
+            set[Column]: ERMrest ``Column`` objects that are FK references to
+            asset tables. A subset of ``feature_columns()``.
+
+        Note:
+            Only available on a class returned by ``Feature.feature_record_class()``.
+            Calling this on the ``FeatureRecord`` base class (where ``feature``
+            is ``None``) raises ``AttributeError``.
         """
         return cls.feature.asset_columns
 
     @classmethod
     def term_columns(cls) -> set[Column]:
-        """Returns columns that reference vocabulary terms.
+        """Return columns that reference controlled vocabulary terms.
+
+        Term columns are FK columns whose referent table is classified as a
+        vocabulary table. In a generated ``FeatureRecord`` subclass these
+        fields accept ``str`` values (the term name, not the RID).
 
         Returns:
-            set[Column]: Set of columns that contain references to controlled vocabulary terms.
+            set[Column]: ERMrest ``Column`` objects that are FK references to
+            vocabulary tables. A subset of ``feature_columns()``.
+
+        Note:
+            Only available on a class returned by ``Feature.feature_record_class()``.
+            Calling this on the ``FeatureRecord`` base class (where ``feature``
+            is ``None``) raises ``AttributeError``.
         """
         return cls.feature.term_columns
 
     @classmethod
     def value_columns(cls) -> set[Column]:
-        """Returns columns that contain direct values.
+        """Return columns that contain direct (non-FK) values.
+
+        Value columns hold scalar data — integers, floats, booleans, or text
+        — rather than FK references to other tables. In a generated
+        ``FeatureRecord`` subclass these fields are typed according to the
+        ERMrest column type (``int``, ``float``, ``bool``, or ``str``).
 
         Returns:
-            set[Column]: Set of columns containing direct values (not references to assets or terms).
+            set[Column]: ERMrest ``Column`` objects that contain direct data
+            values. Computed as ``feature_columns() - asset_columns() -
+            term_columns()``.
+
+        Note:
+            Only available on a class returned by ``Feature.feature_record_class()``.
+            Calling this on the ``FeatureRecord`` base class (where ``feature``
+            is ``None``) raises ``AttributeError``.
         """
         return cls.feature.value_columns
 
@@ -422,12 +486,32 @@ class Feature:
         value_columns (set[Column]): Columns containing direct values (not FK references).
 
     Example:
-        >>> feature = Feature(association_result, model)
-        >>> print(f"Feature {feature.feature_name} on {feature.target_table.name}")
-        >>> print("Asset columns:", [c.name for c in feature.asset_columns])
+        >>> feature = ml.lookup_feature("Image", "Diagnosis")  # doctest: +SKIP
+        >>> print(f"Feature {feature.feature_name} on {feature.target_table.name}")  # doctest: +SKIP
+        >>> print("Asset columns:", [c.name for c in feature.asset_columns])  # doctest: +SKIP
     """
 
     def __init__(self, atable: FindAssociationResult, model: "DerivaModel") -> None:
+        """Initialize a Feature from an association table result.
+
+        Classifies the feature table's FK columns into three disjoint sets:
+        ``asset_columns`` (FK to an asset table), ``term_columns`` (FK to a
+        vocabulary table), and ``value_columns`` (everything else). The
+        association FKs linking back to the target table and to the feature
+        name vocabulary are excluded before classification.
+
+        Args:
+            atable: Result from ``deriva.core.ermrest_model.FindAssociationResult``
+                describing the feature association table. Provides the feature
+                table, the self-FK back to the target, and the set of other FKs.
+            model: ``DerivaModel`` instance used to classify FK targets as
+                asset or vocabulary tables.
+
+        Note:
+            This constructor is not part of the public API. Obtain ``Feature``
+            instances via ``DerivaML.create_feature`` or
+            ``DerivaML.lookup_feature``.
+        """
         self.feature_table = atable.table
         self.target_table = atable.self_fkey.pk_table
         self.feature_name = atable.table.columns["Feature_Name"].default
@@ -445,6 +529,12 @@ class Feature:
         }
         self.feature_columns = {c for c in self.feature_table.columns if c.name not in skip_columns}
 
+        # Exclude the two FKs that are structural parts of the association table
+        # itself — the self-FK pointing back to the target table (e.g., Image)
+        # and the other-FKs pointing to Feature_Name and Execution — before
+        # classifying the remaining FKs as asset, term, or value columns. Without
+        # this subtraction, those structural FKs would be misclassified as feature
+        # columns and create spurious fields in the generated FeatureRecord class.
         assoc_fkeys = {atable.self_fkey} | atable.other_fkeys
 
         # Determine the role of each column in the feature outside the FK columns.
@@ -465,13 +555,32 @@ class Feature:
     def feature_record_class(self) -> type[FeatureRecord]:
         """Create a dynamically generated Pydantic model class for this feature.
 
-        The returned class is a subclass of FeatureRecord with fields derived from
-        the feature table's columns. Term columns accept vocabulary term names (str),
-        asset columns accept file paths (str | Path), and value columns are typed
-        according to their database column type (int, float, str).
+        Builds a ``FeatureRecord`` subclass with fields derived from the feature
+        table's columns. Column types are mapped as follows:
+
+        - Term columns (FK to vocabulary): ``str`` (vocabulary term name)
+        - Asset columns (FK to asset table): ``str | Path`` (file path)
+        - Value columns (direct data): typed per the database column type
+          (``int``, ``float``, ``bool``, or ``str``)
+
+        All feature-specific fields are ``Optional`` with a default of ``None``
+        to allow partial construction when building records for insertion.
+        The ``Feature_Name`` field defaults to this feature's name.
+
+        Args:
+            self: The ``Feature`` instance whose schema drives field generation.
 
         Returns:
-            A FeatureRecord subclass with validated fields matching this feature's schema.
+            A subclass of ``FeatureRecord`` whose fields match this feature's
+            schema. The class's ``feature`` ClassVar is set to ``self``.
+
+        Raises:
+            DerivaMLException: If the feature table schema cannot be read.
+
+        Example:
+            >>> feature = ml.lookup_feature("Image", "Diagnosis")  # doctest: +SKIP
+            >>> DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
+            >>> rec = DiagnosisRecord(Diagnosis="benign")  # doctest: +SKIP
         """
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
