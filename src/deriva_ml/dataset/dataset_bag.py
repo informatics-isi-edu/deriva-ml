@@ -187,6 +187,33 @@ class DatasetBag:
         """
         return self._current_version
 
+    @property
+    def path(self) -> Path:
+        """Filesystem path to this bag's root directory.
+
+        The bag is a self-contained, immutable snapshot on disk. ``path``
+        is the directory containing ``data/``, ``manifest-md5.txt``, and
+        the bag's SQLite database. Use it to:
+
+        - Read materialized asset files relative to the bag.
+        - Diagnose "which bag is this?" errors in logs.
+        - Archive or copy the bag to a new location.
+
+        The directory exists for the lifetime of the bag object. Do not
+        mutate anything inside it — bags are immutable by contract.
+
+        Returns:
+            Path: Root directory of the materialized bag on disk.
+
+        Example:
+            >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")
+            >>> bag = ml.download_dataset_bag(spec)
+            >>> print(f"Bag materialized at {bag.path}")
+            >>> # Read an asset file relative to the bag root
+            >>> manifest = (bag.path / "manifest-md5.txt").read_text()
+        """
+        return self.model.bag_path
+
     def list_tables(self) -> list[str]:
         """List all tables available in the bag's SQLite database.
 
