@@ -160,16 +160,20 @@ class VocabularyMixin:
 
         try:
             # Attempt to insert a new term
-            term_data = pb.schemas[schema_name].tables[table_name].insert(
-                [
-                    {
-                        cols["Name"]: term_name,
-                        cols["Description"]: description,
-                        cols["Synonyms"]: synonyms,
-                    }
-                ],
-                defaults={cols["ID"], cols["URI"]},
-            )[0]
+            term_data = (
+                pb.schemas[schema_name]
+                .tables[table_name]
+                .insert(
+                    [
+                        {
+                            cols["Name"]: term_name,
+                            cols["Description"]: description,
+                            cols["Synonyms"]: synonyms,
+                        }
+                    ],
+                    defaults={cols["ID"], cols["URI"]},
+                )[0]
+            )
             term_handle = VocabularyTermHandle(ml=self, table=table_name, **term_data)
             # Invalidate cache for this vocabulary since we added a new term
             self.clear_vocabulary_cache(vocab_table)
@@ -181,9 +185,7 @@ class VocabularyMixin:
                 existing_term = self.lookup_term(vocab_table, term_name)
             except DerivaMLInvalidTerm:
                 # Term doesn't exist — the insert failed for another reason
-                raise DerivaMLException(
-                    f"Failed to insert term '{term_name}' into {vocab_table.name}: {e}"
-                ) from e
+                raise DerivaMLException(f"Failed to insert term '{term_name}' into {vocab_table.name}: {e}") from e
             # Term does exist — either return it or raise depending on exists_ok
             if not exists_ok:
                 raise DerivaMLInvalidTerm(vocab_table.name, term_name, msg="term already exists")
@@ -264,9 +266,7 @@ class VocabularyMixin:
         # Term not found
         raise DerivaMLInvalidTerm(table_name, term_name)
 
-    def _server_lookup_term(
-        self, schema_name: str, table_name: str, term_name: str
-    ) -> VocabularyTermHandle | None:
+    def _server_lookup_term(self, schema_name: str, table_name: str, term_name: str) -> VocabularyTermHandle | None:
         """Look up a term by name using server-side filtering.
 
         This performs a targeted server query for a specific term name.

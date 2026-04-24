@@ -52,11 +52,7 @@ class WorkflowMixin:
         """
         pb = self.pathBuilder()
         assoc_path = pb.schemas[self.ml_schema].Workflow_Workflow_Type
-        types = (
-            assoc_path.filter(assoc_path.Workflow == workflow_rid)
-            .attributes(assoc_path.Workflow_Type)
-            .fetch()
-        )
+        types = assoc_path.filter(assoc_path.Workflow == workflow_rid).attributes(assoc_path.Workflow_Type).fetch()
         return [t["Workflow_Type"] for t in types]
 
     def find_workflows(self) -> list[Workflow]:
@@ -241,8 +237,8 @@ class WorkflowMixin:
         workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
         workflow_rid = None
         for w in workflow_path.path.entities().fetch():
-            if w['URL'] == url_or_checksum or w['Checksum'] == url_or_checksum:
-                workflow_rid = w['RID']
+            if w["URL"] == url_or_checksum or w["Checksum"] == url_or_checksum:
+                workflow_rid = w["RID"]
                 break
 
         return workflow_rid
@@ -306,9 +302,7 @@ class WorkflowMixin:
         # Find the RID first
         rid = self._find_workflow_rid_by_url(url_or_checksum)
         if rid is None:
-            raise DerivaMLException(
-                f"Workflow with URL or checksum '{url_or_checksum}' not found in the catalog"
-            )
+            raise DerivaMLException(f"Workflow with URL or checksum '{url_or_checksum}' not found in the catalog")
 
         # Use lookup_workflow to get the full object with catalog binding
         return self.lookup_workflow(rid)
