@@ -30,7 +30,7 @@ from sqlalchemy import Table as SQLTable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from deriva_ml.core.definitions import ML_SCHEMA, RID, get_domain_schemas
+from deriva_ml.core.definitions import ML_SCHEMA, RID, _get_domain_schemas
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
@@ -90,7 +90,7 @@ class DatabaseModel(DerivaModel):
 
         # Determine schemas using schema classification
         ml_schema = ML_SCHEMA
-        domain_schemas = get_domain_schemas(model.schemas.keys(), ml_schema)
+        domain_schemas = _get_domain_schemas(model.schemas.keys(), ml_schema)
         schemas = [*domain_schemas, ml_schema]
 
         # Extract bag checksum for unique database path.

@@ -41,7 +41,7 @@ def test_ml_with_feature(populated_catalog):
         metadata=[ColumnDefinition(name="Label", type=BuiltinTypes.text)],
     )
 
-    image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    image_rids = [r["RID"] for r in ml._domain_path().tables["Image"].entities().fetch()]
     assert image_rids, "No Image rows in test catalog"
 
     workflow = ml.create_workflow(
@@ -75,7 +75,7 @@ def test_ml_with_feature_multi(populated_catalog):
         metadata=[ColumnDefinition(name="Score", type=BuiltinTypes.text)],
     )
 
-    image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    image_rids = [r["RID"] for r in ml._domain_path().tables["Image"].entities().fetch()]
     assert image_rids, "No Image rows in test catalog"
 
     ScoreFeature = ml.feature_record_class("Image", feature_name)
@@ -186,7 +186,7 @@ def catalog_with_feature_and_dataset(populated_catalog):
         metadata=[ColumnDefinition(name="Label", type=BuiltinTypes.text)],
     )
 
-    all_image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    all_image_rids = [r["RID"] for r in ml._domain_path().tables["Image"].entities().fetch()]
     assert all_image_rids, "No Image rows in test catalog"
 
     # Ensure Image is registered as a dataset element type (not done by populate_demo_catalog)

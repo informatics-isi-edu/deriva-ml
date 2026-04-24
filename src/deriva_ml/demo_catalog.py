@@ -51,7 +51,7 @@ TEST_DATASET_SIZE = 12
 
 def populate_demo_catalog(execution: Execution) -> None:
     ml_instance = execution._ml_object
-    domain_schema = ml_instance.domain_path()
+    domain_schema = ml_instance._domain_path()
 
     # Create Subjects
     subject = domain_schema.tables["Subject"]
@@ -239,10 +239,10 @@ def create_demo_datasets(execution: Execution) -> DatasetDescription:
         "Dataset_Type", "Validation", synonyms=["Val", "val", "validation"], description="A validation set"
     )
 
-    table_path = ml_instance.domain_path().tables["Subject"]
+    table_path = ml_instance._domain_path().tables["Subject"]
     subject_rids = [i["RID"] for i in table_path.entities().fetch()]
 
-    table_path = ml_instance.domain_path().tables["Image"]
+    table_path = ml_instance._domain_path().tables["Image"]
     image_rids = [i["RID"] for i in table_path.entities().fetch()]
 
     spec = dataset_spec()
@@ -291,8 +291,8 @@ def create_demo_features(execution: Execution) -> None:
 
     # Get the workflow for this notebook
 
-    subject_rids = [i["RID"] for i in ml_instance.domain_path().tables["Subject"].entities().fetch()]
-    image_rids = [i["RID"] for i in ml_instance.domain_path().tables["Image"].entities().fetch()]
+    subject_rids = [i["RID"] for i in ml_instance._domain_path().tables["Subject"].entities().fetch()]
+    image_rids = [i["RID"] for i in ml_instance._domain_path().tables["Image"].entities().fetch()]
     _subject_feature_list = [
         SubjectWellnessFeature(
             Subject=subject_rid,

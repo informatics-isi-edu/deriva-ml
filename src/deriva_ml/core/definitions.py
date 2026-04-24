@@ -31,7 +31,7 @@ from deriva.core.typed import BuiltinType
 # =============================================================================
 # Re-exported Constants
 # =============================================================================
-# From constants.py: Schema names, RID patterns, and column definitions
+# From constants.py: Schema names, RID patterns, column definitions, and internal helpers
 from deriva_ml.core.constants import (
     DRY_RUN_RID,
     ML_SCHEMA,
@@ -39,8 +39,8 @@ from deriva_ml.core.constants import (
     SYSTEM_SCHEMAS,
     DerivaAssetColumns,
     DerivaSystemColumns,
-    get_domain_schemas,
-    is_system_schema,
+    _get_domain_schemas,
+    _is_system_schema,
     rid_part,
     rid_regex,
     snapshot_part,
@@ -128,9 +128,9 @@ __all__ = [
     "DerivaSystemColumns",
     "DerivaAssetColumns",
     "RID",
-    # Schema classification helpers
-    "is_system_schema",
-    "get_domain_schemas",
+    # Schema classification helpers (internal)
+    "_is_system_schema",
+    "_get_domain_schemas",
     # Enums
     "UploadState",
     "BuiltinType",

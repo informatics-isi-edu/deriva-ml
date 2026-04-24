@@ -39,8 +39,8 @@ class PathBuilderMixin:
 
     Methods:
         pathBuilder: Get catalog path builder for queries
-        domain_path: Property returning path builder for domain schema
-        table_path: Get local filesystem path for table CSV files
+        _domain_path: Internal path builder for domain schema
+        _table_path: Internal filesystem path for table CSV files
         get_table_as_dataframe: Get table contents as pandas DataFrame
         get_table_as_dict: Get table contents as dictionaries
     """
@@ -61,13 +61,17 @@ class PathBuilderMixin:
         Returns:
             datapath._CatalogWrapper: A new instance of the catalog path builder.
 
+        Raises:
+            Exception: If the catalog connection is unavailable.
+
         Example:
-            >>> path = ml.pathBuilder.schemas['my_schema'].tables['my_table']
-            >>> results = path.entities().fetch()
+            >>> pb = ml.pathBuilder()  # doctest: +SKIP
+            >>> path = pb.schemas['my_schema'].tables['my_table']  # doctest: +SKIP
+            >>> results = path.entities().fetch()  # doctest: +SKIP
         """
         return self.catalog.getPathBuilder()
 
-    def domain_path(self, schema: str | None = None) -> datapath.DataPath:
+    def _domain_path(self, schema: str | None = None) -> datapath.DataPath:
         """Returns path builder for a domain schema.
 
         Provides a convenient way to access tables and construct queries within a domain-specific schema.
@@ -82,15 +86,15 @@ class PathBuilderMixin:
             DerivaMLException: If no schema specified and default_schema is not set.
 
         Example:
-            >>> domain = ml.domain_path()  # Uses default schema
+            >>> domain = ml._domain_path()  # Uses default schema
             >>> results = domain.my_table.entities().fetch()
             >>> # Or with explicit schema:
-            >>> domain = ml.domain_path("my_schema")
+            >>> domain = ml._domain_path("my_schema")
         """
         schema = schema or self.model._require_default_schema()
         return self.pathBuilder().schemas[schema]
 
-    def table_path(self, table: str | Table, schema: str | None = None) -> Path:
+    def _table_path(self, table: str | Table, schema: str | None = None) -> Path:
         """Returns a local filesystem path for table CSV files.
 
         Generates a standardized path where CSV files should be placed when preparing to upload data to a table.
@@ -104,8 +108,8 @@ class PathBuilderMixin:
             Path: Filesystem path where the CSV file should be placed.
 
         Example:
-            >>> path = ml.table_path("experiment_results")
-            >>> df.to_csv(path) # Save data for upload
+            >>> path = ml._table_path("experiment_results")  # doctest: +SKIP
+            >>> df.to_csv(path)  # Save data for upload  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
         # Use table's schema if available, otherwise use provided schema or default
@@ -126,6 +130,12 @@ class PathBuilderMixin:
 
         Returns:
             DataFrame containing all table contents.
+
+        Raises:
+            DerivaMLTableNotFound: If the table does not exist in any schema.
+
+        Example:
+            >>> df = ml.get_table_as_dataframe("Subject")  # doctest: +SKIP
         """
         return pd.DataFrame(list(self.get_table_as_dict(table)))
 
@@ -139,6 +149,12 @@ class PathBuilderMixin:
 
         Returns:
             Iterable yielding dictionaries for each row.
+
+        Raises:
+            DerivaMLTableNotFound: If the table does not exist in any schema.
+
+        Example:
+            >>> rows = list(ml.get_table_as_dict("Subject"))  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
         pb = self.pathBuilder()
