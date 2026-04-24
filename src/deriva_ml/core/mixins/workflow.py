@@ -32,10 +32,11 @@ class WorkflowMixin:
 
     Methods:
         find_workflows: Find all workflows in the catalog
-        add_workflow: Add a workflow to the catalog
+        _add_workflow: Add a workflow to the catalog (internal factory)
         lookup_workflow: Look up a workflow by RID
         find_workflow_by_url: Find a workflow by URL or checksum
         create_workflow: Create a new workflow definition
+        list_workflow_executions: List execution RIDs for a workflow (via FeatureMixin)
     """
 
     # Type hints for IDE support - actual attributes/methods from host class
@@ -110,7 +111,7 @@ class WorkflowMixin:
             workflows.append(workflow)
         return workflows
 
-    def add_workflow(self, workflow: Workflow) -> RID:
+    def _add_workflow(self, workflow: Workflow) -> RID:
         """Adds a workflow to the catalog.
 
         Registers a new workflow in the catalog or returns the RID of an existing workflow with the same
@@ -135,7 +136,7 @@ class WorkflowMixin:
             ...     version="1.0.0",
             ...     description="Analyzes gene expression patterns"
             ... )
-            >>> workflow_rid = ml.add_workflow(workflow)
+            >>> workflow_rid = ml._add_workflow(workflow)
         """
         # Check if a workflow already exists by URL or checksum
         if workflow_rid := self._find_workflow_rid_by_url(workflow.checksum or workflow.url):
@@ -340,7 +341,7 @@ class WorkflowMixin:
             ...     workflow_type="python_notebook",
             ...     description="RNA sequence analysis pipeline"
             ... )
-            >>> rid = ml.add_workflow(workflow)
+            >>> rid = ml._add_workflow(workflow)
 
             Multiple types::
 

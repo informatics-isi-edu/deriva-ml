@@ -91,7 +91,7 @@ def create_test_asset(execution: Execution, filename: str = "test_model.txt", co
 
 def get_execution_status(ml: DerivaML, execution_rid: str) -> str:
     """Get the current status of an execution."""
-    return ml.retrieve_rid(execution_rid)["Status"]
+    return ml._retrieve_rid(execution_rid)["Status"]
 
 
 def get_execution_metadata_files(ml: DerivaML, execution_rid: str) -> list[str]:
@@ -230,8 +230,8 @@ class TestWorkflow:
         assert workflow.workflow_type == ["Test Workflow"]
         assert workflow.description == "Created via API"
 
-        # add_workflow adds it to the catalog (or returns existing if same URL/checksum)
-        workflow_rid = ml.add_workflow(workflow)
+        # _add_workflow adds it to the catalog (or returns existing if same URL/checksum)
+        workflow_rid = ml._add_workflow(workflow)
         assert workflow_rid is not None
 
         # Verify it's in the catalog
@@ -255,7 +255,7 @@ class TestWorkflow:
         assert workflow.workflow_type == ["Training", "Embedding"]
 
         # Add to catalog and verify
-        workflow_rid = ml.add_workflow(workflow)
+        workflow_rid = ml._add_workflow(workflow)
         looked_up = ml.lookup_workflow(workflow_rid)
         assert sorted(looked_up.workflow_type) == ["Embedding", "Training"]
 
@@ -269,7 +269,7 @@ class TestWorkflow:
             name="Types Property Test",
             workflow_type=["Training", "Embedding"],
         )
-        workflow_rid = ml.add_workflow(workflow)
+        workflow_rid = ml._add_workflow(workflow)
         looked_up = ml.lookup_workflow(workflow_rid)
 
         # workflow_types property should query association table
@@ -287,7 +287,7 @@ class TestWorkflow:
             name="Add Remove Type Test",
             workflow_type="Training",
         )
-        workflow_rid = ml.add_workflow(workflow)
+        workflow_rid = ml._add_workflow(workflow)
         looked_up = ml.lookup_workflow(workflow_rid)
 
         assert looked_up.workflow_types == ["Training"]
@@ -324,7 +324,7 @@ class TestWorkflow:
         # Pydantic validator normalizes to list
         assert workflow.workflow_type == ["Training"]
 
-        workflow_rid = ml.add_workflow(workflow)
+        workflow_rid = ml._add_workflow(workflow)
         looked_up = ml.lookup_workflow(workflow_rid)
         assert looked_up.workflow_types == ["Training"]
         assert looked_up.workflow_type == ["Training"]
@@ -447,11 +447,11 @@ class TestExecutionLifecycle:
         with execution.execute():
             # Inside execute() the status is Running — validated by the
             # state machine, no way to re-transition to Running here.
-            record = ml.retrieve_rid(execution.execution_rid)
+            record = ml._retrieve_rid(execution.execution_rid)
             assert record["Status"] == "Running"
 
         # After __exit__, status is Stopped.
-        record = ml.retrieve_rid(execution.execution_rid)
+        record = ml._retrieve_rid(execution.execution_rid)
         assert record["Status"] == "Stopped"
 
     def test_execution_metadata_files_uploaded(self, basic_execution):

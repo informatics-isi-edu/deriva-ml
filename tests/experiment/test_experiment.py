@@ -38,7 +38,7 @@ def test_workflow(workflow_terms):
         description="A test workflow for experiment testing",
     )
     # Register the workflow in the catalog and return a bound workflow
-    workflow_rid = ml.add_workflow(workflow)
+    workflow_rid = ml._add_workflow(workflow)
     return ml.lookup_workflow(workflow_rid)
 
 
@@ -151,7 +151,7 @@ def execution_with_hydra_config(workflow_terms, test_workflow, tmp_path):
 
 def get_execution_status(ml: DerivaML, execution_rid: str) -> str:
     """Get the current status of an execution."""
-    return ml.retrieve_rid(execution_rid)["Status"]
+    return ml._retrieve_rid(execution_rid)["Status"]
 
 
 # =============================================================================

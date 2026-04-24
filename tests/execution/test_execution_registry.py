@@ -316,8 +316,8 @@ def test_create_execution_kwargs_form_workflow_string_lookup(test_ml):
         description="for D6 string lookup test",
     )
     # Register the workflow in the catalog so lookup_workflow_by_url
-    # can find it. (add_workflow is idempotent on checksum.)
-    test_ml.add_workflow(wf)
+    # can find it. (_add_workflow is idempotent on checksum.)
+    test_ml._add_workflow(wf)
 
     exe = test_ml.create_execution(
         workflow=wf.url,

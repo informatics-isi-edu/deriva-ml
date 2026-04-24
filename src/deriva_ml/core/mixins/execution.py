@@ -45,7 +45,7 @@ class ExecutionMixin:
         - ml_schema: str - name of the ML schema
         - working_dir: Path - working directory path
         - pathBuilder(): method returning catalog path builder
-        - retrieve_rid(): method for retrieving RID data (from RidResolutionMixin)
+        - _retrieve_rid(): method for retrieving RID data (from RidResolutionMixin)
 
     Methods:
         create_execution: Create a new execution environment
@@ -58,7 +58,7 @@ class ExecutionMixin:
     ml_schema: str
     working_dir: Path
     pathBuilder: Callable[[], Any]
-    retrieve_rid: Callable[[RID], dict[str, Any]]
+    _retrieve_rid: Callable[[RID], dict[str, Any]]
     _execution: "Execution"
 
     def create_execution(
@@ -265,7 +265,7 @@ class ExecutionMixin:
                 f"RID '{execution_rid}' refers to a {resolved.table.name}, not an Execution"
             )
 
-        execution_data = self.retrieve_rid(execution_rid)
+        execution_data = self._retrieve_rid(execution_rid)
 
         # Parse timestamps if present
         start_time = None

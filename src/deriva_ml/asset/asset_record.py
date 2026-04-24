@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class AssetRecord(BaseModel):
     """Base class for dynamically generated asset metadata models.
 
-    Subclasses are created by ``asset_record_class()`` with fields derived
+    Subclasses are created by ``_asset_record_class()`` with fields derived
     from the asset table's metadata columns. Fields are typed according
     to their database column type and nullable columns are Optional.
 
@@ -55,7 +55,7 @@ def _map_column_type(typename: str) -> Type:
             return str
 
 
-def asset_record_class(model: DerivaModel, asset_table_name: str) -> type[AssetRecord]:
+def _asset_record_class(model: DerivaModel, asset_table_name: str) -> type[AssetRecord]:
     """Create a dynamically generated Pydantic model for an asset table's metadata.
 
     The returned class is a subclass of AssetRecord with fields derived from
