@@ -97,9 +97,7 @@ class DerivaMLDatabase:
 
     # ==================== Read Operations (Supported) ====================
 
-    def lookup_dataset(
-        self, dataset: RID | DatasetSpec, deleted: bool = False
-    ) -> DatasetBag:
+    def lookup_dataset(self, dataset: RID | DatasetSpec, deleted: bool = False) -> DatasetBag:
         """Look up a dataset by RID or spec.
 
         Args:
@@ -121,10 +119,7 @@ class DerivaMLDatabase:
         self._database_model.rid_lookup(rid)
 
         # Get dataset metadata
-        dataset_record = next(
-            (d for d in self._database_model._get_table_contents("Dataset") if d["RID"] == rid),
-            None
-        )
+        dataset_record = next((d for d in self._database_model._get_table_contents("Dataset") if d["RID"] == rid), None)
         if not dataset_record:
             raise DerivaMLException(f"Dataset {rid} not found in bag")
 
@@ -196,9 +191,7 @@ class DerivaMLDatabase:
 
         # Search for term in SQLite
         for term in self.get_table_as_dict(table_obj.name):
-            if term_name == term.get("Name") or (
-                term.get("Synonyms") and term_name in term.get("Synonyms", [])
-            ):
+            if term_name == term.get("Name") or (term.get("Synonyms") and term_name in term.get("Synonyms", [])):
                 # Convert synonyms to list if needed
                 synonyms = term.get("Synonyms")
                 if synonyms and not isinstance(synonyms, list):
@@ -264,8 +257,7 @@ class DerivaMLDatabase:
             DerivaMLException: Always, since bags are read-only.
         """
         raise DerivaMLException(
-            "Cannot create datasets in a downloaded bag. "
-            "Bags are immutable snapshots of catalog data."
+            "Cannot create datasets in a downloaded bag. Bags are immutable snapshots of catalog data."
         )
 
     def pathBuilder(self):
@@ -286,8 +278,7 @@ class DerivaMLDatabase:
             DerivaMLException: Always, since bags are already snapshots.
         """
         raise DerivaMLException(
-            "catalog_snapshot is not available for database-backed catalogs. "
-            "Bags are already immutable snapshots."
+            "catalog_snapshot is not available for database-backed catalogs. Bags are already immutable snapshots."
         )
 
     def resolve_rid(self, rid: RID) -> dict[str, Any]:

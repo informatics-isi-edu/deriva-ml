@@ -655,35 +655,27 @@ class DatasetBag:
 
         with Session(self.engine) as session:
             # Phase 1: try as a Workflow RID.
-            wf_rows = session.execute(
-                sa_select(workflow_table).where(workflow_table.c.RID == workflow)
-            ).mappings().all()
+            wf_rows = (
+                session.execute(sa_select(workflow_table).where(workflow_table.c.RID == workflow)).mappings().all()
+            )
 
             if wf_rows:
                 rows = session.execute(
-                    sa_select(execution_table.c.RID).where(
-                        execution_table.c.Workflow == workflow
-                    )
+                    sa_select(execution_table.c.RID).where(execution_table.c.Workflow == workflow)
                 ).all()
                 return [r[0] for r in rows]
 
             # Phase 2: fall back to Workflow_Type name via association table.
             wwt = self.model.find_table("Workflow_Workflow_Type")
             wf_of_type = [
-                r[0]
-                for r in session.execute(
-                    sa_select(wwt.c.Workflow).where(wwt.c.Workflow_Type == workflow)
-                ).all()
+                r[0] for r in session.execute(sa_select(wwt.c.Workflow).where(wwt.c.Workflow_Type == workflow)).all()
             ]
             if not wf_of_type:
                 raise DerivaMLException(
-                    f"No workflow resolved for '{workflow}' in bag — tried as "
-                    "Workflow RID and Workflow_Type name."
+                    f"No workflow resolved for '{workflow}' in bag — tried as Workflow RID and Workflow_Type name."
                 )
             rows = session.execute(
-                sa_select(execution_table.c.RID).where(
-                    execution_table.c.Workflow.in_(wf_of_type)
-                )
+                sa_select(execution_table.c.RID).where(execution_table.c.Workflow.in_(wf_of_type))
             ).all()
             return [r[0] for r in rows]
 
