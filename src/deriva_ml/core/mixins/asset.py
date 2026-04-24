@@ -1,7 +1,19 @@
 """Asset management mixin for DerivaML.
 
-This module provides the AssetMixin class which handles
-asset table operations including creating, listing, and looking up assets.
+This module provides the ``AssetMixin`` class, which manages asset tables
+in a Deriva catalog. An "asset" is a file-backed table whose rows track
+uploaded files (images, documents, model weights, etc.) together with
+provenance metadata.
+
+The mixin provides:
+    - ``create_asset``: Define a new asset table schema in the catalog.
+    - ``list_assets``: Query the contents of an existing asset table.
+
+Asset tables follow a fixed schema convention (Filename, URL, Length, MD5,
+Description plus system columns) augmented with user-defined metadata columns.
+Access controlled by ``AssetMixin`` is layered; the ``AssetMixin`` handles schema
+management while upload/download is handled by ``ExecutionMixin`` and the
+upload engine.
 """
 
 from __future__ import annotations
@@ -60,21 +72,50 @@ class AssetMixin:
         schema: str | None = None,
         update_navbar: bool = True,
     ) -> Table:
-        """Creates an asset table.
+        """Create a new asset table in the catalog.
+
+        Defines a Chaise-compatible asset table (Filename, URL, Length, MD5,
+        Description, plus system columns) with optional additional metadata
+        columns and foreign-key references. Registers the asset type in the
+        ``Asset_Type`` vocabulary and optionally updates the Chaise navigation
+        bar.
 
         Args:
-            asset_name: Name of the asset table.
-            column_defs: Iterable of ColumnDefinition objects to provide additional metadata for asset.
-            fkey_defs: Iterable of ForeignKeyDefinition objects to provide additional metadata for asset.
-            referenced_tables: Iterable of Table objects to which asset should provide foreign-key references to.
-            comment: Description of the asset table. (Default value = '')
-            schema: Schema in which to create the asset table.  Defaults to domain_schema.
-            update_navbar: If True (default), automatically updates the navigation bar to include
-                the new asset table. Set to False during batch asset creation to avoid redundant
-                updates, then call apply_catalog_annotations() once at the end.
+            asset_name: Name for the new asset table, e.g. ``"Image"`` or
+                ``"ModelWeights"``.
+            column_defs: Extra metadata columns beyond the standard asset
+                columns. Each is a ``ColumnDefinition`` specifying name, type,
+                nullability, and comment.
+            fkey_defs: Foreign-key definitions from the asset table to other
+                tables (e.g., linking images to a subject table).
+            referenced_tables: Tables that the new asset table should reference
+                via FKs. Convenience alternative to ``fkey_defs`` when only
+                a reference to an existing table is needed.
+            comment: Human-readable description of the asset table stored
+                as the table comment in the catalog.
+            schema: Schema in which to create the table. Defaults to
+                ``self.default_schema``.
+            update_navbar: If ``True`` (default), call
+                ``apply_catalog_annotations()`` immediately to add the new
+                table to the Chaise navigation bar. Set ``False`` when
+                creating multiple asset tables in a batch; call
+                ``apply_catalog_annotations()`` once at the end.
 
         Returns:
-            Table object for the asset table.
+            The newly created ``Table`` object.
+
+        Raises:
+            DerivaMLException: If a table named ``asset_name`` already exists
+                in the target schema.
+            DerivaMLSchemaError: If ``schema`` is not a valid schema in this
+                catalog.
+
+        Example:
+            >>> from deriva.core.typed import Column, builtin_types  # doctest: +SKIP
+            >>> ml.create_asset(  # doctest: +SKIP
+            ...     "ScanImage",  # doctest: +SKIP
+            ...     comment="MRI scan images",  # doctest: +SKIP
+            ... )  # doctest: +SKIP
         """
         # Initialize empty collections if None provided
         column_defs = column_defs or []
@@ -151,9 +192,9 @@ class AssetMixin:
             DerivaMLException: If the table is not an asset table or doesn't exist.
 
         Example:
-            >>> assets = ml.list_assets("Image")
-            >>> for asset in assets:
-            ...     print(f"{asset.asset_rid}: {asset.filename}")
+            >>> assets = ml.list_assets("Image")  # doctest: +SKIP
+            >>> for asset in assets:  # doctest: +SKIP
+            ...     print(f"{asset.asset_rid}: {asset.filename}")  # doctest: +SKIP
         """
         from deriva_ml.asset.asset import Asset
 
@@ -218,12 +259,12 @@ class AssetMixin:
 
         Example:
             >>> # Find all executions that created this asset
-            >>> executions = ml.list_asset_executions("1-abc123", asset_role="Output")
-            >>> for exe in executions:
-            ...     print(f"Created by execution {exe.execution_rid}")
+            >>> executions = ml.list_asset_executions("1-abc123", asset_role="Output")  # doctest: +SKIP
+            >>> for exe in executions:  # doctest: +SKIP
+            ...     print(f"Created by execution {exe.execution_rid}")  # doctest: +SKIP
 
             >>> # Find all executions that used this asset as input
-            >>> executions = ml.list_asset_executions("1-abc123", asset_role="Input")
+            >>> executions = ml.list_asset_executions("1-abc123", asset_role="Input")  # doctest: +SKIP
         """
         # Resolve the RID to find which asset table it belongs to
         rid_info = self.resolve_rid(asset_rid)  # type: ignore[attr-defined]
@@ -266,8 +307,8 @@ class AssetMixin:
             DerivaMLException: If the RID is not found or is not an asset.
 
         Example:
-            >>> asset = ml.lookup_asset("3JSE")
-            >>> print(f"File: {asset.filename}, Table: {asset.asset_table}")
+            >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
+            >>> print(f"File: {asset.filename}, Table: {asset.asset_table}")  # doctest: +SKIP
         """
         from deriva_ml.asset.asset import Asset
 
@@ -321,8 +362,8 @@ class AssetMixin:
             List of Table objects that are asset tables.
 
         Example:
-            >>> for table in ml.list_asset_tables():
-            ...     print(f"Asset table: {table.name}")
+            >>> for table in ml.list_asset_tables():  # doctest: +SKIP
+            ...     print(f"Asset table: {table.name}")  # doctest: +SKIP
         """
         tables = []
         # Include asset tables from all domain schemas
@@ -360,13 +401,13 @@ class AssetMixin:
 
         Example:
             >>> # Find all assets in the Model table
-            >>> models = list(ml.find_assets(asset_table="Model"))
+            >>> models = list(ml.find_assets(asset_table="Model"))  # doctest: +SKIP
 
             >>> # Find all assets with type "Training_Data"
-            >>> training = list(ml.find_assets(asset_type="Training_Data"))
+            >>> training = list(ml.find_assets(asset_type="Training_Data"))  # doctest: +SKIP
 
             >>> # Find all assets across all tables
-            >>> all_assets = list(ml.find_assets())
+            >>> all_assets = list(ml.find_assets())  # doctest: +SKIP
         """
         # Determine which tables to search
         if asset_table is not None:
@@ -400,9 +441,9 @@ class AssetMixin:
             An AssetRecord subclass with validated fields matching the table's metadata.
 
         Example:
-            >>> ImageAsset = ml.asset_record_class("Image")
-            >>> record = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")
-            >>> path = exe.asset_file_path("Image", "scan.jpg", metadata=record)
+            >>> ImageAsset = ml.asset_record_class("Image")  # doctest: +SKIP
+            >>> record = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")  # doctest: +SKIP
+            >>> path = exe.asset_file_path("Image", "scan.jpg", metadata=record)  # doctest: +SKIP
         """
         from deriva_ml.asset.asset_record import asset_record_class
         return asset_record_class(self.model, asset_table_name)
