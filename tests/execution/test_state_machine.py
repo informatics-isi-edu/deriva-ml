@@ -37,6 +37,27 @@ def test_retry_from_failed_back_to_pending_upload():
     assert (ExecutionStatus.Failed, ExecutionStatus.Pending_Upload) in ALLOWED_TRANSITIONS
 
 
+def test_hard_crash_recovery_running_to_pending_upload():
+    """Hard-crash recovery: Running → Pending_Upload must be legal.
+
+    Scenario: a process running an execution is SIGKILL'd (or OOM'd, or the
+    host loses power) while still in ``Running``. ``__exit__`` never runs,
+    so the status stays ``Running`` in both SQLite and the catalog. On a
+    fresh process the user calls::
+
+        exe = ml.resume_execution(rid)
+        exe.update_status(ExecutionStatus.Pending_Upload)
+        exe.upload_execution_outputs()
+
+    Marking the execution ``Failed`` first — which used to be the only
+    legal path forward — would pollute the audit trail with a spurious
+    failure marker. The direct ``Running → Pending_Upload`` edge documents
+    "my process died before it could mark itself done; please advance the
+    state and upload what I staged."
+    """
+    assert (ExecutionStatus.Running, ExecutionStatus.Pending_Upload) in ALLOWED_TRANSITIONS
+
+
 def test_validate_transition_accepts_allowed():
     validate_transition(
         current=ExecutionStatus.Running,
@@ -129,6 +150,46 @@ def test_transition_rejects_invalid(tmp_path):
             target=ExecutionStatus.Running,
             mode=ConnectionMode.offline,
         )
+
+
+def test_transition_running_to_pending_upload_on_crash_recovery(tmp_path):
+    """Hard-crash recovery path writes SQLite and marks sync_pending."""
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_machine import transition
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus,
+    )
+
+    eng = create_engine(f"sqlite:///{tmp_path}/t.db")
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    # Simulate what the state store looks like after a hard crash:
+    # status = Running, sync_pending = False (last catalog sync was the
+    # Created → Running transition that the crashed process completed
+    # before dying).
+    store.insert_execution(
+        rid="EXE-CRASH", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.Running,
+        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-CRASH",
+        created_at=now, last_activity=now,
+    )
+
+    transition(
+        store=store,
+        catalog=None,
+        execution_rid="EXE-CRASH",
+        current=ExecutionStatus.Running,
+        target=ExecutionStatus.Pending_Upload,
+        mode=ConnectionMode.offline,
+    )
+
+    row = store.get_execution("EXE-CRASH")
+    assert row["status"] == "Pending_Upload"
+    assert row["sync_pending"] is True
 
 
 class _MockTable:

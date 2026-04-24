@@ -67,10 +67,19 @@ class InvalidTransitionError(DerivaMLException):
 # The state diagram (spec §2.2):
 #
 #     created → running → {stopped, failed} → pending_upload → {uploaded, failed}
-#                                                      ↑             │
-#                                                      └──── retry ──┘
+#                 │                                   ↑             │
+#                 │    (hard-crash recovery)          │             │
+#                 └───────────────────────────────────┤             │
+#                                                     └──── retry ──┘
 #     created / running / stopped / failed → aborted (terminal)
 #     failed → pending_upload (retry_failed path)
+#     running → pending_upload (hard-crash recovery: process SIGKILL'd
+#       mid-run, so __exit__ never transitioned to Stopped. The user
+#       calls ``exe.update_status(ExecutionStatus.Pending_Upload)`` to
+#       advance past the crashed Running state, then
+#       ``upload_execution_outputs()``. Keeps the audit trail honest —
+#       "Failed" means the run failed, not "the process died before it
+#       could mark itself finished".
 
 ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozenset({
     # Happy path
@@ -78,6 +87,12 @@ ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozen
     (ExecutionStatus.Running, ExecutionStatus.Stopped),
     (ExecutionStatus.Stopped, ExecutionStatus.Pending_Upload),
     (ExecutionStatus.Pending_Upload, ExecutionStatus.Uploaded),
+
+    # Hard-crash recovery: resume path for an execution whose process
+    # died before __exit__ could run. Keeps the audit trail honest —
+    # "Failed" means the run failed, not "the process died before it
+    # could mark itself finished".
+    (ExecutionStatus.Running, ExecutionStatus.Pending_Upload),
 
     # Failure paths
     (ExecutionStatus.Running, ExecutionStatus.Failed),

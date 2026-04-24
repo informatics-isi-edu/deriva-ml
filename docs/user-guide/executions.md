@@ -314,16 +314,17 @@ exe.upload_execution_outputs()
 
 **Scenario A — exception inside the `with` block.** If your code raises and `__exit__` runs, the execution transitions to `Failed`. On restart, `ml.resume_execution(rid)` returns an execution already in `Failed` state. `upload_execution_outputs()` accepts `Failed` as a starting point (`Failed → Pending_Upload` is a legal transition) and flushes any staged outputs.
 
-**Scenario B — hard process crash (SIGKILL, OOM, power failure) inside the `with` block.** `__exit__` never runs, so the execution stays in `Running` in both SQLite and the catalog. On restart, `ml.resume_execution(rid)` runs just-in-time reconciliation: since both sides agree on `Running`, reconciliation is a no-op and the execution is returned still in `Running` state. Because `Running → Pending_Upload` is not a legal transition, you must first mark it terminal before uploading:
+**Scenario B — hard process crash (SIGKILL, OOM, power failure) inside the `with` block.** `__exit__` never runs, so the execution stays in `Running` in both SQLite and the catalog. On restart, `ml.resume_execution(rid)` runs just-in-time reconciliation: since both sides agree on `Running`, reconciliation is a no-op and the execution is returned still in `Running` state. Advance it to `Pending_Upload` and then call the upload helper:
 
 ```python
 exe = ml.resume_execution(rid)
-# Execution is in Running state — mark it failed so upload can proceed.
-exe.update_status(ExecutionStatus.Failed, "Resumed after hard crash")
-exe.upload_execution_outputs()   # Failed → Pending_Upload → Uploaded
+# Execution is in Running state — advance directly to Pending_Upload
+# to signal "the owning process died; please upload what I staged."
+exe.update_status(ExecutionStatus.Pending_Upload)
+exe.upload_execution_outputs()   # Pending_Upload → Uploaded
 ```
 
-Once the status is `Failed`, `upload_execution_outputs()` flushes any staged feature rows and asset manifest entries that survived in SQLite, completing the upload without re-running the model.
+`Running → Pending_Upload` is an intentional recovery edge in the state graph: it documents "this run never got to mark itself finished" without lying about the run's outcome (the audit trail stays free of a spurious `Failed` marker). `upload_execution_outputs()` then flushes any staged feature rows and asset manifest entries that survived in SQLite, completing the upload without re-running the model.
 
 **Notes:**
 
