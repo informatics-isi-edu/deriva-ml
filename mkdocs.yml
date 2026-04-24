@@ -44,6 +44,7 @@ nav:
       - Working with datasets: user-guide/datasets.md
       - Defining and using features: user-guide/features.md
       - Running an experiment: user-guide/executions.md
+      - Working offline: user-guide/offline.md
   - Getting Started:
       - Quick Start: getting-started/quick-start.md
       - Installation: getting-started/install.md
