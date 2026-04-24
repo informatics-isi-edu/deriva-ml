@@ -173,6 +173,63 @@ exe.upload_execution_outputs()
 - Call `add_features()` as many times as needed; rows accumulate in SQLite and are flushed in one batch.
 - `exe.add_features()` is the only way to write feature values. The top-level `ml.add_features()` method has been retired; any code using it should be updated.
 
+## How to record training metrics
+
+**Motivation.** Training runs produce per-epoch numbers — loss, accuracy, any eval metric — that you want to keep alongside the execution for later comparison and plotting. Metrics are not features (features describe rows of data, not the run that produced them), and they are not parameters (parameters describe inputs to the run). They are their own thing: scalars tagged by the training step that produced them. DerivaML records them as a plain text file attached to the execution as an `Execution_Metadata` asset — no extra catalog tables, no schema surgery.
+
+```python
+import json
+
+with ml.create_execution(config) as exe:
+    model = build_model()
+    optimizer = build_optimizer(model)
+
+    for epoch in range(num_epochs):
+        train_loss = train_one_epoch(model, optimizer, train_loader)
+        val_loss = evaluate(model, val_loader)
+
+        with exe.metrics_file().open("a") as f:
+            json.dump(
+                {"epoch": epoch, "train_loss": train_loss, "val_loss": val_loss},
+                f,
+            )
+            f.write("\n")
+
+exe.upload_execution_outputs()
+```
+
+**Explanation.** `exe.metrics_file()` returns an `AssetFilePath` pointing at a file in the execution's staging directory, registers it with the asset manifest on first call, and stamps its asset type as `Metrics_File` so the catalog's `Execution_Metadata.Type` column honestly describes the purpose of the file. Repeat calls to `exe.metrics_file()` within the same execution return the same path, so appending across an epoch loop is safe. `upload_execution_outputs()` uploads the file to Hatrac and inserts a row into `Execution_Metadata` linked to the execution, just like any other asset.
+
+The default filename is `metrics.jsonl` — one JSON record per line is the shape that lets downstream readers stream through the file without loading it whole. You can pass a different filename if you want to distinguish multiple streams (for example, `"train_metrics.jsonl"` and `"eval_metrics.jsonl"`); each distinct filename becomes its own `Execution_Metadata` asset on upload.
+
+**Reading metrics back from a bag:**
+
+```python
+import json
+from deriva_ml.core.enums import MLAsset
+
+bag = dataset.download_dataset_bag(version="1.0.0")
+
+# Find the metrics file in the bag's Execution_Metadata assets
+metadata_dir = bag.path / "data" / "assets" / MLAsset.execution_metadata.value
+metric_files = list(metadata_dir.rglob("metrics.jsonl"))
+
+records = []
+for path in metric_files:
+    for line in path.read_text().splitlines():
+        if line.strip():
+            records.append({"execution_rid": path.parent.name, **json.loads(line)})
+
+# records is now a list[dict] suitable for pd.DataFrame(records)
+```
+
+**Notes:**
+
+- The file itself is plain text. JSON-lines is the recommended shape but CSV, YAML, or a single JSON object also work as long as your readback code knows the format. DerivaML never opens the file during upload — it only tracks it as a generic asset.
+- `metrics_file()` is sugar, not substance. It is equivalent to `asset_file_path(MLAsset.execution_metadata, "metrics.jsonl", asset_types=ExecMetadataType.metrics_file.value)`. If you need the full call (e.g. to pass extra metadata), call `asset_file_path()` directly.
+- For high-throughput logging (thousands of writes per second inside a tight batch loop), file-append is the wrong shape — the fsync cost dominates. Either buffer in memory and flush once per epoch, or open an issue if you have a concrete use case that needs server-side queryable metrics.
+- Metrics written this way are **not** queryable from the catalog like features are — comparing metrics across runs requires downloading each bag and parsing the file. This is an intentional trade-off: the file-as-asset design keeps the API simple for lab-scale use (tens of runs per experiment), at the cost of not scaling to MLflow-style leaderboard queries.
+
 ## How to upload outputs
 
 **Motivation.** Uploading is deliberately separate from running. Large file uploads can take minutes; keeping them outside the context manager means the execution timing reflects computation time, not upload latency. It also lets you inspect outputs before committing them to the catalog.
