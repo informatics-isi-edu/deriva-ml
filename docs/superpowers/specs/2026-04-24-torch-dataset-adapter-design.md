@@ -600,14 +600,21 @@ A user who writes `targets={"Diagnosis": FeatureRecord.select_newest}`
 for the adapter can use the same dict for `restructure_assets`. The
 alignment is *input-shape* only; output shapes remain distinct. §8
 documents the specific changes to `restructure_assets` that achieve
-this alignment, and the deprecation path for users on the old
-parameter names.
+this alignment — a clean-break rename, not a deprecation cycle — and
+the migration guidance for any callers on the old parameter names.
 
 ## 8. `restructure_assets` alignment scope (same PR)
 
 Per anchor 7 and §3.7, the adapter work lands together with a
 coordinated signature update to `restructure_assets`. This section
 enumerates what changes on the restructure side and why.
+
+This is a **clean break** — the old parameter names are removed, not
+deprecated. Rationale: deriva-ml is not yet at the scale where
+maintaining a deprecation-warning surface pays for itself, and
+carrying legacy kwargs through the rename would bake in the exact
+naming inconsistency this alignment is meant to remove. Downstream
+impact is explicitly accepted and called out in §11 (risks).
 
 ### 8.1 Parameter renames
 
@@ -616,12 +623,9 @@ enumerates what changes on the restructure side and why.
 | `group_by: list[str] | None` | `targets: list[str] | dict[str, FeatureSelector] | None` | "group_by" was SQL-flavored and misleading in the ML context. "targets" reads consistently across both methods: what determines the output, directory-name or label. |
 | `value_selector: Callable | None` | merged into `targets` dict form | Single-selector was strictly less expressive than per-feature selectors. The dict form subsumes it: `targets={"A": FeatureRecord.select_newest}` covers `value_selector=FeatureRecord.select_newest` for the single-feature case. |
 
-**Deprecation path for `group_by` and `value_selector`**: both continue
-to work for one release cycle. Passing `group_by` emits a
-`DeprecationWarning` pointing at `targets`; same for `value_selector`.
-Removed in the next major release. Concrete mechanism: check for the
-old kwargs in the method body, issue the warning, and forward the
-value to the new parameter name internally.
+Passing the old kwargs after this PR lands raises `TypeError`
+("unexpected keyword argument") — the standard Python signal for a
+removed keyword. No `DeprecationWarning` shim, no alias.
 
 ### 8.2 New parameter: `target_transform`
 
@@ -631,11 +635,11 @@ Restructure today derives directory names directly from feature values
 the directory name:
 
 ```python
-# Today (still works, deprecated):
+# Before this PR:
 bag.restructure_assets(output_dir="./out", group_by=["Classification.Label"])
 # → directories named after the Label column value
 
-# Aligned form:
+# After this PR:
 bag.restructure_assets(
     output_dir="./out",
     targets=["Classification"],
@@ -643,16 +647,16 @@ bag.restructure_assets(
 )
 ```
 
-The `"Feature.column"` dotted-string syntax is **deprecated** with a
-`DeprecationWarning` pointing at `target_transform`, but continues to
-work for one release cycle to avoid breakage in existing scripts.
+The `"Feature.column"` dotted-string syntax is **removed**. Calls that
+pass it raise `DerivaMLValidationError` at construction explaining the
+new form. Users rewrite their one-line `group_by=["Feature.column"]`
+as a two-line `targets=["Feature"]` + `target_transform=lambda rec: rec.column`.
 
-Runtime constraint: `target_transform`'s return type is validated at
-the first `__getitem__`-equivalent call (inside the directory-naming
-loop). A non-string return raises `DerivaMLValidationError` with a
-message explaining that restructure's target_transform must return a
-filesystem-name-compatible string. (The adapter version has no such
-constraint.)
+Runtime constraint: `target_transform`'s return type is checked at
+the first directory-naming call. A non-string return raises
+`DerivaMLValidationError` with a message explaining that restructure's
+target_transform must return a filesystem-name-compatible string.
+(The adapter version has no such constraint.)
 
 ### 8.3 New parameter: `missing`
 
@@ -663,7 +667,11 @@ unified vocabulary.
 After alignment:
 
 - `missing: Literal["error", "skip", "unknown"] = "unknown"`
-- Default `"unknown"` preserves today's behavior (non-breaking change).
+- Default `"unknown"` preserves today's behavior for callers that
+  don't explicitly pass the kwarg. This is the one concession to
+  continuity: the typical `bag.restructure_assets(output_dir="./out",
+  targets=["Diagnosis"])` call produces the same directory tree as
+  before.
 - `"error"` gives users the strict-mode option (raise at construction
   listing unlabeled RIDs) for when they want to ensure their training
   data is complete before committing to disk.
@@ -720,32 +728,38 @@ implementation-plan detail.
 ### 8.6 Testing impact
 
 New tests verify the aligned semantics on restructure:
-- `targets=[...]` produces the same dir layout as the old
-  `group_by=[...]` form.
-- `value_selector=...` + `targets=[...]` with no selector dict
-  emits a DeprecationWarning and maps to the dict form correctly.
+- `targets=[...]` produces the expected directory layout.
+- `targets={"A": selector}` applies the selector per-feature.
 - `missing="error"` raises on sparse-labeled bags.
 - `missing="skip"` omits assets from the output tree.
-- `missing="unknown"` preserves today's behavior (assets land in
-  `unknown/`).
+- `missing="unknown"` places unlabeled assets in `unknown/` (the
+  preserved default behavior).
 - `target_transform` returning a non-string raises
   `DerivaMLValidationError`.
-- `"Feature.column"` dotted syntax continues to work with a
-  DeprecationWarning.
+- Passing `group_by=` raises `TypeError` (unexpected keyword).
+- Passing `value_selector=` raises `TypeError` (unexpected keyword).
+- Passing a `"Feature.column"` dotted string as a target raises
+  `DerivaMLValidationError` with the new-form hint.
 
-Existing restructure tests stay green without modification (they
-exercise the `group_by` + `value_selector` shape, which still works
-with deprecation warnings).
+**Existing restructure tests that use `group_by` / `value_selector`
+must be updated as part of this PR** — the break is intentional.
+The implementation plan's verification step includes converting the
+existing test suite to the new signature and confirming it still
+covers the same behavior.
 
 ### 8.7 Documentation impact
 
-Docstring for `restructure_assets` is rewritten to use the new
-parameter names (and note the deprecated aliases). The UG Chapter 5
-section on `restructure_assets` gets updated examples in the same
-style as the adapter section — same vocabulary, same selector
-examples, same `missing` callouts. A one-paragraph "Vocabulary
-alignment with `as_torch_dataset`" sidebar explains the shared
-parameter names.
+Docstring for `restructure_assets` is rewritten to the new signature
+— no references to the old parameter names in the docstring body.
+A short "Migration note" section near the bottom of the docstring
+maps the old call shapes (`group_by=`, `value_selector=`,
+`"Feature.column"`) onto the new equivalents so users who find the
+docstring while debugging a `TypeError` can translate their code.
+The UG Chapter 5 section on `restructure_assets` gets updated
+examples in the same style as the adapter section — same vocabulary,
+same selector examples, same `missing` callouts. A one-paragraph
+"Vocabulary alignment with `as_torch_dataset`" sidebar explains the
+shared parameter names.
 
 ## 9. Non-goals (explicit)
 
@@ -806,20 +820,24 @@ deliverables the plan must cover.
 
 - [ ] `src/deriva_ml/dataset/dataset_bag.py` — `restructure_assets`
   signature updated:
-  - Rename `group_by` → `targets` (with deprecated alias)
-  - Deprecate `value_selector` (merged into `targets` dict form)
-  - Add `target_transform` parameter
+  - Rename `group_by` → `targets` (clean break; old kwarg removed)
+  - Remove `value_selector` (replaced by `targets` dict form)
+  - Add `target_transform` parameter with string-return check
   - Add `missing: Literal["error", "skip", "unknown"] = "unknown"`
-  - Keep `"Feature.column"` dotted syntax with DeprecationWarning
-- [ ] `restructure_assets` docstring rewritten to use new parameter
-  names and document the deprecated aliases
+  - Remove `"Feature.column"` dotted syntax in targets
+- [ ] `restructure_assets` docstring rewritten to the new signature.
+  No references to the old parameter names beyond a single migration
+  note (see cross-cutting checklist below).
 - [ ] `docs/user-guide/offline.md` — update existing restructure
   section to use new parameter names; add short "Vocabulary
   alignment with `as_torch_dataset`" sidebar
-- [ ] `tests/dataset/test_restructure_*` — new tests per §8.6 covering
-  aligned semantics + deprecation warnings
-- [ ] Any existing test that uses `group_by=` keeps passing (with
-  deprecation warning filtered or matched)
+- [ ] `tests/dataset/test_restructure_*` — update existing tests to
+  use the new signature (intentional break, not a migration path);
+  add new tests per §8.6 covering the aligned semantics
+- [ ] Grep sibling repos (`deriva-ml-model-template`, `deriva-ml-apps`,
+  `deriva-ml-demo`, `deriva-ml-template-test`) for callers of the
+  removed kwargs and flag them in the PR description so template
+  maintainers can update in lockstep
 
 **Cross-cutting:**
 
@@ -828,8 +846,10 @@ deliverables the plan must cover.
 - [ ] Fast suite green (`tests/local_db/ tests/asset/ tests/model/
   tests/dataset/test_torch_adapter_* tests/dataset/test_restructure_*`)
 - [ ] Ruff check + format clean (parity with main baseline)
-- [ ] CHANGELOG or similar (if the project maintains one) noting the
-  `restructure_assets` parameter-rename deprecation
+- [ ] PR description includes a "Breaking changes" section naming
+  the removed `restructure_assets` kwargs and the required migration
+  (`group_by=` → `targets=`, `value_selector=` → `targets={feature:
+  selector}`, `"Feature.column"` → explicit `target_transform`)
 
 ## 11. Risks and mitigations
 
@@ -861,15 +881,24 @@ anything; it reads.
 without `[torch]` leaves torch out entirely. The default install
 remains lean.
 
-**Risk: `restructure_assets` parameter deprecation breaks downstream
-scripts.** Three downstream repos (deriva-ml-model-template, apps,
-demo) may use `group_by=` or `value_selector=` in their example code.
-Mitigation: the old parameter names continue to work for one release
-cycle with a `DeprecationWarning`; removal is a named separate PR
-scheduled for the next major release. The plan's verification step
-includes grepping sibling repos for the deprecated kwargs and noting
-them in the PR description so template-repo owners can schedule their
-update.
+**Risk: `restructure_assets` parameter rename is a hard break for any
+downstream caller using `group_by=`, `value_selector=`, or the
+`"Feature.column"` dotted-string syntax in targets.** This is an
+explicit choice (§8) — deriva-ml is not yet at the scale where a
+deprecation surface pays for itself, and keeping the old names as
+aliases would bake in the inconsistency that motivated the rename.
+Mitigation is twofold: (1) the implementation plan includes a grep of
+sibling repos (`deriva-ml-model-template`, `deriva-ml-apps`,
+`deriva-ml-demo`, `deriva-ml-template-test`) to enumerate callers and
+flag them in the PR description, so template maintainers can update
+in lockstep with this PR landing; (2) the PR description carries a
+"Breaking changes" section with a concrete migration mapping so
+downstream users who pull the new version see exactly what to
+substitute. The `missing` default stays at `"unknown"` so the
+most common unparameterized call (`bag.restructure_assets(output_dir=
+"./out", targets=["Diagnosis"])`) produces the same tree as before
+the PR — the break is contained to callers that were exercising the
+renamed surface.
 
 **Risk: Shared `_resolve_targets` helper introduces coupling that
 makes future per-method changes harder.** Mitigation: the helper has a
@@ -896,8 +925,3 @@ can be inlined back per-method with a single commit.
   class-balance computation from feature values could be a helper,
   but users can do this themselves from the dataset length + target
   list today.
-- **Remove deprecated `restructure_assets` parameters** (scheduled):
-  At the next major release, remove the `group_by` and
-  `value_selector` kwargs and the `"Feature.column"` dotted-string
-  syntax in `targets`. Tracked as a separate PR keyed off the major
-  version bump.
