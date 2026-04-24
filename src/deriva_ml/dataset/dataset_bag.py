@@ -57,6 +57,7 @@ from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature, FeatureRecord
 
 if TYPE_CHECKING:
+    import tensorflow as tf
     import torch.utils.data
 
     from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
@@ -1606,6 +1607,177 @@ class DatasetBag:
             targets=targets,
             target_transform=target_transform,
             missing=missing,
+        )
+
+    def as_tf_dataset(
+        self,
+        element_type: str,
+        *,
+        sample_loader: Callable[[Path | None, dict[str, Any]], Any] | None = None,
+        transform: Callable[[Any], Any] | None = None,
+        targets: list[str] | dict[str, Any] | None = None,
+        target_transform: Callable[..., Any] | None = None,
+        missing: Literal["error", "skip", "unknown"] = "error",
+        output_signature: "tf.TensorSpec | tuple[tf.TensorSpec, ...] | None" = None,
+    ) -> "tf.data.Dataset":
+        """Build a ``tf.data.Dataset`` from this bag.
+
+        Creates a ``tf.data.Dataset`` backed by a Python generator that
+        reads samples and labels from this already-downloaded
+        ``DatasetBag``. TensorFlow is imported lazily inside the builder
+        so the base library stays importable without TensorFlow installed.
+
+        Each call to the generator yields one element (sample, or
+        ``(sample, target)`` when ``targets`` is supplied). Callers are
+        responsible for chaining ``.batch()`` and ``.prefetch()`` to get
+        production throughput — the method does not apply batching itself.
+
+        Labels come from the bag's feature values via
+        ``bag.feature_values(element_type, feature_name, selector=...)``.
+        The user's ``target_transform`` maps the typed ``FeatureRecord``
+        into whatever numeric shape the loss function expects. The library
+        does not hold or auto-fit a class-to-index table (design anchor 2).
+
+        Args:
+            element_type: Name of the domain table whose rows become the
+                dataset's samples (e.g., ``"Image"``). Must be a table
+                present in the bag (same error path as
+                ``list_dataset_members``). Whether ``sample_loader`` is
+                required depends on whether this is an asset table — see
+                the ``sample_loader`` entry below.
+
+            sample_loader: ``Callable[[Path | None, dict], Any]``. Invoked
+                once per generated element. Receives:
+
+                - ``Path | None`` — absolute filesystem path under
+                  ``bag.path / "data/assets/<element_type>/<rid>/<filename>"``
+                  when ``element_type`` is an asset table; ``None``
+                  otherwise.
+                - ``dict[str, Any]`` — the raw row dict from the element
+                  table (all columns, not just those the framework needs).
+
+                For **asset-table** ``element_type``: no default — raises
+                ``DerivaMLException`` at construction if ``sample_loader``
+                is ``None``. The error message names common loaders
+                (``PIL.Image.open``, ``nibabel.load``, ``h5py.File``) as
+                hints.
+
+                For **non-asset-table** ``element_type``: default returns
+                ``row_dict`` unchanged. Useful for tabular training where
+                the element IS the row data with no file decoding.
+
+            transform: ``Callable[[Any], Any]``. Applied to the sample
+                after ``sample_loader`` returns. Use this for any
+                preprocessing (e.g., resizing, normalization, conversion
+                to ``tf.Tensor``). No-op default.
+
+            targets: Source of label data. Three shapes are accepted:
+
+                - ``None`` (default) — unlabeled dataset. Each element is
+                  just the sample (not a tuple). Useful for inference loops
+                  and self-supervised pretext tasks.
+                - ``list[str]`` — feature names read via
+                  ``bag.feature_values(element_type, name)`` with no
+                  selector. One ``FeatureRecord`` is resolved per element.
+                - ``dict[str, FeatureSelector]`` — feature names mapped to
+                  selector callables, passed verbatim to
+                  ``bag.feature_values(..., selector=...)``. Resolves
+                  multi-annotator cases. Built-in selectors:
+                  ``FeatureRecord.select_newest``, ``select_first``, etc.
+
+            target_transform: ``Callable`` consuming the raw feature-record
+                shape (see target arity below) and returning whatever the
+                user's loss function expects (typically a ``tf.Tensor``).
+                No-op default returns the feature record(s) as-is.
+
+                Target arity:
+
+                - Single-target (``targets=["A"]``): receives a
+                  ``FeatureRecord`` directly.
+                - Multi-target (``targets=["A", "B"]``): receives
+                  ``dict[str, FeatureRecord]`` keyed by feature name.
+
+            missing: Behavior when a feature value is absent for an element:
+
+                - ``"error"`` (default) — raise ``DerivaMLException`` at
+                  adapter construction time, before any element is generated.
+                  Message includes the list of unlabeled RIDs.
+                  Explicit-over-silent: users should know if their dataset
+                  is partially labeled.
+                - ``"skip"`` — drop unlabeled elements from the dataset
+                  entirely. Only labeled elements are yielded.
+                - ``"unknown"`` — keep all elements; pass ``None`` to the
+                  user's ``target_transform`` for unlabeled ones. The
+                  ``target_transform`` must handle ``None`` (typically
+                  returning a sentinel class index or an ignore-mask value).
+                  Useful for semi-supervised and self-training workflows.
+
+            output_signature: ``tf.TypeSpec`` (or nested structure of specs
+                such as ``(tf.TensorSpec(...), tf.TensorSpec(...))``)
+                describing the shape and dtype of each element produced by
+                the generator. When ``None`` (default), the first sample is
+                consumed eagerly to infer the signature via
+                ``tf.type_spec_from_value``, then the generator is
+                re-wrapped so the first sample is not lost. Providing an
+                explicit signature avoids the eager-inference overhead and
+                is preferred for production use.
+
+        Returns:
+            A ``tf.data.Dataset`` whose elements are:
+
+            - ``sample`` when ``targets=None`` (unlabeled).
+            - ``(sample, target)`` when ``targets`` is set, where
+              ``sample = transform(sample_loader(path, row_dict))`` and
+              ``target = target_transform(feature_record_shape)``.
+
+            Callers must chain ``.batch()`` / ``.prefetch()`` themselves —
+            the returned dataset is unbatched.
+
+        Raises:
+            ImportError: If TensorFlow is not installed. Install with
+                ``pip install 'deriva-ml[tf]'`` or
+                ``pip install 'tensorflow>=2.15'``.
+            DerivaMLException: If ``element_type`` is not in the bag,
+                if ``element_type`` is an asset table and ``sample_loader``
+                is ``None``, if ``missing="error"`` and any element lacks
+                a feature value (message lists up to 20 unlabeled RIDs),
+                or if ``output_signature=None`` and the generator produces
+                no elements (cannot infer signature).
+            FileNotFoundError: During iteration if the asset file is
+                missing on disk (bag corrupted or removed after
+                construction).
+
+        Example:
+            >>> # Simple image classification with a single feature label:
+            >>> import PIL.Image  # doctest: +SKIP
+            >>> bag = ml.download_dataset_bag(version="1.0.0")  # doctest: +SKIP
+            >>> ds = bag.as_tf_dataset(  # doctest: +SKIP
+            ...     element_type="Image",
+            ...     sample_loader=lambda p, row: tf.image.decode_jpeg(
+            ...         tf.io.read_file(str(p))
+            ...     ),
+            ...     targets=["Glaucoma_Grade"],
+            ...     target_transform=lambda rec: CLASS_TO_IDX[rec.Grade],
+            ... )
+            >>> for batch in ds.batch(32).prefetch(2):  # doctest: +SKIP
+            ...     images, labels = batch
+
+            >>> # Pure-Python assertion — runs for real:
+            >>> from deriva_ml.dataset.tf_adapter import build_tf_dataset
+            >>> callable(build_tf_dataset)
+            True
+        """
+        from deriva_ml.dataset.tf_adapter import build_tf_dataset
+
+        return build_tf_dataset(
+            self,
+            element_type,
+            sample_loader=sample_loader,
+            transform=transform,
+            targets=targets,
+            target_transform=target_transform,
+            missing=missing,
+            output_signature=output_signature,
         )
 
     def restructure_assets(
