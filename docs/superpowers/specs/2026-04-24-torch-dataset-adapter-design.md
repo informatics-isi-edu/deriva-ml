@@ -77,6 +77,30 @@ error behavior, and selector handling mirror
 feature API should be able to read the adapter's signature without
 surprise.
 
+**Anchor 6: Composition over replacement; no feature overlap.**
+deriva-ml already answers several questions the adapter could try to
+re-solve:
+
+- **Train/val/test splitting** lives in `split_dataset` (with
+  stratification via `stratify_by_column`). Each partition becomes its
+  own catalog dataset and its own bag; the adapter handles each bag
+  independently. This is the one real **composition** pattern — see
+  §7.4.1.
+- **Filesystem-layout rewrites for third-party tools** (`ImageFolder`
+  et al.) live in `restructure_assets`. This is an **alternative** to
+  the adapter, not a pipeline step: the two tools solve the same
+  problem with different shapes (lazy in-place read vs. eager
+  on-disk rewrite). See §7.4.3 for why they don't chain.
+- **Catalog-level annotation joins** live in
+  `bag.get_denormalized_as_dataframe` and `bag.feature_values`. The
+  adapter reads feature values through the existing API (anchor 1),
+  it doesn't invent a second path.
+
+The adapter's v1 job is exactly one thing: lazy iteration over an
+already-defined bag. It does not duplicate these neighboring tools,
+does not wrap them in competing convenience methods, and does not
+offer knobs that replicate theirs.
+
 ## 3. Public API
 
 ### 3.1 Signature
@@ -354,11 +378,121 @@ PyTorch model from a bag"**. Structure follows the UG contract:
   users first learn about bags.
 - `DatasetBag.restructure_assets`'s docstring gets one sentence
   pointing at `as_torch_dataset` as the general-case companion.
+- `split_dataset` (in `src/deriva_ml/dataset/split.py`) gets one
+  sentence in its docstring's Examples / See Also section pointing
+  at the composition pattern in §7.4 below. No signature change;
+  existing behavior preserved.
 - The `DatasetBag` class-level docstring gets one bullet mentioning
   the adapter alongside the existing `restructure_assets()` mention.
   (The corresponding paragraph in `CLAUDE.md` — the project-level
   codebase notes — gets the same one-sentence addition for future
   agentic work, tracked as part of the plan's UG-integration task.)
+
+### 7.4 Composition with existing dataset APIs
+
+The adapter **composes** with the other data-shaping primitives; it
+does not replace them. Three composition patterns need dedicated
+coverage in the UG section and in docstrings because they are the
+most common production flows.
+
+#### 7.4.1 Stratified train/val/test split → per-partition torch datasets
+
+`split_dataset` creates a parent `Split` catalog dataset with child
+`Training`, `Testing`, and optionally `Validation` datasets. Each
+partition is a standalone dataset — download each as its own bag,
+then turn each bag into its own `torch.utils.data.Dataset` via the
+adapter. The adapter does not need split-awareness; each bag is
+independent.
+
+```python
+from deriva_ml.dataset.split import split_dataset
+
+# Upstream (online): create stratified split hierarchy in catalog
+split = split_dataset(
+    ml,
+    source_dataset_rid="28D0",
+    test_size=0.2,
+    val_size=0.1,
+    stratify_by_column="Image_Classification.Image_Class",
+    seed=42,
+)
+# split.training.rid, split.testing.rid, split.validation.rid are
+# three new catalog dataset RIDs.
+
+# Later (offline training): one bag per partition
+train_bag = ml.lookup_dataset(split.training.rid).download_dataset_bag(
+    version="1.0.0"
+)
+val_bag   = ml.lookup_dataset(split.validation.rid).download_dataset_bag(
+    version="1.0.0"
+)
+test_bag  = ml.lookup_dataset(split.testing.rid).download_dataset_bag(
+    version="1.0.0"
+)
+
+# Build torch datasets from each bag independently
+kwargs = dict(
+    element_type="Image",
+    sample_loader=lambda p, row: PIL.Image.open(p).convert("RGB"),
+    targets=["Image_Classification"],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Image_Class],
+    transform=train_transform,
+)
+train_ds = train_bag.as_torch_dataset(**{**kwargs, "transform": train_transform})
+val_ds   = val_bag.as_torch_dataset(**{**kwargs, "transform": eval_transform})
+test_ds  = test_bag.as_torch_dataset(**{**kwargs, "transform": eval_transform})
+
+train_loader = DataLoader(train_ds, batch_size=32, shuffle=True,  num_workers=4)
+val_loader   = DataLoader(val_ds,   batch_size=32, shuffle=False, num_workers=4)
+test_loader  = DataLoader(test_ds,  batch_size=32, shuffle=False, num_workers=4)
+```
+
+**Why this works cleanly:** each partition inherits the full feature
+coverage of the source dataset (the split only selects RIDs; feature
+values for those RIDs remain attached). Stratification happens at
+split time against the denormalized catalog DataFrame, so the label
+distribution is correct by construction; the adapter just reads it
+back through `feature_values(...)` the same way it would for any bag.
+
+#### 7.4.2 `restructure_assets` vs `as_torch_dataset` — these are alternatives, not a pipeline
+
+A natural question: "can I call `restructure_assets` first and then feed
+the result into `as_torch_dataset`?" The short answer is **no, and you
+wouldn't want to**. These two tools solve the same problem with
+different shapes, not two halves of one workflow.
+
+| Need | Tool |
+|---|---|
+| Lazy streaming, no disk rewrite, full `FeatureRecord` access, any element type | `as_torch_dataset` |
+| Compatibility with `torchvision.datasets.ImageFolder` or a third-party trainer that expects the `ImageFolder` directory convention | `restructure_assets` + `ImageFolder` |
+
+**Why they don't chain:** `restructure_assets` creates a *new directory*
+with the `ImageFolder` layout by copying or symlinking from the bag's
+flat `data/assets/<type>/<rid>/<file>` tree. It doesn't modify the
+bag. `as_torch_dataset`'s path resolution is hard-coded to
+`bag.path / "data/assets/<type>/<rid>/<file>"` — it reads from the
+bag, not from the restructured sibling tree. Restructuring first and
+then calling the adapter buys nothing: the adapter still reads the
+unchanged bag, and the restructured tree sits unused.
+
+**Picking between them:**
+
+- If your downstream consumer is a `torchvision.datasets.ImageFolder`
+  instance (or any code that expects a class-folder directory layout),
+  use `restructure_assets`. The adapter is the wrong tool.
+- If your downstream consumer is your own `torch.utils.data.DataLoader`
+  and you want the full `FeatureRecord` for each sample, use the
+  adapter. `restructure_assets` is the wrong tool.
+- If you need **both** — e.g., you want an `ImageFolder` for a baseline
+  comparison and a custom adapter for your main model — run
+  `restructure_assets` once and call `as_torch_dataset` independently
+  on the same bag. They don't conflict; they just don't collaborate.
+
+The adapter deliberately does **not** offer a `layout="image_folder"`
+shortcut to drive `restructure_assets` under the hood. Keeping the two
+primitives separate means `restructure_assets` has a clear contract
+(it rewrites disk), the adapter has a clear contract (it reads disk
+lazily), and users see in their own code which tool they chose.
 
 ## 8. Non-goals (explicit)
 
