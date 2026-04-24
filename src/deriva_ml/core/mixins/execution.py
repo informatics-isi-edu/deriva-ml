@@ -126,7 +126,7 @@ class ExecutionMixin:
         Example:
             Config-object form::
 
-                >>> config = ExecutionConfiguration(
+                >>> config = ExecutionConfiguration(  # doctest: +SKIP
                 ...     workflow=workflow,
                 ...     description="Process samples",
                 ...     datasets=[DatasetSpec(rid="4HM", version="1.0.0")],
@@ -138,7 +138,7 @@ class ExecutionMixin:
 
             Kwargs form (equivalent)::
 
-                >>> with ml.create_execution(
+                >>> with ml.create_execution(  # doctest: +SKIP
                 ...     datasets=["4HM@1.0.0"],
                 ...     workflow=workflow,
                 ...     description="Process samples",
@@ -252,7 +252,7 @@ class ExecutionMixin:
                 refer to an Execution record.
 
         Example:
-            >>> record = ml.lookup_execution("1-abc123")
+            >>> record = ml.lookup_execution("1-abc123")  # doctest: +SKIP
             >>> record.status = ExecutionStatus.Uploaded   # writes to catalog
         """
         # Import here to avoid circular dependency
@@ -337,7 +337,7 @@ class ExecutionMixin:
             row in the registry. Empty list if nothing matches.
 
         Example:
-            >>> from deriva_ml.execution.state_store import ExecutionStatus
+            >>> from deriva_ml.execution.state_store import ExecutionStatus  # doctest: +SKIP
             >>> failed = ml.list_executions(status=ExecutionStatus.Failed)
             >>> for snap in failed:
             ...     print(snap.rid, snap.error)
@@ -367,7 +367,7 @@ class ExecutionMixin:
             that has at least one registry row.
 
         Example:
-            >>> print(ml.pending_summary().render())
+            >>> print(ml.pending_summary().render())  # doctest: +SKIP
         """
         from deriva_ml.execution.pending_summary import WorkspacePendingSummary
 
@@ -394,7 +394,7 @@ class ExecutionMixin:
             execution known to the local registry.
 
         Example:
-            >>> for snap in ml.find_incomplete_executions():
+            >>> for snap in ml.find_incomplete_executions():  # doctest: +SKIP
             ...     print(snap.rid, snap.status, snap.pending_rows)
         """
         return self.list_executions(
@@ -437,7 +437,7 @@ class ExecutionMixin:
                 (see state_machine.reconcile_with_catalog).
 
         Example:
-            >>> ml = DerivaML(hostname="example.org", catalog_id="42")
+            >>> ml = DerivaML(hostname="example.org", catalog_id="42")  # doctest: +SKIP
             >>> exe = ml.resume_execution("5-ABC")
             >>> exe.status
             <ExecutionStatus.Stopped>
@@ -523,7 +523,7 @@ class ExecutionMixin:
             The number of executions removed.
 
         Example:
-            >>> from datetime import timedelta
+            >>> from datetime import timedelta  # doctest: +SKIP
             >>> from deriva_ml.execution.state_store import ExecutionStatus
             >>> n = ml.gc_executions(
             ...     status=ExecutionStatus.Uploaded,
@@ -590,7 +590,7 @@ class ExecutionMixin:
             Iterable of live ``ExecutionRecord`` objects.
 
         Example:
-            >>> for record in ml.find_executions(status=ExecutionStatus.Uploaded):
+            >>> for record in ml.find_executions(status=ExecutionStatus.Uploaded):  # doctest: +SKIP
             ...     print(record.execution_rid, record.status)
         """
         # Import for type checking
@@ -643,7 +643,7 @@ class ExecutionMixin:
             Experiment: An experiment object for the given execution RID.
 
         Example:
-            >>> exp = ml.lookup_experiment("47BE")
+            >>> exp = ml.lookup_experiment("47BE")  # doctest: +SKIP
             >>> print(exp.name)  # e.g., "cifar10_quick"
             >>> print(exp.config_choices)  # Hydra config names used
             >>> print(exp.model_config)  # Model hyperparameters
@@ -671,7 +671,7 @@ class ExecutionMixin:
             Iterable of Experiment objects for executions with Hydra config.
 
         Example:
-            >>> experiments = list(ml.find_experiments(status=ExecutionStatus.Uploaded))
+            >>> experiments = list(ml.find_experiments(status=ExecutionStatus.Uploaded))  # doctest: +SKIP
             >>> for exp in experiments:
             ...     print(f"{exp.name}: {exp.config_choices}")
         """
@@ -723,6 +723,11 @@ class ExecutionMixin:
     ) -> "UploadReport":
         """Blocking upload of pending state for selected executions.
 
+        Flushes all pending rows (catalog inserts, asset uploads) for the
+        named executions to the live catalog. Blocks until complete. For a
+        non-blocking version that returns a job handle, use
+        :meth:`_start_upload`. Online mode only.
+
         Args:
             execution_rids: List of RIDs, or None to drain every execution
                 that has pending work.
@@ -732,7 +737,7 @@ class ExecutionMixin:
             UploadReport with totals + per-table counts + error lines.
 
         Example:
-            >>> report = ml.upload_pending()
+            >>> report = ml.upload_pending()  # doctest: +SKIP
             >>> print(f"{report.total_uploaded} uploaded, "
             ...       f"{report.total_failed} failed")
         """
@@ -742,7 +747,7 @@ class ExecutionMixin:
             retry_failed=retry_failed,
         )
 
-    def start_upload(
+    def _start_upload(
         self,
         *,
         execution_rids: "list[RID] | None" = None,
@@ -761,7 +766,7 @@ class ExecutionMixin:
             poll, job.cancel() to stop.
 
         Example:
-            >>> job = ml.start_upload()
+            >>> job = ml._start_upload()  # doctest: +SKIP
             >>> while job.status == "running":
             ...     time.sleep(5)
             ...     print(job.progress())

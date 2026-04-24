@@ -43,7 +43,7 @@ class UploadProgress:
 class UploadJob:
     """Background upload driven by a thread.
 
-    Construct via ml.start_upload(...). Not meant to be subclassed.
+    Construct via ml._start_upload(...). Not meant to be subclassed.
 
     Attributes:
         id: Unique identifier (uuid-like string).
