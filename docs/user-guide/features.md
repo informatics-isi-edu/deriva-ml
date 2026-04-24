@@ -1,4 +1,4 @@
-# Defining and using features
+# Chapter 3: Defining and using features
 
 Features are structured, provenance-linked annotations on existing catalog records. By the end of this chapter you will know how to define features and vocabularies, record values inside an execution, read them back using the three-method S2 surface, reduce multi-annotator data with selectors, and work with asset-based features — both online and from a downloaded bag. You will also understand when to choose each reading method and how selectors differ in their error-handling contracts.
 
@@ -500,6 +500,6 @@ The retired APIs raise immediately with a specific message naming the replacemen
 ## See also
 
 - **API reference:** `DerivaML.create_feature`, `DerivaML.feature_values`, `DerivaML.find_features`, `DerivaML.lookup_feature` in the Library Documentation.
-- **Chapter 2 (Datasets):** how dataset versioning interacts with feature values via catalog snapshots.
-- **Chapter 4 (Executions):** `create_execution`, `upload_execution_outputs`, `resume_execution`, and the full execution lifecycle.
-- **Chapter 5 (Working offline):** `restructure_assets` with `value_selector` for feature-based file organization in offline ML workflows.
+- **[Chapter 2 (Datasets)](datasets.md):** how dataset versioning interacts with feature values via catalog snapshots.
+- **[Chapter 4 (Executions)](executions.md):** `create_execution`, `upload_execution_outputs`, `resume_execution`, and the full execution lifecycle.
+- **[Chapter 5 (Working offline)](offline.md):** `restructure_assets` with `value_selector` for feature-based file organization in offline ML workflows.

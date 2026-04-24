@@ -491,6 +491,7 @@ Non-element-type tables (such as `Device`) are always traversed normally.
 ## See also
 
 - Chapter 1 ("Exploring a catalog") — `find_datasets()`, `lookup_dataset()`, and RID basics.
+- [Chapter 3 ("Defining and using features")](features.md) — attaching provenance-linked annotations to dataset members.
 - Chapter 4 ("Running an experiment") — `ExecutionConfiguration`, `DatasetSpec`, and downloading datasets inside an execution.
 - Chapter 5 ("Working offline") — `DatasetBag` API, `get_table_as_dataframe()`, `feature_values()`, and `restructure_assets()`.
 - Chapter 7 ("Reproducibility") — version pinning via catalog snapshots; `DatasetSpec(version=...)` in execution configs.

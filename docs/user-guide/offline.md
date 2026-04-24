@@ -344,5 +344,5 @@ When `file_transformer` is provided, `use_symlinks` is ignored.
 - [Working with datasets](datasets.md) — Chapter 2: creating datasets, downloading bags, `estimate_bag_size`, version pinning.
 - [Defining and using features](features.md) — Chapter 3: creating features, `feature_values()` selectors, multi-annotator patterns.
 - [Running an experiment](executions.md) — Chapter 4: `ExecutionConfiguration`, `exe.add_features()`, `upload_execution_outputs()`.
-- Chapter 7 — Reproducibility (coming soon): `DatasetSpec` version pinning, catalog snapshots.
+- [Chapter 7 — Reproducibility](reproducibility.md): `DatasetSpec` version pinning, catalog snapshots.
 - API reference: [`DatasetBag`](../api-reference/dataset_bag.md)

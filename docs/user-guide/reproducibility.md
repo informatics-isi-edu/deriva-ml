@@ -275,5 +275,4 @@ uv run deriva-ml-run \
 
 - [Running an experiment](executions.md) — execution context manager, `upload_execution_outputs()`, and `asset_file_path()`
 - [Working with datasets](datasets.md) — dataset versioning, `set_version()`, and `estimate_bag_size()`
-- [Integrating with hydra-zen](hydra-zen.md) — `config_choices`, `deriva-ml-run`, and multirun sweeps
-- [Integrating with hydra-zen](hydra-zen.md) — `deriva-ml-run`, `bump-version`, and `--allow-dirty`
+- [Integrating with hydra-zen](hydra-zen.md) — `config_choices`, `deriva-ml-run`, multirun sweeps, `bump-version`, and `--allow-dirty`
