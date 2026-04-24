@@ -932,8 +932,18 @@ class Dataset:
                 # Get the members for all the nested datasets and add to the member list.
                 nested_datasets = [d["RID"] for d in target_entities]
                 for ds_rid in nested_datasets:
+                    # Nested datasets live on their own version timeline:
+                    # the outer's 1.2.3 does NOT map to the inner's 1.2.3 in
+                    # general. We already resolved the outer version to a
+                    # catalog snapshot above (``version_snapshot_catalog``),
+                    # and ``lookup_dataset`` returns a Dataset bound to THAT
+                    # snapshot. Passing ``version=None`` on the recursive
+                    # call means "use the ml instance you're already bound
+                    # to" — i.e. the snapshot — instead of trying to look
+                    # up the outer's version string in the inner's history,
+                    # which would raise when the strings don't line up.
                     ds = version_snapshot_catalog.lookup_dataset(ds_rid)
-                    for k, v in ds.list_dataset_members(version=version, recurse=recurse, _visited=_visited).items():
+                    for k, v in ds.list_dataset_members(version=None, recurse=recurse, _visited=_visited).items():
                         members[k].extend(v)
         return dict(members)
 
@@ -1484,7 +1494,15 @@ class Dataset:
         ]
         if recurse:
             for parent in parents.copy():
-                parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited, version=version))
+                # Each `parent` is already bound to `version_snapshot_catalog`
+                # via the lookup above. Passing ``version=None`` on recursion
+                # means "use the catalog this Dataset is already pinned to"
+                # — i.e. the outer snapshot. Forwarding the outer version
+                # string would make the nested dataset try to resolve the
+                # outer's version in its OWN history, which raises when the
+                # timelines don't line up (nested datasets have their own
+                # version sequences).
+                parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited, version=None))
         return parents
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -2133,10 +2151,15 @@ class Dataset:
             DerivaMLException: If the specified version doesn't exist.
         """
         version = str(version)
+        history = self.dataset_history()
         try:
-            version_record = next(h for h in self.dataset_history() if h.dataset_version == version)
+            version_record = next(h for h in history if h.dataset_version == version)
         except StopIteration:
-            raise DerivaMLException(f"Dataset version {version} not found for dataset {self.dataset_rid}")
+            available = [(str(h.dataset_version), h.snapshot) for h in history]
+            raise DerivaMLException(
+                f"Dataset version {version} not found for dataset {self.dataset_rid}. "
+                f"Available versions in history: {available}"
+            )
         return (
             f"{self._ml_instance.catalog.catalog_id}@{version_record.snapshot}"
             if version_record.snapshot
