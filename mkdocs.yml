@@ -38,7 +38,7 @@ plugins:
       include_source: True
 
 nav:
-  - Home: index.md
+  - Introduction: index.md
   - User Guide:
       - Exploring a catalog: user-guide/exploring.md
       - Working with datasets: user-guide/datasets.md
@@ -47,27 +47,12 @@ nav:
       - Working offline: user-guide/offline.md
       - Sharing and collaboration: user-guide/sharing.md
       - Reproducibility: user-guide/reproducibility.md
-  - Getting Started:
-      - Quick Start: getting-started/quick-start.md
-      - Installation: getting-started/install.md
-      - Project Setup: getting-started/project-setup.md
-  - Concepts:
-      - Architecture Overview: concepts/overview.md
-      - Identifiers: concepts/identifiers.md
-      - Datasets: concepts/datasets.md
-      - Features: concepts/features.md
-      - File Assets: concepts/file-assets.md
-      - Catalog Annotations: concepts/annotations.md
+      - Integrating with hydra-zen: user-guide/hydra-zen.md
   - Configuration:
       - Overview: configuration/overview.md
       - Configuration Groups: configuration/groups.md
       - Experiments and Multiruns: configuration/experiments.md
       - Notebook Configuration: configuration/notebooks.md
-  - Running Workflows:
-      - Execution Lifecycle: workflows/execution-lifecycle.md
-      - Running Models: workflows/running-models.md
-      - Git Workflow and Versioning: workflows/git-and-versioning.md
-  - CLI Reference: cli-reference.md
   - Sample Notebooks:
       - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
       - Execution: 'Notebooks/DerivaML Execution.ipynb'

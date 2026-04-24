@@ -406,7 +406,7 @@ uv run deriva-ml-run-notebook notebooks/analysis.ipynb \
 uv run deriva-ml-run-notebook notebooks/train.ipynb --inspect
 ```
 
-The CLI tools handle Jupyter kernel detection, `nbstripout`-based checksum computation, and environment variable injection automatically. See [Running Models](../workflows/running-models.md) for the full guide to setting up `configs/` and writing model functions, and Chapter 8 (Integrating with hydra-zen, coming soon) for the complete hydra-zen integration guide.
+The CLI tools handle Jupyter kernel detection, `nbstripout`-based checksum computation, and environment variable injection automatically. See [Integrating with hydra-zen](hydra-zen.md) for the full guide to setting up `configs/` and writing model functions.
 
 ---
 
@@ -436,6 +436,5 @@ The CLI tools handle Jupyter kernel detection, `nbstripout`-based checksum compu
 
 - [Chapter 3 — Defining and using features](features.md): creating feature definitions, `FeatureRecord` classes, and asset-based features.
 - Chapter 5 — Working offline (coming soon): `DatasetBag` API, `restructure_assets()`, working without a catalog connection.
-- Chapter 7 — Reproducibility (coming soon): `bump-version`, Git commit discipline, what DerivaML records per execution. See also [Git and Versioning](../workflows/git-and-versioning.md).
-- Chapter 8 — Integrating with hydra-zen (coming soon): full project layout, `create_model_config()`, experiment presets, multirun sweeps. See also [Running Models](../workflows/running-models.md).
-- [Execution Lifecycle](../workflows/execution-lifecycle.md): primary source document for this chapter; contains additional detail on nested executions, Docker provenance, and upload tuning.
+- [Reproducibility](reproducibility.md): `bump-version`, Git commit discipline, what DerivaML records per execution.
+- [Integrating with hydra-zen](hydra-zen.md): full project layout, `create_model_config()`, experiment presets, multirun sweeps.

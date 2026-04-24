@@ -266,9 +266,9 @@ def train(cfg: AppConfig):
 
 ## Using with Hydra CLI
 
-DerivaML provides [`deriva-ml-run`](../cli-reference.md#deriva-ml-run) which handles
+DerivaML provides [`deriva-ml-run`](../user-guide/hydra-zen.md#how-to-compose-configs-through-the-cli) which handles
 Hydra configuration composition, config module loading, and execution tracking
-automatically. See [Running Models and Notebooks](../workflows/running-models.md)
+automatically. See [Integrating with hydra-zen](../user-guide/hydra-zen.md)
 for the recommended workflow.
 
 The examples below show the underlying Hydra CLI patterns for reference:
@@ -292,7 +292,7 @@ python train.py --multirun +datasets=training_v1,training_v2
 !!! note
     In practice, `create_model_config()` and `deriva-ml-run` handle the
     boilerplate shown below automatically. See
-    [Running Models and Notebooks](../workflows/running-models.md) for the
+    [Integrating with hydra-zen](../user-guide/hydra-zen.md) for the
     recommended approach.
 
 ```python
@@ -731,10 +731,9 @@ Examples:
 
 ## Related Documentation
 
-- [Running Models and Notebooks](../workflows/running-models.md) — Practical guide for project setup and CLI usage
-- [CLI Reference](../cli-reference.md) — All DerivaML command-line tools
-- [Execution Configuration](../workflows/execution-lifecycle.md) — Execution lifecycle and workflows
-- [Git Workflow and Versioning](../workflows/git-and-versioning.md) — Reproducibility guidelines
-- [Datasets](../concepts/datasets.md)
+- [Integrating with hydra-zen](../user-guide/hydra-zen.md) — Practical guide for project setup and CLI usage
+- [Running an experiment](../user-guide/executions.md) — Execution lifecycle and workflows
+- [Reproducibility](../user-guide/reproducibility.md) — Reproducibility guidelines
+- [Working with datasets](../user-guide/datasets.md)
 - [Hydra-zen Documentation](https://mit-ll-responsible-ai.github.io/hydra-zen/)
 - [Hydra Documentation](https://hydra.cc/docs/intro/)

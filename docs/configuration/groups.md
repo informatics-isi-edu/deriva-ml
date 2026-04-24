@@ -113,7 +113,7 @@ workflow_store(
 )
 ```
 
-See [Workflows](../workflows/execution-lifecycle.md#workflows) for how workflows
+See [Running an experiment](../user-guide/executions.md) for how workflows
 track source code provenance.
 
 ## Model Configuration (`model_config`)

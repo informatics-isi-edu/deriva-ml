@@ -204,7 +204,7 @@ uv run deriva-ml-run-notebook notebooks/train.ipynb --kernel my-ml-project
 ```
 
 If no kernel is installed for your environment, use
-[`deriva-ml-install-kernel`](../cli-reference.md#deriva-ml-install-kernel).
+[`deriva-ml-install-kernel`](../user-guide/hydra-zen.md).
 
 ### Output Handling
 
@@ -228,4 +228,4 @@ uv run deriva-ml-run-notebook notebooks/train.ipynb --log-output
 
 - [Configuration Groups](groups.md) — The five standard config groups
 - [Hydra-zen Configuration Overview](overview.md) — Configuration class reference
-- [CLI Reference](../cli-reference.md) — Full CLI documentation
+- [Integrating with hydra-zen](../user-guide/hydra-zen.md) — Full CLI documentation

@@ -345,4 +345,4 @@ When `file_transformer` is provided, `use_symlinks` is ignored.
 - [Defining and using features](features.md) — Chapter 3: creating features, `feature_values()` selectors, multi-annotator patterns.
 - [Running an experiment](executions.md) — Chapter 4: `ExecutionConfiguration`, `exe.add_features()`, `upload_execution_outputs()`.
 - Chapter 7 — Reproducibility (coming soon): `DatasetSpec` version pinning, catalog snapshots.
-- API reference: [`DatasetBag`](../code-docs/dataset_bag.md)
+- API reference: [`DatasetBag`](../api-reference/dataset_bag.md)
