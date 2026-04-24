@@ -86,10 +86,16 @@ pre_commit_hooks = []
 post_commit_hooks = ["git push", "git push --tags"]
 
 [tool.pytest]
-testpaths = ["tests"]
+testpaths = ["tests", "src"]
 python_files = ["test_*.py"]
 #addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"
-addopts = ["-v", "--import-mode=importlib"]
+addopts = [
+    "-v",
+    "--import-mode=importlib",
+    "--doctest-modules",
+    "--ignore=tests/execution/workflow-test.py",
+]
+doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS", "IGNORE_EXCEPTION_DETAIL"]
 markers = [
     "integration: marks tests as requiring a live Deriva catalog (select with -m integration)",
 ]

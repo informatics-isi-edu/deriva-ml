@@ -138,6 +138,34 @@ Tests require a running Deriva catalog. Set `DERIVA_HOST` environment variable t
 
 **Gotcha**: `CatalogManager.ensure_populated()` validates data actually exists before trusting its state flag. Other test modules (function-scoped fixtures) may empty tables during teardown, making the state flag stale.
 
+### Docstring Examples (Doctest)
+
+`Example:` blocks in public-method docstrings are run as doctests during
+the main pytest collection (via `--doctest-modules`).
+
+- **Catalog-dependent examples** must carry `# doctest: +SKIP` on the
+  first interactive line. Doctest collection happens without a live
+  catalog.
+- **Pure-Python examples** (selector factories, type coercion, config
+  construction from literals) run for real and catch regressions.
+- Common symbols (e.g., `FeatureRecord`) are available in the doctest
+  namespace via `src/deriva_ml/conftest.py`.
+
+Example annotation pattern:
+
+```python
+    Example:
+        >>> from deriva_ml import DerivaML  # doctest: +SKIP
+        >>> ml = DerivaML(hostname="example.org", catalog_id="42")  # doctest: +SKIP
+        >>> datasets = ml.find_datasets()  # doctest: +SKIP
+
+        >>> # Pure-Python example — runs for real:
+        >>> from deriva_ml.feature import FeatureRecord
+        >>> selector = FeatureRecord.select_newest
+        >>> callable(selector)
+        True
+```
+
 ## Schema Structure
 
 The library uses two schemas:
