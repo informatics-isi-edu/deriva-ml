@@ -10,6 +10,7 @@ Two patterns cover most users:
 
 ```python
 from deriva_ml import DerivaML, DerivaMLConfig
+from deriva_ml.dataset import DatasetSpec
 from deriva_ml.execution import ExecutionConfiguration
 
 ml = DerivaML.instantiate(DerivaMLConfig(hostname="deriva.example.org", catalog_id="42"))
@@ -52,7 +53,7 @@ These four classes are the bridge between Python and hydra-zen. Use them in `sto
 | `AssetSpecConfig` | `from deriva_ml.asset import AssetSpecConfig` | Asset input: RID, optional MD5-based cache |
 | `ExecutionConfiguration` | `from deriva_ml.execution import ExecutionConfiguration` | Full execution: datasets, assets, workflow, description |
 
-`DatasetSpecConfig` and `AssetSpecConfig` are plain dataclasses designed to round-trip cleanly through hydra-zen's `instantiate()`. `DerivaMLConfig` and `ExecutionConfiguration` are Pydantic models and can also be constructed directly.
+`DatasetSpecConfig` and `AssetSpecConfig` are hydra-zen dataclasses (decorated with `@hydrated_dataclass`) designed to round-trip cleanly through hydra-zen's `instantiate()`. `DerivaMLConfig` and `ExecutionConfiguration` are Pydantic models and can also be constructed directly.
 
 See [Configuration overview](../configuration/overview.md) for field-by-field documentation and complete examples.
 
@@ -82,7 +83,7 @@ Multirun creates a parent execution in the catalog with one child execution per 
 **Notes:**
 
 - `--multirun` requires comma-separated values with no spaces.
-- Config groups are discovered alphabetically; `experiments.py` is always loaded last, so experiment configs can override base configs safely.
+- Config groups are discovered alphabetically; by convention, name the file `experiments.py` so it sorts last, allowing experiment configs to override base configs safely.
 - Pass `--host` and `--catalog` on the CLI to override the hostname and catalog ID without touching your config files.
 
 See [Config groups](../configuration/groups.md) and [Experiments and multi-run](../configuration/experiments.md) for the full composition model.
