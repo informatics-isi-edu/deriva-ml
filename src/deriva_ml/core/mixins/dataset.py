@@ -386,16 +386,16 @@ class DatasetMixin:
 
             - ``columns``: list of ``(column_name, column_type)`` tuples.
             - ``join_path``: ordered list of domain table names on the
-              join chain (excludes the implicit ``Dataset`` root and
-              any association tables).
+                join chain (excludes the implicit ``Dataset`` root and
+                any association tables).
             - ``tables``: ``{table_name: {row_count, is_asset,
-              asset_bytes}}`` — per-table stats for every table in the
-              join path.
+                asset_bytes}}`` — per-table stats for every table in the
+                join path.
             - ``total_rows``: sum of ``row_count`` across all included
-              tables.
+                tables.
             - ``total_asset_bytes``: sum of ``asset_bytes``.
             - ``total_asset_size``: human-readable byte-count string
-              (e.g., ``"1.2 GB"``).
+                (e.g., ``"1.2 GB"``).
 
         Example::
 

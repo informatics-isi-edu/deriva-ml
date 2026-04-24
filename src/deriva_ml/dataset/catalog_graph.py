@@ -12,6 +12,7 @@ table to discover all tables reachable by a given dataset. It provides:
   semantics: RID lists from every FK path reaching a table are unioned before
   counting, avoiding double-counting rows reachable via multiple paths.
 """
+
 from __future__ import annotations
 
 import logging
