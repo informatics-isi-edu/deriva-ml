@@ -323,6 +323,43 @@ class VocabularyMixin:
         # Fetch and convert all terms to VocabularyTerm objects
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]
 
+    def _update_term_field(
+        self,
+        table: str | Table,
+        term_name: str,
+        field_key: str,
+        value: Any,
+    ) -> None:
+        """Internal: Update a single field on a vocabulary term by name.
+
+        Shared implementation for the per-field update helpers (synonyms,
+        description, etc.). Resolves ``term_name`` to a RID via
+        ``lookup_term``, writes ``{field_key: value}`` to the vocabulary
+        table using the resolved column name, and invalidates the
+        vocabulary cache for the table.
+
+        Args:
+            table: Vocabulary table containing the term.
+            term_name: Primary name of the term to update.
+            field_key: Logical vocab-column key (e.g. ``"Synonyms"``,
+                ``"Description"``). Resolved to the actual column name
+                via :meth:`DerivaModel.vocab_columns`.
+            value: New value for the field. Type depends on the column
+                (list[str] for synonyms, str for description, etc.).
+        """
+        # Look up the term to get its RID
+        term = self.lookup_term(table, term_name)
+
+        # Update the term in the catalog
+        vocab_table = self.model.name_to_table(table)
+        cols = self.model.vocab_columns(vocab_table)
+        pb = self.pathBuilder()
+        table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
+        table_path.update([{"RID": term.rid, cols[field_key]: value}])
+
+        # Invalidate cache
+        self.clear_vocabulary_cache(table)
+
     def _update_term_synonyms(self, table: str | Table, term_name: str, synonyms: list[str]) -> None:
         """Internal: Update synonyms for a vocabulary term.
 
@@ -333,18 +370,7 @@ class VocabularyMixin:
             term_name: Primary name of the term to update.
             synonyms: New list of synonyms (replaces all existing).
         """
-        # Look up the term to get its RID
-        term = self.lookup_term(table, term_name)
-
-        # Update the term in the catalog
-        vocab_table = self.model.name_to_table(table)
-        cols = self.model.vocab_columns(vocab_table)
-        pb = self.pathBuilder()
-        table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
-        table_path.update([{"RID": term.rid, cols["Synonyms"]: synonyms}])
-
-        # Invalidate cache
-        self.clear_vocabulary_cache(table)
+        self._update_term_field(table, term_name, "Synonyms", synonyms)
 
     def _update_term_description(self, table: str | Table, term_name: str, description: str) -> None:
         """Internal: Update description for a vocabulary term.
@@ -356,18 +382,7 @@ class VocabularyMixin:
             term_name: Primary name of the term to update.
             description: New description for the term.
         """
-        # Look up the term to get its RID
-        term = self.lookup_term(table, term_name)
-
-        # Update the term in the catalog
-        vocab_table = self.model.name_to_table(table)
-        cols = self.model.vocab_columns(vocab_table)
-        pb = self.pathBuilder()
-        table_path = pb.schemas[vocab_table.schema.name].tables[vocab_table.name]
-        table_path.update([{"RID": term.rid, cols["Description"]: description}])
-
-        # Invalidate cache
-        self.clear_vocabulary_cache(table)
+        self._update_term_field(table, term_name, "Description", description)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def delete_term(self, table: str | Table, term_name: str) -> None:
