@@ -40,11 +40,11 @@ class AssetFilePath(Path):
         asset_rid: Resource Identifier if uploaded to an asset table.
 
     Example:
-        >>> path = exe.asset_file_path("Image", "scan.jpg")
-        >>> # Set typed metadata via AssetRecord
-        >>> ImageAsset = ml.asset_record_class("Image")
-        >>> path.metadata = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")
-        >>> path.set_asset_types(["Training_Data"])
+        >>> path = exe.asset_file_path("Image", "scan.jpg")  # doctest: +SKIP
+        >>> # Set typed metadata via AssetRecord  # doctest: +SKIP
+        >>> ImageAsset = ml.asset_record_class("Image")  # doctest: +SKIP
+        >>> path.metadata = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")  # doctest: +SKIP
+        >>> path.set_asset_types(["Training_Data"])  # doctest: +SKIP
     """
 
     def __init__(
@@ -185,9 +185,9 @@ class AssetSpecConfig:
 
     Use in hydra-zen store definitions to specify assets with caching:
 
-        >>> from hydra_zen import store
-        >>> asset_store = store(group="assets")
-        >>> asset_store(
+        >>> from hydra_zen import store  # doctest: +SKIP
+        >>> asset_store = store(group="assets")  # doctest: +SKIP
+        >>> asset_store(  # doctest: +SKIP
         ...     [AssetSpecConfig(rid="6-EPNR", cache=True)],
         ...     name="cached_weights",
         ... )

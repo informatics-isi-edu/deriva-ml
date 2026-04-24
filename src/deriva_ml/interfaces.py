@@ -758,7 +758,7 @@ class DerivaMLCatalogReader(Protocol):
             DerivaMLException: If the RID does not correspond to a workflow.
 
         Example:
-            >>> workflow = catalog.lookup_workflow("2-ABC1")
+            >>> workflow = catalog.lookup_workflow("2-ABC1")  # doctest: +SKIP
             >>> print(f"{workflow.name}: {workflow.description}")
         """
         ...
@@ -773,7 +773,7 @@ class DerivaMLCatalogReader(Protocol):
             Iterable of Workflow objects.
 
         Example:
-            >>> for workflow in catalog.find_workflows():
+            >>> for workflow in catalog.find_workflows():  # doctest: +SKIP
             ...     print(f"{workflow.name}: {workflow.description}")
         """
         ...
@@ -794,7 +794,7 @@ class DerivaMLCatalogReader(Protocol):
             DerivaMLException: If no matching workflow is found.
 
         Example:
-            >>> url = "https://github.com/org/repo/blob/abc123/workflow.py"
+            >>> url = "https://github.com/org/repo/blob/abc123/workflow.py"  # doctest: +SKIP
             >>> workflow = catalog.lookup_workflow_by_url(url)
             >>> print(f"{workflow.name}: {workflow.description}")
         """
@@ -815,7 +815,7 @@ class DerivaMLCatalogReader(Protocol):
             DerivaMLException: If the RID doesn't refer to an Execution.
 
         Example:
-            >>> record = catalog.lookup_execution("2-ABC1")
+            >>> record = catalog.lookup_execution("2-ABC1")  # doctest: +SKIP
             >>> print(f"{record.status}: {record.description}")
         """
         ...
@@ -837,10 +837,10 @@ class DerivaMLCatalogReader(Protocol):
             Iterable of ExecutionRecord objects.
 
         Example:
-            >>> for record in catalog.find_executions():
+            >>> for record in catalog.find_executions():  # doctest: +SKIP
             ...     print(f"{record.execution_rid}: {record.status}")
             >>> # Filter by workflow type
-            >>> for record in catalog.find_executions(workflow_type="python_script"):
+            >>> for record in catalog.find_executions(workflow_type="python_script"):  # doctest: +SKIP
             ...     print(f"{record.execution_rid}")
         """
         ...

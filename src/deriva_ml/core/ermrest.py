@@ -168,10 +168,10 @@ class UploadCallback(Protocol):
     upload state information.
 
     Example:
-        >>> def my_callback(progress: UploadProgress) -> None:
+        >>> def my_callback(progress: UploadProgress) -> None:  # doctest: +SKIP
         ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
         ...
-        >>> execution.upload_execution_outputs(progress_callback=my_callback)
+        >>> execution.upload_execution_outputs(progress_callback=my_callback)  # doctest: +SKIP
     """
     def __call__(self, progress: UploadProgress) -> None:
         """Called with upload progress information.
@@ -256,7 +256,7 @@ class VocabularyTermHandle(VocabularyTerm):
         Inherits all attributes from VocabularyTerm.
 
     Example:
-        >>> term = ml.lookup_term("Dataset_Type", "Training")
+        >>> term = ml.lookup_term("Dataset_Type", "Training")  # doctest: +SKIP
         >>> term.description = "Data used for model training"
         >>> term.synonyms = ("Train", "TrainingData")
         >>> term.delete()

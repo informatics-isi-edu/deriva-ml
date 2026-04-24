@@ -12,17 +12,17 @@ The Asset class parallels the Dataset class, providing:
 - Download capability for offline access
 
 Typical usage:
-    >>> # Look up an existing asset
-    >>> asset = ml.lookup_asset("3JSE")
-    >>> print(f"Asset: {asset.filename} ({asset.asset_table})")
-    >>> print(f"Types: {asset.asset_types}")
+    >>> # Look up an existing asset  # doctest: +SKIP
+    >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
+    >>> print(f"Asset: {asset.filename} ({asset.asset_table})")  # doctest: +SKIP
+    >>> print(f"Types: {asset.asset_types}")  # doctest: +SKIP
 
-    >>> # Find the execution that created this asset
-    >>> executions = asset.list_executions(asset_role="Output")
-    >>> creator = executions[0] if executions else None
+    >>> # Find the execution that created this asset  # doctest: +SKIP
+    >>> executions = asset.list_executions(asset_role="Output")  # doctest: +SKIP
+    >>> creator = executions[0] if executions else None  # doctest: +SKIP
 
-    >>> # Download for offline use
-    >>> local_path = asset.download(Path("/tmp/assets"))
+    >>> # Download for offline use  # doctest: +SKIP
+    >>> local_path = asset.download(Path("/tmp/assets"))  # doctest: +SKIP
 """
 
 from __future__ import annotations
@@ -69,13 +69,13 @@ class Asset:
         _ml_instance (DerivaMLCatalog): Reference to the catalog containing this asset.
 
     Example:
-        >>> # Look up an existing asset
-        >>> asset = ml.lookup_asset("3JSE")
-        >>> print(f"File: {asset.filename}, Size: {asset.length} bytes")
-        >>> print(f"Types: {asset.asset_types}")
+        >>> # Look up an existing asset  # doctest: +SKIP
+        >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
+        >>> print(f"File: {asset.filename}, Size: {asset.length} bytes")  # doctest: +SKIP
+        >>> print(f"Types: {asset.asset_types}")  # doctest: +SKIP
 
-        >>> # Find executions that used this asset
-        >>> for exe in asset.list_executions():
+        >>> # Find executions that used this asset  # doctest: +SKIP
+        >>> for exe in asset.list_executions():  # doctest: +SKIP
         ...     print(f"Execution {exe.execution_rid}: {exe.configuration.description}")
     """
 
@@ -110,8 +110,8 @@ class Asset:
             execution_rid: RID of the execution that created this asset (if known).
 
         Example:
-            >>> # Usually created via ml.lookup_asset()
-            >>> asset = ml.lookup_asset("3JSE")
+            >>> # Usually created via ml.lookup_asset()  # doctest: +SKIP
+            >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
         """
         self._logger = logging.getLogger("deriva_ml")
         self._ml_instance = catalog
@@ -195,13 +195,13 @@ class Asset:
             with this asset.
 
         Example:
-            >>> # Find the execution that created this asset
-            >>> creators = asset.list_executions(asset_role="Output")
-            >>> if creators:
+            >>> # Find the execution that created this asset  # doctest: +SKIP
+            >>> creators = asset.list_executions(asset_role="Output")  # doctest: +SKIP
+            >>> if creators:  # doctest: +SKIP
             ...     print(f"Created by execution {creators[0].execution_rid}")
 
-            >>> # Find all executions that used this asset as input
-            >>> users = asset.list_executions(asset_role="Input")
+            >>> # Find all executions that used this asset as input  # doctest: +SKIP
+            >>> users = asset.list_executions(asset_role="Input")  # doctest: +SKIP
         """
         return self._ml_instance.list_asset_executions(self.asset_rid, asset_role=asset_role)
 
@@ -217,8 +217,8 @@ class Asset:
             List of Feature objects defined on this asset's table.
 
         Example:
-            >>> features = asset.find_features()
-            >>> for f in features:
+            >>> features = asset.find_features()  # doctest: +SKIP
+            >>> for f in features:  # doctest: +SKIP
             ...     print(f"{f.feature_name}: "
             ...           f"{[c.name for c in f.term_columns]} terms")
         """
@@ -251,7 +251,7 @@ class Asset:
             type_name: Name of the asset type vocabulary term to add.
 
         Example:
-            >>> asset.add_asset_type("Training_Data")
+            >>> asset.add_asset_type("Training_Data")  # doctest: +SKIP
         """
         asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
         type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(
@@ -275,7 +275,7 @@ class Asset:
             type_name: Name of the asset type vocabulary term to remove.
 
         Example:
-            >>> asset.remove_asset_type("Temporary")
+            >>> asset.remove_asset_type("Temporary")  # doctest: +SKIP
         """
         asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
         type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(
@@ -307,8 +307,8 @@ class Asset:
             Path to the downloaded file.
 
         Example:
-            >>> local_path = asset.download(Path("/tmp/assets"))
-            >>> print(f"Downloaded to: {local_path}")
+            >>> local_path = asset.download(Path("/tmp/assets"))  # doctest: +SKIP
+            >>> print(f"Downloaded to: {local_path}")  # doctest: +SKIP
         """
 
         # Use hatrac to download the file
@@ -327,8 +327,8 @@ class Asset:
             Dictionary of all columns/values for this asset record.
 
         Example:
-            >>> metadata = asset.get_metadata()
-            >>> print(f"Created: {metadata.get('RCT')}")
+            >>> metadata = asset.get_metadata()  # doctest: +SKIP
+            >>> print(f"Created: {metadata.get('RCT')}")  # doctest: +SKIP
         """
         pb = self._ml_instance.pathBuilder()
         asset_path = pb.schemas[self._ml_instance.model.name_to_table(self.asset_table).schema.name].tables[self.asset_table]
@@ -343,8 +343,8 @@ class Asset:
             URL to view this asset in Chaise.
 
         Example:
-            >>> url = asset.get_chaise_url()
-            >>> print(f"View at: {url}")
+            >>> url = asset.get_chaise_url()  # doctest: +SKIP
+            >>> print(f"View at: {url}")  # doctest: +SKIP
         """
         table_obj = self._ml_instance.model.name_to_table(self.asset_table)
         schema_name = table_obj.schema.name

@@ -83,7 +83,7 @@ class FileMixin:
 
         Examples:
             Add files via an execution:
-                >>> with ml.create_execution(config) as exe:
+                >>> with ml.create_execution(config) as exe:  # doctest: +SKIP
                 ...     files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]
                 ...     dataset = exe.add_files(files, dataset_types="text")
         """
@@ -228,12 +228,12 @@ class FileMixin:
 
         Examples:
             List all files:
-                >>> files = ml.list_files()
+                >>> files = ml.list_files()  # doctest: +SKIP
                 >>> for f in files:
                 ...     print(f"{f['RID']}: {f['URL']}")
 
             Filter by file type:
-                >>> image_files = ml.list_files(["image", "png"])
+                >>> image_files = ml.list_files(["image", "png"])  # doctest: +SKIP
         """
         asset_type_atable, file_fk, asset_type_fk = self.model.find_association("File", "Asset_Type")
         ml_path = self.pathBuilder().schemas[self.ml_schema]

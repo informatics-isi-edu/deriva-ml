@@ -315,7 +315,7 @@ class Workspace:
             ensured.
 
         Example:
-            >>> ws = Workspace(working_dir=".", hostname="h", catalog_id="1")
+            >>> ws = Workspace(working_dir=".", hostname="h", catalog_id="1")  # doctest: +SKIP
             >>> store = ws.execution_state_store()
             >>> store.executions   # the sqlalchemy.Table
         """

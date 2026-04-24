@@ -39,7 +39,7 @@ Exception Hierarchy:
 
 Example:
     >>> from deriva_ml.core.exceptions import DerivaMLException, DerivaMLNotFoundError
-    >>> try:
+    >>> try:  # doctest: +SKIP
     ...     dataset = ml.lookup_dataset("invalid_rid")
     ... except DerivaMLDatasetNotFound as e:
     ...     print(f"Dataset not found: {e}")
@@ -63,7 +63,7 @@ class DerivaMLException(Exception):
         msg: Descriptive error message. Defaults to empty string.
 
     Example:
-        >>> raise DerivaMLException("Failed to connect to catalog")
+        >>> raise DerivaMLException("Failed to connect to catalog")  # doctest: +SKIP
         DerivaMLException: Failed to connect to catalog
     """
 
@@ -84,7 +84,7 @@ class DerivaMLConfigurationError(DerivaMLException):
     initialization, or schema setup.
 
     Example:
-        >>> raise DerivaMLConfigurationError("Invalid catalog configuration")
+        >>> raise DerivaMLConfigurationError("Invalid catalog configuration")  # doctest: +SKIP
     """
 
     pass
@@ -97,7 +97,7 @@ class DerivaMLSchemaError(DerivaMLConfigurationError):
     or has structural problems that prevent normal operation.
 
     Example:
-        >>> raise DerivaMLSchemaError("Ambiguous domain schema: ['Schema1', 'Schema2']")
+        >>> raise DerivaMLSchemaError("Ambiguous domain schema: ['Schema1', 'Schema2']")  # doctest: +SKIP
     """
 
     pass
@@ -113,7 +113,7 @@ class DerivaMLSchemaRefreshBlocked(DerivaMLConfigurationError):
     schema, causing catalog-insert failures on the next upload.
 
     Example:
-        >>> raise DerivaMLSchemaRefreshBlocked(
+        >>> raise DerivaMLSchemaRefreshBlocked(  # doctest: +SKIP
         ...     "refresh_schema requires a drained workspace; 3 pending rows"
         ... )
     """
@@ -130,7 +130,7 @@ class DerivaMLSchemaPinned(DerivaMLConfigurationError):
     pending-rows guard.
 
     Example:
-        >>> raise DerivaMLSchemaPinned(
+        >>> raise DerivaMLSchemaPinned(  # doctest: +SKIP
         ...     "refresh_schema refused: cache is pinned at snapshot s0"
         ... )
     """
@@ -144,7 +144,7 @@ class DerivaMLAuthenticationError(DerivaMLConfigurationError):
     Raised when authentication with the catalog fails or credentials are invalid.
 
     Example:
-        >>> raise DerivaMLAuthenticationError("Failed to authenticate with catalog")
+        >>> raise DerivaMLAuthenticationError("Failed to authenticate with catalog")  # doctest: +SKIP
     """
 
     pass
@@ -161,8 +161,8 @@ class DerivaMLOfflineError(DerivaMLConfigurationError):
         Creating an execution requires an online mode because the
         Execution RID must be server-assigned::
 
-            >>> ml = DerivaML(..., mode=ConnectionMode.offline)
-            >>> ml.create_execution(config)
+            >>> ml = DerivaML(..., mode=ConnectionMode.offline)  # doctest: +SKIP
+            >>> ml.create_execution(config)  # doctest: +SKIP
             Traceback (most recent call last):
                 ...
             DerivaMLOfflineError: create_execution requires online mode
@@ -182,9 +182,9 @@ class DerivaMLNoExecutionContext(DerivaMLConfigurationError):
     Example:
         Calling a write method on a read-only handle raises this error::
 
-            >>> handle = ml.table("Subject")
-            >>> handle.record_class()              # OK
-            >>> handle.insert({"Name": "x"})       # raises
+            >>> handle = ml.table("Subject")  # doctest: +SKIP
+            >>> handle.record_class()              # OK  # doctest: +SKIP
+            >>> handle.insert({"Name": "x"})       # raises  # doctest: +SKIP
             Traceback (most recent call last):
                 ...
             DerivaMLNoExecutionContext: ml.table() handles are read-only; use exe.table() for writes
@@ -204,7 +204,7 @@ class DerivaMLDataError(DerivaMLException):
     Base class for errors related to data lookup, validation, and integrity.
 
     Example:
-        >>> raise DerivaMLDataError("Invalid data format")
+        >>> raise DerivaMLDataError("Invalid data format")  # doctest: +SKIP
     """
 
     pass
@@ -217,7 +217,7 @@ class DerivaMLNotFoundError(DerivaMLDataError):
     (dataset, table, term, etc.) in the catalog or bag.
 
     Example:
-        >>> raise DerivaMLNotFoundError("Entity '1-ABC' not found in catalog")
+        >>> raise DerivaMLNotFoundError("Entity '1-ABC' not found in catalog")  # doctest: +SKIP
     """
 
     pass
@@ -234,7 +234,7 @@ class DerivaMLDatasetNotFound(DerivaMLNotFoundError):
         msg: Additional context. Defaults to "Dataset not found".
 
     Example:
-        >>> raise DerivaMLDatasetNotFound("1-ABC")
+        >>> raise DerivaMLDatasetNotFound("1-ABC")  # doctest: +SKIP
         DerivaMLDatasetNotFound: Dataset 1-ABC not found
     """
 
@@ -254,7 +254,7 @@ class DerivaMLTableNotFound(DerivaMLNotFoundError):
         msg: Additional context. Defaults to "Table not found".
 
     Example:
-        >>> raise DerivaMLTableNotFound("MyTable")
+        >>> raise DerivaMLTableNotFound("MyTable")  # doctest: +SKIP
         DerivaMLTableNotFound: Table not found: MyTable
     """
 
@@ -275,7 +275,7 @@ class DerivaMLInvalidTerm(DerivaMLNotFoundError):
         msg: Additional context about the error. Defaults to "Term doesn't exist".
 
     Example:
-        >>> raise DerivaMLInvalidTerm("Diagnosis", "unknown_condition")
+        >>> raise DerivaMLInvalidTerm("Diagnosis", "unknown_condition")  # doctest: +SKIP
         DerivaMLInvalidTerm: Invalid term unknown_condition in vocabulary Diagnosis: Term doesn't exist.
     """
 
@@ -296,7 +296,7 @@ class DerivaMLTableTypeError(DerivaMLDataError):
         table: The actual table name or RID that was provided.
 
     Example:
-        >>> raise DerivaMLTableTypeError("Dataset", "1-ABC123")
+        >>> raise DerivaMLTableTypeError("Dataset", "1-ABC123")  # doctest: +SKIP
         DerivaMLTableTypeError: Table 1-ABC123 is not of type Dataset.
     """
 
@@ -313,7 +313,7 @@ class DerivaMLValidationError(DerivaMLDataError):
     mismatched metadata, or constraint violations.
 
     Example:
-        >>> raise DerivaMLValidationError("Invalid RID format: ABC")
+        >>> raise DerivaMLValidationError("Invalid RID format: ABC")  # doctest: +SKIP
     """
 
     pass
@@ -330,7 +330,7 @@ class DerivaMLCycleError(DerivaMLDataError):
         msg: Additional context. Defaults to "Cycle detected".
 
     Example:
-        >>> raise DerivaMLCycleError(["Dataset1", "Dataset2", "Dataset1"])
+        >>> raise DerivaMLCycleError(["Dataset1", "Dataset2", "Dataset1"])  # doctest: +SKIP
     """
 
     def __init__(self, cycle_nodes: list[str], msg: str = "Cycle detected") -> None:
@@ -349,7 +349,7 @@ class DerivaMLStateInconsistency(DerivaMLDataError):
     Example:
         A catalog-side delete of an in-flight execution produces this error::
 
-            >>> exe = ml.resume_execution("EXE-A")
+            >>> exe = ml.resume_execution("EXE-A")  # doctest: +SKIP
             Traceback (most recent call last):
                 ...
             DerivaMLStateInconsistency: Execution EXE-A: SQLite status 'running' but catalog returned no Execution row
@@ -370,7 +370,7 @@ class DerivaMLExecutionError(DerivaMLException):
     and provenance tracking.
 
     Example:
-        >>> raise DerivaMLExecutionError("Execution failed to initialize")
+        >>> raise DerivaMLExecutionError("Execution failed to initialize")  # doctest: +SKIP
     """
 
     pass
@@ -383,7 +383,7 @@ class DerivaMLWorkflowError(DerivaMLExecutionError):
     Git integration for workflow tracking.
 
     Example:
-        >>> raise DerivaMLWorkflowError("Not executing in a Git repository")
+        >>> raise DerivaMLWorkflowError("Not executing in a Git repository")  # doctest: +SKIP
     """
 
     pass
@@ -403,7 +403,7 @@ class DerivaMLDirtyWorkflowError(DerivaMLWorkflowError):
         path: Path to the file with uncommitted changes.
 
     Example:
-        >>> raise DerivaMLDirtyWorkflowError("src/models/train.py")
+        >>> raise DerivaMLDirtyWorkflowError("src/models/train.py")  # doctest: +SKIP
         DerivaMLDirtyWorkflowError: File src/models/train.py has uncommitted changes. ...
     """
 
@@ -421,7 +421,7 @@ class DerivaMLUploadError(DerivaMLExecutionError):
     uploads, metadata insertion, and provenance recording.
 
     Example:
-        >>> raise DerivaMLUploadError("Failed to upload execution assets")
+        >>> raise DerivaMLUploadError("Failed to upload execution assets")  # doctest: +SKIP
     """
 
     pass
@@ -439,7 +439,7 @@ class DerivaMLReadOnlyError(DerivaMLException):
     read-only context where write operations are not supported.
 
     Example:
-        >>> raise DerivaMLReadOnlyError("Cannot create datasets in a downloaded bag")
+        >>> raise DerivaMLReadOnlyError("Cannot create datasets in a downloaded bag")  # doctest: +SKIP
     """
 
     pass
@@ -457,7 +457,7 @@ class DerivaMLDenormalizeError(DerivaMLException):
     and related planning functions are instances of this class.
 
     Example:
-        >>> raise DerivaMLDenormalizeError("Planner failed")
+        >>> raise DerivaMLDenormalizeError("Planner failed")  # doctest: +SKIP
     """
 
 
@@ -474,7 +474,7 @@ class DerivaMLDenormalizeMultiLeaf(DerivaMLDenormalizeError):
             the ambiguity, for reference.
 
     Example:
-        >>> try:
+        >>> try:  # doctest: +SKIP
         ...     d.as_dataframe(["Dataset", "Subject"])
         ... except DerivaMLDenormalizeMultiLeaf as e:
         ...     print(f"Pick one of {e.candidates} as row_per")
@@ -503,7 +503,7 @@ class DerivaMLDenormalizeNoSink(DerivaMLDenormalizeError):
             forming the cycle.
 
     Example:
-        >>> raise DerivaMLDenormalizeNoSink(
+        >>> raise DerivaMLDenormalizeNoSink(  # doctest: +SKIP
         ...     "Cycle in FK graph between tables A, B, C"
         ... )
     """
@@ -554,7 +554,7 @@ class DerivaMLDenormalizeAmbiguousPath(DerivaMLDenormalizeError):
             named in ``include_tables`` or ``via`` to force a choice.
 
     Example:
-        >>> try:
+        >>> try:  # doctest: +SKIP
         ...     d.as_dataframe(["Image", "Subject"])  # diamond schema
         ... except DerivaMLDenormalizeAmbiguousPath as e:
         ...     for p in e.paths:
@@ -609,7 +609,7 @@ class DerivaMLDenormalizeUnrelatedAnchor(DerivaMLDenormalizeError):
         include_tables: the ``include_tables`` argument for reference.
 
     Example:
-        >>> try:
+        >>> try:  # doctest: +SKIP
         ...     d.as_dataframe(["Image", "Subject"])  # dataset has stray types
         ... except DerivaMLDenormalizeUnrelatedAnchor as e:
         ...     print(f"Dataset has unrelated members: {e.unrelated_tables}")

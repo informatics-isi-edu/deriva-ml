@@ -11,7 +11,7 @@ The module provides:
     - ValidationResult: Result container for validation operations
 
 Example (Pydantic config):
-    >>> from deriva_ml.core.validation import VALIDATION_CONFIG
+    >>> from deriva_ml.core.validation import VALIDATION_CONFIG  # doctest: +SKIP
     >>> from pydantic import validate_call
     >>>
     >>> @validate_call(config=VALIDATION_CONFIG)
@@ -19,7 +19,7 @@ Example (Pydantic config):
     ...     pass
 
 Example (RID validation):
-    >>> from deriva_ml.core.validation import validate_rids
+    >>> from deriva_ml.core.validation import validate_rids  # doctest: +SKIP
     >>>
     >>> result = validate_rids(
     ...     ml,
