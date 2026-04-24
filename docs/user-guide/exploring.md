@@ -8,7 +8,7 @@ A `DerivaML` instance is a Python handle on a remote Deriva catalog — a struct
 
 In real projects you will usually work with a domain-specific subclass of `DerivaML` — for example, `EyeAI(DerivaML)` — that adds catalog-specific helper methods. The base `DerivaML` class provides everything described in this chapter, and all examples apply equally to a subclass instance.
 
-## Connecting to a catalog
+## How to connect to a catalog
 
 Create a `DerivaML` instance with a hostname and catalog ID:
 
@@ -22,6 +22,11 @@ That's the entire connection setup for interactive use. For project-structured r
 
 !!! note
     `DerivaML` authenticates with Globus. The first time you connect from a machine, `deriva-auth` will open a browser window. Subsequent connections reuse cached credentials.
+
+**Notes**
+
+- Credentials are cached at `~/.deriva`; re-run `deriva-auth` to refresh them after they expire.
+- `DerivaML` holds a single connection to the catalog; avoid constructing multiple instances for the same catalog in one process.
 
 ## Understanding RIDs
 
@@ -38,24 +43,26 @@ To obtain a globally resolvable URI for a RID — for citations or cross-catalog
 ```python
 # Permanent citation URL, snapshot-qualified
 url = ml.cite("1-000C")
-# Returns: 'https://catalog.example.org/id/1/1-000C@32S-W6DS-GAMG'
+# Returns a persistent URL of the form https://{host}/id/{catalog_id}/{rid}@{snapshot_time}
 
 # Current-state URL (no snapshot)
 url = ml.cite("1-000C", current=True)
-# Returns: 'https://catalog.example.org/id/1/1-000C'
+# Returns a URL without a snapshot qualifier: https://{host}/id/{catalog_id}/{rid}
 ```
 
 !!! warning
     Do not parse RIDs or derive meaning from their structure. The format is an implementation detail of the Deriva platform. Treat them as opaque tokens.
 
-## Listing tables and browsing the schema
+## How to list tables and browse the schema
 
 `ml.model` gives you a programmatic view of the catalog's schema. The model knows about every table in both the domain schema and the `deriva-ml` ML schema.
 
 ```python
-# List all tables in the default domain schema
-for table in ml.model.domain_schema.tables.values():
-    print(table.name)
+# List all tables in every domain schema
+for schema_name in ml.domain_schemas:
+    schema = ml.model.schemas[schema_name]
+    for table_name, table in schema.tables.items():
+        print(f"{schema_name}.{table_name}: {len(table.columns)} columns")
 
 # Look up a specific table by name
 subject_table = ml.model.name_to_table("Subject")
@@ -64,7 +71,13 @@ print(subject_table.columns.keys())  # column names
 
 The ML schema — always named `deriva-ml` — contains the core tracking tables: `Dataset`, `Workflow`, `Execution`, `Feature_Name`, and their association tables. Domain-specific tables (Subject, Image, Observation, and so on) live in the domain schema configured for your project.
 
-## Finding datasets, features, workflows, and executions
+**Notes**
+
+- `ml.domain_schemas` is a `frozenset[str]` of schema names. Use `ml.model.schemas[name]` to get the schema object with its tables.
+- Columns include system columns (`RID`, `RCT`, `RMB`, `RCB`, `RMT`) — filter them out when listing application columns.
+- The `deriva-ml` schema holds Dataset/Execution/Workflow/Feature_Name; your application tables live in the domain schema(s).
+
+## How to find datasets, features, workflows, and executions
 
 Four high-level methods let you discover the key objects in a catalog.
 
@@ -101,7 +114,7 @@ for w in workflows:
 **Executions** — individual runs of a workflow, with status and provenance:
 
 ```python
-from deriva_ml.execution.execution import ExecutionStatus
+from deriva_ml.execution.state_store import ExecutionStatus
 
 # All executions
 for record in ml.find_executions():
@@ -116,7 +129,13 @@ training_runs = list(ml.find_executions(workflow_type="Training"))
 
 Each of these methods returns the full set of matching objects from the catalog. They are read-only operations — nothing is created or modified.
 
-## Querying with pathBuilder
+**Notes**
+
+- `find_datasets()` returns `Dataset` objects bound to the live catalog connection.
+- `find_workflows()` deduplicates by checksum; the same script that runs multiple times shares one workflow row.
+- `find_executions()` is live-catalog-only; a `DatasetBag` does not have its own executions table.
+
+## How to query with pathBuilder
 
 The high-level `find_*` methods cover the most common discovery tasks. When you need to query a table they don't cover — for instance, a domain-specific table, or a join across multiple tables — reach for `ml.pathBuilder()`.
 
@@ -156,6 +175,11 @@ image_path = pb.schemas["my_schema"].tables["Image"]
 rows = image_path.attributes(image_path.RID, image_path.Filename).fetch()
 ```
 
+**Notes**
+
+- `pathBuilder()` is safe to call multiple times; each call returns a fresh root object.
+- Prefer the high-level `find_*` API first; `pathBuilder()` is the escape hatch for ad-hoc queries not covered by those methods.
+
 ## When to reach for pathBuilder vs. the high-level APIs
 
 Use the high-level APIs (`find_datasets`, `find_features`, `find_workflows`, `find_executions`) for:
@@ -171,7 +195,7 @@ Use `pathBuilder()` when:
 
 Prefer the datapath API over constructing raw ERMrest URL strings. Raw URLs bypass the path builder's type inference and require manual URL encoding. The path builder produces the same REST calls but is less brittle.
 
-## Jumping to Chaise
+## How to jump to Chaise
 
 Chaise is Deriva's web interface for browsing and editing catalog data. When you have a table name or a RID and want to inspect it visually, `ml.chaise_url()` gives you a direct link:
 
@@ -191,12 +215,22 @@ Open the returned URL in a browser to see the full record with all columns and r
 !!! tip
     Copy `ml.chaise_url("Execution")` into your browser after a run to browse all execution records and click through to their linked datasets, assets, and feature values.
 
+**Notes**
+
+- `chaise_url()` requires a Chaise deployment on the same host as the catalog; if Chaise is not deployed, the URL will 404.
+- The recordset URL encodes the current schema and table name; it always shows the live state of the table, not a snapshot.
+
 ## Common pitfalls
 
 !!! warning
-    **RIDs are opaque. Do not parse them.**
+    **Connection liveness: Dataset objects hold a reference to the live catalog.**
 
-    The string `1-000C` has internal structure (a catalog identifier prefix and a row identifier suffix separated by a dash), but that structure is an implementation detail. Future Deriva versions may use a different format. Never split on `-`, strip prefixes, or derive the catalog number from a RID. If you need to resolve a RID back to a full record, use `ml.resolve_rid(rid)`.
+    `Dataset` objects returned by `find_datasets()` are bound to the `DerivaML` instance that created them. If that instance is garbage-collected or the connection is closed, subsequent method calls on the `Dataset` (such as `set_version()` or `download_bag()`) will fail with a connection error. Keep the `DerivaML` instance alive for as long as you need to work with the objects it returned.
+
+!!! warning
+    **`find_executions()` is live-catalog only.**
+
+    When working offline with a `DatasetBag`, there is no executions table to query. Use `list_dataset_members()` to traverse objects scoped to the bag instead.
 
 ## See also
 
