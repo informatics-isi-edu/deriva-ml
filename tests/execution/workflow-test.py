@@ -16,5 +16,5 @@ if __name__ == "__main__":
         workflow_type="Test Workflow",
         description="A test operation",
     )
-    rid = ml_instance.add_workflow(api_workflow)
+    rid = ml_instance._add_workflow(api_workflow)
     print(rid)

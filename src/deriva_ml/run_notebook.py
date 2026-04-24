@@ -648,7 +648,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             # would only see the .ipynb/.md files we register below, missing any
             # assets the notebook itself created (e.g., training_curves.png).
             ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id)
-            workflow_rid = ml_instance.retrieve_rid(execution_config["execution_rid"])["Workflow"]
+            workflow_rid = ml_instance._retrieve_rid(execution_config["execution_rid"])["Workflow"]
 
             # Look up the workflow object from the RID
             workflow = ml_instance.lookup_workflow(workflow_rid)

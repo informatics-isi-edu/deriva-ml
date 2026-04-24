@@ -251,7 +251,7 @@ class Execution:
         for wt in self.configuration.workflow.workflow_type:
             self._ml_object.lookup_term(MLVocab.workflow_type, wt)
         self.workflow_rid = (
-            self._ml_object.add_workflow(self.configuration.workflow) if not self._dry_run else DRY_RUN_RID
+            self._ml_object._add_workflow(self.configuration.workflow) if not self._dry_run else DRY_RUN_RID
         )
 
         # Validate the datasets and assets to be valid.
@@ -1276,7 +1276,7 @@ class Execution:
         if not self._model.is_asset(asset_table):
             raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
 
-        asset_record = self._ml_object.retrieve_rid(asset_rid)
+        asset_record = self._ml_object._retrieve_rid(asset_rid)
         asset_metadata = {k: v for k, v in asset_record.items() if k in self._model.asset_metadata(asset_table)}
         asset_url = asset_record["URL"]
         asset_filename = dest_dir / asset_record["Filename"]

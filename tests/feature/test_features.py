@@ -385,7 +385,7 @@ def test_list_workflow_executions_returns_matching_rids(test_ml) -> None:
     from deriva_ml.execution.workflow import Workflow
 
     test_ml.add_term(vc.workflow_type, "Test Workflow", description="Workflow type for testing")
-    wf_rid = test_ml.add_workflow(
+    wf_rid = test_ml._add_workflow(
         Workflow(
             name="S2_test_wf",
             url="https://example.com/s2_test",
@@ -418,7 +418,7 @@ def test_list_workflow_executions_by_workflow_type_name(test_ml) -> None:
     # any other test that also creates workflows tagged "Test Workflow".
     wf_type_name = "S2_ListWF_TypeNameTest"
     test_ml.add_term(vc.workflow_type, wf_type_name, description="Workflow type for type-name test")
-    wf_rid = test_ml.add_workflow(
+    wf_rid = test_ml._add_workflow(
         Workflow(
             name="S2_type_wf",
             url="https://example.com/s2_type",

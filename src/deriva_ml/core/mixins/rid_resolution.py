@@ -60,7 +60,7 @@ class RidResolutionMixin:
     Methods:
         resolve_rid: Resolve a RID to its catalog location
         resolve_rids: Batch resolve multiple RIDs efficiently
-        retrieve_rid: Retrieve the complete record for a RID
+        _retrieve_rid: Retrieve the complete record for a RID (internal)
     """
 
     # Type hints for IDE support - actual attributes from host class
@@ -98,7 +98,7 @@ class RidResolutionMixin:
         except KeyError as _e:
             raise DerivaMLException(f"Invalid RID {rid}")
 
-    def retrieve_rid(self, rid: RID) -> dict[str, Any]:
+    def _retrieve_rid(self, rid: RID) -> dict[str, Any]:
         """Retrieves complete record for RID.
 
         Fetches all column values for the entity identified by the RID.
@@ -113,7 +113,7 @@ class RidResolutionMixin:
             DerivaMLException: If the RID doesn't exist in the catalog.
 
         Example:
-            >>> record = ml.retrieve_rid("1-abc123")
+            >>> record = ml._retrieve_rid("1-abc123")
             >>> print(f"Name: {record['name']}, Created: {record['creation_date']}")
         """
         # Resolve RID and fetch the first (only) matching record
