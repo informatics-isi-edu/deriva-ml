@@ -5,6 +5,7 @@ docstrings don't need boilerplate imports. All catalog-dependent
 examples should use ``# doctest: +SKIP`` since there is no live
 catalog at doctest-collection time.
 """
+
 from __future__ import annotations
 
 import pytest

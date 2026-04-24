@@ -17,7 +17,7 @@ from __future__ import annotations  # noqa: I001
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, cast, TYPE_CHECKING, Any
+from typing import Dict, cast, TYPE_CHECKING, Any
 from typing_extensions import Self
 
 # Third-party imports

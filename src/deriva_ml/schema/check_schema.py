@@ -11,6 +11,7 @@ Public entry points:
   (for updating the reference baseline).
 - ``CheckMLSchemaCLI`` / ``main``: CLI wrappers for the above.
 """
+
 import json
 import re
 from importlib.resources import files
