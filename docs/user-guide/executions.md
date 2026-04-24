@@ -435,6 +435,6 @@ The CLI tools handle Jupyter kernel detection, `nbstripout`-based checksum compu
 ## See also
 
 - [Chapter 3 — Defining and using features](features.md): creating feature definitions, `FeatureRecord` classes, and asset-based features.
-- Chapter 5 — Working offline (coming soon): `DatasetBag` API, `restructure_assets()`, working without a catalog connection.
+- [Chapter 5 — Working offline](offline.md): `DatasetBag` API, `restructure_assets()`, working without a catalog connection.
 - [Reproducibility](reproducibility.md): `bump-version`, Git commit discipline, what DerivaML records per execution.
 - [Integrating with hydra-zen](hydra-zen.md): full project layout, `create_model_config()`, experiment presets, multirun sweeps.
