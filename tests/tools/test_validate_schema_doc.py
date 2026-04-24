@@ -112,9 +112,9 @@ def test_extract_yaml_blocks_ignores_non_yaml_fences(tmp_path):
     assert blocks[0]["table"] == "Dataset"
 
 
-def test_load_from_doc_plain_table(tmp_path):
+def test__load_from_doc_plain_table(tmp_path):
     """A plain table becomes a TableModel with kind='table'."""
-    from deriva_ml.tools.validate_schema_doc import load_from_doc
+    from deriva_ml.tools.validate_schema_doc import _load_from_doc
 
     doc = tmp_path / "schema.md"
     doc.write_text(
@@ -130,7 +130,7 @@ def test_load_from_doc_plain_table(tmp_path):
         "foreign_keys: []\n"
         "```\n"
     )
-    model = load_from_doc(doc)
+    model = _load_from_doc(doc)
     assert len(model.tables) == 1
     t = model.tables[0]
     assert t.name == "Dataset"
@@ -140,9 +140,9 @@ def test_load_from_doc_plain_table(tmp_path):
     assert t.columns[0].type == "text"
 
 
-def test_load_from_doc_vocabulary(tmp_path):
+def test__load_from_doc_vocabulary(tmp_path):
     """A vocabulary table gets terms populated."""
-    from deriva_ml.tools.validate_schema_doc import load_from_doc
+    from deriva_ml.tools.validate_schema_doc import _load_from_doc
 
     doc = tmp_path / "schema.md"
     doc.write_text(
@@ -154,16 +154,16 @@ def test_load_from_doc_vocabulary(tmp_path):
         "  - name: Runtime_Env\n"
         "```\n"
     )
-    model = load_from_doc(doc)
+    model = _load_from_doc(doc)
     t = model.tables[0]
     assert t.kind == "vocabulary"
     assert len(t.terms) == 2
     assert [term.name for term in t.terms] == ["Execution_Config", "Runtime_Env"]
 
 
-def test_load_from_doc_association(tmp_path):
+def test__load_from_doc_association(tmp_path):
     """An association table gets associates populated."""
-    from deriva_ml.tools.validate_schema_doc import load_from_doc
+    from deriva_ml.tools.validate_schema_doc import _load_from_doc
 
     doc = tmp_path / "schema.md"
     doc.write_text(
@@ -175,15 +175,15 @@ def test_load_from_doc_association(tmp_path):
         "  - table: Execution\n"
         "```\n"
     )
-    model = load_from_doc(doc)
+    model = _load_from_doc(doc)
     t = model.tables[0]
     assert t.kind == "association"
     assert [a.table for a in t.associates] == ["Dataset", "Execution"]
 
 
-def test_load_from_doc_foreign_keys(tmp_path):
+def test__load_from_doc_foreign_keys(tmp_path):
     """FKs parse correctly."""
-    from deriva_ml.tools.validate_schema_doc import load_from_doc
+    from deriva_ml.tools.validate_schema_doc import _load_from_doc
 
     doc = tmp_path / "schema.md"
     doc.write_text(
@@ -200,18 +200,18 @@ def test_load_from_doc_foreign_keys(tmp_path):
         "    referenced_columns: [RID]\n"
         "```\n"
     )
-    model = load_from_doc(doc)
+    model = _load_from_doc(doc)
     fk = model.tables[0].foreign_keys[0]
     assert fk.columns == ["Workflow"]
     assert fk.referenced_table == "Workflow"
     assert fk.referenced_columns == ["RID"]
 
 
-def test_load_from_doc_invalid_kind_raises(tmp_path):
+def test__load_from_doc_invalid_kind_raises(tmp_path):
     """Unknown 'kind:' value raises SchemaDocError."""
     import pytest
 
-    from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
+    from deriva_ml.tools.validate_schema_doc import SchemaDocError, _load_from_doc
 
     doc = tmp_path / "schema.md"
     doc.write_text(
@@ -221,14 +221,14 @@ def test_load_from_doc_invalid_kind_raises(tmp_path):
         "```\n"
     )
     with pytest.raises(SchemaDocError, match="unknown kind"):
-        load_from_doc(doc)
+        _load_from_doc(doc)
 
 
-def test_load_from_doc_missing_required_key_raises(tmp_path):
+def test__load_from_doc_missing_required_key_raises(tmp_path):
     """Missing required key 'kind' raises SchemaDocError."""
     import pytest
 
-    from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
+    from deriva_ml.tools.validate_schema_doc import SchemaDocError, _load_from_doc
 
     doc = tmp_path / "schema.md"
     doc.write_text(
@@ -237,12 +237,12 @@ def test_load_from_doc_missing_required_key_raises(tmp_path):
         "```\n"
     )
     with pytest.raises(SchemaDocError, match="missing required key"):
-        load_from_doc(doc)
+        _load_from_doc(doc)
 
 
-def test_load_from_doc_accepts_descriptions(tmp_path):
+def test__load_from_doc_accepts_descriptions(tmp_path):
     """Descriptions on tables and columns are tolerated (doc-side only)."""
-    from deriva_ml.tools.validate_schema_doc import load_from_doc
+    from deriva_ml.tools.validate_schema_doc import _load_from_doc
 
     doc = tmp_path / "schema.md"
     doc.write_text(
@@ -256,7 +256,7 @@ def test_load_from_doc_accepts_descriptions(tmp_path):
         "    description: Human-readable label.\n"
         "```\n"
     )
-    model = load_from_doc(doc)
+    model = _load_from_doc(doc)
     # Description text is NOT preserved in the model (doc-side only).
     t = model.tables[0]
     assert t.name == "Dataset"
@@ -298,9 +298,9 @@ def test_resolve_enum_ref_unknown_member_raises():
         _resolve_enum_ref("MLTable", "no_such_member")
 
 
-def test_load_from_code_simple_tabledef(tmp_path):
+def test__load_from_code_simple_tabledef(tmp_path):
     """A fixture module with one TableDef call produces a TableModel."""
-    from deriva_ml.tools.validate_schema_doc import load_from_code
+    from deriva_ml.tools.validate_schema_doc import _load_from_code
 
     fixture = tmp_path / "fixture_schema.py"
     fixture.write_text(
@@ -325,7 +325,7 @@ def test_load_from_code_simple_tabledef(tmp_path):
         '        ],\n'
         '    ))\n'
     )
-    model = load_from_code(fixture)
+    model = _load_from_code(fixture)
     assert len(model.tables) == 1
     t = model.tables[0]
     assert t.name == "Execution"
@@ -337,9 +337,9 @@ def test_load_from_code_simple_tabledef(tmp_path):
     assert t.foreign_keys[0].referenced_table == "Workflow"
 
 
-def test_load_from_code_vocabulary_with_terms(tmp_path):
+def test__load_from_code_vocabulary_with_terms(tmp_path):
     """A VocabularyTableDef plus _ensure_terms yields a vocabulary TableModel."""
-    from deriva_ml.tools.validate_schema_doc import load_from_code
+    from deriva_ml.tools.validate_schema_doc import _load_from_code
 
     fixture = tmp_path / "fixture_vocab.py"
     fixture.write_text(
@@ -357,7 +357,7 @@ def test_load_from_code_vocabulary_with_terms(tmp_path):
         '        {"Name": "Testing", "Description": "Evaluate a model"},\n'
         '    ])\n'
     )
-    model = load_from_code(fixture)
+    model = _load_from_code(fixture)
     assert len(model.tables) == 1
     t = model.tables[0]
     assert t.name == "Workflow_Type"
@@ -365,9 +365,9 @@ def test_load_from_code_vocabulary_with_terms(tmp_path):
     assert [term.name for term in t.terms] == ["Training", "Testing"]
 
 
-def test_load_from_code_association_table(tmp_path):
+def test__load_from_code_association_table(tmp_path):
     """Table.define_association produces a TableModel with kind='association'."""
-    from deriva_ml.tools.validate_schema_doc import load_from_code
+    from deriva_ml.tools.validate_schema_doc import _load_from_code
 
     fixture = tmp_path / "fixture_assoc.py"
     fixture.write_text(
@@ -387,7 +387,7 @@ def test_load_from_code_association_table(tmp_path):
         '        )\n'
         '    )\n'
     )
-    model = load_from_code(fixture)
+    model = _load_from_code(fixture)
     assert len(model.tables) == 1
     t = model.tables[0]
     assert t.kind == "association"
@@ -414,7 +414,7 @@ def test_diff_identical_schemas_empty():
         ColumnModel,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     s1 = SchemaModel(tables=[
         TableModel(
@@ -430,7 +430,7 @@ def test_diff_identical_schemas_empty():
             columns=[ColumnModel(name="Name", type="text")],
         ),
     ])
-    assert diff_schemas(expected=s1, actual=s2) == []
+    assert _diff_schemas(expected=s1, actual=s2) == []
 
 
 def test_diff_column_missing_in_actual():
@@ -439,7 +439,7 @@ def test_diff_column_missing_in_actual():
         MismatchKind,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Dataset", kind="table",
@@ -449,7 +449,7 @@ def test_diff_column_missing_in_actual():
         name="Dataset", kind="table",
         columns=[ColumnModel(name="Name", type="text")],
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert len(mismatches) == 1
     assert mismatches[0].kind == MismatchKind.COLUMN_MISMATCH
     assert "Extra" in mismatches[0].detail
@@ -461,7 +461,7 @@ def test_diff_column_type_mismatch():
         MismatchKind,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Dataset", kind="table",
@@ -471,7 +471,7 @@ def test_diff_column_type_mismatch():
         name="Dataset", kind="table",
         columns=[ColumnModel(name="Name", type="markdown")],
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(
         m.kind == MismatchKind.COLUMN_MISMATCH
         and "text" in m.detail and "markdown" in m.detail
@@ -486,7 +486,7 @@ def test_diff_fk_target_mismatch():
         MismatchKind,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Execution", kind="table",
@@ -508,7 +508,7 @@ def test_diff_fk_target_mismatch():
             referenced_columns=["RID"],
         )],
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)
 
 
@@ -518,7 +518,7 @@ def test_diff_vocab_terms_differ():
         SchemaModel,
         TableModel,
         VocabularyTermModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Asset_Type",
@@ -536,7 +536,7 @@ def test_diff_vocab_terms_differ():
             VocabularyTermModel(name="Extra_CodeOnly_Term"),
         ],
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(
         m.kind == MismatchKind.VOCAB_TERMS_MISMATCH
         and "Extra_DocOnly_Term" in m.detail
@@ -551,7 +551,7 @@ def test_diff_association_endpoints_differ():
         MismatchKind,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Dataset_Execution",
@@ -569,7 +569,7 @@ def test_diff_association_endpoints_differ():
             AssociationEndpointModel(table="Workflow"),  # differs
         ],
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.ASSOCIATION_MISMATCH for m in mismatches)
 
 
@@ -655,7 +655,7 @@ def test_to_doc_markdown_roundtrip(tmp_path):
         SchemaModel,
         TableModel,
         VocabularyTermModel,
-        load_from_doc,
+        _load_from_doc,
         to_doc_markdown,
     )
     original = SchemaModel(tables=[
@@ -682,7 +682,7 @@ def test_to_doc_markdown_roundtrip(tmp_path):
     md = to_doc_markdown(original)
     doc = tmp_path / "schema.md"
     doc.write_text(md)
-    roundtripped = load_from_doc(doc)
+    roundtripped = _load_from_doc(doc)
 
     assert len(roundtripped.tables) == 3
     assert [t.name for t in roundtripped.tables] == [
@@ -706,7 +706,7 @@ def test_dynamic_value_fk_schema_matches_any():
         ForeignKeyModel,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Execution",
@@ -730,7 +730,7 @@ def test_dynamic_value_fk_schema_matches_any():
             referenced_columns=["RID"],
         )],
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert mismatches == [], f"Expected no mismatches; got {mismatches}"
 
 
@@ -743,7 +743,7 @@ def test_dynamic_value_does_not_mask_other_fk_differences():
         MismatchKind,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="Execution",
@@ -767,7 +767,7 @@ def test_dynamic_value_does_not_mask_other_fk_differences():
             referenced_columns=["RID"],
         )],
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)
 
 
@@ -779,7 +779,7 @@ def test_compare_associates_detects_metadata_mismatch():
         MismatchKind,
         SchemaModel,
         TableModel,
-        diff_schemas,
+        _diff_schemas,
     )
     expected = SchemaModel(tables=[TableModel(
         name="X_Y",
@@ -799,7 +799,7 @@ def test_compare_associates_detects_metadata_mismatch():
         ],
         metadata=[],  # code is missing the metadata column
     )])
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(
         m.kind == MismatchKind.ASSOCIATION_MISMATCH
         and "metadata" in m.detail
