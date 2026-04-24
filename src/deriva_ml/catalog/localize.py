@@ -1,4 +1,18 @@
-"""Localize remote hatrac assets to a local catalog server."""
+"""Localize remote Hatrac assets to a local catalog server.
+
+Copies assets referenced in a cloned catalog's asset tables from the source
+Hatrac store to the local Hatrac instance. Intended for use after
+``create_ml_workspace`` is called with ``asset_mode=REFERENCES``.
+
+Three-stage flow:
+1. Enumerate all rows in asset tables (tables with URL, Filename, MD5 columns).
+2. For each row, download the file from the source Hatrac URL to a temp file,
+   then upload it to the local Hatrac namespace.
+3. Update the catalog row's URL to point to the new local Hatrac path.
+
+The ``LocalizeResult`` dataclass summarizes counts of processed/skipped/failed
+assets and provides the old-to-new URL mapping for auditing.
+"""
 
 from __future__ import annotations
 
@@ -89,7 +103,7 @@ def localize_assets(
 
     Examples:
         Localize specific assets using DerivaML:
-            >>> from deriva_ml import DerivaML
+            >>> from deriva_ml import DerivaML  # doctest: +SKIP
             >>> ml = DerivaML("localhost", "42")
             >>> result = localize_assets(
             ...     ml,
@@ -99,7 +113,7 @@ def localize_assets(
             >>> print(f"Localized {result.assets_processed} assets")
 
         Localize assets cloned from another server with relative URLs:
-            >>> result = localize_assets(
+            >>> result = localize_assets(  # doctest: +SKIP
             ...     ml,
             ...     asset_table="file",
             ...     asset_rids=["TG0", "TG2"],
@@ -108,7 +122,7 @@ def localize_assets(
             ... )
 
         Localize using ErmrestCatalog:
-            >>> from deriva.core import DerivaServer
+            >>> from deriva.core import DerivaServer  # doctest: +SKIP
             >>> server = DerivaServer("https", "localhost")
             >>> catalog = server.connect_ermrest("42")
             >>> result = localize_assets(
