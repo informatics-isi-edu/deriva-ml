@@ -31,8 +31,6 @@ _deriva_server = importlib.import_module("deriva.core.deriva_server")
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 _core_utils = importlib.import_module("deriva.core.utils.core_utils")
-_globus_auth_utils = importlib.import_module("deriva.core.utils.globus_auth_utils")
-
 DEFAULT_SESSION_CONFIG = _deriva_core.DEFAULT_SESSION_CONFIG
 get_credential = _deriva_core.get_credential
 urlquote = _deriva_core.urlquote
@@ -42,7 +40,6 @@ ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
 Table = _ermrest_model.Table
 DEFAULT_LOGGER_OVERRIDES = _core_utils.DEFAULT_LOGGER_OVERRIDES
 deriva_tags = _core_utils.tag
-GlobusNativeLogin = _globus_auth_utils.GlobusNativeLogin
 
 from deriva_ml.core.catalog_stub import CatalogStub
 from deriva_ml.core.config import DerivaMLConfig
@@ -853,8 +850,26 @@ class DerivaML(
         return self._workspace
 
     @property
-    def working_data(self):
-        """Deprecated: use ``workspace`` instead."""
+    def working_data(self) -> Path:
+        """Return the working data directory path.
+
+        .. deprecated::
+            ``working_data`` is deprecated and will be removed in the next
+            major version. Use ``working_dir`` instead.
+
+            ``working_dir`` is the canonical attribute; it is set during
+            execution initialization and contains all output assets, metadata,
+            and intermediate files for the current execution.
+
+        Returns:
+            Path to the working data directory (same as ``working_dir``).
+
+        Raises:
+            DeprecationWarning: Always emitted at access time.
+
+        Example:
+            >>> exe.working_dir  # use this instead  # doctest: +SKIP
+        """
         import warnings
 
         warnings.warn(
@@ -893,7 +908,7 @@ class DerivaML(
         )
         return result.to_dataframe()
 
-    def cache_features(
+    def _cache_features(
         self,
         table_name: str,
         feature_name: str,
@@ -917,7 +932,7 @@ class DerivaML(
 
         Example::
 
-            labels = ml.cache_features("Image", "Classification")
+            labels = ml._cache_features("Image", "Classification")
             print(labels["Diagnosis_Type"].value_counts())
         """
         import time
@@ -950,40 +965,6 @@ class DerivaML(
             )
             rc.store(key, columns, rows, meta)
         return df
-
-    @staticmethod
-    def globus_login(host: str) -> None:
-        """Authenticate with Globus to obtain credentials for a Deriva server.
-
-        Initiates a Globus Native Login flow to obtain OAuth2 tokens required
-        by the Deriva server.  The flow uses a device-code grant (no browser
-        or local server), and stores refresh tokens so that subsequent calls
-        can re-authenticate silently.  The BDBag keychain is also updated so
-        that bag downloads can use the same credentials.
-
-        If the user is already logged in for the given host, a message is
-        printed and no further action is taken.
-
-        Args:
-            host: Hostname of the Deriva server to authenticate with
-                (e.g., ``"www.eye-ai.org"``).
-
-        Example:
-            >>> DerivaML.globus_login('www.eye-ai.org')
-            'Login Successful'
-        """
-        gnl = GlobusNativeLogin(host=host)
-        if gnl.is_logged_in([host]):
-            print("You are already logged in.")
-        else:
-            gnl.login(
-                [host],
-                no_local_server=True,
-                no_browser=True,
-                refresh_tokens=True,
-                update_bdbag_keychain=True,
-            )
-            print("Login Successful")
 
     def chaise_url(self, table: RID | Table | str) -> str:
         """Generates Chaise web interface URL.
@@ -1093,27 +1074,6 @@ class DerivaML(
         from deriva_ml.catalog.clone import get_catalog_provenance
 
         return get_catalog_provenance(self.catalog)
-
-    def user_list(self) -> List[Dict[str, str]]:
-        """Returns catalog user list.
-
-        Retrieves basic information about all users who have access to the catalog, including their
-        identifiers and full names.
-
-        Returns:
-            List[Dict[str, str]]: List of user information dictionaries, each containing:
-                - 'ID': User identifier
-                - 'Full_Name': User's full name
-
-        Examples:
-
-            >>> users = ml.user_list()
-            >>> for user in users:
-            ...     print(f"{user['Full_Name']} ({user['ID']})")
-        """
-        # Get the user table path and fetch basic user info
-        user_path = self.pathBuilder().public.ERMrest_Client.path
-        return [{"ID": u["ID"], "Full_Name": u["Full_Name"]} for u in user_path.entities().fetch()]
 
     # resolve_rid, retrieve_rid moved to RidResolutionMixin
 
@@ -1360,32 +1320,6 @@ class DerivaML(
         }
         self.model.annotations.update(catalog_annotation)
         self.model.apply()
-
-    def add_page(self, title: str, content: str) -> None:
-        """Adds page to web interface.
-
-        Creates a new page in the catalog's web interface with the specified title and content. The page will be
-        accessible through the catalog's navigation system.
-
-        Args:
-            title: The title of the page to be displayed in navigation and headers.
-            content: The main content of the page can include HTML markup.
-
-        Raises:
-            DerivaMLException: If the page creation fails or the user lacks necessary permissions.
-
-        Example:
-            >>> ml.add_page(
-            ...     title="Analysis Results",
-            ...     content="<h1>Results</h1><p>Analysis completed successfully...</p>"
-            ... )
-        """
-        # Insert page into www tables with title and content
-        # Use default schema or first domain schema for www tables
-        schema = self.default_schema or (sorted(self.domain_schemas)[0] if self.domain_schemas else None)
-        if schema is None:
-            raise DerivaMLException("No domain schema available for adding pages")
-        self.pathBuilder().www.tables[schema].insert([{"Title": title, "Content": content}])
 
     def create_vocabulary(
         self, vocab_name: str, comment: str = "", schema: str | None = None, update_navbar: bool = True
