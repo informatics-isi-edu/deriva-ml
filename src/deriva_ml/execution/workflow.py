@@ -738,16 +738,44 @@ class Workflow(BaseModel):
 
     @staticmethod
     def get_dynamic_version(root: str | os.PathLike | None = None) -> str:
-        """
-        Return a dynamic version string based on VCS state (setuptools_scm),
-        including dirty/uncommitted changes if configured.
+        """Return a dynamic version string derived from VCS state.
 
-        Works under uv / Python 3.10+ by forcing setuptools to use stdlib distutils.
-        """
-        # 1) Tell setuptools to use stdlib distutils (or no override) to avoid
-        #    the '_distutils_hack' assertion you hit.
-        os.environ.setdefault("SETUPTOOLS_USE_DISTUTILS", "stdlib")
+        Wraps :func:`setuptools_scm.get_version` (the same mechanism used at
+        build time). The returned string includes distance-from-tag and an
+        optional ``.dirty`` suffix when the working tree has uncommitted
+        changes.
 
+        Args:
+            root: Repository root to introspect. When ``None``, uses the
+                installed deriva-ml package's parent directory (i.e. the
+                source checkout that's being developed against).
+
+        Returns:
+            A setuptools-scm-style version string (e.g. ``"1.2.3"``,
+            ``"1.2.3.post2+g1234abc"``, or ``"1.2.3.post2+g1234abc.dirty"``).
+
+        Raises:
+            RuntimeError: If ``setuptools_scm`` is not importable in the
+                current environment.
+        """
+        # Historical note: this routine used to unconditionally set
+        # ``os.environ["SETUPTOOLS_USE_DISTUTILS"] = "stdlib"`` as a
+        # defensive measure against a ``_distutils_hack`` assertion that
+        # older setuptools versions hit on some macOS configurations.
+        #
+        # That mutation is process-wide and leaks into subprocess.Popen
+        # inheritance, which broke third-party packages on Python 3.12+
+        # that still import ``distutils.version`` (distutils is removed
+        # from the stdlib per PEP 632 but setuptools vendors it back in
+        # its own package — the env var short-circuits that vendored
+        # fallback). Net effect: any test that called a workflow
+        # helper would poison the process env, and any later subprocess
+        # under Python 3.13+ would crash importing ``distutils``.
+        #
+        # Python 3.12 is the floor for this project (pyproject.toml:
+        # ``requires-python = ">=3.12"``) so the distutils_hack concern
+        # is moot — distutils is simply gone, and setuptools's own
+        # fallback handles it. We drop the env mutation entirely.
         warnings.filterwarnings(
             "ignore",
             category=UserWarning,
