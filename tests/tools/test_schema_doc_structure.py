@@ -39,9 +39,9 @@ def test_schema_doc_yaml_blocks_all_valid():
 def test_schema_doc_has_entry_per_mltable_member():
     """Every MLTable enum member appears as a table in the doc."""
     from deriva_ml.core.enums import MLTable
-    from deriva_ml.tools.validate_schema_doc import load_from_doc
+    from deriva_ml.tools.validate_schema_doc import _load_from_doc
 
-    model = load_from_doc(DOC_PATH)
+    model = _load_from_doc(DOC_PATH)
     doc_names = {t.name for t in model.tables}
     for member in MLTable:
         if member.value in _DYNAMIC_MLTABLE_EXEMPT:
@@ -56,9 +56,9 @@ def test_schema_doc_has_entry_per_mltable_member():
 def test_schema_doc_has_entry_per_mlvocab_member():
     """Every MLVocab enum member appears as a vocabulary table in the doc."""
     from deriva_ml.core.enums import MLVocab
-    from deriva_ml.tools.validate_schema_doc import load_from_doc
+    from deriva_ml.tools.validate_schema_doc import _load_from_doc
 
-    model = load_from_doc(DOC_PATH)
+    model = _load_from_doc(DOC_PATH)
     vocab_names = {t.name for t in model.tables if t.kind == "vocabulary"}
     for member in MLVocab:
         assert member.value in vocab_names, (

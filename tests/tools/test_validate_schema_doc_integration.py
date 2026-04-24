@@ -16,17 +16,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 def test_validator_runs_clean_on_current_repo():
     """The authoritative doc and code agree. This IS the CI gate."""
     from deriva_ml.tools.validate_schema_doc import (
-        diff_schemas,
-        load_from_code,
-        load_from_doc,
+        _diff_schemas,
+        _load_from_code,
+        _load_from_doc,
     )
 
     doc_path = REPO_ROOT / "docs" / "reference" / "schema.md"
     code_path = REPO_ROOT / "src" / "deriva_ml" / "schema" / "create_schema.py"
 
-    expected = load_from_doc(doc_path)
-    actual = load_from_code(code_path)
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    expected = _load_from_doc(doc_path)
+    actual = _load_from_code(code_path)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
 
     assert mismatches == [], (
         "schema.md and create_schema.py disagree:\n"

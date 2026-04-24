@@ -124,7 +124,7 @@ def _extract_yaml_blocks(path: Path) -> list[dict]:
 _VALID_KINDS = frozenset({"table", "vocabulary", "association"})
 
 
-def load_from_doc(path: Path) -> SchemaModel:
+def _load_from_doc(path: Path) -> SchemaModel:
     """Parse a schema doc Markdown file into a SchemaModel.
 
     Args:
@@ -497,7 +497,7 @@ def _extract_association(node: ast.Call) -> TableModel | None:
     )
 
 
-def load_from_code(path: Path) -> SchemaModel:
+def _load_from_code(path: Path) -> SchemaModel:
     """Parse create_schema.py AST into a SchemaModel.
 
     Walks the tree for:
@@ -565,7 +565,7 @@ class Mismatch:
     detail: str
 
 
-def diff_schemas(*, expected: SchemaModel, actual: SchemaModel) -> list[Mismatch]:
+def _diff_schemas(*, expected: SchemaModel, actual: SchemaModel) -> list[Mismatch]:
     """Compare two schemas; return list of Mismatches.
 
     Args:
@@ -812,18 +812,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        expected = load_from_doc(Path(args.doc))
+        expected = _load_from_doc(Path(args.doc))
     except (SchemaDocError, FileNotFoundError) as exc:
         print(f"error loading doc: {exc}", file=sys.stderr)
         return 2
 
     try:
-        actual = load_from_code(Path(args.code))
+        actual = _load_from_code(Path(args.code))
     except (SchemaCodeError, FileNotFoundError) as exc:
         print(f"error loading code: {exc}", file=sys.stderr)
         return 2
 
-    mismatches = diff_schemas(expected=expected, actual=actual)
+    mismatches = _diff_schemas(expected=expected, actual=actual)
     print(_format_mismatches(mismatches))
     return 1 if mismatches else 0
 
@@ -833,7 +833,7 @@ def to_doc_markdown(model: SchemaModel) -> str:
 
     Used for bootstrap (generate an initial doc from the code) and for
     emergency regeneration. The output is round-trip identical with
-    load_from_doc.
+    _load_from_doc.
 
     Args:
         model: SchemaModel instance.
