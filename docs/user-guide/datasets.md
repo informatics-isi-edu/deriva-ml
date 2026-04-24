@@ -180,7 +180,7 @@ Bag export honors the hierarchy: downloading a parent dataset includes all recor
 Every dataset starts at version `0.1.0` and increments its minor version each time `add_dataset_members` is called. You can also increment a version explicitly and control which component changes.
 
 ```python
-from deriva_ml.dataset.aux_classes import VersionPart
+from deriva_ml.dataset import VersionPart
 
 # Read the current version
 print(dataset.current_version)  # e.g., DatasetVersion(0, 3, 0)
@@ -211,8 +211,9 @@ This is the guarantee that makes dataset downloads reproducible. Downloading a v
 
 **Notes**
 
-- Version numbers do not auto-bump on member changes in situations where you call `add_dataset_members` zero times. You must call `increment_dataset_version` explicitly when you want to mark a milestone.
-- Calling `add_dataset_members` does auto-increment the minor version. If you want to control when versions are created, increment the version manually before adding members, then add them without triggering further auto-increments.
+- Every call to `add_dataset_members` unconditionally bumps the minor version once. There is no parameter to suppress this. If you want fewer version bumps, **batch all members into a single `add_dataset_members` call** rather than making multiple small calls.
+- To mark a milestone (major or patch version) without adding members, call `increment_dataset_version` explicitly.
+- `VersionPart` lives in `deriva_ml.dataset.aux_classes` alongside `DatasetVersion` and related types, and is re-exported from `deriva_ml.dataset` for convenience.
 - Version pinning for executions (`DatasetSpec(rid=..., version="1.0.0")`) is covered in Chapter 7 ("Reproducibility").
 
 ## How to split a dataset
@@ -466,7 +467,7 @@ Non-element-type tables (such as `Device`) are always traversed normally.
 
 - `download_dataset_bag` writes the bag to a temporary directory inside the working directory. The path is stable for the lifetime of the `DatasetBag` object.
 - To exclude a table that causes timeout issues, use `DatasetSpec(exclude_tables={"ProcessStep"})`.
-- For MINID creation (citable identifiers for shared bags), see Chapter 6 ("Sharing and collaboration").
+- To create a MINID (a persistent, citable identifier) for a shared bag, pass `use_minid=True` to `download_dataset_bag`. MINIDs are covered in depth in Chapter 6 ("Sharing and collaboration").
 
 ## Common pitfalls
 
