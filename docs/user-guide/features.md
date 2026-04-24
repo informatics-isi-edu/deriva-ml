@@ -1,6 +1,6 @@
 # Defining and using features
 
-Features are structured, provenance-linked annotations on existing catalog records. By the end of this chapter you will know how to define features and vocabularies, record values inside an execution, read them back using the three-method S2 surface, reduce multi-annotator data with selectors, and work with asset-based features — both online and from a downloaded bag.
+Features are structured, provenance-linked annotations on existing catalog records. By the end of this chapter you will know how to define features and vocabularies, record values inside an execution, read them back using the three-method S2 surface, reduce multi-annotator data with selectors, and work with asset-based features — both online and from a downloaded bag. You will also understand when to choose each reading method and how selectors differ in their error-handling contracts.
 
 ## What is a feature?
 
@@ -78,7 +78,7 @@ DiagnosisRecord = ml.create_feature(
 ### Feature with metadata columns
 
 ```python
-from deriva_ml.deriva_definitions import ColumnDefinition, BuiltinTypes
+from deriva_ml import ColumnDefinition, BuiltinTypes
 
 DiagnosisRecord = ml.create_feature(
     target_table="Image",
@@ -244,6 +244,13 @@ print(f"Value columns: {[c.name for c in feature.value_columns]}")
 DiagnosisRecord = feature.feature_record_class()
 ```
 
+**Notes**
+
+- `find_features(table=None)` returns a `list[Feature]`. Omit `table` to discover features across all domain tables.
+- `feature_values` returns an iterator but materializes all rows in memory before yielding the first record — it is not a true streaming cursor. Apply a `selector` to reduce memory usage when the feature table is large.
+- `lookup_feature` does not fetch values; it returns the schema-level `Feature` object and its `feature_record_class()`. Use it when you need column metadata or want a typed record class without running `create_feature` again.
+- All three methods work identically on `DerivaML` (live catalog), `Dataset` (catalog-pinned to a snapshot), and `DatasetBag` (offline local bag). The only difference is scope: `Dataset` and `DatasetBag` are limited to data included in that version's bag.
+
 ## How to use selectors to reduce multi-annotator data
 
 When the same record has multiple feature values — from different annotators, model runs, or time windows — a **selector** collapses the group to a single value per target RID.
@@ -272,7 +279,7 @@ originals = list(ml.feature_values(
 ))
 ```
 
-(`select_latest` is an alias for `select_newest`.)
+(`select_latest` has the same behavior as `select_newest`.)
 
 ### `select_by_execution` — specific execution
 
@@ -284,6 +291,9 @@ from_run = list(ml.feature_values(
     selector=FeatureRecord.select_by_execution("3-WY2A"),
 ))
 ```
+
+!!! note
+    `select_by_execution` raises `DerivaMLException` when no record in a group matches the given execution RID; `select_by_workflow` returns `None` and silently omits that target RID from the iterator. Use `select_by_workflow` when "no match" is a valid state (some targets may not have been processed by that workflow); use `select_by_execution` when a missing match is a bug.
 
 ### `select_by_workflow` — workflow-scoped factory
 
@@ -374,11 +384,7 @@ for rec in ml.feature_values("Image", "ResNet50_Embedding"):
 `DatasetBag` implements the same three-method surface as `DerivaML`. You can call `find_features`, `feature_values`, and `lookup_feature` on a bag without a catalog connection.
 
 ```python
-from deriva_ml.dataset import DatasetSpec
-
-bag = dataset.download_dataset_bag(
-    DatasetSpec(rid=dataset_rid, version="2.0.0", materialize=True)
-)
+bag = dataset.download_dataset_bag(version="2.0.0", materialize=True)
 
 # Identical API to the live catalog
 for rec in bag.feature_values("Image", "Diagnosis",
