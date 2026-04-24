@@ -15,18 +15,24 @@ from pydantic import BaseModel, ConfigDict
 
 
 class AddedTable(BaseModel):
+    """A table present in the live schema but absent from the cached schema."""
+
     model_config = ConfigDict(frozen=True)
     schema_name: str
     table: str
 
 
 class RemovedTable(BaseModel):
+    """A table present in the cached schema but absent from the live schema."""
+
     model_config = ConfigDict(frozen=True)
     schema_name: str
     table: str
 
 
 class AddedColumn(BaseModel):
+    """A column present in the live schema but absent from the cached schema."""
+
     model_config = ConfigDict(frozen=True)
     schema_name: str
     table: str
@@ -35,6 +41,8 @@ class AddedColumn(BaseModel):
 
 
 class RemovedColumn(BaseModel):
+    """A column present in the cached schema but absent from the live schema."""
+
     model_config = ConfigDict(frozen=True)
     schema_name: str
     table: str
@@ -42,6 +50,8 @@ class RemovedColumn(BaseModel):
 
 
 class ColumnTypeChange(BaseModel):
+    """A column whose ERMrest typename differs between cached and live schemas."""
+
     model_config = ConfigDict(frozen=True)
     schema_name: str
     table: str
@@ -51,6 +61,8 @@ class ColumnTypeChange(BaseModel):
 
 
 class AddedForeignKey(BaseModel):
+    """A foreign-key constraint present in the live schema but absent from the cached schema."""
+
     model_config = ConfigDict(frozen=True)
     schema_name: str
     table: str
@@ -61,6 +73,8 @@ class AddedForeignKey(BaseModel):
 
 
 class RemovedForeignKey(BaseModel):
+    """A foreign-key constraint present in the cached schema but absent from the live schema."""
+
     model_config = ConfigDict(frozen=True)
     schema_name: str
     table: str
@@ -189,8 +203,11 @@ def _fkey_detail(fk: dict) -> tuple[list[str], str, str, list[str]]:
     return fk_cols, ref_schema, ref_table, ref_cols
 
 
-def compute_diff(cached: dict, live: dict) -> SchemaDiff:
+def _compute_diff(cached: dict, live: dict) -> SchemaDiff:
     """Compare two ERMrest ``/schema`` payloads.
+
+    Internal implementation; callers should use the schema-pin mixin methods
+    rather than calling this directly.
 
     Args:
         cached: Payload stored in the local schema cache.
