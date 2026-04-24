@@ -1,6 +1,6 @@
 # Sharing and collaboration
 
-DerivaML gives you three ways to share data: a citable persistent identifier (MINID) for a versioned dataset, a portable BDBag archive that a collaborator can unpack without catalog access, and a partial catalog clone (`create_ml_workspace`) for setting up a fully functional multi-site workspace.
+DerivaML gives you three ways to share data: a citable persistent identifier (MINID) for a versioned dataset, a portable BDBag archive that a collaborator can unpack without catalog access, and a partial catalog clone (`create_ml_workspace`) for setting up a fully functional multi-site workspace. By the end of this chapter you will know when to use each mechanism and how to configure the key parameters that control copying behavior.
 
 These mechanisms are not mutually exclusive. A typical handoff might share a MINID for citation purposes, attach a BDBag archive for immediate offline use, and maintain a clone for ongoing collaboration on a shared server.
 
@@ -37,7 +37,7 @@ bag = dataset.download_dataset_bag(
 print(bag.version)  # "2.0.0"
 ```
 
-The MINID URL is stored in the catalog's dataset version record. Calling `download_dataset_bag(use_minid=True)` again for the same version returns the cached MINID rather than re-uploading, unless the dataset's export spec has changed.
+The MINID URL is stored in the catalog's dataset version record. Calling `download_dataset_bag(use_minid=True)` again for the same version returns the cached MINID rather than re-uploading, unless the dataset's download spec has changed (tracked via a spec-hash on the version record).
 
 A collaborator who receives the MINID URL can resolve it to the BDBag archive and materialize it without any DerivaML installation:
 
@@ -50,7 +50,7 @@ bdbag --resolve-fetch all /path/to/unpacked/bag
 
 - `use_minid=True` requires `s3_bucket` to be configured on the catalog; confirm this with your catalog administrator before attempting.
 - MINIDs are version-specific — each call with a different `version` argument creates a separate identifier.
-- MINID registration is idempotent for a given version and export spec hash: DerivaML checks whether the existing MINID is still current before re-registering.
+- MINID registration is idempotent for a given version: DerivaML checks the spec-hash stored on the version record and only re-registers if the download spec has changed.
 - Collaborators who receive only the MINID URL can inspect and use the data without a Deriva account.
 
 ## How to share a bag archive
@@ -142,6 +142,12 @@ print(result.report.to_text())               # Human-readable clone report
 | `asset_mode` | `AssetCopyMode` | `REFERENCES` | How to handle asset files (see below) |
 | `orphan_strategy` | `OrphanStrategy` | `FAIL` | What to do with broken FK references |
 | `add_ml_schema` | `bool` | `True` | Add `deriva-ml` tracking schema to clone |
+| `reinitialize_dataset_versions` | `bool` | `True` | Reinitialize dataset version snapshots in the clone |
+| `copy_annotations` | `bool` | `True` | Copy Chaise/ERMrest annotations to the clone |
+| `copy_policy` | `bool` | `True` | Copy ACLs and ACL bindings to the clone |
+| `source_credential` | `dict \| None` | None | Credentials for the source catalog (multi-site deployments) |
+| `dest_credential` | `dict \| None` | None | Credentials for the destination catalog (multi-site deployments) |
+| `table_concurrency` | `int` | `1` | Maximum number of tables copied concurrently; lower values reduce server load |
 | `include_tables` | `list[str]` | None | Extra tables to include (`"schema:table"` format) |
 | `exclude_objects` | `list[str]` | None | Tables to exclude (`"schema:table"` format) |
 | `prune_hidden_fkeys` | `bool` | `False` | Drop FKs whose reference table is hidden |
@@ -149,8 +155,8 @@ print(result.report.to_text())               # Human-readable clone report
 
 **Asset modes:**
 
-- `AssetCopyMode.NONE` — Asset table rows are copied but file content is not. URLs are left pointing to the source server but the files are not accessible.
-- `AssetCopyMode.REFERENCES` — Asset table rows are copied with their original URLs intact. Files remain on the source Hatrac server and are still accessible if the source is reachable.
+- `AssetCopyMode.NONE` — Asset files are not copied and asset table rows are not copied. Use this when you want the schema and non-asset data only.
+- `AssetCopyMode.REFERENCES` — Asset table rows are copied with their original URLs intact. Files remain on the source Hatrac server and are still accessible if the source is reachable. Use `localize_assets` later to copy the files.
 - `AssetCopyMode.FULL` — Asset files are downloaded from the source and re-uploaded to the destination Hatrac. Fully self-contained but slow for large catalogs.
 
 ## How to choose an orphan-handling strategy
@@ -193,6 +199,40 @@ Use `NULLIFY` when:
     `NULLIFY` only works when the FK column allows NULL. If the column is required (`nullok=False`), the strategy falls back to the behavior of `FAIL` for that constraint and logs a warning.
 
 **Recommended workflow for unfamiliar catalogs:** Run `create_ml_workspace` once with `orphan_strategy=OrphanStrategy.FAIL`, inspect `result.report.to_text()`, identify the affected tables, then re-run with `DELETE` or `NULLIFY` as appropriate for each table's semantics.
+
+```python
+from deriva_ml.catalog.clone import create_ml_workspace, OrphanStrategy
+
+# First pass: fail fast so the CloneReport shows all orphan violations
+result = create_ml_workspace(
+    source_hostname="catalog.example.org",
+    source_catalog_id="1",
+    root_rid="3-HXMC",
+    dest_hostname="local.example.org",
+    orphan_strategy=OrphanStrategy.FAIL,
+)
+
+# Inspect what went wrong
+print(result.report.to_text())
+
+# Second pass: after reviewing the report, nullify incidental references
+# (e.g., Created_By FK to hidden users) and let the clone succeed
+result = create_ml_workspace(
+    source_hostname="catalog.example.org",
+    source_catalog_id="1",
+    root_rid="3-HXMC",
+    dest_hostname="local.example.org",
+    orphan_strategy=OrphanStrategy.NULLIFY,   # NULLs out dangling optional FKs
+)
+```
+
+**Notes**
+
+- `orphan_strategy` is a single global setting — it applies the same policy to every FK violation in Stage 3. Per-table overrides are not supported; use the `CloneReport` from a `FAIL` run to confirm the chosen strategy is safe for all affected tables.
+- `FAIL` does not destroy the partially-created catalog — it leaves FK constraints unapplied. The clone is still usable for data inspection; only the web interface may render relationships incorrectly.
+- `NULLIFY` requires that the FK column is marked `nullok=True`. If the column is required, the strategy falls back to `FAIL` for that constraint and logs a warning.
+- After a `FAIL` run, the most common recovery path is to re-run with `NULLIFY` (for optional metadata FKs) or `DELETE` (for rows that are genuinely unreachable from the root RID).
+- `DELETE` can cascade: removing an orphan row may expose additional orphans in dependent tables. Always review `result.report.to_text()` after a `DELETE` run to verify the scope of removals.
 
 ## How to copy assets after a clone
 
@@ -239,7 +279,7 @@ if localize_result.errors:
 | `asset_table` | `str` | — | Name of the asset table |
 | `asset_rids` | `list[str]` | — | RIDs of the assets to copy |
 | `schema_name` | `str \| None` | None | Schema containing the table; searches all if omitted |
-| `source_hostname` | `str \| None` | None | Required when URLs are relative (e.g., cloned with `REFERENCES`) |
+| `source_hostname` | `str \| None` | None | Used when URLs are relative (e.g., cloned with `REFERENCES`); if omitted, relative-URL assets are treated as already-local and skipped |
 | `hatrac_namespace` | `str \| None` | None | Destination namespace; defaults to `/hatrac/{asset_table}` |
 | `chunk_size` | `int \| None` | None | Chunk size in bytes; auto-chunked above 100 MB |
 | `dry_run` | `bool` | `False` | Report what would be done without making changes |
@@ -247,7 +287,7 @@ if localize_result.errors:
 **Notes**
 
 - Assets already pointing at the local server are detected by hostname comparison and skipped automatically.
-- Relative URLs (e.g., `/hatrac/...` without a hostname) require `source_hostname` to be specified; without it, they are treated as already-local and skipped.
+- Relative URLs (e.g., `/hatrac/...` without a hostname) use `source_hostname` if provided; without it, they are treated as already-local and skipped with a log message.
 - `localize_assets` is optimized for bulk operations: it fetches all asset records in one query and batches the catalog URL updates.
 - For very large asset sets, consider processing in chunks (split `asset_rids` into batches) to avoid long-running operations that could be interrupted.
 
@@ -256,9 +296,6 @@ if localize_result.errors:
 DerivaML delegates access control entirely to Deriva's policy engine and Globus Auth. A catalog clone inherits the source catalog's ACLs and ACL bindings when `copy_policy=True` (the default). Changing who can read or write a catalog requires using the Deriva web interface or ERMrest policy API directly — there is no DerivaML Python API for this.
 
 For Globus-based sharing (sharing a catalog with external collaborators using their institutional credentials), refer to the [Deriva documentation](https://docs.derivacloud.org) and the [Globus Auth documentation](https://docs.globus.org/api/auth/). DerivaML assumes that authentication is already configured when a `DerivaML` instance is constructed.
-
-!!! tip
-    BDBag archives and MINID URLs are the most practical way to share data with collaborators who do not have a Deriva account. No catalog access policy changes are needed.
 
 ---
 
@@ -272,6 +309,9 @@ For Globus-based sharing (sharing a catalog with external collaborators using th
 
 !!! note "bdbag CLI is required to inspect archives without DerivaML"
     Collaborators who receive a `.bag.zip` archive and do not have DerivaML installed need the `bdbag` command-line tool (`pip install bdbag`) to validate and materialize the bag. The archive is a standard BagIt container and can be inspected with any BagIt-compatible tool.
+
+!!! note "Sharing with collaborators who have no Deriva account"
+    BDBag archives and MINID URLs work for collaborators who have no Deriva account and no access policy changes are needed. Reserve catalog clones for collaborators who need to run workflows or browse data interactively — those require a Deriva account and appropriate ACLs on the destination catalog.
 
 ---
 
