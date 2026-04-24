@@ -1280,6 +1280,203 @@ Invoke `superpowers:finishing-a-development-branch` and present the four options
 
 ---
 
+## Task 9: Migration guide
+
+**Files:**
+- Create: `docs/user-guide/migration-from-previous-version.md` (or similar name — see Step 1)
+- Modify: `mkdocs.yml` to include the new page in the nav
+- Modify: `docs/index.md` — add a pointer to the migration guide
+
+Write a user-facing migration guide covering all breaking changes and notable additions shipped to deriva-ml across the post-S2 documentation pass (PR #65 UG rewrite, PR #66 docstring sweep with 12 renames, PR #67 DRY cleanup, PR #68 metrics_file, and this D2 PR). Users upgrading from the previously-published version need a single place that says "here's what changes, here's how to update your code."
+
+### Why this belongs in D2 specifically
+
+The biggest breaking change in the set is **D2's `restructure_assets` signature rename** (`group_by=` → `targets=`, `value_selector=` merged, `"Feature.column"` removed). That's a `TypeError`-on-call for any downstream caller. PRs #66 and #67 had smaller renames (the 12 `_`-prefixed private renames were API cleanup that affected code calling the old public names). The migration guide lands in D2's PR so users pulling the new version find the guide in the same release that breaks them.
+
+- [ ] **Step 1: Decide the file path and naming**
+
+The migration guide should live somewhere discoverable. Three options:
+
+- `docs/user-guide/migration.md` — alongside the other UG chapters. Most discoverable.
+- `docs/migration.md` — top-level, separate from the UG structure. Good if users think of "migration" as a one-time reference not part of the regular UG.
+- `docs/reference/migration.md` — under the reference section. Good if it's more reference material than tutorial.
+
+Lean: `docs/user-guide/migration.md` — users will find it while browsing the UG, and the tone is more "walk me through changing my code" than reference-material lookup.
+
+- [ ] **Step 2: Enumerate every breaking change**
+
+The guide covers:
+
+**A. Breaking changes — `TypeError` or `AttributeError` on call:**
+
+1. **`DatasetBag.restructure_assets` signature rename** (D2):
+   - `group_by=["Diagnosis"]` → `targets=["Diagnosis"]`
+   - `group_by=["Classification.Label"]` → `targets=["Classification"], target_transform=lambda rec: rec.Label`
+   - `value_selector=FeatureRecord.select_newest` → `targets={"Feature": FeatureRecord.select_newest}`
+   - Dotted `"Feature.column"` syntax removed entirely.
+2. **Public methods renamed to `_`-prefixed private** (PR #66 — 12 renames):
+   - `ml.domain_path()` → `ml._domain_path()` (and similar for `table_path`, `is_system_schema`, `get_domain_schemas`, `apply_logger_overrides`, `compute_diff`, `retrieve_rid`, `cache_features`, `add_workflow`, `start_upload`, `asset_record_class` module-level factory)
+   - These were all internal helpers that shouldn't have been public; users calling them were depending on accidental API surface. The underscored versions still work.
+   - User-facing alternatives:
+     - `retrieve_rid` → use `resolve_rid()` instead (user-facing wrapper)
+     - `asset_record_class` — the mixin method `ml.asset_record_class(table)` is still public; only the module-level factory is private.
+     - `add_workflow` → use `create_workflow()` (user-facing factory)
+3. **Methods deleted** (PR #66):
+   - `prefetch_dataset` — was a deprecated one-line shim; use `cache_dataset` directly.
+   - `list_foreign_keys` — no callers, no replacement needed.
+   - `add_page`, `user_list`, `globus_login` — removed from `DerivaML`; these were stale web-app helpers that never had users.
+4. **Documentation-only fix that may affect copy-pasted user code**:
+   - `AssetRIDConfig` (doc name) → `AssetSpec` / `AssetSpecConfig` (real class names). Users who copied example code from the old configuration docs hit an `ImportError`.
+
+**B. New features — additive, no break, but worth flagging:**
+
+1. **`Execution.metrics_file(filename="metrics.jsonl")`** (PR #68) — recommended over manually calling `asset_file_path(MLAsset.execution_metadata, ...)` for training metrics.
+2. **`DatasetBag.as_torch_dataset(...)` and `DatasetBag.as_tf_dataset(...)`** (D2) — recommended over hand-rolling `torch.utils.data.Dataset` subclasses.
+3. **State-machine recovery edge** (PR A) — `Running → Pending_Upload` is now a legal transition. Users doing manual crash-recovery should use `update_status(Pending_Upload)` instead of `update_status(Failed)` (the old workaround).
+
+**C. Environment / tooling changes:**
+
+1. **Python 3.12+ required** (no change — already the floor, but worth stating).
+2. **Optional `deriva-ml[torch]` / `deriva-ml[tf]` extras** (D2) — new install-time choices.
+3. **Dropped `SETUPTOOLS_USE_DISTUTILS` env var** (PR #68 side-effect) — internal fix, no user action needed; documented because users with custom setups may notice the env var no longer gets set process-wide.
+
+- [ ] **Step 3: Draft the migration guide**
+
+Structure the guide as:
+
+```markdown
+# Migrating from previous deriva-ml versions
+
+[one-paragraph intro: "if you're upgrading from X.Y.Z or earlier, here's
+what changes"]
+
+## At a glance
+
+[single summary table: category | old | new | fix]
+
+## Breaking changes
+
+### DatasetBag.restructure_assets signature changes
+[before/after code blocks, one per rename. Include the migration mapping
+from this plan's Task 5.]
+
+### Renamed private methods
+[table of 12 renames + one paragraph per user-facing alternative where
+the rename hides a better public API (resolve_rid, create_workflow)]
+
+### Deleted methods
+[list + replacements]
+
+### Asset specification classes (documentation-only break)
+[AssetRIDConfig was never a real class; copy-paste victims land here]
+
+## New recommended patterns
+
+### Training metrics
+[metrics_file() vs manual asset_file_path]
+
+### PyTorch / TensorFlow / Keras training
+[pointer to the three-framework UG section]
+
+### Crash recovery
+[update_status(Pending_Upload) pattern]
+
+## Finding affected code in your project
+
+[grep recipes for each break:]
+```bash
+# Find restructure_assets old-kwarg callers:
+grep -rn "group_by=\|value_selector=\|restructure_assets.*\"[A-Za-z_]*\.[A-Za-z_]*\"" your_project/
+
+# Find renamed-private callers:
+grep -rn -E "\b(domain_path|table_path|is_system_schema|get_domain_schemas|apply_logger_overrides|compute_diff|retrieve_rid|cache_features|add_workflow|start_upload)\(" your_project/ \
+  | grep -v "_\(domain_path\|table_path\|..." # exclude already-underscored
+
+# Find deleted-method callers:
+grep -rn -E "\.(prefetch_dataset|list_foreign_keys|add_page|user_list|globus_login)\(" your_project/
+```
+
+## Version compatibility matrix
+
+| deriva-ml version | Python | Torch | TF | Notes |
+|---|---|---|---|---|
+| prior published | ≥3.12 | n/a | n/a | [current baseline] |
+| this release | ≥3.12 | ≥2.0 optional | ≥2.15 optional | [what this doc covers] |
+
+## Support
+
+[if users hit a break not documented here, pointer to raising an issue]
+```
+
+Keep it around 400-600 lines; detailed enough to answer "what do I change in my code" but not a rehash of the UG.
+
+- [ ] **Step 4: Update `mkdocs.yml` nav**
+
+Add the migration guide to the User Guide section of the nav, probably at the end (not between chapters):
+
+```yaml
+nav:
+  - Introduction: index.md
+  - User Guide:
+      - Exploring a catalog: user-guide/exploring.md
+      - Working with datasets: user-guide/datasets.md
+      - ... [other chapters] ...
+      - Integrating with hydra-zen: user-guide/hydra-zen.md
+      - Migrating from previous versions: user-guide/migration.md    # new
+  # ... rest unchanged ...
+```
+
+- [ ] **Step 5: Add pointer from Introduction**
+
+`docs/index.md` gets one sentence near the top (or in a "What's new" section if one exists) pointing users coming from older versions at the migration guide. Don't make it prominent — users upgrading need it; new users don't.
+
+- [ ] **Step 6: Grep sibling repos once more**
+
+Run the sibling-repo greps from Task 5 Step 1 and Task 8 Step 5 one more time. This time record the raw output in the migration-guide's "Finding affected code in your project" section as worked examples — real call sites from real deriva-ml-ecosystem projects.
+
+If the sibling repos aren't present on this machine, skip this step and flag in the commit message that the example-output section is representative, not actual.
+
+- [ ] **Step 7: mkdocs --strict**
+
+Run: `uv run mkdocs build --strict 2>&1 | tail -20`
+Expected: no new warnings. Confirm the new page renders (it'll show up in `site/user-guide/migration/index.html` after build).
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add docs/user-guide/migration.md mkdocs.yml docs/index.md
+git commit -m "docs(migration): add migration guide from previous deriva-ml version
+
+Post-S2 D2 Task 9. User-facing migration guide covering every
+breaking change and notable addition across the post-S2 documentation
+pass (PRs #65, #66, #67, #68, and this PR).
+
+Sections:
+- At-a-glance table summarizing each change
+- Breaking changes with before/after code:
+  - restructure_assets signature (group_by → targets, value_selector
+    merged, Feature.column dotted syntax removed)
+  - 12 renamed private methods + user-facing alternatives where applicable
+  - 5 deleted methods + replacements
+  - AssetRIDConfig doc-only break (class is actually AssetSpec/
+    AssetSpecConfig)
+- New recommended patterns:
+  - metrics_file() for training-metric logs (D1)
+  - as_torch_dataset / as_tf_dataset for framework integration (D2)
+  - update_status(Pending_Upload) for crash recovery (A)
+- Grep recipes for finding affected call sites
+- Version compatibility matrix
+
+The guide lands in D2's PR because D2 ships the single biggest
+break (restructure_assets kwarg rename — TypeError on call); users
+pulling the new release find the guide in the same release that
+breaks them.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+```
+
+---
+
 ## Summary checklist
 
 | Task | Files touched | Status |
@@ -1292,3 +1489,4 @@ Invoke `superpowers:finishing-a-development-branch` and present the four options
 | 6 | `offline.md` UG section | pending |
 | 7 | Various docstrings + `CLAUDE.md` | pending |
 | 8 | Verification only | pending |
+| 9 | `migration.md`, `mkdocs.yml`, `index.md` | pending |
