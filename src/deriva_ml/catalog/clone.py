@@ -31,7 +31,6 @@ from deriva.core.asyncio import AsyncCatalogWrapper, AsyncErmrestCatalog
 from deriva.core.asyncio.async_datapath import copy_tables_concurrent_async
 from deriva.core.hatrac_store import HatracStore
 
-from deriva_ml.model.catalog import VOCAB_COLUMNS
 from deriva_ml.schema import create_ml_schema, initialize_ml_schema
 
 logger = logging.getLogger("deriva_ml")
@@ -904,9 +903,6 @@ def _expand_tables_with_vocabularies(
     Returns:
         Tuple of (all_tables, vocabulary_tables_added).
     """
-    def is_vocabulary(table) -> bool:
-        return VOCAB_COLUMNS.issubset({c.name.upper() for c in table.columns})
-
     included_set: set[tuple[str, str]] = set()
     for table_spec in include_tables:
         if ":" in table_spec:
@@ -928,7 +924,7 @@ def _expand_tables_with_vocabularies(
             if pk_key in included_set:
                 continue
 
-            if is_vocabulary(pk_table):
+            if pk_table.is_vocabulary():
                 included_set.add(pk_key)
                 vocab_spec = f"{pk_key[0]}:{pk_key[1]}"
                 if vocab_spec not in vocabularies_added:

@@ -15,7 +15,7 @@ import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from graphlib import CycleError, TopologicalSorter
-from typing import Any, Callable, Final, Iterable, NewType, TypeAlias
+from typing import Any, Callable, Iterable, NewType, TypeAlias
 
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
@@ -128,9 +128,6 @@ ColumnSet: TypeAlias = set[Column]
 AssociationResult: TypeAlias = FindAssociationResult
 TableSet: TypeAlias = set[Table]
 PathList: TypeAlias = list[list[Table]]
-
-# Define constants:
-VOCAB_COLUMNS: Final[set[str]] = {"NAME", "URI", "SYNONYMS", "DESCRIPTION", "ID"}
 
 FilterPredicate = Callable[[Table], bool]
 
