@@ -1,3 +1,16 @@
+"""DerivaML schema creation and catalog initialization.
+
+Provides functions for creating and resetting the ``deriva-ml`` schema in an
+ERMrest catalog. The main entry points are:
+
+- ``create_ml_schema``: Create (or DROP+recreate) the core ``deriva-ml`` schema
+  with all required tables, vocabularies, and FK relationships.
+  **WARNING**: Drops the existing schema with CASCADE if it already exists.
+- ``initialize_ml_schema``: Populate vocabulary tables with standard terms
+  after schema creation.
+- ``create_ml_catalog``: Create a brand-new catalog and install the schema.
+- ``reset_ml_schema``: Drop and recreate the schema (test/dev helper).
+"""
 import argparse
 import logging
 import subprocess

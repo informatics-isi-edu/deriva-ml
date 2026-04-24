@@ -347,7 +347,7 @@ class Display(AnnotationBuilder):
     Example:
         Basic display name::
 
-            >>> display = Display(name="Research Subjects")
+            >>> display = Display(name="Research Subjects")  # doctest: +SKIP
             >>> handle.set_annotation(display)
 
         With description/tooltip::

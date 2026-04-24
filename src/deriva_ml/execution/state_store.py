@@ -109,7 +109,7 @@ class ExecutionStateStore:
     so all library-bookkeeping tables live in a single main.db.
 
     Usage:
-        >>> store = ExecutionStateStore(engine=workspace.engine)
+        >>> store = ExecutionStateStore(engine=workspace.engine)  # doctest: +SKIP
         >>> store.ensure_schema()
         >>> # then use store.executions, store.pending_rows,
         >>> # store.directory_rules for queries.
@@ -237,7 +237,7 @@ class ExecutionStateStore:
         Workspace pattern (see ManifestStore.ensure_schema).
 
         Example:
-            >>> store = ExecutionStateStore(engine=workspace.engine)
+            >>> store = ExecutionStateStore(engine=workspace.engine)  # doctest: +SKIP
             >>> store.ensure_schema()
             >>> # Tables now exist; safe to insert/select.
         """
@@ -311,7 +311,7 @@ class ExecutionStateStore:
             objects (timezone-aware).
 
         Example:
-            >>> row = store.get_execution("EXE-A")
+            >>> row = store.get_execution("EXE-A")  # doctest: +SKIP
             >>> row["status"] if row else None
             'running'
         """
@@ -382,7 +382,7 @@ class ExecutionStateStore:
 
         Example:
             >>> # All incomplete executions:
-            >>> incomplete = [ExecutionStatus.Created, ExecutionStatus.Running,
+            >>> incomplete = [ExecutionStatus.Created, ExecutionStatus.Running,  # doctest: +SKIP
             ...               ExecutionStatus.Stopped, ExecutionStatus.Failed,
             ...               ExecutionStatus.Pending_Upload]
             >>> rows = store.list_executions(status=incomplete)
@@ -552,7 +552,7 @@ class ExecutionStateStore:
             tables yield zero for each (via COALESCE).
 
         Example:
-            >>> store.count_pending_by_kind(execution_rid="EXE-A")
+            >>> store.count_pending_by_kind(execution_rid="EXE-A")  # doctest: +SKIP
             {'pending_rows': 5, 'failed_rows': 0,
              'pending_files': 12, 'failed_files': 1}
         """
@@ -653,7 +653,7 @@ class ExecutionStateStore:
                              uploaded_files, total_bytes_pending}
 
         Example:
-            >>> data = store.pending_summary_rows(execution_rid="EXE-A")
+            >>> data = store.pending_summary_rows(execution_rid="EXE-A")  # doctest: +SKIP
             >>> # Caller builds PendingSummary from this.
         """
         from pathlib import Path
@@ -781,7 +781,7 @@ class ExecutionStateStore:
             lease_token: UUID string. Same token goes in the POST body.
 
         Example:
-            >>> token = generate_lease_token()
+            >>> token = generate_lease_token()  # doctest: +SKIP
             >>> store.mark_pending_leasing(pid, lease_token=token)
             >>> # Now POST the token to ERMrest_RID_Lease.
         """
@@ -809,7 +809,7 @@ class ExecutionStateStore:
             assigned_rid: The server-assigned RID from the response.
 
         Example:
-            >>> store.finalize_pending_lease(
+            >>> store.finalize_pending_lease(  # doctest: +SKIP
             ...     lease_token="uuid...", assigned_rid="1-ABCD"
             ... )
         """
@@ -839,7 +839,7 @@ class ExecutionStateStore:
             lease_token: The token to clear.
 
         Example:
-            >>> store.revert_pending_leasing(lease_token="uuid...")
+            >>> store.revert_pending_leasing(lease_token="uuid...")  # doctest: +SKIP
             >>> # Row is now back to status='staged', ready to re-issue.
         """
         with self.engine.begin() as conn:

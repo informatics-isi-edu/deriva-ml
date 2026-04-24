@@ -1,3 +1,15 @@
+"""Workflow model and script-URL resolution for DerivaML executions.
+
+Defines the ``Workflow`` Pydantic model, which represents a versioned
+computational workflow in a Deriva catalog. Key responsibilities:
+
+- Stores workflow metadata (URL, type, description, checksum, RID).
+- Resolves the calling script's source URL automatically (Git remote, Jupyter
+  kernel path, or local file path) when ``url`` is not provided explicitly.
+- Supports catalog write-back for ``description`` and ``workflow_type`` when
+  the workflow is bound to a live catalog instance.
+- Deduplicates workflows by checksum via ``DerivaML.add_workflow()``.
+"""
 from __future__ import annotations
 
 import logging
@@ -88,7 +100,7 @@ class Workflow(BaseModel):
         <deriva_ml.DerivaML.create_workflow>`, which validates the workflow type against
         the catalog vocabulary::
 
-            >>> workflow = ml.create_workflow(
+            >>> workflow = ml.create_workflow(  # doctest: +SKIP
             ...     name="RNA Analysis",
             ...     workflow_type="python_notebook",
             ...     description="RNA sequence analysis"
@@ -107,7 +119,7 @@ class Workflow(BaseModel):
 
         Look up an existing workflow by RID and update its properties::
 
-            >>> workflow = ml.lookup_workflow("2-ABC1")
+            >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
             >>> workflow.description = "Updated description for RNA analysis"
             >>> workflow.workflow_type = "python_script"
             >>> print(workflow.description)
@@ -115,13 +127,13 @@ class Workflow(BaseModel):
 
         Look up by URL and update::
 
-            >>> url = "https://github.com/org/repo/blob/abc123/analysis.py"
+            >>> url = "https://github.com/org/repo/blob/abc123/analysis.py"  # doctest: +SKIP
             >>> workflow = ml.lookup_workflow_by_url(url)
             >>> workflow.description = "New description"
 
         Attempting to update on a read-only catalog raises an error::
 
-            >>> snapshot_ml = ml.catalog_snapshot("2023-01-15T10:30:00")
+            >>> snapshot_ml = ml.catalog_snapshot("2023-01-15T10:30:00")  # doctest: +SKIP
             >>> workflow = snapshot_ml.lookup_workflow("2-ABC1")
             >>> workflow.description = "New description"  # Raises DerivaMLException
     """
@@ -168,12 +180,12 @@ class Workflow(BaseModel):
         Examples:
             Update description::
 
-                >>> workflow = ml.lookup_workflow("2-ABC1")
+                >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
                 >>> workflow.description = "Updated description"
 
             Update workflow type::
 
-                >>> workflow = ml.lookup_workflow("2-ABC1")
+                >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
                 >>> workflow.workflow_type = "python_notebook"
         """
         # Only intercept updates after full initialization
@@ -399,7 +411,7 @@ class Workflow(BaseModel):
             DerivaMLException: If not in a Git repository or detection fails (non-Docker).
 
         Example:
-            >>> workflow = Workflow.create_workflow(
+            >>> workflow = Workflow.create_workflow(  # doctest: +SKIP
             ...     name="Sample Analysis",
             ...     workflow_type="python_script",
             ...     description="Process sample data"
@@ -483,7 +495,7 @@ class Workflow(BaseModel):
                 and allow_dirty is False.
 
         Example:
-            >>> url, checksum = Workflow.get_url_and_checksum(Path("analysis.ipynb"))
+            >>> url, checksum = Workflow.get_url_and_checksum(Path("analysis.ipynb"))  # doctest: +SKIP
             >>> print(f"URL: {url}")
             >>> print(f"Checksum: {checksum}")
         """

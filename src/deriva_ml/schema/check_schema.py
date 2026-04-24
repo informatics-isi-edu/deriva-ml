@@ -1,3 +1,16 @@
+"""Schema validation utilities for DerivaML catalogs.
+
+Compares a live catalog's ``deriva-ml`` schema against a reference JSON file
+to detect drift. Useful for CI checks and upgrade verification.
+
+Public entry points:
+
+- ``check_ml_schema``: Connect to a catalog and diff its schema against the
+  reference (or a provided file). Prints differences to stdout.
+- ``dump_ml_schema``: Export the current catalog schema to a JSON file
+  (for updating the reference baseline).
+- ``CheckMLSchemaCLI`` / ``main``: CLI wrappers for the above.
+"""
 import json
 import re
 from importlib.resources import files

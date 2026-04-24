@@ -165,7 +165,7 @@ def transition(
         NotImplementedError: Online-mode path is implemented in Task C3.
 
     Example:
-        >>> transition(
+        >>> transition(  # doctest: +SKIP
         ...     store=store, catalog=ml.catalog,
         ...     execution_rid="EXE-A",
         ...     current=ExecutionStatus.Running,
@@ -328,7 +328,7 @@ def flush_pending_sync(
 
     Example:
         >>> # After resuming an execution online that last ran offline:
-        >>> flush_pending_sync(store=store, catalog=ml.catalog,
+        >>> flush_pending_sync(store=store, catalog=ml.catalog,  # doctest: +SKIP
         ...                    execution_rid="EXE-A")
     """
     row = store.get_execution(execution_rid)
@@ -423,7 +423,7 @@ def reconcile_with_catalog(
 
     Example:
         >>> # On resume_execution in online mode:
-        >>> reconcile_with_catalog(
+        >>> reconcile_with_catalog(  # doctest: +SKIP
         ...     store=ws.execution_state_store(),
         ...     catalog=ml.catalog,
         ...     execution_rid="EXE-A",
@@ -547,7 +547,7 @@ def create_catalog_execution(
         Exception: On HTTP failure (caller may want to retry).
 
     Example:
-        >>> rid = create_catalog_execution(
+        >>> rid = create_catalog_execution(  # doctest: +SKIP
         ...     catalog=ml.catalog,
         ...     workflow_rid="WFL-1",
         ...     description="first training run",

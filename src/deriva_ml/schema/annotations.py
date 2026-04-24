@@ -1,3 +1,17 @@
+"""Catalog and table annotation generators for DerivaML schemas.
+
+Applies Chaise display annotations (visible-columns, row-name patterns,
+bulk-upload specs, and export configurations) to a catalog model. These
+annotations control how the Chaise web interface presents DerivaML tables.
+
+Public entry points:
+
+- ``catalog_annotation``: Apply all standard annotations to a full catalog model.
+- ``asset_annotation``: Apply upload and display annotations to a single asset table.
+- ``generate_annotation``: Return the full annotation dict for a catalog model
+  (used by ``create_ml_schema``).
+- ``main``: CLI wrapper — apply annotations to a live catalog.
+"""
 import argparse
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
