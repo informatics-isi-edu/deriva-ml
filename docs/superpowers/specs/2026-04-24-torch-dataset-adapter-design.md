@@ -11,29 +11,39 @@ boilerplate every user rewrites."
 ## 1. Problem statement
 
 A deriva-ml user who downloads a `DatasetBag` and wants to train a
-PyTorch model today writes ~35 lines of glue code per project:
-enumerate dataset members, pull feature values for labels, join with
-the asset table to resolve file paths, build `(path, label)` pairs,
-build a label-to-int encoder, subclass `torch.utils.data.Dataset`,
-implement `__len__` and `__getitem__`, and finally instantiate a
-`DataLoader`. The same boilerplate appears in every downstream project
-that targets this library, with minor variations in the label column
-name and the sample loader. It's error-prone (asset-path resolution is
-fragile, feature joins need `recurse=True` knowledge, label encoding
-is easy to get wrong across train/test splits) and every rewrite
-re-encodes decisions that deriva-ml already has typed answers for.
+model with it — whether in **PyTorch**, **TensorFlow**, or **Keras**
+— today writes ~35 lines of glue code per project: enumerate dataset
+members, pull feature values for labels, join with the asset table
+to resolve file paths, build `(path, label)` pairs, build a
+label-to-int encoder, subclass the framework's `Dataset` base or
+build a `tf.data.Dataset.from_generator` wrapper, implement length
+and iteration, and finally instantiate the training loop's data
+loader. The same boilerplate appears in every downstream project
+that targets this library, with minor variations in the label
+column name and the sample loader. It's error-prone (asset-path
+resolution is fragile, feature joins need `recurse=True` knowledge,
+label encoding is easy to get wrong across train/test splits) and
+every rewrite re-encodes decisions that deriva-ml already has typed
+answers for.
 
-`DatasetBag.restructure_assets()` covers the narrow case of image
-classification with a single scalar feature as the label, by emitting
-the `ImageFolder` directory layout. That shape breaks down for
-tabular datasets, multi-modal inputs, regression targets, multi-label
-classification, non-image data, and lazy streaming. It also leaves
-TensorFlow users unserved.
+`DatasetBag.restructure_assets()` covers one shape — classification
+with a single scalar feature as the label, emitted as the
+`ImageFolder`-style directory layout. That's right for third-party
+trainers that expect class-folder trees (RetFound fine-tuning,
+`torchvision.datasets.ImageFolder`,
+`tf.keras.utils.image_dataset_from_directory`), but it breaks down
+for tabular datasets, multi-modal inputs, regression targets,
+multi-label classification, non-image data, and lazy streaming.
 
-Users want a one-line path from bag to `torch.utils.data.Dataset` that
-respects the library's existing feature-access API, stays consistent
-with the `DatasetBag`-vs-catalog parity the rest of the library promises,
-and doesn't force the user to materialize or copy their data.
+Users want a one-line path from bag to the appropriate framework's
+native dataset type — `torch.utils.data.Dataset` for PyTorch (and
+Keras on the PyTorch backend), `tf.data.Dataset` for TensorFlow
+(and Keras on the TF backend) — that respects the library's existing
+feature-access API, stays consistent with the `DatasetBag`-vs-catalog
+parity the rest of the library promises, and doesn't force the user
+to materialize or copy their data. `restructure_assets()` stays as
+the right tool when you specifically need the class-folder layout
+for a third-party consumer; the new adapters handle everything else.
 
 ## 2. Design anchors
 
@@ -419,6 +429,24 @@ without hiding what each method's input actually is. Additionally:
 hook is `file_transformer`, which operates on paths).
 `output_signature` applies only to `as_tf_dataset`
 (TF-specific, no counterpart on torch or restructure).
+
+**Restructure-only parameters preserved unchanged.**
+`restructure_assets` continues to accept every parameter it accepts
+today, unchanged in name, type, default, and behavior, with one
+exception: `group_by` was renamed to `targets` and `value_selector`
+was folded into the `targets` dict form as part of the vocabulary
+alignment (see §8). The parameters that stay exactly as they are
+today:
+
+- `output_dir`, `asset_table`, `use_symlinks`
+- `type_selector`, `type_to_dir_map`, `enforce_vocabulary`
+- `file_transformer`
+
+Plus the algorithmic behavior: FK-reachability for finding assets,
+dataset-type-derived top-level directory naming, silent vs. strict
+missing-label handling (parameterized via `missing=` but default
+`"unknown"` preserves today's behavior). §8.4 enumerates these
+preserved parameters explicitly.
 
 ## 4. Package structure
 
@@ -819,6 +847,18 @@ the migration guidance for any callers on the old parameter names.
 Per anchor 7 and §3.7, the adapter work lands together with a
 coordinated signature update to `restructure_assets`. This section
 enumerates what changes on the restructure side and why.
+
+**The alignment preserves every capability `restructure_assets` has
+today.** §8.4 enumerates the parameters that stay exactly as-is
+(unchanged in name, type, default, and behavior). The algorithmic
+behavior — FK-reachability for finding assets, dataset-type-derived
+top-level directory naming, silent vs. strict missing-label handling
+— is also preserved. What changes is the **vocabulary for
+label-selection**: `group_by` becomes `targets`, `value_selector` is
+subsumed by the `targets` dict form, and the `"Feature.column"`
+dotted-string syntax is replaced by `target_transform`. Every user
+workflow that works today works after this PR with a one-line
+kwarg-rename; no capability is removed.
 
 This is a **clean break** — the old parameter names are removed, not
 deprecated. Rationale: deriva-ml is not yet at the scale where
