@@ -121,7 +121,7 @@ def test_pin_schema_online_with_drift_returns_diff_and_logs_warning(
     from deriva_ml.core.schema_cache import SchemaCache
 
     # Force a cache with a known-fake snapshot_id and a missing-table
-    # payload so compute_diff reports an 'added_tables' result.
+    # payload so _compute_diff reports an 'added_tables' result.
     cache = SchemaCache(test_ml.working_dir)
     current = cache.load()
     forged_schema = {

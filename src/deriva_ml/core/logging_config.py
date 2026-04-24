@@ -11,11 +11,14 @@ Key design principles:
     - Respects Hydra's logging configuration when running under Hydra
     - Hydra loggers follow the deriva_ml logging level
 
-The module provides:
-    - get_logger(): Get the standard DerivaML logger
-    - configure_logging(): Set up logging with specified levels
-    - LoggerMixin: Mixin class providing _logger attribute
-    - is_hydra_initialized(): Check if running under Hydra
+Public API:
+    - :func:`get_logger`: Return the main ``deriva_ml`` logger (or a child).
+    - :func:`configure_logging`: Set log levels for DerivaML and related libs.
+    - :func:`is_hydra_initialized`: Test whether a Hydra context is active.
+    - :class:`LoggerMixin`: Mixin providing a ``_logger`` property.
+
+Internal helpers (not part of the public API):
+    - :func:`_apply_logger_overrides`: Apply per-logger level overrides dict.
 
 Example:
     >>> from deriva_ml.core.logging_config import configure_logging, get_logger
@@ -175,20 +178,15 @@ def configure_logging(
     return logger
 
 
-def apply_logger_overrides(overrides: dict[str, Any]) -> None:
+def _apply_logger_overrides(overrides: dict[str, Any]) -> None:
     """Apply logger level overrides from a configuration dictionary.
 
-    This is used for compatibility with deriva's DEFAULT_LOGGER_OVERRIDES
-    pattern, allowing fine-grained control over specific loggers.
+    This is an internal helper used for compatibility with deriva's
+    DEFAULT_LOGGER_OVERRIDES pattern, allowing fine-grained control over
+    specific loggers. Not part of the public API.
 
     Args:
         overrides: Dictionary mapping logger names to log levels.
-
-    Example:
-        >>> apply_logger_overrides({
-        ...     "deriva": logging.WARNING,
-        ...     "bdbag": logging.ERROR,
-        ... })
     """
     for name, level_value in overrides.items():
         logging.getLogger(name).setLevel(level_value)
@@ -219,7 +217,6 @@ __all__ = [
     "LOGGER_NAME",
     "get_logger",
     "configure_logging",
-    "apply_logger_overrides",
     "is_hydra_initialized",
     "LoggerMixin",
 ]

@@ -55,7 +55,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLSchemaPinned,
     DerivaMLSchemaRefreshBlocked,
 )
-from deriva_ml.core.logging_config import apply_logger_overrides, configure_logging
+from deriva_ml.core.logging_config import _apply_logger_overrides, configure_logging
 from deriva_ml.core.mixins import (
     AnnotationMixin,
     AssetMixin,
@@ -347,7 +347,7 @@ class DerivaML(
         self._deriva_logging_level = deriva_logging_level
 
         # Apply deriva's default logger overrides for fine-grained control
-        apply_logger_overrides(DEFAULT_LOGGER_OVERRIDES)
+        _apply_logger_overrides(DEFAULT_LOGGER_OVERRIDES)
 
         # Store instance configuration
         self.host_name = hostname
@@ -612,7 +612,7 @@ class DerivaML(
                 Run an online ``DerivaML.__init__`` or
                 :meth:`refresh_schema` first.
         """
-        from deriva_ml.core.schema_diff import compute_diff
+        from deriva_ml.core.schema_diff import _compute_diff
 
         cache = SchemaCache(self.working_dir)
         drift: SchemaDiff | None = None
@@ -621,7 +621,7 @@ class DerivaML(
             cached_payload = cache.load()
             if cached_payload["snapshot_id"] != live_snapshot_id:
                 live_schema = self.catalog.get("/schema").json()
-                diff = compute_diff(cached_payload["schema"], live_schema)
+                diff = _compute_diff(cached_payload["schema"], live_schema)
                 if not diff.is_empty():
                     logging.getLogger("deriva_ml").warning(
                         "pin_schema: cache at %s, live at %s; "
@@ -664,7 +664,7 @@ class DerivaML(
 
         Online mode only. Fetches the live catalog's ``/schema``
         payload, compares it against the cached copy with
-        :func:`~deriva_ml.core.schema_diff.compute_diff`, and returns
+        :func:`~deriva_ml.core.schema_diff._compute_diff`, and returns
         the result. The returned :class:`SchemaDiff` may be empty
         (no drift) — callers should check ``diff.is_empty()`` rather
         than truthiness.
@@ -680,14 +680,14 @@ class DerivaML(
             DerivaMLReadOnlyError: If called in offline mode.
             FileNotFoundError: If the workspace has no cache file.
         """
-        from deriva_ml.core.schema_diff import compute_diff
+        from deriva_ml.core.schema_diff import _compute_diff
 
         if self._mode is not ConnectionMode.online:
             raise DerivaMLReadOnlyError("diff_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         cached_payload = cache.load()
         live_schema = self.catalog.get("/schema").json()
-        return compute_diff(cached_payload["schema"], live_schema)
+        return _compute_diff(cached_payload["schema"], live_schema)
 
     @staticmethod
     def _get_session_config() -> dict:
