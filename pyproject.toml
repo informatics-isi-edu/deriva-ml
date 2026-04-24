@@ -47,6 +47,8 @@ deriva-ml-upload = "deriva_ml.cli.upload:main"
 deriva-ml-validate-schema = "deriva_ml.tools.validate_schema_doc:main"
 
 [project.optional-dependencies]
+torch = ["torch>=2.0"]
+tf = ["tensorflow>=2.15"]
 
 [build-system]
 requires = ["setuptools>=80", "setuptools_scm[toml]>=8", "wheel"]
