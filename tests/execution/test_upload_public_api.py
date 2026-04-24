@@ -1,5 +1,5 @@
 """Tests for the upload public API — upload_pending, upload_outputs,
-start_upload / UploadJob."""
+_start_upload / UploadJob."""
 
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ def test_start_upload_returns_upload_job(test_ml, monkeypatch):
         "deriva_ml.execution.upload_job.run_upload_engine", _fake,
     )
 
-    job = test_ml.start_upload(execution_rids=[exe.execution_rid])
+    job = test_ml._start_upload(execution_rids=[exe.execution_rid])
     assert isinstance(job, UploadJob)
     report = job.wait(timeout=10)
     assert report.total_uploaded == 0
@@ -145,7 +145,7 @@ def test_upload_job_cancel(test_ml, monkeypatch):
         "deriva_ml.execution.upload_job.run_upload_engine", _slow_run,
     )
 
-    job = test_ml.start_upload(execution_rids=[exe.execution_rid])
+    job = test_ml._start_upload(execution_rids=[exe.execution_rid])
     started.wait(timeout=2)
     stop.set()  # let the slow fake finish; cancel races with completion
     job.cancel()
