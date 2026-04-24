@@ -187,7 +187,7 @@ print(dataset.current_version)  # e.g., DatasetVersion(0, 3, 0)
 
 # View the version history
 for entry in dataset.dataset_history():
-    print(f"v{entry.version}: {entry.description} ({entry.timestamp})")
+    print(f"v{entry.dataset_version}: {entry.description} ({entry.snapshot})")
 
 # Bump to 1.0.0 when the dataset is stable for a training run
 new_version = dataset.increment_dataset_version(
@@ -199,12 +199,14 @@ print(new_version)  # DatasetVersion(1, 0, 0)
 
 `increment_dataset_version` propagates the bump through the parent/child graph using a topological sort, so all related datasets move to consistent version numbers together.
 
-Each version is tied to a catalog snapshot. Once a version exists, `set_version("1.0.0")` returns a read-only `Dataset` object bound to that snapshot:
+Each version is tied to a catalog snapshot. To read members as they existed at a specific version, pass `version=` to `list_dataset_members()` or download the versioned bag:
 
 ```python
-# Returns a Dataset that always reads the state of the catalog at v1.0.0
-versioned = dataset.set_version("1.0.0")
-members = versioned.list_dataset_members()
+# List members as they existed at v1.0.0 (uses the catalog snapshot for that version)
+members = dataset.list_dataset_members(version="1.0.0")
+
+# Or download the versioned bag for fully offline use
+versioned_bag = dataset.download_dataset_bag(version="1.0.0")
 ```
 
 This is the guarantee that makes dataset downloads reproducible. Downloading a versioned dataset always returns the same rows.
@@ -356,7 +358,7 @@ bag = dataset.download_dataset_bag(
     materialize=True,
 )
 print(f"Downloaded to {bag.path}")
-print(f"RID: {bag.dataset_rid}, version: {bag.version}")
+print(f"RID: {bag.dataset_rid}, version: {bag.current_version}")
 ```
 
 `materialize=True` (the default) fetches the actual asset files from the Hatrac object store in addition to downloading the table data. `materialize=False` downloads only the table rows and a reference manifest — useful when you only need metadata, not the files themselves:
@@ -445,7 +447,7 @@ After download, the `DatasetBag` object provides immediate access to metadata:
 
 ```python
 print(f"RID: {bag.dataset_rid}")
-print(f"Version: {bag.version}")
+print(f"Version: {bag.current_version}")
 print(f"Local path: {bag.path}")
 
 # Load a table as a DataFrame
