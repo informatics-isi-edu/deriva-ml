@@ -73,23 +73,23 @@ nav:
       - Execution: 'Notebooks/DerivaML Execution.ipynb'
       - Features: 'Notebooks/DerivaML Features.ipynb'
       - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
-  - Library Documentation:
+  - API Reference:
       - Core Classes:
-          - DerivaML: code-docs/deriva_ml_base.md
-          - DerivaModel: code-docs/deriva_model.md
+          - DerivaML: api-reference/deriva_ml_base.md
+          - DerivaModel: api-reference/deriva_model.md
       - Datasets:
-          - Dataset: code-docs/dataset.md
-          - DatasetBag: code-docs/dataset_bag.md
-          - Dataset Splitting: code-docs/dataset_split.md
-          - Dataset Auxiliary Classes: code-docs/dataset_aux_classes.md
+          - Dataset: api-reference/dataset.md
+          - DatasetBag: api-reference/dataset_bag.md
+          - Dataset Splitting: api-reference/dataset_split.md
+          - Dataset Auxiliary Classes: api-reference/dataset_aux_classes.md
       - Execution:
-          - Execution: code-docs/execution.md
-          - ExecutionConfiguration: code-docs/execution_configuration.md
-          - Workflow: code-docs/workflow.md
+          - Execution: api-reference/execution.md
+          - ExecutionConfiguration: api-reference/execution_configuration.md
+          - Workflow: api-reference/workflow.md
       - Features:
-          - Feature: code-docs/feature.md
+          - Feature: api-reference/feature.md
       - Utilities:
-          - Definitions & Types: code-docs/deriva_definitions.md
-          - Exceptions: code-docs/exceptions.md
-          - Upload: code-docs/upload.md
+          - Definitions & Types: api-reference/deriva_definitions.md
+          - Exceptions: api-reference/exceptions.md
+          - Upload: api-reference/upload.md
   - Release Notes: release-notes.md
