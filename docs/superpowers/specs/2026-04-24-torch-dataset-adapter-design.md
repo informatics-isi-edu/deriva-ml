@@ -131,11 +131,9 @@ make future additions (e.g., `sampler=`, `num_workers_hint=`) awkward.
 
 **`element_type`** — Name of the domain table whose rows become the
 dataset's samples. Must be a table present in the bag (covered by the
-same error path `list_dataset_members` uses). If the element_type is
-an asset table (has `URL`, `Filename`, `MD5` columns), the default
-`sample_loader` returns the file's bytes; if it's a non-asset table,
-no default loader exists and the user must supply one that reads from
-`row_dict` alone.
+same error path `list_dataset_members` uses). Whether `sample_loader`
+is required depends on whether the element_type is an asset table or
+not — see the `sample_loader` entry below.
 
 **`sample_loader`** — `Callable[[Path | None, dict], Any]`. Invoked
 once per `__getitem__` call. Receives:
@@ -150,10 +148,23 @@ Return value is the sample (`PIL.Image`, tensor, array, dict of
 modalities, whatever the user's model expects). The library does not
 inspect it.
 
-Default: when `element_type` is an asset table, the default loader
-returns `path.read_bytes()`. When `element_type` is a non-asset table,
-the default loader returns the `row_dict` unchanged. Either can be
-overridden.
+Default: asymmetric by element-type kind.
+
+- **Asset-table element_type**: no default — the adapter raises
+  `DerivaMLException` at construction if `sample_loader` is `None`.
+  Returning raw bytes isn't useful (users can't train on bytes; they
+  need a decoded PIL Image / tensor / array), so demanding the loader
+  explicitly surfaces the decision the user needs to make. The error
+  message names common loaders the user might reach for
+  (`PIL.Image.open`, `nibabel.load`, `h5py.File`) as hints. Being
+  domain-specific about decoding is the user's job; the library stays
+  domain-agnostic.
+- **Non-asset-table element_type**: default returns `row_dict`
+  unchanged. Useful for tabular training where the element IS the row
+  data and no file-level decoding exists. Can be overridden.
+
+Either default can be overridden by passing any callable with the
+required signature.
 
 **`transform`** — `Callable[[Any], Any]`. Applied to the sample after
 `sample_loader` returns. Standard torchvision-style transform pipeline
@@ -232,10 +243,11 @@ count otherwise.
 | feature named in `targets` does not exist | `DerivaMLException` at construction (same message as `bag.feature_values` itself) |
 | `missing="error"` + sparse labels | `DerivaMLException` at construction listing up to 20 unlabeled RIDs |
 | `import torch` fails | `ImportError` at first call to `as_torch_dataset` with install hint |
-| element_type not asset, no `sample_loader` supplied | Default returns row_dict; no error. Downstream shape is the user's choice. |
+| asset-table element_type, no `sample_loader` supplied | `DerivaMLException` at construction — message suggests common loaders (PIL.Image.open, nibabel.load, h5py.File) |
+| non-asset element_type, no `sample_loader` supplied | No error — default returns row_dict unchanged |
 | asset file missing on disk (bag corrupted) | `FileNotFoundError` on `__getitem__` (torch convention) |
 
-All statically-detectable errors surface at construction time (rows 1-4
+All statically-detectable errors surface at construction time (rows 1-5
 above), so the dataset is valid as soon as it's returned for the
 overwhelmingly common cases. The `__getitem__`-time `FileNotFoundError`
 is unavoidable: the filesystem can change between construction and
@@ -430,17 +442,17 @@ test_bag  = ml.lookup_dataset(split.testing.rid).download_dataset_bag(
     version="1.0.0"
 )
 
-# Build torch datasets from each bag independently
-kwargs = dict(
+# Build torch datasets from each bag independently.
+# Shared adapter config — everything except the per-partition transform:
+shared = dict(
     element_type="Image",
     sample_loader=lambda p, row: PIL.Image.open(p).convert("RGB"),
     targets=["Image_Classification"],
     target_transform=lambda rec: CLASS_TO_IDX[rec.Image_Class],
-    transform=train_transform,
 )
-train_ds = train_bag.as_torch_dataset(**{**kwargs, "transform": train_transform})
-val_ds   = val_bag.as_torch_dataset(**{**kwargs, "transform": eval_transform})
-test_ds  = test_bag.as_torch_dataset(**{**kwargs, "transform": eval_transform})
+train_ds = train_bag.as_torch_dataset(**shared, transform=train_transform)
+val_ds   = val_bag.as_torch_dataset(**shared, transform=eval_transform)
+test_ds  = test_bag.as_torch_dataset(**shared, transform=eval_transform)
 
 train_loader = DataLoader(train_ds, batch_size=32, shuffle=True,  num_workers=4)
 val_loader   = DataLoader(val_ds,   batch_size=32, shuffle=False, num_workers=4)
