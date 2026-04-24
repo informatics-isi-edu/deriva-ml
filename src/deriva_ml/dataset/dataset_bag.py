@@ -22,10 +22,10 @@ Key concepts:
 
 Typical usage:
     >>> # Download a dataset from a catalog
-    >>> bag = ml.download_dataset_bag(dataset_spec)
+    >>> bag = ml.download_dataset_bag(dataset_spec)  # doctest: +SKIP
     >>> # List dataset members by type
-    >>> members = bag.list_dataset_members(recurse=True)
-    >>> for image in members.get("Image", []):
+    >>> members = bag.list_dataset_members(recurse=True)  # doctest: +SKIP
+    >>> for image in members.get("Image", []):  # doctest: +SKIP
     ...     print(image["Filename"])
 """
 
@@ -97,13 +97,13 @@ class DatasetBag:
 
     Example:
         >>> # Download a dataset
-        >>> bag = dataset.download_dataset_bag(version="1.0.0")
+        >>> bag = dataset.download_dataset_bag(version="1.0.0")  # doctest: +SKIP
         >>> # List members by type
-        >>> members = bag.list_dataset_members()
-        >>> for image in members.get("Image", []):
+        >>> members = bag.list_dataset_members()  # doctest: +SKIP
+        >>> for image in members.get("Image", []):  # doctest: +SKIP
         ...     print(f"File: {image['Filename']}")
         >>> # Navigate to nested datasets
-        >>> for child in bag.list_dataset_children():
+        >>> for child in bag.list_dataset_children():  # doctest: +SKIP
         ...     print(f"Nested: {child.dataset_rid}")
     """
 
@@ -239,7 +239,7 @@ class DatasetBag:
             dict: Dictionary for each row in the table.
 
         Example:
-            >>> for subject in bag.get_table_as_dict("Subject"):
+            >>> for subject in bag.get_table_as_dict("Subject"):  # doctest: +SKIP
             ...     print(subject["Name"])
         """
         return self._catalog.get_table_as_dict(table)
@@ -258,8 +258,8 @@ class DatasetBag:
             DataFrame with one row per record in the table.
 
         Example:
-            >>> df = bag.get_table_as_dataframe("Image")
-            >>> print(df.shape)
+            >>> df = bag.get_table_as_dataframe("Image")  # doctest: +SKIP
+            >>> print(df.shape)  # doctest: +SKIP
         """
         return pd.DataFrame(self.get_table_as_dict(table))
 
@@ -339,13 +339,19 @@ class DatasetBag:
             # Filter to only rows belonging to our dataset(s)
             path_sql = path_sql.where(dataset_table_class.RID.in_(dataset_rids))
             sql_cmds.append(path_sql)
+        # Use UNION (not UNION ALL) to deduplicate rows that are reachable via
+        # multiple FK paths. SQLAlchemy's union() is DISTINCT by default, which
+        # is exactly what we want here: a dataset member table (e.g., Image) may
+        # appear in the bag via two separate FK paths (e.g., directly in the
+        # dataset AND via a nested child dataset), and without DISTINCT we would
+        # count or return the same row twice. See §6 inline comment gap #4.
         return union(*sql_cmds)
 
     def dataset_history(self) -> list[DatasetHistory]:
-        """Retrieves the version history of a dataset.
+        """Retrieve the version history of this dataset from the bag.
 
-        Returns a chronological list of dataset versions, including their version numbers,
-        creation times, and associated metadata.
+        Returns a list of all recorded versions for this dataset, read from
+        the bag's local SQLite ``Dataset_Version`` table.
 
         Returns:
             list[DatasetHistory]: List of history entries, each containing:
@@ -358,11 +364,11 @@ class DatasetBag:
                 - execution_rid: Associated execution RID
 
         Raises:
-            DerivaMLException: If dataset_rid is not a valid dataset RID.
+            DerivaMLException: If the bag SQLite database cannot be read.
 
         Example:
-            >>> history = ml.dataset_history("1-abc123")
-            >>> for entry in history:
+            >>> history = bag.dataset_history()  # doctest: +SKIP
+            >>> for entry in history:  # doctest: +SKIP
             ...     print(f"Version {entry.dataset_version}: {entry.description}")
         """
         # Query Dataset_Version table directly via the model
@@ -388,17 +394,39 @@ class DatasetBag:
         version: Any = None,
         **kwargs: Any,
     ) -> dict[str, list[dict[str, Any]]]:
-        """Return a list of entities associated with a specific dataset.
+        """Return all members of this dataset bag grouped by table name.
+
+        Queries the local SQLite replica of the downloaded bag. Each key
+        in the returned dict is a table name (e.g. ``"Image"``); each value
+        is a list of row dicts with the full set of columns for that table.
 
         Args:
-            recurse: Whether to include members of nested datasets.
-            limit: Maximum number of members to return per type. None for no limit.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Ignored (bags are immutable snapshots).
+            recurse: If ``True``, recursively include members from nested
+                child datasets. Default is ``False``.
+            limit: Maximum number of members to return per table. ``None``
+                (default) returns all rows.
+            _visited: Internal parameter to track visited datasets and prevent
+                infinite recursion. Callers should not pass this.
+            version: Dataset version string (e.g. ``"1.2.0"``) to query.
+                When ``None`` (default), uses the latest materialized version
+                in the bag. This parameter exists for API symmetry with the
+                live-catalog ``Dataset.list_dataset_members``; bag contents
+                are immutable so changing ``version`` only filters which
+                version's membership snapshot is read.
             **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
-            Dictionary mapping member types to lists of member records.
+            Dict mapping table name to list of row dicts. Empty dict if
+            no members are present.
+
+        Raises:
+            DerivaMLException: If the bag SQLite database cannot be read
+                or the requested version is not present in the bag.
+
+        Example:
+            >>> bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            >>> members = bag.list_dataset_members(recurse=True)  # doctest: +SKIP
+            >>> images = members.get("Image", [])  # doctest: +SKIP
         """
         # Initialize visited set for recursion guard
         if _visited is None:
@@ -482,7 +510,7 @@ class DatasetBag:
             defined on the table.
 
         Example:
-            >>> for f in bag.find_features("Image"):
+            >>> for f in bag.find_features("Image"):  # doctest: +SKIP
             ...     print(f"{f.feature_name}: {len(f.term_columns)} terms, "
             ...           f"{len(f.value_columns)} value columns")
         """
@@ -524,11 +552,11 @@ class DatasetBag:
             DerivaMLDataError: If the bag is corrupt (source table missing).
 
         Example:
-            >>> from deriva_ml.feature import FeatureRecord
-            >>> for rec in bag.feature_values("Image", "Glaucoma"):
+            >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
+            >>> for rec in bag.feature_values("Image", "Glaucoma"):  # doctest: +SKIP
             ...     print(rec.Image, rec.Glaucoma)
             >>> # With selector — one record per image, most recent wins:
-            >>> records = list(bag.feature_values(
+            >>> records = list(bag.feature_values(  # doctest: +SKIP
             ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
             ... ))
         """
@@ -579,10 +607,10 @@ class DatasetBag:
             DerivaMLException: If the feature does not exist on *table* in the bag.
 
         Example:
-            >>> feat = bag.lookup_feature("Image", "Glaucoma")
-            >>> RecordClass = feat.feature_record_class()
-            >>> record = RecordClass(Image="1-ABC", Glaucoma="Normal")
-            >>> print(record.Glaucoma)
+            >>> feat = bag.lookup_feature("Image", "Glaucoma")  # doctest: +SKIP
+            >>> RecordClass = feat.feature_record_class()  # doctest: +SKIP
+            >>> record = RecordClass(Image="1-ABC", Glaucoma="Normal")  # doctest: +SKIP
+            >>> print(record.Glaucoma)  # doctest: +SKIP
             Normal
         """
         return self.model.lookup_feature(table, feature_name)
@@ -615,8 +643,8 @@ class DatasetBag:
                 Workflow RID or a Workflow_Type name in this bag.
 
         Example:
-            >>> rids = bag.list_workflow_executions("Glaucoma_Training_v2")
-            >>> print(len(rids))
+            >>> rids = bag.list_workflow_executions("Glaucoma_Training_v2")  # doctest: +SKIP
+            >>> print(len(rids))  # doctest: +SKIP
             3
         """
         from sqlalchemy import select as sa_select
@@ -700,17 +728,18 @@ class DatasetBag:
         )
 
     def list_dataset_element_types(self) -> Iterable[Table]:
-        """List the types of elements that can be contained in datasets.
+        """List the ERMrest Table objects that can be members of a dataset.
 
-        This method analyzes the dataset and identifies the data types for all
-        elements within it. It is useful for understanding the structure and
-        content of the dataset and allows for better manipulation and usage of its
-        data.
+        Delegates to the underlying ``DerivaMLDatabase`` to return all tables
+        that are linked to the Dataset table via association tables in the bag.
 
         Returns:
-            list[str]: A list of strings where each string represents a data type
-            of an element found in the dataset.
+            Iterable[Table]: ERMrest ``Table`` objects for each dataset-element
+            table (e.g., Image, Subject, nested Dataset).
 
+        Example:
+            >>> for table in bag.list_dataset_element_types():  # doctest: +SKIP
+            ...     print(table.name)
         """
         return self.model.list_dataset_element_types()
 
@@ -721,16 +750,31 @@ class DatasetBag:
         version: Any = None,
         **kwargs: Any,
     ) -> list[Self]:
-        """Get nested datasets.
+        """Return directly nested (child) datasets of this bag.
+
+        Queries the bag's local SQLite ``Dataset_Dataset`` association table
+        to find datasets nested inside this one.
 
         Args:
-            recurse: Whether to include children of children.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Ignored (bags are immutable snapshots).
+            recurse: If ``True``, recursively include children of children.
+                Default is ``False``.
+            _visited: Internal parameter tracking visited RIDs to guard
+                against circular references. Callers should not pass this.
+            version: Ignored (bags are immutable snapshots; present for
+                API symmetry with ``Dataset.list_dataset_children``).
             **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
-            List of child dataset bags.
+            List of ``DatasetBag`` instances for each direct child dataset,
+            in the order returned by the SQLite query.
+
+        Raises:
+            DerivaMLException: If the bag SQLite database cannot be read.
+
+        Example:
+            >>> children = bag.list_dataset_children(recurse=True)  # doctest: +SKIP
+            >>> for child in children:  # doctest: +SKIP
+            ...     print(child.dataset_rid, child.dataset_types)
         """
         # Initialize visited set for recursion guard
         if _visited is None:
@@ -767,17 +811,31 @@ class DatasetBag:
         version: Any = None,
         **kwargs: Any,
     ) -> list[Self]:
-        """Given a dataset_table RID, return a list of RIDs of the parent datasets if this is included in a
-        nested dataset.
+        """Return the parent datasets that contain this dataset as a nested member.
+
+        Queries the bag's local SQLite ``Dataset_Dataset`` association table to
+        find datasets in which this dataset appears as a ``Nested_Dataset``.
 
         Args:
-            recurse: If True, recursively return all ancestor datasets.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Ignored (bags are immutable snapshots).
+            recurse: If ``True``, recursively return all ancestor datasets up
+                to the root. Default is ``False``.
+            _visited: Internal parameter tracking visited RIDs to guard against
+                circular references. Callers should not pass this.
+            version: Ignored (bags are immutable snapshots; present for
+                API symmetry with ``Dataset.list_dataset_parents``).
             **kwargs: Additional arguments (ignored, for protocol compatibility).
 
         Returns:
-            List of parent dataset bags.
+            List of ``DatasetBag`` instances for each direct parent dataset.
+            Empty list if this dataset has no parents in the bag.
+
+        Raises:
+            DerivaMLException: If the bag SQLite database cannot be read.
+
+        Example:
+            >>> parents = bag.list_dataset_parents()  # doctest: +SKIP
+            >>> for p in parents:  # doctest: +SKIP
+            ...     print(p.dataset_rid)
         """
         # Initialize visited set for recursion guard
         if _visited is None:
@@ -814,9 +872,9 @@ class DatasetBag:
             List of execution RIDs associated with this dataset.
 
         Example:
-            >>> bag = ml.download_dataset_bag(dataset_spec)
-            >>> execution_rids = bag.list_executions()
-            >>> for rid in execution_rids:
+            >>> bag = ml.download_dataset_bag(dataset_spec)  # doctest: +SKIP
+            >>> execution_rids = bag.list_executions()  # doctest: +SKIP
+            >>> for rid in execution_rids:  # doctest: +SKIP
             ...     print(f"Associated execution: {rid}")
         """
         de_table = self.model.get_orm_class_by_name(f"{self.model.ml_schema}.Dataset_Execution")
@@ -950,12 +1008,28 @@ class DatasetBag:
         row_per: str | None = None,
         via: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Dry-run the denormalization; return planning metadata.
+        """Dry-run the denormalization and return planning metadata.
 
         Shortcut for
         :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.describe` —
         returns the full plan dict (see that method's docstring for the
         exact 12-key shape). Never raises on ambiguity.
+
+        Args:
+            include_tables: Tables whose columns would appear in the output.
+            row_per: Optional explicit leaf table (Rule 2).
+            via: Optional path-only intermediates (Rule 6).
+
+        Returns:
+            dict: Planning metadata with 12 keys including ``anchor``,
+            ``row_per``, ``join_path``, ``columns``, ``ambiguities``,
+            and related diagnostics. See ``Denormalizer.describe`` for
+            the full shape.
+
+        Example::
+
+            plan = bag.describe_denormalized(["Image", "Subject"])
+            print(plan["anchor"], plan["row_per"])
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
