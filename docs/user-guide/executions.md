@@ -35,7 +35,7 @@ config = ExecutionConfiguration(
 )
 ```
 
-**Explanation.** `workflow` holds the `Workflow` object returned by `ml.create_workflow()`. If you leave it `None` here you must pass `workflow=` to `ml.create_execution()` instead — omitting it from both raises an exception. `description` is free-form Markdown. `datasets` accepts a list of `DatasetSpec` objects; `assets` accepts a list of RID strings or `AssetSpec` objects.
+**Explanation.** `workflow` holds the `Workflow` object returned by `ml.create_workflow()`. If you leave it `None` here you must pass `workflow=` to `ml.create_execution()` instead — the enforcement happens at `ml.create_execution()`, not at `ExecutionConfiguration` construction, so omitting it from both raises an exception only when you call `ml.create_execution()`. `description` is free-form Markdown. `datasets` accepts a list of `DatasetSpec` objects; `assets` accepts a list of RID strings or `AssetSpec` objects.
 
 **DatasetSpec options:**
 
@@ -90,7 +90,7 @@ exe.upload_execution_outputs()
 - `exe.execution_rid` — the RID of the catalog Execution record; use it to look up the run later.
 - `exe.working_dir` — the local scratch directory for this execution; do not write output files here directly (they will not be uploaded). Use `asset_file_path()` instead.
 - `exe.datasets` — the list of `DatasetSpec` objects from the configuration; iterate these to download each declared dataset.
-- `exe.asset_paths` — a dict mapping asset table name → list of local file paths for downloaded input assets.
+- `exe.asset_paths` — a `dict[str, list[AssetFilePath]]` mapping asset table name → list of paths for downloaded input assets.
 
 ## How to write asset files
 
@@ -103,8 +103,11 @@ with ml.create_execution(config) as exe:
     model_path = exe.asset_file_path("Model", "classifier.pt")
     torch.save(model.state_dict(), model_path)
 
-    # 2. Register an existing file (symlinked into staging by default).
+    # 2. Register an existing file (copied into staging).
     exe.asset_file_path("Image", "/tmp/processed.png", copy_file=True)
+    # Note: the return value is dropped here intentionally. The file is already
+    # on disk; you don't need to reference the AssetFilePath afterward unless
+    # you plan to update its metadata via .set_metadata() or .set_asset_types().
 
     # 3. Rename during staging.
     exe.asset_file_path("Image", "/tmp/temp_scan.png",
@@ -284,7 +287,7 @@ with ml.create_execution(config) as exe:
 exe.upload_execution_outputs()
 ```
 
-`update_status(status, message)` writes `status` to `Execution.Status` and `message` to `Execution.Status_Detail` in the catalog, making progress visible immediately.
+`update_status(status, message)` writes `status` to `Execution.Status` and `message` to `Execution.Status_Detail` in the catalog, making progress visible immediately. When you want to update the progress message without changing state, pass the current status (typically `Running`) as the first argument; only the message changes.
 
 ## How to handle a crash-resume
 
@@ -307,11 +310,25 @@ exe.upload_execution_outputs()
 
 **Explanation.** `ml.resume_execution(rid)` rebuilds an `Execution` object bound to the existing catalog record and its local SQLite state. When `upload_execution_outputs()` runs, it discovers the pending feature rows and asset manifest entries and processes them as if the run had just completed.
 
+**Two distinct crash scenarios:**
+
+**Scenario A — exception inside the `with` block.** If your code raises and `__exit__` runs, the execution transitions to `Failed`. On restart, `ml.resume_execution(rid)` returns an execution already in `Failed` state. `upload_execution_outputs()` accepts `Failed` as a starting point (`Failed → Pending_Upload` is a legal transition) and flushes any staged outputs.
+
+**Scenario B — hard process crash (SIGKILL, OOM, power failure) inside the `with` block.** `__exit__` never runs, so the execution stays in `Running` in both SQLite and the catalog. On restart, `ml.resume_execution(rid)` runs just-in-time reconciliation: since both sides agree on `Running`, reconciliation is a no-op and the execution is returned still in `Running` state. Because `Running → Pending_Upload` is not a legal transition, you must first mark it terminal before uploading:
+
+```python
+exe = ml.resume_execution(rid)
+# Execution is in Running state — mark it failed so upload can proceed.
+exe.update_status(ExecutionStatus.Failed, "Resumed after hard crash")
+exe.upload_execution_outputs()   # Failed → Pending_Upload → Uploaded
+```
+
+Once the status is `Failed`, `upload_execution_outputs()` flushes any staged feature rows and asset manifest entries that survived in SQLite, completing the upload without re-running the model.
+
 **Notes:**
 
 - Staged feature records survive process death because SQLite writes are fsync'd on every mutation.
 - Asset files in the manifest with status `pending` are re-uploaded; already-uploaded entries are skipped.
-- If the execution is in `Failed` state (the context manager caught an exception before the crash), `upload_execution_outputs()` will still flush staged outputs — partial results are preserved.
 - `resume_execution()` is also useful when you want to add more outputs to a completed execution without re-running it, for example to attach post-hoc analysis files.
 
 ## CLI reference
