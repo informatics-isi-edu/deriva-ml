@@ -52,6 +52,7 @@ from sqlalchemy.orm.util import AliasedClass
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.pd_utils import rows_to_dataframe
 from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature, FeatureRecord
 
@@ -261,7 +262,7 @@ class DatasetBag:
             >>> df = bag.get_table_as_dataframe("Image")  # doctest: +SKIP
             >>> print(df.shape)  # doctest: +SKIP
         """
-        return pd.DataFrame(self.get_table_as_dict(table))
+        return rows_to_dataframe(self.get_table_as_dict(table))
 
     @staticmethod
     def _find_relationship_attr(source, target):
