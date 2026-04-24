@@ -72,8 +72,8 @@ class DatasetMixin:
             Iterable of Dataset objects.
 
         Example:
-            >>> datasets = list(ml.find_datasets())
-            >>> for ds in datasets:
+            >>> datasets = list(ml.find_datasets())  # doctest: +SKIP
+            >>> for ds in datasets:  # doctest: +SKIP
             ...     print(f"{ds.dataset_rid}: {ds.description}")
         """
         # Import here to avoid circular imports
@@ -116,8 +116,8 @@ class DatasetMixin:
             DerivaMLException: If the dataset is not found.
 
         Example:
-            >>> dataset = ml.lookup_dataset("4HM")
-            >>> print(f"Version: {dataset.current_version}")
+            >>> dataset = ml.lookup_dataset("4HM")  # doctest: +SKIP
+            >>> print(f"Version: {dataset.current_version}")  # doctest: +SKIP
         """
         if isinstance(dataset, DatasetSpec):
             dataset_rid = dataset.rid
@@ -145,6 +145,10 @@ class DatasetMixin:
         Raises:
             DerivaMLException: If the dataset RID is not a valid dataset, or if the
                 dataset is nested inside a parent dataset.
+
+        Example:
+            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
+            >>> ml.delete_dataset(ds, recurse=False)  # doctest: +SKIP
         """
         # Get association table entries for this dataset_table
         # Delete association table entries
@@ -164,10 +168,21 @@ class DatasetMixin:
         dataset_path.update([{"RID": r, "Deleted": True} for r in rid_list])
 
     def list_dataset_element_types(self) -> Iterable[Table]:
-        """List the types of entities that can be added to a dataset.
+        """List the table types that can be added as dataset members.
+
+        Returns every table that has an association with the Dataset table,
+        restricted to domain-schema tables and the Dataset table itself.
+        These are the types accepted by ``add_dataset_members()``.
 
         Returns:
-            An iterable of Table objects that can be included as an element of a dataset.
+            Iterable of ``Table`` objects representing valid member types.
+
+        Raises:
+            DerivaMLException: If the catalog schema cannot be read.
+
+        Example:
+            >>> types = ml.list_dataset_element_types()  # doctest: +SKIP
+            >>> print([t.name for t in types])  # doctest: +SKIP
         """
 
         def is_domain_or_dataset_table(table: Table) -> bool:
@@ -181,16 +196,29 @@ class DatasetMixin:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
-        """Makes it possible to add objects from the specified table to a dataset.
+        """Make it possible to add objects from ``element`` table to a dataset.
 
-        A dataset is a heterogeneous collection of objects, each of which comes from a different table.
-        This routine adds the specified table as a valid element type for datasets.
+        Creates a new association table linking Dataset to the given table,
+        then updates catalog annotations so the new type is included in
+        bag-export specs. If the workspace ORM was already built, it is
+        rebuilt to pick up the new association table — the ORM is eagerly
+        constructed at init time and does not see DDL changes applied after
+        that point.
 
         Args:
-            element: Name of the table or table object that is to be added to the dataset.
+            element: Name of the table (str) or Table object to register as
+                a valid dataset element type.
 
         Returns:
-            The table object that was added to the dataset.
+            The Table object that was registered.
+
+        Raises:
+            DerivaMLException: If ``element`` is not a valid table name.
+            DerivaMLTableTypeError: If the table is a system or ML table
+                and cannot be a dataset element type.
+
+        Example:
+            >>> ml.add_dataset_element_type("Image")  # doctest: +SKIP
         """
         # Import here to avoid circular imports
         from deriva_ml.dataset.catalog_graph import CatalogGraph
@@ -208,13 +236,10 @@ class DatasetMixin:
             else:
                 raise e
 
-        # If the workspace has already been built (e.g. because a prior
-        # Execution created an AssetManifest that touched .workspace),
-        # its local ORM schema doesn't know about the new association
-        # table. Rebuild it so subsequent catalog-mode denormalize calls
-        # can resolve ``{Dataset_{element}}`` as a join target. Without
-        # this, the next Denormalizer that tries to join through the
-        # new assoc table raises ``KeyError: 'Table Dataset_X not found'``.
+        # Rebuild the workspace ORM so it can resolve the new association table.
+        # The workspace ORM is built eagerly at init time from the schema snapshot;
+        # DDL applied after that point (like this new association table) is not
+        # visible until the ORM is rebuilt from a fresh model fetch.
         if getattr(self, "_workspace", None) is not None:
             ls = getattr(self._workspace, "local_schema", None)
             if ls is not None:
@@ -261,9 +286,9 @@ class DatasetMixin:
 
         Examples:
             Download with default options:
-                >>> spec = DatasetSpec(rid="1-abc123")
-                >>> bag = ml.download_dataset_bag(dataset=spec)
-                >>> print(f"Downloaded to {bag.path}")
+                >>> spec = DatasetSpec(rid="1-abc123")  # doctest: +SKIP
+                >>> bag = ml.download_dataset_bag(dataset=spec)  # doctest: +SKIP
+                >>> print(f"Downloaded to {bag.path}")  # doctest: +SKIP
         """
         if not self.model.is_dataset_rid(dataset.rid):
             raise DerivaMLTableTypeError("Dataset", dataset.rid)
@@ -480,8 +505,3 @@ class DatasetMixin:
             timeout=dataset.timeout,
             fetch_concurrency=dataset.fetch_concurrency,
         )
-
-    # Backward compatibility alias
-    def prefetch_dataset(self, dataset: "DatasetSpec", materialize: bool = True) -> dict[str, Any]:
-        """Deprecated: Use cache_dataset() instead."""
-        return self.cache_dataset(dataset, materialize)
