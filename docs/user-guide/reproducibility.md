@@ -65,14 +65,18 @@ Under the hood, each dataset version stores a catalog snapshot timestamp. When d
 
 ## How to capture workflow checksums and git commits
 
-When you construct a `Workflow`, deriva-ml inspects the calling source and records:
+Workflow provenance happens in two distinct steps: local object construction and catalog-side deduplication.
+
+**Step 1 — Local object construction.** When you call `ml.create_workflow(...)` (or instantiate `Workflow(...)` directly), a Pydantic validator inspects the calling source and populates three fields:
 
 - The GitHub blob URL pointing to the script at the current git commit (`https://github.com/org/repo/blob/<commit>/src/models/train.py`)
 - A checksum computed from the file content (git object hash)
 - The git version tag (from `setuptools_scm` or `pyproject.toml`)
 
+No catalog contact happens at this stage. The `Workflow` object is a local value object.
+
 ```python
-# At execution time, deriva-ml detects your script automatically
+# Constructs a local Workflow object — no catalog write yet
 workflow = ml.create_workflow(
     name="CNN Training v2",
     workflow_type="Training",
@@ -80,17 +84,20 @@ workflow = ml.create_workflow(
 )
 ```
 
-The checksum is the deduplication key. If you run the same committed script a second time, `ml.add_workflow()` finds the existing workflow record and returns its RID — no duplicate is created. This is intentional: the same code is the same workflow, and all executions that used it are linked under one record.
+**Step 2 — Catalog-side deduplication.** When you pass the workflow to `ml.create_execution(config)`, derive-ml calls `ml.add_workflow(workflow)` internally. That function queries the catalog for an existing record with the same checksum. If one exists, it returns its RID; otherwise it inserts a new record. Either way the execution is linked to the canonical RID.
 
 ```python
-# All three executions below share one workflow RID
-# because the script has not changed between runs
+# All three executions below share one workflow RID because
+# add_workflow (called inside create_execution) finds the same
+# checksum and reuses the existing record
 with ml.create_execution(config_a) as exe: ...
 with ml.create_execution(config_b) as exe: ...
 with ml.create_execution(config_c) as exe: ...
 ```
 
-Use this property intentionally: when you want a new workflow record (for a meaningfully different version of the code), commit the changes first. The new commit hash produces a new checksum, which creates a new workflow RID.
+If you call `ml.add_workflow(workflow)` directly (without going through `create_execution`), deduplication still applies — but `create_execution` is the typical path that triggers it automatically.
+
+Use this property intentionally: when you want a new workflow record (for a meaningfully different version of the code), commit the changes first. The new commit hash produces a new checksum, which causes `add_workflow` to insert a new record.
 
 You can verify the current version tag at any time:
 
@@ -110,16 +117,19 @@ uv run deriva-ml-run +experiment=production_training
 
 **Notes:**
 
-- Jupyter notebooks use the same mechanism: the checksum is computed after stripping output cells with `nbstripout`, so re-running a notebook without code changes produces the same checksum.
+- Jupyter notebooks use the same mechanism: for `.ipynb` files, deriva-ml pipes the notebook through `nbstripout -t` before computing the git object hash, so re-running a notebook without code changes produces the same checksum. Install `nbstripout` (`pip install nbstripout`) to enable this path.
 - The `url` and `checksum` fields on `Workflow` can be set explicitly to override automatic detection.
 - `bump-version` fetches tags, bumps the version, creates a new tag, and pushes — all in one step. Do not use `bump-my-version` directly; it does not push.
 
 ## How to capture a Docker image digest
 
-When running inside a Docker container there is no local git repository. Deriva-ml reads provenance from environment variables that your CI/CD pipeline sets at image build time:
+When running inside a Docker container there is no local git repository. Deriva-ml reads provenance from environment variables that your CI/CD pipeline sets at image build time.
+
+`DERIVA_MCP_IN_DOCKER=true` is the **gate**: unless this variable is set to `true`, none of the other Docker provenance variables are read and deriva-ml falls back to the standard git-based path (which will fail if there is no repo). Always set this variable first.
 
 | Variable | Purpose |
 |---|---|
+| `DERIVA_MCP_IN_DOCKER` | **Gate.** Set to `true` to activate Docker provenance path |
 | `DERIVA_MCP_IMAGE_NAME` | Image name, e.g. `ghcr.io/org/repo` |
 | `DERIVA_MCP_IMAGE_DIGEST` | Image digest (`sha256:...`) used as the workflow checksum |
 | `DERIVA_MCP_GIT_COMMIT` | Git commit hash at build time (fallback when digest is absent) |
@@ -134,6 +144,7 @@ A typical GitHub Actions build step looks like:
     push: true
     tags: ghcr.io/org/repo:${{ github.sha }}
   env:
+    DERIVA_MCP_IN_DOCKER: "true"
     DERIVA_MCP_IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
     DERIVA_MCP_GIT_COMMIT: ${{ github.sha }}
     DERIVA_MCP_VERSION: ${{ github.ref_name }}
@@ -158,7 +169,7 @@ Bake these variables into the image so they are present when the container runs.
 - The `description` and `argv`
 - The `config_choices` dict populated by `deriva-ml-run` from the Hydra runtime
 
-`uv.lock` is copied from the project root at the same moment. If the project root cannot be determined (e.g., in a Docker container without a mounted checkout), the lock file is skipped.
+`uv.lock` is copied from the project root at the same moment. It is skipped whenever the script is not tracked by git — specifically when `git_root` cannot be resolved. The most common cases are Docker containers without a mounted checkout and scripts run from outside a git repository.
 
 `environment_snapshot_<timestamp>.txt` is generated from the live Python environment: `sys.version`, the output of `pip list`, the OS name and CPU architecture, GPU availability via `nvidia-smi`, and a filtered subset of environment variables. It is generated and uploaded during initialization regardless of execution environment.
 
@@ -194,8 +205,7 @@ uv run deriva-ml-run dry_run=true +experiment=my_experiment
 
 **Notes:**
 
-- `DERIVA_ML_ALLOW_DIRTY` is also checked by `bump-version`, which will not tag a dirty tree (unless `uv.lock` is the only modified file, which it auto-commits).
-- Notebook runs follow the same rule: call `nbstripout --install` once per repository so that output cells are stripped before git sees the file, and commit the cleaned notebook before running.
+- Notebook runs follow the same rule: commit the notebook before running so that the recorded URL and checksum are consistent. Install `nbstripout` once per repository (`nbstripout --install`) to keep output cells out of git history.
 
 ## How to re-run a past execution
 
@@ -249,7 +259,7 @@ uv run deriva-ml-run \
 
 **Notes:**
 
-- `find_executions()` queries the live catalog. For offline inspection, `list_executions()` reads the local SQLite registry without contacting the server.
+- `find_executions()` queries the live catalog. Its `status` parameter accepts a single `ExecutionStatus` value (or `None` for all statuses) — not a list. For offline inspection, `list_executions()` reads the local SQLite registry without contacting the server and accepts a list of statuses.
 - `lookup_execution(rid)` returns a live `ExecutionRecord` whose `status` field writes through to the catalog on assignment.
 - The reproduced execution gets a new RID — it is a new record linked to the same workflow and dataset versions, not an alias of the original.
 - If the original execution used input assets (`AssetSpec`), include those in the new configuration using their RIDs.
