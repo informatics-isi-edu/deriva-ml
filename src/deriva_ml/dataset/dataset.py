@@ -28,6 +28,7 @@ Typical usage example:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -100,6 +101,25 @@ from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
+
+
+def _hash_spec(spec: Any) -> str:
+    """SHA-256 hex digest of a download spec, keyed by sorted-JSON form.
+
+    Used to key the bag cache and to compare a freshly computed spec
+    against the ``Minid_Spec_Hash`` recorded on a historical version.
+    ``sort_keys=True`` makes the hash order-insensitive across dict
+    renderings so semantically-equal specs always hash identically.
+
+    Args:
+        spec: The download spec (any JSON-serializable Python object,
+            typically the dict returned by
+            ``CatalogGraph.generate_dataset_download_spec``).
+
+    Returns:
+        Lowercase hex-digest string (64 chars).
+    """
+    return hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
 
 
 class Dataset:
@@ -2292,8 +2312,6 @@ class Dataset:
             str: URL to the MINID landing page (if use_minid=True) or
                 the direct bag download URL.
         """
-        import hashlib
-
         with TemporaryDirectory() as tmp_dir:
             # Generate spec if not supplied (allows callers to reuse a spec they already computed).
             if spec is None:
@@ -2307,7 +2325,7 @@ class Dataset:
                 spec = downloader.generate_dataset_download_spec(self)
 
             if spec_hash is None:
-                spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
+                spec_hash = _hash_spec(spec)
 
             spec_file = Path(tmp_dir) / "download_spec.json"
             with spec_file.open("w", encoding="utf-8") as ds:
@@ -2651,8 +2669,6 @@ class Dataset:
             DerivaMLException: If the version doesn't exist, or if
                 ``create=False`` and no cached/registered bag is available.
         """
-        import hashlib
-
         # ----- Resolve version record -----------------------------------------
         version_str = str(version)
         history = self.dataset_history()
@@ -2684,7 +2700,7 @@ class Dataset:
             exclude_tables=exclude_tables,
         )
         spec = downloader.generate_dataset_download_spec(self)
-        spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
+        spec_hash = _hash_spec(spec)
 
         # The deterministic cache key: {spec_hash[:16]}_{snapshot}
         # - spec_hash[:16] captures the FK traversal plan (schema-dependent)
