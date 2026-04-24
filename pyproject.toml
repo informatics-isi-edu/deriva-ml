@@ -93,7 +93,6 @@ addopts = [
     "-v",
     "--import-mode=importlib",
     "--doctest-modules",
-    "--ignore=tests/execution/workflow-test.py",
 ]
 doctest_optionflags = ["NORMALIZE_WHITESPACE", "ELLIPSIS", "IGNORE_EXCEPTION_DETAIL"]
 markers = [

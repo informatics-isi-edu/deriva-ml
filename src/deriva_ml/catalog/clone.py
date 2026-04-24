@@ -1977,7 +1977,7 @@ def create_ml_workspace(
         truncate_oversized: If True, truncate values exceeding index size limits.
         reinitialize_dataset_versions: If True, reinitialize dataset versions.
         table_concurrency: Maximum number of tables to copy concurrently
-            during the fill phase. Lower values reduce server load. Default: 2.
+            during the fill phase. Lower values reduce server load. Default: 1.
         progress_callback: Optional callback(message, percent_complete) for
             progress reporting (e.g., from MCP tools).
 
