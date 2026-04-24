@@ -116,11 +116,11 @@ uv run deriva-ml-run +experiment=quick_training
 If the working tree has uncommitted changes, DerivaML issues a warning and the
 execution record may not have a valid code reference.
 
-See [Automatic Source Code Detection](../workflows/execution-lifecycle.md#automatic-source-code-detection)
+See [Running an experiment](../user-guide/executions.md)
 for details on how provenance works in scripts, notebooks, and Docker containers.
 
 ## See Also
 
 - [Configuration Groups](groups.md) — The five standard config groups
 - [Hydra-zen Configuration Overview](overview.md) — Configuration class reference
-- [Running Models](../workflows/running-models.md) — CLI usage and complete walkthrough
+- [Integrating with hydra-zen](../user-guide/hydra-zen.md) — CLI usage and complete walkthrough

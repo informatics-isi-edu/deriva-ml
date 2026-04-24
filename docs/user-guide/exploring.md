@@ -236,5 +236,5 @@ Open the returned URL in a browser to see the full record with all columns and r
 
 - Chapter 2 — Working with datasets (`user-guide/datasets.md`, coming next): creating, versioning, and downloading datasets
 - Chapter 4 — Running an experiment (`user-guide/executions.md`): the execution lifecycle and provenance capture
-- [API Reference — DerivaML](../code-docs/deriva_ml_base.md) — full method documentation for `DerivaML`
-- [API Reference — Feature](../code-docs/feature.md) — `Feature` object returned by `find_features`
+- [API Reference — DerivaML](../api-reference/deriva_ml_base.md) — full method documentation for `DerivaML`
+- [API Reference — Feature](../api-reference/feature.md) — `Feature` object returned by `find_features`

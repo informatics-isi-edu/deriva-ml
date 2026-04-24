@@ -492,4 +492,4 @@ Non-element-type tables (such as `Device`) are always traversed normally.
 - Chapter 4 ("Running an experiment") — `ExecutionConfiguration`, `DatasetSpec`, and downloading datasets inside an execution.
 - Chapter 5 ("Working offline") — `DatasetBag` API, `get_table_as_dataframe()`, `feature_values()`, and `restructure_assets()`.
 - Chapter 7 ("Reproducibility") — version pinning via catalog snapshots; `DatasetSpec(version=...)` in execution configs.
-- API reference: [`deriva_ml.dataset.dataset.Dataset`](../code-docs/dataset.md), [`deriva_ml.dataset.split.split_dataset`](../code-docs/dataset_split.md), [`deriva_ml.dataset.aux_classes.DatasetSpec`](../code-docs/dataset_aux_classes.md).
+- API reference: [`deriva_ml.dataset.dataset.Dataset`](../api-reference/dataset.md), [`deriva_ml.dataset.split.split_dataset`](../api-reference/dataset_split.md), [`deriva_ml.dataset.aux_classes.DatasetSpec`](../api-reference/dataset_aux_classes.md).
