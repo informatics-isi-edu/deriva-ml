@@ -2,6 +2,8 @@
 
 A downloaded bag is a self-contained, read-only snapshot of a catalog dataset that lives on your laptop and needs no network connection. By the end of this chapter you will know how to materialize asset files into a bag, read features and tables from it, organize those assets for standard ML frameworks, build new feature records offline, and commit them back to the catalog when you reconnect.
 
+This chapter builds on Chapter 2 (datasets), Chapter 3 (features), and Chapter 4 (executions). After reading it you will be able to work entirely from a bag file without a catalog connection and then upload results in a single execution when you come back online.
+
 ## Bags and live catalogs
 
 A live `Dataset` object talks to the server on every operation. A `DatasetBag` wraps the same data stored locally as a BDBag — a directory of CSV files, asset files, a SQLite database, and integrity manifests. The two classes implement the same `DatasetLike` protocol, so most read operations use identical method calls on either object.
@@ -34,7 +36,7 @@ Inside an execution the same `DatasetSpec` object works via `exe.download_datase
 - For large datasets, set a generous read timeout: `DatasetSpec(rid=..., version=..., timeout=(10, 1800))`.
 - `estimate_bag_size()` on the live `Dataset` gives row counts and asset byte totals before you commit to a download — see Chapter 2.
 
-## How bag.path works and what it contains
+## How to inspect bag structure
 
 `bag.path` is a `pathlib.Path` pointing to the root of the materialized bag directory on disk.
 
@@ -65,7 +67,7 @@ The directory layout after materialization:
       <RID>/
         <Table>/
           <filename>        # materialized asset files
-  deriva_ml.db              # SQLite database (bag queries go here)
+  *.db                      # SQLite database (bag queries go here)
   schema.json               # catalog schema snapshot
 ```
 
@@ -108,7 +110,7 @@ feat = bag.lookup_feature("Image", "Glaucoma")
 
 - `bag.list_dataset_members()` returns members of this dataset only. Pass `recurse=True` to include nested datasets.
 - `bag.get_table_as_dataframe("Subject")` returns all rows in that table, not just those belonging to the dataset. For dataset-scoped rows, combine with `list_dataset_members()`.
-- Feature cache: the first call to `bag.feature_values()` for a given `(table, feature)` pair populates a per-bag cache. Subsequent calls are fast.
+- Feature cache: the first call to `bag.feature_values()` for a given `(table, feature)` pair populates a per-bag cache. Subsequent calls are fast. The cache avoids re-scanning the source CSV on subsequent calls, but every call loads all matching records into memory before yielding the first one — this is not a streaming iterator, same as the live-catalog `feature_values`.
 - `bag.list_workflow_executions(workflow)` may return an empty list if the `Execution` rows were not exported into the bag. This is a known bag-export limitation; see "What bags can't do" below.
 
 ## What bags can't do
@@ -167,14 +169,13 @@ cfg = ExecutionConfiguration(
     description="Offline inference results",
     workflow=workflow,
 )
-execution = ml.create_execution(cfg)
 
-with execution.execute() as exe:
+with ml.create_execution(cfg) as exe:
     count = exe.add_features(pending_records)
     print(f"Staged {count} records")
 
 # Records are flushed to the catalog after the context manager exits
-execution.upload_execution_outputs()
+exe.upload_execution_outputs()
 ```
 
 `exe.add_features()` stages records in the execution's local SQLite state. They are flushed to ERMrest in a single batch after asset upload, when the execution completes. If the process crashes before upload, call `ml.resume_execution(execution.execution_rid)` and re-run `upload_execution_outputs()`.
@@ -230,7 +231,7 @@ manifest = bag.restructure_assets(
     enforce_vocabulary=True,       # only allow vocabulary-based features in group_by
     value_selector=None,           # callable(list[FeatureRecord]) -> FeatureRecord for multi-value features
     file_transformer=None,         # callable(src: Path, dest: Path) -> Path for format conversion
-)
+)  # returns dict[Path, Path]
 ```
 
 ### Directory structure
@@ -283,7 +284,7 @@ manifest = bag.restructure_assets(
 )
 ```
 
-`FeatureRecord.select_newest` picks the record with the latest creation timestamp. Other built-in selectors: `FeatureRecord.select_first`, `FeatureRecord.select_majority_vote(column)`.
+`FeatureRecord.select_newest` picks the record with the latest creation timestamp. Other built-in selectors: `FeatureRecord.select_first`. For majority voting, use `FeatureRecord.select_majority_vote("column_name")` — it is a `@classmethod` factory that takes a column name and returns a selector; pass the result as `value_selector=FeatureRecord.select_majority_vote("Glaucoma")`.
 
 Set `enforce_vocabulary=False` to silently use the first value when multiple exist without raising.
 
