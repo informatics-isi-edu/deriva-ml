@@ -18,7 +18,7 @@ Integration with hydra-zen:
 
 Example:
     Programmatic configuration:
-        >>> config = DerivaMLConfig(
+        >>> config = DerivaMLConfig(  # doctest: +SKIP
         ...     hostname='deriva.example.org',
         ...     catalog_id='my_catalog',
         ...     working_dir='/path/to/work'
@@ -26,7 +26,7 @@ Example:
         >>> ml = DerivaML.instantiate(config)
 
     With hydra-zen:
-        >>> from hydra_zen import builds, instantiate, store, zen
+        >>> from hydra_zen import builds, instantiate, store, zen  # doctest: +SKIP
         >>> from deriva_ml import DerivaML
         >>> from deriva_ml.core.config import DerivaMLConfig
         >>>

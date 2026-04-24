@@ -5,7 +5,7 @@ An Experiment wraps an execution RID and provides helper methods for extracting
 configuration details, model parameters, and experiment metadata.
 
 Typical usage example:
-    >>> from deriva_ml import DerivaML
+    >>> from deriva_ml import DerivaML  # doctest: +SKIP
     >>> from deriva_ml.execution import Experiment
     >>>
     >>> ml = DerivaML("localhost", 45)
@@ -51,7 +51,7 @@ class Experiment:
         status: Execution status (e.g., "Completed").
 
     Example:
-        >>> exp = Experiment(ml, "47BE")
+        >>> exp = Experiment(ml, "47BE")  # doctest: +SKIP
         >>> print(f"Experiment: {exp.name}")
         >>> print(f"Config: {exp.config_choices}")
         >>> for ds in exp.input_datasets:
@@ -345,7 +345,7 @@ class Experiment:
             Markdown-formatted string.
 
         Example:
-            >>> exp = ml.lookup_experiment("47BE")
+            >>> exp = ml.lookup_experiment("47BE")  # doctest: +SKIP
             >>> print(exp.to_markdown())
         """
         lines = []
@@ -400,7 +400,7 @@ class Experiment:
             show_assets: If True, display input assets.
 
         Example:
-            >>> exp = ml.lookup_experiment("47BE")
+            >>> exp = ml.lookup_experiment("47BE")  # doctest: +SKIP
             >>> exp.display_markdown()
         """
         from IPython.display import Markdown, display

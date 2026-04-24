@@ -13,14 +13,14 @@ Key Features:
 
 Example:
     Create FileSpec from a local file:
-        >>> specs = list(FileSpec.create_filespecs(
+        >>> specs = list(FileSpec.create_filespecs(  # doctest: +SKIP
         ...     path="/data/images/sample.png",
         ...     description="Sample image",
         ...     file_types=["Image", "PNG"]
         ... ))
 
     Read FileSpecs from a JSONL file:
-        >>> specs = list(FileSpec.read_filespec("files.jsonl"))
+        >>> specs = list(FileSpec.read_filespec("files.jsonl"))  # doctest: +SKIP
 """
 
 from __future__ import annotations
@@ -119,13 +119,13 @@ class FileSpec(BaseModel):
 
         Example:
             Static file types:
-                >>> specs = FileSpec.create_filespecs("/data/images", "Images", ["Image"])
+                >>> specs = FileSpec.create_filespecs("/data/images", "Images", ["Image"])  # doctest: +SKIP
 
             Dynamic file types based on extension:
                 >>> def get_types(path):
                 ...     ext = path.suffix.lower()
                 ...     return {"png": ["PNG", "Image"], ".jpg": ["JPEG", "Image"]}.get(ext, [])
-                >>> specs = FileSpec.create_filespecs("/data", "Mixed files", get_types)
+                >>> specs = FileSpec.create_filespecs("/data", "Mixed files", get_types)  # doctest: +SKIP
         """
         path = Path(path)
         file_types = file_types or []

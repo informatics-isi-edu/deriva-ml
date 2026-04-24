@@ -107,7 +107,7 @@ class FeatureMixin:
 
         Examples:
             Create a feature with confidence score:
-                >>> DiagnosisFeature = ml.create_feature(
+                >>> DiagnosisFeature = ml.create_feature(  # doctest: +SKIP
                 ...     target_table="Image",
                 ...     feature_name="Diagnosis",
                 ...     terms=["Diagnosis_Type"],
@@ -217,7 +217,7 @@ class FeatureMixin:
 
         Example:
             >>> # Get the dynamically generated class
-            >>> DiagnosisFeature = ml.feature_record_class("Image", "Diagnosis")
+            >>> DiagnosisFeature = ml.feature_record_class("Image", "Diagnosis")  # doctest: +SKIP
             >>>
             >>> # Create a validated feature record
             >>> record = DiagnosisFeature(
@@ -251,7 +251,7 @@ class FeatureMixin:
             DerivaMLException: If deletion fails due to constraints or permissions.
 
         Example:
-            >>> success = ml.delete_feature("samples", "obsolete_feature")
+            >>> success = ml.delete_feature("samples", "obsolete_feature")  # doctest: +SKIP
             >>> print("Deleted" if success else "Not found")
         """
         # Get table reference and find feature
@@ -304,7 +304,7 @@ class FeatureMixin:
                 table.
 
         Example:
-            >>> feature = ml.lookup_feature("Image", "Classification")
+            >>> feature = ml.lookup_feature("Image", "Classification")  # doctest: +SKIP
             >>> print(f"Feature: {feature.feature_name}")
             >>> print(f"Stored in: {feature.feature_table.name}")
             >>> print(f"Term columns: {[c.name for c in feature.term_columns]}")
@@ -331,12 +331,12 @@ class FeatureMixin:
 
         Examples:
             Find all feature definitions:
-                >>> all_features = ml.find_features()
+                >>> all_features = ml.find_features()  # doctest: +SKIP
                 >>> for f in all_features:
                 ...     print(f"{f.target_table.name}.{f.feature_name}")
 
             Find features defined on a specific table:
-                >>> image_features = ml.find_features("Image")
+                >>> image_features = ml.find_features("Image")  # doctest: +SKIP
                 >>> print([f.feature_name for f in image_features])
         """
         return list(self.model.find_features(table))

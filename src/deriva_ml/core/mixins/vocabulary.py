@@ -131,7 +131,7 @@ class VocabularyMixin:
 
         Examples:
             Add a new tissue type:
-                >>> term = ml.add_term(
+                >>> term = ml.add_term(  # doctest: +SKIP
                 ...     table="tissue_types",
                 ...     term_name="epithelial",
                 ...     description="Epithelial tissue type",
@@ -142,7 +142,7 @@ class VocabularyMixin:
                 >>> term.synonyms = ("epithelium", "epithelial_tissue")
 
             Attempt to add an existing term:
-                >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)
+                >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)  # doctest: +SKIP
         """
         # Initialize an empty synonyms list if None
         synonyms = synonyms or []
@@ -209,14 +209,14 @@ class VocabularyMixin:
 
         Examples:
             Look up by primary name:
-                >>> term = ml.lookup_term("tissue_types", "epithelial")
+                >>> term = ml.lookup_term("tissue_types", "epithelial")  # doctest: +SKIP
                 >>> print(term.description)
 
             Look up by synonym:
-                >>> term = ml.lookup_term("tissue_types", "epithelium")
+                >>> term = ml.lookup_term("tissue_types", "epithelium")  # doctest: +SKIP
 
             Modify the term:
-                >>> term = ml.lookup_term("tissue_types", "epithelial")
+                >>> term = ml.lookup_term("tissue_types", "epithelial")  # doctest: +SKIP
                 >>> term.description = "Updated description"
                 >>> term.synonyms = ("epithelium", "epithelial_tissue")
         """
@@ -306,7 +306,7 @@ class VocabularyMixin:
             DerivaMLException: If table doesn't exist or is not a vocabulary table.
 
         Examples:
-            >>> terms = ml.list_vocabulary_terms("tissue_types")
+            >>> terms = ml.list_vocabulary_terms("tissue_types")  # doctest: +SKIP
             >>> for term in terms:
             ...     print(f"{term.name}: {term.description}")
             ...     if term.synonyms:
@@ -386,7 +386,7 @@ class VocabularyMixin:
             DerivaMLException: If the term is currently in use by other records.
 
         Example:
-            >>> ml.delete_term("Dataset_Type", "Obsolete_Type")
+            >>> ml.delete_term("Dataset_Type", "Obsolete_Type")  # doctest: +SKIP
         """
         # Look up the term (validates table and term existence)
         term = self.lookup_term(table, term_name)
