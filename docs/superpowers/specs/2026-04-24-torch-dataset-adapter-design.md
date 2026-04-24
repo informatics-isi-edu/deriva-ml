@@ -89,8 +89,8 @@ re-solve:
 - **Filesystem-layout rewrites for third-party tools** (`ImageFolder`
   et al.) live in `restructure_assets`. This is an **alternative** to
   the adapter, not a pipeline step: the two tools solve the same
-  problem with different shapes (lazy in-place read vs. eager
-  on-disk rewrite). See §7.4.3 for why they don't chain.
+  problem with different output shapes (lazy in-place read vs.
+  eager on-disk rewrite). See §7.4.2 for why they don't chain.
 - **Catalog-level annotation joins** live in
   `bag.get_denormalized_as_dataframe` and `bag.feature_values`. The
   adapter reads feature values through the existing API (anchor 1),
@@ -100,6 +100,20 @@ The adapter's v1 job is exactly one thing: lazy iteration over an
 already-defined bag. It does not duplicate these neighboring tools,
 does not wrap them in competing convenience methods, and does not
 offer knobs that replicate theirs.
+
+**Anchor 7: Shared target-specification vocabulary across
+`as_torch_dataset` and `restructure_assets`.** Both methods answer
+the same question — "given a bag element, which feature value becomes
+the label?" — so their inputs describing that question use the same
+parameter names, types, and semantics. The divergence is output-only:
+one returns a torch `Dataset`; the other writes a directory tree.
+This is NOT composition (§7.4.2 explains why they don't chain), it is
+*vocabulary alignment*: users who learn one method's label-selection
+arguments can transfer that knowledge directly. Concretely, both
+methods share the same `targets`, `target_transform`, and `missing`
+parameters with matching semantics. Achieving this requires small
+non-breaking changes to `restructure_assets`'s signature, which ship
+in the same PR as the adapter — see §8 for the alignment scope.
 
 ## 3. Public API
 
@@ -254,6 +268,79 @@ is unavoidable: the filesystem can change between construction and
 access (asset file removed, bag directory renamed, etc.), and torch's
 own convention is to propagate `OSError` subclasses from dataset
 access. No library-level retry or fallback.
+
+### 3.7 Shared target-specification vocabulary
+
+Per anchor 7, `as_torch_dataset` and `restructure_assets` share the
+vocabulary for describing how to resolve feature values into labels.
+The same three parameters appear on both methods with identical names,
+types, and semantics:
+
+**`targets: list[str] | dict[str, FeatureSelector] | None`**
+
+Describes which features supply labels for a bag element.
+
+- `None` (adapter only; meaningless for restructure) — yields
+  unlabeled samples.
+- `list[str]` — list of feature names on `element_type` (or on
+  tables FK-reachable from it; see `restructure_assets`'s
+  "Finding assets through foreign key relationships" docstring).
+  Each feature resolves via `bag.feature_values(element_type, name)`
+  with no per-feature selector.
+- `dict[str, FeatureSelector]` — mapping from feature name to a
+  `Callable[[list[FeatureRecord]], FeatureRecord | None]` that
+  resolves multi-annotator cases. Passed through verbatim to
+  `bag.feature_values(element_type, name, selector=...)`. Built-in
+  selectors: `FeatureRecord.select_newest`, `select_first`,
+  `select_latest`, `select_majority_vote(column)`.
+
+Single-key vs multi-key behavior matches each method's output shape
+(see §3.3 for the adapter; §8 for restructure).
+
+**`target_transform: Callable[[FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord]], Any]`**
+
+User-supplied callable that maps the resolved feature record(s) into
+the final label value.
+
+- For the adapter: return value goes to the training loop unchanged.
+  Any type (int, tensor, list, etc.).
+- For restructure: return value MUST be a string (used as a
+  filesystem directory name). A non-string return raises
+  `DerivaMLValidationError` at construction with a message explaining
+  the string constraint.
+
+The input-shape contract is identical across methods:
+- Single-target (`targets=["A"]`): receives `FeatureRecord`.
+- Multi-target (`targets=["A", "B"]`): receives `dict[str, FeatureRecord]`.
+- Multi-valued single-target: receives `list[FeatureRecord]`.
+
+This means a user's `target_transform` written for one method works
+for the other with a return-type adjustment (e.g., `return CLASS_IDX[rec.Grade]`
+for adapter becomes `return rec.Grade` for restructure).
+
+**`missing: Literal["error", "skip", "unknown"]`**
+
+Policy for elements whose feature value is absent:
+
+- `"error"` — raise `DerivaMLException` at construction listing
+  unlabeled RIDs. Default for **adapter**.
+- `"skip"` — drop unlabeled elements entirely. For restructure, the
+  asset file is not placed in the output tree. For the adapter, the
+  element is absent from `__len__`.
+- `"unknown"` — keep unlabeled elements. For restructure, the asset
+  goes into an `unknown/` directory (matches today's behavior).
+  For the adapter, the target is `None` (user's `target_transform`
+  must handle it). Default for **restructure**.
+
+The default differs by method because the failure modes differ:
+silent mislabeling during training is a correctness hazard (adapter
+default is `"error"`); silently placing an asset in `unknown/` during
+a filesystem lay-out is recoverable by inspection (restructure default
+is `"unknown"`, which preserves today's behavior and avoids breakage).
+
+Users who want the adapter's strictness in restructure just pass
+`missing="error"`; users who want restructure's leniency in the adapter
+pass `missing="unknown"`.
 
 ## 4. Package structure
 
@@ -506,7 +593,161 @@ primitives separate means `restructure_assets` has a clear contract
 (it rewrites disk), the adapter has a clear contract (it reads disk
 lazily), and users see in their own code which tool they chose.
 
-## 8. Non-goals (explicit)
+**But they do share the target-specification vocabulary.** Per
+anchor 7 and §3.7, both methods accept the same `targets`,
+`target_transform`, and `missing` parameters with matching semantics.
+A user who writes `targets={"Diagnosis": FeatureRecord.select_newest}`
+for the adapter can use the same dict for `restructure_assets`. The
+alignment is *input-shape* only; output shapes remain distinct. §8
+documents the specific changes to `restructure_assets` that achieve
+this alignment, and the deprecation path for users on the old
+parameter names.
+
+## 8. `restructure_assets` alignment scope (same PR)
+
+Per anchor 7 and §3.7, the adapter work lands together with a
+coordinated signature update to `restructure_assets`. This section
+enumerates what changes on the restructure side and why.
+
+### 8.1 Parameter renames
+
+| Today | After | Notes |
+|---|---|---|
+| `group_by: list[str] | None` | `targets: list[str] | dict[str, FeatureSelector] | None` | "group_by" was SQL-flavored and misleading in the ML context. "targets" reads consistently across both methods: what determines the output, directory-name or label. |
+| `value_selector: Callable | None` | merged into `targets` dict form | Single-selector was strictly less expressive than per-feature selectors. The dict form subsumes it: `targets={"A": FeatureRecord.select_newest}` covers `value_selector=FeatureRecord.select_newest` for the single-feature case. |
+
+**Deprecation path for `group_by` and `value_selector`**: both continue
+to work for one release cycle. Passing `group_by` emits a
+`DeprecationWarning` pointing at `targets`; same for `value_selector`.
+Removed in the next major release. Concrete mechanism: check for the
+old kwargs in the method body, issue the warning, and forward the
+value to the new parameter name internally.
+
+### 8.2 New parameter: `target_transform`
+
+Restructure today derives directory names directly from feature values
+(or via the `"Feature.column"` dotted-string syntax). After alignment,
+`target_transform` is the canonical way to customize what goes into
+the directory name:
+
+```python
+# Today (still works, deprecated):
+bag.restructure_assets(output_dir="./out", group_by=["Classification.Label"])
+# → directories named after the Label column value
+
+# Aligned form:
+bag.restructure_assets(
+    output_dir="./out",
+    targets=["Classification"],
+    target_transform=lambda rec: rec.Label,   # returns str → directory name
+)
+```
+
+The `"Feature.column"` dotted-string syntax is **deprecated** with a
+`DeprecationWarning` pointing at `target_transform`, but continues to
+work for one release cycle to avoid breakage in existing scripts.
+
+Runtime constraint: `target_transform`'s return type is validated at
+the first `__getitem__`-equivalent call (inside the directory-naming
+loop). A non-string return raises `DerivaMLValidationError` with a
+message explaining that restructure's target_transform must return a
+filesystem-name-compatible string. (The adapter version has no such
+constraint.)
+
+### 8.3 New parameter: `missing`
+
+Currently, `restructure_assets` silently places unlabeled assets in an
+`Unknown/` directory. This is effectively `missing="unknown"` in the
+unified vocabulary.
+
+After alignment:
+
+- `missing: Literal["error", "skip", "unknown"] = "unknown"`
+- Default `"unknown"` preserves today's behavior (non-breaking change).
+- `"error"` gives users the strict-mode option (raise at construction
+  listing unlabeled RIDs) for when they want to ensure their training
+  data is complete before committing to disk.
+- `"skip"` drops the asset from the output tree entirely (new behavior;
+  no directory for it).
+
+### 8.4 Unchanged restructure parameters
+
+Everything else on `restructure_assets` stays as-is:
+
+- `output_dir`, `asset_table`, `use_symlinks`, `type_selector`,
+  `type_to_dir_map`, `enforce_vocabulary`, `file_transformer`.
+- The FK-reachability behavior (find assets through foreign-key
+  relationships from the dataset).
+- The `type_to_dir_map` default (`{"Training": "training",
+  "Testing": "testing", "Unknown": "unknown"}`).
+
+These are restructure-specific and don't map to adapter concepts.
+
+### 8.5 Internal refactor: shared resolution helper
+
+The feature-resolution logic (lookup-features-by-name, apply-selector,
+handle-missing) gets extracted into a private helper in
+`src/deriva_ml/dataset/target_resolution.py` (or similar). Both
+`as_torch_dataset` and `restructure_assets` call into it. This makes
+the "same semantics" claim in anchor 7 enforceable by shared code
+rather than by parallel re-implementation.
+
+Shape of the helper (sketch; implementation-plan will firm up):
+
+```python
+def resolve_targets(
+    bag: "DatasetBag",
+    element_type: str,
+    targets: list[str] | dict[str, FeatureSelector] | None,
+    missing: Literal["error", "skip", "unknown"],
+) -> dict[str, FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord] | None]:
+    """Resolve feature values per element_rid for the requested targets.
+
+    Returns a dict keyed by element RID. The value shape matches §3.3:
+    single FeatureRecord, dict of FeatureRecords, or list per target arity.
+    Values are None for elements where missing="unknown" / "skip" left
+    the label absent.
+
+    Raises DerivaMLException at construction when missing="error" and
+    any target is absent, or when a target feature doesn't exist.
+    """
+```
+
+This helper is private (`_resolve_targets`) — callers reach it through
+the public methods, not directly. Naming inside the module is an
+implementation-plan detail.
+
+### 8.6 Testing impact
+
+New tests verify the aligned semantics on restructure:
+- `targets=[...]` produces the same dir layout as the old
+  `group_by=[...]` form.
+- `value_selector=...` + `targets=[...]` with no selector dict
+  emits a DeprecationWarning and maps to the dict form correctly.
+- `missing="error"` raises on sparse-labeled bags.
+- `missing="skip"` omits assets from the output tree.
+- `missing="unknown"` preserves today's behavior (assets land in
+  `unknown/`).
+- `target_transform` returning a non-string raises
+  `DerivaMLValidationError`.
+- `"Feature.column"` dotted syntax continues to work with a
+  DeprecationWarning.
+
+Existing restructure tests stay green without modification (they
+exercise the `group_by` + `value_selector` shape, which still works
+with deprecation warnings).
+
+### 8.7 Documentation impact
+
+Docstring for `restructure_assets` is rewritten to use the new
+parameter names (and note the deprecated aliases). The UG Chapter 5
+section on `restructure_assets` gets updated examples in the same
+style as the adapter section — same vocabulary, same selector
+examples, same `missing` callouts. A one-paragraph "Vocabulary
+alignment with `as_torch_dataset`" sidebar explains the shared
+parameter names.
+
+## 9. Non-goals (explicit)
 
 The following are intentionally **out of scope** to keep the v1
 surface focused:
@@ -533,12 +774,14 @@ surface focused:
 - **Label encoding helpers.** Explicit non-goal per anchor 2.
   Users own their encoder; the library surfaces typed records.
 
-## 9. Deliverables checklist
+## 10. Deliverables checklist
 
 Implementation plan (separate document at
 `docs/superpowers/plans/2026-04-24-torch-dataset-adapter-plan.md`)
 will enumerate specific tasks; this spec's checklist names the
-deliverables the plan must cover:
+deliverables the plan must cover.
+
+**Adapter deliverables:**
 
 - [ ] `src/deriva_ml/dataset/torch_adapter.py` — new module
 - [ ] `src/deriva_ml/dataset/dataset_bag.py` — `as_torch_dataset`
@@ -550,12 +793,45 @@ deliverables the plan must cover:
 - [ ] `tests/dataset/test_torch_adapter_e2e.py` (pytest.importorskip)
 - [ ] `docs/user-guide/offline.md` — new "How to train a PyTorch model
   from a bag" section per §7.2
+
+**Shared infrastructure (per §8.5):**
+
+- [ ] `src/deriva_ml/dataset/target_resolution.py` (or equivalent) —
+  private helper `_resolve_targets(bag, element_type, targets, missing)`
+  shared between `as_torch_dataset` and `restructure_assets`
+- [ ] Tests for the shared helper covering the three `missing=`
+  branches and selector-dict vs list forms
+
+**Restructure alignment deliverables (per §8):**
+
+- [ ] `src/deriva_ml/dataset/dataset_bag.py` — `restructure_assets`
+  signature updated:
+  - Rename `group_by` → `targets` (with deprecated alias)
+  - Deprecate `value_selector` (merged into `targets` dict form)
+  - Add `target_transform` parameter
+  - Add `missing: Literal["error", "skip", "unknown"] = "unknown"`
+  - Keep `"Feature.column"` dotted syntax with DeprecationWarning
+- [ ] `restructure_assets` docstring rewritten to use new parameter
+  names and document the deprecated aliases
+- [ ] `docs/user-guide/offline.md` — update existing restructure
+  section to use new parameter names; add short "Vocabulary
+  alignment with `as_torch_dataset`" sidebar
+- [ ] `tests/dataset/test_restructure_*` — new tests per §8.6 covering
+  aligned semantics + deprecation warnings
+- [ ] Any existing test that uses `group_by=` keeps passing (with
+  deprecation warning filtered or matched)
+
+**Cross-cutting:**
+
 - [ ] Cross-references per §7.3
 - [ ] mkdocs --strict clean (no new warnings)
 - [ ] Fast suite green (`tests/local_db/ tests/asset/ tests/model/
-  tests/dataset/test_torch_adapter_*`)
+  tests/dataset/test_torch_adapter_* tests/dataset/test_restructure_*`)
+- [ ] Ruff check + format clean (parity with main baseline)
+- [ ] CHANGELOG or similar (if the project maintains one) noting the
+  `restructure_assets` parameter-rename deprecation
 
-## 10. Risks and mitigations
+## 11. Risks and mitigations
 
 **Risk: PyTorch API changes between versions.** Using only stable APIs
 (`torch.utils.data.Dataset`, no tensor ops in the adapter) keeps the
@@ -585,7 +861,25 @@ anything; it reads.
 without `[torch]` leaves torch out entirely. The default install
 remains lean.
 
-## 11. Future work (named for future-spec continuity)
+**Risk: `restructure_assets` parameter deprecation breaks downstream
+scripts.** Three downstream repos (deriva-ml-model-template, apps,
+demo) may use `group_by=` or `value_selector=` in their example code.
+Mitigation: the old parameter names continue to work for one release
+cycle with a `DeprecationWarning`; removal is a named separate PR
+scheduled for the next major release. The plan's verification step
+includes grepping sibling repos for the deprecated kwargs and noting
+them in the PR description so template-repo owners can schedule their
+update.
+
+**Risk: Shared `_resolve_targets` helper introduces coupling that
+makes future per-method changes harder.** Mitigation: the helper has a
+narrow contract (resolve feature values → dict keyed by element RID;
+apply missing policy). Method-specific concerns (directory-naming for
+restructure, label-in-tuple for adapter) stay in their respective
+methods. If a future change genuinely needs divergence, the helper
+can be inlined back per-method with a single commit.
+
+## 12. Future work (named for future-spec continuity)
 
 - **TF adapter** (separate future spec): `bag.as_tf_dataset(...)` with
   the same target/selector/missing semantics but a `tf.data.Dataset`
@@ -602,3 +896,8 @@ remains lean.
   class-balance computation from feature values could be a helper,
   but users can do this themselves from the dataset length + target
   list today.
+- **Remove deprecated `restructure_assets` parameters** (scheduled):
+  At the next major release, remove the `group_by` and
+  `value_selector` kwargs and the `"Feature.column"` dotted-string
+  syntax in `targets`. Tracked as a separate PR keyed off the major
+  version bump.
