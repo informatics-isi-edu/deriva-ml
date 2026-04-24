@@ -39,6 +39,8 @@ plugins:
 
 nav:
   - Home: index.md
+  - User Guide:
+      - Exploring a catalog: user-guide/exploring.md
   - Getting Started:
       - Quick Start: getting-started/quick-start.md
       - Installation: getting-started/install.md
