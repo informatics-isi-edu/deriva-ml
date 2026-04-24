@@ -37,7 +37,7 @@ import shutil
 from collections import defaultdict
 from copy import copy
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Self, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, Self, cast
 
 # Third-party imports
 import pandas as pd
@@ -57,6 +57,8 @@ from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature, FeatureRecord
 
 if TYPE_CHECKING:
+    import torch.utils.data
+
     from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 try:
@@ -1441,6 +1443,170 @@ class DatasetBag:
 
         check_dataset(self, set())
         return list(found_types) if found_types else None
+
+    def as_torch_dataset(
+        self,
+        element_type: str,
+        *,
+        sample_loader: Callable[[Path | None, dict[str, Any]], Any] | None = None,
+        transform: Callable[[Any], Any] | None = None,
+        targets: list[str] | dict[str, Any] | None = None,
+        target_transform: Callable[..., Any] | None = None,
+        missing: Literal["error", "skip", "unknown"] = "error",
+    ) -> "torch.utils.data.Dataset":
+        """Build a ``torch.utils.data.Dataset`` from this bag.
+
+        Creates a lazy PyTorch dataset that reads samples and labels from
+        this already-downloaded ``DatasetBag``. The dataset's
+        ``__getitem__`` returns individual samples (and optionally labels)
+        without materializing the entire dataset into memory at construction
+        time. Torch is imported lazily inside the builder so the base
+        library stays importable without torch installed.
+
+        This is the recommended path from a ``DatasetBag`` to a
+        ``torch.utils.data.DataLoader`` for custom training loops and
+        models. For workflows that need the ``ImageFolder``-style class-
+        folder directory layout (e.g., ``torchvision.datasets.ImageFolder``
+        or third-party fine-tuning scripts), use ``restructure_assets()``
+        instead — the two tools are alternatives, not a pipeline.
+
+        Labels come from the bag's feature values via
+        ``bag.feature_values(element_type, feature_name, selector=...)``.
+        The user's ``target_transform`` maps the typed ``FeatureRecord``
+        into whatever numeric shape the loss function expects. The library
+        does not hold or auto-fit a class-to-index table (design anchor 2).
+
+        Args:
+            element_type: Name of the domain table whose rows become the
+                dataset's samples (e.g., ``"Image"``). Must be a table
+                present in the bag (same error path as
+                ``list_dataset_members``). Whether ``sample_loader`` is
+                required depends on whether this is an asset table — see
+                the ``sample_loader`` entry below.
+
+            sample_loader: ``Callable[[Path | None, dict], Any]``. Invoked
+                once per ``__getitem__`` call. Receives:
+
+                - ``Path | None`` — absolute filesystem path under
+                  ``bag.path / "data/assets/<element_type>/<rid>/<filename>"``
+                  when ``element_type`` is an asset table; ``None``
+                  otherwise.
+                - ``dict[str, Any]`` — the raw row dict from the element
+                  table (all columns, not just those the framework needs).
+
+                For **asset-table** ``element_type``: no default — raises
+                ``DerivaMLException`` at construction if ``sample_loader``
+                is ``None``. The error message names common loaders
+                (``PIL.Image.open``, ``nibabel.load``, ``h5py.File``) as
+                hints.
+
+                For **non-asset-table** ``element_type``: default returns
+                ``row_dict`` unchanged. Useful for tabular training where
+                the element IS the row data with no file decoding.
+
+            transform: ``Callable[[Any], Any]``. Applied to the sample
+                after ``sample_loader`` returns. Standard torchvision-style
+                transform pipeline goes here (e.g.,
+                ``torchvision.transforms.Compose([...])``). No-op default.
+
+            targets: Source of label data. Three shapes are accepted:
+
+                - ``None`` (default) — unlabeled dataset. ``__getitem__``
+                  returns just the sample (not a tuple). Useful for
+                  inference loops and self-supervised pretext tasks.
+                - ``list[str]`` — feature names read via
+                  ``bag.feature_values(element_type, name)`` with no
+                  selector. One ``FeatureRecord`` is resolved per element.
+                - ``dict[str, FeatureSelector]`` — feature names mapped to
+                  selector callables, passed verbatim to
+                  ``bag.feature_values(..., selector=...)``. Resolves
+                  multi-annotator cases. Built-in selectors:
+                  ``FeatureRecord.select_newest``, ``select_first``, etc.
+
+            target_transform: ``Callable`` consuming the raw feature-record
+                shape (see target arity below) and returning whatever the
+                user's loss function expects (typically an ``int`` or a
+                ``torch.Tensor``). No-op default returns the feature
+                record(s) as-is.
+
+                Target arity:
+
+                - Single-target (``targets=["A"]``): receives a
+                  ``FeatureRecord`` directly.
+                - Multi-target (``targets=["A", "B"]``): receives
+                  ``dict[str, FeatureRecord]`` keyed by feature name.
+
+            missing: Behavior when a feature value is absent for an element:
+
+                - ``"error"`` (default) — raise ``DerivaMLException`` at
+                  adapter construction time, before any ``__getitem__``
+                  call. Message includes the list of unlabeled RIDs.
+                  Explicit-over-silent: users should know if their dataset
+                  is partially labeled.
+                - ``"skip"`` — drop unlabeled elements from the dataset
+                  entirely. The resulting dataset's ``__len__`` reflects
+                  only labeled elements. Index mapping is stable across the
+                  dataset's lifetime.
+                - ``"unknown"`` — keep all elements; pass ``None`` to the
+                  user's ``target_transform`` for unlabeled ones. The
+                  ``target_transform`` must handle ``None`` (typically
+                  returning a sentinel class index or an ignore-mask value).
+                  Useful for semi-supervised and self-training workflows.
+
+        Returns:
+            A ``torch.utils.data.Dataset`` whose ``__getitem__`` returns:
+
+            - ``sample`` when ``targets=None`` (unlabeled).
+            - ``(sample, target)`` when ``targets`` is set, where
+              ``sample = transform(sample_loader(path, row_dict))`` and
+              ``target = target_transform(feature_record_shape)``.
+
+            ``__len__`` equals the count of labeled elements when
+            ``missing="skip"``, the total element count otherwise.
+
+        Raises:
+            ImportError: If PyTorch is not installed. Install with
+                ``pip install 'deriva-ml[torch]'`` or
+                ``pip install 'torch>=2.0'``.
+            DerivaMLException: If ``element_type`` is not in the bag,
+                if ``element_type`` is an asset table and ``sample_loader``
+                is ``None``, or if ``missing="error"`` and any element
+                lacks a feature value (message lists up to 20 unlabeled
+                RIDs).
+            FileNotFoundError: On ``__getitem__`` if the asset file is
+                missing on disk (bag corrupted or removed after
+                construction). This is the standard torch convention —
+                the library does not retry or fall back.
+
+        Example:
+            >>> # Simple image classification with a single feature label:
+            >>> import PIL.Image  # doctest: +SKIP
+            >>> from torch.utils.data import DataLoader  # doctest: +SKIP
+            >>> bag = ml.download_dataset_bag(version="1.0.0")  # doctest: +SKIP
+            >>> ds = bag.as_torch_dataset(  # doctest: +SKIP
+            ...     element_type="Image",
+            ...     sample_loader=lambda p, row: PIL.Image.open(p).convert("RGB"),
+            ...     targets=["Glaucoma_Grade"],
+            ...     target_transform=lambda rec: CLASS_TO_IDX[rec.Grade],
+            ... )
+            >>> loader = DataLoader(ds, batch_size=32, shuffle=True)  # doctest: +SKIP
+
+            >>> # Pure-Python assertion — runs for real:
+            >>> from deriva_ml.dataset.torch_adapter import build_torch_dataset
+            >>> callable(build_torch_dataset)
+            True
+        """
+        from deriva_ml.dataset.torch_adapter import build_torch_dataset
+
+        return build_torch_dataset(
+            self,
+            element_type,
+            sample_loader=sample_loader,
+            transform=transform,
+            targets=targets,
+            target_transform=target_transform,
+            missing=missing,
+        )
 
     def restructure_assets(
         self,
