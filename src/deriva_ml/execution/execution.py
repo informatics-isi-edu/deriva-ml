@@ -14,15 +14,15 @@ The Execution class serves as the primary interface for managing the lifecycle o
 or manual process within DerivaML.
 
 Typical usage example:
-    >>> config = ExecutionConfiguration(workflow="analysis_workflow", description="Data analysis")
-    >>> with ml.create_execution(config) as execution:
-    ...     execution.download_dataset_bag(dataset_spec)
+    >>> config = ExecutionConfiguration(workflow="analysis_workflow", description="Data analysis")  # doctest: +SKIP
+    >>> with ml.create_execution(config) as execution:  # doctest: +SKIP
+    ...     execution.download_dataset_bag(dataset_spec)  # doctest: +SKIP
     ...     # Run analysis
-    ...     path = execution.asset_file_path("Model", "model.pt")
+    ...     path = execution.asset_file_path("Model", "model.pt")  # doctest: +SKIP
     ...     # Write model to path...
     ...
     >>> # IMPORTANT: Upload AFTER the context manager exits
-    >>> execution.upload_execution_outputs()
+    >>> execution.upload_execution_outputs()  # doctest: +SKIP
 
 The context manager handles start/stop timing automatically. The upload_execution_outputs()
 call must happen AFTER exiting the context manager to ensure proper status tracking.
@@ -149,18 +149,18 @@ class Execution:
         The context manager handles start/stop timing. Upload must be called AFTER
         the context manager exits::
 
-            >>> config = ExecutionConfiguration(
-            ...     workflow="analysis",
-            ...     description="Process samples",
-            ... )
-            >>> with ml.create_execution(config) as execution:
-            ...     bag = execution.download_dataset_bag(dataset_spec)
+            >>> config = ExecutionConfiguration(  # doctest: +SKIP
+            ...     workflow="analysis",  # doctest: +SKIP
+            ...     description="Process samples",  # doctest: +SKIP
+            ... )  # doctest: +SKIP
+            >>> with ml.create_execution(config) as execution:  # doctest: +SKIP
+            ...     bag = execution.download_dataset_bag(dataset_spec)  # doctest: +SKIP
             ...     # Run analysis using bag.path
-            ...     output_path = execution.asset_file_path("Model", "model.pt")
+            ...     output_path = execution.asset_file_path("Model", "model.pt")  # doctest: +SKIP
             ...     # Write results to output_path
             ...
             >>> # IMPORTANT: Call upload AFTER exiting the context manager
-            >>> execution.upload_execution_outputs()
+            >>> execution.upload_execution_outputs()  # doctest: +SKIP
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -192,20 +192,20 @@ class Execution:
         Example:
             Create an execution with a workflow::
 
-                >>> workflow = ml.lookup_workflow("2-ABC1")
-                >>> config = ExecutionConfiguration(
-                ...     workflow=workflow,
-                ...     description="Process data"
-                ... )
-                >>> execution = Execution(config, ml)
+                >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
+                >>> config = ExecutionConfiguration(  # doctest: +SKIP
+                ...     workflow=workflow,  # doctest: +SKIP
+                ...     description="Process data"  # doctest: +SKIP
+                ... )  # doctest: +SKIP
+                >>> execution = Execution(config, ml)  # doctest: +SKIP
 
             Or pass workflow separately::
 
-                >>> workflow = ml.lookup_workflow_by_url(
-                ...     "https://github.com/org/repo/blob/abc123/analysis.py"
-                ... )
-                >>> config = ExecutionConfiguration(description="Run analysis")
-                >>> execution = Execution(config, ml, workflow=workflow)
+                >>> workflow = ml.lookup_workflow_by_url(  # doctest: +SKIP
+                ...     "https://github.com/org/repo/blob/abc123/analysis.py"  # doctest: +SKIP
+                ... )  # doctest: +SKIP
+                >>> config = ExecutionConfiguration(description="Run analysis")  # doctest: +SKIP
+                >>> execution = Execution(config, ml, workflow=workflow)  # doctest: +SKIP
         """
 
         self.asset_paths: dict[str, list[AssetFilePath]] = {}
@@ -310,13 +310,11 @@ class Execution:
 
         self._initialize_execution(reload)
 
-        # Register the execution in the workspace SQLite registry.
-        # Per spec §2.4, SQLite is authoritative for local state; the
-        # file-tree exists but we do NOT rely on listing the filesystem
-        # to enumerate executions anymore.
-        # Skip when: dry_run (sentinel RID not valid) or reload
-        # (resume_execution path — the row may already exist, and we
-        # shouldn't blow away whatever status/history it already has).
+        # Guard SQLite registry insertion: skip when (a) this is a dry-run
+        # (we never want to persist dry-run state) or (b) we are resuming an
+        # existing execution (reload is not None), in which case the registry
+        # entry was written by the original run and should not be overwritten.
+        # Writing twice would corrupt the start-time and initial-status fields.
         if not self._dry_run and reload is None:
             from datetime import datetime, timezone
 
@@ -593,8 +591,8 @@ class Execution:
                 rid is missing (gc'd or never created).
 
         Example:
-            >>> exe = ml.resume_execution("5-ABC")
-            >>> exe.status
+            >>> exe = ml.resume_execution("5-ABC")  # doctest: +SKIP
+            >>> exe.status  # doctest: +SKIP
             <ExecutionStatus.Stopped>
         """
         from deriva_ml.core.exceptions import DerivaMLStateInconsistency
@@ -626,9 +624,9 @@ class Execution:
                 rid is missing (gc'd or never created).
 
         Example:
-            >>> with exe.execute():
-            ...     raise RuntimeError("boom")
-            >>> exe.error
+            >>> with exe.execute():  # doctest: +SKIP
+            ...     raise RuntimeError("boom")  # doctest: +SKIP
+            >>> exe.error  # doctest: +SKIP
             'RuntimeError: boom'
         """
         from deriva_ml.core.exceptions import DerivaMLStateInconsistency
@@ -662,9 +660,9 @@ class Execution:
                 rid is missing (gc'd or never created, e.g. dry-run).
 
         Example:
-            >>> exe = ml.resume_execution("EXE-A")
-            >>> if exe.start_time is not None:
-            ...     print(f"started at {exe.start_time}")
+            >>> exe = ml.resume_execution("EXE-A")  # doctest: +SKIP
+            >>> if exe.start_time is not None:  # doctest: +SKIP
+            ...     print(f"started at {exe.start_time}")  # doctest: +SKIP
         """
         from datetime import timezone
 
@@ -699,6 +697,11 @@ class Execution:
         Raises:
             DerivaMLStateInconsistency: If the executions row for this
                 rid is missing.
+
+        Example:
+            >>> exe = ml.resume_execution("EXE-A")  # doctest: +SKIP
+            >>> if exe.stop_time is not None:  # doctest: +SKIP
+            ...     print(f"stopped at {exe.stop_time}")  # doctest: +SKIP
         """
         from datetime import timezone
 
@@ -734,14 +737,14 @@ class Execution:
 
         Example:
             >>> # RID lookup (primary access pattern)
-            >>> bag = exe.datasets["1-XYZ"]
+            >>> bag = exe.datasets["1-XYZ"]  # doctest: +SKIP
             >>> # Iterate bags in insertion order
-            >>> for bag in exe.datasets:
-            ...     print(bag.dataset_rid)
+            >>> for bag in exe.datasets:  # doctest: +SKIP
+            ...     print(bag.dataset_rid)  # doctest: +SKIP
             >>> # Introspect which RIDs are present
-            >>> rids = list(exe.datasets.keys())
+            >>> rids = list(exe.datasets.keys())  # doctest: +SKIP
             >>> # Count
-            >>> n = len(exe.datasets)
+            >>> n = len(exe.datasets)  # doctest: +SKIP
 
         Migration note:
             Callers that previously indexed by position
@@ -800,12 +803,12 @@ class Execution:
             or None if no datasets have been downloaded.
 
         Example:
-            >>> with ml.create_execution(config) as exe:
-            ...     if exe.database_catalog:
-            ...         db = exe.database_catalog
+            >>> with ml.create_execution(config) as exe:  # doctest: +SKIP
+            ...     if exe.database_catalog:  # doctest: +SKIP
+            ...         db = exe.database_catalog  # doctest: +SKIP
             ...         # Use same interface as DerivaML
-            ...         dataset = db.lookup_dataset("4HM")
-            ...         term = db.lookup_term("Diagnosis", "cancer")
+            ...         dataset = db.lookup_dataset("4HM")  # doctest: +SKIP
+            ...         term = db.lookup_term("Diagnosis", "cancer")  # doctest: +SKIP
             ...     else:
             ...         # No datasets downloaded, use live catalog
             ...         pass
@@ -826,9 +829,9 @@ class Execution:
             DerivaML: The live catalog instance.
 
         Example:
-            >>> with ml.create_execution(config) as exe:
+            >>> with ml.create_execution(config) as exe:  # doctest: +SKIP
             ...     # Use live catalog for lookups
-            ...     existing_dataset = exe.catalog.lookup_dataset("1-ABC")
+            ...     existing_dataset = exe.catalog.lookup_dataset("1-ABC")  # doctest: +SKIP
         """
         return self._ml_object
 
@@ -868,13 +871,13 @@ class Execution:
             DerivaMLDataError: SQLite staging write failed.
 
         Example:
-            >>> feature = ml.lookup_feature("Image", "Glaucoma")
-            >>> RecordClass = feature.feature_record_class()
-            >>> records = [
-            ...     RecordClass(Image="IMG-1", Glaucoma="Normal"),
-            ...     RecordClass(Image="IMG-2", Glaucoma="Severe"),
-            ... ]
-            >>> with ml.create_execution(cfg) as exe:
+            >>> feature = ml.lookup_feature("Image", "Glaucoma")  # doctest: +SKIP
+            >>> RecordClass = feature.feature_record_class()  # doctest: +SKIP
+            >>> records = [  # doctest: +SKIP
+            ...     RecordClass(Image="IMG-1", Glaucoma="Normal"),  # doctest: +SKIP
+            ...     RecordClass(Image="IMG-2", Glaucoma="Severe"),  # doctest: +SKIP
+            ... ]  # doctest: +SKIP
+            >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
             ...     exe.add_features(records)     # staged, not yet in ermrest
             ...     # ... more work ...
             >>> # on __exit__: staged records flushed to ermrest after assets
@@ -939,9 +942,9 @@ class Execution:
             DerivaMLException: If download or materialization fails.
 
         Example:
-            >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")
-            >>> bag = execution.download_dataset_bag(spec)
-            >>> print(f"Downloaded to {bag.path}")
+            >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")  # doctest: +SKIP
+            >>> bag = execution.download_dataset_bag(spec)  # doctest: +SKIP
+            >>> print(f"Downloaded to {bag.path}")  # doctest: +SKIP
         """
         return self._ml_object.download_dataset_bag(dataset)
 
@@ -970,8 +973,8 @@ class Execution:
                 detects divergence.
 
         Example:
-            >>> exe.update_status(ExecutionStatus.Running)
-            >>> exe.update_status(ExecutionStatus.Failed, error="Network timeout")
+            >>> exe.update_status(ExecutionStatus.Running)  # doctest: +SKIP
+            >>> exe.update_status(ExecutionStatus.Failed, error="Network timeout")  # doctest: +SKIP
         """
         store = self._ml_object.workspace.execution_state_store()
         row = store.get_execution(self.execution_rid)
@@ -1011,12 +1014,12 @@ class Execution:
         the main execution work.
 
         Example:
-            >>> execution.execution_start()
-            >>> try:
+            >>> execution.execution_start()  # doctest: +SKIP
+            >>> try:  # doctest: +SKIP
             ...     # Run analysis
-            ...     execution.execution_stop()
+            ...     execution.execution_stop()  # doctest: +SKIP
             ... except Exception:
-            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")
+            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")  # doctest: +SKIP
         """
         from datetime import timezone
 
@@ -1041,11 +1044,11 @@ class Execution:
         moves status from Stopped → Pending_Upload → Uploaded.
 
         Example:
-            >>> try:
+            >>> try:  # doctest: +SKIP
             ...     # Run analysis
-            ...     execution.execution_stop()
+            ...     execution.execution_stop()  # doctest: +SKIP
             ... except Exception:
-            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")
+            ...     execution.update_status(ExecutionStatus.Failed, error="Analysis error")  # doctest: +SKIP
         """
         from datetime import timezone
 
@@ -1361,9 +1364,9 @@ class Execution:
             DerivaMLException: If upload fails or assets are invalid.
 
         Example:
-            >>> states = execution.upload_assets("output/results")
-            >>> for asset, state in states.items():
-            ...     print(f"{asset}: {state}")
+            >>> states = execution.upload_assets("output/results")  # doctest: +SKIP
+            >>> for asset, state in states.items():  # doctest: +SKIP
+            ...     print(f"{asset}: {state}")  # doctest: +SKIP
         """
 
         def path_to_asset(path: str) -> str:
@@ -1385,15 +1388,15 @@ class Execution:
         timeout: tuple[int, int] | None = None,
         chunk_size: int | None = None,
     ) -> dict[str, list[AssetFilePath]]:
-        """Uploads all outputs from the execution to the catalog.
+        """Upload all registered output assets to Hatrac and record provenance.
 
-        Scans the execution's output directories for assets, features, and other results,
-        then uploads them to the catalog. Can optionally clean up the output folders
-        after successful upload.
+        Reads the asset manifest, uploads each file to the catalog's Hatrac
+        object store, and inserts ``{Asset}_Execution`` association records
+        linking each uploaded asset to this execution with the ``Output`` role.
 
-        IMPORTANT: This method must be called AFTER exiting the context manager, not inside it.
-        The context manager handles execution timing (start/stop), while this method handles
-        the separate upload step.
+        Call this method **after** exiting the execution context manager, not
+        inside it. The context manager sets execution status to ``Stopped``
+        on exit; uploading after that preserves the correct status ordering.
 
         Args:
             clean_folder: Whether to delete output folders after upload. If None (default),
@@ -1403,35 +1406,27 @@ class Execution:
                 Called with UploadProgress objects containing file name, bytes uploaded,
                 total bytes, percent complete, phase, and status message.
             max_retries: Maximum number of retry attempts for failed uploads (default: 3).
-            retry_delay: Initial delay in seconds between retries, doubles with each attempt (default: 5.0).
+            retry_delay: Initial delay in seconds between retries, doubles with each attempt
+                (default: 5.0). Doubles on each successive retry.
             timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (600, 600).
                 Note: urllib3 uses connect_timeout as the socket timeout during request body
                 writes, so it must be large enough for a full chunk upload.
-            chunk_size: Optional chunk size in bytes for hatrac uploads. If provided,
-                large files will be uploaded in chunks of this size.
+            chunk_size: Optional chunk size in bytes for Hatrac uploads. Increase for large
+                files on high-bandwidth connections.
 
         Returns:
-            dict[str, list[AssetFilePath]]: Mapping of asset types to their file paths.
+            Dict mapping asset table name to list of uploaded ``AssetFilePath`` objects, e.g.
+            ``{"Image": [...], "Model": [...]}``. Returns ``{}`` for dry-run executions.
 
         Raises:
-            DerivaMLException: If upload fails or outputs are invalid.
+            DerivaMLUploadError: If any file upload fails. Partial uploads are
+                recorded in the manifest so the upload can be resumed.
+            DerivaMLReadOnlyError: If the catalog connection is read-only.
 
         Example:
-            >>> with ml.create_execution(config) as execution:
-            ...     # Do ML work, register output files with asset_file_path()
-            ...     path = execution.asset_file_path("Model", "model.pt")
-            ...     # Write to path...
-            ...
-            >>> # Upload AFTER the context manager exits
-            >>> def my_callback(progress):
-            ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
-            >>> outputs = execution.upload_execution_outputs(progress_callback=my_callback)
-            >>>
-            >>> # Upload large files with increased timeout (30 min per chunk)
-            >>> outputs = execution.upload_execution_outputs(timeout=(6, 1800))
-            >>>
-            >>> # Override cleanup setting for this execution
-            >>> outputs = execution.upload_execution_outputs(clean_folder=False)  # Keep files
+            >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+            ...     path = exe.asset_file_path("Model", "model.pt")  # doctest: +SKIP
+            >>> uploaded = exe.upload_execution_outputs()  # doctest: +SKIP
         """
         if self._dry_run:
             return {}
@@ -1826,6 +1821,15 @@ class Execution:
 
         Returns:
             Pathlib path to the file in which to place table values.
+
+        Raises:
+            DerivaMLException: If ``table`` is not found in any domain schema.
+
+        Example:
+            >>> path = exe.table_path("Measurement")  # doctest: +SKIP
+            >>> with path.open("w") as f:  # doctest: +SKIP
+            ...     writer = csv.DictWriter(f, fieldnames=["Subject", "Score"])  # doctest: +SKIP
+            ...     writer.writerow({"Subject": "IMG-1", "Score": 0.95})  # doctest: +SKIP
         """
         # Find which domain schema contains this table
         table_schema = None
@@ -1852,7 +1856,7 @@ class Execution:
             This Execution instance, which is itself a context manager.
 
         Example:
-            >>> with exe.execute() as e:
+            >>> with exe.execute() as e:  # doctest: +SKIP
             ...     # e.status is ExecutionStatus.Running
             ...     pass
             >>> # e.status is ExecutionStatus.Stopped (or failed on exception)
@@ -1866,8 +1870,8 @@ class Execution:
             List of Dataset objects that were used as inputs.
 
         Example:
-            >>> for ds in execution.list_input_datasets():
-            ...     print(f"Input: {ds.dataset_rid} - {ds.description}")
+            >>> for ds in execution.list_input_datasets():  # doctest: +SKIP
+            ...     print(f"Input: {ds.dataset_rid} - {ds.description}")  # doctest: +SKIP
         """
         if self._execution_record is not None:
             return self._execution_record.list_input_datasets()
@@ -1890,8 +1894,8 @@ class Execution:
             List of Asset objects associated with this execution.
 
         Example:
-            >>> inputs = execution.list_assets(asset_role="Input")
-            >>> outputs = execution.list_assets(asset_role="Output")
+            >>> inputs = execution.list_assets(asset_role="Input")  # doctest: +SKIP
+            >>> outputs = execution.list_assets(asset_role="Output")  # doctest: +SKIP
         """
         if self._execution_record is not None:
             return self._execution_record.list_assets(asset_role=asset_role)
@@ -1923,17 +1927,34 @@ class Execution:
         version: DatasetVersion | str | None = None,
         description: str = "",
     ) -> Dataset:
-        """Create a new dataset with specified types.
+        """Create a new dataset tracked to this execution.
 
-        Creates a dataset associated with this execution for provenance tracking.
+        Creates a ``Dataset`` catalog record linked to this execution as its
+        provenance. The dataset is immediately usable for adding members and
+        incrementing versions.
 
         Args:
-            dataset_types: One or more dataset type terms from Dataset_Type vocabulary.
-            description: Markdown description of the dataset being created.
+            dataset_types: One or more dataset type vocabulary term names to apply.
+                Must be pre-registered via ``add_dataset_type``. Pass ``None``
+                or an empty list to create an untyped dataset.
+            description: Human-readable description of the dataset. Stored in
+                the catalog ``Dataset.Description`` column.
             version: Dataset version. Defaults to 0.1.0.
 
         Returns:
-            The newly created Dataset.
+            A ``Dataset`` instance bound to the newly created catalog record.
+
+        Raises:
+            DerivaMLInvalidTerm: If any name in ``dataset_types`` is not a
+                registered ``Dataset_Type`` vocabulary term.
+            DerivaMLExecutionError: If the execution context is no longer active.
+
+        Example:
+            >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+            ...     ds = exe.create_dataset(  # doctest: +SKIP
+            ...         dataset_types=["training"],  # doctest: +SKIP
+            ...         description="Training images v1",  # doctest: +SKIP
+            ...     )  # doctest: +SKIP
         """
         return Dataset.create_dataset(
             ml_instance=self._ml_object,
@@ -1969,14 +1990,14 @@ class Execution:
 
         Examples:
             Add a single file type:
-                >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]
-                >>> rids = exe.add_files(files, file_types="text")
+                >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]  # doctest: +SKIP
+                >>> rids = exe.add_files(files, file_types="text")  # doctest: +SKIP
 
             Add multiple file types:
-                >>> rids = exe.add_files(
-                ...     files=[FileSpec(url="image.png", md5="def456", length=2000)],
-                ...     file_types=["image", "png"],
-                ... )
+                >>> rids = exe.add_files(  # doctest: +SKIP
+                ...     files=[FileSpec(url="image.png", md5="def456", length=2000)],  # doctest: +SKIP
+                ...     file_types=["image", "png"],  # doctest: +SKIP
+                ... )  # doctest: +SKIP
         """
         return self._ml_object.add_files(
             files=files,
@@ -2008,9 +2029,9 @@ class Execution:
             DerivaMLException: If the association cannot be created.
 
         Example:
-            >>> parent_exec = ml.create_execution(parent_config)
-            >>> child_exec = ml.create_execution(child_config)
-            >>> parent_exec.add_nested_execution(child_exec, sequence=0)
+            >>> parent_exec = ml.create_execution(parent_config)  # doctest: +SKIP
+            >>> child_exec = ml.create_execution(child_config)  # doctest: +SKIP
+            >>> parent_exec.add_nested_execution(child_exec, sequence=0)  # doctest: +SKIP
         """
         if self._dry_run:
             return
@@ -2149,8 +2170,8 @@ class Execution:
                 in ``ExecutionStatus.Created``.
 
         Example:
-            >>> with exe.execute() as e:
-            ...     e.status
+            >>> with exe.execute() as e:  # doctest: +SKIP
+            ...     e.status  # doctest: +SKIP
             <ExecutionStatus.Running>
         """
         from datetime import datetime, timezone
@@ -2270,9 +2291,9 @@ class Execution:
                 abort (e.g., status='uploaded' — terminal).
 
         Example:
-            >>> exe = ml.resume_execution("EXE-A")
-            >>> exe.abort()
-            >>> exe.status
+            >>> exe = ml.resume_execution("EXE-A")  # doctest: +SKIP
+            >>> exe.abort()  # doctest: +SKIP
+            >>> exe.status  # doctest: +SKIP
             <ExecutionStatus.Aborted>
         """
         if self._dry_run:
@@ -2303,9 +2324,9 @@ class Execution:
             diagnostic messages from any failed rows.
 
         Example:
-            >>> summary = exe.pending_summary()
-            >>> if summary.has_pending:
-            ...     print(summary.render())
+            >>> summary = exe.pending_summary()  # doctest: +SKIP
+            >>> if summary.has_pending:  # doctest: +SKIP
+            ...     print(summary.render())  # doctest: +SKIP
         """
         from deriva_ml.execution.pending_summary import (
             PendingAssetCount,
@@ -2329,13 +2350,22 @@ class Execution:
     ) -> "UploadReport":
         """Upload this execution's pending rows and asset files.
 
-        Sugar for ml.upload_pending(execution_rids=[self.execution_rid], **kwargs).
-        See upload_pending for details.
+        Convenience wrapper around ``ml.upload_pending`` scoped to this
+        execution. See ``upload_pending`` for full details on retry
+        semantics and the returned report structure.
+
+        Args:
+            retry_failed: If True, retry rows and assets that previously
+                failed upload. Default is False.
+
+        Returns:
+            UploadReport summarising rows inserted, assets uploaded, and
+            any per-item failures.
 
         Example:
-            >>> with exe.execute() as e:
-            ...     ... work ...
-            >>> exe.upload_outputs()
+            >>> with exe.execute() as e:  # doctest: +SKIP
+            ...     pass  # do work
+            >>> report = exe.upload_outputs()  # doctest: +SKIP
         """
         return self._ml_object.upload_pending(
             execution_rids=[self.execution_rid],
