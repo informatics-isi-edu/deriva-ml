@@ -101,19 +101,31 @@ large_data = DatasetSpecConfig(
 | `description` | str | "" | Description for logging |
 | `timeout` | list[int] | None | Download timeout as `[connect, read]` in seconds. Default: `[10, 610]` |
 
-### AssetRIDConfig
+### AssetSpecConfig
 
-For configuring input assets (model weights, config files, etc.):
+For configuring input assets (model weights, config files, etc.). `AssetSpecConfig` is
+the hydra-zen interface to `AssetSpec`; use it inside hydra-zen stores, and use
+`AssetSpec` directly elsewhere. Bare RID strings are also accepted where a list of
+assets is expected and are coerced to `AssetSpec` automatically.
 
 ```python
-from deriva_ml.execution import AssetRIDConfig
+from deriva_ml.execution import AssetSpec, AssetSpecConfig
 
-# Define input assets
-model_weights = AssetRIDConfig(rid="WXYZ", description="Pretrained model")
-config_file = AssetRIDConfig(rid="ABCD", description="Hyperparameters")
+# Direct construction (non-hydra code):
+model_weights = AssetSpec(rid="WXYZ")
+config_file = AssetSpec(rid="ABCD", cache=True)
 
 assets = [model_weights, config_file]
+
+# Hydra-zen store definitions use AssetSpecConfig:
+cached_weights = AssetSpecConfig(rid="WXYZ", cache=True)
 ```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `rid`     | str  | required | Resource Identifier of the asset |
+| `asset_role` | str | `"Input"` | Role of the asset (`"Input"` or `"Output"`). `AssetSpec` only. |
+| `cache`   | bool | `False` | If `True`, cache the downloaded asset by MD5 checksum in the DerivaML cache directory so repeated executions reuse it. |
 
 ## Working Directory Configuration
 
@@ -197,16 +209,16 @@ datasets_store(training_v2, name="training_v2")
 
 ```python
 from hydra_zen import store
-from deriva_ml.execution import AssetRIDConfig
+from deriva_ml.execution import AssetSpecConfig
 
 # Define asset collections
 resnet_weights = [
-    AssetRIDConfig(rid="RSN1", description="ResNet50 pretrained"),
+    AssetSpecConfig(rid="RSN1", cache=True),
 ]
 
 vit_weights = [
-    AssetRIDConfig(rid="VIT1", description="ViT-B/16 pretrained"),
-    AssetRIDConfig(rid="VIT2", description="ViT fine-tuned"),
+    AssetSpecConfig(rid="VIT1", cache=True),
+    AssetSpecConfig(rid="VIT2"),
 ]
 
 # Store them
@@ -725,7 +737,7 @@ Examples:
 4. **Use descriptive names** for stored configurations
 5. **Set `working_dir`** for reproducible output locations
 6. **Use `DatasetSpecConfig`** instead of building `DatasetSpec` directly for cleaner configs
-7. **Use `AssetRIDConfig`** for consistent asset specification
+7. **Use `AssetSpecConfig`** in hydra-zen stores (and `AssetSpec` elsewhere) for consistent asset specification
 8. **Define a model protocol** for consistent model interfaces across your project
 9. **Always add descriptions** using `with_description()` for lists or `zen_meta` for builds
 
