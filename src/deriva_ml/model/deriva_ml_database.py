@@ -16,6 +16,7 @@ from deriva.core.ermrest_model import Table
 
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
+from deriva_ml.core.pd_utils import rows_to_dataframe
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.feature import Feature
@@ -216,7 +217,7 @@ class DerivaMLDatabase:
         Returns:
             DataFrame containing all table contents.
         """
-        return pd.DataFrame(list(self.get_table_as_dict(table)))
+        return rows_to_dataframe(self.get_table_as_dict(table))
 
     def get_table_as_dict(self, table: str) -> Generator[dict[str, Any], None, None]:
         """Get table contents as dictionaries.

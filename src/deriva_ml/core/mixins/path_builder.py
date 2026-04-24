@@ -22,6 +22,7 @@ Table = _ermrest_model.Table
 
 import pandas as pd
 
+from deriva_ml.core.pd_utils import rows_to_dataframe
 from deriva_ml.dataset.upload import table_path as _table_path
 
 if TYPE_CHECKING:
@@ -137,7 +138,7 @@ class PathBuilderMixin:
         Example:
             >>> df = ml.get_table_as_dataframe("Subject")  # doctest: +SKIP
         """
-        return pd.DataFrame(list(self.get_table_as_dict(table)))
+        return rows_to_dataframe(self.get_table_as_dict(table))
 
     def get_table_as_dict(self, table: str) -> Iterable[dict[str, Any]]:
         """Get table contents as dictionaries.
