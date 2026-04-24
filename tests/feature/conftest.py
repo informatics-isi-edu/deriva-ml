@@ -175,7 +175,7 @@ def feature_symmetry_fixture(catalog_manager, tmp_path_factory):
 
     # All Image RIDs (feature values exist for all of them from demo catalog seeding)
     all_image_rids = [
-        r["RID"] for r in ml.domain_path().tables[target_table].entities().fetch()
+        r["RID"] for r in ml._domain_path().tables[target_table].entities().fetch()
     ]
     assert all_image_rids, "Demo catalog must have Image rows"
 

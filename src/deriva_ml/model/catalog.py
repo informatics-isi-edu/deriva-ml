@@ -37,8 +37,8 @@ from deriva_ml.core.definitions import (
     SYSTEM_SCHEMAS,
     DerivaAssetColumns,
     TableDefinition,
-    get_domain_schemas,
-    is_system_schema,
+    _get_domain_schemas,
+    _is_system_schema,
 )
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
@@ -186,7 +186,7 @@ class DerivaModel:
             self.domain_schemas = frozenset(domain_schemas)
         else:
             # Auto-detect all domain schemas
-            self.domain_schemas = get_domain_schemas(self.model.schemas.keys(), ml_schema)
+            self.domain_schemas = _get_domain_schemas(self.model.schemas.keys(), ml_schema)
 
         # Determine default schema for table creation
         if default_schema is not None:
@@ -269,7 +269,7 @@ class DerivaModel:
         Returns:
             True if the schema is a system or ML schema.
         """
-        return is_system_schema(schema_name, self.ml_schema)
+        return _is_system_schema(schema_name, self.ml_schema)
 
     def is_domain_schema(self, schema_name: str) -> bool:
         """Check if a schema is a domain schema.

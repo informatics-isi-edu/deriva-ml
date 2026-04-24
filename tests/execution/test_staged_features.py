@@ -166,7 +166,7 @@ def image_feature(populated_catalog):
         feature_name=feature_name,
         metadata=[ColumnDefinition(name="Image_Label", type=BuiltinTypes.text)],
     )
-    image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    image_rids = [r["RID"] for r in ml._domain_path().tables["Image"].entities().fetch()]
     assert len(image_rids) >= 2, "Need at least 2 Image rows"
 
     # Derive schema/table from the feature definition
@@ -206,7 +206,7 @@ def other_feature(populated_catalog):
         feature_name=feature_name,
         metadata=[ColumnDefinition(name="Quality", type=BuiltinTypes.int4)],
     )
-    image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    image_rids = [r["RID"] for r in ml._domain_path().tables["Image"].entities().fetch()]
     assert image_rids, "No Image rows in test catalog"
 
     feat = RecordClass.feature
@@ -342,7 +342,7 @@ def asset_feature(populated_catalog):
         assets=[asset_table],
         update_navbar=False,
     )
-    image_rids = [r["RID"] for r in ml.domain_path().tables["Image"].entities().fetch()]
+    image_rids = [r["RID"] for r in ml._domain_path().tables["Image"].entities().fetch()]
     assert len(image_rids) >= 1, "Need at least 1 Image row"
 
     feat = RecordClass.feature

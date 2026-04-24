@@ -19,6 +19,10 @@ Column Sets:
     DerivaSystemColumns: Standard Deriva system columns present in all tables.
     DerivaAssetColumns: Columns specific to asset tables (files, etc.).
 
+Internal Helpers:
+    _is_system_schema: Check whether a schema name is a system/ML schema.
+    _get_domain_schemas: Filter a schema list to only user-defined domain schemas.
+
 Example:
     >>> from deriva_ml.core.constants import RID, ML_SCHEMA
     >>> def process_entity(rid: RID) -> None:
@@ -47,7 +51,7 @@ DRY_RUN_RID = "0000"
 SYSTEM_SCHEMAS: frozenset[str] = frozenset({"public", "www", "WWW"})
 
 
-def is_system_schema(schema_name: str, ml_schema: str = ML_SCHEMA) -> bool:
+def _is_system_schema(schema_name: str, ml_schema: str = ML_SCHEMA) -> bool:
     """Check if a schema is a system or ML schema (not a domain schema).
 
     System schemas are Deriva infrastructure schemas (public, www, WWW) and the
@@ -62,17 +66,17 @@ def is_system_schema(schema_name: str, ml_schema: str = ML_SCHEMA) -> bool:
         True if the schema is a system or ML schema, False if it's a domain schema.
 
     Example:
-        >>> is_system_schema("public")
+        >>> _is_system_schema("public")
         True
-        >>> is_system_schema("deriva-ml")
+        >>> _is_system_schema("deriva-ml")
         True
-        >>> is_system_schema("my_project")
+        >>> _is_system_schema("my_project")
         False
     """
     return schema_name.lower() in {s.lower() for s in SYSTEM_SCHEMAS} or schema_name == ml_schema
 
 
-def get_domain_schemas(all_schemas: set[str] | list[str], ml_schema: str = ML_SCHEMA) -> frozenset[str]:
+def _get_domain_schemas(all_schemas: set[str] | list[str], ml_schema: str = ML_SCHEMA) -> frozenset[str]:
     """Return all domain schemas from a collection of schema names.
 
     Filters out system schemas (public, www, WWW) and the ML schema to return
@@ -86,10 +90,10 @@ def get_domain_schemas(all_schemas: set[str] | list[str], ml_schema: str = ML_SC
         Frozen set of domain schema names.
 
     Example:
-        >>> get_domain_schemas(["public", "deriva-ml", "my_project", "www"])
+        >>> _get_domain_schemas(["public", "deriva-ml", "my_project", "www"])
         frozenset({'my_project'})
     """
-    return frozenset(s for s in all_schemas if not is_system_schema(s, ml_schema))
+    return frozenset(s for s in all_schemas if not _is_system_schema(s, ml_schema))
 
 # =============================================================================
 # RID Regular Expression Components
