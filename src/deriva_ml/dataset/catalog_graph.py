@@ -1,3 +1,17 @@
+"""FK-graph traversal for dataset export specification generation.
+
+``CatalogGraph`` walks the ERMrest foreign-key graph starting from the Dataset
+table to discover all tables reachable by a given dataset. It provides:
+
+- ``generate_dataset_download_spec``: A full download specification (query
+  processors + bag settings) for the Deriva export engine.
+- ``generate_dataset_download_annotations``: Chaise export annotations for the
+  Dataset table, with optional S3 upload and MINID post-processors.
+- ``estimate_bag_size`` support via ``_aggregate_queries``, which builds
+  datapath objects grouped by target table. Size estimation uses RID-union
+  semantics: RID lists from every FK path reaching a table are unioned before
+  counting, avoiding double-counting rows reachable via multiple paths.
+"""
 from __future__ import annotations
 
 import logging
@@ -25,10 +39,21 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 class CatalogGraph:
-    """Generates export specifications and annotations for dataset downloads.
+    """FK-graph traversal engine for dataset export and size estimation.
 
-    This class creates the configuration needed for Deriva's export processor to
-    download datasets as BDBags, optionally with S3 upload and MINID registration.
+    Walks the ERMrest foreign-key graph starting from the Dataset table to
+    discover all tables reachable from a given dataset. Uses that traversal to
+    produce:
+
+    - **Export specs** (``generate_dataset_download_spec``): Query processor
+      definitions consumed by the Deriva export engine to download a dataset as
+      a BDBag, with optional S3 upload and MINID post-processors.
+    - **Chaise annotations** (``generate_dataset_download_annotations``): Export
+      annotations applied to the Dataset table for browser-based downloads.
+    - **Aggregate queries** (``_aggregate_queries``): Datapath objects for
+      ``estimate_bag_size``. Uses RID-union semantics — RID sets from every FK
+      path reaching a table are unioned before counting, giving exact row counts
+      when the same table is reachable via multiple overlapping or disjoint paths.
 
     Args:
         ml_instance: The DerivaML catalog instance.
