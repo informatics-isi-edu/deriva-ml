@@ -265,6 +265,44 @@ class TestBagCurrentVersion:
         assert bag.current_version is not None
 
 
+class TestBagPath:
+    """Tests for DatasetBag.path property — filesystem path to the bag root."""
+
+    def test_path_returns_pathlib_path(self, catalog_manager: CatalogManager, tmp_path: Path):
+        """bag.path returns a pathlib.Path (not a string)."""
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+        dataset = dataset_desc.dataset
+
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        assert isinstance(bag.path, Path), f"bag.path should be Path, got {type(bag.path)}"
+
+    def test_path_points_to_existing_directory(self, catalog_manager: CatalogManager, tmp_path: Path):
+        """bag.path points at a directory that exists on disk."""
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+        dataset = dataset_desc.dataset
+
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        assert bag.path.exists(), f"bag.path does not exist on disk: {bag.path}"
+        assert bag.path.is_dir(), f"bag.path is not a directory: {bag.path}"
+
+    def test_path_contains_bag_structure(self, catalog_manager: CatalogManager, tmp_path: Path):
+        """bag.path directory contains the expected BDBag structure (data/, manifest)."""
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+        dataset = dataset_desc.dataset
+
+        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
+
+        # BDBag spec guarantees data/ and at least one manifest-* file.
+        assert (bag.path / "data").is_dir(), "bag should have a data/ subdirectory"
+        manifests = list(bag.path.glob("manifest-*.txt"))
+        assert manifests, f"bag should have at least one manifest-*.txt file in {bag.path}"
+
+
 class TestBagDatasetProperties:
     """Tests for basic DatasetBag properties."""
 
