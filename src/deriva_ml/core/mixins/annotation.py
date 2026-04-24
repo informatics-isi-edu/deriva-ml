@@ -59,7 +59,6 @@ class AnnotationMixin:
         set_visible_foreign_keys: Set visible-foreign-keys annotation on a table
         set_table_display: Set table-display annotation on a table
         set_column_display: Set column-display annotation on a column
-        list_foreign_keys: List all foreign keys related to a table
         add_visible_column: Add a column to visible-columns list
         remove_visible_column: Remove a column from visible-columns list
         reorder_visible_columns: Reorder columns in visible-columns list
@@ -79,21 +78,27 @@ class AnnotationMixin:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def get_table_annotations(self, table: str | Table) -> dict[str, Any]:
-        """Get all display-related annotations for a table.
+        """Get all Chaise display-related annotations for a table.
 
-        Returns the current values of display, visible-columns, visible-foreign-keys,
-        and table-display annotations for the specified table.
+        Returns the current values of display, visible-columns,
+        visible-foreign-keys, and table-display annotations. Missing
+        annotations are represented as ``None`` in the returned dict.
 
         Args:
-            table: Table name or Table object.
+            table: Table name (str) or ``Table`` object.
 
         Returns:
-            Dictionary with keys: table, schema, display, visible_columns,
-            visible_foreign_keys, table_display. Missing annotations are None.
+            Dict with keys ``table`` (str), ``schema`` (str),
+            ``display`` (dict | None), ``visible_columns`` (dict | None),
+            ``visible_foreign_keys`` (dict | None), ``table_display``
+            (dict | None).
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
 
         Example:
-            >>> annotations = ml.get_table_annotations("Image")
-            >>> print(annotations["visible_columns"])
+            >>> anns = ml.get_table_annotations("Image")  # doctest: +SKIP
+            >>> anns["visible_columns"]  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
         return {
@@ -107,22 +112,27 @@ class AnnotationMixin:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def get_column_annotations(self, table: str | Table, column_name: str) -> dict[str, Any]:
-        """Get all display-related annotations for a column.
+        """Get all Chaise display-related annotations for a column.
 
-        Returns the current values of display and column-display annotations
-        for the specified column.
+        Returns display and column-display annotations. Missing annotations
+        are ``None``.
 
         Args:
-            table: Table name or Table object containing the column.
+            table: Table name (str) or ``Table`` object.
             column_name: Name of the column.
 
         Returns:
-            Dictionary with keys: table, column, display, column_display.
-            Missing annotations are None.
+            Dict with keys ``table`` (str), ``schema`` (str),
+            ``column`` (str), ``display`` (dict | None),
+            ``column_display`` (dict | None).
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If ``column_name`` is not a column of ``table``.
 
         Example:
-            >>> annotations = ml.get_column_annotations("Image", "Filename")
-            >>> print(annotations["display"])
+            >>> anns = ml.get_column_annotations("Image", "Filename")  # doctest: +SKIP
+            >>> anns["display"]  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
         column = table_obj.columns[column_name]
@@ -140,23 +150,31 @@ class AnnotationMixin:
         annotation: dict[str, Any] | None,
         column_name: str | None = None,
     ) -> str:
-        """Set the display annotation on a table or column.
+        """Set the Chaise display annotation on a table or column.
 
-        The display annotation controls basic naming and display options.
-        Changes are staged locally until apply_annotations() is called.
+        The display annotation controls how the table or column is labeled in
+        the Chaise web UI. The dict shape follows the Chaise display tag
+        specification, e.g. ``{"name": "Human Readable Name"}``.
+        Changes are staged locally until ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            annotation: The display annotation value. Set to None to remove.
-            column_name: If provided, sets annotation on the column; otherwise on the table.
+            table: Table name (str) or ``Table`` object.
+            annotation: Annotation dict, e.g. ``{"name": "My Table"}``.
+                Set to ``None`` to remove the annotation.
+            column_name: If provided, sets the annotation on that column;
+                otherwise sets it on the table.
 
         Returns:
-            Target identifier (table name or table.column).
+            Target identifier — table name (str) when setting on the table,
+            or ``"Table.column"`` when setting on a column.
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
 
         Example:
-            >>> ml.set_display_annotation("Image", {"name": "Images"})
-            >>> ml.set_display_annotation("Image", {"name": "File Name"}, column_name="Filename")
-            >>> ml.apply_annotations()  # Commit changes
+            >>> ml.set_display_annotation("Image", {"name": "Scan Image"})  # doctest: +SKIP
+            >>> ml.set_display_annotation("Image", {"name": "File Name"}, column_name="Filename")  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -183,21 +201,30 @@ class AnnotationMixin:
         """Set the visible-columns annotation on a table.
 
         Controls which columns appear in different UI contexts and their order.
-        Changes are staged locally until apply_annotations() is called.
+        The annotation is a dict mapping context names (e.g. ``"compact"``,
+        ``"detailed"``, ``"entry"``) to lists of column specs. Each spec may
+        be a plain column-name string, a foreign-key reference list
+        ``[schema, constraint_name]``, or a pseudo-column dict per the Chaise
+        visible-columns specification.
+        Changes are staged locally until ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            annotation: The visible-columns annotation value. Set to None to remove.
+            table: Table name (str) or ``Table`` object.
+            annotation: The visible-columns annotation dict. Set to ``None``
+                to remove the annotation.
 
         Returns:
             Table name.
 
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+
         Example:
-            >>> ml.set_visible_columns("Image", {
+            >>> ml.set_visible_columns("Image", {  # doctest: +SKIP
             ...     "compact": ["RID", "Filename", "Subject"],
             ...     "detailed": ["RID", "Filename", "Subject", "Description"]
             ... })
-            >>> ml.apply_annotations()
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -217,24 +244,31 @@ class AnnotationMixin:
         """Set the visible-foreign-keys annotation on a table.
 
         Controls which related tables (via inbound foreign keys) appear in
-        different UI contexts and their order.
-        Changes are staged locally until apply_annotations() is called.
+        different UI contexts and their order. The annotation is a dict
+        mapping context names to lists of FK specs. Each FK spec is a list
+        ``[schema, constraint_name]`` referencing an inbound foreign key, or
+        a pseudo-column dict per the Chaise visible-foreign-keys specification.
+        Changes are staged locally until ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            annotation: The visible-foreign-keys annotation value. Set to None to remove.
+            table: Table name (str) or ``Table`` object.
+            annotation: The visible-foreign-keys annotation dict. Set to
+                ``None`` to remove the annotation.
 
         Returns:
             Table name.
 
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+
         Example:
-            >>> ml.set_visible_foreign_keys("Subject", {
+            >>> ml.set_visible_foreign_keys("Subject", {  # doctest: +SKIP
             ...     "detailed": [
             ...         ["domain", "Image_Subject_fkey"],
             ...         ["domain", "Diagnosis_Subject_fkey"]
             ...     ]
             ... })
-            >>> ml.apply_annotations()
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -253,24 +287,30 @@ class AnnotationMixin:
     ) -> str:
         """Set the table-display annotation on a table.
 
-        Controls table-level display options like row naming patterns,
-        page size, and row ordering.
-        Changes are staged locally until apply_annotations() is called.
+        Controls table-level display options such as row-naming patterns,
+        default page size, and sort order. The annotation dict follows the
+        Chaise table-display tag specification, e.g.
+        ``{"row_name": {"row_markdown_pattern": "{{{Name}}}"}}``.
+        Changes are staged locally until ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            annotation: The table-display annotation value. Set to None to remove.
+            table: Table name (str) or ``Table`` object.
+            annotation: The table-display annotation dict. Set to ``None``
+                to remove the annotation.
 
         Returns:
             Table name.
 
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+
         Example:
-            >>> ml.set_table_display("Subject", {
+            >>> ml.set_table_display("Subject", {  # doctest: +SKIP
             ...     "row_name": {
             ...         "row_markdown_pattern": "{{{Name}}} ({{{Species}}})"
             ...     }
             ... })
-            >>> ml.apply_annotations()
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -291,22 +331,29 @@ class AnnotationMixin:
         """Set the column-display annotation on a column.
 
         Controls how a column's values are rendered, including custom
-        formatting and markdown patterns.
-        Changes are staged locally until apply_annotations() is called.
+        formatting and markdown patterns. The annotation dict follows the
+        Chaise column-display tag specification, keyed by context name
+        (or ``"*"`` for all contexts), e.g.
+        ``{"*": {"pre_format": {"format": "%.2f"}}}``.
+        Changes are staged locally until ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object containing the column.
+            table: Table name (str) or ``Table`` object containing the column.
             column_name: Name of the column.
-            annotation: The column-display annotation value. Set to None to remove.
+            annotation: The column-display annotation dict. Set to ``None``
+                to remove the annotation.
 
         Returns:
-            Column identifier (table.column).
+            Column identifier as ``"Table.column"`` (str).
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
 
         Example:
-            >>> ml.set_column_display("Measurement", "Value", {
+            >>> ml.set_column_display("Measurement", "Value", {  # doctest: +SKIP
             ...     "*": {"pre_format": {"format": "%.2f"}}
             ... })
-            >>> ml.apply_annotations()
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
         column = table_obj.columns[column_name]
@@ -350,8 +397,8 @@ class AnnotationMixin:
             DerivaMLTableTypeError: If ``table`` is not an asset table.
 
         Example:
-            >>> ml.set_strict_preallocated_rid("ScanResult", strict=True)
-            >>> ml.apply_annotations()  # Commit to the catalog.
+            >>> ml.set_strict_preallocated_rid("ScanResult", strict=True)  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         if not self.model.is_asset(table):
             raise DerivaMLTableTypeError("asset table", str(table))
@@ -385,74 +432,19 @@ class AnnotationMixin:
     def apply_annotations(self) -> None:
         """Apply all staged annotation changes to the catalog.
 
-        Commits any annotation changes made via set_display_annotation,
-        set_visible_columns, set_visible_foreign_keys, set_table_display,
-        set_column_display, or set_strict_preallocated_rid to the remote
-        catalog.
+        Pushes any in-memory annotation changes to the live catalog. Must
+        be called after any sequence of ``set_*`` or ``add_*/remove_*``
+        annotation calls to make changes visible in Chaise.
+
+        Raises:
+            DerivaMLException: If the catalog is read-only or the apply
+                call fails.
 
         Example:
-            >>> ml.set_display_annotation("Image", {"name": "Images"})
-            >>> ml.set_visible_columns("Image", {"compact": ["RID", "Filename"]})
-            >>> ml.apply_annotations()  # Commit all changes
+            >>> ml.set_display_annotation("Image", {"name": "Scan"})  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         self.model.apply()
-
-    # =========================================================================
-    # Foreign Key Information
-    # =========================================================================
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def list_foreign_keys(self, table: str | Table) -> dict[str, Any]:
-        """List all foreign keys related to a table.
-
-        Returns both outbound foreign keys (from this table to others) and
-        inbound foreign keys (from other tables to this one). Useful for
-        determining valid constraint names for visible-columns and
-        visible-foreign-keys annotations.
-
-        Args:
-            table: Table name or Table object.
-
-        Returns:
-            Dictionary with:
-            - table: Table name
-            - outbound: List of outbound foreign keys
-            - inbound: List of inbound foreign keys
-            Each foreign key contains constraint_name, from_table, from_columns,
-            to_table, to_columns.
-
-        Example:
-            >>> fkeys = ml.list_foreign_keys("Image")
-            >>> for fk in fkeys["outbound"]:
-            ...     print(f"{fk['constraint_name']} -> {fk['to_table']}")
-        """
-        table_obj = self.model.name_to_table(table)
-
-        outbound = []
-        for fkey in table_obj.foreign_keys:
-            outbound.append({
-                "constraint_name": [fkey.constraint_schema.name, fkey.constraint_name],
-                "from_table": table_obj.name,
-                "from_columns": [col.name for col in fkey.columns],
-                "to_table": fkey.pk_table.name,
-                "to_columns": [col.name for col in fkey.referenced_columns],
-            })
-
-        inbound = []
-        for fkey in table_obj.referenced_by:
-            inbound.append({
-                "constraint_name": [fkey.constraint_schema.name, fkey.constraint_name],
-                "from_table": fkey.table.name,
-                "from_columns": [col.name for col in fkey.columns],
-                "to_table": table_obj.name,
-                "to_columns": [col.name for col in fkey.referenced_columns],
-            })
-
-        return {
-            "table": table_obj.name,
-            "outbound": outbound,
-            "inbound": inbound,
-        }
 
     # =========================================================================
     # Visible Columns Convenience Methods
@@ -469,28 +461,32 @@ class AnnotationMixin:
         """Add a column to the visible-columns list for a specific context.
 
         Convenience method for adding columns without replacing the entire
-        visible-columns annotation. Changes are staged until apply_annotations()
-        is called.
+        visible-columns annotation. Changes are staged until
+        ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            context: The context to modify (e.g., "compact", "detailed", "entry").
+            table: Table name (str) or ``Table`` object.
+            context: The context to modify (e.g., ``"compact"``,
+                ``"detailed"``, ``"entry"``).
             column: Column to add. Can be:
-                - String: column name (e.g., "Filename")
-                - List: foreign key reference (e.g., ["schema", "fkey_name"])
-                - Dict: pseudo-column definition
-            position: Position to insert at (0-indexed). If None, appends to end.
+                - str: column name (e.g., ``"Filename"``)
+                - list: foreign key reference (e.g., ``["schema", "fkey_name"]``)
+                - dict: pseudo-column definition
+            position: Position to insert at (0-indexed). If ``None``, appends
+                to the end.
 
         Returns:
             The updated column list for the context.
 
         Raises:
-            DerivaMLException: If context references another context.
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If ``context`` references another context string
+                rather than a list.
 
         Example:
-            >>> ml.add_visible_column("Image", "compact", "Description")
-            >>> ml.add_visible_column("Image", "detailed", ["domain", "Image_Subject_fkey"], 1)
-            >>> ml.apply_annotations()
+            >>> ml.add_visible_column("Image", "compact", "Description")  # doctest: +SKIP
+            >>> ml.add_visible_column("Image", "detailed", ["domain", "Image_Subject_fkey"], 1)  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -532,27 +528,31 @@ class AnnotationMixin:
         """Remove a column from the visible-columns list for a specific context.
 
         Convenience method for removing columns without replacing the entire
-        visible-columns annotation. Changes are staged until apply_annotations()
-        is called.
+        visible-columns annotation. Changes are staged until
+        ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            context: The context to modify (e.g., "compact", "detailed").
+            table: Table name (str) or ``Table`` object.
+            context: The context to modify (e.g., ``"compact"``,
+                ``"detailed"``).
             column: Column to remove. Can be:
-                - String: column name to find and remove
-                - List: foreign key reference [schema, constraint] to find and remove
-                - Integer: index position to remove (0-indexed)
+                - str: column name to find and remove
+                - list: foreign key reference ``[schema, constraint]`` to
+                  find and remove
+                - int: index position to remove (0-indexed)
 
         Returns:
             The updated column list for the context.
 
         Raises:
-            DerivaMLException: If annotation or context doesn't exist, or column not found.
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If the annotation or context doesn't exist, or
+                the column is not found.
 
         Example:
-            >>> ml.remove_visible_column("Image", "compact", "Description")
-            >>> ml.remove_visible_column("Image", "compact", 0)  # Remove first column
-            >>> ml.apply_annotations()
+            >>> ml.remove_visible_column("Image", "compact", "Description")  # doctest: +SKIP
+            >>> ml.remove_visible_column("Image", "compact", 0)  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -613,26 +613,31 @@ class AnnotationMixin:
     ) -> list[Any]:
         """Reorder columns in the visible-columns list for a specific context.
 
-        Convenience method for reordering columns without manually reconstructing
-        the list. Changes are staged until apply_annotations() is called.
+        Convenience method for reordering columns without manually
+        reconstructing the list. Changes are staged until
+        ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            context: The context to modify (e.g., "compact", "detailed").
+            table: Table name (str) or ``Table`` object.
+            context: The context to modify (e.g., ``"compact"``,
+                ``"detailed"``).
             new_order: The new order specification. Can be:
-                - List of indices: [2, 0, 1, 3] reorders by current positions
-                - List of column specs: ["Name", "RID", ...] specifies exact order
+                - list of int: ``[2, 0, 1, 3]`` reorders by current positions
+                - list of column specs: ``["Name", "RID", ...]`` specifies
+                  the exact new order
 
         Returns:
             The reordered column list.
 
         Raises:
-            DerivaMLException: If annotation or context doesn't exist, or invalid order.
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If the annotation or context doesn't exist, or
+                the index list is invalid.
 
         Example:
-            >>> ml.reorder_visible_columns("Image", "compact", [2, 0, 1, 3, 4])
-            >>> ml.reorder_visible_columns("Image", "compact", ["Filename", "Subject", "RID"])
-            >>> ml.apply_annotations()
+            >>> ml.reorder_visible_columns("Image", "compact", [2, 0, 1, 3, 4])  # doctest: +SKIP
+            >>> ml.reorder_visible_columns("Image", "compact", ["Filename", "Subject", "RID"])  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -688,27 +693,31 @@ class AnnotationMixin:
     ) -> list[Any]:
         """Add a foreign key to the visible-foreign-keys list for a specific context.
 
-        Convenience method for adding related tables without replacing the entire
-        visible-foreign-keys annotation. Changes are staged until apply_annotations()
-        is called.
+        Convenience method for adding related tables without replacing the
+        entire visible-foreign-keys annotation. Changes are staged until
+        ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            context: The context to modify (typically "detailed" or "*").
+            table: Table name (str) or ``Table`` object.
+            context: The context to modify (e.g., ``"detailed"`` or ``"*"``).
             foreign_key: Foreign key to add. Can be:
-                - List: inbound foreign key reference (e.g., ["schema", "Other_Table_fkey"])
-                - Dict: pseudo-column definition for complex relationships
-            position: Position to insert at (0-indexed). If None, appends to end.
+                - list: inbound FK reference (e.g.,
+                  ``["schema", "Other_Table_fkey"]``)
+                - dict: pseudo-column definition for complex relationships
+            position: Position to insert at (0-indexed). If ``None``, appends
+                to the end.
 
         Returns:
             The updated foreign key list for the context.
 
         Raises:
-            DerivaMLException: If context references another context.
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If ``context`` references another context string
+                rather than a list.
 
         Example:
-            >>> ml.add_visible_foreign_key("Subject", "detailed", ["domain", "Image_Subject_fkey"])
-            >>> ml.apply_annotations()
+            >>> ml.add_visible_foreign_key("Subject", "detailed", ["domain", "Image_Subject_fkey"])  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -749,27 +758,29 @@ class AnnotationMixin:
     ) -> list[Any]:
         """Remove a foreign key from the visible-foreign-keys list for a specific context.
 
-        Convenience method for removing related tables without replacing the entire
-        visible-foreign-keys annotation. Changes are staged until apply_annotations()
-        is called.
+        Convenience method for removing related tables without replacing the
+        entire visible-foreign-keys annotation. Changes are staged until
+        ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            context: The context to modify (e.g., "detailed", "*").
+            table: Table name (str) or ``Table`` object.
+            context: The context to modify (e.g., ``"detailed"``, ``"*"``).
             foreign_key: Foreign key to remove. Can be:
-                - List: foreign key reference [schema, constraint] to find and remove
-                - Integer: index position to remove (0-indexed)
+                - list: FK reference ``[schema, constraint]`` to find and remove
+                - int: index position to remove (0-indexed)
 
         Returns:
             The updated foreign key list for the context.
 
         Raises:
-            DerivaMLException: If annotation or context doesn't exist, or foreign key not found.
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If the annotation or context doesn't exist, or
+                the foreign key is not found.
 
         Example:
-            >>> ml.remove_visible_foreign_key("Subject", "detailed", ["domain", "Image_Subject_fkey"])
-            >>> ml.remove_visible_foreign_key("Subject", "detailed", 0)  # Remove first
-            >>> ml.apply_annotations()
+            >>> ml.remove_visible_foreign_key("Subject", "detailed", ["domain", "Image_Subject_fkey"])  # doctest: +SKIP
+            >>> ml.remove_visible_foreign_key("Subject", "detailed", 0)  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -832,25 +843,28 @@ class AnnotationMixin:
         """Reorder foreign keys in the visible-foreign-keys list for a specific context.
 
         Convenience method for reordering related tables without manually
-        reconstructing the list. Changes are staged until apply_annotations()
-        is called.
+        reconstructing the list. Changes are staged until
+        ``apply_annotations()`` is called.
 
         Args:
-            table: Table name or Table object.
-            context: The context to modify (e.g., "detailed", "*").
+            table: Table name (str) or ``Table`` object.
+            context: The context to modify (e.g., ``"detailed"``, ``"*"``).
             new_order: The new order specification. Can be:
-                - List of indices: [2, 0, 1] reorders by current positions
-                - List of foreign key refs: [["schema", "fkey1"], ...] specifies exact order
+                - list of int: ``[2, 0, 1]`` reorders by current positions
+                - list of FK refs: ``[["schema", "fkey1"], ...]`` specifies
+                  the exact new order
 
         Returns:
             The reordered foreign key list.
 
         Raises:
-            DerivaMLException: If annotation or context doesn't exist, or invalid order.
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If the annotation or context doesn't exist, or
+                the index list is invalid.
 
         Example:
-            >>> ml.reorder_visible_foreign_keys("Subject", "detailed", [2, 0, 1])
-            >>> ml.apply_annotations()
+            >>> ml.reorder_visible_foreign_keys("Subject", "detailed", [2, 0, 1])  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
         """
         table_obj = self.model.name_to_table(table)
 
@@ -915,8 +929,8 @@ class AnnotationMixin:
             Dictionary with columns, foreign_keys, special_variables, and helper_examples.
 
         Example:
-            >>> vars = ml.get_handlebars_template_variables("Image")
-            >>> for col in vars["columns"]:
+            >>> vars = ml.get_handlebars_template_variables("Image")  # doctest: +SKIP
+            >>> for col in vars["columns"]:  # doctest: +SKIP
             ...     print(f"{col['name']}: {col['template']}")
         """
         table_obj = self.model.name_to_table(table)
