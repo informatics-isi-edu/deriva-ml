@@ -255,10 +255,13 @@ from deriva_ml.dataset import DatasetSpecConfig
 spec = DatasetSpecConfig(rid="XXXX", version="1.0.0", materialize=True)
 ```
 
-**AssetRIDConfig** (`deriva_ml.execution`): Input asset specification
+**AssetSpec / AssetSpecConfig** (`deriva_ml.execution`): Input asset specification. Use
+`AssetSpec` in regular Python code and `AssetSpecConfig` (the hydra-zen interface) inside
+hydra-zen stores. Bare RID strings are accepted where a list of assets is expected.
 ```python
-from deriva_ml.execution import AssetRIDConfig
-asset = AssetRIDConfig(rid="YYYY", description="Pretrained weights")
+from deriva_ml.execution import AssetSpec, AssetSpecConfig
+asset = AssetSpec(rid="YYYY", cache=True)
+cfg = AssetSpecConfig(rid="YYYY", cache=True)
 ```
 
 **ExecutionConfiguration** (`deriva_ml.execution`): Full execution setup
