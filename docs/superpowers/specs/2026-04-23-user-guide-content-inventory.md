@@ -65,7 +65,11 @@ Used as source-of-truth during chapter drafting.
 ### From docs/cli-reference.md
 - `deriva-ml-check-catalog-schema` — for checking catalog schema validity (administration tool, note as such)
 - `deriva-ml-create-schema` — for setting up a new catalog (administration tool, note as such)
-- NOTE: `get_chaise_url()` is referenced in the spec's Chapter 1 outline but not in any source page; flag for chapter author to add from API source reading.
+
+### Net-new content for Chapter 1 (chapter-author must source from code)
+- `get_chaise_url(table_name)` — jump from Python to Chaise web UI for a table; chapter author must read from `src/deriva_ml/core/mixins/` [NET-NEW from src/]
+- `ml.pathBuilder()` — low-level catalog query API; one short example showing entity lookup; chapter author should draw from source and CLAUDE.md patterns [EXPAND from src/]
+- `find_executions()` — listing executions in the catalog; referenced in spec's Chapter 1 outline but absent from all 14 source pages; chapter author must add from API source reading (`src/deriva_ml/core/mixins/`) [NET-NEW from src/]
 
 ---
 
@@ -131,7 +135,7 @@ Used as source-of-truth during chapter drafting.
 - Code example: automatic download in executions with `DatasetSpec` in `ExecutionConfiguration` (lines 458-477)
 - `materialize=False` flag — metadata only, faster for large datasets
 
-**Working with DatasetBag:**
+**Working with DatasetBag (Chapter 2 primary — download + immediate metadata):**
 - `bag.dataset_rid`, `bag.version` — metadata access (lines 483-487)
 - `bag.get_table_as_dataframe("Subject")` — tables as DataFrames (lines 488-490)
 - `bag.path` — local filesystem path (line 492)
@@ -142,18 +146,8 @@ Used as source-of-truth during chapter drafting.
 - Asset organization after materialization: same-type assets in same directory (lines 519-525)
 - Symlinks as efficient reorganization option (line 525)
 
-**restructure_assets:**
-- Code example: `bag.restructure_assets(asset_table, output_dir, group_by)` (lines 531-543)
-- Output directory structure diagram (`ml_data/Complete/Training/positive/image1.jpg`) (lines 545-561)
-- `group_by` with column names and feature names (lines 563-588)
-- `use_symlinks=True/False` — symlinks vs copies (lines 591-609)
-- `type_selector` lambda for custom type selection (lines 612-622)
-- `Unknown` folder for missing grouping values (lines 624-635)
-- Prediction scenarios: datasets without types treated as Testing (lines 638-668)
-- FK path traversal: `bag.restructure_assets` finds assets via indirect FK paths (lines 671-689)
-- `value_selector` for multiple feature values per asset (lines 691-723)
-- `FeatureValueRecord` attributes: `target_rid`, `feature_name`, `value`, `execution_rid`, `raw_record` (lines 713-722)
-- `enforce_vocabulary=True/False` — vocabulary-based grouping validation (lines 726-744)
+**restructure_assets: covered in Chapter 5 (offline), cross-reference only**
+- `bag.restructure_assets()` full API (group_by, use_symlinks, type_selector, value_selector, enforce_vocabulary, FK traversal, Unknown folder, prediction scenarios) — primary coverage in Chapter 5; Chapter 2 adds a one-line pointer.
 
 **Delete:**
 - `ml.delete_dataset(dataset)` — soft delete (lines 763-770)
@@ -167,7 +161,7 @@ Used as source-of-truth during chapter drafting.
 - `deriva-ml-split-dataset` CLI — full synopsis and arguments table (lines 275-329)
 - All `deriva-ml-split-dataset` examples (lines 310-329)
 - `deriva-ml-split-dataset --dry-run` flag
-- `--val-size` argument for three-way split (NOTE: check if this is present in CLI; source concepts/datasets.md shows it for Python API; CLI reference shows `--test-size`, `--train-size` but not `--val-size` explicitly — flag for chapter author verification)
+- `deriva-ml-split-dataset --val-size` argument for three-way split — Python API supports `val_size`; CLI reference shows `--test-size` and `--train-size` but not `--val-size` explicitly [VERIFY CLI flag from src/deriva_ml/cli/ or `--help` output]
 
 ---
 
@@ -327,6 +321,26 @@ Used as source-of-truth during chapter drafting.
 **Complete example:**
 - Code example: full training run from connect to upload (lines 766-817) — preserve in chapter
 
+### From docs/concepts/file-assets.md (asset creation and upload sections — lines 41-224)
+
+**Creating asset tables (lines 41-85):**
+- `ml.create_asset(asset_name, comment)` — basic asset table creation (lines 44-55)
+- `ml.create_asset(asset_name, column_defs=[...])` — asset table with metadata columns: `ColumnDefinition`, `BuiltinTypes` (lines 57-71)
+- `ml.create_asset(asset_name, referenced_tables=[...])` — asset table with FK to domain tables (lines 73-85)
+
+**Uploading assets in executions (lines 87-190):**
+- `exe.asset_file_path(asset_name, file_name)` — basic registration pattern; returns a path to write to (lines 96-121) [NET-NEW from docs/concepts/file-assets.md]
+- `exe.asset_file_path(..., description=...)` — adding a human-readable description to the asset record (lines 123-135)
+- `exe.asset_file_path(..., metadata={...})` + `path.set_metadata(key, value)` — registering with domain column metadata (lines 141-158)
+- `exe.asset_file_path(..., copy_file=True, rename_file=...)` — staging existing files with optional rename (lines 160-172)
+- `exe.asset_file_path(..., asset_types=[...])` + `path.set_asset_types([...])` — registering with asset type tags (lines 174-190)
+
+**Asset Manifest (lines 192-210):**
+- Internal mechanism: `asset-manifest.json` written with fsync per mutation; per-asset status (`pending` → `uploaded`/`failed`); enables crash-safe resume — document as context for "what happens during upload" (lines 192-210). This is internal detail; expose only the user-visible benefit (crash recovery via `resume_execution`), not the manifest file format itself.
+
+**Listing assets (lines 212-224):**
+- `ml.list_assets("Image")` — iterate all assets in a table with RID, Filename, URL, Length, MD5, Asset_Type (lines 214-224) — belongs in Chapter 4 as a "checking what was uploaded" introspection step
+
 ### From docs/workflows/running-models.md (CLI subsection)
 
 - `deriva-ml-run` basic usage: run defaults, override group, override param, dry run, --info (lines 135-155)
@@ -347,14 +361,26 @@ Used as source-of-truth during chapter drafting.
 ## Destination: Chapter 5 — Working offline (docs/user-guide/offline.md)
 
 ### From docs/concepts/datasets.md (bag sections)
-- `DatasetBag` object: `bag.dataset_rid`, `bag.version`, `bag.path` (lines 483-492)
-- `bag.get_table_as_dataframe("Subject")` — tables as DataFrames (lines 488-490)
-- `dataset.download_dataset_bag()` / `download_dataset_bag(version=..., materialize=True/False)` (lines 388-398)
-- Download timeouts (`timeout` tuple) (lines 403-424)
-- `dataset.estimate_bag_size()` (lines 428-445)
-- Bag FK traversal behavior (boundary-aware export) (lines 447-455)
-- `restructure_assets()` return type: `dict[Path, Path]` — manifest, not a Path (CLAUDE.md)
-- All `restructure_assets()` subsections: grouping options, symlinks vs copies, custom type selection, missing values, prediction scenarios, FK path traversal, multiple feature values, enforce_vocabulary (lines 528-744)
+- `dataset.download_dataset_bag()` / `download_dataset_bag(version=..., materialize=True/False)`: covered in Chapter 2 (downloading datasets), cross-reference only
+- Download timeouts (`timeout` tuple): covered in Chapter 2, cross-reference only
+- `dataset.estimate_bag_size()`: covered in Chapter 2 (pre-download sizing), cross-reference only
+- Bag FK traversal behavior (boundary-aware export): covered in Chapter 2, cross-reference only
+- `DatasetBag` object: `bag.dataset_rid`, `bag.version`, `bag.path` (lines 483-492) — Chapter 5 primary: reading a downloaded bag offline
+- `bag.get_table_as_dataframe("Subject")` — tables as DataFrames (lines 488-490) — Chapter 5 primary
+- API parity with live Dataset: bags provide same interface without catalog connection (CLAUDE.md §"Bags Should Behave Like Catalog Connections")
+- `restructure_assets()` return type: `dict[Path, Path]` — manifest, not a Path (CLAUDE.md) — Chapter 5 primary
+- All `restructure_assets()` subsections (Chapter 5 primary owner):
+  - Code example: `bag.restructure_assets(asset_table, output_dir, group_by)` (lines 531-543)
+  - Output directory structure diagram (`ml_data/Complete/Training/positive/image1.jpg`) (lines 545-561)
+  - `group_by` with column names and feature names (lines 563-588)
+  - `use_symlinks=True/False` — symlinks vs copies (lines 591-609)
+  - `type_selector` lambda for custom type selection (lines 612-622)
+  - `Unknown` folder for missing grouping values (lines 624-635)
+  - Prediction scenarios: datasets without types treated as Testing (lines 638-668)
+  - FK path traversal: `bag.restructure_assets` finds assets via indirect FK paths (lines 671-689)
+  - `value_selector` for multiple feature values per asset (lines 691-723)
+  - `FeatureValueRecord` attributes: `target_rid`, `feature_name`, `value`, `execution_rid`, `raw_record` (lines 713-722)
+  - `enforce_vocabulary=True/False` — vocabulary-based grouping validation (lines 726-744)
 
 ### From docs/concepts/features.md
 - `bag.feature_values(...)` — same API as live catalog (lines 449-460)
@@ -379,14 +405,14 @@ Used as source-of-truth during chapter drafting.
 - Crash recovery with `ml.resume_execution(execution_rid)` + `upload_execution_outputs()` (lines 293-300)
 
 ### From docs/concepts/datasets.md
-- MINID creation: `use_minid=True` when downloading — pointer to this as citable identifier (mentioned implicitly via `download_dataset_bag` parameters; verify in source code / CLAUDE.md)
+- MINID creation: `download_dataset_bag(use_minid=True)` — creates a citable identifier for the bag; chapter author must verify exact parameter name from source code (`src/deriva_ml/dataset/dataset.py`) [VERIFY parameter name from src/]
 - BDBag format context: archives for offline use and sharing (lines 384-398)
 
-### Net-new content (from CLAUDE.md and source code reading)
-- `create_ml_workspace` — partial catalog clones, three-stage approach (schema + data + FKs), orphan handling
-- Orphan strategies: FAIL, DELETE, NULLIFY
-- `localize_assets` — copying Hatrac assets after `asset_mode=REFERENCES` clone
-- `create_ml_schema` CASCADE warning: never call on populated catalog
+### Net-new content (explicit source citations for chapter-author subagents)
+- `create_ml_workspace` — partial catalog clones, three-stage approach (schema without FKs → async data copy → FK application with orphan handling), export annotation parsing for guided table discovery (source: `src/deriva_ml/catalog/clone.py`, conceptual overview in `CLAUDE.md §"Catalog Cloning"`)
+- Orphan strategies: FAIL, DELETE, NULLIFY — for handling incoherent row-level policies during clone (source: `src/deriva_ml/catalog/clone.py`)
+- `localize_assets` — copying Hatrac assets from source to local Hatrac after cloning with `asset_mode=REFERENCES` (source: `src/deriva_ml/catalog/localize.py`)
+- `create_ml_schema` CASCADE warning: `create_ml_schema()` drops the existing `deriva-ml` schema with CASCADE if it already exists — never call on a catalog that has data in `deriva-ml` (source: `src/deriva_ml/schema/create_schema.py`, warning documented in `CLAUDE.md §"create_ml_schema CASCADE Warning"`)
 - Access control: brief note + link to Deriva/Globus docs
 
 ---
@@ -554,16 +580,18 @@ Used as source-of-truth during chapter drafting.
 
 ## Content items requiring chapter-author attention (ambiguous or needs verification)
 
-1. **`get_chaise_url()` method** — referenced in spec's Chapter 1 outline but absent from all 14 source pages. Chapter author must add from API source reading (`src/deriva_ml/core/mixins/`) or API reference.
+Items 1, 2, 5, and 6 are also tracked as `[NET-NEW]`/`[EXPAND]`/`[VERIFY]` placeholder bullets in their respective chapter sections above.
 
-2. **`ml.pathBuilder()` usage** — referenced in spec's Chapter 1 outline and in `file-assets.md` (one example, lines 239-248), but not deeply covered in concepts pages. Chapter author should draw from source code and CLAUDE.md patterns.
+1. **`get_chaise_url()` method** — referenced in spec's Chapter 1 outline but absent from all 14 source pages. Chapter author must add from API source reading (`src/deriva_ml/core/mixins/`) or API reference. See Chapter 1 `[NET-NEW from src/]` placeholder.
 
-3. **MINID creation parameter** — `use_minid=True` in `download_dataset_bag` is referenced in Chapter 6 plan but not explicitly shown in any of the 14 source pages. Chapter author must verify parameter name from source code.
+2. **`ml.pathBuilder()` usage** — referenced in spec's Chapter 1 outline and in `file-assets.md` (one example, lines 239-248), but not deeply covered in concepts pages. Chapter author should draw from source code and CLAUDE.md patterns. See Chapter 1 `[EXPAND from src/]` placeholder.
+
+3. **MINID creation parameter** — `use_minid=True` in `download_dataset_bag` is referenced in Chapter 6 plan but not explicitly shown in any of the 14 source pages. Chapter author must verify parameter name from source code (`src/deriva_ml/dataset/dataset.py`). See Chapter 6 `[VERIFY parameter name from src/]` placeholder.
 
 4. **`bag.lookup_feature()` offline behavior** — implied by API parity principle (CLAUDE.md) but not demonstrated in any source page. Chapter author should verify from source and tests.
 
-5. **`deriva-ml-split-dataset --val-size` flag** — the Python API supports `val_size` but the CLI reference does not show this flag explicitly. Chapter author should verify CLI completeness from source.
+5. **`deriva-ml-split-dataset --val-size` flag** — the Python API supports `val_size` but the CLI reference does not show this flag explicitly. Chapter author should verify CLI completeness from source. See Chapter 2 `[VERIFY CLI flag]` placeholder.
 
-6. **`find_executions()` method** — referenced in spec's Chapter 1 outline ("find_datasets, find_features, find_workflows, find_executions") but not in any source page. Chapter author must add from API source reading.
+6. **`find_executions()` method** — referenced in spec's Chapter 1 outline ("find_datasets, find_features, find_workflows, find_executions") but not in any source page. Chapter author must add from API source reading (`src/deriva_ml/core/mixins/`). See Chapter 1 `[NET-NEW from src/]` placeholder.
 
 7. **`docs/concepts/annotations.md` retirement** — the full page is retired as admin-only content. If a future "Schema Administration" section is added to the docs, this entire page maps cleanly to it. Flag for the nav rewrite step.
