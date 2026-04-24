@@ -13,8 +13,8 @@ The Dataset class serves as a base class in DerivaML, making its methods accessi
 DerivaML class instances.
 
 Typical usage example:
-    >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-    >>> with ml.create_execution(config) as exe:
+    >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+    >>> with ml.create_execution(config) as exe:  # doctest: +SKIP
     ...     dataset = exe.create_dataset(
     ...         dataset_types=['experiment'],
     ...         description='Experimental data'
@@ -126,7 +126,7 @@ class Dataset:
 
     Example:
         >>> # Create a new dataset via an execution
-        >>> with ml.create_execution(config) as exe:
+        >>> with ml.create_execution(config) as exe:  # doctest: +SKIP
         ...     dataset = exe.create_dataset(
         ...         dataset_types=["training_data"],
         ...         description="Image classification training set"
@@ -136,7 +136,7 @@ class Dataset:
         ...     # Increment version after changes
         ...     new_version = dataset.increment_dataset_version(VersionPart.minor, "Added samples")
         >>> # Download for offline use
-        >>> bag = dataset.download_dataset_bag(version=new_version)
+        >>> bag = dataset.download_dataset_bag(version=new_version)  # doctest: +SKIP
     """
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
@@ -160,7 +160,7 @@ class Dataset:
 
         Example:
             >>> # Wrap an existing dataset
-            >>> dataset = Dataset(catalog=ml, dataset_rid="4HM")
+            >>> dataset = Dataset(catalog=ml, dataset_rid="4HM")  # doctest: +SKIP
         """
         self._logger = logging.getLogger("deriva_ml")
         self.dataset_rid = dataset_rid
@@ -226,6 +226,13 @@ class Dataset:
 
         Returns:
             List of dataset type term names from the Dataset_Type vocabulary.
+
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
+        Example:
+            >>> types = dataset.dataset_types  # doctest: +SKIP
+            >>> print(types)  # doctest: +SKIP
         """
         _, atable_path = self._get_dataset_type_association_table()
         ds_types = (
@@ -261,7 +268,7 @@ class Dataset:
             DerivaMLException: If dataset_types are invalid or creation fails.
 
         Example:
-            >>> with ml.create_execution(config) as exe:
+            >>> with ml.create_execution(config) as exe:  # doctest: +SKIP
             ...     dataset = exe.create_dataset(
             ...         dataset_types=["experiment", "raw_data"],
             ...         description="RNA sequencing experiment data",
@@ -326,8 +333,8 @@ class Dataset:
             DerivaMLInvalidTerm: If the term doesn't exist in the Dataset_Type vocabulary.
 
         Example:
-            >>> dataset.add_dataset_type("Training")
-            >>> dataset.add_dataset_type("Validation")
+            >>> dataset.add_dataset_type("Training")  # doctest: +SKIP
+            >>> dataset.add_dataset_type("Validation")  # doctest: +SKIP
         """
         # Convert to VocabularyTerm if needed (validates the term exists)
         if isinstance(dataset_type, VocabularyTerm):
@@ -363,7 +370,7 @@ class Dataset:
             DerivaMLInvalidTerm: If the term doesn't exist in the Dataset_Type vocabulary.
 
         Example:
-            >>> dataset.remove_dataset_type("Training")
+            >>> dataset.remove_dataset_type("Training")  # doctest: +SKIP
         """
         # Convert to VocabularyTerm if needed (validates the term exists)
         if isinstance(dataset_type, VocabularyTerm):
@@ -403,8 +410,8 @@ class Dataset:
             DerivaMLInvalidTerm: If any term doesn't exist in the Dataset_Type vocabulary.
 
         Example:
-            >>> dataset.add_dataset_types(["Training", "Image"])
-            >>> dataset.add_dataset_types("Testing")
+            >>> dataset.add_dataset_types(["Training", "Image"])  # doctest: +SKIP
+            >>> dataset.add_dataset_types("Testing")  # doctest: +SKIP
         """
         # Normalize input to a list
         types_to_add = [dataset_types] if not isinstance(dataset_types, list) else dataset_types
@@ -450,6 +457,13 @@ class Dataset:
 
         Returns:
             Iterable of Table objects representing element types.
+
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
+        Example:
+            >>> for t in dataset.list_dataset_element_types():  # doctest: +SKIP
+            ...     print(t.name)  # doctest: +SKIP
         """
         return self._ml_instance.list_dataset_element_types()
 
@@ -461,6 +475,12 @@ class Dataset:
 
         Returns:
             Iterable of Feature objects.
+
+        Raises:
+            DerivaMLTableNotFound: If ``table`` does not exist in the schema.
+
+        Example:
+            >>> features = list(dataset.find_features("Image"))  # doctest: +SKIP
         """
         return self._ml_instance.find_features(table)
 
@@ -479,8 +499,8 @@ class Dataset:
             ``table``. Returns an empty list if no members of that type exist.
 
         Example:
-            >>> image_rids = dataset.list_members("Image")
-            >>> print(f"{len(image_rids)} images in dataset")
+            >>> image_rids = dataset.list_members("Image")  # doctest: +SKIP
+            >>> print(f"{len(image_rids)} images in dataset")  # doctest: +SKIP
         """
         table_name = table if isinstance(table, str) else table.name
         members = self.list_dataset_members()
@@ -518,8 +538,8 @@ class Dataset:
             DerivaMLException: ``feature_name`` is not a feature on ``table``.
 
         Example:
-            >>> from deriva_ml.feature import FeatureRecord
-            >>> records = list(dataset.feature_values(
+            >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
+            >>> records = list(dataset.feature_values(  # doctest: +SKIP
             ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
             ... ))
         """
@@ -566,8 +586,8 @@ class Dataset:
             DerivaMLException: If the feature doesn't exist on the specified table.
 
         Example:
-            >>> feat = dataset.lookup_feature("Image", "Glaucoma")
-            >>> RecordClass = feat.feature_record_class()
+            >>> feat = dataset.lookup_feature("Image", "Glaucoma")  # doctest: +SKIP
+            >>> RecordClass = feat.feature_record_class()  # doctest: +SKIP
         """
         return self._ml_instance.lookup_feature(table, feature_name)
 
@@ -587,9 +607,12 @@ class Dataset:
         Returns:
             List of execution RIDs. May be empty.
 
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
         Example:
-            >>> rids = dataset.list_workflow_executions("Glaucoma_Training_v2")
-            >>> print(f"{len(rids)} training runs in catalog")
+            >>> rids = dataset.list_workflow_executions("Glaucoma_Training_v2")  # doctest: +SKIP
+            >>> print(f"{len(rids)} training runs in catalog")  # doctest: +SKIP
         """
         return self._ml_instance.list_workflow_executions(workflow)
 
@@ -613,8 +636,8 @@ class Dataset:
             DerivaMLException: If dataset_rid is not a valid dataset RID.
 
         Example:
-            >>> history = ml.dataset_history("1-abc123")
-            >>> for entry in history:
+            >>> history = ml.dataset_history("1-abc123")  # doctest: +SKIP
+            >>> for entry in history:  # doctest: +SKIP
             ...     print(f"Version {entry.dataset_version}: {entry.description}")
         """
 
@@ -649,6 +672,13 @@ class Dataset:
 
         Returns:
             DatasetVersion: The most recent semantic version of this dataset.
+
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
+        Example:
+            >>> ver = dataset.current_version  # doctest: +SKIP
+            >>> print(str(ver))  # doctest: +SKIP
         """
         history = self.dataset_history()
         if not history:
@@ -683,8 +713,8 @@ class Dataset:
             Markdown-formatted string.
 
         Example:
-            >>> ds = ml.lookup_dataset("4HM")
-            >>> print(ds.to_markdown())
+            >>> ds = ml.lookup_dataset("4HM")  # doctest: +SKIP
+            >>> print(ds.to_markdown())  # doctest: +SKIP
         """
         prefix = "  " * indent
         version = str(self.current_version) if self.current_version else "n/a"
@@ -717,8 +747,8 @@ class Dataset:
             indent: Number of indent levels (each level is 2 spaces).
 
         Example:
-            >>> ds = ml.lookup_dataset("4HM")
-            >>> ds.display_markdown(show_children=True)
+            >>> ds = ml.lookup_dataset("4HM")  # doctest: +SKIP
+            >>> ds.display_markdown(show_children=True)  # doctest: +SKIP
         """
         from IPython.display import Markdown, display
 
@@ -803,12 +833,12 @@ class Dataset:
             DerivaMLException: If dataset_rid is invalid or version increment fails.
 
         Example:
-            >>> new_version = ml.increment_dataset_version(
+            >>> new_version = ml.increment_dataset_version(  # doctest: +SKIP
             ...     dataset_rid="1-abc123",
             ...     component="minor",
             ...     description="Added new samples"
             ... )
-            >>> print(f"New version: {new_version}")  # e.g., "1.2.0"
+            >>> print(f"New version: {new_version}")  # e.g., "1.2.0"  # doctest: +SKIP
         """
 
         # Find all the datasets that are reachable from this dataset and determine their new version numbers.
@@ -854,8 +884,8 @@ class Dataset:
             DerivaMLException: If dataset_rid is invalid.
 
         Example:
-            >>> members = ml.list_dataset_members("1-abc123", recurse=True)
-            >>> for type_name, records in members.items():
+            >>> members = ml.list_dataset_members("1-abc123", recurse=True)  # doctest: +SKIP
+            >>> for type_name, records in members.items():  # doctest: +SKIP
             ...     print(f"{type_name}: {len(records)} records")
         """
         # Initialize visited set for recursion guard
@@ -1239,13 +1269,13 @@ class Dataset:
 
         Examples:
             Using a list of RIDs (simpler):
-                >>> dataset.add_dataset_members(
+                >>> dataset.add_dataset_members(  # doctest: +SKIP
                 ...     members=["1-ABC", "1-DEF", "1-GHI"],
                 ...     description="Added sample images"
                 ... )
 
             Using a dict by table name (faster for large datasets):
-                >>> dataset.add_dataset_members(
+                >>> dataset.add_dataset_members(  # doctest: +SKIP
                 ...     members={
                 ...         "Image": ["1-ABC", "1-DEF"],
                 ...         "Subject": ["2-XYZ"]
@@ -1349,7 +1379,7 @@ class Dataset:
             DerivaMLException: If any RID is invalid or not part of this dataset.
 
         Example:
-            >>> dataset.delete_dataset_members(
+            >>> dataset.delete_dataset_members(  # doctest: +SKIP
             ...     members=["1-ABC", "1-DEF"],
             ...     description="Removed corrupted samples"
             ... )
@@ -1426,6 +1456,14 @@ class Dataset:
         Returns:
             list[Dataset]: Parent Dataset objects that contain this dataset. Empty
                 list if this dataset is not nested inside any other dataset.
+
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
+        Example:
+            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
+            >>> parents = ds.list_dataset_parents()  # doctest: +SKIP
+            >>> print([p.dataset_rid for p in parents])  # doctest: +SKIP
         """
         # Initialize visited set for recursion guard
         if _visited is None:
@@ -1475,6 +1513,13 @@ class Dataset:
         Returns:
             list[Dataset]: Child Dataset objects nested in this dataset. Empty list
                 if this dataset has no nested children.
+
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
+        Example:
+            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
+            >>> children = ds.list_dataset_children()  # doctest: +SKIP
         """
         # Initialize visited set for recursion guard
         if _visited is None:
@@ -1537,11 +1582,14 @@ class Dataset:
         Returns:
             List of Execution objects associated with this dataset.
 
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
         Example:
-            >>> dataset = ml.lookup_dataset("1-abc123")
-            >>> executions = dataset.list_executions()
-            >>> for exe in executions:
-            ...     print(f"Execution {exe.execution_rid}: {exe.status}")
+            >>> dataset = ml.lookup_dataset("1-abc123")  # doctest: +SKIP
+            >>> executions = dataset.list_executions()  # doctest: +SKIP
+            >>> for exe in executions:  # doctest: +SKIP
+            ...     print(f"Execution {exe.execution_rid}: {exe.status}")  # doctest: +SKIP
         """
         # Import here to avoid circular dependency
 
@@ -1596,8 +1644,11 @@ class Dataset:
         )
         version_records = list(version_records)
 
-        # Capture the current catalog snapshot timestamp. This allows us to
-        # recreate the exact state of the catalog when this version was created.
+        # ERMrest does not return system-generated columns (including snaptime)
+        # in the INSERT response — it only echoes back the columns you sent.
+        # We need the snaptime to record the version's catalog snapshot for
+        # point-in-time reads. Perform a separate GET immediately after the
+        # INSERT to retrieve the server-assigned snaptime for this row.
         snap = ml_instance.catalog.get("/").json()["snaptime"]
 
         # Update version records with the snapshot timestamp
@@ -1645,25 +1696,28 @@ class Dataset:
                 materialization. Defaults to 8.
 
         Returns:
-            DatasetBag: Object containing:
-                - path: Local filesystem path to downloaded dataset
-                - rid: Dataset's Resource Identifier
-                - minid: Dataset's Minimal Viable Identifier (if use_minid=True)
+            DatasetBag: A ``DatasetBag`` instance wrapping the downloaded bag. Key attributes:
+                ``bag.path`` (``Path``) — local directory containing the bag;
+                ``bag.dataset_rid`` (str) — RID of the dataset;
+                ``bag.current_version`` (``DatasetVersion``) — version downloaded.
 
         Raises:
-            DerivaMLException: If use_minid=True but s3_bucket is not configured on the catalog.
+            DerivaMLDatasetNotFound: If this dataset's RID no longer exists in the
+                catalog (e.g., was deleted after this object was created).
+            DerivaMLException: If use_minid=True but s3_bucket is not configured on
+                the catalog, or if the bag export or materialization fails.
 
         Examples:
             Download without MINID (default):
-                >>> bag = dataset.download_dataset_bag(version="1.0.0")
-                >>> print(f"Downloaded to {bag.path}")
+                >>> bag = dataset.download_dataset_bag(version="1.0.0")  # doctest: +SKIP
+                >>> print(f"Downloaded to {bag.path}")  # doctest: +SKIP
 
             Download with MINID (requires s3_bucket configured):
                 >>> # Catalog must be created with s3_bucket="s3://my-bucket"
-                >>> bag = dataset.download_dataset_bag(version="1.0.0", use_minid=True)
+                >>> bag = dataset.download_dataset_bag(version="1.0.0", use_minid=True)  # doctest: +SKIP
 
             Exclude tables that cause query timeouts:
-                >>> bag = dataset.download_dataset_bag(version="1.0.0", exclude_tables={"Process"})
+                >>> bag = dataset.download_dataset_bag(version="1.0.0", exclude_tables={"Process"})  # doctest: +SKIP
         """
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
