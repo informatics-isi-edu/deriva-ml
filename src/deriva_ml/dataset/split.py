@@ -667,6 +667,31 @@ def split_dataset(
                 rid=result.split.rid,
                 version=result.split.version,
             )
+
+        Train directly from the split partitions (composition with
+        framework adapters)::
+
+            result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
+            train_bag = ml.lookup_dataset(result.training.rid).download_dataset_bag(
+                version=result.training.version
+            )
+            test_bag = ml.lookup_dataset(result.testing.rid).download_dataset_bag(
+                version=result.testing.version
+            )
+            train_ds = train_bag.as_torch_dataset(
+                element_type="Image",
+                sample_loader=PIL.Image.open,
+                targets=["Glaucoma_Grade"],
+            )
+            # Each partition bag feeds independently into PyTorch / TensorFlow;
+            # the split hierarchy IS the train/val/test partitioning.
+
+    See Also:
+        ``DatasetBag.as_torch_dataset``, ``DatasetBag.as_tf_dataset``:
+            Build framework-native datasets from any partition bag; same
+            ``targets`` / ``target_transform`` / ``missing`` vocabulary.
+        ``DatasetBag.restructure_assets``:
+            Class-folder layout for ``ImageFolder``-style consumers.
     """
     # -------------------------------------------------------------------------
     # Validate inputs
