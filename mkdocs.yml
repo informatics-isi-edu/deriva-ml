@@ -48,6 +48,7 @@ nav:
       - Sharing and collaboration: user-guide/sharing.md
       - Reproducibility: user-guide/reproducibility.md
       - Integrating with hydra-zen: user-guide/hydra-zen.md
+      - Migrating from previous versions: user-guide/migration.md
   - Configuration:
       - Overview: configuration/overview.md
       - Configuration Groups: configuration/groups.md

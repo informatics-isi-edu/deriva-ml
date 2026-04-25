@@ -5,6 +5,11 @@ backed by a Deriva catalog. It captures code provenance, input data
 versions, configuration, and outputs so experiments can be reproduced,
 cited, and shared.
 
+!!! info "Upgrading from a previous release?"
+    If you are upgrading an existing project, see
+    [Migrating from previous versions](user-guide/migration.md) for the list
+    of breaking changes and how to update your code.
+
 ## What deriva-ml does
 
 Four core concepts organize the library:
