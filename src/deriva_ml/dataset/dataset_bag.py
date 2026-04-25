@@ -60,12 +60,63 @@ if TYPE_CHECKING:
     import tensorflow as tf
     import torch.utils.data
 
+    from deriva_ml.dataset.target_resolution import FeatureSelector
     from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
 
 try:
     from icecream import ic
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+
+def _default_dir_name_from_target(
+    target: "FeatureRecord | dict[str, FeatureRecord] | str | None",
+    targets: "list[str] | dict[str, Any] | None",
+) -> str:
+    """Derive a directory name string from a resolved target without target_transform.
+
+    For single-target with a single-column FeatureRecord: returns the value of the
+    first non-FK, non-metadata column (the term column).
+
+    For multi-target or multi-column features: raises DerivaMLException explaining
+    that target_transform is required.
+
+    For plain string values (column targets already converted to str): returns as-is.
+
+    Args:
+        target: The resolved target from _resolve_targets or column lookup.
+        targets: The original targets spec (for error messages).
+
+    Returns:
+        Directory name string.
+
+    Raises:
+        DerivaMLException: When the target is a dict (multi-target case) and
+            no target_transform was provided.
+    """
+    from deriva_ml.core.exceptions import DerivaMLException
+
+    if target is None:
+        return "Unknown"
+    if isinstance(target, str):
+        return target
+    if isinstance(target, dict):
+        # Multi-target — can't auto-derive a single string
+        raise DerivaMLException(
+            f"restructure_assets with multi-target {list(targets)!r} requires "
+            f"target_transform to derive a single directory name. "
+            f"Provide target_transform=lambda rec: ... that returns a str."
+        )
+    # Single FeatureRecord — find the first term/value column that has a value
+    record_data = target.model_dump()
+    # Skip well-known metadata columns to find the label column
+    _skip_cols = {"RID", "RCT", "RMT", "RCB", "RMB", "Feature_Name", "Execution"}
+    for col, val in record_data.items():
+        if col in _skip_cols:
+            continue
+        if val is not None and not isinstance(val, (dict, list)):
+            return str(val)
+    return "Unknown"
 
 
 class DatasetBag:
@@ -1783,32 +1834,35 @@ class DatasetBag:
     def restructure_assets(
         self,
         output_dir: Path | str,
+        *,
         asset_table: str | None = None,
-        group_by: list[str] | None = None,
+        targets: "list[str] | dict[str, FeatureSelector] | None" = None,
+        target_transform: Callable[..., str] | None = None,
+        missing: Literal["error", "skip", "unknown"] = "unknown",
         use_symlinks: bool = True,
         type_selector: Callable[[list[str]], str] | None = None,
         type_to_dir_map: dict[str, str] | None = None,
         enforce_vocabulary: bool = True,
-        value_selector: Callable | None = None,
         file_transformer: Callable[[Path, Path], Path] | None = None,
     ) -> dict[Path, Path]:
         """Restructure downloaded assets into a directory hierarchy.
 
         Creates a directory structure organizing assets by dataset types and
-        grouping values. This is useful for ML workflows that expect data
-        organized in conventional folder structures (e.g., PyTorch ImageFolder).
+        target label values. This is useful for ML workflows that expect data
+        organized in conventional folder structures (e.g., PyTorch ImageFolder,
+        ``torchvision.datasets.ImageFolder``).
 
         The dataset should be of type Training or Testing, or have nested
         children of those types. The top-level directory name is determined
-        by the dataset type (e.g., "Training" -> "training").
+        by the dataset type (e.g., ``"Training"`` → ``"training"``).
 
         **Finding assets through foreign key relationships:**
 
         Assets are found by traversing all foreign key paths from the dataset,
         not just direct associations. For example, if a dataset contains Subjects,
-        and the schema has Subject -> Encounter -> Image relationships, this method
+        and the schema has Subject → Encounter → Image relationships, this method
         will find all Images reachable through those paths even though they are
-        not directly in a Dataset_Image association table.
+        not directly in a ``Dataset_Image`` association table.
 
         **Handling datasets without types (prediction scenarios):**
 
@@ -1818,28 +1872,63 @@ class DatasetBag:
 
         **Handling missing labels:**
 
-        If an asset doesn't have a value for a group_by key (e.g., no label
-        assigned), it is placed in an "Unknown" directory. This allows
-        restructure_assets to work with unlabeled data for prediction.
+        If an asset doesn't have a value for a requested target, the ``missing``
+        parameter controls the behavior: ``"unknown"`` (default) places the asset
+        in an ``"Unknown"`` directory; ``"skip"`` omits it from the output tree;
+        ``"error"`` raises at construction time listing all unlabeled RIDs.
 
         Args:
             output_dir: Base directory for restructured assets.
-            asset_table: Name of the asset table (e.g., "Image"). If None,
-                auto-detects from dataset members. Raises DerivaMLException
+            asset_table: Name of the asset table (e.g., ``"Image"``). If None,
+                auto-detects from dataset members. Raises ``DerivaMLException``
                 if multiple asset tables are found and none is specified.
-            group_by: Names to group assets by. Each name creates a subdirectory
-                level after the dataset type path. Names can be:
+            targets: Source of directory-naming label data. Three shapes:
 
-                - **Column names**: Direct columns on the asset table. The column
-                  value becomes the subdirectory name.
-                - **Feature names**: Features defined on the asset table (or tables
-                  it references via foreign keys). The feature's vocabulary term
-                  value becomes the subdirectory name.
-                - **Feature.column**: Specify a particular column from a multi-term
-                  feature (e.g., "Classification.Label" to use the Label column).
+                - ``None`` (default) — no label grouping. Assets are placed
+                  directly under the type-derived directory with no further
+                  subdirectory levels.
+                - ``list[str]`` — feature names (or direct column names) to
+                  group by. Each name adds one subdirectory level. For a
+                  single feature the resolved ``FeatureRecord`` is passed to
+                  ``target_transform`` (if provided). For multiple features
+                  a ``dict[str, FeatureRecord]`` is passed.
+                - ``dict[str, FeatureSelector]`` — feature names mapped to
+                  per-feature selector callables; passed verbatim to
+                  ``bag.feature_values(..., selector=...)``. Built-in
+                  selectors: ``FeatureRecord.select_newest``,
+                  ``select_first``, ``select_majority_vote(column)``.
 
-                Column names are checked first, then feature names. If a value
-                is not found, "unknown" is used as the subdirectory name.
+                Column names (direct columns on the asset table, not features)
+                are resolved via column lookup on the asset record. They are
+                converted to strings for the directory name; ``target_transform``
+                receives the raw column value (as a string).
+
+                Dotted ``"Feature.column"`` syntax from earlier releases is
+                **removed** — pass it as a target string with ``target_transform``
+                instead (see Migration note below).
+
+            target_transform: ``Callable`` consuming the resolved label shape
+                (a ``FeatureRecord`` for single-target, ``dict[str, FeatureRecord]``
+                for multi-target, or the raw column value string for column
+                targets) and **returning a ``str``** used as the subdirectory
+                name. No-op default derives the name from the feature's primary
+                value column (single-target) or raises a clear error explaining
+                that ``target_transform`` is required for multi-target and
+                multi-column feature cases.
+
+                Runtime constraint: the return type is checked at the first
+                call; a non-``str`` return raises ``DerivaMLValidationError``
+                with a message explaining the requirement.
+
+            missing: Behavior when a target value is absent for an asset:
+
+                - ``"unknown"`` (default) — place the asset in an ``Unknown/``
+                  subdirectory. Preserves the pre-alignment behavior.
+                - ``"skip"`` — omit the asset from the output tree entirely.
+                  New behavior; no directory is created for it.
+                - ``"error"`` — raise ``DerivaMLException`` at construction
+                  time listing unlabeled RIDs. Useful for ensuring training
+                  data is complete before committing to disk.
 
             use_symlinks: If True (default), create symlinks to original files.
                 If False, copy files. Symlinks save disk space but require
@@ -1847,25 +1936,16 @@ class DatasetBag:
                 ``file_transformer`` is provided.
             type_selector: Function to select type when dataset has multiple types.
                 Receives list of type names, returns selected type name.
-                Defaults to selecting first type or "unknown" if no types.
+                Defaults to selecting first type or ``"testing"`` if no types.
             type_to_dir_map: Optional mapping from dataset type names to directory
-                names. Defaults to {"Training": "training", "Testing": "testing",
-                "Unknown": "unknown"}. Use this to customize directory names or
+                names. Defaults to ``{"Training": "training", "Testing": "testing",
+                "Unknown": "unknown"}``. Use this to customize directory names or
                 add new type mappings.
             enforce_vocabulary: If True (default), only allow features that have
                 controlled vocabulary term columns, and raise an error if an asset
-                has multiple different values for the same feature without a
-                value_selector. This ensures clean, unambiguous directory structures.
-                If False, allow any feature type and use the first value found
-                when multiple values exist.
-            value_selector: Optional function to select which feature value to use
-                when an asset has multiple values for the same feature. Receives a
-                list of FeatureRecord objects (typed Pydantic models with named
-                attributes for each feature column) and returns the selected one.
-                Use the Execution attribute to distinguish between values from
-                different executions. Built-in selectors on FeatureRecord:
-                ``select_newest``, ``select_first``, ``select_latest``,
-                ``select_majority_vote(column)``.
+                has multiple different values for the same feature. Set to False
+                to allow non-vocabulary features and use the first value when
+                multiple exist.
             file_transformer: Optional callable invoked instead of the default
                 symlink/copy step. Receives ``(src_path, dest_path)`` where
                 ``dest_path`` is the suggested destination (preserving the original
@@ -1884,7 +1964,7 @@ class DatasetBag:
 
                     bag.restructure_assets(
                         output_dir="./ml_data",
-                        group_by=["Diagnosis"],
+                        targets=["Diagnosis"],
                         file_transformer=oct_to_png,
                     )
 
@@ -1896,17 +1976,20 @@ class DatasetBag:
             or extension.
 
         Raises:
-            DerivaMLException: If asset_table cannot be determined (multiple
-                asset tables exist without specification), if no valid dataset
-                types (Training/Testing) are found, or if enforce_vocabulary
-                is True and a feature has multiple values without value_selector.
+            DerivaMLException: If ``asset_table`` cannot be determined, if
+                ``missing="error"`` and any asset lacks a target value, or if
+                ``enforce_vocabulary=True`` and a feature has no vocabulary
+                term columns.
+            DerivaMLValidationError: If ``target_transform`` returns a
+                non-``str`` value, or if a dotted ``"Feature.column"`` string
+                is passed in ``targets``.
 
         Examples:
             Basic restructuring with auto-detected asset table::
 
                 manifest = bag.restructure_assets(
                     output_dir="./ml_data",
-                    group_by=["Diagnosis"],
+                    targets=["Diagnosis"],
                 )
                 # Creates:
                 # ./ml_data/training/Normal/image1.jpg
@@ -1916,41 +1999,29 @@ class DatasetBag:
 
                 manifest = bag.restructure_assets(
                     output_dir="./ml_data",
-                    group_by=["Diagnosis"],
+                    targets=["Diagnosis"],
                     type_to_dir_map={"Training": "train", "Testing": "test"},
                 )
                 # Creates:
                 # ./ml_data/train/Normal/image1.jpg
                 # ./ml_data/test/Abnormal/image2.jpg
 
-            Select specific feature column for multi-term features::
-
-                manifest = bag.restructure_assets(
-                    output_dir="./ml_data",
-                    group_by=["Classification.Label"],  # Use Label column
-                )
-
-            Handle multiple feature values with a built-in selector::
+            Per-feature selector for multi-annotator datasets::
 
                 from deriva_ml.feature import FeatureRecord
 
                 manifest = bag.restructure_assets(
                     output_dir="./ml_data",
-                    group_by=["Diagnosis"],
-                    value_selector=FeatureRecord.select_newest,
+                    targets={"Diagnosis": FeatureRecord.select_newest},
                 )
 
-            Prediction scenario with unlabeled data::
+            Extract a specific column from a multi-column feature::
 
-                # Dataset has no type - treated as Testing
-                # Assets have no labels - placed in Unknown directory
                 manifest = bag.restructure_assets(
-                    output_dir="./prediction_data",
-                    group_by=["Diagnosis"],
+                    output_dir="./ml_data",
+                    targets=["Classification"],
+                    target_transform=lambda rec: rec.Label,
                 )
-                # Creates:
-                # ./prediction_data/testing/Unknown/image1.jpg
-                # ./prediction_data/testing/Unknown/image2.jpg
 
             Convert DICOM files to PNG during restructuring::
 
@@ -1965,17 +2036,37 @@ class DatasetBag:
                 manifest = bag.restructure_assets(
                     output_dir="./ml_data",
                     asset_table="OCT_DICOM",
-                    group_by=["Image_Diagnosis.Diagnosis_Image"],
+                    targets=["Diagnosis"],
                     type_to_dir_map={"Training": "train", "Testing": "test"},
                     file_transformer=oct_to_png,
                 )
-                # manifest maps each source .dcm Path to its output .png Path:
-                # Path(".../bag/OCT/image1.dcm") -> Path("./ml_data/train/Normal/image1.png")
+
+        Note:
+            Migration note (from pre-D2 signature):
+
+            - ``group_by=["Diagnosis"]`` → ``targets=["Diagnosis"]``
+            - ``group_by=["Classification.Label"]`` →
+              ``targets=["Classification"], target_transform=lambda rec: rec.Label``
+            - ``value_selector=FeatureRecord.select_newest`` →
+              ``targets={"Feature": FeatureRecord.select_newest}``
         """
+        from deriva_ml.core.exceptions import DerivaMLValidationError
+        from deriva_ml.dataset.target_resolution import _resolve_targets
+
         logger = logging.getLogger("deriva_ml")
-        group_by = group_by or []
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Validate targets: dotted "Feature.column" syntax is removed
+        if targets is not None:
+            target_names = list(targets) if isinstance(targets, dict) else targets
+            for t in target_names:
+                if "." in t:
+                    raise DerivaMLValidationError(
+                        f"Dotted target syntax {t!r} is no longer supported. "
+                        f"Replace with: targets=[{t.split('.')[0]!r}], "
+                        f"target_transform=lambda rec: rec.{t.split('.')[1]}"
+                    )
 
         # Default type-to-directory mapping
         if type_to_dir_map is None:
@@ -2018,13 +2109,62 @@ class DatasetBag:
         # Step 2: Get asset-to-dataset mapping
         asset_dataset_map = self._get_asset_dataset_mapping(asset_table)
 
-        # Step 3: Load feature values cache for relevant features
-        feature_cache = self._load_feature_values_cache(asset_table, group_by, enforce_vocabulary, value_selector)
+        # Step 3: Separate feature-based targets from column-based targets.
+        # _resolve_targets only works with features (via bag.feature_values).
+        # Direct column names on the asset table must be handled separately.
+        feature_target_map: dict[str, Any] = {}
+        column_targets: list[str] = []
+        feature_targets_spec: "list[str] | dict[str, Any] | None" = None
 
-        # Step 4: Get all assets reachable through FK paths
-        # This uses _get_reachable_assets which traverses FK relationships,
-        # so assets connected via Subject -> Encounter -> Image are found
-        # even if the dataset only contains Subjects directly.
+        if targets is not None:
+            target_names_list = list(targets) if isinstance(targets, dict) else list(targets)
+
+            # Classify each target as feature or column by probing lookup_feature.
+            feature_names: list[str] = []
+            for t_name in target_names_list:
+                try:
+                    self.lookup_feature(asset_table, t_name)
+                    feature_names.append(t_name)
+                except Exception:
+                    # Not a recognized feature on asset_table — treat as column
+                    column_targets.append(t_name)
+
+            # Build the feature-only targets spec to pass to _resolve_targets
+            if feature_names:
+                if isinstance(targets, dict):
+                    feature_targets_spec = {k: v for k, v in targets.items() if k in feature_names}
+                else:
+                    feature_targets_spec = feature_names
+
+            # Call _resolve_targets only for feature-based targets
+            if feature_targets_spec:
+                feature_target_map = _resolve_targets(
+                    self,
+                    asset_table,
+                    targets=feature_targets_spec,
+                    missing=missing,
+                )
+
+        # Step 4: For column-based targets, load a simple {rid: value_str} map
+        # by scanning all asset records once.
+        column_value_map: dict[str, dict[str, str]] = {col: {} for col in column_targets}
+
+        # Step 5: Load feature values cache for enforce_vocabulary enforcement.
+        # _load_feature_values_cache raises at load time if enforce_vocabulary=True
+        # and a feature has no vocabulary term columns. We discard the cache dict
+        # itself (naming comes from feature_target_map); this call is for its
+        # validation side-effect only.
+        group_keys_for_cache = [
+            t for t in (list(targets) if isinstance(targets, list) else
+                        list(targets.keys()) if isinstance(targets, dict) else [])
+            if t not in column_targets
+        ]
+        if group_keys_for_cache:
+            self._load_feature_values_cache(
+                asset_table, group_keys_for_cache, enforce_vocabulary, None
+            )
+
+        # Step 6: Get all assets reachable through FK paths
         assets = self._get_reachable_assets(asset_table)
 
         manifest: dict[Path, Path] = {}
@@ -2033,12 +2173,21 @@ class DatasetBag:
             logger.warning(f"No assets found in table '{asset_table}'")
             return manifest
 
-        # Step 5: Process each asset
+        # Populate column_value_map from the asset records
         for asset in assets:
+            for col in column_targets:
+                val = asset.get(col)
+                if val is not None:
+                    column_value_map[col][asset["RID"]] = str(val)
+
+        # Step 7: Process each asset
+        for asset in assets:
+            asset_rid = asset.get("RID")
+
             # Get source file path
             filename = asset.get("Filename")
             if not filename:
-                logger.warning(f"Asset {asset.get('RID')} has no Filename")
+                logger.warning(f"Asset {asset_rid} has no Filename")
                 continue
 
             source_path = Path(filename)
@@ -2057,14 +2206,100 @@ class DatasetBag:
                 continue
 
             # Get dataset type path
-            dataset_rid = asset_dataset_map.get(asset["RID"])
+            dataset_rid = asset_dataset_map.get(asset_rid)
             type_path = type_path_map.get(dataset_rid, ["unknown"])
 
-            # Resolve grouping values
-            group_path = []
-            for key in group_by:
-                value = self._resolve_grouping_value(asset, key, feature_cache)
-                group_path.append(value)
+            # Resolve grouping path components from targets.
+            # Each target name contributes one directory level. Target names are
+            # processed in order (column targets get column lookup; feature targets
+            # get resolution from feature_target_map built by _resolve_targets above).
+            group_path: list[str] = []
+            skip_asset = False
+
+            if targets is not None:
+                target_names_list = list(targets) if isinstance(targets, dict) else list(targets)
+                # For single-feature target, feature_target_map[rid] is FeatureRecord|None.
+                # For multi-feature target, feature_target_map[rid] is dict[str, FeatureRecord].
+                # We unpack accordingly when passing to target_transform or _default_dir_name_from_target.
+                feature_raw = feature_target_map.get(asset_rid)
+
+                # If the RID is absent from the feature_target_map entirely AND there are
+                # feature targets, apply the missing policy at the group level.
+                if feature_targets_spec and asset_rid not in feature_target_map:
+                    if missing == "skip":
+                        skip_asset = True
+                    elif missing == "error":
+                        raise DerivaMLException(
+                            f"Asset {asset_rid!r} has no value for target feature(s). "
+                            f"Pass missing='skip' to drop unlabeled assets, or "
+                            f"missing='unknown' to place them in Unknown/."
+                        )
+                    else:
+                        # missing="unknown": place in Unknown dir
+                        # Build partial path from column targets, then add Unknown for features
+                        for t_name in target_names_list:
+                            if t_name in column_targets:
+                                col_val = column_value_map.get(t_name, {}).get(asset_rid)
+                                group_path.append(str(col_val) if col_val is not None else "Unknown")
+                            else:
+                                group_path.append("Unknown")
+                elif not skip_asset:
+                    # Normal path: resolve each target in order
+                    for t_name in target_names_list:
+                        if t_name in column_targets:
+                            # Column-based target
+                            col_val = column_value_map.get(t_name, {}).get(asset_rid)
+                            if col_val is not None:
+                                if target_transform is not None:
+                                    dir_name = target_transform(col_val)
+                                    if not isinstance(dir_name, str):
+                                        raise DerivaMLValidationError(
+                                            f"restructure_assets target_transform must return str "
+                                            f"(for directory naming); got {type(dir_name).__name__}"
+                                        )
+                                else:
+                                    dir_name = col_val
+                            else:
+                                # Missing column value
+                                if missing == "error":
+                                    raise DerivaMLException(
+                                        f"Asset {asset_rid!r} has no value for column target {t_name!r}. "
+                                        f"Pass missing='skip' to drop unlabeled assets, or "
+                                        f"missing='unknown' to place them in Unknown/."
+                                    )
+                                elif missing == "skip":
+                                    skip_asset = True
+                                    break
+                                else:
+                                    dir_name = "Unknown"
+                            group_path.append(dir_name)
+                        else:
+                            # Feature-based target: look up from feature_target_map
+                            # feature_raw is either FeatureRecord (single) or
+                            # dict[str, FeatureRecord] (multi-feature). Extract for this feature.
+                            if feature_raw is None:
+                                per_feature_val = None
+                            elif isinstance(feature_raw, dict):
+                                per_feature_val = feature_raw.get(t_name)
+                            else:
+                                # Single feature target — feature_raw IS the FeatureRecord
+                                per_feature_val = feature_raw
+
+                            if per_feature_val is None:
+                                dir_name = "Unknown"
+                            elif target_transform is not None:
+                                dir_name = target_transform(per_feature_val)
+                                if not isinstance(dir_name, str):
+                                    raise DerivaMLValidationError(
+                                        f"restructure_assets target_transform must return str "
+                                        f"(for directory naming); got {type(dir_name).__name__}"
+                                    )
+                            else:
+                                dir_name = _default_dir_name_from_target(per_feature_val, [t_name])
+                            group_path.append(dir_name)
+
+            if skip_asset:
+                continue
 
             # Build target directory
             target_dir = output_dir.joinpath(*type_path, *group_path)
