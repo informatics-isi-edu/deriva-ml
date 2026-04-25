@@ -32,6 +32,7 @@ from deriva.core.typed import (
 )
 
 from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
+from deriva_ml.core.exceptions import DerivaMLConfigurationError
 from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
 logger = logging.getLogger("deriva_ml")
@@ -499,16 +500,47 @@ def create_ml_catalog(
     model = catalog.getCatalogModel()
     model.configure_baseline_catalog()
     policy_file = files("deriva_ml.schema").joinpath("policy.json")
-    subprocess.run(
-        [
-            "deriva-acl-config",
-            "--host",
-            catalog.deriva_server.server,
-            "--config-file",
-            policy_file,
-            catalog.catalog_id,
-        ]
-    )
+
+    # Apply the catalog ACL policy via deriva.config.acl_config. We invoke
+    # it as a module via the *current* interpreter (sys.executable -m ...)
+    # rather than through PATH lookup of the deriva-acl-config console
+    # script, because:
+    #   - PATH may pick up a system-Python install with a stale shebang or
+    #     incompatible Python version (deriva-py requires 3.11+ for
+    #     `typing.Self`); a 3.10 system install crashes on import.
+    #   - Stale venv shebangs (after a venv move/rename) break the
+    #     console-script entry point even when the package is installed.
+    # check=True + capture_output=True turns silent failures into a loud
+    # DerivaMLConfigurationError that surfaces in the catalog-creation
+    # stack trace, instead of leaving a half-configured catalog with no
+    # ACLs (the row-level update bindings never get applied, every later
+    # asset upload that updates Execution_Metadata then fails with HTTP
+    # 403, and the user has no idea why).
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "deriva.config.acl_config",
+                "--host",
+                catalog.deriva_server.server,
+                "--config-file",
+                str(policy_file),
+                catalog.catalog_id,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise DerivaMLConfigurationError(
+            f"Failed to apply ACL policy to catalog {catalog.catalog_id} "
+            f"(deriva.config.acl_config exited {e.returncode}). "
+            f"The catalog was created but is missing its security policy — "
+            f"row-level update/delete bindings will not work. "
+            f"stderr:\n{e.stderr}"
+        ) from e
+
     create_ml_schema(catalog, project_name=project_name)
 
     # Create alias if requested
