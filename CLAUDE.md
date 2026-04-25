@@ -97,7 +97,9 @@ Each mixin lives in `src/deriva_ml/core/mixins/` and handles one concern.
 - Provides same interface as Dataset via `DatasetLike` protocol
 - Works with local BDBag directories (no catalog connection needed)
 - Supports nested dataset traversal and member listing
-- Use `restructure_assets()` to reorganize files by dataset type/features
+- Use `as_torch_dataset()` / `as_tf_dataset()` to feed the bag to PyTorch / TensorFlow / Keras training loops
+- Use `restructure_assets()` to reorganize files by dataset type/features for `ImageFolder`-style third-party trainers
+- All three share the same `targets` / `target_transform` / `missing` vocabulary; lazy import of torch/tensorflow inside each adapter so the base library stays importable without either framework
 
 **ExecutionConfiguration** (`src/deriva_ml/execution/execution_configuration.py`): Pydantic model for execution setup:
 - Dataset specifications with version and materialization options

@@ -188,14 +188,14 @@ exe.upload_execution_outputs()
 
 ## How to restructure assets for ML frameworks
 
-PyTorch `ImageFolder` and Keras `image_dataset_from_directory` both expect a `class/image.jpg` directory tree. `bag.restructure_assets()` builds that tree from a downloaded bag, using dataset types and feature labels as directory names.
+PyTorch `ImageFolder` and Keras `image_dataset_from_directory` both expect a `class/image.jpg` directory tree. `bag.restructure_assets()` builds that tree from a downloaded bag, using dataset types and feature labels as directory names. It shares the same `targets` / `target_transform` / `missing` vocabulary as `as_torch_dataset` / `as_tf_dataset` (below) — same label-selection semantics, different output shape.
 
 ```python
 from deriva_ml.feature import FeatureRecord
 
 manifest = bag.restructure_assets(
     output_dir="./ml_data",
-    group_by=["Glaucoma"],
+    targets=["Glaucoma"],
 )
 # Produces:
 # ./ml_data/training/Normal/retina_001.jpg  -> symlink
@@ -207,7 +207,7 @@ The method returns `dict[Path, Path]` — a manifest mapping each source path to
 
 ```python
 # Correct: manifest is a dict
-manifest = bag.restructure_assets(output_dir="./ml_data", group_by=["Glaucoma"])
+manifest = bag.restructure_assets(output_dir="./ml_data", targets=["Glaucoma"])
 for src, dst in manifest.items():
     print(f"{src.name} -> {dst}")
 
@@ -221,22 +221,23 @@ output_path = bag.restructure_assets(...)  # this is a dict, not a Path
 manifest = bag.restructure_assets(
     output_dir="./ml_data",
     asset_table="Image",           # auto-detected if omitted and only one asset table exists
-    group_by=["Glaucoma"],         # column names or feature names; creates subdirectory levels
+    targets=["Glaucoma"],          # feature names or column names; creates subdirectory levels
+    target_transform=None,         # callable returning str for directory naming; see below
+    missing="unknown",             # "error" | "skip" | "unknown" (default); unknown → `unknown/` dir
     use_symlinks=True,             # True (default) = symlinks; False = copies
     type_selector=None,            # callable(list[str]) -> str for multi-type datasets
     type_to_dir_map={              # map dataset type names to directory names
         "Training": "training",
         "Testing": "testing",
     },
-    enforce_vocabulary=True,       # only allow vocabulary-based features in group_by
-    value_selector=None,           # callable(list[FeatureRecord]) -> FeatureRecord for multi-value features
+    enforce_vocabulary=True,       # only allow vocabulary-based features in targets
     file_transformer=None,         # callable(src: Path, dest: Path) -> Path for format conversion
 )  # returns dict[Path, Path]
 ```
 
 ### Directory structure
 
-Top-level subdirectories come from dataset types (`Training` → `training`, `Testing` → `testing`). Below that, each entry in `group_by` adds one level of subdirectories named after the label value.
+Top-level subdirectories come from dataset types (`Training` → `training`, `Testing` → `testing`). Below that, each entry in `targets` adds one level of subdirectories named after the label value.
 
 ```
 ./ml_data/
@@ -245,60 +246,69 @@ Top-level subdirectories come from dataset types (`Training` → `training`, `Te
       retina_001.jpg
     Severe/
       retina_002.jpg
-    Unknown/            # assets with no label for this feature
+    unknown/            # assets with no label for this feature (missing="unknown" default)
       retina_003.jpg
   testing/
     Normal/
       retina_099.jpg
 ```
 
-### Using features as group_by keys
+### Using features as targets
 
-If a `group_by` name matches a feature defined on the asset table (or a table it references via FK), `restructure_assets` reads the feature values from the bag's SQLite cache and uses the vocabulary term as the directory name.
+If a name in `targets` matches a feature defined on the asset table (or a table it references via FK), `restructure_assets` reads the feature values from the bag's SQLite cache and uses the vocabulary term as the directory name.
 
 ```python
 # Group by a feature defined on Image
 manifest = bag.restructure_assets(
     output_dir="./ml_data",
-    group_by=["Glaucoma"],          # feature name
+    targets=["Glaucoma"],          # feature name
 )
 
-# Group by a specific column of a multi-term feature
+# Group by a specific column of a multi-term feature (use target_transform
+# instead of the old "Feature.column" dotted syntax)
 manifest = bag.restructure_assets(
     output_dir="./ml_data",
-    group_by=["Classification.Label"],  # FeatureName.column_name
+    targets=["Classification"],
+    target_transform=lambda rec: rec.Label,  # return str; becomes dir name
 )
 ```
 
-Column names on the asset record are checked first; feature names are checked if no column matches.
+Column names on the asset record are checked first; feature names are checked if no column matches. Direct column targets do not need `target_transform` — the column value is stringified automatically.
 
 ### Handling multiple feature values
 
-When an asset has more than one value for the same feature (e.g., two annotators disagreed), `restructure_assets` raises `DerivaMLException` by default. Provide a `value_selector` to resolve the conflict:
+When an asset has more than one value for the same feature (e.g., two annotators disagreed), pass a per-feature selector via the dict form of `targets`:
 
 ```python
 manifest = bag.restructure_assets(
     output_dir="./ml_data",
-    group_by=["Glaucoma"],
-    value_selector=FeatureRecord.select_newest,
+    targets={"Glaucoma": FeatureRecord.select_newest},
 )
 ```
 
-`FeatureRecord.select_newest` picks the record with the latest creation timestamp. Other built-in selectors: `FeatureRecord.select_first`. For majority voting, use `FeatureRecord.select_majority_vote("column_name")` — it is a `@classmethod` factory that takes a column name and returns a selector; pass the result as `value_selector=FeatureRecord.select_majority_vote("Glaucoma")`.
+`FeatureRecord.select_newest` picks the record with the latest creation timestamp. Other built-in selectors: `FeatureRecord.select_first`. For majority voting, use `FeatureRecord.select_majority_vote("column_name")` — it is a `@classmethod` factory that takes a column name and returns a selector; pass the result as `targets={"Glaucoma": FeatureRecord.select_majority_vote("Glaucoma")}`.
 
 Set `enforce_vocabulary=False` to silently use the first value when multiple exist without raising.
 
+### Missing-label policy
+
+The `missing` parameter controls what happens when an asset has no value for a requested target:
+
+- **`missing="unknown"`** (default): place the asset under `unknown/`. Matches pre-D2 behavior; existing unparameterized calls produce the same tree as before.
+- **`missing="skip"`**: omit the asset from the output tree entirely. Useful for building fully-labeled datasets when your training code cannot tolerate unlabeled samples.
+- **`missing="error"`**: raise `DerivaMLException` at construction listing the unlabeled RIDs. Matches the adapter default; use it when you want to fail loudly on incomplete labeling before committing files to disk.
+
 ### Prediction scenarios
 
-Datasets with no type defined are treated as `Testing`. Assets with no label for a `group_by` key land in `Unknown/`. This allows `restructure_assets` to run on unlabeled inference data:
+Datasets with no type defined are treated as `Testing`. Assets with no label for a `targets` key land in `unknown/` under the default `missing="unknown"` policy. This allows `restructure_assets` to run on unlabeled inference data:
 
 ```python
 # Unlabeled prediction dataset — no types, no Glaucoma labels
 manifest = bag.restructure_assets(
     output_dir="./predictions",
-    group_by=["Glaucoma"],
+    targets=["Glaucoma"],
 )
-# ./predictions/testing/Unknown/retina_new_001.jpg
+# ./predictions/testing/unknown/retina_new_001.jpg
 ```
 
 ### Using symlinks vs copies

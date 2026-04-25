@@ -129,6 +129,12 @@ class DatasetBag:
     - Navigating dataset relationships (parents, children)
     - Accessing feature values
     - Denormalizing data across related tables
+    - Feeding the bag to training frameworks via ``as_torch_dataset`` /
+      ``as_tf_dataset`` (framework adapters), or rewriting its layout via
+      ``restructure_assets`` for tools that expect a class-folder directory
+      tree. All three share the same ``targets`` / ``target_transform`` /
+      ``missing`` vocabulary; see the User Guide "How to feed a bag to a
+      training framework" section.
 
     A bag may contain multiple datasets when nested datasets are involved. Each
     DatasetBag instance represents a single dataset within the bag - use
@@ -2049,6 +2055,15 @@ class DatasetBag:
               ``targets=["Classification"], target_transform=lambda rec: rec.Label``
             - ``value_selector=FeatureRecord.select_newest`` →
               ``targets={"Feature": FeatureRecord.select_newest}``
+
+        See Also:
+            ``DatasetBag.as_torch_dataset``, ``DatasetBag.as_tf_dataset``:
+                Framework adapters. Use these when you want lazy in-place
+                iteration and do NOT need a class-folder directory tree.
+                They share the same ``targets`` / ``target_transform`` /
+                ``missing`` vocabulary as ``restructure_assets``. The two
+                paths are alternatives, not a pipeline — pick one per the
+                User Guide "How to feed a bag to a training framework".
         """
         from deriva_ml.core.exceptions import DerivaMLValidationError
         from deriva_ml.dataset.target_resolution import _resolve_targets
