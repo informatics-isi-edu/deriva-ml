@@ -328,6 +328,307 @@ manifest = bag.restructure_assets(
 
 When `file_transformer` is provided, `use_symlinks` is ignored.
 
+## How to feed a bag to a training framework
+
+Training a model on a `DatasetBag` used to mean writing ~35 lines of join code per project: resolve asset paths, pull feature values, encode labels, subclass your framework's dataset base class. The adapters below collapse that to a single method call. If your downstream consumer is a standard `torch.utils.data.DataLoader` or a `tf.data.Dataset` pipeline, start here.
+
+### Choosing your path
+
+Three tools cover the space of framework consumers:
+
+- **`bag.as_torch_dataset(...)`** — use when your training loop is PyTorch-native, or when you are running Keras 3 on the PyTorch backend. Returns `torch.utils.data.Dataset`.
+- **`bag.as_tf_dataset(...)`** — use when your training loop is TensorFlow-native, or when you are running Keras 3 on the TensorFlow backend. Returns `tf.data.Dataset`.
+- **`bag.restructure_assets(...)`** — use when your downstream consumer expects the `ImageFolder` class-folder directory layout (e.g., RetFound fine-tuning scripts, `torchvision.datasets.ImageFolder`, `tf.keras.utils.image_dataset_from_directory`). This is the right tool for third-party trainers you cannot modify; it rewrites the bag's flat asset tree into a labeled directory structure on disk.
+
+All three share the same `targets`, `target_transform`, and `missing` vocabulary. A `target_transform` you write for one method transfers directly to the others with only a return-type adjustment.
+
+### Using with PyTorch
+
+`as_torch_dataset` returns a `torch.utils.data.Dataset` that reads asset files lazily. Wrap it in a `DataLoader` exactly as you would any other PyTorch dataset.
+
+```python
+# doctest: +SKIP
+from pathlib import Path
+
+import PIL.Image
+import torchvision.transforms as T
+from torch.utils.data import DataLoader
+
+from deriva_ml.feature import FeatureRecord
+
+CLASS_TO_IDX = {"Normal": 0, "Mild": 1, "Moderate": 2, "Severe": 3}
+
+transform = T.Compose([
+    T.Resize(224),
+    T.CenterCrop(224),
+    T.ToTensor(),
+    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+ds = bag.as_torch_dataset(
+    "Image",
+    sample_loader=lambda p, row: PIL.Image.open(p).convert("RGB"),
+    transform=transform,
+    targets=["Glaucoma"],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+)
+
+loader = DataLoader(ds, batch_size=32, shuffle=True, num_workers=4)
+
+for images, labels in loader:
+    # images: (B, 3, 224, 224) tensor; labels: (B,) int tensor
+    loss = criterion(model(images), labels)
+    loss.backward()
+```
+
+Labels come from features. `targets=["Glaucoma"]` tells the adapter to look up the `Glaucoma` feature for each `Image` row via `bag.feature_values("Image", "Glaucoma")`. The `target_transform` receives a `FeatureRecord` and must return whatever your loss function expects — typically an integer class index. The adapter never builds its own encoder; that decision stays in your code where train/val/test consistency is your responsibility.
+
+`sample_loader` is required for asset tables. It receives the absolute `Path` to the materialized file and the raw row dict; return whatever your model consumes. The error message at construction time names common loaders (`PIL.Image.open`, `nibabel.load`, `h5py.File`) if you forget to supply one.
+
+`missing="error"` (the default) raises at construction if any `Image` row has no `Glaucoma` label, listing up to twenty unlabeled RIDs. Pass `missing="skip"` to drop unlabeled elements silently, or `missing="unknown"` to keep them and receive `None` in your `target_transform`.
+
+**Worked variations**
+
+*Tabular regression — no asset file, no `sample_loader` needed:*
+
+```python
+# doctest: +SKIP
+# MeasurementRecord is a plain row dict when sample_loader is omitted
+# for non-asset element types.
+ds = bag.as_torch_dataset(
+    "Measurement",
+    targets=["IOP_Reading"],
+    target_transform=lambda rec: float(rec.IOP_Value),
+)
+```
+
+Non-asset element types default to returning the raw row dict as the sample; no `sample_loader` is needed. Each `__getitem__` returns `(row_dict, target)`.
+
+*Multi-target — two features become a dict target:*
+
+```python
+# doctest: +SKIP
+ds = bag.as_torch_dataset(
+    "Image",
+    sample_loader=lambda p, row: PIL.Image.open(p).convert("RGB"),
+    transform=transform,
+    targets=["Glaucoma", "Cup_Disc_Ratio"],
+    target_transform=lambda recs: {
+        "grade": CLASS_TO_IDX[recs["Glaucoma"].Glaucoma],
+        "cdr":   float(recs["Cup_Disc_Ratio"].Cup_Disc_Ratio),
+    },
+)
+# __getitem__ returns (image_tensor, {"grade": int, "cdr": float})
+```
+
+When `targets` lists more than one feature name, `target_transform` receives `dict[str, FeatureRecord]` keyed by feature name.
+
+*Multi-annotator resolution — selector-dict form:*
+
+```python
+# doctest: +SKIP
+ds = bag.as_torch_dataset(
+    "Image",
+    sample_loader=lambda p, row: PIL.Image.open(p).convert("RGB"),
+    transform=transform,
+    targets={"Glaucoma": FeatureRecord.select_newest},
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+    missing="skip",
+)
+```
+
+Passing a `dict` for `targets` lets you supply a per-feature selector. `FeatureRecord.select_newest` picks the annotation with the latest creation timestamp when multiple annotators labeled the same image. Other built-in selectors: `FeatureRecord.select_first`, `FeatureRecord.select_majority_vote("column_name")`.
+
+**Notes**
+
+- Install the PyTorch extra: `pip install 'deriva-ml[torch]'`. Without it, calling `as_torch_dataset` raises `ImportError` with an install hint; every other `DatasetBag` method continues to work.
+- `Dataset.as_torch_dataset` (the live-catalog variant) is not yet available. The bag-only adapter covers the primary training workflow: download the bag offline, then train. Live-catalog streaming is a named follow-up.
+
+### Using with TensorFlow
+
+`as_tf_dataset` returns a `tf.data.Dataset` that wraps the bag as a generator. Chain `.batch()`, `.prefetch()`, and `.cache()` on the result exactly as you would any other `tf.data.Dataset`.
+
+```python
+# doctest: +SKIP
+import PIL.Image
+import numpy as np
+import tensorflow as tf
+import torchvision.transforms.functional as TF
+
+CLASS_TO_IDX = {"Normal": 0, "Mild": 1, "Moderate": 2, "Severe": 3}
+
+def load_image(p, row):
+    img = PIL.Image.open(p).convert("RGB").resize((224, 224))
+    return np.array(img, dtype=np.float32) / 255.0
+
+ds = bag.as_tf_dataset(
+    "Image",
+    sample_loader=load_image,
+    targets=["Glaucoma"],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+)
+
+# Standard tf.data pipeline
+ds = ds.batch(32).prefetch(tf.data.AUTOTUNE)
+
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy")
+model.fit(ds, epochs=10)
+```
+
+**`output_signature` — when to let it infer, when to set it explicitly**
+
+`as_tf_dataset` builds its generator via `tf.data.Dataset.from_generator`, which requires a type/shape signature. By default (`output_signature=None`) the adapter eagerly reads the first `(sample, target)` pair at construction time, derives a `tf.TensorSpec` from it via `tf.type_spec_from_value`, and re-wraps the generator so that first sample is not skipped during iteration. This adds one extra sample load at startup — acceptable for research workflows.
+
+Pass `output_signature` explicitly in two situations:
+
+1. **Production pipelines** where you want deterministic startup with no eager reads:
+   ```python
+   # doctest: +SKIP
+   import tensorflow as tf
+   sig = (
+       tf.TensorSpec(shape=(224, 224, 3), dtype=tf.float32),
+       tf.TensorSpec(shape=(),            dtype=tf.int32),
+   )
+   ds = bag.as_tf_dataset("Image", ..., output_signature=sig)
+   ```
+
+2. **Variable-shape inputs** (ragged tensors, variable-length sequences) where the first sample's shape is not representative:
+   ```python
+   # doctest: +SKIP
+   sig = (
+       tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32),  # variable H x W
+       tf.TensorSpec(shape=(),              dtype=tf.int32),
+   )
+   ds = bag.as_tf_dataset("Image", ..., output_signature=sig)
+   ```
+
+**Worked variations**
+
+*Tabular regression:*
+
+```python
+# doctest: +SKIP
+ds = bag.as_tf_dataset(
+    "Measurement",
+    targets=["IOP_Reading"],
+    target_transform=lambda rec: float(rec.IOP_Value),
+).batch(64).prefetch(tf.data.AUTOTUNE)
+```
+
+*Multi-target:*
+
+```python
+# doctest: +SKIP
+ds = bag.as_tf_dataset(
+    "Image",
+    sample_loader=load_image,
+    targets=["Glaucoma", "Cup_Disc_Ratio"],
+    target_transform=lambda recs: (
+        CLASS_TO_IDX[recs["Glaucoma"].Glaucoma],
+        float(recs["Cup_Disc_Ratio"].Cup_Disc_Ratio),
+    ),
+)
+```
+
+*Multi-annotator resolution:*
+
+```python
+# doctest: +SKIP
+from deriva_ml.feature import FeatureRecord
+
+ds = bag.as_tf_dataset(
+    "Image",
+    sample_loader=load_image,
+    targets={"Glaucoma": FeatureRecord.select_newest},
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+    missing="skip",
+)
+```
+
+**Notes**
+
+- Install the TensorFlow extra: `pip install 'deriva-ml[tf]'`. Without it, calling `as_tf_dataset` raises `ImportError`; other methods continue to work.
+- On macOS (Apple Silicon) use `pip install tensorflow-macos` rather than `tensorflow`. On CUDA Linux use `pip install tensorflow[and-cuda]`. Either wheel satisfies the import guard inside `as_tf_dataset`; install deriva-ml itself without the `[tf]` extra when using a platform-specific wheel.
+- `Dataset.as_tf_dataset` (live-catalog variant) is not yet available. Same bag-only scope as the PyTorch adapter.
+
+### Using with Keras
+
+Keras 3 consumes data from either backend's native format. There is no separate `as_keras_dataset` method — Keras is a consumer of the adapters above, not a third parallel adapter. Pick the method that matches the Keras backend you have configured.
+
+**PyTorch backend** — wrap `as_torch_dataset` in a `DataLoader` and pass it to `model.fit`:
+
+```python
+# doctest: +SKIP
+import os
+os.environ["KERAS_BACKEND"] = "torch"
+
+import keras
+from torch.utils.data import DataLoader
+
+ds = bag.as_torch_dataset(
+    "Image",
+    sample_loader=lambda p, row: PIL.Image.open(p).convert("RGB"),
+    transform=transform,
+    targets=["Glaucoma"],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+)
+loader = DataLoader(ds, batch_size=32, shuffle=True, num_workers=4)
+
+model = keras.applications.ResNet50(weights=None, classes=4)
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy")
+model.fit(loader, epochs=10)
+```
+
+Keras on the PyTorch backend natively accepts `torch.utils.data.DataLoader` objects in `model.fit`.
+
+**TensorFlow backend** — pass `as_tf_dataset` directly to `model.fit`:
+
+```python
+# doctest: +SKIP
+import os
+os.environ["KERAS_BACKEND"] = "tensorflow"
+
+import keras
+import tensorflow as tf
+
+ds = bag.as_tf_dataset(
+    "Image",
+    sample_loader=load_image,
+    targets=["Glaucoma"],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+).batch(32).prefetch(tf.data.AUTOTUNE)
+
+model = keras.applications.ResNet50(weights=None, classes=4)
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy")
+model.fit(ds, epochs=10)
+```
+
+**JAX backend** — either adapter works. Keras 3 on JAX accepts any Python iterable of `(x, y)` tuples. Pass a `DataLoader` wrapping `as_torch_dataset`, or chain `as_tf_dataset` through a generator, or materialize to NumPy arrays directly. The JAX backend does not add requirements beyond what Keras itself needs.
+
+**Note:** Set `KERAS_BACKEND` before importing Keras — the backend is selected at import time and cannot change in the same process.
+
+### Using with ImageFolder / third-party tools
+
+When your downstream consumer expects a class-folder directory layout — `torchvision.datasets.ImageFolder`, `tf.keras.utils.image_dataset_from_directory`, RetFound fine-tuning scripts, or any other tool that walks a `class/image.jpg` tree — use `bag.restructure_assets()` instead of the adapters above. It writes (or symlinks) the bag's flat asset tree into the labeled directory structure those tools require.
+
+The `targets`, `target_transform`, and `missing` parameters on `restructure_assets` carry identical names and semantics to the ones on `as_torch_dataset` and `as_tf_dataset`. A `target_transform` you write for one method transfers directly to the other with only the return-type constraint: `restructure_assets` requires a string (used as the directory name), while the adapters accept any type.
+
+**These two tools are alternatives, not a pipeline.** A common question is whether to call `restructure_assets` first and then feed the result to `as_torch_dataset`. The answer is no, and there is nothing to gain from doing so. `restructure_assets` writes a new directory tree by symlinking from `bag.path/data/assets/...`; `as_torch_dataset` reads directly from `bag.path/data/assets/...` regardless of what `restructure_assets` produced. Restructuring first and then calling the adapter changes nothing: the adapter still reads the unchanged bag, and the restructured tree sits unused.
+
+Pick one tool based on your downstream consumer:
+
+- Your consumer expects `ImageFolder` layout → use `restructure_assets`.
+- Your consumer is a `DataLoader` or `tf.data` pipeline you control → use `as_torch_dataset` or `as_tf_dataset`.
+- You need both (e.g., a baseline comparison against `ImageFolder` and a custom adapter for your main model) → run each independently on the same bag. They do not conflict.
+
+See the "How to restructure assets for ML frameworks" section above for the full `restructure_assets` signature and directory-layout examples.
+
+## See also (framework adapters)
+
+- [Defining and using features](features.md) — Chapter 3: `feature_values()` selectors, `FeatureRecord` record shapes, built-in selectors (`select_newest`, `select_majority_vote`).
+- `DatasetBag.feature_values` docstring — selector callable shape, multi-annotator patterns, and the `missing=` policy interaction.
+- `split_dataset` docstring — stratified train/val/test split that composes upstream of all three framework paths: split the catalog dataset, download each partition as its own bag, then call the appropriate adapter on each bag independently.
+
 ## Common pitfalls
 
 !!! warning "restructure_assets returns a dict, not a Path"
