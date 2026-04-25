@@ -2170,14 +2170,18 @@ class DatasetBag:
         # itself (naming comes from feature_target_map); this call is for its
         # validation side-effect only.
         group_keys_for_cache = [
-            t for t in (list(targets) if isinstance(targets, list) else
-                        list(targets.keys()) if isinstance(targets, dict) else [])
+            t
+            for t in (
+                list(targets)
+                if isinstance(targets, list)
+                else list(targets.keys())
+                if isinstance(targets, dict)
+                else []
+            )
             if t not in column_targets
         ]
         if group_keys_for_cache:
-            self._load_feature_values_cache(
-                asset_table, group_keys_for_cache, enforce_vocabulary, None
-            )
+            self._load_feature_values_cache(asset_table, group_keys_for_cache, enforce_vocabulary, None)
 
         # Step 6: Get all assets reachable through FK paths
         assets = self._get_reachable_assets(asset_table)

@@ -13,7 +13,6 @@ implementation. See design spec §8.5.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from deriva_ml.core.exceptions import DerivaMLException
@@ -83,13 +82,9 @@ def _resolve_targets(
     # The target column is the element_type's name (e.g., "Image" on an
     # Image-target FeatureRecord). FeatureRecord instances carry that
     # attribute; we pull it dynamically.
-    per_feature_per_rid: dict[str, dict[str, "FeatureRecord"]] = {
-        name: {} for name, _ in feature_specs
-    }
+    per_feature_per_rid: dict[str, dict[str, "FeatureRecord"]] = {name: {} for name, _ in feature_specs}
     for feature_name, selector in feature_specs:
-        for record in bag.feature_values(
-            element_type, feature_name, selector=selector
-        ):
+        for record in bag.feature_values(element_type, feature_name, selector=selector):
             rid = getattr(record, element_type)
             per_feature_per_rid[feature_name][rid] = record
 
@@ -99,9 +94,7 @@ def _resolve_targets(
     # Then union in any RIDs seen from feature_values in case list_dataset_members
     # is unavailable or returns a subset.
     members_by_type = bag.list_dataset_members(recurse=True)
-    all_rids: set[str] = {
-        m["RID"] for m in members_by_type.get(element_type, [])
-    }
+    all_rids: set[str] = {m["RID"] for m in members_by_type.get(element_type, [])}
     for rid_map in per_feature_per_rid.values():
         all_rids.update(rid_map.keys())
 
@@ -112,10 +105,7 @@ def _resolve_targets(
     single_feature_name = feature_specs[0][0] if is_single_target else None
 
     for rid in sorted(all_rids):
-        feature_records = {
-            name: per_feature_per_rid[name].get(rid)
-            for name, _ in feature_specs
-        }
+        feature_records = {name: per_feature_per_rid[name].get(rid) for name, _ in feature_specs}
         any_missing = any(v is None for v in feature_records.values())
 
         if any_missing:
@@ -135,11 +125,7 @@ def _resolve_targets(
 
     if missing == "error" and unlabeled:
         preview = unlabeled[:_MISSING_ERROR_RID_LIST_LIMIT]
-        suffix = (
-            f" (and {len(unlabeled) - len(preview)} more)"
-            if len(unlabeled) > len(preview)
-            else ""
-        )
+        suffix = f" (and {len(unlabeled) - len(preview)} more)" if len(unlabeled) > len(preview) else ""
         raise DerivaMLException(
             f"{len(unlabeled)} element(s) of type {element_type!r} have no "
             f"value for one or more targets in {targets!r}. "
