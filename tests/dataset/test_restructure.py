@@ -25,15 +25,14 @@ class TestRestructureAssets:
     """Tests for the restructure_assets method on DatasetBag."""
 
     def test_restructure_basic_types_only(self, dataset_test, tmp_path):
-        """Test basic restructuring with dataset types only (no group_by)."""
+        """Test basic restructuring with dataset types only (no targets)."""
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         output_dir = tmp_path / "restructured"
         result = bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=[],
         )
 
         assert isinstance(result, dict), f"Expected dict manifest, got {type(result).__name__}"
@@ -61,9 +60,8 @@ class TestRestructureAssets:
 
         output_dir = tmp_path / "restructured_copy"
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=[],
             use_symlinks=False,
         )
 
@@ -82,9 +80,8 @@ class TestRestructureAssets:
 
         # Use last type instead of first
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=[],
             type_selector=lambda types: types[-1] if types else "custom_unknown",
         )
 
@@ -102,9 +99,9 @@ class TestRestructureAssets:
 
         # Group by Subject column (foreign key)
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Subject"],
+            targets=["Subject"],
         )
 
         assert output_dir.exists()
@@ -121,9 +118,9 @@ class TestRestructureAssets:
 
         # Use a non-existent column - should result in "Unknown" folders
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["NonExistentColumn"],
+            targets=["NonExistentColumn"],
         )
 
         assert output_dir.exists()
@@ -162,9 +159,8 @@ class TestRestructureAssets:
 
         output_dir = tmp_path / "restructured_prediction"
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=[],
         )
 
         assert output_dir.exists()
@@ -191,7 +187,7 @@ class TestRestructureAssets:
 
         This tests the complete prediction workflow where:
         1. Dataset has no type (treated as Testing)
-        2. Assets have no labels for group_by (placed in Unknown)
+        2. Assets have no labels for targets (placed in Unknown)
         Result: files end up in testing/Unknown/
         """
         ml = dataset_test.ml_instance
@@ -216,9 +212,9 @@ class TestRestructureAssets:
 
         output_dir = tmp_path / "restructured_full_prediction"
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["NonExistentLabel"],  # No labels - will use Unknown
+            targets=["NonExistentLabel"],  # No labels - will use Unknown
         )
 
         assert output_dir.exists()
@@ -249,9 +245,8 @@ class TestRestructureAssets:
         # Use a valid table that exists but might not have members in this dataset
         # Use "File" which exists in the schema but likely has no members
         result = bag.restructure_assets(
+            output_dir,
             asset_table="File",
-            output_dir=output_dir,
-            group_by=[],
         )
 
         assert isinstance(result, dict), f"Expected dict manifest, got {type(result).__name__}"
@@ -269,9 +264,8 @@ class TestRestructureAssets:
 
         output_dir = tmp_path / "restructured_nested"
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=[],
         )
 
         assert output_dir.exists()
@@ -342,9 +336,8 @@ class TestRestructureAssets:
 
         output_dir = tmp_path / "restructured_split"
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=[],
         )
 
         assert output_dir.exists()
@@ -388,9 +381,9 @@ class TestRestructureAssets:
 
         # Group by multiple columns
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Subject", "Description"],
+            targets=["Subject", "Description"],
         )
 
         assert output_dir.exists()
@@ -502,9 +495,8 @@ class TestRestructureForeignKeyPaths:
 
         output_dir = tmp_path / "restructured_fk"
         result = bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=[],
         )
 
         assert isinstance(result, dict), f"Expected dict manifest, got {type(result).__name__}"
@@ -650,9 +642,9 @@ class TestRestructureWithFeatures:
 
         # Group by the Quality feature which uses ImageQuality vocabulary
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Quality"],
+            targets=["Quality"],
         )
 
         assert output_dir.exists()
@@ -676,9 +668,9 @@ class TestRestructureWithFeatures:
 
         # Group by Subject column first, then Quality feature
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Subject", "Quality"],
+            targets=["Subject", "Quality"],
         )
 
         assert output_dir.exists()
@@ -700,9 +692,9 @@ class TestRestructureWithFeatures:
 
         # Group by Quality feature first, then Subject column
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Quality", "Subject"],
+            targets=["Quality", "Subject"],
         )
 
         assert output_dir.exists()
@@ -725,9 +717,9 @@ class TestEnforceVocabulary:
         # BoundingBox is an asset-based feature with no vocabulary terms
         with pytest.raises(DerivaMLException) as exc_info:
             bag.restructure_assets(
+                output_dir,
                 asset_table="Image",
-                output_dir=output_dir,
-                group_by=["BoundingBox"],
+                targets=["BoundingBox"],
                 enforce_vocabulary=True,
             )
 
@@ -742,9 +734,9 @@ class TestEnforceVocabulary:
 
         # Should not raise with enforce_vocabulary=False
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["BoundingBox"],
+            targets=["BoundingBox"],
             enforce_vocabulary=False,
         )
 
@@ -762,9 +754,9 @@ class TestEnforceVocabulary:
         # BoundingBox feature should fail without explicitly setting enforce_vocabulary
         with pytest.raises(DerivaMLException):
             bag.restructure_assets(
+                output_dir,
                 asset_table="Image",
-                output_dir=output_dir,
-                group_by=["BoundingBox"],
+                targets=["BoundingBox"],
                 # enforce_vocabulary not specified, should default to True
             )
 
@@ -777,9 +769,9 @@ class TestEnforceVocabulary:
 
         # Quality feature uses ImageQuality vocabulary - should work
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Quality"],
+            targets=["Quality"],
             enforce_vocabulary=True,
         )
 
@@ -888,10 +880,9 @@ class TestValueSelectorWithNestedDatasets:
         # Even if there's only one value per asset, we want to verify the
         # feature cache includes assets from child datasets
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Quality"],  # Feature that may have values
-            value_selector=tracking_selector,
+            targets={"Quality": tracking_selector},  # Feature with per-feature selector
         )
 
         # If there were feature values for child assets, the selector would see them
@@ -1049,9 +1040,9 @@ class TestFeatureTablesInBagExport:
 
         # This should work because feature tables are exported with the bag
         bag.restructure_assets(
+            output_dir,
             asset_table="Image",
-            output_dir=output_dir,
-            group_by=["Quality"],
+            targets=["Quality"],
         )
 
         assert output_dir.exists()
