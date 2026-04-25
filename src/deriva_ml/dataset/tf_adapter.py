@@ -168,13 +168,9 @@ def build_tf_dataset(
             yield first
             yield from gen
 
-        return tf.data.Dataset.from_generator(
-            _generate_with_first, output_signature=inferred
-        )
+        return tf.data.Dataset.from_generator(_generate_with_first, output_signature=inferred)
     else:
-        return tf.data.Dataset.from_generator(
-            _generate, output_signature=output_signature
-        )
+        return tf.data.Dataset.from_generator(_generate, output_signature=output_signature)
 
 
 def _bag_element_is_asset(bag: "DatasetBag", element_type: str) -> bool:
