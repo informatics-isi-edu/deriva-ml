@@ -495,10 +495,17 @@ class Execution:
         Args:
             uploaded_assets: Dict mapping "{schema}/{table}" to uploaded AssetFilePaths.
         """
-        import time as _perf_time
-        _t0 = _perf_time.perf_counter()
         manifest = self._get_manifest()
         pb = self._ml_object.pathBuilder()
+
+        # Snapshot the manifest's asset entries ONCE. ``manifest.assets``
+        # is a property that calls ``ManifestStore.list_assets`` (a SQL
+        # SELECT) on every access. Reading it inside the inner loop ran
+        # one full-table SELECT per uploaded file — for a 10K-asset
+        # upload, ~10K serialized SQL round-trips totaling ~19 minutes
+        # on a localhost SSD (measured against an instrumented build).
+        # One read, one dict, in-memory lookups.
+        manifest_assets = manifest.assets
 
         # Group updates by schema/table for batch efficiency
         table_updates: dict[str, list[dict[str, str]]] = {}
@@ -509,7 +516,7 @@ class Execution:
                 # hardcoded metadata descriptions for Execution_Metadata files.
                 table_name = table_key.split("/")[1] if "/" in table_key else table_key
                 manifest_key = f"{table_name}/{asset.file_name}"
-                entry = manifest.assets.get(manifest_key)
+                entry = manifest_assets.get(manifest_key)
 
                 description = None
                 if entry and entry.description:
@@ -520,21 +527,9 @@ class Execution:
                 if description and asset.asset_rid:
                     table_updates.setdefault(table_key, []).append({"RID": asset.asset_rid, "Description": description})
 
-        self._logger.warning(
-            "[perf] _set_asset_descriptions build: %.2fs (%d tables, %d total updates)",
-            _perf_time.perf_counter() - _t0,
-            len(table_updates),
-            sum(len(v) for v in table_updates.values()),
-        )
-
         for table_key, updates in table_updates.items():
-            _tu = _perf_time.perf_counter()
             schema, table_name = table_key.split("/", 1) if "/" in table_key else ("", table_key)
             pb.schemas[schema].tables[table_name].update(updates)
-            self._logger.warning(
-                "[perf] _set_asset_descriptions update %s: %.2fs (%d rows)",
-                table_key, _perf_time.perf_counter() - _tu, len(updates),
-            )
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution environment.
@@ -1270,10 +1265,8 @@ class Execution:
         # Build staging symlinks from manifest into the regex-expected tree
         upload_root = self._build_upload_staging()
 
-        import time as _perf_time
         try:
             self._logger.info("Uploading execution files...")
-            _t0 = _perf_time.perf_counter()
             results = upload_directory(
                 self._model,
                 upload_root,
@@ -1283,28 +1276,21 @@ class Execution:
                 timeout=timeout,
                 chunk_size=chunk_size,
             )
-            self._logger.warning(
-                "[perf] upload_directory: %.2fs (%d files)",
-                _perf_time.perf_counter() - _t0, len(results),
-            )
         except (RuntimeError, DerivaMLException) as e:
             error = format_exception(e)
             self._logger.error(error)
             raise DerivaMLException(f"Failed to upload execution_assets: {error}")
 
         # Update manifest with upload results
-        _t1 = _perf_time.perf_counter()
         manifest = self._get_manifest()
-        self._logger.warning("[perf] _get_manifest: %.2fs", _perf_time.perf_counter() - _t1)
 
         # Build the asset_map and the manifest-update batch in a single
-        # walk over results. The previous implementation called
-        # manifest.mark_uploaded(...) per file, each wrapping a single
-        # UPDATE in its own SQLite transaction (one WAL fsync per file).
-        # For 10K-file uploads that adds up to ~18 minutes of pure fsync
-        # cost on top of the actual upload. Collect (key, rid) pairs
-        # here and flush them in one batched transaction below.
-        _t2 = _perf_time.perf_counter()
+        # walk over results. Collect (key, rid) pairs here and flush
+        # them in one batched transaction below — see
+        # ManifestStore.mark_assets_uploaded for the perf rationale
+        # (replaces a per-file SQLite transaction with one bulk UPDATE).
+        # The presence check uses ``manifest.assets`` once, outside the
+        # loop, because that property runs a SQL SELECT on every access.
         asset_map = {}
         manifest_updates: list[tuple[str, str]] = []
         manifest_keys = manifest.assets.keys() if hasattr(manifest, "assets") else None
@@ -1334,37 +1320,20 @@ class Execution:
                     asset_rid=rid,
                 )
             )
-        self._logger.warning(
-            "[perf] build asset_map + collect updates: %.2fs (%d staged)",
-            _perf_time.perf_counter() - _t2, len(manifest_updates),
-        )
 
         # Single-transaction batched UPDATE of every just-uploaded
         # manifest entry. See ManifestStore.mark_assets_uploaded for
         # the perf rationale.
-        _t3 = _perf_time.perf_counter()
         manifest.mark_uploaded_batch(manifest_updates)
-        self._logger.warning(
-            "[perf] mark_uploaded_batch: %.2fs", _perf_time.perf_counter() - _t3,
-        )
 
-        _t4 = _perf_time.perf_counter()
         self._update_asset_execution_table(asset_map)
-        self._logger.warning(
-            "[perf] _update_asset_execution_table: %.2fs",
-            _perf_time.perf_counter() - _t4,
-        )
 
         # Flush SQLite-staged feature records (Task 7 staged-feature path).
         # Must run AFTER asset upload so asset-column remapping has uploaded-asset RIDs
         # available in asset_map. This is the only feature-write path since S2 — the
         # older file-based .jsonl path was retired in Task 10 alongside ml.add_features.
-        _t5 = _perf_time.perf_counter()
         self._logger.info("Flushing staged feature records...")
         self._flush_staged_features(uploaded_files=asset_map)
-        self._logger.warning(
-            "[perf] _flush_staged_features: %.2fs", _perf_time.perf_counter() - _t5,
-        )
 
         self._logger.info("Upload assets complete")
         return asset_map
