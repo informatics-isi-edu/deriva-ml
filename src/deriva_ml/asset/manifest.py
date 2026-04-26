@@ -85,6 +85,32 @@ class AssetManifest:
     def assets(self) -> dict[str, AssetEntry]:
         return self._store.list_assets(self._execution_rid)
 
+    def get_asset(self, key: str) -> AssetEntry | None:
+        """Point-query a single asset entry by key.
+
+        Use this instead of ``manifest.assets[key]`` to avoid materializing the
+        full ``{key: AssetEntry}`` dict (a SELECT * over all rows for the
+        execution) when only one entry is needed. Hot-path callers like
+        :class:`AssetFilePath.metadata` access metadata once per attribute read,
+        so a per-access full SELECT is an N+1 against SQLite.
+
+        Args:
+            key: Manifest key (``"{AssetTable}/{filename}"``).
+
+        Returns:
+            The matching :class:`AssetEntry`, or ``None`` if the key is not
+            present in this manifest.
+
+        Example:
+            >>> entry = manifest.get_asset("Image/scan.jpg")  # doctest: +SKIP
+            >>> if entry is not None:  # doctest: +SKIP
+            ...     metadata = dict(entry.metadata)
+        """
+        try:
+            return self._store.get_asset(self._execution_rid, key)
+        except KeyError:
+            return None
+
     def pending_assets(self) -> dict[str, AssetEntry]:
         return self._store.pending_assets(self._execution_rid)
 

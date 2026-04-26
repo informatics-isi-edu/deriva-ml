@@ -55,6 +55,25 @@ class WorkflowMixin:
         types = assoc_path.filter(assoc_path.Workflow == workflow_rid).attributes(assoc_path.Workflow_Type).fetch()
         return [t["Workflow_Type"] for t in types]
 
+    def _get_workflow_types_index(self) -> dict[RID, list[str]]:
+        """Fetch the entire ``Workflow_Workflow_Type`` table once, indexed by Workflow RID.
+
+        Used by ``find_workflows`` to avoid issuing one
+        ``_get_workflow_types_for_rid`` query per workflow (1+N pattern).
+        For catalogs with many workflows the savings are linear.
+
+        Returns:
+            Dict mapping each workflow RID to its list of workflow-type
+            term names. Workflows with no type associations are absent
+            from the dict (the caller treats that as ``[]``).
+        """
+        pb = self.pathBuilder()
+        assoc_path = pb.schemas[self.ml_schema].Workflow_Workflow_Type
+        index: dict[RID, list[str]] = {}
+        for row in assoc_path.attributes(assoc_path.Workflow, assoc_path.Workflow_Type).fetch():
+            index.setdefault(row["Workflow"], []).append(row["Workflow_Type"])
+        return index
+
     def find_workflows(self) -> list[Workflow]:
         """Find all workflows in the catalog.
 
@@ -85,15 +104,19 @@ class WorkflowMixin:
                 >>> workflows = ml.find_workflows()
                 >>> workflows[0].description = "Updated description"
         """
-        # Get a workflow table path and fetch all workflows
+        # Get a workflow table path and fetch all workflows.
+        # Pre-fetch the full Workflow_Workflow_Type table once and index
+        # it by RID instead of issuing one association-table query per
+        # workflow — that 1+N pattern dominated find_workflows on
+        # catalogs with hundreds of workflows.
         workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
+        types_index = self._get_workflow_types_index()
         workflows = []
         for w in workflow_path.entities().fetch():
-            workflow_types = self._get_workflow_types_for_rid(w["RID"])
             workflow = Workflow(
                 name=w["Name"],
                 url=w["URL"],
-                workflow_type=workflow_types,
+                workflow_type=types_index.get(w["RID"], []),
                 version=w["Version"],
                 description=w["Description"],
                 rid=w["RID"],
@@ -150,11 +173,19 @@ class WorkflowMixin:
             # Insert a workflow and get its RID
             workflow_rid = ml_schema_path.Workflow.insert([workflow_record])[0]["RID"]
 
-            # Insert workflow type associations
-            assoc_path = ml_schema_path.Workflow_Workflow_Type
-            for wt in workflow.workflow_type:
-                type_name = self.lookup_term(MLVocab.workflow_type, wt).name
-                assoc_path.insert([{"Workflow": workflow_rid, MLVocab.workflow_type: type_name}])
+            # Insert workflow type associations in a single batched insert.
+            # Resolving each type name still goes through the cached
+            # lookup_term, but the catalog round-trip is consolidated.
+            if workflow.workflow_type:
+                assoc_path = ml_schema_path.Workflow_Workflow_Type
+                assoc_rows = [
+                    {
+                        "Workflow": workflow_rid,
+                        MLVocab.workflow_type: self.lookup_term(MLVocab.workflow_type, wt).name,
+                    }
+                    for wt in workflow.workflow_type
+                ]
+                assoc_path.insert(assoc_rows)
         except Exception as e:
             error = format_exception(e)
             raise DerivaMLException(f"Failed to insert workflow. Error: {error}")

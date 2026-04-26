@@ -269,23 +269,37 @@ class Denormalizer:
             else:
                 bare_rids.append(a)
 
-        # Batch-resolve bare RIDs via catalog. ErmrestCatalog.resolve_rid
-        # raises KeyError on not-found; DerivaML.resolve_rid raises
-        # DerivaMLException. Translate both into a friendly ValueError so
+        # Batch-resolve bare RIDs. Prefer the plural ``ml.resolve_rids``
+        # entry point (one query per candidate table) over the per-RID
+        # ``catalog.resolve_rid`` fallback — for N anchors that's the
+        # difference between O(tables) round-trips and O(N) round-trips.
+        # Exceptions from either path are translated into ValueError so
         # the public contract in the docstring's Raises: block holds.
         if bare_rids:
-            if catalog is None:
-                raise ValueError(
-                    "Bare RIDs given but no catalog available for lookup. Pass (table, RID) tuples or provide catalog=."
-                )
-            if not hasattr(catalog, "resolve_rid"):
-                raise ValueError("catalog= does not expose resolve_rid; cannot look up bare RIDs")
-            for rid in bare_rids:
+            if ml is not None and hasattr(ml, "resolve_rids"):
                 try:
-                    info = catalog.resolve_rid(rid)
+                    rid_results = ml.resolve_rids(bare_rids)
                 except Exception as e:
-                    raise ValueError(f"Cannot resolve RID {rid!r} to a table") from e
-                resolved.append((info.table.name, rid))
+                    raise ValueError(f"Cannot resolve one or more RIDs: {bare_rids!r}") from e
+                for rid in bare_rids:
+                    info = rid_results.get(rid)
+                    if info is None:
+                        raise ValueError(f"Cannot resolve RID {rid!r} to a table")
+                    resolved.append((info.table_name, rid))
+            else:
+                if catalog is None:
+                    raise ValueError(
+                        "Bare RIDs given but no catalog available for lookup. "
+                        "Pass (table, RID) tuples or provide catalog= or ml=."
+                    )
+                if not hasattr(catalog, "resolve_rid"):
+                    raise ValueError("catalog= does not expose resolve_rid; cannot look up bare RIDs")
+                for rid in bare_rids:
+                    try:
+                        info = catalog.resolve_rid(rid)
+                    except Exception as e:
+                        raise ValueError(f"Cannot resolve RID {rid!r} to a table") from e
+                    resolved.append((info.table.name, rid))
 
         # Group by table.
         anchors_by_table: dict[str, list[str]] = {}

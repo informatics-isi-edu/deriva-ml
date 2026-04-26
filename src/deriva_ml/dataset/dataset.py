@@ -89,6 +89,7 @@ from deriva_ml.core.definitions import (
     VocabularyTerm,
 )
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.mixins.rid_resolution import AnyQuantifier
 from deriva_ml.dataset.aux_classes import (
     DatasetHistory,
     DatasetMinid,
@@ -1419,40 +1420,49 @@ class Dataset:
 
         # Go through every rid to be deleted and sort them based on what association table entries
         # need to be removed.
-        dataset_elements = {}
-        association_map = {
-            a.other_fkeys.pop().pk_table.name: a.table.name for a in self._dataset_table.find_associations()
-        }
-        # Get a list of all the object types that can be linked to a dataset.
-        for m in members:
-            try:
-                rid_info = self._ml_instance.resolve_rid(m)
-            except KeyError:
-                raise DerivaMLException(f"Invalid RID: {m}")
-            if rid_info.table.name not in association_map:
-                raise DerivaMLException(f"RID table: {rid_info.table.name} not part of dataset")
-            dataset_elements.setdefault(rid_info.table.name, []).append(rid_info.rid)
+        dataset_elements: dict[str, list[RID]] = {}
+        associations = list(self._dataset_table.find_associations())
+        association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in associations}
 
-        # Delete the entries from the association tables.
+        # Batch resolve all RIDs in one query per candidate table instead
+        # of one network round-trip per RID. Mirrors the optimization in
+        # add_dataset_members.
+        candidate_tables = [
+            self._ml_instance.model.name_to_table(table_name) for table_name in association_map.keys()
+        ]
+        try:
+            rid_results = self._ml_instance.resolve_rids(members, candidate_tables=candidate_tables)
+        except DerivaMLException as e:
+            # Preserve the legacy "Invalid RID" message shape for callers
+            # that match on the prefix.
+            raise DerivaMLException(f"Invalid RID: {e}") from e
+        for rid, rid_info in rid_results.items():
+            if rid_info.table_name not in association_map:
+                raise DerivaMLException(f"RID table: {rid_info.table_name} not part of dataset")
+            dataset_elements.setdefault(rid_info.table_name, []).append(rid_info.rid)
+
+        # Delete the entries from the association tables. Use one
+        # filtered DELETE per element table (Any-quantified IN-list)
+        # rather than per-RID — collapses N round-trips into 1 per
+        # element type.
         pb = self._ml_instance.pathBuilder()
         for table, elements in dataset_elements.items():
+            if not elements:
+                continue
             # Determine schema: ML schema for Dataset, otherwise use the table's actual schema
             if table == "Dataset":
                 schema_name = self._ml_instance.ml_schema
             else:
-                # Find the table and use its schema
                 table_obj = self._ml_instance.model.name_to_table(table)
                 schema_name = table_obj.schema.name
             schema_path = pb.schemas[schema_name]
             fk_column = "Nested_Dataset" if table == "Dataset" else table
 
-            if len(elements):
-                atable_path = schema_path.tables[association_map[table]]
-                for e in elements:
-                    entity = atable_path.filter(
-                        (atable_path.Dataset == self.dataset_rid) & (atable_path.columns[fk_column] == e),
-                    )
-                    entity.delete()
+            atable_path = schema_path.tables[association_map[table]]
+            atable_path.filter(
+                (atable_path.Dataset == self.dataset_rid)
+                & (atable_path.columns[fk_column] == AnyQuantifier(*elements)),
+            ).delete()
 
         self.increment_dataset_version(
             VersionPart.minor,

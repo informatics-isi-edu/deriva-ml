@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from deriva.core.hatrac_store import HatracStore
 
+from deriva_ml.core.mixins.rid_resolution import AnyQuantifier
+
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.core.base import DerivaML
@@ -107,20 +109,24 @@ class Experiment:
         query = query.filter(meta_exec.Asset_Role == "Output")
         records = list(query.entities().fetch())
 
-        # Collect metadata records
+        # Collect every metadata RID, then issue a single IN-style query
+        # to Execution_Metadata for the full row set. The previous code
+        # fetched one record per RID — for an execution with K config
+        # files (typically 2, but multirun runs can attach more) that
+        # was K extra round-trips on every Experiment(rid).
+        metadata_rids = [
+            r["Execution_Metadata"] for r in records if r.get("Execution_Metadata")
+        ]
         metadata_files: dict[str, dict] = {}
-        for record in records:
-            metadata_rid = record.get("Execution_Metadata")
-            if not metadata_rid:
-                continue
-
+        if metadata_rids:
             meta_records = list(
-                metadata_table.filter(metadata_table.RID == metadata_rid)
+                metadata_table.filter(
+                    metadata_table.RID == AnyQuantifier(*metadata_rids)
+                )
                 .entities()
                 .fetch()
             )
-            if meta_records:
-                meta = meta_records[0]
+            for meta in meta_records:
                 filename = meta.get("Filename", "")
                 if filename:
                     metadata_files[filename] = meta

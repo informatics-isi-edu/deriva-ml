@@ -86,9 +86,14 @@ class AssetFilePath(Path):
 
     @property
     def metadata(self) -> dict[str, Any]:
-        """Current metadata dict. If bound to manifest, reads from manifest."""
+        """Current metadata dict. If bound to manifest, reads from manifest.
+
+        Uses a point-query (:meth:`AssetManifest.get_asset`) rather than the
+        full ``manifest.assets`` dict — accessing this attribute in a hot loop
+        otherwise becomes N×SELECT-all against SQLite.
+        """
         if self._manifest and self._manifest_key:
-            entry = self._manifest.assets.get(self._manifest_key)
+            entry = self._manifest.get_asset(self._manifest_key)
             if entry:
                 return dict(entry.metadata)
         return dict(self.asset_metadata)

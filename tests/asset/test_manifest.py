@@ -165,6 +165,43 @@ class TestAssetManifest:
         with pytest.raises(KeyError):
             manifest.update_asset_metadata("nonexistent", {})
 
+    def test_get_asset_point_query(self, manifest):
+        """``get_asset`` returns a single entry without fetching the rest.
+
+        Regression test for the perf fix that swapped
+        ``manifest.assets.get(key)`` (full SELECT for the execution) for
+        a point query in ``AssetFilePath.metadata``. Stage three rows
+        and ensure ``get_asset`` returns just the requested one with
+        the right metadata.
+        """
+        manifest.add_asset(
+            "Image/a.jpg",
+            AssetEntry(asset_table="Image", schema="s", metadata={"Subject": "2-A"}),
+        )
+        manifest.add_asset(
+            "Image/b.jpg",
+            AssetEntry(asset_table="Image", schema="s", metadata={"Subject": "2-B"}),
+        )
+        manifest.add_asset(
+            "Image/c.jpg",
+            AssetEntry(asset_table="Image", schema="s", metadata={"Subject": "2-C"}),
+        )
+
+        got = manifest.get_asset("Image/b.jpg")
+        assert got is not None
+        assert got.metadata == {"Subject": "2-B"}
+        assert got.asset_table == "Image"
+
+    def test_get_asset_missing_returns_none(self, manifest):
+        """``get_asset`` returns None for missing keys (caller-friendly).
+
+        ``AssetFilePath.metadata`` is a property that reads on every
+        access; raising KeyError for an unknown key would surface as a
+        confusing crash from a simple attribute read. None is the
+        expected sentinel — the property falls back to ``asset_metadata``.
+        """
+        assert manifest.get_asset("never/added.jpg") is None
+
     def test_to_json_format(self, manifest):
         """Test that to_json returns a well-formed dict."""
         manifest.add_asset(
