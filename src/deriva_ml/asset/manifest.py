@@ -103,6 +103,20 @@ class AssetManifest:
     def mark_uploaded(self, key: str, rid: str) -> None:
         self._store.mark_asset_uploaded(self._execution_rid, key, rid)
 
+    def mark_uploaded_batch(self, items: "list[tuple[str, str]]") -> None:
+        """Bulk variant of :meth:`mark_uploaded` for post-upload finalization.
+
+        Wraps ``ManifestStore.mark_assets_uploaded`` so callers in the
+        upload pipeline can flip every just-uploaded entry to
+        ``status="uploaded"`` in a single SQLite transaction. See the
+        store-level docstring for the perf rationale (avoids one
+        WAL fsync per file on N-file uploads).
+
+        Args:
+            items: List of ``(key, rid)`` tuples. Empty list is a no-op.
+        """
+        self._store.mark_assets_uploaded(self._execution_rid, items)
+
     def set_asset_rid(self, key: str, rid: str) -> None:
         """Assign a pre-leased RID to an asset entry without changing status.
 

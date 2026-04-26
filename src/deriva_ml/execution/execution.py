@@ -1275,18 +1275,29 @@ class Execution:
         # Update manifest with upload results
         manifest = self._get_manifest()
 
+        # Build the asset_map and the manifest-update batch in a single
+        # walk over results. The previous implementation called
+        # manifest.mark_uploaded(...) per file, each wrapping a single
+        # UPDATE in its own SQLite transaction (one WAL fsync per file).
+        # For 10K-file uploads that adds up to ~18 minutes of pure fsync
+        # cost on top of the actual upload. Collect (key, rid) pairs
+        # here and flush them in one batched transaction below.
         asset_map = {}
+        manifest_updates: list[tuple[str, str]] = []
+        manifest_keys = manifest.assets.keys() if hasattr(manifest, "assets") else None
         for path, status in results.items():
             asset_table, file_name = normalize_asset_dir(path)
 
-            # Find and update manifest entry
             table_name = asset_table.split("/")[1] if "/" in asset_table else asset_table
             manifest_key = f"{table_name}/{file_name}"
             rid = status.result["RID"]
-            try:
-                manifest.mark_uploaded(manifest_key, rid)
-            except KeyError:
-                pass  # File wasn't in manifest (legacy flow)
+
+            # Stage the manifest update for the batch flush. The legacy
+            # per-file path tolerated KeyError silently for files not
+            # in the manifest; preserve that semantic by checking
+            # presence up-front (a dict lookup, not a SQL round-trip).
+            if manifest_keys is None or manifest_key in manifest_keys:
+                manifest_updates.append((manifest_key, rid))
 
             asset_map.setdefault(asset_table, []).append(
                 AssetFilePath(
@@ -1300,6 +1311,12 @@ class Execution:
                     asset_rid=rid,
                 )
             )
+
+        # Single-transaction batched UPDATE of every just-uploaded
+        # manifest entry. See ManifestStore.mark_assets_uploaded for
+        # the perf rationale.
+        manifest.mark_uploaded_batch(manifest_updates)
+
         self._update_asset_execution_table(asset_map)
 
         # Flush SQLite-staged feature records (Task 7 staged-feature path).

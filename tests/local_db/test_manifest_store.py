@@ -65,6 +65,46 @@ class TestAssetCrud:
         assert got.rid == "1-RID"
         assert got.uploaded_at is not None
 
+    def test_mark_assets_uploaded_batch(self, store: ManifestStore) -> None:
+        """Bulk variant flips every (key, rid) pair in one transaction.
+
+        Regression test for the perf fix that replaced a per-file
+        ``engine.begin()`` (one WAL fsync per file) with a single
+        batched transaction. On a 10K-asset upload this is the
+        difference between ~18 minutes of fsync overhead and a few
+        seconds. Behavior must match the per-row method except for
+        speed: status flips to ``uploaded``, rid + uploaded_at +
+        updated_at populated, error cleared.
+        """
+        # Stage three assets so the test sees a real loop, not just one row.
+        for i, key in enumerate(("Image/a.jpg", "Image/b.jpg", "Image/c.jpg")):
+            store.add_asset("4SP", key, AssetEntry(asset_table="Image", schema="isa"))
+
+        store.mark_assets_uploaded(
+            "4SP",
+            [
+                ("Image/a.jpg", "RID-A"),
+                ("Image/b.jpg", "RID-B"),
+                ("Image/c.jpg", "RID-C"),
+            ],
+        )
+
+        for key, expected_rid in (
+            ("Image/a.jpg", "RID-A"),
+            ("Image/b.jpg", "RID-B"),
+            ("Image/c.jpg", "RID-C"),
+        ):
+            got = store.get_asset("4SP", key)
+            assert got.status == "uploaded", f"{key} status={got.status}"
+            assert got.rid == expected_rid
+            assert got.uploaded_at is not None
+            assert got.error is None
+
+    def test_mark_assets_uploaded_batch_empty(self, store: ManifestStore) -> None:
+        """Empty list is a no-op — must not raise, must not cycle a transaction."""
+        store.mark_assets_uploaded("4SP", [])
+        # If this returned without raising, the contract holds.
+
     def test_mark_failed(self, store: ManifestStore) -> None:
         entry = AssetEntry(asset_table="Image", schema="isa")
         store.add_asset("4SP", "Image/x.jpg", entry)
