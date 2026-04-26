@@ -1256,8 +1256,10 @@ class Execution:
         # Build staging symlinks from manifest into the regex-expected tree
         upload_root = self._build_upload_staging()
 
+        import time as _perf_time
         try:
             self._logger.info("Uploading execution files...")
+            _t0 = _perf_time.perf_counter()
             results = upload_directory(
                 self._model,
                 upload_root,
@@ -1267,13 +1269,19 @@ class Execution:
                 timeout=timeout,
                 chunk_size=chunk_size,
             )
+            self._logger.info(
+                "[perf] upload_directory: %.2fs (%d files)",
+                _perf_time.perf_counter() - _t0, len(results),
+            )
         except (RuntimeError, DerivaMLException) as e:
             error = format_exception(e)
             self._logger.error(error)
             raise DerivaMLException(f"Failed to upload execution_assets: {error}")
 
         # Update manifest with upload results
+        _t1 = _perf_time.perf_counter()
         manifest = self._get_manifest()
+        self._logger.info("[perf] _get_manifest: %.2fs", _perf_time.perf_counter() - _t1)
 
         # Build the asset_map and the manifest-update batch in a single
         # walk over results. The previous implementation called
@@ -1282,6 +1290,7 @@ class Execution:
         # For 10K-file uploads that adds up to ~18 minutes of pure fsync
         # cost on top of the actual upload. Collect (key, rid) pairs
         # here and flush them in one batched transaction below.
+        _t2 = _perf_time.perf_counter()
         asset_map = {}
         manifest_updates: list[tuple[str, str]] = []
         manifest_keys = manifest.assets.keys() if hasattr(manifest, "assets") else None
@@ -1311,20 +1320,37 @@ class Execution:
                     asset_rid=rid,
                 )
             )
+        self._logger.info(
+            "[perf] build asset_map + collect updates: %.2fs (%d staged)",
+            _perf_time.perf_counter() - _t2, len(manifest_updates),
+        )
 
         # Single-transaction batched UPDATE of every just-uploaded
         # manifest entry. See ManifestStore.mark_assets_uploaded for
         # the perf rationale.
+        _t3 = _perf_time.perf_counter()
         manifest.mark_uploaded_batch(manifest_updates)
+        self._logger.info(
+            "[perf] mark_uploaded_batch: %.2fs", _perf_time.perf_counter() - _t3,
+        )
 
+        _t4 = _perf_time.perf_counter()
         self._update_asset_execution_table(asset_map)
+        self._logger.info(
+            "[perf] _update_asset_execution_table: %.2fs",
+            _perf_time.perf_counter() - _t4,
+        )
 
         # Flush SQLite-staged feature records (Task 7 staged-feature path).
         # Must run AFTER asset upload so asset-column remapping has uploaded-asset RIDs
         # available in asset_map. This is the only feature-write path since S2 — the
         # older file-based .jsonl path was retired in Task 10 alongside ml.add_features.
+        _t5 = _perf_time.perf_counter()
         self._logger.info("Flushing staged feature records...")
         self._flush_staged_features(uploaded_files=asset_map)
+        self._logger.info(
+            "[perf] _flush_staged_features: %.2fs", _perf_time.perf_counter() - _t5,
+        )
 
         self._logger.info("Upload assets complete")
         return asset_map
