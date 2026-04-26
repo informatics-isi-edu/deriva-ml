@@ -1269,7 +1269,7 @@ class Execution:
                 timeout=timeout,
                 chunk_size=chunk_size,
             )
-            self._logger.info(
+            self._logger.warning(
                 "[perf] upload_directory: %.2fs (%d files)",
                 _perf_time.perf_counter() - _t0, len(results),
             )
@@ -1281,7 +1281,7 @@ class Execution:
         # Update manifest with upload results
         _t1 = _perf_time.perf_counter()
         manifest = self._get_manifest()
-        self._logger.info("[perf] _get_manifest: %.2fs", _perf_time.perf_counter() - _t1)
+        self._logger.warning("[perf] _get_manifest: %.2fs", _perf_time.perf_counter() - _t1)
 
         # Build the asset_map and the manifest-update batch in a single
         # walk over results. The previous implementation called
@@ -1320,7 +1320,7 @@ class Execution:
                     asset_rid=rid,
                 )
             )
-        self._logger.info(
+        self._logger.warning(
             "[perf] build asset_map + collect updates: %.2fs (%d staged)",
             _perf_time.perf_counter() - _t2, len(manifest_updates),
         )
@@ -1330,13 +1330,13 @@ class Execution:
         # the perf rationale.
         _t3 = _perf_time.perf_counter()
         manifest.mark_uploaded_batch(manifest_updates)
-        self._logger.info(
+        self._logger.warning(
             "[perf] mark_uploaded_batch: %.2fs", _perf_time.perf_counter() - _t3,
         )
 
         _t4 = _perf_time.perf_counter()
         self._update_asset_execution_table(asset_map)
-        self._logger.info(
+        self._logger.warning(
             "[perf] _update_asset_execution_table: %.2fs",
             _perf_time.perf_counter() - _t4,
         )
@@ -1348,7 +1348,7 @@ class Execution:
         _t5 = _perf_time.perf_counter()
         self._logger.info("Flushing staged feature records...")
         self._flush_staged_features(uploaded_files=asset_map)
-        self._logger.info(
+        self._logger.warning(
             "[perf] _flush_staged_features: %.2fs", _perf_time.perf_counter() - _t5,
         )
 
