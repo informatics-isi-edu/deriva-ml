@@ -47,6 +47,12 @@ export DERIVA_ML_ALLOW_DIRTY=true
 
 ## Build and Development Commands
 
+> **CWD:** every command in this section assumes you are in
+> `/Users/carl/GitHub/DerivaML/deriva-ml`. The Bash tool's cwd is **not**
+> reliably persistent across turns — always chain `cd` into a single
+> call, e.g. `cd /Users/carl/GitHub/DerivaML/deriva-ml && uv run pytest`.
+> See the workspace-level `CLAUDE.md` ("CWD discipline") for the rule.
+
 ```bash
 # Install dependencies
 uv sync
