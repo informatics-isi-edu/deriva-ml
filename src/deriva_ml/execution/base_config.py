@@ -566,6 +566,14 @@ def run_notebook(
     # Create execution context (downloads inputs)
     execution = Execution(configuration=exec_config, ml_object=ml, dry_run=config.dry_run)
 
+    # Transition Created → Running. Notebook code paths can't use a
+    # ``with`` context manager around the cells (the kernel runs cells
+    # one at a time and ``run_notebook`` returns to the user), so we
+    # take the imperative ``execution_start()`` path here. Pairs with
+    # ``upload_execution_outputs()`` at the end of the notebook, which
+    # auto-stops the execution if it is still Running.
+    execution.execution_start()
+
     return ml, execution, config
 
 

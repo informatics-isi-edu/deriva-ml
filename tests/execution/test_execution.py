@@ -440,6 +440,53 @@ class TestExecutionLifecycle:
         execution.upload_execution_outputs()
         assert get_execution_status(ml, execution.execution_rid) == "Uploaded"
 
+    def test_notebook_lifecycle_auto_stops_running(self, workflow_terms, test_workflow):
+        """upload_execution_outputs() auto-stops a still-Running execution.
+
+        Regression test for the notebook code path. ``run_notebook()``
+        returns ``(ml, execution, config)`` to the user with the execution
+        in status ``Running`` (it calls ``execution_start()`` internally).
+        The user's notebook cells run, doing work, and the last cell calls
+        ``execution.upload_execution_outputs()`` directly — no
+        ``execution_stop()`` call between them, since notebooks have no
+        natural ``__exit__`` hook for the kernel-managed cell flow.
+
+        Before this fix, ``upload_execution_outputs()`` only handled
+        Stopped → Pending_Upload, and a Running-status execution either
+        crashed inside the upload (state machine rejected its terminal
+        transitions) or the exception handler tried Created/Running →
+        Failed which is illegal from Created. Now ``upload_execution_outputs()``
+        auto-calls ``execution_stop()`` if the execution is still Running.
+
+        Tested flow (mirrors ``run_notebook`` + last-cell ``upload``):
+
+            create_execution         status=Created
+            execution_start()        status=Running
+            (user work in cells)
+            upload_execution_outputs status=Uploaded   # auto-stops first
+        """
+        ml = workflow_terms
+
+        notebook_config = ExecutionConfiguration(
+            description="Notebook execution (regression test)",
+            workflow=test_workflow,
+        )
+        execution = ml.create_execution(notebook_config)
+        assert get_execution_status(ml, execution.execution_rid) == "Created"
+
+        # run_notebook() does this internally before returning to the user.
+        execution.execution_start()
+        assert get_execution_status(ml, execution.execution_rid) == "Running"
+
+        # Notebook user code runs in cells here. We simulate "user did
+        # something but did not call execution_stop()" — the typical
+        # notebook pattern.
+
+        # Final cell: upload directly. Must succeed without a separate
+        # execution_stop() call because notebooks have no __exit__ hook.
+        execution.upload_execution_outputs()
+        assert get_execution_status(ml, execution.execution_rid) == "Uploaded"
+
     def test_multirun_parent_lifecycle(self, workflow_terms, test_workflow):
         """Multirun parent execution flows through the full state-machine cycle.
 

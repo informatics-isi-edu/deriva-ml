@@ -1462,6 +1462,17 @@ class Execution:
         if clean_folder is None:
             clean_folder = getattr(self._ml_object, "clean_execution_dir", True)
 
+        # Auto-stop a still-Running execution. Notebook code paths
+        # (``run_notebook`` + per-cell user code) and other imperative
+        # callers that don't use a ``with`` block reach this method with
+        # status=Running because no ``__exit__`` ever fired — by the time
+        # they're calling ``upload_execution_outputs()`` they're done with
+        # work and just haven't transitioned. Convert that final
+        # transition into a single call instead of forcing every notebook
+        # cell to know about ``execution_stop()``.
+        if self.status is ExecutionStatus.Running:
+            self.execution_stop()
+
         # Transition to Pending_Upload BEFORE starting the upload work. This
         # ensures that an exception during _upload_execution_dirs can legally
         # transition to Failed (Stopped → Failed is not a legal transition,
@@ -2336,6 +2347,25 @@ class Execution:
 
         current = self.status
         now = datetime.now(timezone.utc)
+
+        # Tolerate executions that have already advanced past Running by
+        # the time __exit__ fires. The canonical pattern for the
+        # context manager is "exit at Running → Stopped"; but it is
+        # legal (and fixture code in demo_catalog.py does this) to
+        # call upload_execution_outputs() inside the with block, which
+        # advances Running → Stopped → Pending_Upload → Uploaded
+        # before __exit__ is invoked. Forcing a Stopped/Failed
+        # transition from a terminal state would crash the caller's
+        # successful path on the way out. Leave terminal states alone
+        # — the work is already done.
+        if current in {
+            ExecutionStatus.Stopped,
+            ExecutionStatus.Pending_Upload,
+            ExecutionStatus.Uploaded,
+            ExecutionStatus.Failed,
+            ExecutionStatus.Aborted,
+        }:
+            return False
 
         if exc_value is None:
             target = ExecutionStatus.Stopped
