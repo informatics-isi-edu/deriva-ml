@@ -283,6 +283,10 @@ class Execution:
 
         if rid_path := os.environ.get("DERIVA_ML_SAVE_EXECUTION_RID", None):
             # Put execution_rid into the provided file path so we can find it later.
+            # Also include hydra_runtime_output_dir so an outer runner harness
+            # (run_notebook.py) can locate the Hydra job log it owns and register
+            # it post-kernel — see "additive upload" in the state-machine docs.
+            hydra_dir = getattr(self._ml_object, "hydra_runtime_output_dir", None)
             with Path(rid_path).open("w") as f:
                 json.dump(
                     {
@@ -290,6 +294,7 @@ class Execution:
                         "catalog_id": self._ml_object.catalog_id,
                         "workflow_rid": self.workflow_rid,
                         "execution_rid": self.execution_rid,
+                        "hydra_runtime_output_dir": str(hydra_dir) if hydra_dir else None,
                     },
                     f,
                 )

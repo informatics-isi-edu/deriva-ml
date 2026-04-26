@@ -59,6 +59,7 @@ from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, MLAsset
 from deriva_ml.core.constants import DRY_RUN_RID
+from deriva_ml.core.enums import ExecMetadataType
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
 from deriva_ml.execution import Execution, ExecutionConfiguration, Workflow
 
@@ -707,7 +708,36 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 asset_types=ExecAssetType.notebook_output,
             )
 
-            # Upload all registered assets to the catalog
+            # Register Hydra's job log as a runner-owned Execution_Metadata
+            # asset. The kernel cannot register this safely — Hydra's
+            # FileHandler keeps appending to the file during the kernel's
+            # own upload pass, and the asset model assumes immutable bytes.
+            # By the time we reach this point, papermill has returned and
+            # the kernel subprocess has exited, so the FileHandler is
+            # guaranteed gone and the file is final. See state-machine
+            # docs for the additive-upload semantics this depends on
+            # (Uploaded → Pending_Upload).
+            hydra_dir_str = execution_config.get("hydra_runtime_output_dir")
+            if hydra_dir_str:
+                hydra_dir = Path(hydra_dir_str)
+                notebook_log = hydra_dir / "notebook.log"
+                if notebook_log.exists():
+                    timestamp = hydra_dir.parts[-1]
+                    execution.asset_file_path(
+                        asset_name=MLAsset.execution_metadata,
+                        file_name=notebook_log,
+                        rename_file=f"hydra-{timestamp}-notebook.log",
+                        asset_types=ExecMetadataType.hydra_config.value,
+                        description=(
+                            "Hydra job log capturing the papermill kernel run "
+                            "(stdout/stderr from every logger active during the cells)."
+                        ),
+                    )
+
+            # Upload all registered assets to the catalog. If the kernel
+            # already called upload_execution_outputs() from its last
+            # cell, status is Uploaded; this call cycles through
+            # Pending_Upload to ship the runner-owned assets only.
             execution.upload_execution_outputs()
 
             # Print execution URL (without snapshot ID for readability)
