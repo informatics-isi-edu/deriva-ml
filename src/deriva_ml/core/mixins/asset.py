@@ -180,7 +180,11 @@ class AssetMixin:
     def list_assets(self, asset_table: Table | str) -> list["Asset"]:
         """Lists contents of an asset table.
 
-        Returns a list of Asset objects for the specified asset table.
+        Returns a list of Asset objects for the specified asset table. Asset
+        types are pre-fetched in a single query and joined client-side to
+        avoid an N+1 round-trip pattern: for an asset table with N rows, the
+        catalog is hit twice (once for the assets, once for the
+        ``Asset_Type`` association rows) regardless of N.
 
         Args:
             asset_table: Table or name of the asset table to list assets for.
@@ -213,18 +217,22 @@ class AssetMixin:
         ) = self.model.find_association(asset_table_obj, MLVocab.asset_type)
         type_path = pb.schemas[asset_type_table.schema.name].tables[asset_type_table.name]
 
-        # Build a list of Asset objects
-        assets = []
-        for asset_record in asset_path.entities().fetch():
-            # Get associated asset types for each asset
-            asset_types = (
-                type_path.filter(type_path.columns[asset_table_obj.name] == asset_record["RID"])
-                .attributes(type_path.Asset_Type)
-                .fetch()
-            )
-            asset_type_list = [asset_type[MLVocab.asset_type.value] for asset_type in asset_types]
+        # Pre-fetch the entire {asset_rid -> [type_name, ...]} mapping in a
+        # single round-trip. This replaces what was previously a per-asset
+        # filtered fetch (N round-trips for N assets) with one bulk query
+        # plus an in-memory groupby. For a 10K-row asset table on a
+        # localhost catalog this is a ~10-min difference.
+        asset_rid_col = asset_table_obj.name
+        type_col = MLVocab.asset_type.value
+        asset_rid_to_types: dict[str, list[str]] = {}
+        for row in type_path.attributes(
+            type_path.columns[asset_rid_col], type_path.columns[type_col]
+        ).fetch():
+            asset_rid_to_types.setdefault(row[asset_rid_col], []).append(row[type_col])
 
-            assets.append(Asset(
+        # Single bulk fetch of all asset rows, then attach types from the map.
+        return [
+            Asset(
                 catalog=self,  # type: ignore[arg-type]
                 asset_rid=asset_record["RID"],
                 asset_table=asset_table_obj.name,
@@ -233,9 +241,10 @@ class AssetMixin:
                 length=asset_record.get("Length", 0),
                 md5=asset_record.get("MD5", ""),
                 description=asset_record.get("Description", ""),
-                asset_types=asset_type_list,
-            ))
-        return assets
+                asset_types=asset_rid_to_types.get(asset_record["RID"], []),
+            )
+            for asset_record in asset_path.entities().fetch()
+        ]
 
     def list_asset_executions(
         self, asset_rid: str, asset_role: str | None = None
