@@ -495,6 +495,8 @@ class Execution:
         Args:
             uploaded_assets: Dict mapping "{schema}/{table}" to uploaded AssetFilePaths.
         """
+        import time as _perf_time
+        _t0 = _perf_time.perf_counter()
         manifest = self._get_manifest()
         pb = self._ml_object.pathBuilder()
 
@@ -518,9 +520,21 @@ class Execution:
                 if description and asset.asset_rid:
                     table_updates.setdefault(table_key, []).append({"RID": asset.asset_rid, "Description": description})
 
+        self._logger.warning(
+            "[perf] _set_asset_descriptions build: %.2fs (%d tables, %d total updates)",
+            _perf_time.perf_counter() - _t0,
+            len(table_updates),
+            sum(len(v) for v in table_updates.values()),
+        )
+
         for table_key, updates in table_updates.items():
+            _tu = _perf_time.perf_counter()
             schema, table_name = table_key.split("/", 1) if "/" in table_key else ("", table_key)
             pb.schemas[schema].tables[table_name].update(updates)
+            self._logger.warning(
+                "[perf] _set_asset_descriptions update %s: %.2fs (%d rows)",
+                table_key, _perf_time.perf_counter() - _tu, len(updates),
+            )
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution environment.
