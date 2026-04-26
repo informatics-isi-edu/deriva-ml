@@ -66,20 +66,45 @@ class InvalidTransitionError(DerivaMLException):
 #
 # The state diagram (spec §2.2):
 #
-#     created → running → {stopped, failed} → pending_upload → {uploaded, failed}
-#                 │                                   ↑             │
-#                 │    (hard-crash recovery)          │             │
-#                 └───────────────────────────────────┤             │
-#                                                     └──── retry ──┘
+#     created → running → {stopped, failed} → pending_upload → uploaded
+#                 │                                   ↑           │   │
+#                 │    (hard-crash recovery)          │           │   │
+#                 └───────────────────────────────────┤           │   │
+#                                                     │           │   │
+#                                          (failed retry)         │   │
+#                                                     ←───────────┘   │
+#                                                                     │
+#                                       (additive upload, see below)  │
+#                                                     ←───────────────┘
+#
 #     created / running / stopped / failed → aborted (terminal)
-#     failed → pending_upload (retry_failed path)
-#     running → pending_upload (hard-crash recovery: process SIGKILL'd
-#       mid-run, so __exit__ never transitioned to Stopped. The user
-#       calls ``exe.update_status(ExecutionStatus.Pending_Upload)`` to
-#       advance past the crashed Running state, then
-#       ``upload_execution_outputs()``. Keeps the audit trail honest —
-#       "Failed" means the run failed, not "the process died before it
-#       could mark itself finished".
+#
+# Notes on the non-happy-path edges:
+#
+#   running → pending_upload — hard-crash recovery. The process
+#     SIGKILL'd mid-run, so __exit__ never fired and never moved
+#     status to Stopped. The user calls
+#     ``exe.update_status(ExecutionStatus.Pending_Upload)`` to advance
+#     past the crashed Running state, then ``upload_execution_outputs()``.
+#     Keeps the audit trail honest — "Failed" means the run failed,
+#     not "the process died before it could mark itself finished".
+#
+#   failed → pending_upload — retry from upload failure. The first
+#     upload attempt raised; staging is intact; user re-runs
+#     ``upload_execution_outputs()``.
+#
+#   uploaded → pending_upload — additive upload. The execution
+#     completed and its first asset batch successfully uploaded, but
+#     additional assets (registered against the same execution by a
+#     different lifecycle owner — typically the runner harness layer
+#     wrapping a kernel's notebook execution, see
+#     ``run_notebook.py``) need to be uploaded as a follow-on batch.
+#     The semantics: an execution's upload is **a batch operation,
+#     not a wall**. Asset rows linked to an execution have no temporal
+#     constraint vs. its status — the catalog already supports this.
+#     ``upload_execution_outputs()`` auto-takes this transition when
+#     called on an already-Uploaded execution that has new pending
+#     manifest entries; if there are no pending entries it is a no-op.
 
 ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozenset({
     # Happy path
@@ -100,6 +125,14 @@ ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozen
 
     # Retry from upload failure back into upload
     (ExecutionStatus.Failed, ExecutionStatus.Pending_Upload),
+
+    # Additive upload from a different lifecycle owner. The kernel
+    # finishes its notebook and uploads its outputs (Uploaded). The
+    # runner harness then registers its own assets (e.g., the Hydra
+    # job log it is solely responsible for, since the kernel's view
+    # of that file is racy) and calls ``upload_execution_outputs()``
+    # again. Status cycles Uploaded → Pending_Upload → Uploaded.
+    (ExecutionStatus.Uploaded, ExecutionStatus.Pending_Upload),
 
     # Abort is legal from any pre-terminal state. 'uploaded' is
     # terminal — we don't allow abort after successful upload.

@@ -487,6 +487,64 @@ class TestExecutionLifecycle:
         execution.upload_execution_outputs()
         assert get_execution_status(ml, execution.execution_rid) == "Uploaded"
 
+    def test_additive_upload_after_uploaded(self, basic_execution):
+        """A second ``upload_execution_outputs()`` call ships newly-staged assets.
+
+        Models the runner-harness pattern: a notebook kernel finishes its
+        cells and runs ``upload_execution_outputs()`` (kernel-side, status
+        moves to Uploaded). The runner then knows about additional assets
+        only it could safely produce — typically Hydra's job log, which
+        has a write-race when registered kernel-side because Hydra's
+        FileHandler keeps appending to the file during the kernel's own
+        upload pass. The runner registers those additional assets against
+        the same execution and calls ``upload_execution_outputs()`` again.
+
+        The state machine's documented Uploaded → Pending_Upload edge
+        permits this; ``upload_execution_outputs()`` auto-takes the
+        transition when there are pending manifest entries, and is a
+        no-op when there aren't.
+
+        Tested flow (mirrors ``run_notebook`` outer harness):
+
+            kernel:   create_execution → ... → upload_execution_outputs()
+                      status: Uploaded
+            runner:   register more assets via asset_file_path()
+                      upload_execution_outputs()
+                      status: Uploaded (cycled through Pending_Upload)
+        """
+        # Phase 1: kernel-style upload. with-block handles
+        # Created → Running → Stopped; upload_execution_outputs finalizes
+        # the lifecycle to Uploaded.
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "kernel_output.txt", "kernel content")
+        first_uploaded = basic_execution.upload_execution_outputs()
+        assert get_execution_status(
+            basic_execution._ml_object, basic_execution.execution_rid
+        ) == "Uploaded"
+        assert "deriva-ml/Execution_Asset" in first_uploaded
+        assert len(first_uploaded["deriva-ml/Execution_Asset"]) == 1
+
+        # Phase 2: runner-style additive upload. Stage another asset
+        # against the same execution, call upload again. The state
+        # machine takes Uploaded → Pending_Upload → Uploaded.
+        create_test_asset(basic_execution, "runner_output.txt", "runner content")
+        second_uploaded = basic_execution.upload_execution_outputs()
+        assert get_execution_status(
+            basic_execution._ml_object, basic_execution.execution_rid
+        ) == "Uploaded"
+        # Only the runner's newly-staged asset uploads on the second
+        # call (the kernel's asset is already settled in the catalog).
+        assert "deriva-ml/Execution_Asset" in second_uploaded
+        assert len(second_uploaded["deriva-ml/Execution_Asset"]) == 1
+
+        # Phase 3: a third call with nothing pending is a no-op — must
+        # not cycle the state machine, must not raise.
+        third_uploaded = basic_execution.upload_execution_outputs()
+        assert get_execution_status(
+            basic_execution._ml_object, basic_execution.execution_rid
+        ) == "Uploaded"
+        assert third_uploaded == second_uploaded  # last cached result preserved
+
     def test_multirun_parent_lifecycle(self, workflow_terms, test_workflow):
         """Multirun parent execution flows through the full state-machine cycle.
 

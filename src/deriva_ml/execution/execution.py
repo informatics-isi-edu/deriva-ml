@@ -1499,6 +1499,22 @@ class Execution:
         if self.status is ExecutionStatus.Running:
             self.execution_stop()
 
+        # Additive upload path: the execution already finished a prior
+        # upload batch (status=Uploaded) and the caller has registered
+        # additional assets that need to ship. If there's nothing
+        # pending, treat the call as a no-op and return early — the
+        # state machine has no Uploaded → Uploaded edge, and we shouldn't
+        # cycle Uploaded → Pending_Upload → Uploaded just to do nothing.
+        # Typical caller: the runner harness in run_notebook.py
+        # registering the Hydra job log after the kernel's own upload
+        # completed. See state_machine.ALLOWED_TRANSITIONS for the
+        # documented Uploaded → Pending_Upload edge.
+        if self.status is ExecutionStatus.Uploaded:
+            manifest = self._get_manifest()
+            if not manifest.pending_assets():
+                return self.uploaded_assets or {}
+            self.update_status(ExecutionStatus.Pending_Upload)
+
         # Transition to Pending_Upload BEFORE starting the upload work. This
         # ensures that an exception during _upload_execution_dirs can legally
         # transition to Failed (Stopped → Failed is not a legal transition,

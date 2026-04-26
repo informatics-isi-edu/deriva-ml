@@ -291,10 +291,12 @@ stateDiagram-v2
     Created --> Running : __enter__
     Running --> Stopped : __exit__ (clean)
     Running --> Failed : __exit__ (exception)
+    Running --> Pending_Upload : hard-crash recovery
     Stopped --> Pending_Upload : upload_execution_outputs()
     Pending_Upload --> Uploaded : upload complete
     Pending_Upload --> Failed : upload error
     Failed --> Pending_Upload : upload_execution_outputs() (retry)
+    Uploaded --> Pending_Upload : additive upload
     Created --> Aborted
     Running --> Aborted
     Stopped --> Aborted
@@ -308,16 +310,26 @@ stateDiagram-v2
 | Status | When set | Description |
 |--------|----------|-------------|
 | `Created` | `ml.create_execution()` | Execution record inserted; no work has started. |
-| `Running` | `__enter__` | Context manager entered; start time recorded. |
-| `Stopped` | `__exit__` (no exception) | Work finished cleanly; stop time recorded. |
+| `Running` | `__enter__` (or `execution_start()`) | Work in progress; start time recorded. |
+| `Stopped` | `__exit__` (or `execution_stop()`) | Work finished cleanly; stop time recorded. |
 | `Failed` | `__exit__` (exception) or upload error | Error message stored in catalog. |
 | `Pending_Upload` | `upload_execution_outputs()` starts | Upload in progress. |
-| `Uploaded` | `upload_execution_outputs()` completes | All outputs in catalog; terminal. |
+| `Uploaded` | `upload_execution_outputs()` completes | All outputs uploaded. Re-entrant — can cycle to `Pending_Upload` for an additive upload. |
 | `Aborted` | explicit abort | Abandoned before completion; terminal. |
 
-The `Failed → Pending_Upload` transition exists for the retry case: if `upload_execution_outputs()` raises after the execution already reached `Failed`, you can call `upload_execution_outputs()` again. The state machine allows the retry path so partial upload failures are recoverable.
+**Non-happy-path transitions:**
 
-`Stopped → Failed` is not a legal transition. An execution that stops cleanly can only move to `Pending_Upload` next.
+- **`Running → Pending_Upload`** — hard-crash recovery. The process was killed mid-run, so `__exit__` never fired and never moved status to `Stopped`. Resume the execution, call `update_status(ExecutionStatus.Pending_Upload)`, then `upload_execution_outputs()`. The audit trail stays honest: "Failed" means the run failed, not "the process died before it could mark itself finished."
+
+- **`Failed → Pending_Upload`** — retry from upload failure. If `upload_execution_outputs()` raised after the execution already reached `Failed` (e.g., a transient network error), staging is intact; call `upload_execution_outputs()` again to retry.
+
+- **`Uploaded → Pending_Upload`** — additive upload. The execution finished and its initial asset batch successfully uploaded, but a second lifecycle owner needs to ship more assets against the same execution. The classic case is a runner harness wrapping a kernel: the kernel uploads its own outputs (status reaches `Uploaded`), the runner then registers assets only it can produce safely (e.g., the Hydra job log it owns) and calls `upload_execution_outputs()` again. `upload_execution_outputs()` automatically takes this transition when there are pending manifest entries; if there are none, the call is a no-op and status stays `Uploaded`. Asset rows linked to an execution have no temporal constraint vs. its status — an execution's upload is a batch operation, not a wall.
+
+**Disallowed transitions worth knowing:**
+
+- `Stopped → Failed` — an execution that stops cleanly can only move to `Pending_Upload` next. Failure has to happen inside an upload, not after work completed.
+- `Created → Stopped` — `Stopped` requires `Running` first; you cannot skip the active state.
+- `Uploaded → Failed` — once an upload succeeds, the only way back to upload activity is via `Pending_Upload` (the additive-upload path above), not directly into `Failed`.
 
 ## How to update status during a run
 
