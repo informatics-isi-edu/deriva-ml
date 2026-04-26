@@ -949,17 +949,21 @@ class Execution:
         feature_name = feat.feature_name
         target_table_name = feat.target_table.name
 
-        count = 0
-        for f in features:
-            self._manifest_store.stage_feature_record(
-                execution_rid=self.execution_rid,
-                feature_table=qualified,
-                feature_name=feature_name,
-                target_table=target_table_name,
-                record_json=f.model_dump_json(),
-            )
-            count += 1
-        return count
+        # Stage every record in a single SQLite transaction. The
+        # legacy per-record loop wrapped each ``stage_feature_record``
+        # call in its own ``engine.begin()`` block (one WAL fsync per
+        # record); for a multi-thousand-record ``add_features`` call
+        # that's N serialized fsyncs. The bulk path collapses to one.
+        # See ``ManifestStore.stage_feature_records``.
+        records_json = [f.model_dump_json() for f in features]
+        self._manifest_store.stage_feature_records(
+            execution_rid=self.execution_rid,
+            feature_table=qualified,
+            feature_name=feature_name,
+            target_table=target_table_name,
+            records_json=records_json,
+        )
+        return len(features)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
@@ -1686,8 +1690,10 @@ class Execution:
                 except DerivaMLException as e:
                     error_msg = f"lookup_feature failed for {qualified}: {e}"
                     self._logger.error(error_msg)
-                    for r in rows:
-                        self._manifest_store.mark_feature_record_failed(r.stage_id, error=error_msg)
+                    # Mark all rows failed in a single bulk transaction.
+                    self._manifest_store.mark_feature_records_failed(
+                        [(r.stage_id, error_msg) for r in rows]
+                    )
                     failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
                     continue  # skip to next group — do not attempt insert
 
@@ -1713,13 +1719,18 @@ class Execution:
 
                 pb = self._ml_object.pathBuilder()
                 pb.schemas[schema_name].tables[table_name].insert(payloads)
-                # Success — mark all rows uploaded
-                for r in rows:
-                    self._manifest_store.mark_feature_record_uploaded(r.stage_id)
+                # Success — mark all rows uploaded in a single
+                # batched UPDATE … WHERE stage_id IN (…). Replaces
+                # one engine.begin() per row.
+                self._manifest_store.mark_feature_records_uploaded(
+                    [r.stage_id for r in rows]
+                )
             except Exception as e:  # noqa: BLE001 — capture broad, propagate summary
                 error_msg = f"{type(e).__name__}: {e}"
-                for r in rows:
-                    self._manifest_store.mark_feature_record_failed(r.stage_id, error=error_msg)
+                # Mark all rows failed in a single bulk transaction.
+                self._manifest_store.mark_feature_records_failed(
+                    [(r.stage_id, error_msg) for r in rows]
+                )
                 failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
 
         if failures:

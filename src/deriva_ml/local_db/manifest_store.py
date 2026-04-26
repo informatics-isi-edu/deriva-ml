@@ -419,6 +419,42 @@ class ManifestStore:
                 .values(rid=rid, updated_at=_now_iso())
             )
 
+    def set_asset_rids(
+        self, execution_rid: str, items: "list[tuple[str, str]]"
+    ) -> None:
+        """Bulk variant of :meth:`set_asset_rid` for batched RID assignment.
+
+        Equivalent to calling ``set_asset_rid`` for each ``(key, rid)``
+        pair, but executes the UPDATE statements inside a **single**
+        SQLite transaction. For an upload of N pre-leased assets, this
+        replaces N independent ``engine.begin()`` blocks (each with its
+        own commit + WAL fsync) with one — turning an
+        O(N × fsync_cost) loop into one batched fsync.
+
+        Skips the per-row existence check that :meth:`set_asset_rid`
+        performs via ``_require_asset``. The caller (the lease writeback
+        in ``manifest_lease.lease_manifest_pending_assets``) holds the
+        exact key set whose tokens just round-tripped successfully
+        through ``ERMrest_RID_Lease``; every key is known to be present.
+
+        Args:
+            execution_rid: Owning execution RID.
+            items: List of ``(key, rid)`` tuples. Empty list is a no-op.
+        """
+        if not items:
+            return
+        now = _now_iso()
+        with self._engine.begin() as conn:
+            for key, rid in items:
+                conn.execute(
+                    update(self._assets_t)
+                    .where(
+                        (self._assets_t.c.execution_rid == execution_rid)
+                        & (self._assets_t.c.key == key)
+                    )
+                    .values(rid=rid, updated_at=now)
+                )
+
     def mark_asset_failed(self, execution_rid: str, key: str, error: str) -> None:
         """Transition an asset entry to ``status="failed"`` and record the error message.
 
@@ -489,6 +525,60 @@ class ManifestStore:
         with self._engine.begin() as conn:
             result = conn.execute(insert(self._feature_records_t), row)
             return result.inserted_primary_key[0]
+
+    def stage_feature_records(
+        self,
+        execution_rid: str,
+        feature_table: str,
+        feature_name: str,
+        target_table: str,
+        records_json: "list[str]",
+    ) -> "list[int]":
+        """Bulk variant of :meth:`stage_feature_record` for batched staging.
+
+        Inserts every staged-feature row in a single SQLite transaction.
+        Replaces N independent ``engine.begin()`` blocks (each with its
+        own commit + WAL fsync) with one. For a multi-thousand-feature
+        ``Execution.add_features`` call this collapses N fsyncs into 1.
+
+        All rows must share the same ``(feature_table, feature_name,
+        target_table)``; ``add_features`` already enforces this at the
+        wrapping layer (mixed-feature batches raise a validation error
+        before reaching here).
+
+        Args:
+            execution_rid: RID of the owning execution.
+            feature_table: Qualified feature table name (``"schema.Table"``).
+            feature_name: Feature name (e.g. ``"Glaucoma"``).
+            target_table: Target table name (the table the feature is *on*).
+            records_json: List of JSON-serialized FeatureRecord dicts.
+
+        Returns:
+            List of autoincrement ``stage_id`` values, one per input row,
+            in input order. Empty list if ``records_json`` is empty.
+        """
+        if not records_json:
+            return []
+        now = _now_iso()
+        stage_ids: list[int] = []
+        with self._engine.begin() as conn:
+            for record_json in records_json:
+                result = conn.execute(
+                    insert(self._feature_records_t),
+                    {
+                        "execution_rid": execution_rid,
+                        "feature_table": feature_table,
+                        "feature_name": feature_name,
+                        "target_table": target_table,
+                        "record_json": record_json,
+                        "created_at": now,
+                        "status": "pending",
+                        "uploaded_at": None,
+                        "error": None,
+                    },
+                )
+                stage_ids.append(result.inserted_primary_key[0])
+        return stage_ids
 
     def _row_to_staged_feature_record(self, r: Any) -> StagedFeatureRow:
         """Convert a DB row mapping to a :class:`StagedFeatureRow`."""
@@ -578,6 +668,36 @@ class ManifestStore:
                 .values(status="uploaded", uploaded_at=now, error=None)
             )
 
+    def mark_feature_records_uploaded(self, stage_ids: "list[int]") -> None:
+        """Bulk variant of :meth:`mark_feature_record_uploaded`.
+
+        Updates every supplied ``stage_id`` to ``status="uploaded"``
+        inside a single SQLite transaction, using one
+        ``UPDATE … WHERE stage_id IN (…)`` statement. Replaces the
+        per-row ``engine.begin()`` loop the caller previously used after
+        a successful bulk feature flush — same one-fsync-per-row issue
+        as ``mark_asset_uploaded`` had before commit 4296f22.
+
+        Skips the per-row existence check that
+        :meth:`mark_feature_record_uploaded` performs via
+        ``_require_feature_record``. The caller (the post-flush loop in
+        ``Execution._flush_staged_features``) already inserted these
+        rows itself; every ``stage_id`` is known to be present.
+
+        Args:
+            stage_ids: List of staged-row primary keys. Empty list is
+                a no-op.
+        """
+        if not stage_ids:
+            return
+        now = _now_iso()
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(self._feature_records_t)
+                .where(self._feature_records_t.c.stage_id.in_(stage_ids))
+                .values(status="uploaded", uploaded_at=now, error=None)
+            )
+
     def mark_feature_record_failed(self, stage_id: int, error: str) -> None:
         """Transition a staged feature record to ``status="failed"`` and record the error.
 
@@ -595,3 +715,30 @@ class ManifestStore:
                 .where(self._feature_records_t.c.stage_id == stage_id)
                 .values(status="failed", error=error)
             )
+
+    def mark_feature_records_failed(
+        self, items: "list[tuple[int, str]]"
+    ) -> None:
+        """Bulk variant of :meth:`mark_feature_record_failed`.
+
+        Updates every ``(stage_id, error)`` pair to ``status="failed"``
+        in a single SQLite transaction. The error is per-row (a flush
+        can fail rows individually with different validation errors),
+        so we issue one UPDATE per row inside the same transaction
+        rather than a single grouped statement. Still N fsyncs → 1.
+
+        Skips per-row existence checks; caller owns the stage_ids.
+
+        Args:
+            items: List of ``(stage_id, error)`` tuples. Empty list is
+                a no-op.
+        """
+        if not items:
+            return
+        with self._engine.begin() as conn:
+            for stage_id, error in items:
+                conn.execute(
+                    update(self._feature_records_t)
+                    .where(self._feature_records_t.c.stage_id == stage_id)
+                    .values(status="failed", error=error)
+                )

@@ -134,6 +134,19 @@ class AssetManifest:
         """
         self._store.set_asset_rid(self._execution_rid, key, rid)
 
+    def set_asset_rids_batch(self, items: "list[tuple[str, str]]") -> None:
+        """Bulk variant of :meth:`set_asset_rid` for batched lease writeback.
+
+        Wraps ``ManifestStore.set_asset_rids`` so callers (the lease
+        post-write loop in ``manifest_lease.py``) can flush N RID
+        assignments in a single SQLite transaction instead of N. See
+        the store-level docstring for the perf rationale.
+
+        Args:
+            items: List of ``(key, rid)`` tuples. Empty list is a no-op.
+        """
+        self._store.set_asset_rids(self._execution_rid, items)
+
     def mark_failed(self, key: str, error: str) -> None:
         self._store.mark_asset_failed(self._execution_rid, key, error)
 

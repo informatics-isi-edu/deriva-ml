@@ -105,6 +105,43 @@ class TestAssetCrud:
         store.mark_assets_uploaded("4SP", [])
         # If this returned without raising, the contract holds.
 
+    def test_set_asset_rids_batch(self, store: ManifestStore) -> None:
+        """Bulk set_asset_rids assigns every (key, rid) in one transaction.
+
+        Regression test for the perf fix that replaced a per-token loop
+        of set_asset_rid calls (each its own engine.begin()) with a
+        single batched transaction. Same pattern as
+        mark_assets_uploaded but without the status flip.
+        """
+        for key in ("Image/a.jpg", "Image/b.jpg", "Image/c.jpg"):
+            store.add_asset("4SP", key, AssetEntry(asset_table="Image", schema="isa"))
+
+        store.set_asset_rids(
+            "4SP",
+            [
+                ("Image/a.jpg", "RID-A"),
+                ("Image/b.jpg", "RID-B"),
+                ("Image/c.jpg", "RID-C"),
+            ],
+        )
+
+        for key, expected_rid in (
+            ("Image/a.jpg", "RID-A"),
+            ("Image/b.jpg", "RID-B"),
+            ("Image/c.jpg", "RID-C"),
+        ):
+            got = store.get_asset("4SP", key)
+            assert got.rid == expected_rid
+            # Status stays at 'pending' — set_asset_rids is the
+            # pre-leasing writeback path, not the post-upload
+            # finalization path.
+            assert got.status == "pending"
+            assert got.uploaded_at is None
+
+    def test_set_asset_rids_batch_empty(self, store: ManifestStore) -> None:
+        """Empty list is a no-op — must not raise."""
+        store.set_asset_rids("4SP", [])
+
     def test_mark_failed(self, store: ManifestStore) -> None:
         entry = AssetEntry(asset_table="Image", schema="isa")
         store.add_asset("4SP", "Image/x.jpg", entry)

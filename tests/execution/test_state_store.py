@@ -511,6 +511,114 @@ def test_revert_leasing_to_staged(tmp_path):
     assert row["lease_token"] is None
 
 
+def test_mark_pending_leasing_batch(tmp_path):
+    """Bulk Phase 1 of leasing: every (pending_id, token) flips together.
+
+    Regression test for the perf fix that replaced a per-row
+    update_pending_row loop in lease_orchestrator with a single
+    batched transaction. Crash semantics unchanged: the entire
+    batch must commit before the catalog POST so a crash leaves
+    every row in a recoverable state.
+    """
+    from datetime import datetime, timezone
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.Running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pids = []
+    for i in range(3):
+        pids.append(store.insert_pending_row(
+            execution_rid="EXE-A", key=f"k{i}",
+            target_schema="s", target_table="t",
+            metadata_json="{}", created_at=now,
+        ))
+
+    items = [(pids[0], "T-A"), (pids[1], "T-B"), (pids[2], "T-C")]
+    store.mark_pending_leasing_batch(items)
+
+    rows = sorted(store.list_pending_rows(execution_rid="EXE-A"), key=lambda r: r["id"])
+    for row, (_, expected_token) in zip(rows, items):
+        assert row["status"] == str(PendingRowStatus.leasing)
+        assert row["lease_token"] == expected_token
+
+
+def test_mark_pending_leasing_batch_empty(tmp_path):
+    """Empty list is a no-op."""
+    from deriva_ml.execution.state_store import ExecutionStateStore
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    store.mark_pending_leasing_batch([])  # must not raise
+
+
+def test_finalize_pending_leases_batch(tmp_path):
+    """Bulk Phase 3 of leasing: every (token, rid) finalizes in one transaction.
+
+    All rows share the leased_at timestamp captured at transaction
+    entry, mirroring the wire batch they came from.
+    """
+    from datetime import datetime, timezone
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.Running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pids = [
+        store.insert_pending_row(
+            execution_rid="EXE-A", key=f"k{i}",
+            target_schema="s", target_table="t",
+            metadata_json="{}", created_at=now,
+        )
+        for i in range(3)
+    ]
+    # Phase 1: stage tokens
+    store.mark_pending_leasing_batch(
+        [(pids[0], "T1"), (pids[1], "T2"), (pids[2], "T3")]
+    )
+
+    # Phase 3: finalize in one batch
+    store.finalize_pending_leases_batch(
+        [("T1", "1-AAA"), ("T2", "1-BBB"), ("T3", "1-CCC")]
+    )
+
+    rows = sorted(store.list_pending_rows(execution_rid="EXE-A"), key=lambda r: r["id"])
+    expected = [("1-AAA",), ("1-BBB",), ("1-CCC",)]
+    for row, (rid,) in zip(rows, expected):
+        assert row["status"] == str(PendingRowStatus.leased)
+        assert row["rid"] == rid
+        assert row["leased_at"] is not None
+
+
+def test_finalize_pending_leases_batch_empty(tmp_path):
+    """Empty list is a no-op."""
+    from deriva_ml.execution.state_store import ExecutionStateStore
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    store.finalize_pending_leases_batch([])  # must not raise
+
+
 # ─── Workspace-wide count_pending_rows ────────────────────────────────
 
 

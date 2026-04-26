@@ -53,6 +53,10 @@ def lease_manifest_pending_assets(
 
     token_to_rid = post_lease_batch(catalog=catalog, tokens=list(token_to_key.keys()))
 
-    for token, rid in token_to_rid.items():
-        key = token_to_key[token]
-        manifest.set_asset_rid(key, rid)
+    # Flush every RID assignment in a single SQLite transaction. The
+    # legacy per-token loop wrapped each set_asset_rid in its own
+    # engine.begin() block (one WAL fsync per assignment); for an
+    # upload of N pre-leased assets that's N serialized fsyncs. The
+    # bulk path collapses to one. See ManifestStore.set_asset_rids.
+    items = [(token_to_key[token], rid) for token, rid in token_to_rid.items()]
+    manifest.set_asset_rids_batch(items)

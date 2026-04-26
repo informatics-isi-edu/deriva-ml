@@ -98,8 +98,10 @@ def acquire_leases_for_execution(
     # Phase 1: write 'leasing' + token to SQLite, committed.
     # This MUST happen before the POST so that if we crash, the token
     # is in SQLite and we can look it up on the server at reconcile.
-    for pid, token in rows_to_lease:
-        store.mark_pending_leasing(pid, lease_token=token)
+    # Single transaction covers the entire batch — see
+    # ExecutionStateStore.mark_pending_leasing_batch for the perf
+    # rationale (one WAL fsync vs. N).
+    store.mark_pending_leasing_batch(rows_to_lease)
 
     # Phase 2: POST the batch. On failure, revert all.
     tokens = [t for _, t in rows_to_lease]
@@ -110,11 +112,17 @@ def acquire_leases_for_execution(
             "acquire_leases: POST failed for execution %s; reverting %d rows to staged",
             execution_rid, len(rows_to_lease),
         )
+        # Revert every leasing row in one transaction. revert is
+        # rare (only fires when ERMrest's lease POST fails) so the
+        # per-row loop here is bounded by N anyway, but a single
+        # transaction matches the phase-1 commit semantics.
         for _, token in rows_to_lease:
             store.revert_pending_leasing(lease_token=token)
         raise
 
-    # Phase 3: finalize each row with its assigned RID.
+    # Phase 3: finalize each successfully-leased row in one
+    # batched transaction; revert each token the server didn't echo.
+    finalize_items: list[tuple[str, str]] = []
     for _, token in rows_to_lease:
         assigned_rid = assigned.get(token)
         if assigned_rid is None:
@@ -127,7 +135,8 @@ def acquire_leases_for_execution(
             )
             store.revert_pending_leasing(lease_token=token)
         else:
-            store.finalize_pending_lease(lease_token=token, assigned_rid=assigned_rid)
+            finalize_items.append((token, assigned_rid))
+    store.finalize_pending_leases_batch(finalize_items)
 
     logger.debug(
         "acquire_leases: %d rows leased for execution %s",

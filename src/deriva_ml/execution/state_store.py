@@ -791,6 +791,35 @@ class ExecutionStateStore:
             lease_token=lease_token,
         )
 
+    def mark_pending_leasing_batch(
+        self, items: "list[tuple[int, str]]"
+    ) -> None:
+        """Bulk variant of :meth:`mark_pending_leasing`.
+
+        Writes ``status='leasing'`` + ``lease_token`` for every supplied
+        ``(pending_id, lease_token)`` pair inside a single SQLite
+        transaction. Same crash-recovery semantics as the per-row method
+        — the entire batch must be committed before the POST to
+        ``ERMrest_RID_Lease`` so a crash between SQLite-commit and POST
+        leaves every row in a recoverable state. The bulk path collapses
+        N WAL fsyncs into 1 for an N-asset upload (matches the pattern
+        used in ``mark_assets_uploaded``).
+
+        Args:
+            items: List of ``(pending_id, lease_token)`` tuples. Empty
+                list is a no-op.
+        """
+        if not items:
+            return
+        leasing = str(PendingRowStatus.leasing)
+        with self.engine.begin() as conn:
+            for pending_id, lease_token in items:
+                conn.execute(
+                    update(self.pending_rows)
+                    .where(self.pending_rows.c.id == pending_id)
+                    .values(status=leasing, lease_token=lease_token)
+                )
+
     def finalize_pending_lease(
         self,
         *,
@@ -825,6 +854,40 @@ class ExecutionStateStore:
                     leased_at=datetime.now(timezone.utc),
                 )
             )
+
+    def finalize_pending_leases_batch(
+        self, items: "list[tuple[str, str]]"
+    ) -> None:
+        """Bulk variant of :meth:`finalize_pending_lease`.
+
+        Writes the assigned RID and ``status='leased'`` for every
+        ``(lease_token, assigned_rid)`` pair in a single SQLite
+        transaction. The leased_at timestamp is captured once at
+        transaction entry and shared by every row (so all rows in a
+        single batched lease share an identical leased_at — true to
+        the wire batch they came from).
+
+        Args:
+            items: List of ``(lease_token, assigned_rid)`` tuples.
+                Empty list is a no-op.
+        """
+        if not items:
+            return
+        from datetime import datetime, timezone
+
+        leased_at = datetime.now(timezone.utc)
+        leased = str(PendingRowStatus.leased)
+        with self.engine.begin() as conn:
+            for lease_token, assigned_rid in items:
+                conn.execute(
+                    update(self.pending_rows)
+                    .where(self.pending_rows.c.lease_token == lease_token)
+                    .values(
+                        rid=assigned_rid,
+                        status=leased,
+                        leased_at=leased_at,
+                    )
+                )
 
     def revert_pending_leasing(self, *, lease_token: str) -> None:
         """Rollback: clear lease_token and flip back to 'staged'.

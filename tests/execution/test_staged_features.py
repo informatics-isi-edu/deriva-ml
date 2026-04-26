@@ -89,6 +89,120 @@ def test_mark_feature_record_failed_records_error(tmp_path: Path) -> None:
     assert row.error == "ermrest rejected"
 
 
+def test_stage_feature_records_bulk_inserts_all(tmp_path: Path) -> None:
+    """stage_feature_records inserts every row in one transaction.
+
+    Regression test for the perf fix that replaced a per-record
+    engine.begin() loop in Execution.add_features with a single
+    batched transaction. Behavior must match per-row staging: every
+    input becomes a pending row, stage_ids are returned in input
+    order, and the rows read back exactly as inserted.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
+    store = ManifestStore(engine)
+    store.ensure_schema()
+
+    payloads = [
+        {"Image": "IMG-A", "Glaucoma": "Normal"},
+        {"Image": "IMG-B", "Glaucoma": "Severe"},
+        {"Image": "IMG-C", "Glaucoma": "Normal"},
+    ]
+    stage_ids = store.stage_feature_records(
+        execution_rid="EXE-1",
+        feature_table="domain.Image_Glaucoma",
+        feature_name="Glaucoma",
+        target_table="Image",
+        records_json=[json.dumps(p) for p in payloads],
+    )
+    assert len(stage_ids) == 3
+    rows = sorted(store.list_feature_records("EXE-1"), key=lambda r: r.stage_id)
+    assert [r.stage_id for r in rows] == sorted(stage_ids)
+    assert [json.loads(r.record_json) for r in rows] == payloads
+    for r in rows:
+        assert r.status == "pending"
+        assert r.error is None
+        assert r.uploaded_at is None
+
+
+def test_stage_feature_records_bulk_empty_is_noop(tmp_path: Path) -> None:
+    """Empty list is a no-op — must not raise, must not insert any rows."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    assert store.stage_feature_records(
+        execution_rid="EXE-1",
+        feature_table="domain.Image_Glaucoma",
+        feature_name="Glaucoma",
+        target_table="Image",
+        records_json=[],
+    ) == []
+    assert store.list_feature_records("EXE-1") == []
+
+
+def test_mark_feature_records_uploaded_bulk(tmp_path: Path) -> None:
+    """Bulk mark-uploaded flips every supplied stage_id in one transaction.
+
+    Regression test for the perf fix that replaced a per-row
+    engine.begin() loop in _flush_staged_features. After a successful
+    bulk insert into ermrest, every staged-row's status must flip to
+    'uploaded' and uploaded_at must be set.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    stage_ids = store.stage_feature_records(
+        execution_rid="EXE-1",
+        feature_table="domain.Image_Glaucoma",
+        feature_name="Glaucoma",
+        target_table="Image",
+        records_json=[
+            json.dumps({"Image": f"IMG-{i}", "Glaucoma": "Normal"}) for i in range(3)
+        ],
+    )
+
+    store.mark_feature_records_uploaded(stage_ids)
+
+    for r in store.list_feature_records("EXE-1"):
+        assert r.status == "uploaded"
+        assert r.uploaded_at is not None
+        assert r.error is None
+
+
+def test_mark_feature_records_uploaded_bulk_empty_is_noop(tmp_path: Path) -> None:
+    """Empty list is a no-op."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    store.mark_feature_records_uploaded([])  # must not raise
+
+
+def test_mark_feature_records_failed_bulk(tmp_path: Path) -> None:
+    """Bulk mark-failed records per-row error messages in one transaction.
+
+    Each row gets its own error string (a flush can fail rows
+    individually), but every UPDATE fires inside one engine.begin().
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    stage_ids = store.stage_feature_records(
+        execution_rid="EXE-1",
+        feature_table="domain.Image_Glaucoma",
+        feature_name="Glaucoma",
+        target_table="Image",
+        records_json=[json.dumps({"Image": f"IMG-{i}"}) for i in range(2)],
+    )
+
+    items = [(stage_ids[0], "validation error"), (stage_ids[1], "duplicate key")]
+    store.mark_feature_records_failed(items)
+
+    rows = sorted(store.list_feature_records("EXE-1"), key=lambda r: r.stage_id)
+    assert rows[0].status == "failed"
+    assert rows[0].error == "validation error"
+    assert rows[1].status == "failed"
+    assert rows[1].error == "duplicate key"
+
+
 def test_list_pending_feature_records_filters_by_status(tmp_path: Path) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
     store = ManifestStore(engine)

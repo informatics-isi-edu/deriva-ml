@@ -26,14 +26,26 @@ def _fake_catalog(token_to_rid_map: dict[str, str]):
 
 def _fake_manifest(entries: dict):
     """Build a fake AssetManifest whose pending_assets() returns the given
-    dict and whose set_asset_rid(key, rid) updates the entry in place."""
+    dict.
+
+    Both the legacy per-key ``set_asset_rid`` and the bulk
+    ``set_asset_rids_batch`` are wired to mutate the same shared entries
+    dict so tests can assert on ``entries[key].rid`` regardless of which
+    write path the production code uses. ``call_count`` on each remains
+    available so tests can assert which path fired.
+    """
     manifest = MagicMock()
     manifest.pending_assets.return_value = entries
 
     def fake_set_asset_rid(key, rid):
         entries[key].rid = rid
 
+    def fake_set_asset_rids_batch(items):
+        for key, rid in items:
+            entries[key].rid = rid
+
     manifest.set_asset_rid.side_effect = fake_set_asset_rid
+    manifest.set_asset_rids_batch.side_effect = fake_set_asset_rids_batch
     return manifest
 
 
@@ -83,8 +95,14 @@ def test_rids_assigned_to_entries_missing_rid(monkeypatch):
 
     assert entries["Image/a.png"].rid == "1-NEW-A"
     assert entries["Image/b.png"].rid == "1-NEW-B"
-    # set_asset_rid was called for each entry.
-    assert manifest.set_asset_rid.call_count == 2
+    # The bulk path fires once, not per-entry — perf fix in
+    # set_asset_rids_batch consolidates N writebacks into one
+    # SQLite transaction.
+    assert manifest.set_asset_rids_batch.call_count == 1
+    items = manifest.set_asset_rids_batch.call_args.args[0]
+    assert sorted(items) == sorted(
+        [("Image/a.png", "1-NEW-A"), ("Image/b.png", "1-NEW-B")]
+    )
 
 
 def test_mixed_entries_only_missing_rids_leased(monkeypatch):
@@ -107,5 +125,7 @@ def test_mixed_entries_only_missing_rids_leased(monkeypatch):
 
     assert entries["Image/a.png"].rid == "1-ALREADY"  # unchanged
     assert entries["Image/b.png"].rid == "1-LEASED"
-    # set_asset_rid called only for the one that was missing.
-    assert manifest.set_asset_rid.call_count == 1
+    # set_asset_rids_batch called once with only the one missing entry.
+    assert manifest.set_asset_rids_batch.call_count == 1
+    items = manifest.set_asset_rids_batch.call_args.args[0]
+    assert items == [("Image/b.png", "1-LEASED")]
