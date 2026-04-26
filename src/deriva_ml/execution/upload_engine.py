@@ -658,6 +658,20 @@ def _invoke_deriva_py_uploader(
     rows_by_path: dict[str, dict] = {str(Path(f["path"]).resolve()): f for f in files}
     written_paths: set[str] = set()
 
+    # Pending writes accumulated by status_callback. Each entry is
+    # ``(pending_id, fields_dict)`` ready for
+    # ``store.update_pending_rows_batch``. Flushed in chunks to collapse
+    # one transaction per file into one transaction per chunk — the
+    # crash-safety contract is preserved by the reconciliation pass at
+    # the end of run_upload_engine, which re-derives terminal state from
+    # ``uploader.file_status``.
+    pending_writes: list[tuple[int, dict]] = []
+    # Tunable: how many terminal rows to buffer before forcing a flush.
+    # Sized so a small upload (handful of files) still gets a single
+    # commit, while a large upload (thousands of files) flushes
+    # frequently enough that crash recovery has minimal redundant work.
+    _CALLBACK_FLUSH_BATCH = 64
+
     with TemporaryDirectory(prefix="deriva-ml-upload-") as scan_root_str:
         # Resolve symlinks in the temp dir path so the scan-path ↔
         # input-path map lines up with what GenericUploader records
@@ -723,8 +737,21 @@ def _invoke_deriva_py_uploader(
             abs_input = str(Path(f["path"]).resolve())
             scan_path_to_input[str(_path_for(f))] = abs_input
 
-        def _apply_state_to_sqlite(scan_path: str, state_info: dict) -> None:
-            """Idempotent: translate one uploader status dict to a SQLite write."""
+        def _flush_pending_writes() -> None:
+            """Flush any buffered terminal-state writes in one transaction."""
+            if not pending_writes:
+                return
+            store.update_pending_rows_batch(pending_writes)
+            pending_writes.clear()
+
+        def _queue_state_for_sqlite(scan_path: str, state_info: dict) -> None:
+            """Idempotent: translate one uploader status dict to a buffered write.
+
+            Writes are accumulated in ``pending_writes`` and flushed in
+            batches by ``status_callback`` (see ``_CALLBACK_FLUSH_BATCH``)
+            and once more after ``uploadFiles`` returns. This avoids one
+            SQLite transaction per file on N-file uploads.
+            """
             if scan_path in written_paths:
                 return
             input_path = scan_path_to_input.get(scan_path)
@@ -738,17 +765,25 @@ def _invoke_deriva_py_uploader(
             now = datetime.now(timezone.utc)
             # Map deriva-py UploadState codes → SQLite status.
             if state == UploadState.Success:
-                store.update_pending_row(
-                    row["pending_id"],
-                    status=PendingRowStatus.uploaded,
-                    uploaded_at=now,
+                pending_writes.append(
+                    (
+                        row["pending_id"],
+                        {
+                            "status": PendingRowStatus.uploaded,
+                            "uploaded_at": now,
+                        },
+                    )
                 )
                 written_paths.add(scan_path)
             elif state == UploadState.Failed:
-                store.update_pending_row(
-                    row["pending_id"],
-                    status=PendingRowStatus.failed,
-                    error=status or "upload failed",
+                pending_writes.append(
+                    (
+                        row["pending_id"],
+                        {
+                            "status": PendingRowStatus.failed,
+                            "error": status or "upload failed",
+                        },
+                    )
                 )
                 written_paths.add(scan_path)
             # UploadState.Cancelled/Aborted/Paused/Timeout: leave Pending.
@@ -757,9 +792,13 @@ def _invoke_deriva_py_uploader(
             # Observe cancel first.
             if cancel_event is not None and cancel_event.is_set():
                 uploader.cancel()
-            # Walk file_status, write any newly-terminal rows.
+            # Walk file_status, queue any newly-terminal rows.
             for scan_path, info in list(uploader.file_status.items()):
-                _apply_state_to_sqlite(scan_path, info)
+                _queue_state_for_sqlite(scan_path, info)
+            # Flush in chunks to bound the redundant work a crash forces
+            # the reconciliation pass to redo.
+            if len(pending_writes) >= _CALLBACK_FLUSH_BATCH:
+                _flush_pending_writes()
 
         def file_callback(**kwargs) -> bool | int:
             if cancel_event is not None and cancel_event.is_set():
@@ -788,9 +827,11 @@ def _invoke_deriva_py_uploader(
                 file_callback=file_callback,
             )
 
-            # Reconciliation pass — catch anything the callback missed.
+            # Reconciliation pass — catch anything the callback missed,
+            # then commit every buffered write in one final transaction.
             for scan_path, info in uploader.file_status.items():
-                _apply_state_to_sqlite(scan_path, info)
+                _queue_state_for_sqlite(scan_path, info)
+            _flush_pending_writes()
 
             # Build the return dict BEFORE cleanup() clears file_status.
             for scan_path, info in uploader.file_status.items():
@@ -806,6 +847,17 @@ def _invoke_deriva_py_uploader(
                         "error": info.get("Status") or "upload failed",
                     })
         finally:
+            # On exception or early return, flush any buffered terminal
+            # writes so partial progress is durable. Reconciliation on
+            # the next run will redo at most _CALLBACK_FLUSH_BATCH-1
+            # files of redundant work.
+            try:
+                _flush_pending_writes()
+            except Exception:  # noqa: BLE001 — best effort; log and move on
+                logger.warning(
+                    "upload: failed to flush buffered SQLite writes on cleanup",
+                    exc_info=True,
+                )
             try:
                 uploader.cleanup()
             except Exception:

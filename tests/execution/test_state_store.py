@@ -327,6 +327,107 @@ def test_list_pending_rows_filter_by_status(tmp_path):
     assert {r["id"] for r in staged} == {id2}
 
 
+def test_update_pending_rows_batch_applies_all_in_one_transaction(tmp_path):
+    """Bulk variant flips every (id, fields) pair in one transaction.
+
+    Regression test for the perf fix that replaced one
+    ``engine.begin()`` per upload-engine status callback with a single
+    batched transaction. On a 10K-asset upload this is the difference
+    between thousands of WAL fsyncs and a handful (the callback flushes
+    in chunks). The behavior must match the per-row method except for
+    speed: arbitrary fields applied; PendingRowStatus enums coerced to
+    strings just like ``update_pending_row``.
+    """
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.Running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    ids = []
+    for i in range(3):
+        ids.append(store.insert_pending_row(
+            execution_rid="EXE-A", key=f"k{i}",
+            target_schema="s", target_table="t",
+            metadata_json="{}", created_at=now,
+        ))
+
+    upload_time = datetime.now(timezone.utc)
+    store.update_pending_rows_batch([
+        (ids[0], {"status": PendingRowStatus.uploaded, "uploaded_at": upload_time}),
+        (ids[1], {"status": PendingRowStatus.uploaded, "uploaded_at": upload_time}),
+        (ids[2], {"status": PendingRowStatus.failed, "error": "boom"}),
+    ])
+
+    rows = {r["id"]: r for r in store.list_pending_rows(execution_rid="EXE-A")}
+    assert rows[ids[0]]["status"] == str(PendingRowStatus.uploaded)
+    assert rows[ids[0]]["uploaded_at"] is not None
+    assert rows[ids[1]]["status"] == str(PendingRowStatus.uploaded)
+    assert rows[ids[2]]["status"] == str(PendingRowStatus.failed)
+    assert rows[ids[2]]["error"] == "boom"
+
+
+def test_update_pending_rows_batch_empty_is_noop(tmp_path):
+    """Empty list must not raise and must not cycle a transaction."""
+    from deriva_ml.execution.state_store import ExecutionStateStore
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    store.update_pending_rows_batch([])  # contract: no-op
+
+
+def test_update_pending_rows_batch_rejects_unknown_columns(tmp_path):
+    """Validation runs before any write so a bad row doesn't half-commit.
+
+    The per-row ``update_pending_row`` raises KeyError for unknown
+    columns; the batch variant must do the same — and crucially, must
+    raise *before* opening the transaction so a malformed row in a
+    long batch doesn't leave half the upload in an inconsistent state.
+    """
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, ExecutionStatus, PendingRowStatus,
+    )
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    eng = _engine(tmp_path)
+    store = ExecutionStateStore(engine=eng)
+    store.ensure_schema()
+    now = datetime.now(timezone.utc)
+    store.insert_execution(
+        rid="EXE-A", workflow_rid=None, description=None,
+        config_json="{}", status=ExecutionStatus.Running,
+        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
+        created_at=now, last_activity=now,
+    )
+    pid = store.insert_pending_row(
+        execution_rid="EXE-A", key="k0",
+        target_schema="s", target_table="t",
+        metadata_json="{}", created_at=now,
+    )
+
+    with pytest.raises(KeyError):
+        store.update_pending_rows_batch([
+            (pid, {"status": PendingRowStatus.uploaded}),
+            (pid, {"not_a_real_column": "oops"}),
+        ])
+    # The first entry must NOT have been applied — validation precedes
+    # the transaction.
+    rows = {r["id"]: r for r in store.list_pending_rows(execution_rid="EXE-A")}
+    assert rows[pid]["status"] == str(PendingRowStatus.staged)
+
+
 def test_insert_directory_rule(tmp_path):
     from datetime import datetime, timezone
     from deriva_ml.execution.state_store import (

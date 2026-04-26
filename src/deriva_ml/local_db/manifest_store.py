@@ -321,6 +321,11 @@ class ManifestStore:
     def mark_asset_uploaded(self, execution_rid: str, key: str, rid: str) -> None:
         """Transition an asset entry to ``status="uploaded"`` and record its catalog RID.
 
+        Single-row convenience wrapper over
+        :meth:`mark_assets_uploaded`. Adds the existence check that the
+        bulk path intentionally omits, so callers continue to see
+        ``KeyError`` when ``key`` isn't present.
+
         Args:
             execution_rid: Owning execution RID.
             key: Asset key.
@@ -330,19 +335,7 @@ class ManifestStore:
             KeyError: If the entry does not exist.
         """
         self._require_asset(execution_rid, key)
-        now = _now_iso()
-        with self._engine.begin() as conn:
-            conn.execute(
-                update(self._assets_t)
-                .where((self._assets_t.c.execution_rid == execution_rid) & (self._assets_t.c.key == key))
-                .values(
-                    status="uploaded",
-                    rid=rid,
-                    uploaded_at=now,
-                    error=None,
-                    updated_at=now,
-                )
-            )
+        self.mark_assets_uploaded(execution_rid, [(key, rid)])
 
     def mark_assets_uploaded(
         self, execution_rid: str, items: "list[tuple[str, str]]"
@@ -398,10 +391,14 @@ class ManifestStore:
     def set_asset_rid(self, execution_rid: str, key: str, rid: str) -> None:
         """Assign a pre-leased RID to an asset entry without changing status.
 
-        Used when the RID is known in advance (from ``ERMrest_RID_Lease``)
-        so the catalog insert at upload time can use the caller-supplied
-        RID. Unlike :meth:`mark_asset_uploaded`, this leaves ``status``
-        and ``uploaded_at`` unchanged.
+        Single-row convenience wrapper over :meth:`set_asset_rids`.
+        Adds the existence check that the bulk path intentionally
+        omits, so callers continue to see ``KeyError`` when ``key``
+        isn't present. Used when the RID is known in advance (from
+        ``ERMrest_RID_Lease``) so the catalog insert at upload time
+        can use the caller-supplied RID. Unlike
+        :meth:`mark_asset_uploaded`, this leaves ``status`` and
+        ``uploaded_at`` unchanged.
 
         Args:
             execution_rid: Owning execution RID.
@@ -412,12 +409,7 @@ class ManifestStore:
             KeyError: If the entry does not exist.
         """
         self._require_asset(execution_rid, key)
-        with self._engine.begin() as conn:
-            conn.execute(
-                update(self._assets_t)
-                .where((self._assets_t.c.execution_rid == execution_rid) & (self._assets_t.c.key == key))
-                .values(rid=rid, updated_at=_now_iso())
-            )
+        self.set_asset_rids(execution_rid, [(key, rid)])
 
     def set_asset_rids(
         self, execution_rid: str, items: "list[tuple[str, str]]"
@@ -500,6 +492,9 @@ class ManifestStore:
     ) -> int:
         """Insert one staged feature record row with status ``"pending"``.
 
+        Single-row convenience wrapper over
+        :meth:`stage_feature_records`.
+
         Args:
             execution_rid: RID of the owning execution.
             feature_table: Qualified feature table name (``"schema.Table"``).
@@ -510,21 +505,14 @@ class ManifestStore:
         Returns:
             The autoincrement ``stage_id`` of the inserted row.
         """
-        now = _now_iso()
-        row = {
-            "execution_rid": execution_rid,
-            "feature_table": feature_table,
-            "feature_name": feature_name,
-            "target_table": target_table,
-            "record_json": record_json,
-            "created_at": now,
-            "status": "pending",
-            "uploaded_at": None,
-            "error": None,
-        }
-        with self._engine.begin() as conn:
-            result = conn.execute(insert(self._feature_records_t), row)
-            return result.inserted_primary_key[0]
+        ids = self.stage_feature_records(
+            execution_rid=execution_rid,
+            feature_table=feature_table,
+            feature_name=feature_name,
+            target_table=target_table,
+            records_json=[record_json],
+        )
+        return ids[0]
 
     def stage_feature_records(
         self,
@@ -653,6 +641,11 @@ class ManifestStore:
     def mark_feature_record_uploaded(self, stage_id: int) -> None:
         """Transition a staged feature record to ``status="uploaded"``.
 
+        Single-row convenience wrapper over
+        :meth:`mark_feature_records_uploaded`. Adds the existence
+        check that the bulk path intentionally omits, so callers
+        continue to see ``KeyError`` when ``stage_id`` isn't present.
+
         Args:
             stage_id: Primary key of the row to update.
 
@@ -660,13 +653,7 @@ class ManifestStore:
             KeyError: If no row with *stage_id* exists.
         """
         self._require_feature_record(stage_id)
-        now = _now_iso()
-        with self._engine.begin() as conn:
-            conn.execute(
-                update(self._feature_records_t)
-                .where(self._feature_records_t.c.stage_id == stage_id)
-                .values(status="uploaded", uploaded_at=now, error=None)
-            )
+        self.mark_feature_records_uploaded([stage_id])
 
     def mark_feature_records_uploaded(self, stage_ids: "list[int]") -> None:
         """Bulk variant of :meth:`mark_feature_record_uploaded`.
@@ -701,6 +688,11 @@ class ManifestStore:
     def mark_feature_record_failed(self, stage_id: int, error: str) -> None:
         """Transition a staged feature record to ``status="failed"`` and record the error.
 
+        Single-row convenience wrapper over
+        :meth:`mark_feature_records_failed`. Adds the existence check
+        that the bulk path intentionally omits, so callers continue
+        to see ``KeyError`` when ``stage_id`` isn't present.
+
         Args:
             stage_id: Primary key of the row to update.
             error: Human-readable error description.
@@ -709,12 +701,7 @@ class ManifestStore:
             KeyError: If no row with *stage_id* exists.
         """
         self._require_feature_record(stage_id)
-        with self._engine.begin() as conn:
-            conn.execute(
-                update(self._feature_records_t)
-                .where(self._feature_records_t.c.stage_id == stage_id)
-                .values(status="failed", error=error)
-            )
+        self.mark_feature_records_failed([(stage_id, error)])
 
     def mark_feature_records_failed(
         self, items: "list[tuple[int, str]]"

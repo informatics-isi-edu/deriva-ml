@@ -466,8 +466,10 @@ class ExecutionStateStore:
     def update_pending_row(self, pending_id: int, **fields: object) -> None:
         """Partial update of a pending_rows entry.
 
-        Status / token / rid / timestamps are the common callers. Enum
-        values are coerced to strings.
+        Single-row convenience wrapper over
+        :meth:`update_pending_rows_batch`. Status / token / rid /
+        timestamps are the common callers; enum values are coerced to
+        strings by the bulk path.
 
         Args:
             pending_id: The integer id of the row to update.
@@ -476,22 +478,61 @@ class ExecutionStateStore:
         Raises:
             KeyError: If a kwarg doesn't match a pending_rows column.
         """
-        valid_cols = {c.name for c in self.pending_rows.columns}
-        unknown = set(fields) - valid_cols
-        if unknown:
-            raise KeyError(f"unknown columns on pending_rows: {unknown}")
+        self.update_pending_rows_batch([(pending_id, dict(fields))])
 
-        coerced = {
-            k: str(v) if isinstance(v, PendingRowStatus) else v
-            for k, v in fields.items()
-        }
+    def update_pending_rows_batch(
+        self,
+        updates: "list[tuple[int, dict]]",
+    ) -> None:
+        """Bulk variant of :meth:`update_pending_row`.
+
+        Writes one UPDATE per ``(pending_id, fields)`` pair, but inside a
+        single ``engine.begin()`` so the entire batch lands as one WAL
+        transaction with one fsync. Used by the upload-engine callback
+        path: ``status_callback()`` fires per file and would otherwise
+        commit a separate transaction for every uploaded asset — on a
+        10K-file upload that's the difference between thousands of
+        fsyncs and a handful (the callback flushes in chunks).
+
+        Each entry's ``fields`` dict is validated against the
+        ``pending_rows`` schema; ``PendingRowStatus`` enums are coerced
+        to strings exactly as in the per-row method, so callers can
+        reuse the same call shape.
+
+        Args:
+            updates: List of ``(pending_id, fields)`` tuples. Empty
+                list is a no-op.
+
+        Raises:
+            KeyError: If any ``fields`` dict references an unknown
+                ``pending_rows`` column. Validation happens before any
+                write so the batch either applies entirely or not at
+                all (no partial transaction).
+        """
+        if not updates:
+            return
+
+        valid_cols = {c.name for c in self.pending_rows.columns}
+        # Validate all entries up-front so a bad row doesn't half-commit
+        # the rest of the batch.
+        prepared: list[tuple[int, dict]] = []
+        for pending_id, fields in updates:
+            unknown = set(fields) - valid_cols
+            if unknown:
+                raise KeyError(f"unknown columns on pending_rows: {unknown}")
+            coerced = {
+                k: str(v) if isinstance(v, PendingRowStatus) else v
+                for k, v in fields.items()
+            }
+            prepared.append((pending_id, coerced))
 
         with self.engine.begin() as conn:
-            conn.execute(
-                update(self.pending_rows)
-                .where(self.pending_rows.c.id == pending_id)
-                .values(**coerced)
-            )
+            for pending_id, coerced in prepared:
+                conn.execute(
+                    update(self.pending_rows)
+                    .where(self.pending_rows.c.id == pending_id)
+                    .values(**coerced)
+                )
 
     def list_pending_rows(
         self,
@@ -771,10 +812,11 @@ class ExecutionStateStore:
     def mark_pending_leasing(self, pending_id: int, *, lease_token: str) -> None:
         """Phase 1 of RID leasing: write lease_token + status='leasing'.
 
-        Must be committed BEFORE the POST to ERMrest_RID_Lease so that
-        a crash between this write and the POST is recoverable via
-        revert_pending_leasing (token wasn't yet sent, so no server
-        state to reconcile).
+        Single-row convenience wrapper over
+        :meth:`mark_pending_leasing_batch`. Must be committed BEFORE
+        the POST to ERMrest_RID_Lease so that a crash between this
+        write and the POST is recoverable via revert_pending_leasing
+        (token wasn't yet sent, so no server state to reconcile).
 
         Args:
             pending_id: pending_rows.id to transition.
@@ -785,25 +827,20 @@ class ExecutionStateStore:
             >>> store.mark_pending_leasing(pid, lease_token=token)
             >>> # Now POST the token to ERMrest_RID_Lease.
         """
-        self.update_pending_row(
-            pending_id,
-            status=PendingRowStatus.leasing,
-            lease_token=lease_token,
-        )
+        self.mark_pending_leasing_batch([(pending_id, lease_token)])
 
     def mark_pending_leasing_batch(
         self, items: "list[tuple[int, str]]"
     ) -> None:
-        """Bulk variant of :meth:`mark_pending_leasing`.
+        """Phase 1 of RID leasing for a batch.
 
         Writes ``status='leasing'`` + ``lease_token`` for every supplied
         ``(pending_id, lease_token)`` pair inside a single SQLite
-        transaction. Same crash-recovery semantics as the per-row method
-        — the entire batch must be committed before the POST to
-        ``ERMrest_RID_Lease`` so a crash between SQLite-commit and POST
-        leaves every row in a recoverable state. The bulk path collapses
-        N WAL fsyncs into 1 for an N-asset upload (matches the pattern
-        used in ``mark_assets_uploaded``).
+        transaction — the entire batch must be committed before the
+        POST to ``ERMrest_RID_Lease`` so a crash between SQLite-commit
+        and POST leaves every row in a recoverable state. The bulk
+        path collapses N WAL fsyncs into 1 for an N-asset upload
+        (matches the pattern used in ``mark_assets_uploaded``).
 
         Args:
             items: List of ``(pending_id, lease_token)`` tuples. Empty
@@ -811,14 +848,10 @@ class ExecutionStateStore:
         """
         if not items:
             return
-        leasing = str(PendingRowStatus.leasing)
-        with self.engine.begin() as conn:
-            for pending_id, lease_token in items:
-                conn.execute(
-                    update(self.pending_rows)
-                    .where(self.pending_rows.c.id == pending_id)
-                    .values(status=leasing, lease_token=lease_token)
-                )
+        self.update_pending_rows_batch([
+            (pending_id, {"status": PendingRowStatus.leasing, "lease_token": lease_token})
+            for pending_id, lease_token in items
+        ])
 
     def finalize_pending_lease(
         self,
@@ -829,9 +862,11 @@ class ExecutionStateStore:
         """Phase 2: POST succeeded, assign the server RID and flip to
         'leased'.
 
-        Identified by lease_token (not pending_id) so this works for
-        batched lease responses without requiring the caller to hold
-        pending_id↔token mappings.
+        Single-row convenience wrapper over
+        :meth:`finalize_pending_leases_batch`. Identified by
+        lease_token (not pending_id) so this works for batched lease
+        responses without requiring the caller to hold pending_id↔token
+        mappings.
 
         Args:
             lease_token: The token we POSTed and got a RID back for.
@@ -842,23 +877,12 @@ class ExecutionStateStore:
             ...     lease_token="uuid...", assigned_rid="1-ABCD"
             ... )
         """
-        from datetime import datetime, timezone
-
-        with self.engine.begin() as conn:
-            conn.execute(
-                update(self.pending_rows)
-                .where(self.pending_rows.c.lease_token == lease_token)
-                .values(
-                    rid=assigned_rid,
-                    status=str(PendingRowStatus.leased),
-                    leased_at=datetime.now(timezone.utc),
-                )
-            )
+        self.finalize_pending_leases_batch([(lease_token, assigned_rid)])
 
     def finalize_pending_leases_batch(
         self, items: "list[tuple[str, str]]"
     ) -> None:
-        """Bulk variant of :meth:`finalize_pending_lease`.
+        """Phase 2 for a batch of leases.
 
         Writes the assigned RID and ``status='leased'`` for every
         ``(lease_token, assigned_rid)`` pair in a single SQLite
@@ -866,6 +890,10 @@ class ExecutionStateStore:
         transaction entry and shared by every row (so all rows in a
         single batched lease share an identical leased_at — true to
         the wire batch they came from).
+
+        Note: this method matches by ``lease_token``, not ``id``, so
+        it does not go through ``update_pending_rows_batch``. The
+        single-tx semantics are still preserved.
 
         Args:
             items: List of ``(lease_token, assigned_rid)`` tuples.

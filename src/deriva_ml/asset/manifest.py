@@ -127,10 +127,16 @@ class AssetManifest:
         self._store.update_asset_types(self._execution_rid, key, asset_types)
 
     def mark_uploaded(self, key: str, rid: str) -> None:
+        """Single-row convenience wrapper over :meth:`mark_uploaded_batch`.
+
+        Delegates to the bulk path with a one-element list; the store
+        layer's single-row method retains the existence check that
+        raises ``KeyError`` for missing keys.
+        """
         self._store.mark_asset_uploaded(self._execution_rid, key, rid)
 
     def mark_uploaded_batch(self, items: "list[tuple[str, str]]") -> None:
-        """Bulk variant of :meth:`mark_uploaded` for post-upload finalization.
+        """Bulk post-upload finalization.
 
         Wraps ``ManifestStore.mark_assets_uploaded`` so callers in the
         upload pipeline can flip every just-uploaded entry to
@@ -146,9 +152,11 @@ class AssetManifest:
     def set_asset_rid(self, key: str, rid: str) -> None:
         """Assign a pre-leased RID to an asset entry without changing status.
 
-        Used when the RID is known in advance (from ``ERMrest_RID_Lease``)
-        so the catalog insert at upload time can use the caller-supplied
-        RID. Unlike :meth:`mark_uploaded`, this leaves ``status`` and
+        Single-row convenience wrapper over
+        :meth:`set_asset_rids_batch`. Used when the RID is known in
+        advance (from ``ERMrest_RID_Lease``) so the catalog insert at
+        upload time can use the caller-supplied RID. Unlike
+        :meth:`mark_uploaded`, this leaves ``status`` and
         ``uploaded_at`` unchanged.
 
         Args:
@@ -161,7 +169,7 @@ class AssetManifest:
         self._store.set_asset_rid(self._execution_rid, key, rid)
 
     def set_asset_rids_batch(self, items: "list[tuple[str, str]]") -> None:
-        """Bulk variant of :meth:`set_asset_rid` for batched lease writeback.
+        """Bulk variant for batched lease writeback.
 
         Wraps ``ManifestStore.set_asset_rids`` so callers (the lease
         post-write loop in ``manifest_lease.py``) can flush N RID

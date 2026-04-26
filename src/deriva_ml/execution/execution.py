@@ -559,10 +559,29 @@ class Execution:
         # Download assets....
         self._logger.info("Downloading assets ...")
         self.asset_paths = {}
-        for asset_spec in self.configuration.assets:
+        # Batch-resolve every asset RID up front (one query per
+        # candidate table) instead of one resolve_rid round-trip per
+        # asset. Skip cleanly when there are no asset specs so an
+        # empty configuration doesn't fire a no-op resolve_rids call.
+        asset_specs = list(self.configuration.assets)
+        if asset_specs:
+            asset_rids = [spec.rid for spec in asset_specs]
+            rid_results = self._ml_object.resolve_rids(asset_rids)
+        else:
+            rid_results = {}
+        for asset_spec in asset_specs:
             asset_rid = asset_spec.rid
             use_cache = asset_spec.cache
-            asset_table = self._ml_object.resolve_rid(asset_rid).table.name
+            rid_info = rid_results.get(asset_rid)
+            if rid_info is None:
+                # resolve_rids would have raised on missing RIDs; this
+                # branch only triggers if asset_specs was non-empty but
+                # rid_info wasn't returned (defensive — should not
+                # happen).
+                rid_info_table = self._ml_object.resolve_rid(asset_rid).table
+            else:
+                rid_info_table = rid_info.table
+            asset_table = rid_info_table.name
             dest_dir = (
                 execution_root(self._ml_object.working_dir, self.execution_rid) / "downloaded-assets" / asset_table
             )
@@ -573,6 +592,7 @@ class Execution:
                     dest_dir=dest_dir,
                     update_catalog=not (reload or self._dry_run),
                     use_cache=use_cache,
+                    _asset_table=rid_info_table,
                 )
             )
 
@@ -1344,7 +1364,12 @@ class Execution:
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_asset(
-        self, asset_rid: RID, dest_dir: Path, update_catalog: bool = True, use_cache: bool = False
+        self,
+        asset_rid: RID,
+        dest_dir: Path,
+        update_catalog: bool = True,
+        use_cache: bool = False,
+        _asset_table: Any = None,
     ) -> AssetFilePath:
         """Download an asset from a URL and place it in a local directory.
 
@@ -1355,12 +1380,17 @@ class Execution:
             use_cache: If True, check the cache directory for a previously downloaded copy
                 with a matching MD5 checksum before downloading. Cached copies are stored
                 in ``cache_dir/assets/{rid}_{md5}/`` and symlinked into the destination.
+            _asset_table: Internal — pre-resolved Table object for this RID. When supplied
+                (typically from ``_initialize_execution``'s batched ``resolve_rids`` call)
+                skips the per-asset ``resolve_rid`` round-trip. Underscore-prefixed because
+                callers should not rely on this; pass through the public ``resolve_rid``
+                path otherwise.
 
         Returns:
             An AssetFilePath with the path to the downloaded (or cached) asset file.
         """
 
-        asset_table = self._ml_object.resolve_rid(asset_rid).table
+        asset_table = _asset_table if _asset_table is not None else self._ml_object.resolve_rid(asset_rid).table
         if not self._model.is_asset(asset_table):
             raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
 
