@@ -408,28 +408,79 @@ class TestExecutionLifecycle:
         execution.upload_execution_outputs()
 
     def test_execution_manual_start_stop(self, basic_execution):
-        """Test manual execution start and stop."""
-        from deriva_ml.execution.state_store import ExecutionStatus
+        """``execution_start()`` / ``execution_stop()`` cycle status correctly.
 
+        Imperative counterpart of the context-manager flow used by
+        ``with ml.create_execution(...) as exe:``. Required by code paths
+        that can't use a ``with`` block (e.g., the multirun parent execution
+        managed by an atexit handler in ``runner._complete_parent_execution``).
+        Each call must drive the documented state-machine transition:
+
+            execution_start()           → Created  → Running
+            execution_stop()            → Running  → Stopped
+            upload_execution_outputs()  → Stopped  → Pending_Upload → Uploaded
+
+        Regression guard: prior to the fix in commit
+        "fix(execution): execution_start/stop transition status",
+        ``execution_start()`` only wrote ``start_time`` and left status at
+        ``Created``, so ``execution_stop()``'s subsequent
+        ``update_status(Stopped)`` raised ``InvalidTransitionError`` for
+        ``Created → Stopped``. The multirun parent path crashed in
+        production before this test was strengthened.
+        """
         execution = basic_execution
         ml = execution._ml_object
 
         execution.execution_start()
-        # In the Phase 2 lifecycle execution_start records start_time but
-        # leaves status at Created (the prior 'Initializing' state is gone).
-        assert get_execution_status(ml, execution.execution_rid) == "Created"
-
-        # Transition Created → Running via update_status.
-        execution.update_status(ExecutionStatus.Running)
         assert get_execution_status(ml, execution.execution_rid) == "Running"
 
         execution.execution_stop()
-        # execution_stop transitions Running → Stopped.
         assert get_execution_status(ml, execution.execution_rid) == "Stopped"
 
         execution.upload_execution_outputs()
-        # upload_execution_outputs advances Stopped → Pending_Upload → Uploaded.
         assert get_execution_status(ml, execution.execution_rid) == "Uploaded"
+
+    def test_multirun_parent_lifecycle(self, workflow_terms, test_workflow):
+        """Multirun parent execution flows through the full state-machine cycle.
+
+        Direct regression test for the runner's multirun parent path. The
+        runner does not use a ``with`` context manager for the parent — it
+        calls ``execution_start()`` after ``create_execution`` and
+        ``execution_stop()`` from an ``atexit`` handler. Both must drive the
+        same ``Created → Running → Stopped`` transitions the context
+        manager does, otherwise the parent gets stuck at ``Created`` and
+        ``execution_stop()`` raises ``InvalidTransitionError`` for the
+        illegal ``Created → Stopped`` jump (observed in production with
+        the lr_sweep multirun on a fresh catalog).
+
+        Equivalent to ``test_execution_manual_start_stop`` but framed
+        around the parent-execution use case so a future refactor that
+        breaks one path leaves the other passing visibly named.
+        """
+        ml = workflow_terms
+
+        # Parent executions in the runner have no datasets — they only
+        # group children — so we mirror that here.
+        parent_config = ExecutionConfiguration(
+            description="Multirun parent execution (regression test)",
+            workflow=test_workflow,
+        )
+        parent = ml.create_execution(parent_config)
+        assert get_execution_status(ml, parent.execution_rid) == "Created"
+
+        # Runner calls execution_start() imperatively after create_execution.
+        parent.execution_start()
+        assert get_execution_status(ml, parent.execution_rid) == "Running"
+
+        # ... children would run here in production. Skip for the unit test.
+
+        # Runner's atexit handler calls execution_stop() then
+        # upload_execution_outputs(). Both must succeed.
+        parent.execution_stop()
+        assert get_execution_status(ml, parent.execution_rid) == "Stopped"
+
+        parent.upload_execution_outputs()
+        assert get_execution_status(ml, parent.execution_rid) == "Uploaded"
 
     def test_execution_status_updates(self, basic_execution):
         """Test updating execution status through the Phase 2 lifecycle.

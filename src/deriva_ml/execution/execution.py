@@ -1009,9 +1009,19 @@ class Execution:
     def execution_start(self) -> None:
         """Marks the execution as started.
 
-        Records the start time in SQLite and updates the execution's
-        status to 'Running'. This should be called before beginning
-        the main execution work.
+        Records the start time in SQLite and transitions the execution's
+        status from ``Created`` to ``Running`` via the state machine
+        (the same path the context-manager ``__enter__`` uses). This
+        should be called before beginning the main execution work — its
+        non-context-manager counterpart for code paths that can't use
+        ``with ml.create_execution(...) as exe:`` (e.g., the multirun
+        parent execution managed by an ``atexit`` handler).
+
+        Pairs with ``execution_stop()`` which transitions Running → Stopped.
+
+        Raises:
+            InvalidTransitionError: If the execution is not currently in
+                ``ExecutionStatus.Created``.
 
         Example:
             >>> execution.execution_start()  # doctest: +SKIP
@@ -1023,17 +1033,34 @@ class Execution:
         """
         from datetime import timezone
 
-        # Persist start_time to SQLite (authoritative source for the
-        # `start_time` read-through property). Skip for dry-run — no
-        # SQLite row exists.
-        if not self._dry_run:
-            store = self._ml_object.workspace.execution_state_store()
-            store.update_execution(
-                self.execution_rid,
-                start_time=datetime.now(timezone.utc),
-            )
         self.uploaded_assets = None
         self._logger.info("Start execution...")
+
+        # Dry-run executions don't have a SQLite registry row — there's
+        # nothing to transition and the status read-through returns a
+        # sentinel. Skip the state-machine call entirely.
+        if self._dry_run:
+            return
+
+        # Transition Created → Running through the state machine, writing
+        # start_time atomically with the status change so a crash between
+        # the two can't leave the row inconsistent. Mirrors __enter__ —
+        # the only difference is that this path is invoked imperatively
+        # by callers that don't (or can't) use the context manager.
+        current = self.status
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(
+                self._ml_object.catalog
+                if self._ml_object._mode is ConnectionMode.online
+                else None
+            ),
+            execution_rid=self.execution_rid,
+            current=current,
+            target=ExecutionStatus.Running,
+            mode=self._ml_object._mode,
+            extra_fields={"start_time": datetime.now(timezone.utc)},
+        )
 
     def execution_stop(self) -> None:
         """Marks the execution as stopped (algorithm finished successfully).
