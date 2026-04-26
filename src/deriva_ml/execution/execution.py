@@ -409,22 +409,48 @@ class Execution:
             json.dump(get_execution_environment(), fp)
 
     def _upload_hydra_config_assets(self):
-        """Upload hydra assets to the catalog with Hydra_Config type."""
+        """Register Hydra static config YAMLs as Execution_Metadata assets.
+
+        Walks ``<hydra_run_dir>/hydra-config/`` — the subdirectory Hydra
+        designates for the resolved configuration snapshots
+        (``config.yaml``, ``hydra.yaml``, ``overrides.yaml``). These are
+        immutable per-run artifacts written once at hydra-launch and the
+        actual provenance for "what configuration did this run use".
+
+        Deliberately does NOT walk the parent ``<hydra_run_dir>`` itself.
+        Hydra installs a job-logging ``FileHandler`` at
+        ``<hydra_run_dir>/<job_name>.log`` (e.g., ``notebook.log``) that
+        keeps appending log lines for the entire process — including
+        every ``logger.info`` from this very upload pass. Registering a
+        live, growing file as an immutable asset breaks the asset
+        contract ("the bytes you registered are the bytes that get
+        uploaded") and produces a known race in deriva-py's uploader:
+        the file's MD5 changes between hash-time and a subsequent
+        idempotency pre-check, the pre-check by ``MD5+Filename`` misses
+        the row that was already inserted, and a duplicate-RID INSERT
+        fires (HTTP 409). The job log is the *runner's* asset, not the
+        kernel's — see ``deriva_ml/run_notebook.py`` for the runner-side
+        registration that closes the FileHandler before staging the log.
+        """
         hydra_runtime_output_dir = self._ml_object.hydra_runtime_output_dir
-        if hydra_runtime_output_dir:
-            timestamp = hydra_runtime_output_dir.parts[-1]
-            for hydra_asset in hydra_runtime_output_dir.rglob("*"):
-                if hydra_asset.is_dir():
-                    continue
-                # Register file for upload (side effect); result intentionally unused
-                # Use Hydra_Config type for Hydra YAML configuration files
-                self.asset_file_path(
-                    asset_name=MLAsset.execution_metadata,
-                    file_name=hydra_runtime_output_dir / hydra_asset,
-                    rename_file=f"hydra-{timestamp}-{hydra_asset.name}",
-                    asset_types=ExecMetadataType.hydra_config.value,
-                    description=self._get_metadata_description(hydra_asset.name),
-                )
+        if not hydra_runtime_output_dir:
+            return
+        config_dir = hydra_runtime_output_dir / "hydra-config"
+        if not config_dir.exists():
+            return  # tolerate older Hydra layouts that don't separate config from log
+        timestamp = hydra_runtime_output_dir.parts[-1]
+        for hydra_asset in config_dir.iterdir():
+            if hydra_asset.is_dir():
+                continue
+            # Register file for upload (side effect); result intentionally unused.
+            # Use Hydra_Config type for Hydra YAML configuration files.
+            self.asset_file_path(
+                asset_name=MLAsset.execution_metadata,
+                file_name=hydra_asset,
+                rename_file=f"hydra-{timestamp}-{hydra_asset.name}",
+                asset_types=ExecMetadataType.hydra_config.value,
+                description=self._get_metadata_description(hydra_asset.name),
+            )
 
     @staticmethod
     def _get_metadata_description(file_name: str) -> str | None:
