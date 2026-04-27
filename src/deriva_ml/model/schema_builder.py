@@ -431,8 +431,22 @@ class SchemaORM:
         self._disposed = True
 
     def __del__(self) -> None:
-        """Cleanup resources when garbage collected."""
-        self.dispose()
+        """Cleanup resources when garbage collected.
+
+        Best-effort. ``__del__`` runs at unpredictable points, including
+        interpreter shutdown when SQLAlchemy module-level globals
+        (registries, engines) may already be partially torn down. In
+        that race we'd see ``AttributeError: 'NoneType' object has no
+        attribute '_dispose_registries'`` printed via ``Exception
+        ignored in:`` — benign but noisy enough to make every short
+        script look like it failed. Swallow everything here; the
+        explicit ``dispose()`` callable from ``__exit__`` and from
+        callers still raises normally.
+        """
+        try:
+            self.dispose()
+        except Exception:
+            pass
 
     def __enter__(self) -> "SchemaORM":
         """Context manager entry."""
