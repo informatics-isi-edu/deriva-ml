@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
 from deriva_ml.execution.state_machine import (
@@ -168,9 +169,7 @@ class ExecutionMixin:
         # accepted in both forms (workflow had legacy config-form
         # support; dry_run is universal). Only the kwargs-only fields
         # gate the mixing check.
-        kwargs_form_only = any(
-            x is not None for x in (datasets, assets, description)
-        )
+        kwargs_form_only = any(x is not None for x in (datasets, assets, description))
         if configuration is not None and kwargs_form_only:
             raise TypeError(
                 "create_execution: cannot mix configuration= with "
@@ -201,20 +200,14 @@ class ExecutionMixin:
             configuration = ExecutionConfiguration(
                 datasets=ds_specs,
                 assets=as_specs,
-                workflow=resolved_workflow
-                if isinstance(resolved_workflow, WorkflowClass)
-                else None,
+                workflow=resolved_workflow if isinstance(resolved_workflow, WorkflowClass) else None,
                 description=description or "",
             )
             # If workflow is a RID (not a Workflow or string URL),
             # pass it through the legacy workflow= parameter so
             # Execution.__init__ can raise its own clear error
             # (our job is just assembly, not re-validation).
-            workflow_for_execution = (
-                resolved_workflow
-                if not isinstance(resolved_workflow, WorkflowClass)
-                else None
-            )
+            workflow_for_execution = resolved_workflow if not isinstance(resolved_workflow, WorkflowClass) else None
         else:
             # Config-object form: preserve legacy behaviour.
             workflow_for_execution = resolved_workflow
@@ -261,9 +254,7 @@ class ExecutionMixin:
         # Get execution record from catalog and verify it's an Execution
         resolved = self.resolve_rid(execution_rid)
         if resolved.table.name != "Execution":
-            raise DerivaMLException(
-                f"RID '{execution_rid}' refers to a {resolved.table.name}, not an Execution"
-            )
+            raise DerivaMLException(f"RID '{execution_rid}' refers to a {resolved.table.name}, not an Execution")
 
         execution_data = self._retrieve_rid(execution_rid)
 
@@ -272,12 +263,14 @@ class ExecutionMixin:
         stop_time = None
         if execution_data.get("Start"):
             from datetime import datetime
+
             try:
                 start_time = datetime.fromisoformat(execution_data["Start"].replace("Z", "+00:00"))
             except (ValueError, AttributeError):
                 pass
         if execution_data.get("Stop"):
             from datetime import datetime
+
             try:
                 stop_time = datetime.fromisoformat(execution_data["Stop"].replace("Z", "+00:00"))
             except (ValueError, AttributeError):
@@ -344,14 +337,13 @@ class ExecutionMixin:
         """
         store = self.workspace.execution_state_store()
         rows = store.list_executions(
-            status=status, workflow_rid=workflow_rid,
-            mode=mode, since=since,
+            status=status,
+            workflow_rid=workflow_rid,
+            mode=mode,
+            since=since,
         )
         return [
-            ExecutionSnapshot.from_row(
-                row, **store.count_pending_by_kind(execution_rid=row["rid"])
-            )
-            for row in rows
+            ExecutionSnapshot.from_row(row, **store.count_pending_by_kind(execution_rid=row["rid"])) for row in rows
         ]
 
     def pending_summary(self) -> "WorkspacePendingSummary":
@@ -463,11 +455,13 @@ class ExecutionMixin:
             # as a disagreement). See spec §4.6 step 3.
             if row["sync_pending"]:
                 flush_pending_sync(
-                    store=store, catalog=self.catalog,
+                    store=store,
+                    catalog=self.catalog,
                     execution_rid=execution_rid,
                 )
             reconcile_with_catalog(
-                store=store, catalog=self.catalog,
+                store=store,
+                catalog=self.catalog,
                 execution_rid=execution_rid,
             )
 
@@ -479,19 +473,22 @@ class ExecutionMixin:
 
             try:
                 reconcile_pending_leases(
-                    store=store, catalog=self.catalog,
+                    store=store,
+                    catalog=self.catalog,
                     execution_rid=execution_rid,
                 )
             except Exception as exc:
                 logging.getLogger("deriva_ml").warning(
                     "per-execution lease reconciliation failed for %s (%s); continuing",
-                    execution_rid, exc,
+                    execution_rid,
+                    exc,
                 )
 
         # Construct Execution bound to this DerivaML — it reads lifecycle
         # fields from SQLite via read-through properties (Group E).
         return Execution._from_registry(
-            ml_object=self, execution_rid=execution_rid,
+            ml_object=self,
+            execution_rid=execution_rid,
         )
 
     def gc_executions(
@@ -569,6 +566,7 @@ class ExecutionMixin:
         workflow: "Workflow | RID | None" = None,
         workflow_type: str | None = None,
         status: ExecutionStatus | None = None,
+        sort: SortSpec = None,
     ) -> Iterable["ExecutionRecord"]:
         """Search the live catalog for executions matching the given filters.
 
@@ -585,6 +583,16 @@ class ExecutionMixin:
             workflow: Optional Workflow or RID to filter by.
             workflow_type: Optional workflow type name (e.g., "python_script").
             status: Optional ExecutionStatus to filter by.
+            sort: Optional sort spec.
+                - ``None`` (default): backend-determined order (no sort
+                  clause applied; cheapest path).
+                - ``True``: newest-first by record creation time
+                  (``RCT desc``). Recommended for "show me the most
+                  recent executions" queries.
+                - Callable ``(path) -> sort_keys``: receives the
+                  Execution table path and returns one or more
+                  path-builder sort keys (e.g. ``path.RCT.desc``,
+                  or ``[path.Status, path.RCT.desc]``).
 
         Returns:
             Iterable of live ``ExecutionRecord`` objects.
@@ -592,6 +600,18 @@ class ExecutionMixin:
         Example:
             >>> for record in ml.find_executions(status=ExecutionStatus.Uploaded):  # doctest: +SKIP
             ...     print(record.execution_rid, record.status)
+
+            Newest-first (most common):
+
+            >>> for record in ml.find_executions(sort=True):  # doctest: +SKIP
+            ...     pass
+
+            Custom sort -- group by status, then newest within group:
+
+            >>> for record in ml.find_executions(  # doctest: +SKIP
+            ...     sort=lambda path: [path.Status, path.RCT.desc],
+            ... ):
+            ...     pass
         """
         # Import for type checking
         from deriva_ml.execution.workflow import Workflow as WorkflowClass
@@ -613,8 +633,7 @@ class ExecutionMixin:
         if workflow_type:
             wt_assoc = pb.schemas[self.ml_schema].Workflow_Workflow_Type
             matching_workflow_rids = {
-                row["Workflow"]
-                for row in wt_assoc.filter(wt_assoc.Workflow_Type == workflow_type).entities().fetch()
+                row["Workflow"] for row in wt_assoc.filter(wt_assoc.Workflow_Type == workflow_type).entities().fetch()
             }
             if not matching_workflow_rids:
                 return  # No workflows match this type, so no executions
@@ -622,8 +641,17 @@ class ExecutionMixin:
         if status:
             filtered_path = filtered_path.filter(execution_path.Status == status.value)
 
+        # Resolve sort spec against this method's default (newest-first
+        # by record creation time). resolve_sort returns None when the
+        # caller explicitly opted out of sorting (sort=None), in which
+        # case we don't call .sort() at all -- backend default order.
+        entity_set = filtered_path.entities()
+        sort_keys = resolve_sort(sort, lambda p: p.RCT.desc, execution_path)
+        if sort_keys is not None:
+            entity_set = entity_set.sort(*sort_keys)
+
         # Create ExecutionRecord objects
-        for exec_record in filtered_path.entities().fetch():
+        for exec_record in entity_set.fetch():
             # If filtering by workflow type, check the execution's workflow is in the matching set
             if matching_workflow_rids is not None and exec_record.get("Workflow") not in matching_workflow_rids:
                 continue
@@ -773,6 +801,7 @@ class ExecutionMixin:
             >>> report = job.wait()
         """
         from deriva_ml.execution.upload_job import UploadJob
+
         return UploadJob(
             ml=self,
             execution_rids=execution_rids,

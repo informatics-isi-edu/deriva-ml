@@ -34,6 +34,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLDirtyWorkflowError,
     DerivaMLException,
     DerivaMLInvalidTerm,
+    DerivaMLMaterializeLimitExceeded,
     DerivaMLTableTypeError,
 )
 
@@ -127,6 +128,7 @@ __all__ = [
     # Exceptions
     "DerivaMLException",
     "DerivaMLInvalidTerm",
+    "DerivaMLMaterializeLimitExceeded",
     "DerivaMLTableTypeError",
     # Definitions
     "RID",

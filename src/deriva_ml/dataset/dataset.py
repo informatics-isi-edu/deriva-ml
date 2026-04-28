@@ -532,6 +532,8 @@ class Dataset:
         table: str | Table,
         feature_name: str,
         selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
     ) -> Iterable[FeatureRecord]:
         """Dataset-scoped feature values — identical signature to DerivaML.feature_values.
 
@@ -549,6 +551,15 @@ class Dataset:
             selector: Optional callable ``(list[FeatureRecord]) -> FeatureRecord | None``
                 used to reduce multi-value groups. See ``FeatureRecord`` for built-ins.
                 Return ``None`` from a selector to omit that target RID.
+            materialize_limit: Optional cap on the upstream catalog
+                query's row materialization. Forwarded to
+                ``DerivaML.feature_values``; raises
+                ``DerivaMLMaterializeLimitExceeded`` if exceeded.
+                Default ``None`` preserves unbounded behavior.
+            execution_rids: Optional filter forwarded to the upstream
+                catalog query. When set, only feature rows whose
+                ``Execution`` value is in this list are materialized.
+                Empty list short-circuits to an empty result.
 
         Returns:
             Iterator of ``FeatureRecord`` — filtered to dataset members, then
@@ -557,6 +568,8 @@ class Dataset:
         Raises:
             DerivaMLTableNotFound: ``table`` does not exist.
             DerivaMLException: ``feature_name`` is not a feature on ``table``.
+            DerivaMLMaterializeLimitExceeded: If the upstream
+                materialization exceeds ``materialize_limit``.
 
         Example:
             >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
@@ -567,10 +580,21 @@ class Dataset:
         members = set(self.list_members(table))
         target_col = table if isinstance(table, str) else table.name
 
-        # Filter upstream raw records to dataset members
+        # Filter upstream raw records to dataset members. Forward
+        # materialize_limit and execution_rids to the catalog query so
+        # the upstream materialization is bounded too. The dataset-scope
+        # filter is applied AFTER the catalog query, so the limit check
+        # in the upstream guards us against memory blow-up before we
+        # filter further.
         raw_in_scope = [
             rec
-            for rec in self._ml_instance.feature_values(table, feature_name, selector=None)
+            for rec in self._ml_instance.feature_values(
+                table,
+                feature_name,
+                selector=None,
+                materialize_limit=materialize_limit,
+                execution_rids=execution_rids,
+            )
             if getattr(rec, target_col, None) in members
         ]
 
@@ -1427,9 +1451,7 @@ class Dataset:
         # Batch resolve all RIDs in one query per candidate table instead
         # of one network round-trip per RID. Mirrors the optimization in
         # add_dataset_members.
-        candidate_tables = [
-            self._ml_instance.model.name_to_table(table_name) for table_name in association_map.keys()
-        ]
+        candidate_tables = [self._ml_instance.model.name_to_table(table_name) for table_name in association_map.keys()]
         try:
             rid_results = self._ml_instance.resolve_rids(members, candidate_tables=candidate_tables)
         except DerivaMLException as e:

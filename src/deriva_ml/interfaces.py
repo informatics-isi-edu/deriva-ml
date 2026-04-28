@@ -79,6 +79,7 @@ Table = _ermrest_model.Table
 
 from deriva_ml.core.definitions import RID, VocabularyTerm
 from deriva_ml.core.mixins.rid_resolution import BatchRidResult
+from deriva_ml.core.sort import SortSpec
 from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.model.catalog import DerivaModel
 
@@ -134,6 +135,7 @@ class DatasetLike(Protocol):
         recurse: bool = False,
         _visited: set[RID] | None = None,
         version: Any = None,
+        sort: SortSpec = None,
         **kwargs: Any,
     ) -> list[Self]:
         """Get nested child datasets.
@@ -142,6 +144,13 @@ class DatasetLike(Protocol):
             recurse: Whether to recursively include children of children.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
             version: Dataset version to list children from (Dataset only, ignored by DatasetBag).
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                the method's default. A callable receives the path-builder
+                context and returns sort keys. Currently reserved for
+                forward-compat — concrete ``Dataset`` and ``DatasetBag``
+                implementations may ignore this parameter (it is accepted
+                via ``**kwargs``).
             **kwargs: Additional implementation-specific arguments.
 
         Returns:
@@ -158,6 +167,7 @@ class DatasetLike(Protocol):
         recurse: bool = False,
         _visited: set[RID] | None = None,
         version: Any = None,
+        sort: SortSpec = None,
         **kwargs: Any,
     ) -> list[Self]:
         """Get parent datasets that contain this dataset.
@@ -166,6 +176,13 @@ class DatasetLike(Protocol):
             recurse: Whether to recursively include parents of parents.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
             version: Dataset version to list parents from (Dataset only, ignored by DatasetBag).
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                the method's default. A callable receives the path-builder
+                context and returns sort keys. Currently reserved for
+                forward-compat — concrete ``Dataset`` and ``DatasetBag``
+                implementations may ignore this parameter (it is accepted
+                via ``**kwargs``).
             **kwargs: Additional implementation-specific arguments.
 
         Returns:
@@ -183,6 +200,7 @@ class DatasetLike(Protocol):
         limit: int | None = None,
         _visited: set[RID] | None = None,
         version: Any = None,
+        sort: SortSpec = None,
         **kwargs: Any,
     ) -> dict[str, list[dict[str, Any]]]:
         """List members of the dataset.
@@ -192,6 +210,13 @@ class DatasetLike(Protocol):
             limit: Maximum number of members per type. None for no limit.
             _visited: Internal parameter to track visited datasets and prevent infinite recursion.
             version: Dataset version to list members from (Dataset only, ignored by DatasetBag).
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                the method's default. A callable receives the path-builder
+                context and returns sort keys. Currently reserved for
+                forward-compat — concrete ``Dataset`` and ``DatasetBag``
+                implementations may ignore this parameter (it is accepted
+                via ``**kwargs``).
             **kwargs: Additional implementation-specific arguments.
 
         Returns:
@@ -242,6 +267,8 @@ class DatasetLike(Protocol):
         table: Table | str,
         feature_name: str,
         selector: Any = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
     ) -> Iterable[FeatureRecord]:
         """Yield feature values for a single feature, one record per target RID.
 
@@ -250,12 +277,27 @@ class DatasetLike(Protocol):
             feature_name: Name of the feature to read.
             selector: Optional callable ``(list[FeatureRecord]) -> FeatureRecord | None``
                 used to reduce multi-value groups.
+            materialize_limit: Optional cap on the number of rows that
+                may be materialized into memory. When the catalog query
+                returns more than this many rows, raises
+                ``DerivaMLMaterializeLimitExceeded``. Default ``None``
+                preserves the existing unbounded behavior; callers
+                driving Python directly opt into responsibility for
+                memory management. The ``deriva-ml-mcp`` plugin sets a
+                default to keep MCP responses bounded.
+            execution_rids: Optional filter — when set, only feature
+                rows whose ``Execution`` value is in this list are
+                materialized. Lets callers compare metric values
+                across a known set of executions in a single
+                catalog round-trip rather than N sequential queries.
 
         Returns:
             Iterator of ``FeatureRecord`` instances.
 
         Raises:
             DerivaMLException: If ``feature_name`` is not a feature on ``table``.
+            DerivaMLMaterializeLimitExceeded: If the result set exceeds
+                ``materialize_limit``.
         """
         ...
 
@@ -677,11 +719,15 @@ class DerivaMLCatalogReader(Protocol):
         """
         ...
 
-    def find_datasets(self, deleted: bool = False) -> Iterable[DatasetLike]:
+    def find_datasets(self, deleted: bool = False, sort: SortSpec = None) -> Iterable[DatasetLike]:
         """Find all datasets in the catalog.
 
         Args:
             deleted: Whether to include deleted datasets.
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                newest-first by record creation time (``RCT desc``). A callable
+                receives the path-builder context and returns one or more sort keys.
 
         Returns:
             Iterable of all datasets.
@@ -763,11 +809,17 @@ class DerivaMLCatalogReader(Protocol):
         """
         ...
 
-    def find_workflows(self) -> Iterable["Workflow"]:
+    def find_workflows(self, sort: SortSpec = None) -> Iterable["Workflow"]:
         """Find all workflows in the catalog.
 
         Returns all workflow definitions, each bound to the catalog for
         potential modification.
+
+        Args:
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                newest-first by record creation time (``RCT desc``). A callable
+                receives the path-builder context and returns one or more sort keys.
 
         Returns:
             Iterable of Workflow objects.
@@ -825,6 +877,7 @@ class DerivaMLCatalogReader(Protocol):
         workflow: "Workflow | RID | None" = None,
         workflow_type: str | None = None,
         status: "ExecutionStatus | None" = None,
+        sort: SortSpec = None,
     ) -> Iterable["ExecutionRecord"]:
         """List all executions in the catalog.
 
@@ -832,6 +885,10 @@ class DerivaMLCatalogReader(Protocol):
             workflow: Optional Workflow object or RID to filter by.
             workflow_type: Optional workflow type name to filter by.
             status: Optional status to filter by.
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                newest-first by record creation time (``RCT desc``). A callable
+                receives the path-builder context and returns one or more sort keys.
 
         Returns:
             Iterable of ExecutionRecord objects.
@@ -955,11 +1012,15 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
         """
         ...
 
-    def find_datasets(self, deleted: bool = False) -> Iterable["Dataset"]:
+    def find_datasets(self, deleted: bool = False, sort: SortSpec = None) -> Iterable["Dataset"]:
         """Find all datasets in the catalog.
 
         Args:
             deleted: Whether to include deleted datasets.
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                newest-first by record creation time (``RCT desc``). A callable
+                receives the path-builder context and returns one or more sort keys.
 
         Returns:
             Iterable of all datasets.

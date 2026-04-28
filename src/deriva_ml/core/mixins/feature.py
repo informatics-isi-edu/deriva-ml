@@ -10,7 +10,9 @@ from __future__ import annotations
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
 from collections import defaultdict
+from functools import reduce
 from itertools import chain
+from operator import or_
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 datapath = importlib.import_module("deriva.core.datapath")
@@ -21,7 +23,7 @@ Table = _ermrest_model.Table
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import ColumnDefinition, VocabularyTerm
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLMaterializeLimitExceeded
 from deriva_ml.feature import Feature, FeatureRecord
 
 if TYPE_CHECKING:
@@ -142,7 +144,7 @@ class FeatureMixin:
             elif isinstance(m, dict):
                 # Already a dict (e.g., from Column.define())
                 return m
-            elif hasattr(m, 'to_dict'):
+            elif hasattr(m, "to_dict"):
                 # ColumnDefinition or similar dataclass
                 return m.to_dict()
             else:
@@ -368,6 +370,8 @@ class FeatureMixin:
         table: Table | str,
         feature_name: str,
         selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
     ) -> Iterable[FeatureRecord]:
         """Yield feature values for a single feature, one record per target RID.
 
@@ -389,7 +393,10 @@ class FeatureMixin:
 
         All rows for the feature are fetched from the catalog before the first
         record is yielded — this method is iterator-shaped for composability,
-        not for streaming of very large feature tables.
+        not for streaming of very large feature tables. When ``execution_rids``
+        is set, the catalog query is filtered server-side to those execution
+        RIDs only -- this is the recommended way to keep the materialization
+        cost bounded for cross-execution comparisons.
 
         Args:
             table: Target table the feature is defined on (name or Table).
@@ -401,6 +408,20 @@ class FeatureMixin:
                 ``FeatureRecord.select_first``, and the factory
                 ``FeatureRecord.select_by_workflow(workflow, container=...)``.
                 Return ``None`` from a selector to omit that target RID.
+            materialize_limit: Optional cap on the number of rows that
+                may be materialized into memory. When the catalog query
+                returns more than this many rows, raises
+                ``DerivaMLMaterializeLimitExceeded``. Default ``None``
+                preserves the existing unbounded behavior; callers
+                driving Python directly opt into responsibility for
+                memory management. The ``deriva-ml-mcp`` plugin sets a
+                default to keep MCP responses bounded.
+            execution_rids: Optional filter -- when set, only feature
+                rows whose ``Execution`` value is in this list are
+                materialized. Lets callers compare metric values
+                across a known set of executions in a single
+                catalog round-trip rather than N sequential queries.
+                Empty list short-circuits to an empty result.
 
         Returns:
             Iterator of ``FeatureRecord`` — one record per target RID after
@@ -409,6 +430,8 @@ class FeatureMixin:
         Raises:
             DerivaMLTableNotFound: ``table`` does not exist.
             DerivaMLException: ``feature_name`` is not a feature on ``table``.
+            DerivaMLMaterializeLimitExceeded: If the result set exceeds
+                ``materialize_limit``.
 
         Example:
             Get the newest Glaucoma label per image::
@@ -441,19 +464,33 @@ class FeatureMixin:
         field_names = set(record_class.model_fields.keys())
         target_col = feat.target_table.name
 
-        # Fetch raw rows via datapath
+        # Fetch raw rows via datapath. Apply execution_rids filter
+        # server-side to avoid materializing rows we'll discard.
+        # Empty list short-circuits to an empty result.
+        if execution_rids is not None and not execution_rids:
+            return
+
         pb = self.pathBuilder()
-        raw_values = (
-            pb.schemas[feat.feature_table.schema.name]
-            .tables[feat.feature_table.name]
-            .entities()
-            .fetch()
-        )
+        feature_path = pb.schemas[feat.feature_table.schema.name].tables[feat.feature_table.name]
+
+        if execution_rids is not None:
+            # Path-builder column wrappers don't expose .in_(); build the
+            # IN-clause as a chained OR of equality predicates instead.
+            predicates = [feature_path.Execution == rid for rid in execution_rids]
+            feature_path = feature_path.filter(reduce(or_, predicates))
+
+        raw_values = list(feature_path.entities().fetch())
+
+        # Enforce the materialize_limit cap before record construction.
+        if materialize_limit is not None and len(raw_values) > materialize_limit:
+            raise DerivaMLMaterializeLimitExceeded(
+                actual_count=len(raw_values),
+                limit=materialize_limit,
+            )
 
         # Materialize to FeatureRecord instances
         records: list[FeatureRecord] = [
-            record_class(**{k: v for k, v in raw.items() if k in field_names})
-            for raw in raw_values
+            record_class(**{k: v for k, v in raw.items() if k in field_names}) for raw in raw_values
         ]
 
         if selector is None:
@@ -572,8 +609,7 @@ class FeatureMixin:
         rids = [r.execution_rid for r in self.find_executions(workflow_type=workflow)]
         if not rids:
             raise DerivaMLException(
-                f"No workflow resolved for '{workflow}' — tried as Workflow RID "
-                f"and Workflow_Type name."
+                f"No workflow resolved for '{workflow}' — tried as Workflow RID and Workflow_Type name."
             )
         return rids
 
