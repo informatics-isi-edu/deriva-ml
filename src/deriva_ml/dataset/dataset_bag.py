@@ -582,6 +582,8 @@ class DatasetBag:
         table: str | Table,
         feature_name: str,
         selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
     ) -> Iterable[FeatureRecord]:
         """Yield offline feature values — same signature as ``DerivaML.feature_values``.
 
@@ -603,6 +605,17 @@ class DatasetBag:
                 drops the target when it returns ``None``). Use
                 ``FeatureRecord.select_newest`` to pick the most-recently created
                 value.
+            materialize_limit: Optional cap on the number of records
+                returned. The bag cache is already populated (bounded
+                by the snapshot), so this check is mainly for API
+                parity with the online ``DerivaML.feature_values``.
+                Raises ``DerivaMLMaterializeLimitExceeded`` when the
+                row count exceeds the limit.
+            execution_rids: Optional filter -- when set, only feature
+                records whose ``Execution`` value is in this list are
+                yielded. Applied Python-side after the cache fetch
+                (the bag cache has no server-side query layer).
+                Empty list short-circuits to no records.
 
         Yields:
             FeatureRecord instances with typed fields matching the feature
@@ -611,6 +624,8 @@ class DatasetBag:
         Raises:
             DerivaMLException: If *feature_name* does not exist on *table*.
             DerivaMLDataError: If the bag is corrupt (source table missing).
+            DerivaMLMaterializeLimitExceeded: If the result set exceeds
+                ``materialize_limit``.
 
         Example:
             >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
@@ -630,6 +645,26 @@ class DatasetBag:
 
         target_col = table if isinstance(table, str) else table.name
         records = list(self._feature_cache.fetch_feature_records(target_col, feature_name))
+
+        # Apply execution_rids filter (Python-side; the bag cache doesn't
+        # have a server-side query layer to push this into). Empty list
+        # short-circuits to an empty result.
+        if execution_rids is not None:
+            if not execution_rids:
+                return
+            execution_rid_set = set(execution_rids)
+            records = [r for r in records if getattr(r, "Execution", None) in execution_rid_set]
+
+        # Enforce materialize_limit cap. Bag-side limit is post-cache-fetch
+        # since the cache is already populated; primary purpose of the
+        # cap here is API parity with the online backend.
+        if materialize_limit is not None and len(records) > materialize_limit:
+            from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+
+            raise DerivaMLMaterializeLimitExceeded(
+                actual_count=len(records),
+                limit=materialize_limit,
+            )
 
         if selector is None:
             yield from records
