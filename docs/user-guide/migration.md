@@ -13,6 +13,9 @@ If you are upgrading from the previously-published deriva-ml version to the post
 | **`Execution.metrics_file()`** | New recommended path for training-metric logs | Additive; replace ad-hoc `asset_file_path()` calls for metrics if you want the cleaner API |
 | **`DatasetBag.as_torch_dataset()` / `as_tf_dataset()`** | New framework adapters | Additive; consider replacing hand-rolled `Dataset` subclasses |
 | **Crash recovery** | `Running → Pending_Upload` is now a legal state transition | Additive; drop the `update_status(Failed)` workaround if you had one |
+| **`find_*(sort=...)`** | `find_executions`, `find_datasets`, `find_workflows` accept an optional `sort` parameter | Additive; existing callers unaffected (default preserves backend order) |
+| **`DerivaMLCatalog` / `DatasetLike` protocols** | Extended with optional `sort=`, `materialize_limit=`, `execution_rids=` kwargs | If you subclass these protocols, accept the new kwargs (or `**kwargs`) so static type-checks still pass |
+| **`DerivaMLMaterializeLimitExceeded`** | New exception class exported from `deriva_ml` | Additive; catch it once you start passing `materialize_limit=` to `feature_values()` |
 
 ## Breaking changes
 
@@ -213,6 +216,70 @@ See [Chapter 5 — Working offline](offline.md#how-to-feed-a-bag-to-a-training-f
 
 `restructure_assets` still exists and is still the right tool when your downstream trainer expects the `ImageFolder` class-folder directory layout (e.g., RetFound fine-tuning scripts). The new adapters and `restructure_assets` share the same `targets` / `target_transform` / `missing` vocabulary (that is the whole point of the D2 rename) — but they are alternatives, not a pipeline.
 
+### Sorted `find_*` results
+
+`find_executions`, `find_datasets`, and `find_workflows` now accept an optional `sort=` keyword. The same three-state spec works on all three:
+
+```python
+# Backend-determined order — existing default, no behavior change.
+all_execs = ml.find_executions()
+
+# Newest-first by record creation time (RCT desc) — recommended for
+# "show me what's new" queries.
+recent = ml.find_executions(sort=True)
+recent_ds = ml.find_datasets(sort=True)
+recent_wfs = ml.find_workflows(sort=True)
+
+# Custom sort — receives the path-builder path and returns one or more
+# sort keys. Useful when you want to sort by a domain column.
+by_name = ml.find_workflows(sort=lambda p: p.Name)
+```
+
+`sort=` defaults to `None`, so existing call sites are unaffected. Pass `True` to opt into the method's documented default (RCT desc). Pass a callable to compose your own ordering using path-builder column expressions.
+
+The shared semantics live in [`deriva_ml.core.sort.resolve_sort`](../api/index.md) (a one-line helper) and the matching `SortSpec` type alias, both available from `deriva_ml.core.sort` if you are writing your own `find_*`-shaped helpers in downstream code.
+
+### Subclasser note: `DerivaMLCatalog` / `DatasetLike` protocols
+
+If you implement `DatasetLike`, `DerivaMLCatalogReader`, or `DerivaMLCatalog` yourself (custom storage backend, mock, test double), the protocol declarations now include three optional kwargs:
+
+- `sort=` (on `find_executions`, `find_datasets`, `find_workflows`, and reserved on `list_dataset_*` for forward-compat)
+- `materialize_limit=` (on `feature_values`)
+- `execution_rids=` (on `feature_values`)
+
+All three default to `None`, so live behavior is unchanged. But strict static type-checking (`mypy --strict` on a `Protocol` `runtime_checkable=True`) will flag your concrete class as no longer conforming if its method signatures don't expose the kwargs. The minimum-effort fix is to add `**kwargs` to your impls, or accept the new kwargs and ignore them.
+
+```python
+# Before — was protocol-conformant.
+class MyCustomCatalog(DerivaMLCatalogReader):
+    def find_executions(self) -> list[Execution]: ...
+
+# After — accept the new kwarg (ignore if you don't use it).
+class MyCustomCatalog(DerivaMLCatalogReader):
+    def find_executions(self, sort=None) -> list[Execution]: ...
+```
+
+### `DerivaMLMaterializeLimitExceeded`
+
+A new exception class is exported from the top-level package:
+
+```python
+from deriva_ml import DerivaMLMaterializeLimitExceeded
+```
+
+It is raised when a query result set would exceed the caller-supplied `materialize_limit=`. The first user-facing call site will be `feature_values(materialize_limit=...)`; the exception class is available now so downstream code can prepare its handler.
+
+```python
+try:
+    rows = ml.feature_values(
+        feature_name="Glaucoma",
+        materialize_limit=10_000,
+    )
+except DerivaMLMaterializeLimitExceeded as e:
+    # Narrow the query (e.g. pass execution_rids=...) or raise the limit.
+    ...
+```
+
 ### Crash recovery
 
 Before, after a hard process crash (OOM, SIGKILL) in the middle of an execution, you had to manually mark the execution `Failed` so `upload_execution_outputs` could proceed:
@@ -264,6 +331,16 @@ The base install remains lean — neither framework is a hard dependency. Librar
 
 A small internal fix: `Workflow.get_dynamic_version()` used to set `os.environ["SETUPTOOLS_USE_DISTUTILS"] = "stdlib"` as a defensive measure for an older setuptools bug. That mutation leaked into every subsequent `subprocess.Popen`, which on Python 3.13 crashed third-party packages (e.g., `fair_identifiers_client`) that still import `distutils.version`. The env mutation is gone. No user action required; noted here because observers may have seen the env var appear process-wide before and wondered why.
 
+### `SchemaORM.__del__` shutdown noise
+
+Short-lived scripts that constructed a `DerivaML` instance and exited used to print a multi-line `Exception ignored in: <function SchemaORM.__del__>` traceback ending in `AttributeError: 'NoneType' object has no attribute '_dispose_registries'`. This was the well-known interpreter-shutdown ordering issue — SQLAlchemy module globals torn down before the finalizer ran. The runtime swallowed it, so nothing actually broke, but the traceback made successful runs look failed. The finalizer now catches and ignores the late-shutdown error explicitly. No user action required; the explicit `dispose()` and context-manager exit paths still raise normally.
+
+### Internal performance fixes (no API change)
+
+Several catalog-load and feature-flush hot paths were rewritten to batch SQLite transactions and HTTP round-trips that previously fired per-row. On a 10K-asset CIFAR-10 load this collapses the wall-clock from ~50 minutes to ~11 minutes. The fixes are internal: no API surface changed for callers. Specific paths affected: lease-token writeback, feature-record staging and flush, upload-engine status callbacks, asset-RID resolution at execution start, `delete_dataset_members`, `find_workflows`, and `_load_hydra_config`.
+
+If you previously worked around the slow asset-load time with shell-side parallelism or chunking, you can drop those workarounds.
+
 ## Finding affected code in your project
 
 Run these greps against your project directory to enumerate call sites that need updates:
@@ -282,6 +359,11 @@ grep -rnE "\.(prefetch_dataset|list_foreign_keys|add_page|user_list|globus_login
 
 # AssetRIDConfig (doc-only break)
 grep -rn "AssetRIDConfig" your_project/ --include="*.py"
+
+# DerivaMLCatalog / DatasetLike subclassers (only relevant if you
+# implement these protocols — the kwargs default to None so live
+# behavior is unchanged, but mypy --strict will flag the protocol gap)
+grep -rnE "class .*\(.*DerivaMLCatalog(Reader)?\)|class .*\(.*DatasetLike\)" your_project/ --include="*.py"
 ```
 
 For known downstream projects in the deriva-ml ecosystem, the sibling-repo grep at the time this guide was written found the following call sites:
@@ -298,7 +380,7 @@ Template maintainers should update the `group_by=` to `targets=` in lockstep wit
 | deriva-ml version | Python | Torch | TensorFlow | Notes |
 |---|---|---|---|---|
 | Previous published release | ≥3.12 | n/a | n/a | Pre-S2 baseline |
-| This release (post-S2) | ≥3.12 | ≥2.0 optional (`[torch]` extra) | ≥2.15 optional (`[tf]` extra) | This migration guide applies |
+| This release (post-S2) | ≥3.12 | ≥2.0 optional (`[torch]` extra) | ≥2.15 optional (`[tf]` extra) | This migration guide applies. Includes the batched-SQLite/HTTP perf fixes (~5× speedup on 10K-asset loads) and the additive `find_*(sort=...)`, `materialize_limit=`, `execution_rids=` kwargs. |
 
 ## Support
 
