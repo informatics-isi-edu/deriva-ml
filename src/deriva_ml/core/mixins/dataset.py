@@ -18,6 +18,7 @@ from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
+from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.dataset.aux_classes import DatasetSpec
 
 if TYPE_CHECKING:
@@ -62,11 +63,20 @@ class DatasetMixin:
         """Get the Dataset table. Must be provided by host class."""
         raise NotImplementedError
 
-    def find_datasets(self, deleted: bool = False) -> Iterable["Dataset"]:
+    def find_datasets(self, deleted: bool = False, sort: SortSpec = None) -> Iterable["Dataset"]:
         """List all datasets in the catalog.
 
         Args:
             deleted: If True, include datasets that have been marked as deleted.
+            sort: Optional sort spec.
+                - ``None`` (default): backend-determined order (no sort
+                  clause applied; cheapest path).
+                - ``True``: newest-first by record creation time
+                  (``RCT desc``). Recommended for "show me the most
+                  recent datasets" queries.
+                - Callable ``(path) -> sort_keys``: receives the
+                  Dataset table path and returns one or more
+                  path-builder sort keys.
 
         Returns:
             Iterable of Dataset objects.
@@ -75,6 +85,10 @@ class DatasetMixin:
             >>> datasets = list(ml.find_datasets())  # doctest: +SKIP
             >>> for ds in datasets:  # doctest: +SKIP
             ...     print(f"{ds.dataset_rid}: {ds.description}")
+
+            Newest-first (most common):
+
+            >>> recent = list(ml.find_datasets(sort=True))  # doctest: +SKIP
         """
         # Import here to avoid circular imports
         from deriva_ml.dataset.dataset import Dataset
@@ -90,9 +104,18 @@ class DatasetMixin:
                 (dataset_path.Deleted == False) | (dataset_path.Deleted == None)  # noqa: E711, E712
             )
 
+        # Resolve sort spec against this method's default (newest-first
+        # by record creation time). resolve_sort returns None when the
+        # caller explicitly opted out of sorting (sort=None), in which
+        # case we don't call .sort() at all -- backend default order.
+        entity_set = filtered_path.entities()
+        sort_keys = resolve_sort(sort, lambda p: p.RCT.desc, dataset_path)
+        if sort_keys is not None:
+            entity_set = entity_set.sort(*sort_keys)
+
         # Create Dataset objects - dataset_types is now a property that fetches from catalog
         datasets = []
-        for dataset in filtered_path.entities().fetch():
+        for dataset in entity_set.fetch():
             datasets.append(
                 Dataset(
                     self,  # type: ignore[arg-type]
