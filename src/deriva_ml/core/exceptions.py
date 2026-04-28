@@ -319,6 +319,37 @@ class DerivaMLValidationError(DerivaMLDataError):
     pass
 
 
+class DerivaMLMaterializeLimitExceeded(DerivaMLValidationError):
+    """Raised when a result set exceeds the caller-supplied ``materialize_limit``.
+
+    Surfaced by helpers (e.g. ``feature_values``) that materialize the
+    full result set into memory before reduction. Callers can either
+    raise the limit, narrow their query (e.g. add an ``execution_rids``
+    filter), or switch to a streaming consumer.
+
+    Attributes:
+        actual_count: The actual size of the result set that triggered
+            the limit.
+        limit: The ``materialize_limit`` the caller passed.
+
+    Example:
+        >>> from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+        >>> exc = DerivaMLMaterializeLimitExceeded(actual_count=1500, limit=1000)
+        >>> exc.actual_count
+        1500
+        >>> "exceeds materialize_limit" in str(exc)
+        True
+    """
+
+    def __init__(self, actual_count: int, limit: int):
+        self.actual_count = actual_count
+        self.limit = limit
+        super().__init__(
+            f"feature_values result set ({actual_count} rows) exceeds materialize_limit ({limit}); "
+            f"narrow the query (e.g. pass execution_rids=...) or raise the limit."
+        )
+
+
 class DerivaMLCycleError(DerivaMLDataError):
     """Exception raised when a cycle is detected in relationships.
 
