@@ -13,6 +13,7 @@ from deriva.core import format_exception
 
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.execution.workflow import Workflow
 
 if TYPE_CHECKING:
@@ -74,12 +75,23 @@ class WorkflowMixin:
             index.setdefault(row["Workflow"], []).append(row["Workflow_Type"])
         return index
 
-    def find_workflows(self) -> list[Workflow]:
+    def find_workflows(self, sort: SortSpec = None) -> list[Workflow]:
         """Find all workflows in the catalog.
 
         Catalog-level operation to find all workflow definitions, including their
         names, URLs, types, versions, and descriptions. Each returned Workflow
         is bound to the catalog, allowing its description to be updated.
+
+        Args:
+            sort: Optional sort spec.
+                - ``None`` (default): backend-determined order (no sort
+                  clause applied; cheapest path).
+                - ``True``: newest-first by record creation time
+                  (``RCT desc``). Recommended for "show me the most
+                  recent workflows" queries.
+                - Callable ``(path) -> sort_keys``: receives the
+                  Workflow table path and returns one or more
+                  path-builder sort keys.
 
         Returns:
             list[Workflow]: List of workflow objects, each containing:
@@ -103,6 +115,10 @@ class WorkflowMixin:
 
                 >>> workflows = ml.find_workflows()
                 >>> workflows[0].description = "Updated description"
+
+            Newest-first (most common)::
+
+                >>> recent = list(ml.find_workflows(sort=True))  # doctest: +SKIP
         """
         # Get a workflow table path and fetch all workflows.
         # Pre-fetch the full Workflow_Workflow_Type table once and index
@@ -110,9 +126,13 @@ class WorkflowMixin:
         # workflow — that 1+N pattern dominated find_workflows on
         # catalogs with hundreds of workflows.
         workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
+        entity_set = workflow_path.entities()
+        sort_keys = resolve_sort(sort, lambda p: p.RCT.desc, workflow_path)
+        if sort_keys is not None:
+            entity_set = entity_set.sort(*sort_keys)
         types_index = self._get_workflow_types_index()
         workflows = []
-        for w in workflow_path.entities().fetch():
+        for w in entity_set.fetch():
             workflow = Workflow(
                 name=w["Name"],
                 url=w["URL"],
